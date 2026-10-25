@@ -57,7 +57,7 @@ def audit_source(path):
     return {'ok':True,'kind':'source','license':'MIT','members':len(files),'sha256':hashlib.sha256(Path(path).read_bytes()).hexdigest()}
 
 
-def audit_windows(path,source,downloads):
+def audit_windows(path,source,downloads,*,cores=None):
     from tools.package_windows import PINS,runtime_members,generated_root_files
     from romancer import ROMANCER_VERSION,ROMANCER_RELEASE_NAME,ROMANCER_BUILD_LABEL
     with zipfile.ZipFile(source) as archive:source_files=_members(archive,limit=MAX_MEMBER_BYTES)
@@ -65,9 +65,12 @@ def audit_windows(path,source,downloads):
     with zipfile.ZipFile(path) as archive:files=_members(archive,limit=64*1024**2)
     if 'BUNDLE.json' not in files:raise ValueError('missing Windows manifest')
     manifest=json.loads(files['BUNDLE.json']);rows={}
+    from romancer.bundled_cores import CORE_PINS,core_members
+    engines=core_members(cores) if cores is not None else {}
     identity={'schema_version':1,'product':'ROMancer','version':ROMANCER_VERSION,
               'release_name':ROMANCER_RELEASE_NAME,'build_label':ROMANCER_BUILD_LABEL,
-              'credit':'By RetchEWretched','platform':'windows-amd64','runtime':PINS}
+              'credit':'By RetchEWretched','platform':'windows-amd64','runtime':PINS,
+              'engines':{'included':bool(engines),'systems':CORE_PINS if engines else {}}}
     if (type(manifest) is not dict or set(manifest)!=set(identity)|{'files'}
             or any(manifest.get(k)!=v or type(manifest.get(k)) is not type(v) for k,v in identity.items())
             or type(manifest.get('files')) is not list):raise ValueError('Windows manifest identity differs')
@@ -88,21 +91,22 @@ def audit_windows(path,source,downloads):
         expected.update({prefix+name:raw for name,raw in runtime_members(Path(downloads)/pin['file'],pin['sha256'],kind)})
     expected['python/python314._pth']=b'python314.zip\n.\nLib/site-packages\n../app\n'
     expected['LICENSE']=source_files['LICENSE'];expected.update(generated_root_files(readme=source_files['README.txt']))
+    expected.update({'cores/'+name:raw for name,raw in engines.items()})
     if set(files)!=set(expected)|{'BUNDLE.json'}:raise ValueError('Windows package contains unexpected or missing files')
     for name,raw in expected.items():
         if files[name]!=raw:raise ValueError('Windows pinned/source bytes differ: '+name)
     if json.loads(files['RUNTIME-ORIGINS.json'])!=PINS or manifest.get('runtime')!=PINS:raise ValueError('runtime origin metadata differs')
     required=['python/LICENSE.txt','python/Lib/site-packages/pillow-12.3.0.dist-info/licenses/LICENSE']
     if any(name not in files for name in required):raise ValueError('missing runtime notices')
-    return {'ok':True,'kind':'windows','version':manifest['version'],'members':len(files),'pinned_runtime_verified':True,'sha256':hashlib.sha256(Path(path).read_bytes()).hexdigest()}
+    return {'ok':True,'kind':'windows','version':manifest['version'],'members':len(files),'pinned_runtime_verified':True,'engines_bundled':bool(engines),'sha256':hashlib.sha256(Path(path).read_bytes()).hexdigest()}
 
 
 def main():
-    parser=argparse.ArgumentParser();parser.add_argument('--source',type=Path,required=True);parser.add_argument('--windows',type=Path);parser.add_argument('--downloads',type=Path);args=parser.parse_args()
+    parser=argparse.ArgumentParser();parser.add_argument('--source',type=Path,required=True);parser.add_argument('--windows',type=Path);parser.add_argument('--downloads',type=Path);parser.add_argument('--cores',type=Path);args=parser.parse_args()
     print(json.dumps(audit_source(args.source)))
     if args.windows:
         if not args.downloads:parser.error('--downloads is required to audit pinned Windows runtime bytes')
-        print(json.dumps(audit_windows(args.windows,args.source,args.downloads)))
+        print(json.dumps(audit_windows(args.windows,args.source,args.downloads,cores=args.cores)))
 
 
 if __name__=='__main__':main()

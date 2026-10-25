@@ -149,6 +149,8 @@ class Workspace:
         if type(options) is not dict:options=self._effective_core_options
         value={'core_sha256':self.core_hash,'game_sha256':self.game_hash,'core_options':options,
                'system_files':self._system_files,'game_dependencies':self._content_dependencies}
+        devices=getattr(self,'_controller_devices',{})
+        if devices:value['controller_devices']=devices
         return hashlib.sha256(json.dumps(value,sort_keys=True,separators=(',',':')).encode('utf-8')).hexdigest()
 
     def _binding(self):
@@ -161,7 +163,7 @@ class Workspace:
         if self.frontend is not None or self.session is not None:
             raise ValueError('use a fresh worker for another load attempt')
         allowed = {'core', 'game', 'expected_core_sha256', 'expected_game_sha256',
-                   'session_dir', 'system_dir', 'core_options', 'game_save', 'game_dependencies', 'system_files'}
+                   'session_dir', 'system_dir', 'core_options', 'game_save', 'game_dependencies', 'system_files','controller_devices'}
         if set(parameters) - allowed:
             raise ValueError('unknown load parameter')
         core = Path(_text(parameters.get('core'), 'core')).resolve()
@@ -174,6 +176,8 @@ class Workspace:
                 raise ValueError('linked session parent is not permitted')
         session = session.resolve()
         options = parameters.get('core_options', {})
+        from .controller_devices import validate_devices
+        devices=validate_devices(parameters.get('controller_devices',{}))
         if (type(options) is not dict or len(options) > 128 or any(
                 type(k) is not str or type(v) is not str or not k or len(k) > 256 or len(v) > 1024
                 or '\x00' in k or '\x00' in v for k, v in options.items())):
@@ -270,7 +274,7 @@ class Workspace:
         if seed is not None:
             _publish(save_dir / (snapshot_game.stem + '.srm'), seed)
         frontend = LibretroFrontend(snapshot_core, system_dir=system, save_dir=save_dir,
-                                    assets_dir=session / 'assets', core_options=options)
+                                    assets_dir=session / 'assets', core_options=options,controller_devices=devices)
         try:
             loaded = frontend.load_game(snapshot_game)
             seed_verification = frontend.verify_save_seed(seed) if seed is not None else None
@@ -283,6 +287,7 @@ class Workspace:
             self.run_mode = 'game_save_continuation'
             self.provenance = provenance
         self.frontend = frontend
+        self._controller_devices=dict(devices)
         self._memory_session_id = secrets.token_hex(16)
         self._effective_core_options = dict(loaded.get('core_options', {}))
         return {'ok': True, 'loaded': loaded, 'av': av, 'save_seed_verification':seed_verification, **self._binding(),

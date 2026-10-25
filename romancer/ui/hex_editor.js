@@ -1,4 +1,4 @@
-import {esc,button,field,select,read,badge} from './common.js';
+import {esc,button,field,select,read,badge,setUnavailable} from './common.js';
 import {selectionKey} from './tool_inputs.js';
 
 export class HexDraft{
@@ -8,14 +8,27 @@ export class HexDraft{
  edits(state){if(this.scope!==selectionKey(state))throw Error('The selection changed. Review bytes for the selected ROM.');return [...this.changes].sort(([a],[b])=>a-b).map(([offset,after])=>({offset,before:this.original.get(offset),after}));}
 }
 const integer=value=>{const n=Number(value);if(!Number.isSafeInteger(n)||n<0)throw Error('Enter a nonnegative decimal or 0x hex offset.');return n;};
+export function serializeHexDraft(state,draft){return JSON.stringify({artifact_id:state.artifact.artifact_id,sha256:state.artifact.sha256,edits:draft.edits(state).map(e=>[e.offset,e.before,e.after])});}
+export function restoreHexDraft(state,data,stored){
+ const draft=new HexDraft(state,data);if(!stored)return draft;
+ const value=JSON.parse(stored);if(value.artifact_id!==state.artifact.artifact_id||value.sha256!==state.artifact.sha256)throw Error('Saved byte edits belong to a different source.');
+ if(!Array.isArray(value.edits)||value.edits.length>16000)throw Error('Saved byte draft exceeds the editing budget.');
+ const seen=new Set();for(const item of value.edits){if(!Array.isArray(item)||item.length!==3)throw Error('Invalid saved byte edit.');const [offset,before,after]=item;
+  if(!Number.isSafeInteger(offset)||offset<0||offset>=state.artifact.size||typeof before!=='string'||typeof after!=='string'||!/^[\da-f]{2}$/i.test(before)||!/^[\da-f]{2}$/i.test(after)||seen.has(offset))throw Error('Invalid saved byte edit.');seen.add(offset);
+  if(draft.original.has(offset)&&draft.original.get(offset)!==before.toLowerCase())throw Error('Saved original byte no longer matches this source.');
+  if(before.toLowerCase()!==after.toLowerCase()){draft.original.set(offset,before.toLowerCase());draft.changes.set(offset,after.toLowerCase());}
+ }return draft;
+}
 export function hexEditor(ctx,data){
- const {state}=ctx;if(data.artifact_id!==state.artifact?.artifact_id||data.sha256!==state.artifact?.sha256)throw Error('The selected ROM changed. Load bytes for the current selection.');const ticket=selectionKey(state);if(state.hexDraft?.scope!==ticket)state.hexDraft=new HexDraft(state,data);else state.hexDraft.load(data);
+ const {state}=ctx;if(data.artifact_id!==state.artifact?.artifact_id||data.sha256!==state.artifact?.sha256)throw Error('The selected ROM changed. Load bytes for the current selection.');const ticket=selectionKey(state);let draftError='';if(state.hexDraft?.scope!==ticket){try{state.hexDraft=restoreHexDraft(state,data,ctx.draft('hex-changes',null));}catch(error){draftError=error.message;state.hexDraft=null;}}else state.hexDraft.load(data);
+ if(draftError){ctx.use({'hex-discard-invalid':()=>{ctx.setDraft('hex-changes',null);state.hexDraft=null;return ctx.render();}});return `<section class="card"><h3>Saved byte edits need attention</h3><p class="notice warm">${esc(draftError)}</p><p>Your ROM is unchanged. Discard this saved draft to reopen the editor.</p>${button('Discard invalid byte draft','hex-discard-invalid')}</section>`;}
+ if(Number.isSafeInteger(state.resumeHexSelection)&&state.resumeHexSelection>=data.offset&&state.resumeHexSelection<data.offset+data.length){state.hexDraft.selected=state.resumeHexSelection;delete state.resumeHexSelection;}
  const draft=state.hexDraft,current=()=>selectionKey(state)===ticket;
  const scoped=async(op,p)=>{const result=await ctx.run(op,{...ctx.sourceParams(),...p},{render:false});if(!current())throw Error('The selected ROM changed. Repeat this action.');return result;};
  const go=async offset=>{const result=await scoped('resource.inspect',{offset:Math.min(integer(offset),Math.max(0,state.artifact.size-1)),length:256});state.results['resource.inspect']=result;ctx.setDraft('hex-offset',String(result.offset));await ctx.render();};
  ctx.use({
   'hex-go':()=>go(read('hex-offset')),'hex-page':node=>go(Math.max(0,data.offset+Number(node.dataset.id))),
-  'hex-jump':node=>go(node.dataset.id),'hex-clear':()=>{state.hexDraft=new HexDraft(state,data);state.hexReview=null;return ctx.render();},
+  'hex-jump':node=>go(node.dataset.id),'hex-clear':()=>{state.hexDraft=new HexDraft(state,data);ctx.setDraft('hex-changes',serializeHexDraft(state,state.hexDraft));state.hexReview=null;return ctx.render();},
   'hex-search':async()=>{state.hexSearch={scope:ticket,result:await scoped('hex.search',{kind:read('hex-search-kind'),query:read('hex-search-query'),start:integer(read('hex-search-start')),endian:read('hex-endian'),width:Number(read('hex-width')),signed:read('hex-signed')==='true'})};await ctx.render();},
   'hex-search-more':async()=>{const next=state.hexSearch?.result?.next_start;if(next===null||next===undefined)return;ctx.setDraft('hex-search-start',String(next));await ctx.render();},
   'hex-explain':async()=>{state.hexExplanation={scope:ticket,result:await scoped('resources.explain',{offset:draft.selected})};return ctx.render();},
@@ -27,7 +40,7 @@ export function hexEditor(ctx,data){
    const plan=await scoped(source.system_id?'systems.plan_edits':'bytes.plan',{edits});
    if(JSON.stringify(draft.edits(state))!==signature)throw Error('Bytes changed during review. Review them again.');state.hexReview={scope:ticket,signature,plan};await ctx.render();},
   'hex-apply':async()=>{const reviewed=state.hexReview;if(reviewed?.scope!==ticket||reviewed.signature!==JSON.stringify(draft.edits(state)))throw Error('Review the current byte edits first.');
-   const built=await ctx.run('build.apply',{...ctx.projectParams(),plan_id:reviewed.plan.plan_id},{render:false});if(!current())return;if(state.hexReview!==reviewed||JSON.stringify(draft.edits(state))!==reviewed.signature){ctx.notify('Build created. Your newer byte edits are still staged.');return;}state.hexReview=null;state.hexDraft=null;await ctx.refreshProject();await ctx.setArtifact(built.artifact_id);ctx.notify('Separate build created.');await ctx.navigate('overview');}
+   const built=await ctx.run('build.apply',{...ctx.projectParams(),plan_id:reviewed.plan.plan_id},{render:false});if(!current())return;if(state.hexReview!==reviewed||JSON.stringify(draft.edits(state))!==reviewed.signature){ctx.notify('Build created. Your newer byte edits are still staged.');return;}state.hexReview=null;ctx.setDraft('hex-changes',JSON.stringify({artifact_id:state.artifact.artifact_id,sha256:state.artifact.sha256,edits:[]}));state.hexDraft=null;await ctx.refreshProject();await ctx.setArtifact(built.artifact_id);ctx.notify('Separate build created.');await ctx.navigate('overview');}
  });
  const bytes=data.hex.match(/../g)||[],search=state.hexSearch?.scope===ticket?state.hexSearch.result:null,numbers=state.hexNumbers?.scope===ticket?state.hexNumbers.result:null,marks=state.hexBookmarks?.scope===ticket?state.hexBookmarks.result:null;
  const reviewed=state.hexReview?.scope===ticket&&state.hexReview.signature===JSON.stringify(draft.edits(state));
@@ -52,8 +65,8 @@ export function mountHexEditor(ctx){
  const root=document.getElementById('hex-editor');if(!root)return;const draft=ctx.state.hexDraft;
  root.querySelectorAll('[data-hex-offset]').forEach(node=>{
   node.addEventListener('focus',()=>{draft.selected=Number(node.dataset.hexOffset);const label=root.querySelector('#hex-selected');if(label)label.textContent='0x'+draft.selected.toString(16);node.select();});
-  node.addEventListener('input',()=>{ctx.state.hexReview=null;root.querySelector('[data-action="hex-apply"]').disabled=true;
-   try{draft.set(Number(node.dataset.hexOffset),node.value);node.setCustomValidity('');node.classList.toggle('changed',draft.changes.has(Number(node.dataset.hexOffset)));root.querySelector('[data-action="hex-review"]').disabled=!draft.changes.size;root.querySelector('[data-action="hex-clear"]').disabled=!draft.changes.size;}catch(error){node.setCustomValidity(error.message);}});
+  node.addEventListener('input',()=>{ctx.state.hexReview=null;setUnavailable(root.querySelector('[data-action="hex-apply"]'),true);
+   try{draft.set(Number(node.dataset.hexOffset),node.value);ctx.setDraft('hex-changes',serializeHexDraft(ctx.state,draft));node.setCustomValidity('');node.classList.toggle('changed',draft.changes.has(Number(node.dataset.hexOffset)));setUnavailable(root.querySelector('[data-action="hex-review"]'),!draft.changes.size);setUnavailable(root.querySelector('[data-action="hex-clear"]'),!draft.changes.size);}catch(error){node.setCustomValidity(error.message);}});
   node.addEventListener('blur',()=>{if(!node.checkValidity()){node.reportValidity();node.value=draft.changes.get(Number(node.dataset.hexOffset))||draft.original.get(Number(node.dataset.hexOffset));node.setCustomValidity('');}});
   node.addEventListener('keydown',event=>{const delta={ArrowLeft:-1,ArrowRight:1,ArrowUp:-16,ArrowDown:16}[event.key];if(delta){const next=root.querySelector(`[data-hex-offset="${Number(node.dataset.hexOffset)+delta}"]`);if(next){event.preventDefault();next.focus();}}});
  });

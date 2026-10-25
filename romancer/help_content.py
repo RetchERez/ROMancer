@@ -108,9 +108,9 @@ TOPICS=(
         'Choose the edited decoded build and review recompression into its original parent.',
         'The new stream must fit the confirmed allocation. ROMancer refuses growth that would overwrite neighboring data.',
         'Reinsertion independently decodes the result and compares every decoded byte. Unknown formats stay read-only.'], 'GBA lz77 lz10 rle extract reinsert allocation'),
-    _topic('playtest','Playtest a source or build','Use a matching local emulator core and saved system setup.',[
+    _topic('playtest','Playtest a source or build','Use the included engine or a matching saved setup.',[
         'Choose the source or build in the top bar and open Playtest.',
-        'Use saved setup or find a compatible locally installed core. A Windows app needs a Windows x64 core.',
+        'The full Windows release selects its included engine automatically. Choose Load game, then Play; custom cores are available in Advanced setup.',
         'Choose Load game, then Play. Focus the controller area for saved keys or a connected gamepad. Test sound checks local audio output.',
         'Pause before inspecting a frame or restoring a state. A state is tied to the exact core, content, options and system files.',
         'If a required core or BIOS is missing, open System setup and choose its local location. No AI service is used.'], 'audio sound controller keyboard gamepad core DLL BIOS save state muted'),
@@ -160,7 +160,7 @@ TOPICS=(
         'Editing, help, recipes, patch verification and configured native playtests run locally.',
         'No account, API key, subscription or model service is required.',
         'Playtest requires compatible local emulator components and any system files that component needs.',
-        'The public ROMancer package excludes game images, BIOS files and private cores. Optional external data sources are not needed for the core workflow.'], 'privacy AI network internet account'),
+        'The full Windows release includes credited open-source engines and their source/licenses. Game images, user firmware dumps and private data are excluded. Optional external services are not required.'], 'privacy AI network internet account'),
     _topic('nes','NES system notes','Validated cartridge regions and stored CHR graphics.',[
         'iNES/NES2.0 headers describe PRG and CHR extents. A trainer changes the data offsets.',
         'Stored CHR-ROM uses planar2bpp tiles. CHR-RAM graphics are loaded by game code and are not a stored CHR-ROM region.',

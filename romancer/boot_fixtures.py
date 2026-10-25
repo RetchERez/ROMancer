@@ -24,7 +24,9 @@ def make_boot_fixture(system):
     if system=='genesis':
         data[:8]=bytes.fromhex('00ff000000000200');data[0x100:0x110]=b'SEGA MEGA DRIVE '
         data[0x150:0x180]=b'ROMANCER ORIGINAL BOOT'.ljust(48,b' ');data[0x1a4:0x1a8]=(len(data)-1).to_bytes(4,'big');data[0x1f0:0x1f3]=b'JUE'
-        code=bytearray.fromhex('46fc270023fc5345474100a1400033fc010000a1110033fc010000a11200')
+        # Original hardware without TMSS does not decode A14000. Check the
+        # hardware version before unlocking; the same image then boots on both.
+        code=bytearray.fromhex('46fc2700103900a100010200000f670a23fc5345474100a1400033fc010000a1110033fc010000a11200')
         for word in [0x8004,0x8144,0x8230,0x833c,0x8407,0x856c,0x8700,0x8b00,0x8c81,0x8f02,0x9001]:code+=bytes.fromhex('33fc')+word.to_bytes(2,'big')+bytes.fromhex('00c00004')
         code+=bytes.fromhex('23fcc000000000c0000441f900001000303c000f33d800c0000051c8fff860fe')
         data[0x200:0x200+len(code)]=code;data[0x1000:0x1002]=bytes.fromhex('00e0')

@@ -15,11 +15,11 @@ from tools.package_windows import PINS
 MAX_DOWNLOAD=64*1024**2
 
 
-def fetch_pin(directory,pin,*,opener=urlopen):
+def fetch_pin(directory,pin,*,opener=urlopen,allowed_hosts=('www.python.org','files.pythonhosted.org')):
     name=pin['file'];url=urlsplit(pin['url'])
     if (type(name) is not str or Path(name).name!=name or '/' in name or '\\' in name or ':' in name
             or not re.fullmatch('[0-9a-f]{64}',pin['sha256']) or url.scheme!='https'
-            or url.hostname not in ('www.python.org','files.pythonhosted.org') or url.username or url.password):
+            or url.hostname not in allowed_hosts or url.username or url.password):
         raise ValueError('unsafe runtime name, URL or hash')
     directory=Path(directory).absolute()
     if any(p.is_symlink() or p.is_junction() for p in (directory,*directory.parents)):raise ValueError('linked runtime cache is not supported')

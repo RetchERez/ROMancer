@@ -1,0 +1,31 @@
+import assert from 'node:assert/strict';
+import {DraftQueue} from '../romancer/ui/project_flow.js';
+import {saveStatus,guardClose,artifactStatus,hasStagedChanges} from '../romancer/ui/workspace_status.js';
+import {button} from '../romancer/ui/common.js';
+
+let resolve,fail=true,attempts=0;const notices=[];
+const queue=new DraftQueue(()=>notices.push(queue.snapshot().state));
+assert.equal(saveStatus(queue.snapshot()).label,'Saved');
+queue.enqueue('p:a:edit',()=>new Promise(r=>resolve=r),()=>{});
+assert.equal(saveStatus(queue.snapshot()).label,'Saving…');
+const event={preventDefault(){this.prevented=true;}};guardClose(event,queue);assert.equal(event.prevented,true);assert.equal(event.returnValue,'');
+await Promise.resolve();resolve();await queue.flush();assert.equal(queue.snapshot().unsafe,false);
+const savedEvent={preventDefault(){throw Error('Saved work must not block close');}};guardClose(savedEvent,queue);
+queue.enqueue('p:a:edit',async()=>{attempts++;if(fail)throw Error('disk full');},()=>{});
+await assert.rejects(queue.flush(),/not saved/i);assert.equal(saveStatus(queue.snapshot()).label,'Save failed');
+fail=false;await queue.retry();assert.equal(attempts,2);assert.equal(queue.snapshot().unsafe,false);assert.ok(notices.includes('saving')&&notices.includes('failed')&&notices.includes('saved'));
+
+assert.equal(artifactStatus({kind:'source'}).label,'Original');assert.equal(artifactStatus({kind:'build'}).label,'Build');
+const state={project:{project_id:'p'},artifact:{artifact_id:'a'},drafts:{},results:{}};
+assert.equal(hasStagedChanges(state),false);
+state.drafts['p:a:resources:hex-offset']='256';assert.equal(hasStagedChanges(state),false,'navigation fields are not ROM edits');
+state.drafts['p:a:assets:doc:asset-changes']=JSON.stringify([{kind:'palette',before:{r:0},after:{r:1}}]);assert.equal(hasStagedChanges(state),true);
+state.drafts['p:a:assets:doc:asset-changes']='[]';assert.equal(hasStagedChanges(state),false);
+state.gameVisualModel={model:{fields:[{id:'lives',value:3}]}};state.drafts['p:a:overview:game-lives']='8';assert.equal(hasStagedChanges(state),true);
+state.drafts['p:a:overview:game-lives']='3';assert.equal(hasStagedChanges(state),false);
+state.drafts['p:other:assets:asset-changes']='[{}]';assert.equal(hasStagedChanges(state),false,'other sources do not mark this file staged');
+state.hexDraft={changes:new Map(),edits:()=>[]};assert.equal(hasStagedChanges(state),false,'an empty hex editor is not staged');
+const unavailable=button('Create build','asset-build',{disabled:true,reason:'Review <this> source first.'});
+assert.match(unavailable,/aria-describedby="unavailable-/);assert.match(unavailable,/Review &lt;this&gt; source first\./);assert.match(unavailable,/tabindex="0"/);
+assert.doesNotMatch(button('Create build','asset-build'),/unavailable-reason/);
+console.log('Saving, failure/retry, pending-close protection and exact source/build/draft labels passed.');

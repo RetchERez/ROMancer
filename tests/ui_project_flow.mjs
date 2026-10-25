@@ -42,6 +42,13 @@ const appSource=await (await import('node:fs/promises')).readFile(new URL('../ro
 const closeSource=appSource.slice(appSource.indexOf('async function closeProject()'),appSource.indexOf('\nasync function navigate(',appSource.indexOf('async function closeProject()')));
 const transitionState={project:{project_id:'p'},artifact:{artifact_id:'a'},runtime:{},drafts:{}};
 const transitionWrites=new flow.DraftQueue();
-const closing=new Function('state','stopPlayback','flushDrafts','api','clearProjectState','clearDraftCache','removePreference','render',closeSource+';return closeProject;')(transitionState,()=>{},()=>transitionWrites.flush(),{call:async()=>{transitionState.drafts.late='painted while closing';transitionWrites.enqueue('late',async()=>{throw Error('disk full');},()=>{});}},flow.clearProjectState,()=>{transitionWrites.clear();transitionState.drafts={};},()=>{},async()=>{});
+const closing=new Function('state','stopPlayback','flushDrafts','api','clearProjectState','clearDraftCache','removePreference','render','rememberLocation',closeSource+';return closeProject;')(transitionState,()=>{},()=>transitionWrites.flush(),{call:async()=>{transitionState.drafts.late='painted while closing';transitionWrites.enqueue('late',async()=>{throw Error('disk full');},()=>{});}},flow.clearProjectState,()=>{transitionWrites.clear();transitionState.drafts={};},()=>{},async()=>{},()=>{});
 await assert.rejects(closing(),/not saved|unsaved/i);
 assert.equal(transitionState.project.project_id,'p');assert.equal(transitionState.drafts.late,'painted while closing');
+
+// Undo must reconcile the live byte buffer as well as the stored draft value.
+const moveSource=appSource.slice(appSource.indexOf('async function moveDraft('),appSource.indexOf('\nconst ctx=',appSource.indexOf('async function moveDraft(')));
+const hexState={drafts:{},hexDraft:{changes:new Map([[1,'58']])},hexReview:{signature:'reviewed'},pending:{}};
+const full='p:a:resources:hex-changes',revisions=new Map([[full,{revision:1}]]);
+const moving=new Function('state','flushDrafts','lastDraft','draftRevisions','api','render',moveSource+';return moveDraft;')(hexState,async()=>{},{project_id:'p',artifact_id:'a',key:'resources:hex-changes',full},revisions,{call:async()=>({revision:2,value:null})},async()=>{});
+await moving('undo');assert.equal(hexState.hexDraft,null);assert.equal(hexState.hexReview,null);assert.equal(hexState.drafts[full],null);

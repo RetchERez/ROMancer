@@ -15,7 +15,23 @@ The BPS format was designed by byuu. Its public-domain specification is referenc
 at https://floating.muncher.se/byuu/bps/bps_spec.html. ROMancer's encoder and decoder
 are implemented locally; no external patching executable is bundled.
 
-Emulator cores, system files, games, saves and commercial artwork are not included.
-Any separately supplied emulator core retains its own license and notices.
+The full Windows release includes separately licensed FCEUmm, bsnes-mercury Balanced,
+BlastEm, Gambatte and mGBA engines. Their licenses, original notices, source commits,
+DLL hashes and corresponding-source archive are retained under cores/. The engines
+are third-party code; ROMancer does not claim authorship or relicense them as MIT.
+ROMancer's MIT grant applies to its own project code. The runtime worker source and
+bridge are included in the ROMancer source package. Redistribute the corresponding
+source and component notices alongside the engine binaries.
+
+The source-only archive contains ROMancer code and engine metadata/build recipes;
+it does not embed upstream emulator implementations. The separate engine pack includes
+its complete Windows libretro build inputs, documented CRT compatibility patch and
+compiler runtime notices. Games, user saves, commercial artwork and separately
+supplied firmware dumps are not bundled. Custom engines retain their own terms.
 The harbor demonstration, vector marks and fixture content are original to this
 ROMancer continuation. Browser fonts use the operating system's font stack.
+
+The Windows setup executable uses NSIS 3.13 (zlib installer compression).
+Its original component licenses are retained in app/NSIS-LICENSE.txt and the
+source-only package. NSIS is credited third-party code, not part of ROMancer's
+MIT authorship claim. The build uses a pinned official compiler archive.

@@ -48,7 +48,7 @@ def preflight_load(load,base,*,allow_game_save=False):
     else:load=snapshot_json(load)
     base=Path(base).absolute()
     required={'core','game','expected_core_sha256','expected_game_sha256','session_dir'}
-    allowed=required|{'system_dir','core_options','game_dependencies','system_files'}|({'game_save'} if allow_game_save else set())
+    allowed=required|{'system_dir','core_options','game_dependencies','system_files','controller_devices'}|({'game_save'} if allow_game_save else set())
     if type(load) is not dict or not required<=set(load) or set(load)-allowed:raise ValueError('invalid worker load fields')
     for name in ('core','game','session_dir','system_dir'):
         if name in load and load[name] is not None:
@@ -71,6 +71,8 @@ def preflight_load(load,base,*,allow_game_save=False):
         if not system.is_dir() or system==session or system in session.parents or session in system.parents:
             raise ValueError('system directory must exist separately from the session')
     options=load.get('core_options',{})
+    from .controller_devices import validate_devices
+    validate_devices(load.get('controller_devices',{}))
     if (type(options) is not dict or len(options)>128 or any(type(k) is not str or type(v) is not str
             or not k or len(k)>256 or len(v)>1024 or '\x00' in k+v for k,v in options.items())):
         raise ValueError('invalid bounded core options')

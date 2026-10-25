@@ -114,6 +114,22 @@ class VerifiedGameTests(unittest.TestCase):
                 inspected=self.api.dispatch('games.inspect',{**p,'artifact_id':built['artifact_id']})
                 self.assertEqual(inspected['fields'][0]['value'],next(iter(values.values())))
 
+    def test_verified_weapon_table_preserves_the_four_unnamed_record_bytes(self):
+        profile,row=self.other_game('chrono-trigger-usa');p={**self.params,'artifact_id':row['artifact_id']}
+        with patch('romancer.verified_games.PROFILES',(profile,)):
+            model=self.api.dispatch('games.inspect',p)
+            definition=model['resources'][0]['definition']
+            self.assertEqual((definition['offset'],definition['count'],definition['stride']),(0xc0262,90,5))
+            self.assertEqual([f['name'] for f in definition['fields']],['Base attack'])
+            saved=self.api.dispatch('games.configure',{**p,'resource_id':'weapon-power-table'})
+            self.assertTrue(saved['ok'],saved)
+            self.assertEqual(saved['inspection']['rows'][1]['cells'][0]['value'],3)
+            source=projects.artifact(Path(self.project['path']),row['artifact_id'])
+            self.assertEqual(source['descriptors']['tables']['definition'],definition)
+            from romancer.data_tables import table_edits
+            edits=table_edits(Path(row['path']),row['sha256'],definition,[{'row':1,'field':'Base attack','before':3,'after':7}])
+            self.assertEqual(edits,[{'offset':0xc0267,'before':'03','after':'07'}])
+
     def test_genesis_protects_game_controls_and_includes_visible_integrity_fix(self):
         profile,row=self.other_game('immortal-ue');p={**self.params,'artifact_id':row['artifact_id']}
         with patch('romancer.verified_games.PROFILES',(profile,)):

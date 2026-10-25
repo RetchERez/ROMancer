@@ -16,7 +16,7 @@ from romancer.cd_patch import check_output_paths
 DIRECTORIES = {'romancer', 'examples', 'profiles', 'tests', 'tools', 'knowledge', '.github'}
 ROOT_FILES = {'README.txt', 'run.sh', 'run.ps1', 'Launch ROMancer.cmd',
               'launch.ps1', 'desktop_window.ps1', 'requirements.txt', 'THIRD_PARTY_NOTICES.txt',
-              'LICENSE', '.gitignore', '.gitattributes', '.editorconfig',
+              'LICENSE', 'NSIS-LICENSE.txt', '.gitignore', '.gitattributes', '.editorconfig',
               'package.json', 'package-lock.json'}
 EXCLUDED = {'__pycache__', '.git', '.venv', '.superpowers', 'work_private', 'private',
             'reports', 'evidence', 'saves', 'states', 'bios', 'roms', 'dist',
@@ -31,6 +31,7 @@ APPROVED_FILES = frozenset(ROOT_FILES | {
     for directory, names in {
         '.github': 'workflows/ci.yml',
         'romancer': '''
+            mcp_server.py bundled_cores.py core_pins.py controller_devices.py ui/workspace_status.js ui/workspace_resume.js
             ui/tool_inputs.js ui/patch_controls.js ui/revision_controls.js ui/hex_editor.js ui/build_history.js ui/project_checks.js ui/save_manager.js ui/translation_controls.js ui/visual_controls.js ui/workbench_usability.js
             ui/desktop_entry.js ui/app.bundle.js ui/bundle.json
             rom_health.py ui/rom_health.js
@@ -102,6 +103,7 @@ APPROVED_FILES = frozenset(ROOT_FILES | {
             universal.json visual_novel.json
         ''',
         'tests': '''
+            test_mcp_server.py test_bundled_cores.py test_controller_devices.py test_setup_installer.py ui_controller_choices.mjs ui_workspace_status.mjs ui_workspace_resume.mjs
             test_level_design.py test_studio_tools.py test_value_search.py test_studio_discovery.py test_source_information.py test_release_scope.py ui_level_design.mjs ui_animation_studio.mjs ui_value_finder.mjs ui_edit_previews.mjs ui_game_visuals.mjs ui_visual_live.mjs ui_publish_drafts.mjs ui_audio_preview.mjs
             test_sound_studio.py test_audio_systems.py ui_sound_studio.mjs
             test_graphics_discovery.py ui_graphics_investigation.mjs test_rom_scan.py test_project_lifecycle.py ui_rom_scan.mjs ui_project_manager.mjs ui_sprite_assembly.mjs
@@ -135,6 +137,7 @@ APPROVED_FILES = frozenset(ROOT_FILES | {
             test_systems_cli.py test_system_ui.py
         ''',
         'tools': '''
+            build_cores.py package_cores.py fetch_cores.py package_installer.py fetch_installer.py verify_engines.py
             fetch_runtime.py audit_release.py check_ui.mjs
             build_ui.mjs
             verify_v1.py

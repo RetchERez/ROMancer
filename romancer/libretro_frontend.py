@@ -277,6 +277,7 @@ class LibretroFrontend:
         save_dir: str | Path | None = None,
         assets_dir: str | Path | None = None,
         core_options: dict[str, str] | None = None,
+        controller_devices: dict[str, int] | None = None,
     ):
         self.core_path = str(Path(core_path).resolve())
         if not Path(self.core_path).is_file():
@@ -312,6 +313,9 @@ class LibretroFrontend:
         self._initialized = False
         self._content_path: Path | None = None
         self.input_descriptors: list[dict[str, Any]] = []
+        from .controller_devices import validate_devices
+        self.controller_devices=validate_devices({} if controller_devices is None else controller_devices)
+        self.controller_types=[]
         self._disk_control: RetroDiskControlCallback | None = None
         self._sram_loaded_from: str | None = None
         self._sram_saved_to: str | None = None
@@ -437,7 +441,9 @@ class LibretroFrontend:
             raise LibretroError(f"Core rejected content: {game}")
         self._loaded = True
         self._content_path = game
-        self.lib.retro_set_controller_port_device(0, RETRO_DEVICE_JOYPAD)
+        from .controller_devices import checked_choices
+        for port,device in checked_choices(self.controller_types,self.controller_devices).items():
+            self.lib.retro_set_controller_port_device(int(port),device)
         self._load_save_ram()
         return {
             "loaded": True,
@@ -448,6 +454,8 @@ class LibretroFrontend:
             "pixel_format": PIXEL_FORMAT_NAMES.get(self.pixel_format, str(self.pixel_format)),
             "core_options": dict(sorted(self._core_option_values.items())),
             "input_descriptors": list(self.input_descriptors),
+            "controller_types": self.controller_types,
+            "controller_devices": checked_choices(self.controller_types,self.controller_devices),
             "save_ram_loaded_from": self._sram_loaded_from,
             "disk_control_available": self._disk_control is not None,
         }
@@ -769,8 +777,11 @@ class LibretroFrontend:
                     return False
                 self._disk_control = ctypes.cast(data, ctypes.POINTER(RetroDiskControlCallback))[0]
                 return True
+            if cmd == RETRO_ENVIRONMENT_SET_CONTROLLER_INFO:
+                from .controller_devices import read_controller_info
+                self.controller_types=read_controller_info(data)
+                return True
             if cmd in {
-                RETRO_ENVIRONMENT_SET_CONTROLLER_INFO,
                 RETRO_ENVIRONMENT_SET_MEMORY_MAPS,
                 RETRO_ENVIRONMENT_SET_SUPPORT_ACHIEVEMENTS,
             }:
@@ -871,7 +882,7 @@ class LibretroFrontend:
         return
 
     def _input_state(self, port: int, device: int, index: int, control_id: int) -> int:
-        if int(device) != RETRO_DEVICE_JOYPAD or int(index) != 0:
+        if int(device)&255 != RETRO_DEVICE_JOYPAD or int(index) != 0:
             return 0
         mask = int(self._joypads.get(int(port), 0)) & 0xFFFF
         if int(control_id) == RETRO_DEVICE_ID_JOYPAD_MASK:

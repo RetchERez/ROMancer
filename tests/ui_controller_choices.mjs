@@ -1,0 +1,15 @@
+import assert from 'node:assert/strict';
+import {padForSelection,controllerButtons} from '../romancer/ui/playback_controls.js';
+import {runtimeSetup} from '../romancer/ui/runtime_setup.js';
+const first={index:0,connected:true,buttons:[]},second={index:2,connected:true,buttons:[{pressed:true}]};
+assert.equal(padForSelection([null,first,second],-1),first);
+assert.equal(padForSelection([first,second],2),second);
+assert.equal(padForSelection([first,second],-2),null);
+assert.equal(padForSelection([first],2),null,'A disconnected selected pad must not switch to another controller.');
+assert.deepEqual(controllerButtons(padForSelection([first,second],2)),['b']);
+const profile={core:'included.dll',options:{},input_map:{}};
+const state={artifact:{system_id:'nes'},project:{},results:{}};
+const html=await runtimeSetup({state,api:{call:async op=>op==='profiles.get'?{profile,engine:'FCEUmm'}:{ok:true}},use:()=>{},draft:(_k,f)=>f});
+assert.match(html,/FCEUmm included/);assert.doesNotMatch(html,/Find local cores/);
+assert.match(html,/<summary>Advanced options &amp; controller keys<\/summary>|<summary>Advanced options & controller keys<\/summary>/);
+console.log('Bundled engines need no core-path setup; physical pads stay explicitly selected.');

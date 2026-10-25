@@ -1,8 +1,12 @@
 import assert from 'node:assert/strict';
-import {HexDraft,hexEditor} from '../romancer/ui/hex_editor.js';
+import {HexDraft,hexEditor,restoreHexDraft,serializeHexDraft} from '../romancer/ui/hex_editor.js';
 const state={project:{project_id:'p'},artifact:{artifact_id:'a',sha256:'s',size:3},results:{},drafts:{}};
 const data={artifact_id:'a',sha256:'s',offset:0,hex:'616263',length:3};
 const draft=new HexDraft(state,data);draft.set(1,'58');assert.deepEqual(draft.edits(state),[{offset:1,before:'62',after:'58'}]);
+const persisted=serializeHexDraft(state,draft),reopened=restoreHexDraft(state,data,persisted);
+assert.deepEqual(reopened.edits(state),draft.edits(state));
+assert.throws(()=>restoreHexDraft({...state,artifact:{...state.artifact,sha256:'changed'}},data,persisted),/different source/i);
+assert.throws(()=>restoreHexDraft(state,{...data,hex:'61ff63'},persisted),/original byte/i);
 draft.set(1,'62');assert.deepEqual(draft.edits(state),[]);
 assert.throws(()=>draft.set(1,'xxx'),/two/i);assert.throws(()=>draft.set(9,'ff'),/visible/i);
 

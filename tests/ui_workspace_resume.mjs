@@ -1,0 +1,16 @@
+import assert from 'node:assert/strict';
+import {locationSnapshot,restoreLocation,locationKey} from '../romancer/ui/workspace_resume.js';
+const sha='a'.repeat(64),state={project:{project_id:'p'},artifact:{artifact_id:'a',sha256:sha,size:4096},page:'resources',results:{'resource.inspect':{artifact_id:'a',sha256:sha,offset:256}},hexDraft:{selected:299,scope:'p:a:'+sha}};
+const saved=locationSnapshot(state,620);assert.equal(saved.offset,256);assert.equal(saved.selected,299);assert.equal(saved.scroll,620);
+state.hexDraft.scope='other';assert.equal(locationSnapshot(state).selected,256,'a previous source cursor must not enter a new source resume');delete state.hexDraft.scope;
+const fresh={project:state.project,artifact:state.artifact,results:{}};
+assert.equal(restoreLocation(fresh,saved),true);assert.equal(fresh.page,'resources');assert.equal(fresh.resourceJump,256);assert.equal(fresh.resumeHexSelection,299);
+assert.equal(restoreLocation({...fresh,artifact:{...state.artifact,sha256:'b'.repeat(64)}},saved),false);
+assert.equal(restoreLocation(fresh,{...saved,page:'arbitrary-code'}),false);
+assert.equal(restoreLocation(fresh,{...saved,offset:-1}),false);
+assert.equal(restoreLocation(fresh,{...saved,offset:10000}),false);
+assert.equal(restoreLocation(fresh,{...saved,scroll:Infinity}),false);
+assert.notEqual(locationKey(state),locationKey({...state,artifact:{...state.artifact,artifact_id:'other'}}));
+state.page='assets';state.assetPage=3;state.scriptPage=2;state.catalogPage=4;state.catalogQuery='palette';
+const art=locationSnapshot(state,70);const target={project:state.project,artifact:state.artifact,results:{}};assert.equal(restoreLocation(target,art),true);assert.equal(target.assetPage,3);assert.equal(target.catalogQuery,'palette');
+console.log('Exact project/file/hash-bound page, resource offset, cursor and scroll resume passed.');

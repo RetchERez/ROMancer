@@ -32,13 +32,18 @@ export function helpForError(message){
 }
 
 export class DraftQueue {
- constructor(){this.pending=new Map();this.failed=new Map();}
+ constructor(onChange=()=>{}){this.pending=new Map();this.failed=new Map();this.operations=new Map();this.onChange=onChange;}
+ snapshot(){return {pending:this.pending.size,failed:this.failed.size,state:this.failed.size?'failed':this.pending.size?'saving':'saved',unsafe:!!(this.pending.size||this.failed.size)};}
+ changed(){try{this.onChange(this.snapshot());}catch{}}
  enqueue(key,operation,onError){
+  this.operations.set(key,{operation,onError});
   const prior=this.pending.get(key)||Promise.resolve();
-  const next=prior.then(operation).then(()=>this.failed.delete(key)).catch(error=>{this.failed.set(key,error);onError(error);});
+  const next=prior.then(operation).then(()=>this.failed.delete(key)).catch(error=>{this.failed.set(key,error);try{onError(error);}catch{}});
   this.pending.set(key,next);
-  void next.finally(()=>{if(this.pending.get(key)===next)this.pending.delete(key);});
+  this.changed();
+  void next.finally(()=>{if(this.pending.get(key)===next){this.pending.delete(key);if(!this.failed.has(key))this.operations.delete(key);}this.changed();});
  }
+ async retry(){for(const key of this.failed.keys())if(!this.pending.has(key)){const task=this.operations.get(key);if(task)this.enqueue(key,task.operation,task.onError);}await this.flush();}
  async flush(){while(this.pending.size)await Promise.all([...this.pending.values()]);if(this.failed.size)throw Error('Draft not saved. Your unsaved edits are still here. Retry saving before changing source or project.');}
- clear(){if(this.pending.size||this.failed.size)throw Error('Unsaved edits must be saved before clearing drafts.');this.failed.clear();}
+ clear(){if(this.pending.size||this.failed.size)throw Error('Unsaved edits must be saved before clearing drafts.');this.failed.clear();this.operations.clear();this.changed();}
 }

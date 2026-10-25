@@ -101,10 +101,12 @@ def generated_root_files(*,readme=None):
     return files
 
 
-def build_bundle(app_root,downloads,destination):
+def build_bundle(app_root,downloads,destination,*,cores=None):
     from tools.package_source import package
     from romancer import ROMANCER_VERSION,ROMANCER_RELEASE_NAME,ROMANCER_BUILD_LABEL
     app_root=Path(app_root).resolve();downloads=Path(downloads).resolve();destination=Path(destination).absolute()
+    from romancer.bundled_cores import core_members,CORE_PINS
+    engines=core_members(cores) if cores is not None else {}
     if destination.exists():raise ValueError('bundle output already exists')
     destination.parent.mkdir(parents=True,exist_ok=True)
     with tempfile.TemporaryDirectory(prefix='.windows-bundle-',dir=destination.parent) as temp:
@@ -123,16 +125,18 @@ def build_bundle(app_root,downloads,destination):
         from tools.package_source import readme_path
         for name,raw in generated_root_files(readme=readme_path(app_root).read_bytes()).items():(stage/name).write_bytes(raw)
         if (app_root/'LICENSE').is_file():shutil.copyfile(app_root/'LICENSE',stage/'LICENSE')
+        for name,raw in engines.items():
+            target=stage/'cores'/name;target.parent.mkdir(parents=True,exist_ok=True);target.write_bytes(raw)
         rows=[]
         for path in sorted(stage.rglob('*')):
             if path.is_file():
                 with path.open('rb') as stream:sha=hashlib.file_digest(stream,'sha256').hexdigest()
                 rows.append({'path':path.relative_to(stage).as_posix(),'size':path.stat().st_size,'sha256':sha})
-        manifest={'schema_version':1,'product':'ROMancer','version':ROMANCER_VERSION,'release_name':ROMANCER_RELEASE_NAME,'build_label':ROMANCER_BUILD_LABEL,'credit':'By RetchEWretched','platform':'windows-amd64','runtime':PINS,'files':rows}
+        manifest={'schema_version':1,'product':'ROMancer','version':ROMANCER_VERSION,'release_name':ROMANCER_RELEASE_NAME,'build_label':ROMANCER_BUILD_LABEL,'credit':'By RetchEWretched','platform':'windows-amd64','runtime':PINS,'engines':{'included':bool(engines),'systems':CORE_PINS if engines else {}},'files':rows}
         (stage/'BUNDLE.json').write_text(json.dumps(manifest,indent=2)+'\n',encoding='utf-8');verify_tree(stage)
         from romancer.patch_sets import _publish_directory
         _publish_directory(stage,destination)
-    return {'ok':True,'path':str(destination),'version':ROMANCER_VERSION,'members':len(rows),'runtime_bundled':True}
+    return {'ok':True,'path':str(destination),'version':ROMANCER_VERSION,'members':len(rows),'runtime_bundled':True,'engines_bundled':bool(engines)}
 
 
 def package_bundle(bundle,destination):
@@ -154,6 +158,6 @@ def package_bundle(bundle,destination):
 
 
 if __name__=='__main__':
-    parser=argparse.ArgumentParser();parser.add_argument('--app',type=Path,required=True);parser.add_argument('--downloads',type=Path,required=True);parser.add_argument('--output',type=Path,required=True);parser.add_argument('--zip',type=Path);args=parser.parse_args()
-    print(json.dumps(build_bundle(args.app,args.downloads,args.output)))
+    parser=argparse.ArgumentParser();parser.add_argument('--app',type=Path,required=True);parser.add_argument('--downloads',type=Path,required=True);parser.add_argument('--output',type=Path,required=True);parser.add_argument('--zip',type=Path);parser.add_argument('--cores',type=Path,help='Verified engine pack, including corresponding source and licenses');args=parser.parse_args()
+    print(json.dumps(build_bundle(args.app,args.downloads,args.output,cores=args.cores)))
     if args.zip:print(json.dumps(package_bundle(args.output,args.zip)))

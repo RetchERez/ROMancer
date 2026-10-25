@@ -54,38 +54,53 @@ def _options(options,input_map):
     if len(set(input_map.values()))!=len(input_map):raise ValueError('controller keys must be unique')
 
 
-def save_profile(workspace,system_id,core,options,system_dir,input_map):
+def save_profile(workspace,system_id,core,options,system_dir,input_map,*,controller_devices=None):
     if system_id not in SYSTEM_IDS:raise ValueError('unknown system')
     _options(options,input_map);core=checked_path(core);binary=_binary(core)
     system_dir=str(checked_path(system_dir)) if system_dir else None;files=measure_system_files(system_dir)
-    profile={'schema_version':1,'system_id':system_id,'core':str(core),'core_identity':binary,'options':json.loads(canonical_bytes(options,max_bytes=128*1024)),'system_dir':system_dir,'system_files':files,'input_map':dict(input_map)}
-    profile['identity']=_identity(profile)
-    workspace=checked_path(workspace);workspace.mkdir(parents=True,exist_ok=True);path=workspace/'runtime-profiles.json'
+    workspace=checked_path(workspace);path=workspace/'runtime-profiles.json'
     registry=load_script_json(path,max_bytes=1024**2) if path.exists() else {'schema_version':1,'profiles':{}}
+    if controller_devices is None:
+        previous=registry['profiles'].get(system_id,{})
+        if previous.get('core_identity')==binary:controller_devices=previous.get('controller_devices',{})
+    profile={'schema_version':1,'system_id':system_id,'core':str(core),'core_identity':binary,'options':json.loads(canonical_bytes(options,max_bytes=128*1024)),'system_dir':system_dir,'system_files':files,'input_map':dict(input_map)}
+    if controller_devices is not None:
+        from .controller_devices import validate_devices
+        selected=validate_devices(controller_devices)
+        if selected:profile['controller_devices']=selected
+    profile['identity']=_identity(profile)
+    workspace.mkdir(parents=True,exist_ok=True)
     registry['profiles'][system_id]=profile;write_json(path,registry,max_bytes=1024**2)
     return {'ok':True,'status':'CONFIGURED','profile':profile,'runtime_verified':False}
 
 
 def _identity(profile):
-    return digest({'system_id':profile['system_id'],'core':profile['core_identity'],'options':profile['options'],
-                   'system_files':[{k:f[k] for k in ('relative','expected_sha256','size')} for f in profile['system_files']],'input_map':profile['input_map']})
+    value={'system_id':profile['system_id'],'core':profile['core_identity'],'options':profile['options'],
+           'system_files':[{k:f[k] for k in ('relative','expected_sha256','size')} for f in profile['system_files']],'input_map':profile['input_map']}
+    if profile.get('controller_devices'):value['controller_devices']=profile['controller_devices']
+    return digest(value)
 
 
 def load_profile(workspace,system_id):
     if system_id not in SYSTEM_IDS:raise ValueError('unknown system')
     path=checked_path(Path(workspace)/'runtime-profiles.json')
-    if not path.exists():return {'ok':True,'status':'NOT_CONFIGURED','profile':None,'runtime_verified':False}
-    value=load_script_json(path,max_bytes=1024**2)
+    value=load_script_json(path,max_bytes=1024**2) if path.exists() else {'schema_version':1,'profiles':{}}
     if value.get('schema_version')!=1:raise ValueError('unsupported runtime profile version')
+    if system_id not in value['profiles']:
+        from .bundled_cores import bundled_profile
+        default=bundled_profile(system_id)
+        if default:return default
     return {'ok':True,'status':'CONFIGURED' if system_id in value['profiles'] else 'NOT_CONFIGURED','profile':value['profiles'].get(system_id),'runtime_verified':False}
 
 
 def validate_profile(profile):
-    fields(profile,'schema_version system_id core core_identity options system_dir system_files input_map identity')
+    fields({k:v for k,v in profile.items() if k!='controller_devices'},'schema_version system_id core core_identity options system_dir system_files input_map identity')
+    from .controller_devices import validate_devices
+    devices=validate_devices(profile.get('controller_devices',{}))
     if type(profile['schema_version']) is not int or profile['schema_version']!=1 or profile['system_id'] not in SYSTEM_IDS or profile['identity']!=_identity(profile):raise ValueError('runtime profile identity/schema changed')
     _options(profile['options'],profile['input_map'])
     if _binary(profile['core'])!=profile['core_identity']:raise ValueError('core changed; choose and save its new revision')
     actual=measure_system_files(profile['system_dir'])
     if actual!=profile['system_files']:raise ValueError('system files changed; review and save the new configuration')
     return {'ok':True,'status':'INPUTS_VERIFIED','profile_identity':profile['identity'],'core':profile['core'],'core_options':profile['options'],'expected_core_sha256':profile['core_identity']['sha256'],
-            'system_dir':profile['system_dir'],'system_files':[{k:f[k] for k in ('source','relative','expected_sha256')} for f in actual],'input_map':profile['input_map'],'runtime_verified':False}
+            'system_dir':profile['system_dir'],'system_files':[{k:f[k] for k in ('source','relative','expected_sha256')} for f in actual],'input_map':profile['input_map'],'controller_devices':devices,'runtime_verified':False}

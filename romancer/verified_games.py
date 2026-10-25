@@ -119,6 +119,25 @@ def palette_visuals(profile,root,path):
     return {'kind':'rgb555-palettes','palettes':rows,'scope':'Literal stored colors; native scene rendering is not predicted.'}
 
 
+def resource_definitions(profile):
+    if profile['id']!='chrono-trigger-usa':return []
+    # The disassembly documents 90 five-byte records. Only the attack byte is
+    # exposed here; inferred meanings for the remaining bytes are not promoted.
+    return [{'id':'weapon-power-table','name':'Weapon base attack table','kind':'tables',
+             'reference':profile['reference'],'scope':'90 documented records; base attack byte only. Other record bytes are preserved. Row numbers are record IDs, not guessed weapon names.',
+             'definition':{'schema_version':1,'name':'Weapon base attack','offset':0xc0262,'count':90,'stride':5,
+                           'fields':[{'name':'Base attack','offset':0,'type':'u8','endian':'little','pointer_base':None}]}}]
+
+
+def configure_resource(api,parameters,*,cancelled=lambda:False):
+    project,row,path=api.source(parameters);profile,root=_resolve(project,row,cancelled)
+    if profile is None:raise ValueError('no verified resource definitions for this exact source revision')
+    resource=next((r for r in resource_definitions(profile) if r['id']==parameters['resource_id']),None)
+    if resource is None:raise ValueError('unknown verified resource definition')
+    result=api._tables_save({'project_id':parameters['project_id'],'artifact_id':row['artifact_id'],'definition':resource['definition']},cancelled)
+    return {**result,'reference':resource['reference'],'definition_scope':resource['scope']}
+
+
 def inspect(project,row,path,*,cancelled=lambda:False):
     profile,root=_resolve(project,row,cancelled)
     if profile is None:return {'ok':True,'status':'UNSUPPORTED','profile':None,'artifact_id':row['artifact_id'],'source_sha256':row['sha256']}
@@ -126,7 +145,7 @@ def inspect(project,row,path,*,cancelled=lambda:False):
     if visual:projects._measure(root['path'],root,cancelled=cancelled)
     return {'ok':True,'status':'MATCHED' if row['kind']=='source' else 'DERIVED','artifact_id':row['artifact_id'],
             'source_sha256':row['sha256'],'verified_original_sha256':root['sha256'],'gameplay_verified':False,
-            'profile':{k:profile[k] for k in ('id','name','system','reference','scope')},'fields':model,'visual':visual,
+            'profile':{k:profile[k] for k in ('id','name','system','reference','scope')},'fields':model,'visual':visual,'resources':resource_definitions(profile),
             'locations':[{'offset':o,'length':n,'label':label,**BYTE_NOTES[profile['id']][i]} for i,(o,n,label) in enumerate(profile['offsets'])],
             'note':'Definition locations were tested on the matched original. A new build still needs playtesting.'}
 

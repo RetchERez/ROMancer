@@ -103,7 +103,10 @@ class WorkbenchAPI:
             'profiles.scan_local':('directories',self._scan_local_cores),
             'profiles.configure_local':('system_id candidate',self._configure_local_core),
             'profiles.get':('system_id',self._profile_get),
+            'games.configure':('project_id artifact_id resource_id',self._game_configure),
+            'system.agent_config':('allow_writes read_roots',self._agent_config),
             'profiles.save':('system_id core options system_dir input_map',self._profile_save),
+            'profiles.controller':('system_id controller_devices',self._profile_controller),
             'profiles.validate':('system_id',self._profile_validate),
             'runtime.smoke_profile':('project_id artifact_id system_id',self._runtime_smoke),
             'runtime.load_profile':('project_id artifact_id system_id',self._runtime_profile),
@@ -366,7 +369,18 @@ class WorkbenchAPI:
         return {'ok':True,'product':'ROMancer','version':ROMANCER_VERSION,'display_version':ROMANCER_BUILD_LABEL,'release_name':ROMANCER_RELEASE_NAME,'build_label':ROMANCER_BUILD_LABEL,'target_version':'1.0','credit':'By RetchEWretched','release_status':'RELEASE',
                 'python':platform.python_version(),'platform':platform.system(),'pillow':importlib.util.find_spec('PIL') is not None,
                 'native_dialog':os.name=='nt' or importlib.util.find_spec('tkinter') is not None,'adapters':{**adapter_inventory(),'adapters':[a for a in adapter_inventory()['adapters'] if a['id'] in ('nes','snes','genesis','gb','gba')]},'systems':system_inventory(),
-                'runtime_note':'Choose a libretro core built for this operating system. Commercial game coverage requires exact-revision evidence.'}
+                'runtime_note':'The full Windows release includes engines for all five systems. Source installations can use compatible local libretro cores. Gameplay evidence applies to the exact ROM and tested setup.'}
+
+    def _agent_config(self,p,c):
+        if type(p['allow_writes']) is not bool or type(p['read_roots']) is not list or len(p['read_roots'])>8:raise ValueError('choose agent access and up to eight import folders')
+        arguments=['-I','-B',str(Path(__file__).with_name('mcp_server.py').resolve()),'--workspace',str(self.workspace)]
+        if p['allow_writes']:arguments.append('--allow-writes')
+        for root in p['read_roots']:
+            if type(root) is not str or not root or len(root)>4096:raise ValueError('invalid agent import folder')
+            directory=checked_path(root)
+            if not directory.is_dir():raise ValueError('agent import folder must exist')
+            arguments.extend(['--rom-root',str(directory)])
+        return {'ok':True,'configuration':{'mcpServers':{'romancer':{'command':sys.executable,'args':arguments}}},'access':'editing' if p['allow_writes'] else 'inspection','note':'Contains local paths. Paste into your local MCP client configuration; it includes no authentication token.'}
 
     def _help(self,p,c):
         from .help_content import help_topics
@@ -795,6 +809,10 @@ class WorkbenchAPI:
         from .runtime_profiles import load_profile
         return load_profile(self.workspace,p['system_id'])
 
+    def _game_configure(self,p,c):
+        from .verified_games import configure_resource
+        return configure_resource(self,p,cancelled=c)
+
     def _profile_save(self,p,c):
         from .runtime_profiles import save_profile
         with self.profile_lock:return save_profile(self.workspace,p['system_id'],p['core'],p['options'],p['system_dir'],p['input_map'])
@@ -805,9 +823,21 @@ class WorkbenchAPI:
         if profile is None:raise ValueError('configure this system first')
         return validate_profile(profile)
 
+    def _profile_controller(self,p,c):
+        from .runtime_profiles import save_profile,load_profile,validate_profile
+        from .controller_devices import validate_devices
+        devices=validate_devices(p['controller_devices'])
+        with self.profile_lock:
+            profile=load_profile(self.workspace,p['system_id'])['profile']
+            if profile is None:raise ValueError('load a compatible engine setup first')
+            validate_profile(profile)
+            return save_profile(self.workspace,p['system_id'],profile['core'],profile['options'],profile['system_dir'],profile['input_map'],controller_devices=devices)
+
     def _profile_load_config(self,system_id):
         checked=self._profile_validate({'system_id':system_id},lambda:False)
-        return {k:checked[k] for k in ('core','expected_core_sha256','core_options','system_dir','system_files')}
+        result={k:checked[k] for k in ('core','expected_core_sha256','core_options','system_dir','system_files')}
+        if checked.get('controller_devices'):result['controller_devices']=checked['controller_devices']
+        return result
 
     def _runtime_smoke(self,p,c):
         from .runtime_session import OwnedRuntime,preflight_load
