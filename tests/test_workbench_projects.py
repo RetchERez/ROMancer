@@ -2,9 +2,54 @@ import importlib
 import tempfile
 from pathlib import Path
 import unittest
+from unittest.mock import patch
+import json
+import os
 
 
 class ProjectTests(unittest.TestCase):
+    def test_metadata_replace_retries_transient_windows_reader_without_partial_output(self):
+        m=self.service()
+        with tempfile.TemporaryDirectory() as temp:
+            target=Path(temp)/'metadata.json';m.write_json(target,{'value':'old'});real=m.os.replace;calls=[]
+            def replace(source,destination):
+                calls.append(1)
+                if len(calls)<=2:
+                    self.assertEqual(json.loads(target.read_text()),{'value':'old'})
+                    error=PermissionError('temporarily shared');error.winerror=32;raise error
+                return real(source,destination)
+            with patch.object(m.os,'replace',side_effect=replace),patch('time.sleep'):
+                m.write_json(target,{'value':'new'})
+            self.assertEqual(len(calls),3);self.assertEqual(json.loads(target.read_text()),{'value':'new'})
+            self.assertFalse(list(Path(temp).glob('.metadata-*')))
+
+    def test_metadata_persistent_denial_is_bounded_and_keeps_the_previous_file(self):
+        m=self.service()
+        with tempfile.TemporaryDirectory() as temp:
+            target=Path(temp)/'metadata.json';m.write_json(target,{'value':'old'})
+            error=PermissionError('not permitted');error.winerror=5
+            with patch.object(m.os,'replace',side_effect=error) as replace,patch('time.sleep'):
+                with self.assertRaises(PermissionError):m.write_json(target,{'value':'new'})
+            self.assertLessEqual(replace.call_count,41);self.assertEqual(json.loads(target.read_text()),{'value':'old'})
+            self.assertFalse(list(Path(temp).glob('.metadata-*')))
+
+    @unittest.skipUnless(os.name=='nt','Windows sharing semantics')
+    def test_actual_windows_reader_can_close_before_atomic_metadata_replacement(self):
+        import ctypes,threading,time
+        from ctypes import wintypes
+        m=self.service();kernel=ctypes.WinDLL('kernel32',use_last_error=True)
+        kernel.CreateFileW.argtypes=[wintypes.LPCWSTR,wintypes.DWORD,wintypes.DWORD,ctypes.c_void_p,wintypes.DWORD,wintypes.DWORD,wintypes.HANDLE];kernel.CreateFileW.restype=wintypes.HANDLE
+        kernel.CloseHandle.argtypes=[wintypes.HANDLE];kernel.CloseHandle.restype=wintypes.BOOL
+        with tempfile.TemporaryDirectory() as temp:
+            target=Path(temp)/'metadata.json';m.write_json(target,{'value':'old'})
+            handle=kernel.CreateFileW(str(target),0x80000000,3,None,3,0,None)
+            self.assertNotEqual(handle,ctypes.c_void_p(-1).value)
+            def release():time.sleep(.06);kernel.CloseHandle(handle)
+            reader=threading.Thread(target=release);reader.start()
+            try:m.write_json(target,{'value':'new'})
+            finally:reader.join()
+            self.assertEqual(json.loads(target.read_text()),{'value':'new'})
+
     def test_cancelled_copy_does_not_publish(self):
         m=self.service()
         with tempfile.TemporaryDirectory() as temp:

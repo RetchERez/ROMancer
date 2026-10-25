@@ -7,6 +7,7 @@ from pathlib import Path
 import re
 import shutil
 import tempfile
+import time
 import uuid
 from .asset_schema import fields, label, number
 from .assets import checked_path, hash_stream, identity, digest
@@ -35,7 +36,13 @@ def write_json(path,value,*,max_bytes=MAX_STORE):
     fd,name=tempfile.mkstemp(prefix='.metadata-',dir=path.parent)
     try:
         with os.fdopen(fd,'wb') as stream:stream.write(raw);stream.flush();os.fsync(stream.fileno())
-        os.replace(name,path)
+        # Windows readers and virus scanners can briefly deny deletion sharing.
+        # Keep the previous complete file visible until one atomic rename succeeds.
+        for attempt in range(41):
+            try:os.replace(name,path);break
+            except PermissionError as error:
+                if getattr(error,'winerror',None) not in (5,32,33) or attempt==40:raise
+                time.sleep(.025)
     finally:
         Path(name).unlink(missing_ok=True)
 
