@@ -163,7 +163,9 @@ def build_installer(payload,compiler_archive,output):
     if output.exists():raise ValueError('installer output already exists')
     output.parent.mkdir(parents=True,exist_ok=True)
     import zipfile
-    with tempfile.TemporaryDirectory(prefix='.setup-build-',dir=output.parent) as temp:
+    # A scanner can retain a handle to the compiled EXE after atomic publication.
+    # Cleanup of private build files must not turn that verified result into a failure.
+    with tempfile.TemporaryDirectory(prefix='.setup-build-',dir=output.parent,ignore_cleanup_errors=True) as temp:
         temp=Path(temp)
         with zipfile.ZipFile(compiler_archive) as z:z.extractall(temp/'compiler') # Exact trusted archive hash checked above.
         compiler=temp/'compiler/nsis-3.13/makensis.exe';target=temp/'Setup.exe';script=temp/'setup.nsi'
