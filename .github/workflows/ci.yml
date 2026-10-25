@@ -97,7 +97,7 @@ jobs:
             $capabilities = Invoke-RestMethod -Uri ($parts[0] + '/api/call') -Method Post -Headers $headers -ContentType 'application/json' -Body $body
             if ($capabilities.version -ne $active.version) { throw 'Installed server version differs' }
             & $installedPython -I -B (Join-Path $version 'app/tools/verify_v1.py') --output (Join-Path $PWD 'work_private/installed-workflow.json') --work-dir (Join-Path $PWD 'work_private/installed-fixtures')
-            if ($LASTEXITCODE -ne 0) { throw 'Installed five-system workflows failed' }
+            if ($LASTEXITCODE -ne 0) { throw 'Installed six-system workflows failed' }
             & $installedPython -I -B (Join-Path $version 'app/tools/verify_engines.py') --workspace (Join-Path $PWD 'work_private/automatic-engines') --output (Join-Path $PWD 'work_private/engine-proof.json')
             if ($LASTEXITCODE -ne 0) { throw 'Automatic bundled engines failed' }
           } finally {
