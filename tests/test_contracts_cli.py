@@ -30,7 +30,7 @@ class ContractsCliTests(unittest.TestCase):
         code, result = self.cli('adapter-inventory')
         self.assertEqual(code, 0, result)
         self.assertEqual({item['id'] for item in result['adapters']},
-                         {'nes', 'snes', 'genesis', 'gb', 'gba'})
+                         {'nes', 'snes', 'genesis', 'gb', 'gbc', 'gba'})
         self.assertFalse(result['write_authorized'])
 
     def test_profile_revision_check_does_not_authorize_write(self):
