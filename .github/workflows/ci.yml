@@ -40,6 +40,12 @@ jobs:
       - run: python -c "from pathlib import Path; Path('work_private').mkdir(exist_ok=True)"
       - run: python -B tools/verify_v1.py --output work_private/workflow.json --work-dir work_private/fixtures
   windows-bundle:
+    # Draft release assets require repository push access on GitHub. The token
+    # is exposed only to the download step; checkout never persists it.
+    # Fork PRs run the read-only test matrix instead of this trusted packaging job.
+    if: github.event_name != 'pull_request' || github.event.pull_request.head.repo.full_name == github.repository
+    permissions:
+      contents: write
     runs-on: windows-latest
     timeout-minutes: 20
     steps:
