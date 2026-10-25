@@ -1,4 +1,5 @@
 from romancer.boot_fixtures import make_boot_fixture
+from contextlib import ExitStack
 import threading
 import base64
 import hashlib
@@ -33,10 +34,10 @@ class LiveStepTests(unittest.TestCase):
     def test_smoke_check_is_measured_and_does_not_claim_gameplay_correctness(self):
         from romancer.workbench_api import WorkbenchAPI
         from romancer.boot_fixtures import make_boot_fixture
-        with tempfile.TemporaryDirectory() as folder:
+        with tempfile.TemporaryDirectory() as folder, ExitStack() as resources:
             root=Path(folder);core=root/'mock_libretro.so';game=root/'original.gb';game.write_bytes(make_boot_fixture('gb')['data'])
             subprocess.run(['gcc','-shared','-fPIC','-O2','-DROMANCER_V35_TEST','tests/mock_libretro.c','-o',str(core)],check=True)
-            api=WorkbenchAPI(root/'workspace');self.addCleanup(api.close)
+            api=WorkbenchAPI(root/'workspace');resources.callback(api.close)
             project=api.dispatch('project.create',{'name':'ROM check'});p={'project_id':project['project_id']};source=api.dispatch('source.import',{**p,'path':str(game),'system':None})
             api.dispatch('profiles.save',{'system_id':'gb','core':str(core),'options':{},'system_dir':None,'input_map':{}})
             api.dispatch('runtime.load_profile',{**p,'artifact_id':source['artifact_id'],'system_id':'gb'});existing=api.runtime.sessions.copy()
@@ -47,10 +48,10 @@ class LiveStepTests(unittest.TestCase):
     @unittest.skipUnless(sys.platform=='linux' and shutil.which('gcc'),'compiled native callback fixture')
     def test_real_native_step_and_literal_pcm(self):
         from romancer.workbench_api import WorkbenchAPI
-        with tempfile.TemporaryDirectory() as folder:
+        with tempfile.TemporaryDirectory() as folder, ExitStack() as resources:
             root=Path(folder);core=root/'core.so';game=root/'game.bin';game.write_bytes(make_boot_fixture('nes')['data'])
             subprocess.run(['gcc','-shared','-fPIC','-O2','-DROMANCER_V35_TEST','tests/mock_libretro.c','-o',str(core)],check=True)
-            api=WorkbenchAPI(root/'workspace');self.addCleanup(api.close)
+            api=WorkbenchAPI(root/'workspace');resources.callback(api.close)
             project=api.dispatch('project.create',{'name':'Live test'});p={'project_id':project['project_id']}
             source=api.dispatch('source.import',{**p,'path':str(game),'system':None})
             loaded=api.dispatch('runtime.load',{**p,'artifact_id':source['artifact_id'],'core':str(core),'options':{}})
