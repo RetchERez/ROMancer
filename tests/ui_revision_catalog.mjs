@@ -1,0 +1,14 @@
+import assert from 'node:assert/strict';
+import {revisionResult,identifyRevision,revisionControls} from '../romancer/ui/revision_controls.js';
+const state={project:{project_id:'a'.repeat(32)},artifact:{artifact_id:'b'.repeat(32),sha256:'1'.repeat(64)},results:{}};
+const result={status:'UNKNOWN',project_id:state.project.project_id,artifact_id:state.artifact.artifact_id,source_sha256:state.artifact.sha256,scope:'file',matches:[],hashes:{crc32:'352441c2'}};
+const ctx={state,use:()=>{},draft:(_k,f)=>f,run:async()=>result};
+await identifyRevision(ctx,'file','');assert.equal(revisionResult(state),result);
+let html=revisionControls(ctx);assert.match(html,/No catalog match/);assert.doesNotMatch(html,/corrupt|MISMATCHED/);
+state.revisionLookup.result={...result,status:'MATCHED',matches:[{name:'<img src=x onerror=bad>'}]};
+assert.ok(!revisionControls(ctx).includes('<img src=x'));
+state.artifact={...state.artifact,sha256:'2'.repeat(64)};assert.equal(revisionResult(state),null);
+ctx.run=async()=>{state.artifact={...state.artifact,artifact_id:'c'.repeat(32)};return result;};
+await assert.rejects(()=>identifyRevision(ctx,'file',''),/selection changed/i);
+assert.equal(revisionResult(state),null);
+console.log('Revision identification separates unknown from mismatch and hides stale or unescaped results.');

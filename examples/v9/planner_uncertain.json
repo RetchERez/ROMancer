@@ -1,0 +1,19 @@
+{
+  "beliefs": [],
+  "actions": [
+    {
+      "name": "inspect_map",
+      "kind": "act",
+      "information_gain": 0.9,
+      "progress_value": 0.1,
+      "reversibility": 1.0
+    },
+    {
+      "name": "sell_unique_item",
+      "kind": "sell",
+      "progress_value": 0.8,
+      "information_gain": 0.0,
+      "reversibility": 0.1
+    }
+  ]
+}

@@ -1,0 +1,30 @@
+import assert from 'node:assert/strict';
+import {candidateGroups,graphicsInvestigation,ensureGraphicsObservation} from '../romancer/ui/graphics_investigation.js';
+const {comparePlacements}=await import('../romancer/ui/graphics_investigation.js');
+assert.deepEqual(comparePlacements({matches:[{offset:1,x:0,y:0,height:8}],coverage:{offset:0,bytes_scanned:64}},{matches:[{offset:2,x:0,y:0,height:8}],coverage:{offset:0,bytes_scanned:64}}),{added:1,absent:1,retained:0,semantic_ownership_known:false});
+const matches=[{offset:32,x:0,y:0,width:8,height:16},{offset:64,x:0,y:0,width:8,height:16},{offset:96,x:8,y:0,width:8,height:16}];
+assert.equal(candidateGroups({matches},16).length,2);
+assert.equal(candidateGroups({matches},16)[0].choices.length,2);
+const state={page:'playtest',project:{project_id:'p'},artifact:{artifact_id:'a',sha256:'a'.repeat(64),size:1000},runtime:{game_sha256:'a'.repeat(64)},frame:{sha256:'f'.repeat(64),game_sha256:'a'.repeat(64)},graphicsInvestigations:{}};
+const actions={},ctx={state,use:a=>Object.assign(actions,a),sourceParams:()=>({project_id:'p',artifact_id:state.artifact.artifact_id}),draft:(_,fallback)=>fallback,setDraft(){},render:async()=>{},notify(){}};
+const {selectionKey}=await import('../romancer/ui/tool_inputs.js');
+state.graphicsInvestigations[selectionKey(state)]={status:'READY',result:{ok:true,matches,frame:{sha256:state.frame.sha256},coverage:{offset:0,bytes_scanned:1000,whole_source:true,frame_positions:[]},limits:[]}};
+let html=graphicsInvestigation(ctx);assert.match(html,/Choose a source offset/);assert.match(html,/unproven|candidate/i);assert.doesNotMatch(html,/Verified sprite/);
+let finish,called=[];state.graphicsInvestigations={};globalThis.document={getElementById:()=>null};ctx.api={call:async(op,p)=>{called.push(op);if(op==='jobs.submit')return new Promise(resolve=>finish=resolve);return {status:'COMPLETED',result:{ok:true,matches:[],coverage:{},frame:{sha256:'f'.repeat(64)}}};}};
+const loading=ensureGraphicsObservation(ctx);await Promise.resolve();state.artifact={artifact_id:'b',sha256:'b'.repeat(64),size:1000};state.graphicsInvestigations={};finish({job_id:'job'});await loading;
+assert.deepEqual(state.graphicsInvestigations,{});assert.deepEqual(called,['jobs.submit','jobs.cancel'],'a detached observation is cancelled and cannot repaint another source');
+console.log('Gameplay graphics candidates retain ambiguity and cannot cross source selections.');
+
+const raceState={page:'playtest',project:{project_id:'p'},artifact:{artifact_id:'a',sha256:'a'.repeat(64),size:1000},runtime:{game_sha256:'a'.repeat(64),session_dir:'session'},frame:{sha256:'frame-A'},playing:false};
+let cancelDone,raceCalls=[];const raceCtx={state:raceState,use(){},sourceParams:()=>({project_id:'p',artifact_id:'a'}),api:{call:async(op)=>{raceCalls.push(op);if(op==='jobs.cancel')return new Promise(resolve=>cancelDone=resolve);return {job_id:'new',status:'COMPLETED',result:{ok:true,matches:[]}};}}};
+raceState.graphicsInvestigations={[selectionKey(raceState)]:{status:'SCANNING',job_id:'old',frame_sha256:'frame-A'}};
+const replacing=ensureGraphicsObservation(raceCtx,{force:true,region:{x:0,y:0,width:8,height:8}});await Promise.resolve();raceState.frame={sha256:'frame-B'};raceState.playing=true;cancelDone({ok:true});await replacing;
+assert.deepEqual(raceCalls,['jobs.cancel'],'a resumed or replaced frame requires a new region selection');
+
+const drafts=new Map([['asset-changes','[{"kind":"cell","cell_index":0}]'],['paint-buffer','pending pixels']]),handoffState={page:'playtest',project:{project_id:'p'},artifact:{artifact_id:'a',sha256:'sha',size:100},frame:{sha256:'frame'},results:{'assets.inspect':{document_id:'doc'}}};let handoffActions={};
+handoffState.graphicsInvestigations={[selectionKey(handoffState)]:{status:'READY',result:{evidence_id:'e',matches:[{offset:0,x:0,y:0,width:8,height:8}],frame:{sha256:'frame'},coverage:{offset:0,bytes_scanned:100,next_offset:100},limits:[]}}};
+globalThis.document={getElementById:()=>({value:'0'})};
+const handoff={state:handoffState,use:a=>Object.assign(handoffActions,a),draft:(id,f)=>drafts.get(id)??f,setDraft:(id,v)=>drafts.set(id,v),sourceParams:()=>({project_id:'p',artifact_id:'a'}),run:async()=>({schema:{},inspection:{document_id:'doc',bitmaps:[{id:'tiles'}]},layout:{columns:1,rows:1,indices:[0],flips:[0]}}),navigate:async page=>handoffState.page=page,render:async()=>{}};
+graphicsInvestigation(handoff);await handoffActions['graphics-edit-candidates']();
+assert.equal(drafts.get('paint-buffer'),'pending pixels');assert.equal(drafts.get('asset-changes'),'[{"kind":"cell","cell_index":0}]');
+assert.equal(drafts.get('sprite-order'),'rows','candidate layout controls reflect the loaded arrangement');

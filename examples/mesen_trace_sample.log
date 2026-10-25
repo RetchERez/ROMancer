@@ -1,0 +1,4 @@
+C000  A9 00     LDA #$00                        A:12 X:00 Y:00 P:24 SP:FD CYC:7
+C002  85 20     STA $20 = $00                    A:00 X:00 Y:00 P:26 SP:FD CYC:9
+C004  AD 08 05  LDA $0508 = $26                  A:00 X:00 Y:00 P:26 SP:FD CYC:13
+C007  8D 08 05  STA $0508 = $1A                  A:1A X:00 Y:00 P:24 SP:FD CYC:17

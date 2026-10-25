@@ -1,0 +1,15 @@
+{
+  "schema_version": 1,
+  "id": "generic_jrpg",
+  "name": "Generic JRPG Discovery",
+  "game": null,
+  "system": "unknown",
+  "genre": "JRPG",
+  "runtime": {"preferred_cores": [], "boot_frames": 180},
+  "contexts": ["unknown"],
+  "controls": {"unknown": {}},
+  "memory_fields": [],
+  "state_signatures": [],
+  "scenarios": [],
+  "limits": ["No semantic controls are assumed. Run runtime-controls or bind a game-specific profile first."]
+}

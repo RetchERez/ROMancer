@@ -1,0 +1,32 @@
+{
+  "hypotheses": [
+    {
+      "claim": "Model initial state, goal state, controls, constraints, reversible actions, and irreversible actions",
+      "priority": "high",
+      "states": [
+        "PUZZLE"
+      ]
+    },
+    {
+      "claim": "Change one variable at a time and record cause/effect",
+      "priority": "high",
+      "states": [
+        "PUZZLE"
+      ]
+    },
+    {
+      "claim": "Reset only after preserving what was learned",
+      "priority": "high",
+      "states": [
+        "PUZZLE"
+      ]
+    }
+  ],
+  "id": "puzzle",
+  "name": "Puzzle",
+  "policy": "Hypothesis generator only. Exact game evidence overrides every entry.",
+  "schema_version": 1,
+  "states": [
+    "PUZZLE"
+  ]
+}

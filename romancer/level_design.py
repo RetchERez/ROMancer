@@ -1,0 +1,115 @@
+"""Declared fixed-capacity level data. No inferred game semantics or allocation."""
+import hashlib
+from .asset_schema import fields,number,label
+from .asset_codecs import cell_size,decode_cell,CODECS
+from .script_schema import canonical_bytes
+
+
+def _identity(raw,definition,source_sha256):
+    if type(definition) is not dict:raise ValueError('level definition must be a JSON object')
+    if type(raw) is not bytes or not 1<=len(raw)<=64*1024**2:raise ValueError('level source exceeds byte budget')
+    if hashlib.sha256(raw).hexdigest()!=source_sha256 or definition.get('source_sha256')!=source_sha256:raise ValueError('level definition source differs')
+
+
+def inspect_level(raw,definition,source_sha256):
+    _identity(raw,definition,source_sha256)
+    d=__import__('json').loads(canonical_bytes(definition,max_bytes=256*1024))
+    fields(d,'schema_version source_sha256 name tiles metatiles rooms');number(d['schema_version'],1,1);label(d['name'])
+    ranges=[]
+    def storage(offset,length,name):
+        number(offset,0,len(raw)-1);number(length,1,len(raw))
+        if offset+length>len(raw):raise ValueError('declared level storage exceeds source')
+        if any(offset<b and offset+length>a for a,b,_ in ranges):raise ValueError('declared level storage overlaps')
+        ranges.append((offset,offset+length,name))
+    def format_grid(g,count,name):
+        fields(g,'offset entry_bytes endian');number(g['entry_bytes'],1,2)
+        if g['endian'] not in ('little','big'):raise ValueError('invalid integer byte order')
+        storage(g['offset'],count*g['entry_bytes'],name)
+        return [int.from_bytes(raw[g['offset']+i*g['entry_bytes']:g['offset']+(i+1)*g['entry_bytes']],g['endian']) for i in range(count)]
+    t=d['tiles'];fields(t,'offset count codec palette_offset palette_format');number(t['count'],1,1024)
+    unit=cell_size(t['codec'],8,8);storage(t['offset'],t['count']*unit,'tiles')
+    tiles=[decode_cell(raw[t['offset']+i*unit:t['offset']+(i+1)*unit],codec=t['codec'],width=8,height=8) for i in range(t['count'])]
+    colors=2**CODECS[t['codec']]
+    if t['palette_format'] not in ('rgb888','rgb555-le','rgb555-be'):raise ValueError('unsupported declared level palette')
+    n=3 if t['palette_format']=='rgb888' else 2;storage(t['palette_offset'],colors*n,'palette');palette=[]
+    for i in range(colors):
+        data=raw[t['palette_offset']+i*n:t['palette_offset']+(i+1)*n]
+        if n==3:palette.append(list(data))
+        else:
+            value=int.from_bytes(data,'little' if t['palette_format'].endswith('le') else 'big')
+            palette.append([round(((value>>shift)&31)*255/31) for shift in (0,5,10)])
+    m=d['metatiles'];fields(m,'offset count width height entry_bytes endian');number(m['count'],1,1024);number(m['width'],1,8);number(m['height'],1,8)
+    parts=m['width']*m['height'];flat=format_grid({k:m[k] for k in ('offset','entry_bytes','endian')},m['count']*parts,'metatiles')
+    if any(v>=len(tiles) for v in flat):raise ValueError('metatile references an undeclared tile')
+    blocks=[flat[i*parts:(i+1)*parts] for i in range(m['count'])]
+    if type(d['rooms']) is not list or not 1<=len(d['rooms'])<=32:raise ValueError('declare 1 to 32 rooms')
+    rooms=[];ids=set();uses={str(i):[] for i in range(m['count'])};total=0
+    for r in d['rooms']:
+        fields(r,'id name width height terrain collision objects');label(r['id']);label(r['name'])
+        if r['id'] in ids:raise ValueError('duplicate room ID')
+        ids.add(r['id']);number(r['width'],1,128);number(r['height'],1,128);count=r['width']*r['height'];total+=count
+        if total>32768 or count*parts*64>4*1024**2:raise ValueError('level preview exceeds pixel budget')
+        terrain=format_grid(r['terrain'],count,r['id']+' terrain')
+        if any(v>=len(blocks) for v in terrain):raise ValueError('room references an undeclared metatile')
+        collision=format_grid(r['collision'],count,r['id']+' collision') if r['collision'] is not None else None
+        objects=[];o=r['objects']
+        if o is not None:
+            fields(o,'offset count stride fields');number(o['count'],1,256);number(o['stride'],1,128);storage(o['offset'],o['count']*o['stride'],r['id']+' objects')
+            if type(o['fields']) is not list or not 1<=len(o['fields'])<=16:raise ValueError('invalid object fields')
+            used=set();names=set()
+            for f in o['fields']:
+                fields(f,'name offset bytes endian maximum');label(f['name']);number(f['offset'],0,o['stride']-1);number(f['bytes'],1,2);number(f['maximum'],0,(1<<(8*f['bytes']))-1)
+                if f['endian'] not in ('little','big') or f['offset']+f['bytes']>o['stride']:raise ValueError('object field exceeds record')
+                span=set(range(f['offset'],f['offset']+f['bytes']))
+                if span&used or f['name'] in names:raise ValueError('object fields overlap or duplicate')
+                used|=span;names.add(f['name'])
+            for index in range(o['count']):
+                obj={}
+                for f in o['fields']:
+                    at=o['offset']+index*o['stride']+f['offset'];value=int.from_bytes(raw[at:at+f['bytes']],f['endian'])
+                    maximum=min(f['maximum'],r['width']-1 if f['name']=='x' else r['height']-1 if f['name']=='y' else len(d['rooms'])-1 if f['name']=='exit_room' else f['maximum'])
+                    number(value,0,maximum);obj[f['name']]=value
+                objects.append(obj)
+        for i,value in enumerate(terrain):uses[str(value)].append({'room_id':r['id'],'cell':i})
+        rooms.append({'id':r['id'],'name':r['name'],'width':r['width'],'height':r['height'],'terrain':terrain,'collision':collision,'objects':objects})
+    document_id=hashlib.sha256(canonical_bytes(d,max_bytes=256*1024)).hexdigest()
+    result={'ok':True,'document_id':document_id,'source_sha256':source_sha256,'definition':d,'tiles':tiles,'palette':palette,'metatiles':blocks,'block_width':m['width'],'block_height':m['height'],'rooms':rooms,'uses':uses,'ranges':[{'offset':a,'length':b-a,'name':name} for a,b,name in ranges],'game_semantics_verified':False}
+    try:canonical_bytes(result,max_bytes=2*1024**2)
+    except ValueError as exc:raise ValueError('combined level preview budget exceeded; declare fewer rooms, cells or tiles') from exc
+    return result
+
+
+def plan_level(raw,definition,document_id,changes,source_sha256):
+    doc=inspect_level(raw,definition,source_sha256)
+    if doc['document_id']!=document_id:raise ValueError('level review document is stale')
+    if type(changes) is not list or not 1<=len(changes)<=8192:raise ValueError('review 1 to 8192 level changes')
+    d=doc['definition'];writes={};seen=set();affected=set()
+    for change in changes:
+        if type(change) is not dict:raise ValueError('level changes must be JSON objects')
+        kind=change.get('kind')
+        if kind=='metatile':
+            fields(change,'kind index part value');m=d['metatiles'];number(change['index'],0,m['count']-1);number(change['part'],0,m['width']*m['height']-1);number(change['value'],0,len(doc['tiles'])-1)
+            offset=m['offset']+(change['index']*m['width']*m['height']+change['part'])*m['entry_bytes'];width=m['entry_bytes'];endian=m['endian']
+            affected.update(use['room_id'] for use in doc['uses'][str(change['index'])])
+        elif kind in ('terrain','collision','object'):
+            r=next((r for r in d['rooms'] if r['id']==change.get('room_id')),None)
+            if r is None:raise ValueError('unknown room')
+            affected.add(r['id'])
+            if kind=='object':
+                fields(change,'kind room_id index field value');o=r['objects']
+                if o is None:raise ValueError('objects are not declared')
+                number(change['index'],0,o['count']-1);f=next((f for f in o['fields'] if f['name']==change['field']),None)
+                if f is None:raise ValueError('unknown object field')
+                maximum=min(f['maximum'],r['width']-1 if f['name']=='x' else r['height']-1 if f['name']=='y' else len(d['rooms'])-1 if f['name']=='exit_room' else f['maximum'])
+                number(change['value'],0,maximum);offset=o['offset']+change['index']*o['stride']+f['offset'];width=f['bytes'];endian=f['endian']
+            else:
+                fields(change,'kind room_id index value');number(change['index'],0,r['width']*r['height']-1);g=r[kind]
+                if g is None:raise ValueError('collision is not declared')
+                width=g['entry_bytes'];endian=g['endian'];number(change['value'],0,len(doc['metatiles'])-1 if kind=='terrain' else (1<<(8*width))-1);offset=g['offset']+change['index']*width
+        else:raise ValueError('unknown level change')
+        key=(offset,width)
+        if key in seen:raise ValueError('duplicate level edit')
+        seen.add(key);after=change['value'].to_bytes(width,endian);before=raw[offset:offset+width]
+        if before!=after:writes[offset]={'offset':offset,'before':before.hex(),'after':after.hex()}
+    if not writes:raise ValueError('no changed level bytes')
+    return {'ok':True,'edits':[writes[k] for k in sorted(writes)],'affected_rooms':sorted(affected),'document_id':document_id,'source_sha256':source_sha256}

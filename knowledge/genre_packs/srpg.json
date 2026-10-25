@@ -1,0 +1,34 @@
+{
+  "hypotheses": [
+    {
+      "claim": "Read victory and defeat conditions before moving a unit",
+      "priority": "high",
+      "states": [
+        "TACTICAL_PHASE"
+      ]
+    },
+    {
+      "claim": "Check enemy threat range, terrain, counterattacks, and escape route before committing movement",
+      "priority": "high",
+      "states": [
+        "TACTICAL_PHASE"
+      ]
+    },
+    {
+      "claim": "Information and guaranteed actions should generally precede irreversible risky actions",
+      "priority": "high",
+      "states": [
+        "TACTICAL_PHASE"
+      ]
+    }
+  ],
+  "id": "srpg",
+  "name": "Strategy RPG / Tactical RPG",
+  "policy": "Hypothesis generator only. Exact game evidence overrides every entry.",
+  "schema_version": 1,
+  "states": [
+    "TACTICAL_PHASE",
+    "COMBAT",
+    "RESULTS"
+  ]
+}

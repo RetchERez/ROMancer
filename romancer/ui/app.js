@@ -1,0 +1,116 @@
+import {disposeAudio} from './runtime_setup.js';
+import {runScoped,chooseArtifact,shouldSaveField,retainedScroll,rememberDetails,restoreDetails} from './workbench_usability.js';
+import {ensureRomScan} from './rom_scan.js';
+import {ensureGraphicsObservation} from './graphics_investigation.js';
+import {projectActions} from './project_manager.js';
+import {createTutorial} from './tutorial.js';
+import * as tutorials from './views/tutorials.js';
+import {readPreference,writePreference,removePreference} from './preferences.js';
+import * as automation from './views/automation.js';
+import {stopPlayback} from './playback_controls.js';
+import * as tables from './views/tables.js';
+import {selectionTicket,selectionCurrent,clearProjectState,releaseProjectResources,DraftQueue,droppedSource,helpForError} from './project_flow.js';
+import * as help from './views/help.js';
+import {applyInterfaceScale} from './interface_scale.js';
+import {api} from './api.js';
+import {icon} from './icons.js';
+import {esc,button,field,heading,requireProject,read,json} from './common.js';
+import * as overview from './views/overview.js';
+import * as resources from './views/resources.js';
+import * as scripts from './views/scripts.js';
+import * as assets from './views/assets.js';
+import * as playtest from './views/playtest.js';
+import * as debug from './views/debug.js';
+import * as routes from './views/routes.js';
+import * as regression from './views/regression.js';
+import * as release from './views/release.js';
+import * as settings from './views/settings.js';
+import * as levels from './views/levels.js';
+import * as sound from './views/sound.js';
+export let startupReady=false;
+applyInterfaceScale(readPreference('romancer-scale')||100);
+window.addEventListener('resize',()=>applyInterfaceScale(readPreference('romancer-scale')||100));
+const views={tutorials,overview,resources,scripts,assets,levels,sound,tables,automation,playtest,debug,routes,regression,release,help,settings};
+const names={tutorials:'Tutorials',automation:'Recipes & definitions',overview:'Overview',resources:'Resources',scripts:'Text & layout',assets:'Graphics & fonts',levels:'Levels',sound:'Music & sound',tables:'Data tables',playtest:'Playtest',debug:'Troubleshooting',routes:'Routes',regression:'Regression',release:'Export',settings:'Settings',help:'Help'};
+const state={page:'overview',projects:[],project:null,artifact:null,capabilities:null,drafts:{},results:{},pending:null,job:null,runtime:null,frame:null,snapshot:null};
+let actions={},renderRevision=0,toastTimer,lastRenderedScope=null;
+const draftRevisions=new Map(),draftWrites=new DraftQueue(),loadedDrafts=new Set();let lastDraft=null;
+async function flushDrafts(){await draftWrites.flush();}
+function clearDraftCache(){draftWrites.clear();draftRevisions.clear();loadedDrafts.clear();state.drafts={};lastDraft=null;}
+function saveDraft(id,value){if(!state.project||!state.artifact)return;const project_id=state.project.project_id,artifact_id=state.artifact.artifact_id,key=draftFieldKey(id),full=[project_id,artifact_id,key].join(':');state.drafts[full]=value;lastDraft={project_id,artifact_id,key,full};draftWrites.enqueue(full,async()=>{let record=draftRevisions.get(full);if(!record)record=await api.call('drafts.get',{project_id,artifact_id,key});record=await api.call('drafts.save',{project_id,artifact_id,key,revision:record.revision,value});draftRevisions.set(full,record);},error=>notify('Draft not saved: '+error.message,true));}
+async function moveDraft(direction){await flushDrafts();if(!lastDraft)throw new Error('Edit a field first.');const {project_id,artifact_id,key,full}=lastDraft,record=draftRevisions.get(full);const result=await api.call('drafts.move',{project_id,artifact_id,key,revision:record.revision,direction});draftRevisions.set(full,result);state.drafts[full]=result.value;state.pending=null;if(key.endsWith(':paint-buffer'))state.paint=null;await render();}
+const ctx={state,api,navigate,notify,render,refreshProject,openProject,modal,closeModal:()=>document.getElementById('modal').close(),
+    draft:(id,fallback)=>state.drafts[draftKey(id)]??fallback,setDraft:saveDraft,
+    use:(handlers)=>Object.assign(actions,handlers),run,projectParams:()=>({project_id:state.project.project_id}),
+    sourceParams:()=>({project_id:state.project.project_id,artifact_id:state.artifact.artifact_id}),
+    setArtifact:async id=>{if(state.artifact?.artifact_id!==id)selectionTicket(state);stopPlayback(state);state.animationPlaying=false;await flushDrafts();if(state.runtime){await api.call('runtime.close',{project_id:state.project.project_id});state.runtime=null;state.frame=null;state.snapshot=null;}await flushDrafts();clearDraftCache();state.artifact=chooseArtifact(state.project,id);writePreference('romancer-artifact:'+state.project.project_id,state.artifact?.artifact_id||'');state.profileFamily=null;state.profileLoadedFamily=null;state.scriptPage=0;state.assetPage=0;state.catalogPage=0;state.catalogQuery='';state.pending=null;await render();}};
+const tutorial=createTutorial({...ctx,openProject,closeProject});
+function draftFieldKey(id){const doc=id.startsWith('script-segment-')?state.results['script.inspect']?.document_id:['paint-buffer','asset-changes'].includes(id)?state.results['assets.inspect']?.document_id:null;return [state.page,...(doc?[doc]:[]),id].join(':');}
+function draftKey(id){return [state.project?.project_id,state.artifact?.artifact_id,draftFieldKey(id)].join(':');}
+function errorNotice(){if(!state.lastError)return '';const advice=helpForError(state.lastError);return `<div class="notice warm actionable-error" role="alert"><p>${esc(state.lastError)}</p><div class="actions">${button(advice.label,'help-topic',{id:advice.topic})}${button('Dismiss','error-dismiss')}</div></div>`;}
+function notify(message,error=false){const toast=document.getElementById('toast');toast.textContent=message;if(error){state.lastError=String(message);const panel=document.getElementById('error-panel');if(panel)panel.innerHTML=errorNotice();const advice=helpForError(message),link=document.createElement('button');link.type='button';link.dataset.action='help-topic';link.dataset.id=advice.topic;link.textContent=advice.label;toast.append(document.createElement('br'),link);}toast.className=error?'error':'';toast.style.display='block';clearTimeout(toastTimer);toastTimer=setTimeout(()=>toast.style.display='none',error?10000:4500);}
+function modal(title,body){const node=document.getElementById('modal');node.innerHTML=`<div class="dialog-heading"><h2 id="modal-title">${esc(title)}</h2>${button('Close','close-modal',{icon:'close'})}</div>${body}`;if(!node.open)node.showModal();}
+async function refreshProject(){const id=state.project?.project_id;state.projects=(await api.call('projects.list')).projects;if(!id||state.project?.project_id!==id)return;const opened=await api.call('project.open',{project_id:id});if(state.project?.project_id!==id)return;state.project=opened;state.artifact=chooseArtifact(opened,state.artifact?.artifact_id);}
+
+function jobTray(){const job=state.job,active=job&&!['COMPLETED','FAILED','CANCELLED','INTERRUPTED'].includes(job.status);return `<div class="job-tray ${active?'working':''}"><div><span class="pulse"></span><strong>${active?'Working':job?.status==='FAILED'?'Action failed':job?.status==='CANCELLED'?'Cancelled':'Ready'}</strong><span> ${active?' — '+esc(job.message):''}</span></div>${active?button('Cancel job','cancel-job'):`<div class="actions">${state.tutorial?.minimized?button('Resume lesson','tutorial-toggle'):''}${button('Undo draft','draft-undo')}${button('Redo draft','draft-redo')}</div>`}</div>`;}
+function updateJob(job){state.job=job;const tray=document.querySelector('.job-tray');if(tray)tray.outerHTML=jobTray();}
+async function run(operation,parameters,options={}){return runScoped(ctx,operation,parameters,options,updateJob);}
+async function openProject(id){stopPlayback(state);const ticket=selectionTicket(state);await flushDrafts();if(!selectionCurrent(state,ticket))return;if(state.runtime&&state.project){await api.call('runtime.close',{project_id:state.project.project_id});state.runtime=null;state.frame=null;state.snapshot=null;}state.profileFamily=null;state.profileLoadedFamily=null;state.scriptPage=0;state.catalogPage=0;state.catalogQuery='';const opened=await api.call('project.open',{project_id:id});if(!selectionCurrent(state,ticket))return;await flushDrafts();if(!selectionCurrent(state,ticket))return;clearDraftCache();releaseProjectResources(state);state.project=opened;state.artifact=chooseArtifact(state.project,readPreference('romancer-artifact:'+state.project.project_id));state.results={};state.pending=null;writePreference('romancer-project',id);state.page='overview';await refreshProject();await render();}
+async function closeProject(){stopPlayback(state);state.animationPlaying=false;await flushDrafts();if(state.runtime&&state.project)await api.call('runtime.close',{project_id:state.project.project_id});await flushDrafts();clearDraftCache();clearProjectState(state);lastDraft=null;removePreference('romancer-project');await render();}
+async function navigate(page){stopPlayback(state);state.animationPlaying=false;await flushDrafts();if(!views[page])return;state.page=page;await render();document.getElementById('main')?.focus({preventScroll:true});}
+async function importDialog(){const dropped=state.droppedImportFile;modal(state.project?'Import ROM':'New ROM project',`${!state.project?field('new-project-name','Project name',dropped?dropped.name.replace(/\.[^.]+$/,''):'My ROM project'):''}<p>Your original file stays unchanged.</p>${dropped?`<p class="notice">Selected: <strong>${esc(dropped.name)}</strong></p>`:''}<label class="field"><span>Choose a ROM file</span><input type="file" id="import-file" accept=".nes,.sfc,.smc,.md,.gen,.bin,.gb,.gbc,.gba,.rom"></label><details class="config"><summary>Advanced path import</summary>${field('import-path','Absolute file path','',{placeholder:'C:\\Games\\My game.sfc'})}${button('Browse this computer','choose-input',{icon:'folder'})}<p>Use a path for files larger than64MiB.</p></details><div class="actions">${button('Import ROM','import-confirm',{primary:true,icon:'plus'})}${button('Import help','help-topic',{id:'import'})+button('Start a new project','new-project')}</div>`);}
+function showSearch(){const query=document.getElementById('global-search').value.toLowerCase().trim();const matches=Object.entries(names).filter(([key,value])=>value.toLowerCase().includes(query));modal('Workspace search',`<div class="search-results">${matches.map(([key,value])=>button(value,'search-open',{id:key,class:'search-result',icon:key})).join('')||'<p class="subtle">No matching views.</p>'}${state.project?[...state.project.sources,...state.project.builds].filter(a=>a.name.toLowerCase().includes(query)).map(a=>`<p class="subtle">${esc(a.name)} · ${esc(a.system)}<br>${esc(a.sha256)}</p>`).join(''):''}</div>`);}
+function baseActions(){return {
+ 'error-dismiss':()=>{state.lastError=null;document.getElementById('error-panel').innerHTML='';document.getElementById('toast').style.display='none';},
+ 'draft-undo':()=>moveDraft(-1),'draft-redo':()=>moveDraft(1),
+ 'navigate':node=>{document.getElementById('modal').close();return navigate(node.dataset.id);},'close-modal':()=>document.getElementById('tutorial-never')?tutorial.dismissPrompt(false):document.getElementById('modal').close(),
+ 'import':()=>{state.droppedImportFile=null;return importDialog();},
+ 'candidate-cancel':()=>{state.candidateReview=null;state.resourcePrefill=null;state.openDeclaration=null;return render();},
+ 'help-topic':node=>{state.helpTopic=node.dataset.id||({assets:'graphics',scripts:'text',resources:'discovery',release:'export',settings:'recovery',overview:'start',help:'start'}[state.page]||state.page);document.getElementById('modal').close();return navigate('help');},
+ 'workspace-search':showSearch,
+ 'demo-system':async node=>{const result=await run('project.demo_system',{system_id:node.dataset.id},{render:false});await openProject(result.project_id);notify('Workshop opened.');},
+ 'demo-nes':async()=>{const result=await run('project.demo_nes',{}, {render:false});await openProject(result.project_id);notify('NES workshop opened.');},
+ 'demo':async()=>{const result=await run('project.demo',{}, {render:false});await openProject(result.project_id);notify('Harbor workshop opened.');},
+ 'open-project':node=>openProject(node.dataset.id),
+ 'choose-input':async()=>{const result=await run('system.pick_file',{}, {refresh:false,render:false});if(result.path)document.getElementById('import-path').value=result.path;},
+ 'import-confirm':async()=>{const file=document.getElementById('import-file').files[0]||state.droppedImportFile,path=read('import-path').trim();if(!file&&!path)throw new Error('Select a source file or enter its absolute path.');if(!state.project){state.project=await api.call('project.create',{name:read('new-project-name')});writePreference('romancer-project',state.project.project_id);}if(file)await api.upload(state.project.project_id,file);else await run('source.import',{project_id:state.project.project_id,path,system:null},{render:false});document.getElementById('modal').close();state.droppedImportFile=null;await refreshProject();state.artifact=state.project.sources.at(-1);state.page='resources';await render();notify('Source copied into the project. Original preserved.');},
+ 'cancel-job':async()=>{if(state.job)updateJob(await api.call('jobs.cancel',{job_id:state.job.job_id}));},
+ 'about':()=>modal('About ROMancer',`<div class="brand"><img src="/mark.svg" alt=""><div><strong>ROMancer</strong><small>By RetchEWretched</small></div></div><p>A local workbench for investigating, editing, and testing retro game resources.</p><div class="notice">Version ${esc(state.capabilities?.display_version||state.capabilities?.version)} · NES · SNES · GEN · Game Boy · GBA</div><p class="subtle">Python ${esc(state.capabilities?.python)} · ${esc(state.capabilities?.platform)}<br>Local projects · Content-bound builds · Independent BPS verification</p>${button('Capabilities & settings','navigate',{id:'settings'})}`),
+ 'download':async node=>api.download(state.project.project_id,node.dataset.id,node.dataset.name||'romancer-export'),
+ 'search-open':node=>{document.getElementById('modal').close();navigate(node.dataset.id);},
+ ...projectActions({...ctx,closeProject,flushDrafts,importDialog}),
+ };}
+async function render(){
+ if(document.getElementById('app')?.dataset.startupRecovered==='true')return;
+ disposeAudio();state.soundPlayer?.close();state.soundPlayer=null;state.animationClock?.stop();state.animationClock=null;
+ const revision=++renderRevision,previousScroll=document.getElementById('main')?.scrollTop||0,renderScope=[state.project?.project_id,state.artifact?.artifact_id,state.page].join(':'),details=rememberDetails(document.getElementById('main'));actions=baseActions();tutorial.bind();
+ const project=state.project,artifacts=project?[...project.sources,...project.builds]:[];
+ document.getElementById('app').innerHTML=`<div class="shell"><aside class="sidebar"><a class="brand" href="#" data-action="navigate" data-id="overview"><img src="/mark.svg" alt=""><div><strong>ROMancer</strong><small>By RetchEWretched</small></div></a><div class="nav-label">Workspace</div><nav aria-label="Workbench">${['overview','resources','scripts','assets','levels','sound','playtest','release'].map(k=>`<button class="nav-item ${state.page===k?'active':''}" data-action="navigate" data-id="${k}" title="${names[k]}" ${state.page===k?'aria-current="page"':''}>${icon(k)}<span>${names[k]}</span></button>`).join('')}<details class="more-tools" ${['tables','automation','debug','routes','regression'].includes(state.page)?'open':''}><summary title="More tools">More tools</summary>${['tables','automation','debug','routes','regression'].map(k=>`<button class="nav-item ${state.page===k?'active':''}" data-action="navigate" data-id="${k}" title="${names[k]}">${icon(k)}<span>${names[k]}</span></button>`).join('')}</details></nav><div class="sidebar-bottom"><button class="nav-item" data-action="navigate" data-id="help" title="Help">${icon('shield')}<span>Help</span></button><button class="nav-item" data-action="projects-manage" title="Projects">${icon('folder')}<span>Projects</span></button><button class="nav-item ${state.page==='settings'?'active':''}" data-action="navigate" data-id="settings" title="Settings">${icon('settings')}<span>Settings</span></button><button class="nav-item" data-action="about" title="About ROMancer">${icon('shield')}<span>About</span></button><div class="local-label"><span class="dot"></span>Runs on your computer</div></div></aside><header class="topbar"><div class="project-control">${icon('folder')}<div><small>ACTIVE PROJECT</small><br><select id="project-select" aria-label="Active project"><option value="">Choose a project</option>${state.projects.map(p=>`<option value="${p.project_id}" ${project?.project_id===p.project_id?'selected':''}>${esc(p.name)}</option>`).join('')}</select></div>${button('New project','new-project',{icon:'plus',class:'compact'})}</div>${artifacts.length?`<div class="project-control source-selector"><div><small>SELECTED SOURCE / BUILD</small><br><select id="artifact-select" aria-label="Selected source or build">${artifacts.map(a=>`<option value="${a.artifact_id}" ${state.artifact?.artifact_id===a.artifact_id?'selected':''}>${esc(a.name)}</option>`).join('')}</select></div></div>`:''}<label class="search">${icon('search')}<input id="global-search" placeholder="Search workspace" aria-label="Search workspace"><kbd>Ctrl K</kbd><button type="button" data-action="workspace-search" aria-label="Run workspace search" class="search-go">Go</button></label></header><main id="main" tabindex="-1"><div class="loading">Opening ${names[state.page]}…</div></main>${jobTray()}${tutorial.panel()}</div>`;
+ const view=views[state.page];let html;
+ if(project&&state.artifact){const scope=project.project_id+':'+state.artifact.artifact_id;if(!loadedDrafts.has(scope)){try{const saved=await api.call('drafts.list',ctx.sourceParams());for(const d of saved.drafts){const full=scope+':'+d.key;if(!(full in state.drafts))state.drafts[full]=d.value;draftRevisions.set(full,d);}loadedDrafts.add(scope);}catch(error){notify(error.message,true);}}}
+ try{if(revision!==renderRevision)return;html=await view.render({...ctx,isCurrentRender:()=>revision===renderRevision,use:handlers=>{if(revision===renderRevision)ctx.use(handlers);}});}catch(error){html=`${heading('Workspace',names[state.page],'')}<div class="card"><p class="error">${esc(error.message)}</p>${button('Return to overview','navigate',{id:'overview'})}</div>`;}
+ if(revision!==renderRevision)return;
+ if(document.getElementById('app')?.dataset.startupRecovered==='true')return;
+ document.getElementById('main').innerHTML=`<div id="error-panel">${errorNotice()}</div>`+html;
+ if(lastRenderedScope===renderScope)restoreDetails(document.getElementById('main'),details);
+ await view.mount?.(ctx);tutorial.mount();document.getElementById('main').scrollTop=retainedScroll(lastRenderedScope,renderScope,previousScroll);lastRenderedScope=renderScope;
+ void ensureRomScan(ctx);
+ void ensureGraphicsObservation(ctx);
+}
+document.addEventListener('click',async event=>{const node=event.target.closest('[data-action]');if(!node||node.disabled)return;event.preventDefault();const handler=actions[node.dataset.action];if(!handler)return;node.disabled=true;try{await handler(node,event);}catch(error){notify(error.message,true);}finally{if(node.isConnected)node.disabled=false;}});
+document.addEventListener('input',event=>{if(shouldSaveField(event.target)){state.pending=null;saveDraft(event.target.id,event.target.value);}});
+document.addEventListener('change',async event=>{try{if(event.target.id==='project-select'){if(event.target.value)await openProject(event.target.value);else await closeProject();}if(event.target.id==='import-file')state.droppedImportFile=null;if(event.target.id==='artifact-select')await ctx.setArtifact(event.target.value);}catch(error){notify(error.message,true);}});
+document.addEventListener('keydown',event=>{if((event.ctrlKey||event.metaKey)&&event.key.toLowerCase()==='k'){event.preventDefault();document.getElementById('global-search')?.focus();}if(event.key==='Enter'&&event.target.id==='global-search'){showSearch()}});
+async function initialize(){
+try{state.capabilities=await api.call('system.capabilities');state.projects=(await api.call('projects.list')).projects;const last=readPreference('romancer-project');if(state.projects.some(p=>p.project_id===last)){state.project=await api.call('project.open',{project_id:last});state.artifact=chooseArtifact(state.project,readPreference('romancer-artifact:'+state.project.project_id));}await render();if(document.getElementById('app')?.dataset.startupRecovered!=='true'){startupReady=true;void tutorial.init();}}catch(error){if(document.getElementById('app')?.dataset.startupRecovered!=='true')document.getElementById('app').innerHTML=`<div class="boot"><img src="/mark.svg" alt=""><h1>Open ROMancer from its launcher</h1><p>${esc(error.message)}</p><small>By RetchEWretched</small></div>`;}
+
+}
+export const startup=initialize();
+
+document.addEventListener('dragover',event=>{if([...event.dataTransfer?.types||[]].includes('Files')){event.preventDefault();document.body.classList.add('file-drag');}});
+document.addEventListener('dragleave',event=>{if(!event.relatedTarget)document.body.classList.remove('file-drag');});
+document.addEventListener('drop',event=>{if(![...event.dataTransfer?.types||[]].includes('Files'))return;event.preventDefault();document.body.classList.remove('file-drag');try{state.droppedImportFile=droppedSource(event.dataTransfer.files);importDialog();}catch(error){notify(error.message,true);}});
+
+window.addEventListener('pagehide',()=>{stopPlayback(state);disposeAudio();state.soundPlayer?.close();state.animationClock?.stop();});
+
+document.getElementById('modal').addEventListener('cancel',event=>{if(document.getElementById('tutorial-never')){event.preventDefault();tutorial.dismissPrompt(false).catch(error=>notify(error.message,true));}});

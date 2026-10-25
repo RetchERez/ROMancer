@@ -1,0 +1,30 @@
+{
+  "hypotheses": [
+    {
+      "claim": "Examine scenes methodically and use clues before brute-forcing inventory combinations",
+      "priority": "high",
+      "states": [
+        "EXPLORATION",
+        "PUZZLE"
+      ]
+    },
+    {
+      "claim": "New information or items may make earlier locations relevant again",
+      "priority": "medium",
+      "states": [
+        "EXPLORATION",
+        "INVENTORY"
+      ]
+    }
+  ],
+  "id": "adventure",
+  "name": "Adventure / Point-and-Click",
+  "policy": "Hypothesis generator only. Exact game evidence overrides every entry.",
+  "schema_version": 1,
+  "states": [
+    "EXPLORATION",
+    "DIALOGUE",
+    "INVENTORY",
+    "PUZZLE"
+  ]
+}

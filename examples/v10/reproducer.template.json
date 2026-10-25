@@ -1,0 +1,11 @@
+{
+  "name": "example_failure",
+  "precondition": "Load a state immediately before the failing interaction",
+  "steps": [
+    {"input": "RIGHT", "frames": 12},
+    {"input": "A", "frames": 1},
+    {"wait": 20}
+  ],
+  "expected": "Expected state transition occurs",
+  "actual": "Transition does not occur"
+}

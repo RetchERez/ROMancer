@@ -1,0 +1,147 @@
+{
+  "schema_version": 1,
+  "id": "shadowrun_genesis",
+  "name": "Shadowrun (Genesis/Mega Drive)",
+  "game": "Shadowrun",
+  "system": "Genesis/Mega Drive",
+  "genre": "Action RPG",
+  "identity": {
+    "sha256": null,
+    "crc32": null,
+    "note": "No ROM hash is embedded. Bind a project profile to the user's image by hash."
+  },
+  "runtime": {
+    "preferred_cores": [
+      "Genesis Plus GX",
+      "PicoDrive"
+    ],
+    "boot_frames": 180,
+    "memory_monitoring_expected": true
+  },
+  "contexts": [
+    "field",
+    "menu",
+    "cybercombat",
+    "cyberdeck"
+  ],
+  "controls": {
+    "field": {
+      "move_up": [
+        "up"
+      ],
+      "move_down": [
+        "down"
+      ],
+      "move_left": [
+        "left"
+      ],
+      "move_right": [
+        "right"
+      ],
+      "attack": [
+        "y"
+      ],
+      "target": [
+        "b"
+      ],
+      "switch_character": [
+        "a"
+      ],
+      "open_pause_menu": [
+        "start"
+      ]
+    },
+    "menu": {
+      "cursor_up": [
+        "up"
+      ],
+      "cursor_down": [
+        "down"
+      ],
+      "cursor_left": [
+        "left"
+      ],
+      "cursor_right": [
+        "right"
+      ],
+      "select_primary": [
+        "y"
+      ],
+      "select_secondary": [
+        "b"
+      ],
+      "switch_character": [
+        "a"
+      ],
+      "exit": [
+        "start"
+      ]
+    },
+    "cybercombat": {
+      "cursor_left": [
+        "left"
+      ],
+      "cursor_right": [
+        "right"
+      ],
+      "offensive_program": [
+        "y"
+      ],
+      "neutral_program": [
+        "b"
+      ],
+      "defensive_program": [
+        "a"
+      ],
+      "open_cyberdeck": [
+        "start"
+      ]
+    },
+    "cyberdeck": {
+      "cursor_up": [
+        "up"
+      ],
+      "cursor_down": [
+        "down"
+      ],
+      "cursor_left": [
+        "left"
+      ],
+      "cursor_right": [
+        "right"
+      ],
+      "select_a": [
+        "y"
+      ],
+      "select_b": [
+        "b"
+      ],
+      "select_c": [
+        "a"
+      ],
+      "exit": [
+        "start"
+      ]
+    }
+  },
+  "memory_fields": [],
+  "state_signatures": [],
+  "scenarios": [],
+  "sources": [
+    {
+      "title": "Shadowrun Sega Genesis manual",
+      "url": "https://classicreload.com/sites/default/files/Shadowrun_-_1994_-_Sega.pdf",
+      "supports": "Overhead combat, menus, cybercombat, and cyberdeck controls"
+    },
+    {
+      "title": "Genesis Plus GX libretro input mapping source",
+      "url": "https://github.com/libretro/Genesis-Plus-GX/blob/master/libretro/libretro.c",
+      "supports": "Genesis controller to RetroPad button mapping used by the runtime profile"
+    }
+  ],
+  "limits": [
+    "This profile uses Libretro RetroPad labels, not the letters printed on a Genesis controller. With Genesis Plus GX, Genesis A maps to RetroPad Y, Genesis B to RetroPad B, and Genesis C to RetroPad A.",
+    "Core-reported input descriptors should be checked at runtime when a different core or controller device is used.",
+    "This profile does not assume map coordinates, quest flags, combat stats, or ROM-specific RAM offsets."
+  ]
+}

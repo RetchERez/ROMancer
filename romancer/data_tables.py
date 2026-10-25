@@ -1,0 +1,115 @@
+"""Declared numeric records and linear file pointers over exact source revisions."""
+from contextlib import contextmanager
+import json
+from pathlib import Path
+from .asset_schema import fields,label,number
+from .assets import checked_path,digest
+from .script_schema import canonical_bytes
+from .workbench_projects import _measure
+
+TYPES={prefix+str(bits):(bits//8,prefix=='s') for prefix in ('u','s') for bits in (8,16,24,32)}
+
+
+def validate_definition(definition,size):
+    definition=json.loads(canonical_bytes(definition,max_bytes=65536))
+    fields(definition,'schema_version name offset count stride fields')
+    if type(definition['schema_version']) is not int or definition['schema_version']!=1:raise ValueError('unsupported table definition version')
+    label(definition['name'],64);number(definition['offset'],0,size);number(definition['count'],1,65536);number(definition['stride'],1,65536)
+    if definition['offset']+definition['count']*definition['stride']>size:raise ValueError('table records extend beyond the source')
+    rows=definition['fields']
+    if type(rows) is not list or not 1<=len(rows)<=32:raise ValueError('define1..32 named table fields')
+    occupied=[];names=set()
+    for field in rows:
+        fields(field,'name offset type endian pointer_base');label(field['name'],64)
+        key=field['name'].casefold()
+        if key in names:raise ValueError('table field names must be unique')
+        names.add(key)
+        if field['type'] not in TYPES or field['endian'] not in ('little','big'):raise ValueError('choose a supported numeric type and byte order')
+        width,signed=TYPES[field['type']];number(field['offset'],0,definition['stride']-1)
+        if field['offset']+width>definition['stride']:raise ValueError('table field extends beyond its record stride')
+        if field['pointer_base'] is not None:
+            number(field['pointer_base'],0,0xffffffff)
+            if signed:raise ValueError('linear pointers use an unsigned numeric field')
+        for start,end in occupied:
+            if field['offset']<end and start<field['offset']+width:raise ValueError('table fields overlap')
+        occupied.append((field['offset'],field['offset']+width))
+    return definition
+
+
+@contextmanager
+def _context(path,sha,definition):
+    path=checked_path(Path(path));source=_measure(path)
+    if not 1<=source['size']<=64*1024**2:raise ValueError('tables require a declared flat resource up to64MiB')
+    if source['sha256']!=sha:raise ValueError('source revision changed; inspect the current table')
+    definition=validate_definition(definition,source['size'])
+    with path.open('rb') as stream:
+        yield stream,source,definition
+        _measure(path,source)
+
+
+def _read(stream,definition,row,field,size):
+    width,signed=TYPES[field['type']];offset=definition['offset']+row*definition['stride']+field['offset']
+    stream.seek(offset);raw=stream.read(width)
+    if len(raw)!=width:raise ValueError('table source changed while reading')
+    value=int.from_bytes(raw,field['endian'],signed=signed)
+    target=value-field['pointer_base'] if field['pointer_base'] is not None else None
+    resolved=target is not None and 0<=target<size
+    return {'field':field['name'],'value':value,'offset':offset,'raw_hex':raw.hex(),'target_offset':target if resolved else None,
+            'pointer_resolution':('declared-linear-file-offset' if resolved else 'unresolved') if field['pointer_base'] is not None else None}
+
+
+def _check_value(value,field):
+    width,signed=TYPES[field['type']];bits=width*8
+    minimum=-(1<<(bits-1)) if signed else 0;maximum=(1<<(bits-1 if signed else bits))-1
+    if type(value) is not int or not minimum<=value<=maximum:raise ValueError(f"{field['name']} must be an integer from{minimum} to{maximum}")
+    return value.to_bytes(width,field['endian'],signed=signed)
+
+
+def inspect_table(path,sha,definition,page=0,limit=50):
+    number(page,0,65535);number(limit,1,100)
+    with _context(path,sha,definition) as (stream,source,definition):
+        rows=[{'index':row,'offset':definition['offset']+row*definition['stride'],
+               'cells':[_read(stream,definition,row,field,source['size']) for field in definition['fields']]}
+              for row in range(page*limit,min((page+1)*limit,definition['count']))]
+    return {'ok':True,'status':'INSPECTED','source_sha256':sha,'document_id':digest({'source_sha256':sha,'definition':definition}),
+            'definition':definition,'rows':rows,'page':page,'limit':limit,'total':definition['count'],'pointer_formula':'target file offset = stored value - base'}
+
+
+def table_edits(path,sha,definition,changes):
+    changes=json.loads(canonical_bytes(changes,max_bytes=256*1024))
+    if type(changes) is not list or not 1<=len(changes)<=1024:raise ValueError('review1..1024 table changes at a time')
+    edits=[];seen=set()
+    with _context(path,sha,definition) as (stream,source,definition):
+        named={field['name']:field for field in definition['fields']}
+        for change in changes:
+            fields(change,'row field before after');number(change['row'],0,definition['count']-1)
+            field=named.get(change['field'])
+            if field is None:raise ValueError('unknown table field')
+            key=(change['row'],change['field'])
+            if key in seen:raise ValueError('duplicate changes target the same table field')
+            seen.add(key);current=_read(stream,definition,change['row'],field,source['size'])
+            _check_value(change['before'],field);replacement=_check_value(change['after'],field)
+            if current['value']!=change['before']:raise ValueError('table old-value precondition failed; inspect the current revision')
+            if current['raw_hex']!=replacement.hex():edits.append({'offset':current['offset'],'before':current['raw_hex'],'after':replacement.hex()})
+    if not edits:raise ValueError('change at least one table value before reviewing a build')
+    return sorted(edits,key=lambda row:row['offset'])
+
+
+def batch_changes(path,sha,definition,field_name,operation,value,first,count):
+    number(first,0,65535);number(count,1,1024)
+    if operation not in ('set','add','multiply','percent') or type(value) is not int or abs(value)>0xffffffff:raise ValueError('choose a bounded numeric set/add/multiply/percent operation')
+    if operation=='percent':number(value,-100,1000)
+    changes=[]
+    with _context(path,sha,definition) as (stream,source,definition):
+        if first+count>definition['count']:raise ValueError('batch extends beyond table records')
+        field=next((field for field in definition['fields'] if field['name']==field_name),None)
+        if field is None:raise ValueError('choose a declared field for the batch')
+        for row in range(first,first+count):
+            before=_read(stream,definition,row,field,source['size'])['value']
+            after=value if operation=='set' else before+value if operation=='add' else before*value
+            if operation=='percent':
+                scaled=before*(100+value);after=((abs(scaled)+50)//100)*(1 if scaled>=0 else -1)
+            try:_check_value(after,field)
+            except ValueError as error:raise ValueError(f'row {row}: {error}') from error
+            if after!=before:changes.append({'row':row,'field':field_name,'before':before,'after':after})
+    return changes

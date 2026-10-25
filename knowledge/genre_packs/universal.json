@@ -1,0 +1,59 @@
+{
+  "hypotheses": [
+    {
+      "claim": "Read visible UI/objective before acting",
+      "priority": "high",
+      "states": [
+        "UNKNOWN",
+        "TITLE",
+        "MAIN_MENU",
+        "DIALOGUE",
+        "EXPLORATION"
+      ]
+    },
+    {
+      "claim": "Prefer reversible information-gain actions under uncertainty",
+      "priority": "high",
+      "states": [
+        "UNKNOWN",
+        "EXPLORATION",
+        "SHOP",
+        "PUZZLE"
+      ]
+    },
+    {
+      "claim": "Verify observable state change after each intentional action",
+      "priority": "high",
+      "states": [
+        "DIALOGUE",
+        "EXPLORATION",
+        "COMBAT",
+        "SHOP",
+        "PUZZLE"
+      ]
+    },
+    {
+      "claim": "Preserve a real game save before irreversible commitment when supported",
+      "priority": "high",
+      "states": [
+        "SHOP",
+        "EXPLORATION",
+        "MAIN_MENU"
+      ]
+    }
+  ],
+  "id": "universal",
+  "name": "Universal Game-Playing Method",
+  "policy": "Hypothesis generator only. Exact game evidence overrides every entry.",
+  "schema_version": 1,
+  "states": [
+    "UNKNOWN",
+    "TITLE",
+    "MAIN_MENU",
+    "DIALOGUE",
+    "EXPLORATION",
+    "COMBAT",
+    "SHOP",
+    "PUZZLE"
+  ]
+}

@@ -1,0 +1,7 @@
+{
+  "verb": "talk",
+  "target": "Engineer",
+  "destination": "Laboratory",
+  "completion_signal": "dialogue event advances",
+  "verified": true
+}

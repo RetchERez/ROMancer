@@ -1,0 +1,11 @@
+{
+  "name": "romancer",
+  "version": "1.0.15",
+  "private": true,
+  "type": "module",
+  "description": "ROMancer local retro resource workbench — By RetchEWretched",
+  "license": "MIT",
+  "engines": {"node": ">=20"},
+  "scripts": {"build": "node tools/build_ui.mjs", "test": "node tools/check_ui.mjs"},
+  "devDependencies": {"esbuild": "0.25.12"}
+}

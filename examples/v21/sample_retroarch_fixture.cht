@@ -1,0 +1,7 @@
+cheats = 2
+cheat0_desc = "Game Genie Infinite Lives"
+cheat0_code = "SXIOPO"
+cheat0_enable = false
+cheat1_desc = "Pro Action Replay Max Gold"
+cheat1_code = "7E1234FF"
+cheat1_enable = false

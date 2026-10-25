@@ -1,0 +1,35 @@
+{
+  "hypotheses": [
+    {
+      "claim": "Jump height or distance may depend on hold duration, run-up, momentum, or air control",
+      "priority": "medium",
+      "states": [
+        "EXPLORATION"
+      ]
+    },
+    {
+      "claim": "Difficult jumps should be practiced from a safe repeatable anchor",
+      "priority": "high",
+      "states": [
+        "EXPLORATION"
+      ]
+    },
+    {
+      "claim": "A missed jump is usually an execution problem before it is a progression problem",
+      "priority": "high",
+      "states": [
+        "DEATH",
+        "EXPLORATION"
+      ]
+    }
+  ],
+  "id": "platformer",
+  "name": "Platformer",
+  "policy": "Hypothesis generator only. Exact game evidence overrides every entry.",
+  "schema_version": 1,
+  "states": [
+    "EXPLORATION",
+    "COMBAT",
+    "DEATH"
+  ]
+}

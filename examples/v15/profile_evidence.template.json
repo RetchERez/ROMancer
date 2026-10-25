@@ -1,0 +1,7 @@
+{
+  "game": {"title": "Example Game", "rom_sha256": "REPLACE_ME"},
+  "facts": [
+    {"key": "movement", "value": "4-direction", "status": "VERIFIED", "evidence": ["runtime scenario movement_probe"]},
+    {"key": "confirm", "value": "A", "status": "PLAUSIBLE", "evidence": ["genre convention only"]}
+  ]
+}

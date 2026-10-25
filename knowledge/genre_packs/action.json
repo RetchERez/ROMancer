@@ -1,0 +1,26 @@
+{
+  "hypotheses": [
+    {
+      "claim": "Read threat, position, act, evade or defend, then reposition",
+      "priority": "medium",
+      "states": [
+        "COMBAT"
+      ]
+    },
+    {
+      "claim": "Button mashing may waste resources or commit unsafe recovery",
+      "priority": "medium",
+      "states": [
+        "COMBAT"
+      ]
+    }
+  ],
+  "id": "action",
+  "name": "General Action",
+  "policy": "Hypothesis generator only. Exact game evidence overrides every entry.",
+  "schema_version": 1,
+  "states": [
+    "EXPLORATION",
+    "COMBAT"
+  ]
+}

@@ -1,0 +1,34 @@
+{
+  "hypotheses": [
+    {
+      "claim": "Advance dialogue one page at a time and wait for the next state",
+      "priority": "high",
+      "states": [
+        "DIALOGUE"
+      ]
+    },
+    {
+      "claim": "Read all visible choices and current focus before confirming",
+      "priority": "high",
+      "states": [
+        "DIALOGUE_CHOICE"
+      ]
+    },
+    {
+      "claim": "Backlog or history may recover accidentally advanced text",
+      "priority": "medium",
+      "states": [
+        "DIALOGUE"
+      ]
+    }
+  ],
+  "id": "visual_novel",
+  "name": "Visual Novel",
+  "policy": "Hypothesis generator only. Exact game evidence overrides every entry.",
+  "schema_version": 1,
+  "states": [
+    "DIALOGUE",
+    "DIALOGUE_CHOICE",
+    "MAIN_MENU"
+  ]
+}

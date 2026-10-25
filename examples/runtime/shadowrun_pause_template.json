@@ -1,0 +1,18 @@
+{
+  "name": "shadowrun_pause_template",
+  "description": "Template for a known Shadowrun Genesis field anchor. It uses semantic controls so Genesis A/B/C versus RetroPad mapping remains profile-owned.",
+  "context": "field",
+  "boot_frames": 1,
+  "default_memory": ["system_ram"],
+  "stop_on_fail": true,
+  "steps": [
+    {"action": "note", "text": "Replace PLACEHOLDER.state with a same-core state at a safe field anchor."},
+    {"action": "load_state", "path": "PLACEHOLDER.state", "settle_frames": 1},
+    {"action": "checkpoint", "name": "field", "memory": ["system_ram"], "screenshot": true},
+    {"action": "tap", "intent": "open_pause_menu", "context": "field", "hold_frames": 1, "settle_frames": 4},
+    {"action": "checkpoint", "name": "pause", "memory": ["system_ram"], "screenshot": true},
+    {"action": "assert_frame_changed", "from": "field", "to": "pause", "min_changed_cell_ratio": 0.001},
+    {"action": "tap", "intent": "exit", "context": "menu", "hold_frames": 1, "settle_frames": 4},
+    {"action": "assert_not_shutdown"}
+  ]
+}

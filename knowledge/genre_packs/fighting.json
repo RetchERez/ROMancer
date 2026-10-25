@@ -1,0 +1,26 @@
+{
+  "hypotheses": [
+    {
+      "claim": "Learn movement, defense, one safe attack, and punish timing before complex combos",
+      "priority": "high",
+      "states": [
+        "COMBAT"
+      ]
+    },
+    {
+      "claim": "Range and recovery determine whether an attack is safely usable",
+      "priority": "medium",
+      "states": [
+        "COMBAT"
+      ]
+    }
+  ],
+  "id": "fighting",
+  "name": "Fighting Game",
+  "policy": "Hypothesis generator only. Exact game evidence overrides every entry.",
+  "schema_version": 1,
+  "states": [
+    "COMBAT",
+    "RESULTS"
+  ]
+}

@@ -1,0 +1,17 @@
+import {esc,button,field,select,read,size} from './common.js';
+import {selectionKey,fileInput} from './tool_inputs.js';
+import {stopPlayback} from './playback_controls.js';
+export function saveManager(ctx,listing){
+ const {state}=ctx,ticket=selectionKey(state),active=state.runtime?.artifact_id===state.artifact?.artifact_id,current=()=>selectionKey(state)===ticket;
+ ctx.use({
+  'save-capture':async()=>{stopPlayback(state);await ctx.run('saves.capture',{...ctx.sourceParams(),name:read('save-name')},{render:false});if(current()){ctx.notify('Battery save backed up.');await ctx.render();}},
+  'save-import':async()=>{stopPlayback(state);const file=document.getElementById('save-file').files[0],name=read('save-name'),params=ctx.sourceParams();if(!file)throw Error('Choose a raw .sav or .srm file first.');const input=await ctx.api.uploadInput(params.project_id,file,'save');if(!current())throw Error('The ROM changed. Import for the selected ROM again.');await ctx.run('saves.import',{...params,input_id:input.input_id,name},{render:false});if(current()){ctx.notify('Save imported. Restart explicitly to use it.');await ctx.render();}},
+  'save-export':async()=>{const params=ctx.sourceParams(),result=await ctx.run('saves.export',{...params,save_id:read('save-choice')},{render:false});if(current())await ctx.api.download(params.project_id,result.export.export_id,'battery-save.sav');},
+  'save-restore':async()=>{stopPlayback(state);const params=ctx.sourceParams();try{const result=await ctx.run('saves.restore',{...params,save_id:read('save-choice')},{render:false,refresh:false});if(!current())return;state.runtime=result.runtime;state.frame=null;ctx.notify('Restarted with selected save. Previous RAM is in an automatic backup.');}catch(error){const status=await ctx.api.call('runtime.status',{project_id:params.project_id}).catch(()=>null);if(current()&&status?.active===false){state.runtime=null;state.frame=null;}throw error;}finally{if(current())await ctx.render();}}
+ });
+ const saves=listing.saves;
+ return `<section class="card"><h3>Battery saves</h3><p>Raw game saves, separate from emulator save states.</p>${active?'':'<p class="notice">Load the selected ROM before importing, capturing or restoring a save.</p>'}
+ ${field('save-name','Save name',ctx.draft('save-name','My progress'))}${fileInput('save-file','Raw save file','.sav,.srm')}<div class="actions">${button('Back up current save','save-capture',{disabled:!active})}${button('Import save','save-import',{disabled:!active})}</div>
+ ${saves.length?`${select('save-choice','Saved progress',saves.map(r=>[r.save_id,`${r.name} · ${size(r.size)}${r.origin==='automatic_backup'?' · automatic backup':''}`]),ctx.draft('save-choice',saves.at(-1).save_id))}<div class="actions">${button('Download selected save','save-export')}${button('Restart with selected save','save-restore',{disabled:!active})}</div><p class="subtle">Restart makes an automatic backup first. Matching ROM, core, setup and save size are required.</p>`:'<p class="subtle">No battery saves captured for this exact ROM revision yet.</p>'}
+ ${listing.truncated?'<p>Only the first 512 session records were inspected. Keep a private backup of older sessions.</p>':''}<details><summary>Supported save format</summary><p>Raw exposed cartridge save RAM, up to 8 MiB, with the exact size reported by the loaded core. Wrapped saves and save states need their original tool to export a raw save. Capturing RAM does not prove an in-game save event.</p></details></section>`;
+}

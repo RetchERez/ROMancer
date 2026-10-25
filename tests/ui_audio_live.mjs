@@ -1,0 +1,18 @@
+import assert from 'node:assert/strict';
+import {existsSync} from 'node:fs';
+assert.ok(existsSync('romancer/ui/audio_live.js'),'live audio scheduler missing');
+const {decodePCM,LiveAudio}=await import('../romancer/ui/audio_live.js');
+const packet={format:'s16le',channels:2,sample_rate:44100,captured_frames:2,complete:true,dropped_frames:0,invalid_batches:0,pcm_s16le_base64:'AID/fwAAAEA='};
+const decoded=decodePCM(packet);assert.deepEqual([...decoded.left],[-1,0]);assert.deepEqual([...decoded.right],[32767/32768,.5]);
+for(const patch of [{complete:false},{sample_rate:0},{captured_frames:3},{pcm_s16le_base64:'!!!!'},{dropped_frames:1}])assert.throws(()=>decodePCM({...packet,...patch}));
+const nodes=[],context={currentTime:0,state:'running',destination:{},createGain:()=>({gain:{value:1},connect(){},disconnect(){}}),createBuffer:(n,l,r)=>({copyToChannel(){},duration:l/r}),createBufferSource:()=>{const node={connect(){},disconnect(){},start(t){this.time=t;},stop(){this.stopped=true;}};nodes.push(node);return node;},resume:async()=>{},close:async()=>{}};
+const audio=new LiveAudio(()=>context);await audio.start();const ticket=audio.ticket;audio.enqueue(packet,ticket);assert.equal(nodes.length,1);audio.stop();assert.ok(nodes[0].stopped);audio.enqueue(packet,ticket);assert.equal(nodes.length,1);
+await audio.start();for(let i=0;i<8;i++)audio.enqueue({...packet,sample_rate:8000,captured_frames:1600,pcm_s16le_base64:Buffer.alloc(6400).toString('base64')},audio.ticket);
+assert.ok(audio.queuedSeconds<=.25);audio.stop();
+let failedClosed=0,failedDisconnected=0;
+const failedAudio=new LiveAudio(()=>({...context,createGain:()=>({gain:{value:1},connect(){},disconnect(){failedDisconnected++;}}),resume:async()=>{throw Error('audio denied');},close:async()=>{failedClosed++;}}));
+await assert.rejects(failedAudio.start(),/audio denied/);
+assert.equal(failedClosed,1,'A failed audio start must release its AudioContext.');assert.equal(failedDisconnected,1);
+assert.equal(failedAudio.active,false);assert.equal(failedAudio.context,null);
+const {controllerButtons}=await import('../romancer/ui/playback_controls.js');assert.deepEqual(controllerButtons({buttons:[{pressed:true},{pressed:false}],axes:[-1,1]}),['b','left','down']);
+console.log('PCM literal channels, malformed packets, queue bound, cancellation and controller vectors passed.');

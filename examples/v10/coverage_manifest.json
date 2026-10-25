@@ -1,0 +1,7 @@
+{
+  "categories": {
+    "maps": {"known": ["intro", "town", "training"], "hit": ["intro", "town", "training"]},
+    "bosses": {"known": ["mad_mage"], "hit": ["mad_mage"]},
+    "optional_treasure": {"known": ["potion", "ether"], "hit": ["potion"], "excluded": ["ether"]}
+  }
+}

@@ -1,0 +1,30 @@
+{
+  "hypotheses": [
+    {
+      "claim": "Determine exactly what death loses and what persists before taking optional risk",
+      "priority": "high",
+      "states": [
+        "EXPLORATION",
+        "DEATH"
+      ]
+    },
+    {
+      "claim": "Survival and information may be more valuable than greedy optional rewards",
+      "priority": "medium",
+      "states": [
+        "EXPLORATION",
+        "COMBAT"
+      ]
+    }
+  ],
+  "id": "roguelike",
+  "name": "Roguelike / Roguelite",
+  "policy": "Hypothesis generator only. Exact game evidence overrides every entry.",
+  "schema_version": 1,
+  "states": [
+    "EXPLORATION",
+    "COMBAT",
+    "DEATH",
+    "SHOP"
+  ]
+}

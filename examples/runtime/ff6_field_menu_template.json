@@ -1,0 +1,18 @@
+{
+  "name": "ff6_field_menu_template",
+  "description": "Template for a known FFIII/FFVI field anchor. Supply a core-compatible state path or adapt the opening steps to reach a field before using these semantic actions.",
+  "context": "field",
+  "boot_frames": 1,
+  "default_memory": ["system_ram"],
+  "stop_on_fail": true,
+  "steps": [
+    {"action": "note", "text": "Replace PLACEHOLDER.state with a save state produced by the same core/version for the exact tested ROM."},
+    {"action": "load_state", "path": "PLACEHOLDER.state", "settle_frames": 1},
+    {"action": "checkpoint", "name": "field", "memory": ["system_ram"], "screenshot": true},
+    {"action": "tap", "intent": "open_subscreen", "context": "field", "hold_frames": 1, "settle_frames": 4},
+    {"action": "checkpoint", "name": "menu", "memory": ["system_ram"], "screenshot": true},
+    {"action": "assert_frame_changed", "from": "field", "to": "menu", "min_changed_cell_ratio": 0.001},
+    {"action": "tap", "intent": "cancel", "context": "menu", "hold_frames": 1, "settle_frames": 4},
+    {"action": "assert_not_shutdown"}
+  ]
+}

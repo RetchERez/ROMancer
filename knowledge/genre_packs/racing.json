@@ -1,0 +1,26 @@
+{
+  "hypotheses": [
+    {
+      "claim": "Learn acceleration, braking, steering, and track completion before optimizing shortcuts",
+      "priority": "high",
+      "states": [
+        "EXPLORATION"
+      ]
+    },
+    {
+      "claim": "Look ahead and reduce unnecessary steering corrections",
+      "priority": "medium",
+      "states": [
+        "EXPLORATION"
+      ]
+    }
+  ],
+  "id": "racing",
+  "name": "Racing / Driving",
+  "policy": "Hypothesis generator only. Exact game evidence overrides every entry.",
+  "schema_version": 1,
+  "states": [
+    "EXPLORATION",
+    "RESULTS"
+  ]
+}

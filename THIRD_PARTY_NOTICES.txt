@@ -1,0 +1,21 @@
+Third-party notices
+
+ROMancer — By RetchEWretched.
+
+Project code and original continuation fixtures are MIT licensed; see LICENSE.
+That grant does not replace the licenses of separately bundled dependencies.
+The development-only esbuild 0.25.12 tool is MIT licensed and pinned by package-lock.json.
+Its executable/package is not included in the running application or Windows ZIP.
+
+Existing attribution and license notices in distributed source files are preserved.
+
+The source-only archive requires a separately installed Python and Pillow. The Windows app package includes the official CPython 3.14.9 Windows amd64 embedded distribution and Pillow 12.3.0 cp314 Windows amd64 wheel. Versions, official source URLs and SHA-256 pins are recorded in RUNTIME-ORIGINS.json. CPython's full PSF and bundled third-party notices are preserved at python/LICENSE.txt. Pillow's MIT-CMU and bundled dependency notices are preserved at python/Lib/site-packages/pillow-12.3.0.dist-info/licenses/LICENSE, with its metadata and software bill of materials alongside them. No notices are removed from the pinned archives.
+
+The BPS format was designed by byuu. Its public-domain specification is referenced
+at https://floating.muncher.se/byuu/bps/bps_spec.html. ROMancer's encoder and decoder
+are implemented locally; no external patching executable is bundled.
+
+Emulator cores, system files, games, saves and commercial artwork are not included.
+Any separately supplied emulator core retains its own license and notices.
+The harbor demonstration, vector marks and fixture content are original to this
+ROMancer continuation. Browser fonts use the operating system's font stack.

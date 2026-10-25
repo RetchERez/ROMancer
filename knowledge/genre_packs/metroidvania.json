@@ -1,0 +1,28 @@
+{
+  "hypotheses": [
+    {
+      "claim": "Blocked routes may become accessible after acquiring a new ability or key",
+      "priority": "high",
+      "states": [
+        "EXPLORATION",
+        "MAP"
+      ]
+    },
+    {
+      "claim": "Previously blocked locations should be revisited after meaningful traversal upgrades",
+      "priority": "medium",
+      "states": [
+        "EXPLORATION",
+        "MAP"
+      ]
+    }
+  ],
+  "id": "metroidvania",
+  "name": "Metroidvania",
+  "policy": "Hypothesis generator only. Exact game evidence overrides every entry.",
+  "schema_version": 1,
+  "states": [
+    "EXPLORATION",
+    "MAP"
+  ]
+}

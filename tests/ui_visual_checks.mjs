@@ -1,0 +1,12 @@
+import assert from 'node:assert/strict';
+import {selectedRegion,visualFailures,checkpointControls} from '../romancer/ui/visual_controls.js';
+const rect={left:100,top:50,width:512,height:448};
+assert.deepEqual(selectedRegion(rect,{x:120,y:70},{x:160,y:110},256,224),{x:10,y:10,width:21,height:21});
+assert.deepEqual(selectedRegion(rect,{x:160,y:110},{x:120,y:70},256,224),{x:10,y:10,width:21,height:21});
+assert.throws(()=>selectedRegion(rect,{x:100,y:50},{x:612,y:498},512,448),/256/);
+const report={evidence_id:'abc',runtime_trusted:true,authentication:'current_application',report:{observations:[{kind:'frame_region',step:0,pass:false,changed_pixels:1,region:{x:1,y:2,width:2,height:1},actual_frame_sha256:'c'.repeat(64),visual:{expected_png_base64:'YWJj',actual_png_base64:'YWJj',difference_png_base64:'YWJj'}}]}};
+const html=visualFailures(report);assert.match(html,/Expected/);assert.match(html,/Actual/);assert.match(html,/Difference/);assert.match(html,/Current local execution/);
+assert.match(visualFailures({...report,runtime_trusted:false}),/Historical/);
+assert.match(visualFailures({report:report.report}),/Unverified/);
+const ctx={state:{project:{project_id:'p'},artifact:{artifact_id:'a',sha256:'s'},frame:null},use:()=>{}};assert.match(checkpointControls(ctx),/Record inputs/);
+console.log('Visual checkpoint selection maps pixels exactly and failure pictures show their evidence trust.');

@@ -1,0 +1,7 @@
+{
+  "gates": [
+    {"name": "full self-test", "kind": "json", "path": "reports/local_full_self_test.json", "required": true},
+    {"name": "patch ownership", "kind": "ledger", "path": "patch_ownership.json", "required": true},
+    {"name": "required behavior coverage", "kind": "coverage", "path": "coverage.json", "minimum": 95, "required": true}
+  ]
+}

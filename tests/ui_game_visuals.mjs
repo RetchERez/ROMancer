@@ -1,0 +1,10 @@
+import assert from 'node:assert/strict';
+import {gameVisual} from '../romancer/ui/game_visuals.js';
+const model={profile:{id:'chrono-trigger-usa'},fields:[{id:'power',type:'integer',value:3,min:1,max:255}]};
+assert.match(gameVisual(model,{power:'30'}),/900%/);assert.match(gameVisual(model,{power:'30'}),/Stored values/);
+assert.doesNotMatch(gameVisual(model,{power:'30'}),/Attack 23|damage/i);
+assert.match(gameVisual({...model,fields:[{id:'text',type:'text',value:'New game?'}]},{text:'New hack?'}),/New hack\?/);
+const p={...model,fields:[{id:'palette_style',type:'choice',value:'original'}],visual:{palettes:[{name:'Colors',current:[[255,0,0]],original:[[255,0,0]],teal_magenta:[[0,255,0]]}]}};
+assert.match(gameVisual(p,{palette_style:'teal_magenta'}),/0,255,0/);
+assert.match(gameVisual(p,{palette_style:'original'}),/0 changed colors/);
+console.log('Known game previews show exact numeric/text/color changes, without predicting in-game formulas or scenes.');

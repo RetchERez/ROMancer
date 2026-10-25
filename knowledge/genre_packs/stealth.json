@@ -1,0 +1,26 @@
+{
+  "hypotheses": [
+    {
+      "claim": "Observe patrols, detection state, cover, and escape route before committing movement",
+      "priority": "high",
+      "states": [
+        "EXPLORATION"
+      ]
+    },
+    {
+      "claim": "Detection may depend on line of sight, sound, light, distance, or scripted state and must be verified",
+      "priority": "medium",
+      "states": [
+        "EXPLORATION"
+      ]
+    }
+  ],
+  "id": "stealth",
+  "name": "Stealth",
+  "policy": "Hypothesis generator only. Exact game evidence overrides every entry.",
+  "schema_version": 1,
+  "states": [
+    "EXPLORATION",
+    "COMBAT"
+  ]
+}

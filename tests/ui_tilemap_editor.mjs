@@ -1,0 +1,11 @@
+import assert from 'node:assert/strict';
+import {paintMapCell,mapPixels,canvasCell} from '../romancer/ui/tilemap_editor.js';
+const doc={document_id:'d',bitmaps:[{id:'tiles',width:2,height:2,count:2,cells:[{pixels:[0,1,1,0]},{pixels:[1,0,0,1]}]}],palettes:[{id:'p',banks:1,colors_per_bank:2,entries:[{rgb:{r:0,g:0,b:0}},{rgb:{r:255,g:0,b:0}}]}]};
+const map={id:'map',width:2,height:1,bitmap_id:'tiles',palette_id:'p',fields:{tile_index:{kind:'bits',mask:1},palette_bank:{kind:'constant',value:0},flip_x:{kind:'bits',mask:2},flip_y:{kind:'constant',value:0}},entries:[0,1].map(index=>({index,values:{tile_index:0,palette_bank:0,flip_x:0,flip_y:0}}))};
+let changes=paintMapCell(doc,map,[],1,{tile_index:1,palette_bank:0,flip_x:1,flip_y:0});assert.equal(changes[0].entry_index,1);assert.equal(changes[0].before.tile_index,0);
+const pixels=mapPixels(doc,map,changes);assert.deepEqual([...pixels.slice(0,16)],[0,0,0,255,255,0,0,255,0,0,0,255,255,0,0,255]);
+assert.throws(()=>paintMapCell(doc,map,changes,0,{tile_index:2,palette_bank:0,flip_x:0,flip_y:0}),/tile/i);
+assert.throws(()=>paintMapCell(doc,map,changes,0,{tile_index:0,palette_bank:1,flip_x:0,flip_y:0}),/palette|constant/i);
+assert.equal(canvasCell({left:10,top:20,width:200,height:100},209,119,2,1),1);assert.equal(canvasCell({left:10,top:20,width:200,height:100},210,119,2,1),null);
+changes=paintMapCell(doc,map,changes,1,map.entries[1].values);assert.deepEqual(changes,[]);
+console.log('Map painting validates declared tiles/banks/flips, uses staged previews and maps displayed coordinates exactly.');

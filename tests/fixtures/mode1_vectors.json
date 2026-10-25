@@ -1,0 +1,41 @@
+{
+  "checker_commit": "2c59f198b4515cd87a8e7abe74c225af23058e98",
+  "checker_sha256": "a6fee5aa4f93acd27a24454a2292815f8892afbdc66d8223e859509da290bf07",
+  "generator": "ROMancer; independently checked, not independently generated",
+  "good": {
+    "exit_code": 0,
+    "stdout": "edccchk - CD image EDC/ECC Checker\nv1.27 (64-bit Linux)\n  Copyright (C) 2013 Natalia Portillo\n  http://www.claunia.com/\n  based on ecm v1.03\n  Copyright (C) 2002-2011 Neill Corlett\nChecking /tmp/romancer_reference_6ko1qkks/synthetic.bin...\nNon-data sectors........ 0\nMode 0 sectors.......... 0\n\twith errors..... 0\nMode 1 sectors.......... 4\n\twith errors..... 0\nMode 2 form 1 sectors... 0\n\twith errors..... 0\n\twith warnings... 0\nMode 2 form 2 sectors... 0\n\twith errors..... 0\n\twith warnings... 0\nFilled sectors.......... 0\nTotal sectors........... 4\nTotal errors............ 0\nTotal warnings.......... 0\nTotal errors+warnings... 0\nDone\n",
+    "stderr": "Analyze(00%)\n"
+  },
+  "bad": {
+    "exit_code": 0,
+    "stdout": "edccchk - CD image EDC/ECC Checker\nv1.27 (64-bit Linux)\n  Copyright (C) 2013 Natalia Portillo\n  http://www.claunia.com/\n  based on ecm v1.03\n  Copyright (C) 2002-2011 Neill Corlett\nChecking /tmp/romancer_reference_6ko1qkks/synthetic.bin...\nNon-data sectors........ 0\nMode 0 sectors.......... 0\n\twith errors..... 0\nMode 1 sectors.......... 4\n\twith errors..... 1\nMode 2 form 1 sectors... 0\n\twith errors..... 0\n\twith warnings... 0\nMode 2 form 2 sectors... 0\n\twith errors..... 0\n\twith warnings... 0\nFilled sectors.......... 0\nTotal sectors........... 4\nTotal errors............ 1\nTotal warnings.......... 0\nTotal errors+warnings... 1\nDone\n",
+    "stderr": "Analyze(00%)\nMode 1 sector with error at address: 00:02:00\n00:02:00: Failed EDC\n00:02:00: Failed ECC P\n00:02:00: Failed ECC Q\n"
+  },
+  "vectors": [
+    {
+      "seed": 0,
+      "header_hex": "00ffffffffffffffffffff0000020001",
+      "integrity_hex": "875189de00000000000000006d14a722799f9e3a4aef44d480fa439fcd12c593cc396995bcc487aca94eccb6419ac0b66a78c6879709ffc81daee5a9c934e5662b0cd47d5a709beefdf9fafa671d35dd5feb2e0c231129a14ad465c0e4160b085b59a14b992c894f1e3afabf64b4b06ae33f5d2225b31c896915ecb4e7cc39be6c56710ae016da284687e7599f68ed3e054959c445067b7cd4fd0ac03bce6dc91a5a978d55bd2fbbae0c93c18e01d1a981351251e3b1a152bd241c6fe0540bf6fdccf883b2f3ed3c51d8da0e5597d60395996170ab0fc7e9e0c02cc50e90c0f1622a36b7ead5b2515197dfce3d9852c1645e678f1d14f3a64a69ab9ee3d461c42bb4f2fa76f5de8a73d27d9195fb12d5770cafff8fa79656ac9f4c5e06333e71",
+      "sector_sha256": "33c5e1bfcf892d5a3897ef90ff9373417227b34ee70d18d035f8ff7afffe3231"
+    },
+    {
+      "seed": 1,
+      "header_hex": "00ffffffffffffffffffff0000020001",
+      "integrity_hex": "9163a1b40000000000000000cbee01352a73cd1d196d17afd332104e9e3396799f9e3a4aef44d480fa439fcd12c593cc396995bcc487aca94eccb6419ac0b66a78c6879709ffc81daee5a9c934e5662b0cd47d5a709b436e6267359db4bd5bec0bf706823e14da734dcda9cd373fe352b03e0ed376894f1e3afabf64b4b06ae33f5d2225b31c896915ecb4e7cc39be6c56710ae016da284687e7599f68ed3e054959c445067b7cd4fd0ac03bf38fd007d03b43a5b206f0cb536ade8c3b79e2787062bd747a20212564b452b11ad65c6534397a054dea7f50cf4b305f743d765251f412e3e0c4810c3c722d12d3fe9159be2a8f8d9166b76383c367348740e89a65ef51c6b826af56ba78c446bb510fb10c55184bbd6cb32fa73a8b026bc76a0d",
+      "sector_sha256": "32106cab4a6ac97e29ec99ee51528a18b87134ecdb17f07bcd697d58c226c968"
+    },
+    {
+      "seed": 17,
+      "header_hex": "00ffffffffffffffffffff0000020001",
+      "integrity_hex": "87b0bd0e0000000000000000e350d78c9f9e3a4aef44d480fa439fcd12c593cc396995bcc487aca94eccb6419ac0b66a78c6879709ffc81daee5a9c934e5662b0cd47d5a709beefdf9fafa671d35dd5feb2e0c2311bdc6017177c0e4160b085b5916be6cd87d4f1e3afabf64b4b06ae33f5d2225b31c896915ecb4e7cc39be6c56710ae016da284687e7599f68ed3e054959c445067b7cd4fd0ac03bce6dc91a5a978d55bd2fbbae0c93c19db0a36f9d351251e3b1a152da65476f6254e5f68acc008349f3ab3c81d83d0e6197ec8acf643bf226f98de9dfc056c54f90bef1ad2a46b72ed50a340255062875dbd7c16a5ee78fd21418a65d69fc9e79d4dbc465b407104f7b64a9c5956491a4fb3cd54a0c70ff84a79956739fface61f28b63a7",
+      "sector_sha256": "0d9d20eaf390570854feba3cbbae0820e3af187420edb34c635cc249c5ae9108"
+    },
+    {
+      "seed": 255,
+      "header_hex": "00ffffffffffffffffffff0000020001",
+      "integrity_hex": "f479f2bf00000000000000004db2848493cc396995bcc487aca94eccb6419ac0b66a78c6879709ffc81daee5a9c934e5662b0cd47d5a709beefdf9fafa671d35dd5feb2e0c2311bd61aafea93f4e8f8ebeb8895ffc42bd89d52703900a461658210956ec698bb31c896915ecb4e7cc39be6c56710ae016da284687e7599f68ed3e054959c445067b7cd4fd0ac03bce6dc91a5a978d55bd2fbbae0c93c19d819a6e099fdebfee9ee8395f7c924600e63a30640f0001e0280360ca1dad448f0a1f84414ac6bf3beaf0d1edfd8689d83f2893fe1d7c18991b51a3ef68d9cbeac9477119e393fddf9a62ddfa5e3c83764f02a884c967be9892e206a084529ab0884da0fac4b11018783c9317bf2833d558c89e775548bc956e73f5944799845e7525",
+      "sector_sha256": "84fd931d9ee31f73bc17c94d3eb90147c39d902aad8930e239211eca4edac29b"
+    }
+  ]
+}

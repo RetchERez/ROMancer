@@ -1,0 +1,15 @@
+import assert from 'node:assert/strict';
+import {runScoped,chooseArtifact,shouldSaveField,retainedScroll} from '../romancer/ui/workbench_usability.js';
+const original={artifact_id:'a',sha256:'s'},build={artifact_id:'b',sha256:'t'},project={project_id:'p',sources:[original],builds:[build]};
+assert.equal(chooseArtifact(project,'b'),build);assert.equal(chooseArtifact(project,'deleted'),original);
+assert.equal(shouldSaveField({id:'patch-file',type:'file',closest:()=>null}),false);
+assert.equal(shouldSaveField({id:'global-search',type:'text',closest:()=>null}),false);
+assert.equal(shouldSaveField({id:'translation-format',type:'select-one',closest:()=>null}),true);
+assert.equal(retainedScroll('p:a:assets','p:a:assets',620),620);assert.equal(retainedScroll('p:a:assets','p:a:resources',620),0);
+let finish,refreshed=0,rendered=0;const state={project,artifact:original,page:'resources',results:{}};
+const ctx={state,api:{job:()=>new Promise(r=>finish=r)},refreshProject:async()=>refreshed++,render:async()=>rendered++};
+const waiting=runScoped(ctx,'hex.search',{project_id:'p'},{});state.artifact=build;finish({ok:true,offsets:[1]});
+await assert.rejects(waiting,/previous selection/);assert.deepEqual(state.results,{});assert.equal(refreshed,0);assert.equal(rendered,0);
+state.artifact=original;const success=runScoped(ctx,'hex.search',{project_id:'p'},{});finish({ok:true,offsets:[2]});await success;assert.deepEqual(state.results['hex.search'].offsets,[2]);assert.equal(refreshed,1);assert.equal(rendered,1);
+state.selectionRevision=1;const returning=runScoped(ctx,'hex.search',{project_id:'p'},{});state.selectionRevision=3;finish({ok:true,offsets:[99]});await assert.rejects(returning,/previous selection/);assert.deepEqual(state.results['hex.search'].offsets,[2]);
+console.log('Late jobs preserve current selection, files avoid draft storage, and navigation keeps sensible scroll and build choices.');

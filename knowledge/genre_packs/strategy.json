@@ -1,0 +1,29 @@
+{
+  "hypotheses": [
+    {
+      "claim": "Track win/loss condition, resources, production, map control, enemy information, and time model",
+      "priority": "high",
+      "states": [
+        "TACTICAL_PHASE",
+        "EXPLORATION"
+      ]
+    },
+    {
+      "claim": "Scouting can be valuable because information reduces costly uncertainty",
+      "priority": "medium",
+      "states": [
+        "TACTICAL_PHASE",
+        "EXPLORATION"
+      ]
+    }
+  ],
+  "id": "strategy",
+  "name": "Strategy / TBS / RTS",
+  "policy": "Hypothesis generator only. Exact game evidence overrides every entry.",
+  "schema_version": 1,
+  "states": [
+    "TACTICAL_PHASE",
+    "EXPLORATION",
+    "RESULTS"
+  ]
+}

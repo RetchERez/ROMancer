@@ -1,0 +1,15 @@
+import {esc,button,badge} from './common.js';
+import {downloadDocument} from './tool_inputs.js';
+export function projectChecks(ctx){
+ const {state}=ctx,id=state.project?.project_id,result=state.projectValidation?.project_id===id?state.projectValidation:null;
+ ctx.use({'project-checks':async()=>{const report=await ctx.run('project.validate',{project_id:id},{render:false});if(state.project?.project_id!==id)return;state.projectValidation=report;await ctx.render();},
+ 'check-location':async node=>{if(state.project?.project_id!==id)return;await ctx.setArtifact(node.dataset.id);state.resourceJump=Number(node.dataset.name);await ctx.navigate('resources');}});
+ return `<section class="card"><div class="card-heading"><h3>Project checks</h3>${result?badge(result.errors?`${result.errors} errors`:result.warnings?`${result.warnings} warnings`:'Checks passed',result.errors?'warm':'good'):''}</div>${button('Check project','project-checks',{disabled:!id})}
+ ${result?`<p>${result.checked_artifacts} files checked. Declared formats only; gameplay needs separate tests.</p>${result.issues.length?`<div class="table-wrap"><table><thead><tr><th>Location</th><th>Check</th><th>Next step</th></tr></thead><tbody>${result.issues.map(r=>`<tr><td>${esc(r.location)}${r.offset!==null&&r.offset!==undefined?`<br>${r.artifact_id?button('0x'+r.offset.toString(16),'check-location',{id:r.artifact_id,name:String(r.offset)}):'0x'+r.offset.toString(16)}`:''}</td><td>${badge(r.severity,r.severity==='error'?'warm':'neutral')} ${esc(r.code.replaceAll('_',' ').toLowerCase())}</td><td>${esc(r.remedy)}</td></tr>`).join('')}</tbody></table></div>`:''}${result.issues_truncated?'<p>More issues exist; totals include all detected issues.</p>':''}`:'<p class="subtle">Check file identities, resource definitions, dependencies, pointers and compressed allocations.</p>'}</section>`;
+}
+export function supportControls(ctx){
+ const {state}=ctx,selection=state.project?.project_id||null,saved=state.supportPreview?.selection===selection?state.supportPreview.report:null;
+ ctx.use({'support-check':async()=>{const report=await ctx.run('support.collect',{selection},{render:false,refresh:false});if((state.project?.project_id||null)!==selection)return;state.supportPreview={selection,report};await ctx.render();},
+ 'support-download':()=>{if(state.supportPreview?.selection!==(state.project?.project_id||null))throw Error('Run diagnostics for this project first.');downloadDocument(state.supportPreview.report,'ROMancer-support.json');}});
+ return `<section class="card"><h3>Diagnostics & support</h3><p>Run local checks, review the report, then download it to share. No data is sent automatically.</p>${button('Run diagnostics','support-check')}${saved?`<div class="table-wrap"><table><tbody>${saved.checks.map(r=>`<tr><td>${esc(r.code.replaceAll('_',' ').toLowerCase())}</td><td>${badge(r.status,r.status==='PASS'?'good':'neutral')}</td></tr>`).join('')}</tbody></table></div><details open><summary>Review sanitized report</summary><pre>${esc(JSON.stringify(saved,null,2))}</pre></details>${button('Download report','support-download',{primary:true})}`:''}</section>`;
+}

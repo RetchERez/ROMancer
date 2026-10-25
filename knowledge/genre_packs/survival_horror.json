@@ -1,0 +1,30 @@
+{
+  "hypotheses": [
+    {
+      "claim": "Avoiding combat may be preferable when ammunition and healing are scarce",
+      "priority": "medium",
+      "states": [
+        "EXPLORATION",
+        "COMBAT"
+      ]
+    },
+    {
+      "claim": "Map locked doors and preserve key resources before optional risks",
+      "priority": "high",
+      "states": [
+        "EXPLORATION",
+        "INVENTORY"
+      ]
+    }
+  ],
+  "id": "survival_horror",
+  "name": "Survival Horror",
+  "policy": "Hypothesis generator only. Exact game evidence overrides every entry.",
+  "schema_version": 1,
+  "states": [
+    "EXPLORATION",
+    "COMBAT",
+    "INVENTORY",
+    "PUZZLE"
+  ]
+}

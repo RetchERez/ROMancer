@@ -1,0 +1,3 @@
+C5:A9EE lda #$0602                 A:0000 X:0000 Y:0000 S:01ff D:0000 DB:7E nvmxdizc V:018 H:040 F:10
+C5:A9F1 sta $0922                  A:0602 X:0000 Y:0000 S:01ff D:0000 DB:7E nvmxdizc V:018 H:052 F:10
+C5:A9F4 rtl                        A:0602 X:0000 Y:0000 S:01ff D:0000 DB:7E nvmxdizc V:018 H:064 F:10

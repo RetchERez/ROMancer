@@ -1,0 +1,14 @@
+{
+  "name": "runtime_smoke_template",
+  "description": "Generic starter. Replace inputs and assertions with evidence appropriate to the game's known anchor state.",
+  "boot_frames": 120,
+  "default_memory": ["system_ram"],
+  "stop_on_fail": true,
+  "steps": [
+    {"action": "checkpoint", "name": "booted", "memory": ["system_ram"], "state": true, "screenshot": true},
+    {"action": "tap", "button": "start", "hold_frames": 1, "settle_frames": 4},
+    {"action": "checkpoint", "name": "after_start", "memory": ["system_ram"], "screenshot": true},
+    {"action": "assert_frame_changed", "from": "booted", "to": "after_start", "min_changed_cell_ratio": 0.001},
+    {"action": "assert_not_shutdown"}
+  ]
+}

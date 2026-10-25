@@ -1,0 +1,21 @@
+{
+  "shortfall": 450,
+  "progression_likely_to_cover": false,
+  "routes": [
+    {
+      "name": "safe_loop",
+      "reward": 100,
+      "minutes": 1,
+      "renewable": true,
+      "success_rate": 1.0
+    },
+    {
+      "name": "dangerous_loop",
+      "reward": 300,
+      "minutes": 1,
+      "renewable": true,
+      "success_rate": 0.3,
+      "failure_cost": 500
+    }
+  ]
+}

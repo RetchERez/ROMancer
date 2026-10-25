@@ -1,0 +1,65 @@
+{
+  "schema_version": 1,
+  "id": "final_fantasy_iii_snes",
+  "name": "Final Fantasy III (SNES) / Final Fantasy VI",
+  "game": "Final Fantasy III (USA) / Final Fantasy VI",
+  "system": "SNES",
+  "genre": "JRPG",
+  "identity": {
+    "sha256": null,
+    "crc32": null,
+    "note": "No ROM hash is embedded because revisions and user hacks differ. Bind a project profile to the user's legally obtained image by hash."
+  },
+  "runtime": {
+    "preferred_cores": ["Snes9x"],
+    "boot_frames": 180,
+    "memory_monitoring_expected": true
+  },
+  "contexts": ["field", "menu", "battle"],
+  "controls": {
+    "global": {
+      "confirm": ["a"],
+      "cancel": ["b"]
+    },
+    "field": {
+      "move_up": ["up"],
+      "move_down": ["down"],
+      "move_left": ["left"],
+      "move_right": ["right"],
+      "interact": ["a"],
+      "open_subscreen": ["x"]
+    },
+    "menu": {
+      "cursor_up": ["up"],
+      "cursor_down": ["down"],
+      "cursor_left": ["left"],
+      "cursor_right": ["right"],
+      "confirm": ["a"],
+      "cancel": ["b"]
+    },
+    "battle": {
+      "cursor_up": ["up"],
+      "cursor_down": ["down"],
+      "cursor_left": ["left"],
+      "cursor_right": ["right"],
+      "confirm": ["a"],
+      "cancel": ["b"],
+      "pause": ["start"],
+      "run_attempt": ["l", "r"]
+    }
+  },
+  "memory_fields": [],
+  "state_signatures": [],
+  "scenarios": [],
+  "sources": [
+    {
+      "title": "Nintendo Classic Mini manual PDF for Final Fantasy III",
+      "url": "https://www.nintendo.co.jp/clvs/manuals/common/pdf/CLV-P-SABTE.pdf",
+      "supports": "Controller functions"
+    }
+  ],
+  "limits": [
+    "This profile supplies verified controller semantics only. It does not hardcode story progression, RAM addresses, map IDs, or hack-specific behavior.",
+    "ROMancer must learn or import runtime state/memory facts separately for each ROM revision or hack."
+  ]
+}

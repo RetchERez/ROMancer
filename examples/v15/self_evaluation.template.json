@@ -1,0 +1,7 @@
+{
+  "required": ["live_debug", "assembler"],
+  "capabilities": {"live_debug": true, "assembler": false},
+  "required_evidence": [
+    {"name": "verified target routine", "present": true}
+  ]
+}

@@ -1,0 +1,36 @@
+{
+  "hypotheses": [
+    {
+      "claim": "Learn dodge/block timing and enemy tells before maximizing damage",
+      "priority": "high",
+      "states": [
+        "COMBAT"
+      ]
+    },
+    {
+      "claim": "Healing may require a safe action window",
+      "priority": "medium",
+      "states": [
+        "COMBAT"
+      ]
+    },
+    {
+      "claim": "Spacing and avoiding unnecessary multi-enemy fights may improve survival",
+      "priority": "medium",
+      "states": [
+        "COMBAT",
+        "EXPLORATION"
+      ]
+    }
+  ],
+  "id": "action_rpg",
+  "name": "Action RPG",
+  "policy": "Hypothesis generator only. Exact game evidence overrides every entry.",
+  "schema_version": 1,
+  "states": [
+    "EXPLORATION",
+    "COMBAT",
+    "SHOP",
+    "INVENTORY"
+  ]
+}

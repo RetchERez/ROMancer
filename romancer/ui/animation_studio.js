@@ -1,0 +1,30 @@
+import {makeAssembly,assemblePixels} from './sprite_assembly.js';
+import {pixelBuffer} from './pixel_history.js';
+import {selectionKey} from './tool_inputs.js';
+import {button,field,read,esc} from './common.js';
+import {editorPalette} from './edit_preview.js';
+export class AnimationClock{
+ constructor(timers={set:(fn,ms)=>setTimeout(fn,ms),clear:id=>clearTimeout(id)}){this.timers=timers;this.handle=null;this.generation=0;}
+ stop(){this.generation++;if(this.handle!==null)this.timers.clear(this.handle);this.handle=null;}
+ start(frames,show,first=0){this.stop();if(!frames.length)return;const generation=this.generation;let index=first%frames.length;const tick=()=>{this.handle=null;if(generation!==this.generation)return;show(index);if(generation!==this.generation)return;const delay=frames[index].duration;index=(index+1)%frames.length;this.handle=this.timers.set(tick,delay);};tick();}
+}
+export function readAnimation(doc,bitmap,encoded){if(typeof encoded!=='string'||encoded.length>256*1024)throw Error('Animation layout exceeds its budget.');const saved=JSON.parse(encoded);if(saved?.document_id!==doc.document_id||saved.bitmap_id!==bitmap.id)return [];if(!Array.isArray(saved.frames)||saved.frames.length>32)throw Error('Use up to32 declared frames.');return saved.frames.map(f=>{if(!Number.isSafeInteger(f.duration)||f.duration<40||f.duration>2000)throw Error('Frame duration must be40–2000ms.');return {...makeAssembly(bitmap,f),duration:f.duration};});}
+export function animationStudio(ctx,doc,bitmap){if(!doc?.ok||!bitmap)return '';const {state}=ctx,scope=selectionKey(state),current=()=>selectionKey(state)===scope&&state.results['assets.inspect']?.document_id===doc.document_id;let frames=[],error='';try{frames=readAnimation(doc,bitmap,ctx.draft('animation-frames','null'));}catch(e){error=e.message;}
+ const save=next=>{state.animationPlaying=false;state.animationClock?.stop();ctx.setDraft('animation-frames',JSON.stringify({document_id:doc.document_id,bitmap_id:bitmap.id,frames:next}));return ctx.render();};
+ const selected=Math.max(0,Math.min(frames.length-1,state.animationIndex||0));
+ ctx.use({
+  'animation-add':()=>{if(!current())return;const layout=JSON.parse(ctx.draft('sprite-layout','null'));if(layout?.document_id!==doc.document_id||layout.bitmap_id!==bitmap.id)throw Error('Assemble a sprite frame first.');if(frames.length>=32)throw Error('Use up to32 frames.');const duration=Number(read('animation-duration')),next=[...frames,{...makeAssembly(bitmap,layout),duration}];readAnimation(doc,bitmap,JSON.stringify({document_id:doc.document_id,bitmap_id:bitmap.id,frames:next}));return save(next);},
+  'animation-select':node=>{state.animationPlaying=false;state.animationIndex=Number(node.dataset.id);return ctx.render();},
+  'animation-remove':()=>save(frames.filter((_,i)=>i!==selected)),
+  'animation-clear':()=>save([]),
+  'animation-play':()=>{state.animationPlaying=!state.animationPlaying;return ctx.render();},
+  'animation-edit':()=>{if(!current()||!frames[selected])return;state.animationPlaying=false;ctx.setDraft('sprite-layout',JSON.stringify({document_id:doc.document_id,bitmap_id:bitmap.id,...frames[selected]}));return ctx.render();}
+ });
+ const shared=new Map();frames.forEach((f,index)=>new Set(f.tiles.filter(t=>t!==null)).forEach(t=>shared.set(t,new Set([...(shared.get(t)||[]),index]))));const reused=[...shared].filter(([,uses])=>uses.size>1);
+ return `<details class="card"><summary>Animation frames</summary><p>Arrange each frame in Sprite assembly, then add it here. These explicit layouts do not identify the game's animation script.</p>${error?`<p class="notice warm">${esc(error)}</p>${button('Discard invalid animation','animation-clear')}`:''}<div class="actions">${field('animation-duration','Frame duration (ms)',ctx.draft('animation-duration','120'))}${button('Add assembled frame','animation-add')}</div>${frames.length?`<div class="actions">${frames.map((_,i)=>button('Frame '+(i+1),'animation-select',{id:String(i),primary:i===selected})).join('')}</div><div class="sprite-preview"><canvas id="animation-canvas" aria-label="Declared animation frame preview"></canvas></div><p id="animation-position">Frame ${selected+1} of ${frames.length}</p><div class="actions">${button(state.animationPlaying?'Pause animation':'Play animation','animation-play',{primary:true})}${button('Edit selected frame','animation-edit')}${button('Remove selected frame','animation-remove')}</div><p>${reused.length} tiles are shared between frames; editing them changes every frame that uses them.</p>`:''}</details>`;
+}
+export function mountAnimation(ctx,doc,bitmap,palette){const canvas=document.getElementById('animation-canvas');if(!canvas)return;const scope=selectionKey(ctx.state),frames=readAnimation(doc,bitmap,ctx.draft('animation-frames','null'));const clock=ctx.state.animationClock=new AnimationClock();
+ const draw=index=>{if(selectionKey(ctx.state)!==scope||ctx.state.page!=='assets'){clock.stop();return;}if(!frames[index])return;const colors=editorPalette(ctx,palette);const image=assemblePixels(bitmap,frames[index],tile=>pixelBuffer(ctx,doc,bitmap,tile));canvas.width=image.width;canvas.height=image.height;const c=canvas.getContext('2d'),pixels=c.createImageData(image.width,image.height);image.pixels.forEach((value,i)=>{const color=colors?.entries.find(e=>e.index===value&&e.bank===0)?.rgb;const shade=Math.round(value/15*255);pixels.data.set(color?[color.r,color.g,color.b,255]:[shade,shade,shade,255],i*4);});c.putImageData(pixels,0,0);canvas.style.width=Math.min(512,image.width*4)+'px';canvas.style.maxWidth='100%';canvas.style.imageRendering='pixelated';ctx.state.animationIndex=index;const label=document.getElementById('animation-position');if(label)label.textContent=`Frame ${index+1} of ${frames.length}`;};
+ canvas.addEventListener('animation-refresh',()=>draw(Math.min(frames.length-1,ctx.state.animationIndex||0)));
+ const first=Math.min(frames.length-1,ctx.state.animationIndex||0);if(ctx.state.animationPlaying)clock.start(frames,draw,first);else draw(first);
+}

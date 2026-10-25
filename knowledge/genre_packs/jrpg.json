@@ -1,0 +1,63 @@
+{
+  "hypotheses": [
+    {
+      "claim": "Prevent a party wipe before optimizing damage",
+      "priority": "high",
+      "states": [
+        "COMBAT",
+        "COMBAT_COMMAND"
+      ]
+    },
+    {
+      "claim": "Dangerous enemies may deserve target priority over weak low-threat enemies",
+      "priority": "medium",
+      "states": [
+        "COMBAT",
+        "COMBAT_COMMAND"
+      ]
+    },
+    {
+      "claim": "Healing, status recovery, buffs, debuffs, and limited resources should be evaluated by actual encounter value",
+      "priority": "medium",
+      "states": [
+        "COMBAT",
+        "COMBAT_COMMAND"
+      ]
+    },
+    {
+      "claim": "Random encounters may occur from movement in encounter-enabled areas",
+      "priority": "low",
+      "states": [
+        "EXPLORATION"
+      ]
+    },
+    {
+      "claim": "NPC dialogue can gate progression in older RPGs",
+      "priority": "medium",
+      "states": [
+        "EXPLORATION",
+        "DIALOGUE"
+      ]
+    },
+    {
+      "claim": "Shop purchases should address a current bottleneck and retain a justified reserve",
+      "priority": "high",
+      "states": [
+        "SHOP"
+      ]
+    }
+  ],
+  "id": "jrpg",
+  "name": "Turn-Based / ATB JRPG",
+  "policy": "Hypothesis generator only. Exact game evidence overrides every entry.",
+  "schema_version": 1,
+  "states": [
+    "EXPLORATION",
+    "DIALOGUE",
+    "COMBAT",
+    "COMBAT_COMMAND",
+    "SHOP",
+    "INVENTORY",
+    "EQUIPMENT"
+  ]
+}

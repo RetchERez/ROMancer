@@ -1,0 +1,6 @@
+{
+  "name": "release_smoke_suite_template",
+  "scenarios": [
+    {"name": "generic_runtime_smoke", "scenario": "runtime_scenario_template.json"}
+  ]
+}

@@ -1,0 +1,27 @@
+{
+  "hypotheses": [
+    {
+      "claim": "Acquire target, use controlled fire, monitor ammunition/threat, and reload when safe",
+      "priority": "medium",
+      "states": [
+        "COMBAT"
+      ]
+    },
+    {
+      "claim": "Cover and line of sight should be tested rather than assumed",
+      "priority": "medium",
+      "states": [
+        "EXPLORATION",
+        "COMBAT"
+      ]
+    }
+  ],
+  "id": "shooter",
+  "name": "Shooter",
+  "policy": "Hypothesis generator only. Exact game evidence overrides every entry.",
+  "schema_version": 1,
+  "states": [
+    "EXPLORATION",
+    "COMBAT"
+  ]
+}
