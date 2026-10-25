@@ -161,7 +161,7 @@ def plan_reinsert(project,parent_id,decoded_id,edited_id,offset,allocation,codec
         old=before[position:position+4096];new=packed[position:position+4096]
         if old!=new:edits.append({'offset':offset+position,'before':old.hex(),'after':new.hex()})
     if not edits:raise ValueError('recompression makes no byte changes')
-    if parent.get('system_id') in ('nes','snes','genesis','gb','gba'):
+    if parent.get('system_id') in ('nes','snes','genesis','gb','gbc','gba'):
         from .system_integrity import integrity_edits
         edits=integrity_edits(parent['path'],parent['sha256'],parent['system_id'],edits)
     projects._measure(parent['path'],parent,cancelled=cancelled);projects._measure(edited['path'],edited,cancelled=cancelled)

@@ -2,7 +2,7 @@ import {esc,badge} from './common.js';
 import {selectionKey} from './tool_inputs.js';
 
 export function saveStatus(snapshot){return snapshot.failed?{label:'Save failed',tone:'danger'}:snapshot.pending?{label:'Saving…',tone:'warm'}:{label:'Saved',tone:'good'};}
-export function guardClose(event,queue){if(!queue.snapshot().unsafe)return;event.preventDefault();event.returnValue='';}
+export function guardClose(event,queue,state={}){const active=state.job&&!['COMPLETED','FAILED','CANCELLED','INTERRUPTED'].includes(state.job.status);if(!queue.snapshot().unsafe&&!hasStagedChanges(state)&&!active)return;event.preventDefault();event.returnValue='';}
 export function artifactStatus(artifact){return artifact?{label:artifact.kind==='source'?'Original':'Build',tone:artifact.kind==='source'?'neutral':'good'}:{label:'No file',tone:'neutral'};}
 const equal=(a,b)=>JSON.stringify(a)===JSON.stringify(b);
 function changed(items){return Array.isArray(items)&&items.some(c=>c.before_pixels? !equal(c.before_pixels,c.after_pixels):Object.hasOwn(c,'before')?!equal(c.before,c.after):true);}

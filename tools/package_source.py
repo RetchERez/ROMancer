@@ -31,7 +31,7 @@ APPROVED_FILES = frozenset(ROOT_FILES | {
     for directory, names in {
         '.github': 'workflows/ci.yml',
         'romancer': '''
-            mcp_server.py bundled_cores.py core_pins.py controller_devices.py ui/workspace_status.js ui/workspace_resume.js
+            mcp_server.py bundled_cores.py core_pins.py controller_devices.py ui/workspace_status.js ui/workspace_resume.js ui/shortcuts.js ui/tool_help.js
             ui/tool_inputs.js ui/patch_controls.js ui/revision_controls.js ui/hex_editor.js ui/build_history.js ui/project_checks.js ui/save_manager.js ui/translation_controls.js ui/visual_controls.js ui/workbench_usability.js
             ui/desktop_entry.js ui/app.bundle.js ui/bundle.json
             rom_health.py ui/rom_health.js
@@ -103,7 +103,7 @@ APPROVED_FILES = frozenset(ROOT_FILES | {
             universal.json visual_novel.json
         ''',
         'tests': '''
-            test_mcp_server.py test_bundled_cores.py test_controller_devices.py test_setup_installer.py ui_controller_choices.mjs ui_workspace_status.mjs ui_workspace_resume.mjs
+            test_mcp_server.py test_bundled_cores.py test_controller_devices.py test_setup_installer.py ui_controller_choices.mjs ui_workspace_status.mjs ui_shortcuts.mjs ui_tool_help.mjs ui_workspace_resume.mjs
             test_level_design.py test_studio_tools.py test_value_search.py test_studio_discovery.py test_source_information.py test_release_scope.py ui_level_design.mjs ui_animation_studio.mjs ui_value_finder.mjs ui_edit_previews.mjs ui_game_visuals.mjs ui_visual_live.mjs ui_publish_drafts.mjs ui_audio_preview.mjs
             test_sound_studio.py test_audio_systems.py ui_sound_studio.mjs
             test_graphics_discovery.py ui_graphics_investigation.mjs test_rom_scan.py test_project_lifecycle.py ui_rom_scan.mjs ui_project_manager.mjs ui_sprite_assembly.mjs
@@ -131,7 +131,7 @@ APPROVED_FILES = frozenset(ROOT_FILES | {
             test_engineering_cli.py test_workbench_projects.py test_replay.py
             test_analysis_v50.py test_player_docs.py test_release_v50.py
             test_workbench_api.py test_workbench_jobs.py test_v50_hardening.py
-            test_release_review.py test_resource_catalog.py test_windows_package.py test_streaming_release.py test_gameboy.py test_v52_projects.py test_v53_containers.py test_resource_forms.py test_runtime_profiles.py test_system_addresses.py test_route_editor.py test_system_registry.py test_system_identify.py
+            test_release_review.py test_resource_catalog.py test_windows_package.py test_streaming_release.py test_gameboy.py test_gameboy_color.py test_v52_projects.py test_v53_containers.py test_resource_forms.py test_runtime_profiles.py test_system_addresses.py test_route_editor.py test_system_registry.py test_system_identify.py
             test_v51_workflow.py
             test_system_resources.py
             test_systems_cli.py test_system_ui.py

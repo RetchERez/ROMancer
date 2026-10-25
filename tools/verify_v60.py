@@ -1,4 +1,4 @@
-"""Independent five-system edit/export checks, with optional real native cores."""
+"""Independent six-system edit/export checks, with optional real native cores."""
 import argparse
 import base64
 import hashlib
@@ -20,7 +20,7 @@ from romancer.streaming_bps import create_patch,apply_patch
 
 def verify(root,cores=None):
     root=Path(root);root.mkdir(parents=True,exist_ok=True);results=[]
-    for system in ('nes','snes','genesis','gb','gba'):
+    for system in ('nes','snes','genesis','gb','gbc','gba'):
         fixture=make_boot_fixture(system);original=fixture['data'];source=root/(system+fixture['suffix']);source.write_bytes(original)
         sha=hashlib.sha256(original).hexdigest();assessment=identify_system(source,expected_sha256=sha)
         if assessment['system_id']!=system or assessment['status']!='IDENTIFIED':raise ValueError('fixture recognition failed: '+system)
@@ -34,7 +34,7 @@ def verify(root,cores=None):
             owned=demo['sources'][0];params={'project_id':demo['project_id'],'artifact_id':owned['artifact_id']};schema=owned['descriptors']['assets']
             model=with_api.dispatch('assets.inspect',{**params,'schema':schema})
             if not model['ok']:raise ValueError(model)
-            if system in ('nes','gb'):
+            if system in ('nes','gb','gbc'):
                 before=model['bitmaps'][0]['cells'][0]['pixels'];after=before.copy();after[1]=1
                 changes=[{'kind':'cell','bitmap_id':'tiles','cell_index':0,'before_pixels':before,'after_pixels':after}]
             else:
@@ -56,7 +56,7 @@ def verify(root,cores=None):
         allowed=set(range(edit['offset'],edit['offset']+len(bytes.fromhex(edit['after']))))
         if system=='snes':allowed.update(range(0x7fdc,0x7fe0))
         if system=='genesis':allowed.update(range(0x18e,0x190))
-        if system=='gb':allowed.update(range(0x14d,0x150))
+        if system in ('gb','gbc'):allowed.update(range(0x14d,0x150))
         if system=='gba':allowed.add(0xbd)
         differences=[i for i,(a,b) in enumerate(zip(original,changed)) if a!=b]
         if not differences or not set(differences)<=allowed:raise ValueError('unexpected complete output difference')
@@ -76,7 +76,7 @@ def verify(root,cores=None):
                     if len(rgb)!=frame['width']*frame['height']*3:raise ValueError('native frame dimensions mismatch')
                     colors=set(zip(rgb[0::3],rgb[1::3],rgb[2::3]))
                     if label=='source':
-                        if system in ('nes','gb') and len(colors)<2:raise ValueError('native pattern program did not draw')
+                        if system in ('nes','gb','gbc') and len(colors)<2:raise ValueError('native pattern program did not draw')
                         if system in ('snes','genesis','gba') and not all(g>r+100 and g>b+100 for r,g,b in colors):raise ValueError('native program did not draw green backdrop')
                     audio=runtime.request('audio');state=runtime.request('save_state');runtime.request('advance',frames=1,buttons=['a'],port=0)
                     runtime.request('load_state',snapshot=state);runtime.request('advance',frames=1,buttons=[],port=0);restored=runtime.request('capture')
@@ -86,7 +86,7 @@ def verify(root,cores=None):
                         'audio_samples_observed':audio['observed'],'state_restore_verified':True,'input_acknowledged':True,'worker_exit_code':runtime.exit_code})
             if captures[0]==captures[1]:raise ValueError('native render did not change after resource edit: '+system)
             row['native']={'core_sha256':load['expected_core_sha256'],'options':load['core_options'],'render_changed':True,'measurements':measurements,
-                'scope':'original minimal test program; no commercial game or Color-only compatibility claim'}
+                'scope':'original minimal test program; original drawing programs only; not whole-game compatibility'}
         results.append(row)
     return {'ok':True,'status':'VERIFIED','tool_version':ROMANCER_VERSION,'environment':{'python':platform.python_version(),'platform':platform.platform()},'systems':results,'credit':'By RetchEWretched','native_cores_exercised':bool(cores)}
 

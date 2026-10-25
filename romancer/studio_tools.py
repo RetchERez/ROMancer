@@ -38,7 +38,7 @@ class StudioTools:
 
     def observe(self,p,c,region,offset,length):
         project,row,_=self.api.source(p)
-        if row.get('system_id') not in ('nes','snes','genesis','gb','gba'):raise ValueError('select a supported cartridge source')
+        if row.get('system_id') not in ('nes','snes','genesis','gb','gbc','gba'):raise ValueError('select a supported cartridge source')
         if self.api.runtime.session_selection(project)!={'id':row['artifact_id'],'sha256':row['sha256']}:raise ValueError('load the selected source in Playtest first')
         packet=self.api._memory_snapshot({'project_id':p['project_id'],'region':region,'offset':offset,'length':length},c)
         if packet.get('game_sha256')!=row['sha256'] or any(packet.get(k)!=v for k,v in [('region',region),('offset',offset),('length',length)]):raise ValueError('memory observation source or range differs')
@@ -88,7 +88,7 @@ class StudioTools:
 
     def source(self,p,c):
         project,row,path=self.api.source(p)
-        if row.get('system_id') not in ('nes','snes','genesis','gb','gba'):raise ValueError('studio editing requires a supported NES, SNES, Genesis, Game Boy or GBA source')
+        if row.get('system_id') not in ('nes','snes','genesis','gb','gbc','gba'):raise ValueError('studio editing requires a supported NES, SNES, Genesis, Game Boy or GBA source')
         raw=read_bounded(path,64*1024**2,row,cancelled=c)
         return project,row,raw
 

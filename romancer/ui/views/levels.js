@@ -1,7 +1,7 @@
 import {esc,button,field,select,read,json,jsonEditor,heading,empty,report} from '../common.js';
 import {selectionKey} from '../tool_inputs.js';
 import {LevelDraft,mountLevel} from '../level_canvas.js';
-const codecs={nes:'tile8-planar2-msb-v1',snes:'tile8-paired4-msb-v1',genesis:'tile8-packed4-high-v1',gb:'tile8-paired2-msb-v1',gba:'tile8-packed4-low-v1'};
+const codecs={nes:'tile8-planar2-msb-v1',snes:'tile8-paired4-msb-v1',genesis:'tile8-packed4-high-v1',gb:'tile8-paired2-msb-v1',gbc:'tile8-paired2-msb-v1',gba:'tile8-packed4-low-v1'};
 export async function render(ctx){const {state}=ctx;ctx.use({'studio-example':async()=>{const result=await ctx.api.job('studio.example',{});await ctx.openProject(result.project_id);return ctx.navigate('levels');}});
  if(!state.project||!state.artifact)return heading('','Levels','')+empty('Build and edit a room','Open a source with a verified layout or try the original practice ROM.',button('Open design workshop','studio-example',{primary:true}));
  const scope=selectionKey(state),current=()=>scope===selectionKey(state),saved=state.artifact.descriptors?.levels;
@@ -10,7 +10,7 @@ export async function render(ctx){const {state}=ctx;ctx.use({'studio-example':as
  const definition=doc?.definition||saved||{};let model=state.levelEditor;
  if(doc?.ok&&(model?.scope!==scope||model.doc.document_id!==doc.document_id)){let changes=[];try{const draft=JSON.parse(ctx.draft('level-changes','{}'));if(draft.document_id===doc.document_id)changes=draft.changes;}catch{}model=new LevelDraft(doc,changes);model.scope=scope;state.levelEditor=model;}
  const room=doc?.rooms.find(r=>r.id===ctx.draft('level-room',''))||doc?.rooms[0],layer=ctx.draft('level-layer','terrain');
- const persist=()=>{if(!current())return;ctx.setDraft('level-changes',JSON.stringify({document_id:doc.document_id,changes:model.values()}));state.pending=null;};
+ const persist=()=>{if(!current())return;state.historyEditor='level-canvas';ctx.setDraft('level-changes',JSON.stringify({document_id:doc.document_id,changes:model.values()}));state.pending=null;};
  const change=action=>{if(!current())return;model.begin();try{action();model.commit();persist();return ctx.render();}catch(error){model.cancel();throw error;}};
  ctx.use({
   'levels-inspect':()=>ctx.run('levels.inspect',{...ctx.sourceParams(),definition:json('level-definition')}),

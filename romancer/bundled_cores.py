@@ -57,14 +57,16 @@ def _verify_cached(root,stamp):
 def bundled_profile(system_id):
     root=pack_root()
     if not host_supported() or not root.exists():return None
-    if system_id not in CORE_PINS:return None
+    engine_id='gb' if system_id=='gbc' else system_id
+    if engine_id not in CORE_PINS:return None
     stamp=_fingerprint(root);_verify_cached(str(root),stamp)
-    pin=CORE_PINS[system_id]
+    pin=CORE_PINS[engine_id]
     from .runtime_profiles import _binary,_identity
     binary=_binary(root/pin['file'])
     if binary['sha256']!=pin['sha256']:raise ValueError('bundled engine identity differs; reinstall this version')
     profile={'schema_version':1,'system_id':system_id,'core':str(root/pin['file']),
              'core_identity':binary,'options':dict(pin['options']),'system_dir':None,
              'system_files':[],'input_map':dict(DEFAULT_KEYS)}
+    if system_id=='gbc':profile['options']['gambatte_gb_hwmode']='GBC'
     profile['identity']=_identity(profile)
     return {'ok':True,'status':'BUNDLED','profile':profile,'engine':pin['name'],'runtime_verified':False}

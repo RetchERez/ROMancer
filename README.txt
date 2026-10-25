@@ -1,7 +1,7 @@
 ROMancer v1.0 final
 By RetchEWretched
 
-Local ROM editing for NES, SNES, Genesis, Game Boy and GBA.
+Local ROM editing for NES, SNES, Genesis, Game Boy, Game Boy Color and GBA.
 Everyday use works offline. No AI account, model, API key or subscription is required.
 
 START ON WINDOWS
@@ -14,7 +14,7 @@ START ON WINDOWS
 Python and Pillow are included in the Windows x64 package. Edge provides the
 desktop window; Open in browser is available if the window cannot open.
 The launchers are unsigned. The full Windows release includes an engine for
-NES, SNES, Genesis, Game Boy and GBA. Games, user saves and separately supplied
+NES, SNES, Genesis, Game Boy, Game Boy Color and GBA. Games, user saves and separately supplied
 firmware dumps are not distributed. Editing and patching also work without emulation.
 
 Installed projects: %LOCALAPPDATA%\ROMancer\workspace
@@ -30,16 +30,22 @@ PLAYTESTING
    engine and runtime setup. Battery saves have separate import/export controls.
 
 Included Windows x64 engines:
-  NES:      FCEUmm                 GPL-2.0
-  SNES:     bsnes-mercury Balanced GPL-3.0
-  Genesis:  BlastEm                GPL-3.0
-  Game Boy: Gambatte               GPL-2.0
-  GBA:      mGBA                   MPL-2.0
+  NES:                       FCEUmm                 GPL-2.0
+  SNES:                      bsnes-mercury Balanced GPL-3.0
+  Genesis:                   BlastEm                GPL-3.0
+  Game Boy / Game Boy Color:  Gambatte               GPL-2.0
+  GBA:                       mGBA                   MPL-2.0
 
 These are separately licensed third-party engines. Their original notices,
 source revisions, DLL hashes and corresponding source archive are in cores/.
 The main ROMancer source is MIT licensed. Keep every component's notices and
 source distribution together when redistributing the full Windows package.
+
+Game Boy Color is the sixth system choice and shares the included Gambatte engine.
+Validated CGB-compatible and Color-only header flags select a separate GBC hardware
+profile, independent of the filename extension. Ordinary Game Boy images use DMG.
+Color palettes use RGB555; tiles share the paired 2bpp format. Hardware background
+attribute planes and game-specific bank behavior require explicit declarations.
 
 ROMancer verifies the bundled engine identities before using them. If the pack
 is incomplete or changed, reinstall the release; it will not silently load a
@@ -50,6 +56,16 @@ x64 libretro core in Advanced core setup. A standalone emulator EXE is not a
 libretro library. Linux uses a Linux x86_64 .so, rather than a Windows DLL.
 New or unusual cartridges may need configuration or external system files;
 passing the included checks does not certify every game.
+
+EVERYDAY CONTROLS
+
+Ctrl+S saves editing drafts; Create build produces the playable ROM.
+Ctrl+Z undoes the active editor; Ctrl+Y or Ctrl+Shift+Z redoes it.
+Ctrl+K searches the workspace. Press ? outside a text field for the shortcut popup,
+or open Help -> Keyboard shortcuts. No operating-system hotkeys are registered.
+Text fields keep their native undo/redo; game input and dialogs are left alone.
+Closing with pending saves, staged changes or an active job asks for confirmation.
+Short field explanations appear on hover or keyboard focus, with more in Help.
 
 YOUR FIRST EDIT
 
@@ -85,6 +101,11 @@ WHAT IS SUPPORTED
 - ROM health, CRC comparison, supported checksum repair and project validation.
 - Local hash-catalog import, source-bound resource relationships and support reports.
 - Recoverable project deletion, private backup/restore and persisted editor drafts.
+
+Exact-revision examples include Final Fantasy Legend II USA (opening-bedroom
+stool placement) and Deja Vu I & II USA (startup and first Case Book 1 interface
+colors), alongside the four earlier game definitions. Only matched originals or
+owned derived builds expose these edits. Different revisions remain unknown.
 
 FACTS, DEFINITIONS AND LIMITS
 

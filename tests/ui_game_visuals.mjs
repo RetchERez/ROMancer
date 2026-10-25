@@ -7,4 +7,8 @@ assert.match(gameVisual({...model,fields:[{id:'text',type:'text',value:'New game
 const p={...model,fields:[{id:'palette_style',type:'choice',value:'original'}],visual:{palettes:[{name:'Colors',current:[[255,0,0]],original:[[255,0,0]],teal_magenta:[[0,255,0]]}]}};
 assert.match(gameVisual(p,{palette_style:'teal_magenta'}),/0,255,0/);
 assert.match(gameVisual(p,{palette_style:'original'}),/0 changed colors/);
+assert.match(gameVisual({...p,visual:{palettes:[{...p.visual.palettes[0],parchment:[[240,220,180]]}]}},{palette_style:'parchment'}),/240,220,180/);
+const map={...model,fields:[{id:'room_layout',type:'choice',value:'original'}],visual:{kind:'map-point',current:[14,31],original:[14,31],stool_down:[14,32],origin:[10,28],size:[7,8]}};
+assert.match(gameVisual(map,{room_layout:'stool_down'}),/14, 31.*14, 32/s);
+assert.match(gameVisual(map,{room_layout:'stool_down'}),/aria-label="Edited stool position"/);
 console.log('Known game previews show exact numeric/text/color changes, without predicting in-game formulas or scenes.');

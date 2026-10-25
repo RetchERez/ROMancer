@@ -43,7 +43,7 @@ def pointer_references(path,sha,*,target,width,endian,base,start=0,length=SCAN_L
 
 
 def discover(path,sha,system_id,start,length,kinds,*,target=None,cancelled=lambda:False):
-    if system_id not in FOCUS_SYSTEM_IDS:raise ValueError('choose NES, SNES, Genesis, Game Boy or GBA')
+    if system_id not in FOCUS_SYSTEM_IDS:raise ValueError('choose NES, SNES, Genesis, Game Boy, Game Boy Color or GBA')
     if type(kinds) is not list or not kinds or len(kinds)!=len(set(kinds)) or set(kinds)-{'text','graphics','pointers','compression'}:
         raise ValueError('choose supported discovery kinds')
     path,source,raw=_read(path,sha,start,length,cancelled);rows=[];truncated=False;sampling=None;compression_budget={}
@@ -81,7 +81,7 @@ def discover(path,sha,system_id,start,length,kinds,*,target=None,cancelled=lambd
                         add({'kind':'graphics','offset':derived['offset'],'length':count*16,'format':TEMPLATES['nes'],'confidence':'format-derived',
                              'preview':f'{count} stored CHR-ROM tiles','reason':'Validated NES header declares this stored CHR-ROM region; palettes/consumers remain unknown.',
                              'config':{'system_id':'nes','offset':derived['offset'],'count':count,'codec':TEMPLATES['nes']}})
-        cell=16 if system_id in ('nes','gb') else 32;block_size=16*cell
+        cell=16 if system_id in ('nes','gb','gbc') else 32;block_size=16*cell
         sampling=max(block_size,((len(raw)+4095)//4096+cell-1)//cell*cell)
         for offset in range(0,max(0,len(raw)-block_size+1),sampling):
             if cancelled():raise KeyboardInterrupt

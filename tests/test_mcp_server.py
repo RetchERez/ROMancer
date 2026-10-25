@@ -10,6 +10,14 @@ from romancer.mcp_server import MCPServer
 
 
 class MCPTests(unittest.TestCase):
+    def test_memory_observation_requires_write_opt_in_and_numeric_region(self):
+        self.assertNotIn('runtime.memory',self.server.operations)
+        server=MCPServer(self.root/'observing',allow_writes=True);self.addCleanup(server.close);self.start(server)
+        tools=server.handle({'jsonrpc':'2.0','id':3,'method':'tools/list'})['result']['tools']
+        tool=next((row for row in tools if row['name']=='romancer_runtime_memory'),None)
+        self.assertIsNotNone(tool)
+        self.assertEqual(tool['inputSchema']['properties']['region']['type'],'integer')
+
     def setUp(self):
         self.temp=tempfile.TemporaryDirectory();self.addCleanup(self.temp.cleanup)
         self.root=Path(self.temp.name);self.server=MCPServer(self.root/'workspace')

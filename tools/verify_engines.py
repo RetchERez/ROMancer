@@ -1,4 +1,4 @@
-"""Fresh-workspace native acceptance for the five automatically bundled engines.
+"""Fresh-workspace native acceptance for the six automatically bundled engines.
 
 Uses only ROMancer's original drawing programs. This tests startup, input, video,
 state loading and worker closure, not compatibility with every commercial game.
@@ -25,7 +25,7 @@ def verify_engines(workspace,output):
         if not result.get('ok'):raise ValueError(operation+': '+str(result.get('error')))
         return result
     try:
-        for system in ('nes','snes','genesis','gb','gba'):
+        for system in ('nes','snes','genesis','gb','gbc','gba'):
             profile=call('profiles.get',system_id=system)
             if profile['status']!='BUNDLED':raise ValueError(system+' did not select a bundled engine automatically')
             demo=call('project.demo_system',system_id=system);p={'project_id':demo['project_id']}
@@ -34,6 +34,7 @@ def verify_engines(workspace,output):
             call('runtime.advance',**p,frames=120,buttons=[],port=0);frame=call('runtime.capture',**p)
             raw=base64.b64decode(frame['rgb24_base64'],validate=True)
             if len(raw)!=frame['width']*frame['height']*3 or hashlib.sha256(raw).hexdigest()!=frame['sha256']:raise ValueError('native video identity differs')
+            if system=='gbc' and not any(raw[i]!=raw[i+1] or raw[i]!=raw[i+2] for i in range(0,len(raw),3)):raise ValueError('Color-only fixture did not produce actual RGB colors')
             snapshot=call('runtime.save_state',**p)
             call('runtime.advance',**p,frames=12,buttons=['a','start'],port=0);one=call('runtime.capture',**p)
             call('runtime.load_state',**p,snapshot_id=snapshot['snapshot_id'])

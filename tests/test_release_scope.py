@@ -4,15 +4,15 @@ from romancer.workbench_api import WorkbenchAPI
 
 
 class ReleaseScopeTests(unittest.TestCase):
-    def test_only_five_systems_are_exposed_and_other_system_operations_are_refused(self):
+    def test_only_six_systems_are_exposed_and_other_system_operations_are_refused(self):
         with tempfile.TemporaryDirectory() as temp:
             api=WorkbenchAPI(Path(temp)/'workspace')
             try:
                 systems=api.dispatch('systems.list',{})
-                self.assertEqual({s['id'] for s in systems['systems']},{'nes','snes','genesis','gb','gba'})
+                self.assertEqual({s['id'] for s in systems['systems']},{'nes','snes','genesis','gb','gbc','gba'})
                 self.assertFalse(any(op in ('runtime.load_disc','route.run_disc','release.disc_set') or op.startswith('containers.') for op in api.routes))
                 blocked=api.dispatch('profiles.get',{'system_id':'unsupported-system'})
-                self.assertFalse(blocked['ok']);self.assertIn('five',blocked['error'])
+                self.assertFalse(blocked['ok']);self.assertIn('six',blocked['error'])
             finally:api.close()
 
     def test_unknown_bytes_can_be_inspected_but_not_edited_or_run(self):

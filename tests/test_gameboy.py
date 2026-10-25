@@ -34,7 +34,7 @@ class GameBoyTests(unittest.TestCase):
             path=Path(folder)/'arbitrary.dat'
             for flag,mode in [(0,'dmg'),(0x80,'dmg-cgb'),(0xc0,'cgb-only')]:
                 path.write_bytes(cartridge(color=flag));result=identify_system(path)
-                self.assertEqual(result['system_id'],'gb');self.assertEqual(result['status'],'IDENTIFIED')
+                self.assertEqual(result['system_id'],'gbc' if flag else 'gb');self.assertEqual(result['status'],'IDENTIFIED')
                 meta=result['candidates'][0]['metadata'];self.assertEqual(meta['color_mode'],mode)
                 self.assertEqual(meta['logo_validation'],'NOT_CHECKED');self.assertEqual(meta['rom_banks'],2)
             data=bytearray(cartridge());data[0x134]^=1;path.write_bytes(data)

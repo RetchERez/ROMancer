@@ -1,5 +1,5 @@
 import {esc,field,select,button,read,json,report} from './common.js';
-const familyOptions=[['nes','NES'],['snes','SNES'],['genesis','Genesis'],['gb','Game Boy'],['gba','GBA']];
+const familyOptions=[['nes','NES'],['snes','SNES'],['genesis','Genesis'],['gb','Game Boy'],['gbc','Game Boy Color'],['gba','GBA']];
 function selection(){return {kind:'artifact',id:read('route-content')};}
 function assertion(){const kind=read('step-assertion');if(kind==='none')return null;if(kind==='memory_eq')return {kind,region:Number(read('step-region')),offset:Number(read('step-offset')),expected_hex:read('step-hex').replace(/\s/g,'').toLowerCase()};return {kind:'capture_sha256',sha256:read('step-capture').trim()};}
 export async function routeStudio(ctx,example){const {state}=ctx,definitions=(await ctx.api.call('routes.list',ctx.projectParams())).routes;let route;try{route=JSON.parse(ctx.draft('route-json',JSON.stringify(example)));}catch{route=example;}const steps=route.steps||[];

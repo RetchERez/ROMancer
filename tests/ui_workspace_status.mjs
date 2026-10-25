@@ -20,6 +20,7 @@ const state={project:{project_id:'p'},artifact:{artifact_id:'a'},drafts:{},resul
 assert.equal(hasStagedChanges(state),false);
 state.drafts['p:a:resources:hex-offset']='256';assert.equal(hasStagedChanges(state),false,'navigation fields are not ROM edits');
 state.drafts['p:a:assets:doc:asset-changes']=JSON.stringify([{kind:'palette',before:{r:0},after:{r:1}}]);assert.equal(hasStagedChanges(state),true);
+const stagedClose={preventDefault(){this.prevented=true;}};guardClose(stagedClose,queue,state);assert.equal(stagedClose.prevented,true,'An autosaved draft still needs a build, and should warn before exit.');
 state.drafts['p:a:assets:doc:asset-changes']='[]';assert.equal(hasStagedChanges(state),false);
 state.gameVisualModel={model:{fields:[{id:'lives',value:3}]}};state.drafts['p:a:overview:game-lives']='8';assert.equal(hasStagedChanges(state),true);
 state.drafts['p:a:overview:game-lives']='3';assert.equal(hasStagedChanges(state),false);

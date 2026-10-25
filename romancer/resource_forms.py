@@ -10,7 +10,7 @@ from .workbench_projects import _measure
 from .assets import digest
 
 PROVENANCE={'origin':'profile_assertion','note':'Explicit resource declaration entered in ROMancer.','reference':None}
-TEMPLATES={'gb':'tile8-paired2-msb-v1','nes':'tile8-planar2-msb-v1','snes':'tile8-paired4-msb-v1','genesis':'tile8-packed4-high-v1','segacd':'tile8-packed4-high-v1','gba':'tile8-packed4-low-v1'}
+TEMPLATES={'gb':'tile8-paired2-msb-v1','gbc':'tile8-paired2-msb-v1','nes':'tile8-planar2-msb-v1','snes':'tile8-paired4-msb-v1','genesis':'tile8-packed4-high-v1','segacd':'tile8-packed4-high-v1','gba':'tile8-packed4-low-v1'}
 
 
 def _source(path,sha):
@@ -83,7 +83,7 @@ def graphics_schema(path,sha,config):
     if config.get('map_offset') is not None:
         if not palettes or (width,height)!=(8,8):raise ValueError('tilemap requires a palette and8x8 tiles')
         mw=number(config.get('map_width',1),1,64);mh=number(config.get('map_height',1),1,64)
-        if system=='nes':entry=1;fields={'tile_index':255,'palette_bank':None,'flip_x':None,'flip_y':None}
+        if system in ('nes','gb','gbc'):entry=1;fields={'tile_index':255,'palette_bank':None,'flip_x':None,'flip_y':None}
         elif system=='gba':entry=2;fields={'tile_index':1023,'palette_bank':61440,'flip_x':1024,'flip_y':2048}
         elif system=='snes':entry=2;fields={'tile_index':1023,'palette_bank':7168,'flip_x':16384,'flip_y':32768}
         else:entry=2;fields={'tile_index':2047,'palette_bank':24576,'flip_x':2048,'flip_y':4096}

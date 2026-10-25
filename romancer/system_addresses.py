@@ -45,7 +45,7 @@ def translate(system_id,address,mapping,bank,source_size):
         fields(mapping,'id')
         if bank is not None or address>=0x400000:raise ValueError('only the initial4MiB linear cartridge window is supported')
         offset=address
-    elif system_id=='gb' and kind=='gb-rom':
+    elif system_id in ('gb','gbc') and kind=='gb-rom':
         fields(mapping,'id')
         if not 0<=address<0x8000:raise ValueError('address is outside Game Boy ROM windows')
         if address<0x4000:

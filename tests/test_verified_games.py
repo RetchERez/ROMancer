@@ -9,6 +9,33 @@ from romancer import workbench_projects as projects
 
 
 class VerifiedGameTests(unittest.TestCase):
+    def test_handheld_definitions_guard_layout_and_keep_separate_builds(self):
+        from romancer.verified_games import PROFILES
+        from romancer.boot_fixtures import make_boot_fixture
+        identifiers={'ffl2-usa','dejavu-casebooks-usa'}
+        self.assertTrue(identifiers.issubset({p['id'] for p in PROFILES}))
+        for identifier,chosen in [('ffl2-usa','stool_down'),('dejavu-casebooks-usa','parchment')]:
+            profile=copy.deepcopy(next(p for p in PROFILES if p['id']==identifier))
+            raw=bytearray(make_boot_fixture(profile['system'])['data']);raw.extend(bytes(profile['size']-len(raw)))
+            raw[0x148]=(len(raw)//32768).bit_length()-1
+            for offset,length,_ in profile['offsets']:
+                raw[offset:offset+length]=bytes.fromhex('17ce1d' if identifier=='ffl2-usa' else '0000027e1e007f03')
+            raw[0x14d]=(-sum(raw[0x134:0x14d])-25)&255;raw[0x14e:0x150]=bytes(2);raw[0x14e:0x150]=(sum(raw)&65535).to_bytes(2,'big')
+            source=self.root/(identifier+('.gb' if profile['system']=='gb' else '.gbc'));source.write_bytes(raw)
+            row=projects.register_source(Path(self.project['path']),source,None);profile['sha256']=row['sha256']
+            p={**self.params,'artifact_id':row['artifact_id']}
+            with self.subTest(identifier=identifier),patch('romancer.verified_games.PROFILES',(profile,)):
+                inspected=self.api.dispatch('games.inspect',p);self.assertEqual(inspected['status'],'MATCHED',inspected)
+                self.assertIsNotNone(inspected['visual'])
+                field=inspected['fields'][0]['id']
+                plan=self.api.dispatch('games.plan',{**p,'profile_id':identifier,'values':{field:chosen}});self.assertTrue(plan['ok'],plan)
+                built=self.api.dispatch('build.apply',{'project_id':p['project_id'],'plan_id':plan['plan_id']});self.assertTrue(built['ok'],built)
+                derived=self.api.dispatch('games.inspect',{**p,'artifact_id':built['artifact_id']})
+                self.assertEqual(derived['fields'][0]['value'],chosen,derived)
+                self.assertEqual(source.read_bytes(),bytes(raw))
+                invalid=self.api.dispatch('games.plan',{**p,'profile_id':identifier,'values':{field:'unverified'}})
+                self.assertFalse(invalid['ok'])
+
     def test_palette_previews_decode_current_and_both_exact_writer_choices(self):
         from romancer.verified_games import palette_visuals,_rotate
         root=self.root/'palette-root';selected=self.root/'palette-build'
@@ -154,7 +181,7 @@ class VerifiedGameTests(unittest.TestCase):
 
     def test_public_registry_contains_only_small_sourced_definitions(self):
         from romancer.verified_games import PROFILES
-        self.assertEqual(len(PROFILES),4)
+        self.assertEqual(len(PROFILES),6)
         for p in PROFILES:
             self.assertRegex(p['sha256'],r'^[a-f0-9]{64}$')
             self.assertTrue(p['reference'].startswith('https://github.com/'))

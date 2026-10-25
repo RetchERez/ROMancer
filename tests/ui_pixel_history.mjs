@@ -1,4 +1,11 @@
 import assert from 'node:assert/strict';
+const resetCtx={state:{project:{project_id:'reset'},artifact:{artifact_id:'a',sha256:'s'}}};
+const resetDoc={document_id:'reset-doc'};
+// A restored field draft invalidates the live pixel-history cache.
+const {historyFor:resetHistory}=await import('../romancer/ui/pixel_history.js');
+resetHistory(resetCtx,resetDoc,'tiles',0,[0]);resetCtx.state.pixelHistories=null;
+assert.doesNotThrow(()=>resetHistory(resetCtx,resetDoc,'tiles',0,[1]));
+assert.deepEqual(resetHistory(resetCtx,resetDoc,'tiles',0,[1]).current,[1]);
 import {PixelHistory,historyFor} from '../romancer/ui/pixel_history.js';
 const h=new PixelHistory('cell',[0,0,0,0],2);h.begin([0,0,0,0]);h.commit([1,1,0,0]);assert.deepEqual(h.undo(),[0,0,0,0]);assert.deepEqual(h.redo(),[1,1,0,0]);
 h.begin([1,1,0,0]);h.commit([2,1,0,0]);h.begin([2,1,0,0]);h.commit([3,1,0,0]);assert.deepEqual(h.undo(),[2,1,0,0]);assert.deepEqual(h.undo(),[1,1,0,0]);assert.equal(h.canUndo,false);

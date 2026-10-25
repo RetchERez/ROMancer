@@ -21,7 +21,7 @@ def checksum(raw,system):
     if system=='snes':
         raw[0x7fdc:0x7fe0]=b'\xff\xff\0\0';value=sum(raw)&65535;raw[0x7fdc:0x7fe0]=(value^65535).to_bytes(2,'little')+value.to_bytes(2,'little')
     if system=='genesis':raw[0x18e:0x190]=(sum(int.from_bytes(raw[i:i+2],'big') for i in range(0x200,len(raw),2))&65535).to_bytes(2,'big')
-    if system=='gb':
+    if system in ('gb','gbc'):
         raw[0x14d]=(-sum(raw[0x134:0x14d])-25)&255;raw[0x14e:0x150]=b'\0\0';raw[0x14e:0x150]=(sum(raw)&65535).to_bytes(2,'big')
     if system=='gba':raw[0xbd]=(-sum(raw[0xa0:0xbd])-0x19)&255
     return bytes(raw)
@@ -33,7 +33,7 @@ def verify(root,cores=None,restore=True):
         result=api.dispatch(operation,params)
         if not result.get('ok'):raise ValueError(operation+': '+str(result))
         return result
-    for system in ('nes','snes','genesis','gb','gba'):
+    for system in ('nes','snes','genesis','gb','gbc','gba'):
         for variant in (0,1):
             folder=root/(system+'-'+str(variant));folder.mkdir();fixture=make_boot_fixture(system);raw=bytearray(fixture['data'])
             raw[0x3000:0x3010]=(b'HELLO' if not variant else b'WORLD!')+b'\0'+b'\xff'*(10 if not variant else 9)

@@ -7,6 +7,16 @@ def _topic(identifier,title,summary,steps,terms=''):
 
 
 TOPICS=(
+    _topic('saving','Save, undo and exit','Drafts preserve your work; a build is the playable result.',[
+        'Drafts save automatically. Ctrl+S saves them now; Saved in the bottom bar confirms completion. Save failed keeps your edits and offers Retry save.',
+        'Undo and Redo target the active sprite, pixel or level editor, or the last edited field. Text boxes keep normal Ctrl+Z and Ctrl+Y.',
+        'Review changes, then Create build before playtesting. Original ROMs are preserved; build history lets you return to an earlier result.',
+        'Closing with pending saves, staged ROM edits or an active job asks you to confirm. Cancel closing, save drafts, and create a build if you want a playable result.'], 'save exit close undo redo draft build original patch safety'),
+    _topic('terms','What the terms mean','Short explanations also appear beside storage fields on hover or focus.',[
+        'Original: your preserved input copy. Draft: an editing proposal. Build: a separate edited ROM. Patch: a file describing changes for an exact original.',
+        'Offset: a byte position counted from zero. Capacity: reserved storage. Stride: distance between record starts. A CPU address may need bank mapping to become a file offset.',
+        'Tiles store pixels; palettes store colors; tilemaps arrange tiles; sprites may combine several tiles. A declaration describes checked storage, not automatically proven game behavior.',
+        'Matched uses an exact reference. Candidate needs confirmation. Unknown means no supported meaning has been established.'], 'glossary offset bank palette tile sprite pointer checksum encoding capacity stride'),
     _topic('levels','Edit rooms and levels','Use checked fixed-capacity layouts and separate builds.',[
         'Open Levels. Open design workshop creates a separate original NES practice project.',
         'Choose a room and terrain or collision layer. Paint, fill, or select and copy a rectangle; undo restores a stroke.',
@@ -176,7 +186,7 @@ TOPICS=(
     _topic('gb','Game Boy system notes','Explicit ROM banks and paired2bpp tiles.',[
         'Check the DMG/CGB header flags and declared cartridge size.',
         'Game Boy tiles store two bitplanes per row; this differs from the NES tile layout.',
-        'The fixed bank-zero window and selected ROM banks can be translated explicitly. Native acceptance uses original DMG programs; Color-only compatibility is separate.'], 'system gameboy bank checksum'),
+        'The fixed bank-zero window and selected ROM banks can be translated explicitly. Game Boy and Game Boy Color use separate hardware profiles. Original DMG and Color-only drawing programs have measured native state replay; game compatibility still needs its own tests.'], 'system gameboy bank checksum'),
     _topic('gba','GBA system notes','Linear ROM, low-nibble-first tiles and known BIOS compression.',[
         'The header fixed byte and complement help establish the supported cartridge layout.',
         'Templates include low-nibble-first4bpp tiles and RGB555 palettes. The ROM wait-state regions map to the same file content.',

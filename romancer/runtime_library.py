@@ -4,7 +4,7 @@ from pathlib import Path
 from .runtime_profiles import _binary,save_profile,load_profile
 from .assets import checked_path,digest
 
-NAMES={'fceumm':['nes'],'nestopia':['nes'],'snes9x':['snes'],'genesis_plus_gx':['genesis'],'picodrive':['genesis'],'gambatte':['gb'],'sameboy':['gb'],'mgba':['gba']}
+NAMES={'fceumm':['nes'],'nestopia':['nes'],'snes9x':['snes'],'genesis_plus_gx':['genesis'],'picodrive':['genesis'],'gambatte':['gb','gbc'],'sameboy':['gb','gbc'],'mgba':['gba']}
 KEYS={'up':'ArrowUp','down':'ArrowDown','left':'ArrowLeft','right':'ArrowRight','a':'z','b':'x','start':'Enter','select':'Shift'}
 
 
@@ -45,5 +45,5 @@ def configure_local_core(workspace,system_id,candidate):
     if _binary(candidate['core'])!=candidate['identity']:raise ValueError('selected core changed; scan the folder again')
     saved=load_profile(workspace,system_id)['profile']
     if saved:raise ValueError('a setup already exists; use advanced setup to replace it')
-    options={'gambatte_gb_colorization':'disabled','gambatte_gb_hwmode':'GB'} if stem=='gambatte' else {}
+    options={'gambatte_gb_colorization':'disabled','gambatte_gb_hwmode':'GBC' if system_id=='gbc' else 'GB'} if stem=='gambatte' else {}
     return save_profile(workspace,system_id,candidate['core'],options,None,KEYS)

@@ -20,8 +20,11 @@ HARDWARE={
 }
 
 
+HARDWARE['gbc']={**HARDWARE['gb'],'name':'Game Boy Color APU'}
+
+
 def audio_system_info(system,source_sha256):
-    if system not in HARDWARE:raise ValueError('audio knowledge is limited to NES, SNES, Genesis, Game Boy and GBA')
+    if system not in HARDWARE:raise ValueError('audio knowledge is limited to NES, SNES, Genesis, Game Boy, Game Boy Color and GBA')
     driver={'status':'UNKNOWN','id':None,'name':'Unidentified game driver','reference':None}
     if system=='gba' and source_sha256=='d16c7bf6e62bb84049fff1b387108fbd1e6e2cd38ca994ab5310dd9cbf9ba414':
         driver={'status':'DOCUMENTED_EXACT_REVISION','id':'m4a-mp2k','name':'Nintendo M4A / Music Player 2000',

@@ -60,6 +60,16 @@ def read_project(project):
             path=checked_path(project/stored)
             if path.parent not in (project/'sources',project/'builds'):raise ValueError('artifact path escapes project')
             row['path']=str(path)
+    # Older releases grouped both CGB flags under gb. Reclassify only a
+    # validated assessment bound to these exact artifact bytes, never a suffix.
+    for row in value.get('sources',[])+value.get('builds',[]):
+        assessment=row.get('system_assessment') or {}
+        candidates=[c for c in assessment.get('candidates',[]) if c.get('layout_valid')]
+        if (row.get('system_id')=='gb' and assessment.get('status')=='IDENTIFIED'
+                and (assessment.get('source') or {}).get('sha256')==row.get('sha256')
+                and len(candidates)==1 and candidates[0].get('metadata',{}).get('color_flag') in (0x80,0xc0)):
+            row['system_id']='gbc';row['system']='Game Boy Color'
+            assessment['system_id']='gbc';candidates[0]['system_id']='gbc';candidates[0]['format']='gbc-cartridge'
     return value
 
 
@@ -159,7 +169,7 @@ def _publish_copy(source,destination,expected,edits=(),*,cancelled=lambda:False)
 
 def register_source(project:Path,source:Path,system:str|None,*,cancelled=lambda:False)->dict:
     project=Path(project);source=checked_path(Path(source))
-    if system not in (None,'Unknown','NES','SNES','Genesis','Game Boy','Sega CD','GBA'):raise ValueError('unsupported console label')
+    if system not in (None,'Unknown','NES','SNES','Genesis','Game Boy','Game Boy Color','Sega CD','GBA'):raise ValueError('unsupported console label')
     with locked(project) as value:
         if len(value['sources'])>=512:raise ValueError('project source limit reached')
         measured=_measure(source,cancelled=cancelled);artifact_id=uuid.uuid4().hex

@@ -154,7 +154,7 @@ SectionEnd
 def build_installer(payload,compiler_archive,output):
     if os.name!='nt':raise ValueError('the pinned NSIS compiler is a Windows build tool')
     payload=Path(payload).absolute();output=Path(output).absolute();verified=verify_tree(payload)
-    if not verified['manifest'].get('engines',{}).get('included'):raise ValueError('the standard installer requires all five bundled engines')
+    if not verified['manifest'].get('engines',{}).get('included'):raise ValueError('the standard installer requires the bundled engines for all six systems')
     from romancer.bundled_cores import core_members
     core_members(payload/'cores')
     compiler_archive=Path(compiler_archive)

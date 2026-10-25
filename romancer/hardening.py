@@ -27,7 +27,7 @@ STABILITY.update({
 
 def capabilities(out:str|None=None)->dict[str,Any]:
     result={'tool':'ROMancer','version':ROMANCER_VERSION,'policy':'Evidence-first. Candidate findings remain candidate until externally validated.','command_stability':STABILITY,
-            'supported_systems':['nes','snes','genesis','gb','gba'],'patch_formats':['ips'],
+            'supported_systems':['nes','snes','genesis','gb','gbc','gba'],'patch_formats':['ips'],
             'runtime':{'frontend':'direct libretro ABI','software_video_capture':True,'joypad_input':True,'save_states':True,'exposed_memory':True,'save_ram_persistence':True,'disc_control':'when exposed by core','hardware_render_capture':False,'bounded_autonomous_play':True},
             'knowledge_commons':{'safe_capsules':True,'capsule_import_revalidation':True,'capsule_diff':True,'asset_leakage_audit':True},
             'formal_proof':{'invariant_gates':True,'comparison_modes':True,'proof_bundles':True,'declared_scope_only':True},

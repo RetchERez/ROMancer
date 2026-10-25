@@ -25,7 +25,7 @@ def integrity_edits(path,expected_sha256,system_id,edits):
     if assessment['status']!='IDENTIFIED' or assessment['system_id']!=system_id:raise ValueError('a unique current system layout is required')
     if path.stat().st_size>64*1024**2:raise ValueError('cartridge integrity budget is64MiB')
     raw=bytearray(path.read_bytes());_measure(path,{'sha256':expected_sha256,'size':len(raw)})
-    protected={'nes':[(0,16)],'gb':[(0x143,0x14d)],'genesis':[(0x100,0x110),(0x1a0,0x1a8)],'gba':[(0xb2,0xb3)]}.get(system_id,[])
+    protected={'nes':[(0,16)],'gb':[(0x143,0x14d)],'gbc':[(0x143,0x14d)],'genesis':[(0x100,0x110),(0x1a0,0x1a8)],'gba':[(0xb2,0xb3)]}.get(system_id,[])
     if system_id=='snes':
         header=next(c for c in assessment['candidates'] if c['layout_valid'])['header_offset'];protected=[(header+21,header+28)]
     for edit in edits:
@@ -44,7 +44,7 @@ def integrity_edits(path,expected_sha256,system_id,edits):
     elif system_id=='genesis':
         if len(raw)%2:raise ValueError('checksum repair requires an even-sized linear cartridge')
         start=0x18e;length=2;replacement=(sum(int.from_bytes(raw[i:i+2],'big') for i in range(0x200,len(raw),2))&65535).to_bytes(2,'big')
-    elif system_id=='gb':
+    elif system_id in ('gb','gbc'):
         start=0x14d;length=3
         raw[start]=(-sum(raw[0x134:0x14d])-25)&255
         raw[0x14e:0x150]=b'\0\0'

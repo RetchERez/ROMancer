@@ -69,7 +69,7 @@ def run(project,row,*,cancelled=lambda:False,publish=None):
             except ValueError as error:catalog[scope]={'status':'NOT_CHECKED','reason':str(error)}
     else:catalog={'file':{'status':'NO_CATALOG'},'payload':{'status':'NO_CATALOG'}}
     system=row.get('system_id');rows=[];counts={kind:0 for kind in ('text','graphics','compression')};segments=[]
-    size=min(row['size'],MAX_SCAN);supported=system in ('nes','snes','genesis','gb','gba');structures=[];structure_coverage=[]
+    size=min(row['size'],MAX_SCAN);supported=system in ('nes','snes','genesis','gb','gbc','gba');structures=[];structure_coverage=[]
     if supported:
         for start in range(0,size,WINDOW):
             if cancelled():raise KeyboardInterrupt

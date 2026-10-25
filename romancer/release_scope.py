@@ -1,12 +1,12 @@
-"""The five-system workbench release; unknown inputs remain inspect-only."""
+"""The six-system workbench release; unknown inputs remain inspect-only."""
 from . import workbench_projects as projects
 from .script_schema import load_script_json
 
-SYSTEMS=('nes','snes','genesis','gb','gba')
+SYSTEMS=('nes','snes','genesis','gb','gbc','gba')
 
 
 def require_supported(row):
-    if row.get('system_id') not in SYSTEMS:raise ValueError('Inspect only: this source is outside the five supported cartridge systems.')
+    if row.get('system_id') not in SYSTEMS:raise ValueError('Inspect only: this source is outside the six supported cartridge systems.')
 
 
 def require_editable(project,row):
@@ -30,8 +30,8 @@ def require_editable(project,row):
 
 
 def guard_request(api,operation,p):
-    if 'system_id' in p and p['system_id'] not in SYSTEMS:raise ValueError('This release supports only the five cartridge systems listed in Settings.')
-    if operation.startswith('containers.') and operation!='containers.inventory':raise ValueError('This operation is outside the five-system cartridge release.')
+    if 'system_id' in p and p['system_id'] not in SYSTEMS:raise ValueError('This release supports only the six cartridge systems listed in Settings.')
+    if operation.startswith('containers.') and operation!='containers.inventory':raise ValueError('This operation is outside the six-system cartridge release.')
     writes=operation.endswith('.plan') or operation in (
       'bytes.plan','systems.plan_edits','compression.plan_reinsert','runtime.load','runtime.load_profile','runtime.smoke_profile',
       'runtime.load_game_save','saves.restore','patches.preview','recipes.preview','captures.record','debug.observe',

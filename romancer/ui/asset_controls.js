@@ -20,7 +20,7 @@ export function assetTools(ctx,doc,bitmap,palette){if(!doc?.ok||!bitmap)return '
  const count=Math.min(2**({'mono-row-msb-v1':1,'tile8-paired2-msb-v1':2,'tile8-planar2-msb-v1':2,'tile8-paired4-msb-v1':4,'tile8-packed4-high-v1':4,'tile8-packed4-low-v1':4}[bitmap.codec]),palette?.colors_per_bank||256);
  const pixels=()=>pixelBuffer(ctx,doc,bitmap,state.paint?.cell_index??0);
  const history=historyFor(ctx,doc,bitmap.id,state.paint?.cell_index??0,pixels());
- const commit=after=>{const index=state.paint?.cell_index??0;recordPixels(ctx,doc,bitmap.id,index,pixels(),after);setPixelBuffer(ctx,doc,bitmap,index,after);return ctx.render();};
+ const commit=after=>{state.historyEditor='paint-canvas';const index=state.paint?.cell_index??0;recordPixels(ctx,doc,bitmap.id,index,pixels(),after);setPixelBuffer(ctx,doc,bitmap,index,after);return ctx.render();};
  const usage=state.results['resources.references'],showUses=usage?.document_id===doc.document_id&&usage.bitmap_id===bitmap.id&&usage.cell_index===(state.paint?.cell_index??0);
  const glyph=font?.glyphs.find(row=>row.id===ctx.draft('font-glyph',font.glyphs[0]?.id));
  ctx.use({

@@ -46,7 +46,7 @@ def create_nes_demo(root:Path,incoming:Path)->dict:
 def create_system_demo(root,incoming,system_id):
     from .boot_fixtures import make_boot_fixture
     from .resource_forms import graphics_schema
-    labels={'nes':'NES','snes':'SNES','genesis':'Genesis','gb':'Game Boy','gba':'GBA'}
+    labels={'nes':'NES','snes':'SNES','genesis':'Genesis','gb':'Game Boy','gbc':'Game Boy Color','gba':'GBA'}
     fixture=make_boot_fixture(system_id);project=Path(create_project(root,labels[system_id]+' workshop')['path'])
     path=Path(incoming)/(uuid.uuid4().hex+fixture['suffix']);path.write_bytes(fixture['data'])
     try:source=register_source(project,path,None)

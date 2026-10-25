@@ -1,6 +1,6 @@
 import {resourceSystem} from './compression_controls.js';
 import {field,area,select,button,read} from './common.js';
-const systems=[['nes','NES'],['snes','SNES'],['genesis','Genesis'],['gb','Game Boy'],['gba','GBA']];
+const systems=[['nes','NES'],['snes','SNES'],['genesis','Genesis'],['gb','Game Boy'],['gbc','Game Boy Color'],['gba','GBA']];
 const integer=id=>{const text=read(id).trim(),value=Number(text);if(!text||!Number.isSafeInteger(value))throw new Error('Enter a whole number for '+id+'.');return value;};
 const optional=id=>read(id).trim()?integer(id):null;
 function system(ctx,prefix){return select(prefix+'-system','System',systems,ctx.draft(prefix+'-system',resourceSystem(ctx.state)));}

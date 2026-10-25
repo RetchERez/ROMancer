@@ -23,5 +23,5 @@ def candidates(reader):
         'global_checksum_validation':'NOT_CHECKED','logo_validation':'NOT_CHECKED'}
     warnings=['Logo, whole-cartridge checksum, mapper behavior and native boot require separate checks.']
     if not valid:warnings.append('Game Boy declared ROM size or header checksum is inconsistent.')
-    return [candidate('gb','gb-cartridge',0x100,metadata=metadata,valid=valid,warnings=warnings,
+    return [candidate('gbc' if flag in (0x80,0xc0) else 'gb','gbc-cartridge' if flag in (0x80,0xc0) else 'gb-cartridge',0x100,metadata=metadata,valid=valid,warnings=warnings,
         regions=[region('rom','program',0,size),region('header','header',0x100,0x50)] if valid else [])]

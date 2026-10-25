@@ -21,7 +21,7 @@ MAX_CONTRACT_JSON_BYTES = 32 * 1024 * 1024
 MAX_JSON_DEPTH = 64
 MAX_JSON_NODES = 100000
 HASH_CHUNK_BYTES = 1024 * 1024
-ADAPTER_IDS = frozenset({"nes", "snes", "genesis", "gb", "gba"})
+ADAPTER_IDS = frozenset({"nes", "snes", "genesis", "gb", "gbc", "gba"})
 
 
 def _result(scope: str) -> dict:
@@ -34,12 +34,13 @@ def adapter_inventory() -> dict:
         ("nes", "experimental", "iNES identification; NES 2.0 extended fields are not fully decoded."),
         ("snes", "experimental", "Header scoring and address mapping are heuristic, not mapper-state proof."),
         ("genesis", "supported", "SEGA cartridge header identification only; mapper and bank-switch behavior is not established."),
-        ("gb", "supported", "Validated DMG/CGB cartridge header and declared banks; native Color compatibility is separate."),
+        ("gb", "supported", "Validated DMG cartridge header and declared banks."),
+        ("gbc", "supported", "Validated CGB-compatible/Color-only header and declared banks; gameplay needs native evidence."),
         ("gba", "supported", "Header/fixed-byte identification and checksum reporting; this is not runtime compatibility proof."),
     )
     adapters = []
     for identifier, status, reason in definitions:
-        implementation = "romancer/system_formats/gb.py" if identifier=="gb" else f"romancer/systems/{identifier}.py"
+        implementation = "romancer/system_formats/gb.py" if identifier in ("gb","gbc") else f"romancer/systems/{identifier}.py"
         capabilities = {
             "identification": {"status": status, "reason": reason, "implementation": implementation},
             "raw_inspection": {"status": "supported", "reason": "Read-only bytes and header inspection; unknown layouts remain inspectable.", "implementation": "romancer/rom_ident.py"},

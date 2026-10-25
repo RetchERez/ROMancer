@@ -45,7 +45,7 @@ def check_rom(path,expected_sha256,expected_crc32='',crc_scope='file',*,cancelle
     if system=='nes' and layout:
         payload=[{'offset':r['offset'],'length':r['length']} for r in selected['regions'] if r['id'] in ('prg-rom','chr-rom')]
         add('Internal cartridge checksum','NOT_CHECKED','iNES/NES 2.0 has no standard stored whole-ROM checksum. Use a reference CRC32.')
-    elif system=='gb' and len(raw)>=0x150:
+    elif system in ('gb','gbc') and len(raw)>=0x150:
         expected=(-sum(raw[0x134:0x14d])-25)&255;stored=raw[0x14d]
         add('Game Boy header checksum','PASS' if expected==stored else 'FAIL','Header bytes 0134–014C.',f'{stored:02X}',f'{expected:02X}')
         expected=(sum(raw)-raw[0x14e]-raw[0x14f])&65535;stored=int.from_bytes(raw[0x14e:0x150],'big')

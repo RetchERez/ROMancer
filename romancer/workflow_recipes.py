@@ -95,7 +95,7 @@ def import_definition(path,sha,document):
 
 
 def omit_checksum_ranges(path,system,edits):
-    spans={'gb':[(0x14d,0x150)],'gba':[(0xbd,0xbe)],'genesis':[(0x18e,0x190)]}.get(system,[])
+    spans={'gb':[(0x14d,0x150)],'gbc':[(0x14d,0x150)],'gba':[(0xbd,0xbe)],'genesis':[(0x18e,0x190)]}.get(system,[])
     if system=='snes':
         from .system_identify import identify_system
         assessment=identify_system(path);valid=[c for c in assessment['candidates'] if c['layout_valid']]

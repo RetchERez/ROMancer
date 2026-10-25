@@ -368,8 +368,8 @@ class WorkbenchAPI:
         from .system_registry import system_inventory
         return {'ok':True,'product':'ROMancer','version':ROMANCER_VERSION,'display_version':ROMANCER_BUILD_LABEL,'release_name':ROMANCER_RELEASE_NAME,'build_label':ROMANCER_BUILD_LABEL,'target_version':'1.0','credit':'By RetchEWretched','release_status':'RELEASE',
                 'python':platform.python_version(),'platform':platform.system(),'pillow':importlib.util.find_spec('PIL') is not None,
-                'native_dialog':os.name=='nt' or importlib.util.find_spec('tkinter') is not None,'adapters':{**adapter_inventory(),'adapters':[a for a in adapter_inventory()['adapters'] if a['id'] in ('nes','snes','genesis','gb','gba')]},'systems':system_inventory(),
-                'runtime_note':'The full Windows release includes engines for all five systems. Source installations can use compatible local libretro cores. Gameplay evidence applies to the exact ROM and tested setup.'}
+                'native_dialog':os.name=='nt' or importlib.util.find_spec('tkinter') is not None,'adapters':{**adapter_inventory(),'adapters':[a for a in adapter_inventory()['adapters'] if a['id'] in ('nes','snes','genesis','gb','gbc','gba')]},'systems':system_inventory(),
+                'runtime_note':'The full Windows release includes engines for all six systems. Source installations can use compatible local libretro cores. Gameplay evidence applies to the exact ROM and tested setup.'}
 
     def _agent_config(self,p,c):
         if type(p['allow_writes']) is not bool or type(p['read_roots']) is not list or len(p['read_roots'])>8:raise ValueError('choose agent access and up to eight import folders')
@@ -571,7 +571,7 @@ class WorkbenchAPI:
         project,row,path=self.source(p);inspection=inspect_table(path,row['sha256'],p['definition'],0,1)
         if p['document_id']!=inspection['document_id']:raise ValueError('table definition or source changed; inspect it again')
         edits=table_edits(path,row['sha256'],p['definition'],p['changes'])
-        if row.get('system_id') in ('nes','snes','genesis','gb','gba'):
+        if row.get('system_id') in ('nes','snes','genesis','gb','gbc','gba'):
             return self._integrity_plan({'project_id':p['project_id'],'artifact_id':p['artifact_id'],'edits':edits},c)
         return projects.plan_byte_edits(project,row['artifact_id'],edits)
 
@@ -742,7 +742,7 @@ class WorkbenchAPI:
         from .workflow_recipes import preview_recipe
         project,row,path=self.source(p);preview=preview_recipe(path,p['recipe'],cancelled=c)
         if c():raise KeyboardInterrupt
-        planned=self._integrity_plan({**p,'edits':preview['edits']},c) if row.get('system_id') in ('nes','snes','genesis','gb','gba') else projects.plan_byte_edits(project,row['artifact_id'],preview['edits'])
+        planned=self._integrity_plan({**p,'edits':preview['edits']},c) if row.get('system_id') in ('nes','snes','genesis','gb','gbc','gba') else projects.plan_byte_edits(project,row['artifact_id'],preview['edits'])
         return {**planned,'recipe_id':preview['recipe_id']}
 
     def _recipe_export(self,p,c):
@@ -844,7 +844,7 @@ class WorkbenchAPI:
         from .workbench_evidence import store_evidence
         import hashlib
         project,row,path=self.source(p)
-        if row.get('system_id') not in ('nes','snes','genesis','gb','gba') or row['system_id']!=p['system_id']:raise ValueError('select an identified cartridge and its matching saved system setup')
+        if row.get('system_id') not in ('nes','snes','genesis','gb','gbc','gba') or row['system_id']!=p['system_id']:raise ValueError('select an identified cartridge and its matching saved system setup')
         checked=self._profile_load_config(p['system_id']);config={**checked,'game':str(path),'expected_game_sha256':row['sha256'],'session_dir':str(project/'sessions'/('check-'+uuid.uuid4().hex))}
         load=preflight_load(config,project)
         with OwnedRuntime(load,30,cancelled=c) as runtime:
@@ -1021,7 +1021,7 @@ class WorkbenchAPI:
         from .system_identify import identify_system
         from .release_scope import SYSTEMS
         detected=identify_system(Path(p['path']),cancelled=c)
-        if detected.get('system_id') is not None and detected['system_id'] not in SYSTEMS:raise ValueError('Choose a cartridge image for one of the five systems in Settings.')
+        if detected.get('system_id') is not None and detected['system_id'] not in SYSTEMS:raise ValueError('Choose a cartridge image for one of the six systems in Settings.')
         result=projects.register_source(self.project(p),Path(p['path']),p['system'],cancelled=c)
         try:result['scan']=self._scan_start({'project_id':p['project_id'],'artifact_id':result['artifact_id'],'rescan':False},c)
         except (ValueError,OSError,RuntimeError) as error:result['scan']={'status':'NOT_STARTED','reason':str(error)}
@@ -1076,7 +1076,7 @@ class WorkbenchAPI:
         from .system_identify import identify_system
         system=identify_system(source,expected_sha256=row['sha256'])['system_id']
         if system=='segacd':raise ValueError('extract and edit a disc resource, then rebuild its container')
-        if system in ('nes','snes','genesis','gb','gba'):
+        if system in ('nes','snes','genesis','gb','gbc','gba'):
             from .system_integrity import integrity_edits
             hunks=[{'offset':h['offset'],'before':h['before_hex'],'after':h['after_hex']} for h in result['hunks']]
             repaired=integrity_edits(source,row['sha256'],system,hunks)
@@ -1335,7 +1335,7 @@ class WorkbenchAPI:
             if c():raise KeyboardInterrupt
             source_id=p['artifact_id']
             if changes:
-                plan=self._integrity_plan({'project_id':p['project_id'],'artifact_id':source_id,'edits':changes},c) if row.get('system_id') in ('nes','snes','genesis','gb','gba') else projects.plan_byte_edits(project,source_id,changes);build_path=project/'builds'/(plan['plan_id']+Path(row['path']).suffix)
+                plan=self._integrity_plan({'project_id':p['project_id'],'artifact_id':source_id,'edits':changes},c) if row.get('system_id') in ('nes','snes','genesis','gb','gbc','gba') else projects.plan_byte_edits(project,source_id,changes);build_path=project/'builds'/(plan['plan_id']+Path(row['path']).suffix)
                 if build_path.exists():
                     candidates=[r for r in projects.read_project(project)['builds'] if r['plan_id']==plan['plan_id']]
                     if not candidates:raise ValueError('bisection output collision')

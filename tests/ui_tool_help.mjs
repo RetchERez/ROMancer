@@ -1,0 +1,11 @@
+import assert from 'node:assert/strict';
+import {field,select} from '../romancer/ui/common.js';
+const offset=field('hex-offset','File offset','0');
+assert.match(offset,/role="tooltip"/);
+assert.match(offset,/zero-based|counted from zero/i);
+assert.match(offset,/tabindex="0"/);
+assert.match(select('palette-format','Palette format',[['rgb555','RGB555']],'rgb555'),/stored colors/i);
+assert.match(field('stride','Record stride','5'),/start of one record/i);
+assert.doesNotMatch(field('name','Project name','Example'),/role="tooltip"/);
+assert.match(field('offset','Offset <x>','0'),/Offset &lt;x&gt;/);
+console.log('Short field explanations are accessible on hover/focus; ordinary names remain uncluttered.');

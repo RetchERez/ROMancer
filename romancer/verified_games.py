@@ -10,6 +10,16 @@ from .asset_schema import fields, number
 
 
 PROFILES=(
+    {'id':'ffl2-usa','name':'Final Fantasy Legend II','system':'gb','size':262144,
+     'sha256':'2d89231f9e264a024d634bcf7d00de5a66d8a45f6f4ca33e1fc1602a35b9840b',
+     'reference':'https://github.com/daid/FFL2-Disassembly/tree/a5c17a90d87d102a9a45d287042c9a36ffd06f97',
+     'scope':'Opening-bedroom stool position only. Both stool and underlying floor have the same collision value; test each new build.',
+     'offsets':[(0x20375,3,'Bedroom stool map command')]},
+    {'id':'dejavu-casebooks-usa','name':'Deja Vu I & II - The Casebooks of Ace Harding','system':'gbc','size':1048576,
+     'sha256':'b3ca745829e018513eae8d760484140a031c0f031e1881fca3374a9194e3ecac',
+     'reference':'https://github.com/Hoshiruna/djv1-2disasm/tree/b7ae8ca791ba31b956e015d3c87f3acc47f0fb42',
+     'scope':'Startup and first Case Book 1 scene UI palette7. Later scenes use their own palettes.',
+     'offsets':[(0x28318,8,'Startup casebook interface colors'),(0x28504,8,'Opening scene interface colors')]},
     {'id':'castlevania-usa','name':'Castlevania','system':'nes','size':131088,
      'sha256':'55bcab0d9efc33a9d9efc90f2c3c4ab12f3221a44b1f357e6c6202a456399aa8',
      'reference':'https://github.com/rumbleminze/castlevania-snes/blob/main/src/bank7.asm',
@@ -33,6 +43,14 @@ PROFILES=(
 )
 
 BYTE_NOTES={
+ 'ffl2-usa':[
+  {'storage':'Three-byte packed point command','meaning':'Places tile1D (stool) in map0265. 17 CE encodes (14,31); 18 0E encodes (14,32). Exit, story window and collision values are preserved.',
+   'example':'17 CE 1D to 18 0E 1D.','evidence':'Original room header486B, map0265 and tileset0B were observed in native WRAM. Each edited build needs its own playtest.'}],
+ 'dejavu-casebooks-usa':[
+  {'storage':'Four little-endian RGB555 colors','meaning':'Startup palette7 used by the casebook interface. This is stored color data.',
+   'example':'Original or parchment interface palette.','evidence':'The 64-byte native target palette matches the original startup and first-scene ROM blocks.'},
+  {'storage':'Four little-endian RGB555 colors','meaning':'First Case Book 1 scene palette7. Updated with the startup copy; later scene palettes remain unchanged.',
+   'example':'Original or parchment interface palette.','evidence':'Scene loading replaces all64 colors, so both observed copies are changed together.'}],
  'castlevania-usa':[
   {'storage':'Unsigned 8-bit counter','meaning':'Initialization counter includes the current life. Spare lives = stored value minus 1. Both initialization constants must agree.',
    'example':'04 = 3 spare lives; 0A = 9 spare lives.','evidence':'Native HUD changed from P-03 to P-09 after a new start.'},
@@ -85,6 +103,15 @@ def _rotate(raw):
 
 def _model(profile,root,path):
     identifier=profile['id']
+    if identifier=='ffl2-usa':
+        stored=_read(path,0x20375,3)
+        if stored not in (bytes.fromhex('17ce1d'),bytes.fromhex('180e1d')):raise ValueError('bedroom map command guard differs; inspect this build')
+        return [{'id':'room_layout','label':'Opening-bedroom stool','type':'choice','value':'original' if stored==bytes.fromhex('17ce1d') else 'stool_down','options':[['original','Original position'],['stool_down','Move one tile down']]}]
+    if identifier=='dejavu-casebooks-usa':
+        rows=[_read(path,o,n) for o,n,_ in profile['offsets']]
+        original=bytes.fromhex('0000027e1e007f03');parchment=bytes.fromhex('0000285695155d5f')
+        if rows not in ([original,original],[parchment,parchment]):raise ValueError('opening interface palette guard differs; inspect this build')
+        return [{'id':'palette_style','label':'Opening casebook interface','type':'choice','value':'original' if rows[0]==original else 'parchment','options':[['original','Original colors'],['parchment','Parchment colors']]}]
     if identifier=='castlevania-usa':
         constants=[]
         for offset,_,_ in profile['offsets']:
@@ -109,13 +136,16 @@ def _model(profile,root,path):
 
 
 def palette_visuals(profile,root,path):
-    if profile['id']!='wario-land4-ue':return None
+    if profile['id']=='ffl2-usa':
+        return {'kind':'map-point','current':[14,31 if _read(path,0x20375,3)==bytes.fromhex('17ce1d') else 32],'original':[14,31],'stool_down':[14,32],'origin':[10,28],'size':[7,8]}
+    if profile['id'] not in ('wario-land4-ue','dejavu-casebooks-usa'):return None
     def colors(raw):
         return [[round(((int.from_bytes(raw[i:i+2],'little')>>shift)&31)*255/31) for shift in (0,5,10)] for i in range(0,len(raw),2)]
     rows=[]
     for offset,length,label in profile['offsets']:
         original=_read(root['path'],offset,length);current=_read(path,offset,length)
-        rows.append({'name':label,'offset':offset,'current':colors(current),'original':colors(original),'teal_magenta':colors(_rotate(original))})
+        variant={'parchment':colors(bytes.fromhex('0000285695155d5f'))} if profile['id']=='dejavu-casebooks-usa' else {'teal_magenta':colors(_rotate(original))}
+        rows.append({'name':label,'offset':offset,'current':colors(current),'original':colors(original),**variant})
     return {'kind':'rgb555-palettes','palettes':rows,'scope':'Literal stored colors; native scene rendering is not predicted.'}
 
 
@@ -160,7 +190,14 @@ def plan(api,parameters,*,cancelled=lambda:False):
         if before!=after:edits.append({'offset':offset,'before':before.hex(),'after':after.hex()})
     identifier=profile['id'];field=model[0];value=values[field['id']]
     if field['type']=='integer':number(value,field['min'],field['max'])
-    if identifier=='castlevania-usa':
+    if identifier=='ffl2-usa':
+        if type(value) is not str or value not in ('original','stool_down'):raise ValueError('choose a verified bedroom stool position')
+        edit(0x20375,bytes.fromhex('17ce1d' if value=='original' else '180e1d'));name='Bedroom stool - '+value
+    elif identifier=='dejavu-casebooks-usa':
+        if type(value) is not str or value not in ('original','parchment'):raise ValueError('choose a verified opening interface palette')
+        for offset,_,_ in profile['offsets']:edit(offset,bytes.fromhex('0000027e1e007f03' if value=='original' else '0000285695155d5f'))
+        name='Opening casebook colors - '+value
+    elif identifier=='castlevania-usa':
         for offset,_,_ in profile['offsets']:edit(offset,bytes([value+1]))
         name=f'{value} starting spare lives'
     elif identifier=='chrono-trigger-usa':
