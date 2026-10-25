@@ -51,7 +51,15 @@ jobs:
           python-version: '3.14'
       - run: python -m pip install -r requirements.txt
       - run: python -B tools/fetch_runtime.py --downloads work_private/runtime-downloads
-      - run: python -B tools/package_windows.py --app . --downloads work_private/runtime-downloads --output work_private/windows-bundle --zip work_private/windows.zip
+      - name: Download the reviewed engine pack
+        shell: pwsh
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: gh release download v1.0.0 --repo $env:GITHUB_REPOSITORY --pattern ROMancer-v1.0-Engines.zip --dir work_private/runtime-downloads
+      - run: python -B tools/fetch_cores.py --downloads work_private/runtime-downloads --archive work_private/runtime-downloads/ROMancer-v1.0-Engines.zip
+      - run: python -B tools/fetch_installer.py --downloads work_private/runtime-downloads
+      - run: python -B tools/package_windows.py --app . --downloads work_private/runtime-downloads --cores work_private/runtime-downloads/cores --output work_private/windows-bundle --zip work_private/windows.zip
+      - run: python -B tools/package_installer.py --payload work_private/windows-bundle --compiler work_private/runtime-downloads/nsis-3.13.zip --output work_private/Setup.exe
       - name: Install and check with bundled runtime
         shell: pwsh
         run: |
@@ -59,8 +67,12 @@ jobs:
           $payload = Join-Path $PWD 'work_private/windows-bundle'
           $target = Join-Path $PWD 'work_private/clean install test'
           $python = Join-Path $payload 'python/python.exe'
-          & $python -I -B (Join-Path $payload 'app/tools/install_windows.py') --payload $payload --install-root $target
-          if ($LASTEXITCODE -ne 0) { throw 'Bundled installer failed' }
+          New-Item -ItemType Directory -Path (Join-Path $target 'workspace') -Force | Out-Null
+          Set-Content -LiteralPath (Join-Path $target 'workspace/preserve.txt') -Value 'preserved project marker'
+          $setup = Start-Process -FilePath (Join-Path $PWD 'work_private/Setup.exe') -ArgumentList @('/S', ('/D=' + $target)) -WindowStyle Hidden -Wait -PassThru
+          if ($setup.ExitCode -ne 0) { throw 'Setup executable failed' }
+          $entry = Get-ItemProperty -LiteralPath 'HKCU:/Software/Microsoft/Windows/CurrentVersion/Uninstall/ROMancer'
+          if ($entry.InstallLocation -ne $target) { throw 'Apps registration differs' }
           $active = Get-Content -LiteralPath (Join-Path $target 'active.json') -Raw | ConvertFrom-Json
           $version = Join-Path $target ('versions/' + $active.version)
           $installedPython = Join-Path $version 'python/python.exe'
@@ -80,6 +92,13 @@ jobs:
             if ($capabilities.version -ne $active.version) { throw 'Installed server version differs' }
             & $installedPython -I -B (Join-Path $version 'app/tools/verify_v1.py') --output (Join-Path $PWD 'work_private/installed-workflow.json') --work-dir (Join-Path $PWD 'work_private/installed-fixtures')
             if ($LASTEXITCODE -ne 0) { throw 'Installed five-system workflows failed' }
+            & $installedPython -I -B (Join-Path $version 'app/tools/verify_engines.py') --workspace (Join-Path $PWD 'work_private/automatic-engines') --output (Join-Path $PWD 'work_private/engine-proof.json')
+            if ($LASTEXITCODE -ne 0) { throw 'Automatic bundled engines failed' }
           } finally {
             Stop-Process -Id $connection.pid -ErrorAction SilentlyContinue
           }
+          $uninstaller = Start-Process -FilePath (Join-Path $target 'Uninstall ROMancer.exe') -ArgumentList '/S' -WindowStyle Hidden -Wait -PassThru
+          if ($uninstaller.ExitCode -ne 0) { throw 'Uninstaller failed' }
+          if (Test-Path -LiteralPath (Join-Path $target 'active.json')) { throw 'Uninstall did not deactivate' }
+          if (-not (Test-Path -LiteralPath (Join-Path $target 'workspace/preserve.txt'))) { throw 'Uninstall removed a user project' }
+          if (Test-Path -LiteralPath 'HKCU:/Software/Microsoft/Windows/CurrentVersion/Uninstall/ROMancer') { throw 'Apps entry remains after uninstall' }
