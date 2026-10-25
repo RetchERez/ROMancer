@@ -63,7 +63,7 @@
     "romancer/ui/views/tutorials.js": "71040bcf05cf941b748491a8d37712e61b47feba094c2509eebce9142810e075",
     "romancer/ui/visual_controls.js": "539d9babe397128eba73d4513d8de1b973988afb38409935bbe0c66ac8bb75fb",
     "romancer/ui/workbench_usability.js": "e3e78bbc0a1b08785bbea7dfe4b8438a9d757e2dc5d5f2b26baa35e4847d4157",
-    "romancer/ui/workspace_resume.js": "0f4346cbb17797d4679e45660df22d1b1cbbdc7e25fbd890557b3e01da6e8530",
+    "romancer/ui/workspace_resume.js": "87bc4a0bdac0ac738d00fb90ed1e9aca649889669ccb25c3aeb5c5f5ca1c260e",
     "romancer/ui/workspace_status.js": "0c5e3982eb6e456599bdc0abe0f5aa3592f7a84dcde246a520f0a930f1170fa7"
   },
   "sha256": "05d6d23b98e1d63c431063bbc9c9ac429d96fc08d8024e759980b83cd567673b"
