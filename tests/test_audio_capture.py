@@ -8,6 +8,7 @@ import subprocess
 import sys
 import tempfile
 import threading
+import time
 import unittest
 from unittest.mock import Mock, patch
 
@@ -238,7 +239,7 @@ class CompiledAudioTests(unittest.TestCase):
         if not compiler:
             raise unittest.SkipTest('native C compiler unavailable; run compiled cases under WSL')
         cls.tmp = tempfile.TemporaryDirectory(prefix='romancer audio compiled ')
-        cls.addClassCleanup(cls.tmp.cleanup)
+        cls.addClassCleanup(cls._cleanup_fixture)
         cls.root = Path(cls.tmp.name)
         source = Path(__file__).resolve().parent / 'mock_libretro.c'
         cls.cores = {}
@@ -253,7 +254,44 @@ class CompiledAudioTests(unittest.TestCase):
                 raise AssertionError(result.stderr)
             cls.cores[flag] = core
 
+    @classmethod
+    def _cleanup_fixture(cls):
+        # Allow a bounded interval for Windows executable scanning after the
+        # worker exits. Persistent locks still fail the test.
+        for attempt in range(31):
+            try:
+                cls.tmp.cleanup()
+                return
+            except PermissionError:
+                if sys.platform != 'win32' or attempt == 30:
+                    raise
+                time.sleep(.1)
+
+    def _run_windows_fixture(self):
+        if sys.platform != 'win32' or getattr(self, '_native_child', False):
+            return False
+        # Windows keeps ctypes DLLs mapped after retro_deinit. Match the app's
+        # worker ownership so process exit releases them before fixture cleanup.
+        script = '''
+from pathlib import Path
+import sys
+from tests.test_audio_capture import CompiledAudioTests
+test = CompiledAudioTests(sys.argv[2])
+test.root = Path(sys.argv[1])
+test.cores = {False: test.root / 'default.dll', True: test.root / 'v35.dll'}
+test._native_child = True
+getattr(test, sys.argv[2])()
+'''
+        result = subprocess.run(
+            [sys.executable, '-B', '-c', script, str(self.root), self._testMethodName],
+            cwd=Path(__file__).resolve().parents[1], capture_output=True,
+            text=True, timeout=30)
+        self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
+        return True
+
     def test_v35_mock_emits_known_batch_and_normal_save_action(self):
+        if self._run_windows_fixture():
+            return
         game = self.root / 'audio.bin'
         game.write_bytes(b'synthetic audio fixture')
         saves = self.root / 'audio saves'
@@ -275,6 +313,8 @@ class CompiledAudioTests(unittest.TestCase):
             self.assertEqual(host.memory_region('save_ram')[0], 1)
 
     def test_default_mock_still_has_no_audio_or_save_action(self):
+        if self._run_windows_fixture():
+            return
         game = self.root / 'default.bin'
         game.write_bytes(b'synthetic default fixture')
         with LibretroFrontend(self.cores[False], save_dir=self.root / 'default saves') as host:

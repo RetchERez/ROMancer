@@ -2,7 +2,7 @@ from __future__ import annotations
 
 """ROMancer v9 autonomous game-understanding and play-intelligence CLI layer."""
 
-import argparse, json, shutil, subprocess, tempfile
+import argparse, json, shutil, subprocess, sys, tempfile, time
 from pathlib import Path
 from typing import Any
 
@@ -152,12 +152,29 @@ def _test_autoplay()->dict[str,Any]:
     gcc=shutil.which("gcc") or shutil.which("cc"); source=Path(__file__).resolve().parent.parent/"tests"/"mock_libretro.c"
     if not gcc: return {"name":"autonomous runtime","ok":True,"skipped":True,"detail":"gcc/cc not found"}
     try:
-        with tempfile.TemporaryDirectory(prefix="romancer_v9_auto_") as td:
-            td=Path(td); so=td/"mock_libretro.so"; content=td/"fixture.bin"; content.write_bytes(b"ROMancer v9 fixture")
+        temporary=tempfile.TemporaryDirectory(prefix="romancer_v9_auto_")
+        try:
+            td=Path(temporary.name); so=td/("mock_libretro.dll" if sys.platform=="win32" else "mock_libretro.so"); content=td/"fixture.bin"; content.write_bytes(b"ROMancer v9 fixture")
             cp=subprocess.run([gcc,"-shared","-fPIC","-O2",str(source),"-o",str(so)],capture_output=True,text=True,timeout=30)
             if cp.returncode: return {"name":"autonomous runtime","ok":False,"error":cp.stderr[-2000:]}
-            r=runtime_autoplay(so,content,td/"auto",mode="qa",decisions=3,boot_frames=1,action_frames=1,settle_frames=0)
+            if sys.platform=="win32":
+                # Process ownership releases the test DLL before deleting it.
+                bootstrap=("import json,sys;sys.path.insert(0,sys.argv[1]);"
+                    "from romancer.autonomous_play import runtime_autoplay;"
+                    "print(json.dumps(runtime_autoplay(sys.argv[2],sys.argv[3],sys.argv[4],mode='qa',decisions=3,boot_frames=1,action_frames=1,settle_frames=0)))")
+                run=subprocess.run([sys.executable,"-I","-B","-c",bootstrap,str(Path(__file__).resolve().parent.parent),str(so),str(content),str(td/"auto")],capture_output=True,text=True,timeout=30)
+                if run.returncode: return {"name":"autonomous runtime","ok":False,"error":run.stderr[-2000:]}
+                r=json.loads(run.stdout)
+            else:
+                r=runtime_autoplay(so,content,td/"auto",mode="qa",decisions=3,boot_frames=1,action_frames=1,settle_frames=0)
             return {"name":"autonomous runtime","ok":r.get("decisions_completed",0)>=1,"detail":{"decisions":r.get("decisions_completed")}}
+        finally:
+            for attempt in range(31):
+                try:
+                    temporary.cleanup();break
+                except PermissionError:
+                    if sys.platform!="win32" or attempt==30:raise
+                    time.sleep(.1)
     except Exception as exc: return {"name":"autonomous runtime","ok":False,"error":str(exc)}
 
 
