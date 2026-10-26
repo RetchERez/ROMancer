@@ -96,6 +96,12 @@ jobs:
             $body = @{ operation = 'system.capabilities'; parameters = @{} } | ConvertTo-Json -Compress
             $capabilities = Invoke-RestMethod -Uri ($parts[0] + '/api/call') -Method Post -Headers $headers -ContentType 'application/json' -Body $body
             if ($capabilities.version -ne $active.version) { throw 'Installed server version differs' }
+            foreach ($guideFile in @('index.html', 'guide.css', 'guide.pdf', 'screenshots/07-ffl2-room.png', 'screenshots/13-settings.png')) {
+              $download = Join-Path $PWD ('work_private/guide-' + ($guideFile -replace '/', '-'))
+              Invoke-WebRequest -Uri ($parts[0] + '/user-guide/' + $guideFile) -OutFile $download
+              $included = Join-Path $version ('app/user-guide/' + $guideFile)
+              if ((Get-FileHash -LiteralPath $download).Hash -ne (Get-FileHash -LiteralPath $included).Hash) { throw 'Installed guide bytes differ' }
+            }
             & $installedPython -I -B (Join-Path $version 'app/tools/verify_v1.py') --output (Join-Path $PWD 'work_private/installed-workflow.json') --work-dir (Join-Path $PWD 'work_private/installed-fixtures')
             if ($LASTEXITCODE -ne 0) { throw 'Installed six-system workflows failed' }
             & $installedPython -I -B (Join-Path $version 'app/tools/verify_engines.py') --workspace (Join-Path $PWD 'work_private/automatic-engines') --output (Join-Path $PWD 'work_private/engine-proof.json')
@@ -105,6 +111,9 @@ jobs:
           }
           $uninstaller = Start-Process -FilePath (Join-Path $target 'Uninstall ROMancer.exe') -ArgumentList '/S' -WindowStyle Hidden -Wait -PassThru
           if ($uninstaller.ExitCode -ne 0) { throw 'Uninstaller failed' }
+          # NSIS may finish in its temporary child after the entry process exits.
+          $uninstallDeadline = (Get-Date).AddSeconds(30)
+          while ((Test-Path -LiteralPath (Join-Path $target 'active.json')) -and (Get-Date) -lt $uninstallDeadline) { Start-Sleep -Milliseconds 100 }
           if (Test-Path -LiteralPath (Join-Path $target 'active.json')) { throw 'Uninstall did not deactivate' }
           if (-not (Test-Path -LiteralPath (Join-Path $target 'workspace/preserve.txt'))) { throw 'Uninstall removed a user project' }
           if (Test-Path -LiteralPath 'HKCU:/Software/Microsoft/Windows/CurrentVersion/Uninstall/ROMancer') { throw 'Apps entry remains after uninstall' }
