@@ -165,7 +165,7 @@ APPROVED_FILES = APPROVED_FILES | frozenset({
     'romancer/ui/room_navigation.js','tests/ui_level_rooms.mjs',
     'tests/test_declared_workbench.py','tests/test_investigation_mcp.py',
     'tests/ui_debug_navigation.mjs','tests/ui_memory_watch_scope.mjs',
-    'tests/test_verified_room.py','tests/test_user_guide.py','tests/ui_interface_scale.mjs',
+    'tests/test_verified_room.py','tests/test_workbench_evidence.py','tests/test_user_guide.py','tests/ui_interface_scale.mjs',
     'tests/ui_room_editor.mjs','tests/ui_sound_live_preview.mjs','tests/ui_asset_pagination.mjs',
     'tests/ui_level_visual_tools.mjs','tests/ui_menu_preview.mjs','romancer/ui/menu_preview.js',
     'romancer/app_settings.py','romancer/ui/app_settings.js','tests/test_app_settings.py','tests/ui_app_settings.mjs','tests/ui_scan_preferences.mjs',
@@ -176,7 +176,7 @@ APPROVED_FILES = APPROVED_FILES | frozenset({
         '09-playtest-states','10-verified-patch','11-hex-inspection','12-tutorials',
         '13-settings','14-light-theme','15-dark-theme','16-connected-rooms',
         '17-object-inspector','18-byte-explanation','19-chrono-armor','20-ffl2-map-browser','21-game-knowledge',
-        '22-engine-recognition','23-address-domains','24-code-references','25-cartridge-verification','26-mod-byte-comparison')),
+        '22-engine-recognition','23-address-domains','24-code-references','25-cartridge-verification','26-mod-byte-comparison','27-crc-mismatch','28-text-overflow','29-audio-preview','30-project-recovery')),
 })
 
 

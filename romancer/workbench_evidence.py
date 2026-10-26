@@ -7,22 +7,53 @@ import secrets
 import re
 import tempfile
 import sqlite3
-from contextlib import closing
+import stat
+import threading
+from contextlib import closing,contextmanager
 import uuid
 from .assets import checked_path
 from .script_schema import canonical_bytes,load_script_json
 from .workbench_projects import identifier,write_json
 
 
+_KEY_LOCK=threading.Lock()
+
+
+@contextmanager
+def _key_file_lock(project):
+    # Keep this coordination file in place: unlinking a locked inode would let
+    # another process create a different lock and bypass mutual exclusion.
+    path=checked_path(Path(project)/'.evidence-key.lock')
+    with path.open('a+b') as stream:
+        info=os.fstat(stream.fileno())
+        if not stat.S_ISREG(info.st_mode) or info.st_nlink!=1:
+            raise ValueError('invalid evidence key lock')
+        if os.name=='nt':
+            import msvcrt
+            if info.st_size==0:stream.write(b'0');stream.flush()
+            stream.seek(0);msvcrt.locking(stream.fileno(),msvcrt.LK_LOCK,1)
+            try:yield
+            finally:stream.seek(0);msvcrt.locking(stream.fileno(),msvcrt.LK_UNLCK,1)
+        else:
+            import fcntl
+            fcntl.flock(stream.fileno(),fcntl.LOCK_EX)
+            try:yield
+            finally:fcntl.flock(stream.fileno(),fcntl.LOCK_UN)
+
+
 def _key(project):
-    path=checked_path(Path(project)/'.evidence-key')
-    if not path.exists():
-        try:
-            with path.open('xb') as stream:stream.write(secrets.token_bytes(32))
-            if os.name!='nt':path.chmod(0o600)
-        except FileExistsError:pass
-    if path.stat().st_size!=32 or path.stat().st_nlink!=1:raise ValueError('invalid evidence key')
-    return path.read_bytes()
+    # Automatic scans and separate AI/CLI processes can initialize concurrently.
+    # Keep all readers behind creation, close and permission setup;
+    # an existing malformed or linked key must still fail rather than retry.
+    with _KEY_LOCK,_key_file_lock(project):
+        path=checked_path(Path(project)/'.evidence-key')
+        if not path.exists():
+            try:
+                with path.open('xb') as stream:stream.write(secrets.token_bytes(32))
+                if os.name!='nt':path.chmod(0o600)
+            except FileExistsError:pass
+        if path.stat().st_size!=32 or path.stat().st_nlink!=1:raise ValueError('invalid evidence key')
+        return path.read_bytes()
 
 
 def store_evidence(project,kind,report):

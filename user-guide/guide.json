@@ -193,15 +193,42 @@
         }
       ],
       "related": [
+        "checks-appearance",
         "resources",
         "debug",
-        "regression"
+        "regression",
+        "support-identity"
       ],
       "terms": [
         "term-crc",
         "term-sha",
         "term-scope"
-      ]
+      ],
+      "image": "27-crc-mismatch",
+      "image_layout": "following-page",
+      "image_alt": "Read a CRC32 mismatch",
+      "caption": "Expected 00000000 was entered solely to demonstrate this warning. Compare the measured CRC with a trusted reference for the same byte scope; do not replace it with a convenient value just to clear the warning.",
+      "visual_page": {
+        "title": "Read a CRC32 mismatch",
+        "kicker": "Basic / actual application capture",
+        "intro": "A deliberately incorrect reference produces a visible mismatch. The original file was not changed.",
+        "panels": [
+          {
+            "image": "27-crc-mismatch",
+            "title": "Read a CRC32 mismatch",
+            "x": 48,
+            "top": 846,
+            "width": 1200,
+            "crop": [
+              180,
+              60,
+              1390,
+              570
+            ],
+            "caption": "Expected 00000000 was entered solely to demonstrate this warning. Compare the measured CRC with a trusted reference for the same byte scope; do not replace it with a convenient value just to clear the warning."
+          }
+        ]
+      }
     },
     {
       "id": "drafts",
@@ -228,6 +255,7 @@
         }
       ],
       "related": [
+        "drafts-appearance",
         "projects",
         "play",
         "patches"
@@ -236,7 +264,45 @@
         "term-draft",
         "term-plan",
         "term-build"
-      ]
+      ],
+      "image": "19-chrono-armor",
+      "image_layout": "following-page",
+      "image_alt": "Read the staged-edit status",
+      "caption": "Saved means the editing draft is saved. Staged changes still require review and a separate build. An existing build remains available even after an editor undo.",
+      "visual_page": {
+        "title": "Read the staged-edit status",
+        "kicker": "Basic / actual application capture",
+        "intro": "Actual Chrono Trigger table editing. Review the selected source, changed values, byte preview and the status along the bottom.",
+        "panels": [
+          {
+            "image": "19-chrono-armor",
+            "title": "Read the staged-edit status",
+            "x": 48,
+            "top": 846,
+            "width": 1200,
+            "crop": [
+              180,
+              100,
+              1390,
+              620
+            ]
+          },
+          {
+            "image": "19-chrono-armor",
+            "title": "Saved draft / staged changes still need a build",
+            "x": 48,
+            "top": 225,
+            "width": 1200,
+            "crop": [
+              180,
+              950,
+              1390,
+              50
+            ],
+            "caption": "Saved means the editing draft is saved. Staged changes still require review and a separate build. An existing build remains available even after an editor undo."
+          }
+        ]
+      }
     },
     {
       "id": "numbers",
@@ -478,14 +544,41 @@
         }
       ],
       "related": [
+        "projects-appearance",
         "drafts",
         "checks",
-        "patches"
+        "patches",
+        "support-playback"
       ],
       "terms": [
         "term-artifact",
         "term-evidence"
-      ]
+      ],
+      "image": "30-project-recovery",
+      "image_layout": "following-page",
+      "image_alt": "Recover a deleted project",
+      "caption": "The restoration was checked in this private test workspace. Delete project affects the project-owned copies; an external source ROM is preserved.",
+      "visual_page": {
+        "title": "Recover a deleted project",
+        "kicker": "Basic / actual application capture",
+        "intro": "An empty practice project was moved to Trash through the confirmation dialog, then restored through the button shown here.",
+        "panels": [
+          {
+            "image": "30-project-recovery",
+            "title": "Projects / Trash / Restore",
+            "x": 48,
+            "top": 846,
+            "width": 1100,
+            "crop": [
+              550,
+              370,
+              500,
+              260
+            ],
+            "caption": "The restoration was checked in this private test workspace. Delete project affects the project-owned copies; an external source ROM is preserved."
+          }
+        ]
+      }
     },
     {
       "id": "help",
@@ -769,6 +862,7 @@
         }
       ],
       "related": [
+        "palettes-appearance",
         "gba-colors",
         "gbc-colors",
         "sprites"
@@ -776,7 +870,32 @@
       "terms": [
         "term-palette",
         "term-bank"
-      ]
+      ],
+      "image": "06-wario-palettes",
+      "image_layout": "following-page",
+      "image_alt": "Compare palette colors before building",
+      "caption": "Application themes and stored game palettes are separate. Review the decoded color preview, shared uses and proposed bytes, then playtest the scene in the new build.",
+      "visual_page": {
+        "title": "Compare palette colors before building",
+        "kicker": "Advanced / actual application capture",
+        "intro": "The Wario Land 4 example shows an exact-revision palette change in the editor and the resulting visual preview.",
+        "panels": [
+          {
+            "image": "06-wario-palettes",
+            "title": "Compare palette colors before building",
+            "x": 48,
+            "top": 846,
+            "width": 1200,
+            "crop": [
+              180,
+              80,
+              1390,
+              700
+            ],
+            "caption": "Application themes and stored game palettes are separate. Review the decoded color preview, shared uses and proposed bytes, then playtest the scene in the new build."
+          }
+        ]
+      }
     },
     {
       "id": "animation",
@@ -921,15 +1040,42 @@
         }
       ],
       "related": [
+        "translation-appearance",
         "text-layout",
         "text",
-        "projects"
+        "projects",
+        "support-editing"
       ],
       "terms": [
         "term-csv",
         "term-encoding",
         "term-allocation"
-      ]
+      ],
+      "image": "28-text-overflow",
+      "image_layout": "following-page",
+      "image_alt": "Catch text that does not fit",
+      "caption": "The longer proposed string exceeds the nine available text bytes. This is a capacity demonstration, not a new built translation. Shorten the proposal or use an independently verified relocation workflow; never write through the next record.",
+      "visual_page": {
+        "title": "Catch text that does not fit",
+        "kicker": "Advanced / actual application capture",
+        "intro": "Actual Text & layout editor, using an explicitly declared ten-byte menu slot in The Immortal. The protected terminator consumes one byte.",
+        "panels": [
+          {
+            "image": "28-text-overflow",
+            "title": "Catch text that does not fit",
+            "x": 48,
+            "top": 846,
+            "width": 1200,
+            "crop": [
+              180,
+              80,
+              1390,
+              700
+            ],
+            "caption": "The longer proposed string exceeds the nine available text bytes. This is a capacity demonstration, not a new built translation. Shorten the proposal or use an independently verified relocation workflow; never write through the next record."
+          }
+        ]
+      }
     },
     {
       "id": "text-layout",
@@ -991,6 +1137,7 @@
         }
       ],
       "related": [
+        "levels-appearance",
         "connections",
         "room",
         "tilemaps",
@@ -1000,7 +1147,32 @@
         "term-metatile",
         "term-collision",
         "term-layer"
-      ]
+      ],
+      "image": "20-ffl2-map-browser",
+      "image_layout": "following-page",
+      "image_alt": "Find a real room before editing it",
+      "caption": "Use a supported room preview and its declared fields. Unsupported map commands remain unavailable; a rendered image alone does not establish collision, events or a working exit.",
+      "visual_page": {
+        "title": "Find a real room before editing it",
+        "kicker": "Advanced / actual application capture",
+        "intro": "Actual Final Fantasy Legend II map browser and decoded room preview, bound to the matched original revision.",
+        "panels": [
+          {
+            "image": "20-ffl2-map-browser",
+            "title": "Find a real room before editing it",
+            "x": 48,
+            "top": 846,
+            "width": 1200,
+            "crop": [
+              180,
+              80,
+              1390,
+              700
+            ],
+            "caption": "Use a supported room preview and its declared fields. Unsupported map commands remain unavailable; a rendered image alone does not establish collision, events or a working exit."
+          }
+        ]
+      }
     },
     {
       "id": "connections",
@@ -1116,6 +1288,7 @@
         }
       ],
       "related": [
+        "sound-appearance",
         "play",
         "resources",
         "regression"
@@ -1123,7 +1296,32 @@
       "terms": [
         "term-driver",
         "term-codec"
-      ]
+      ],
+      "image": "29-audio-preview",
+      "image_layout": "following-page",
+      "image_alt": "Compare original and edited sound",
+      "caption": "This capture demonstrates a supported NES DPCM sample and an original practice definition. It does not establish the driver, sample locations or music commands of a commercial game.",
+      "visual_page": {
+        "title": "Compare original and edited sound",
+        "kicker": "Advanced / actual application capture",
+        "intro": "Original Design studio practice sample: gain set to 50%, decoded into Original and Edited waveforms, with play, pause, seek and loop controls.",
+        "panels": [
+          {
+            "image": "29-audio-preview",
+            "title": "Compare original and edited sound",
+            "x": 48,
+            "top": 846,
+            "width": 1200,
+            "crop": [
+              180,
+              80,
+              1390,
+              700
+            ],
+            "caption": "This capture demonstrates a supported NES DPCM sample and an original practice definition. It does not establish the driver, sample locations or music commands of a commercial game."
+          }
+        ]
+      }
     },
     {
       "id": "compression",
@@ -1420,7 +1618,7 @@
       "details": [
         {
           "title": "Useful support detail",
-          "text": "State the operation, application revision, selected system, expected result and actual result. Review any screenshot or log for personal information before sharing. Sanitized reports exclude ROM/save bytes, credentials, personal paths, project names and raw errors."
+          "text": "State the operation, application revision, selected system, expected result and actual result. Review any screenshot or log for personal information before sharing. Sanitized reports exclude ROM/save bytes, credentials, personal paths, project names and raw errors. The three checklists that follow cover identity and patch problems, editing problems, and playback or recovery problems. Each gives a meaning and a next step."
         },
         {
           "title": "Recovery order",
@@ -1428,6 +1626,9 @@
         }
       ],
       "related": [
+        "support-identity",
+        "support-editing",
+        "support-playback",
         "projects",
         "checks",
         "regression"
@@ -1435,6 +1636,150 @@
       "terms": [
         "term-evidence",
         "term-revision"
+      ]
+    },
+    {
+      "id": "support-identity",
+      "title": "ROM and patch problems",
+      "part": "Advanced",
+      "kicker": "Troubleshooting / symptom, meaning, next step",
+      "intro": "Start here when an import, identity check or downloaded patch does not match what you expected.",
+      "steps": [
+        "Confirm which file is selected. A source, a modified build and a header-stripped file can have different hashes even when their names look alike.",
+        "Read the expected and measured values, comparison scope and patch instructions. Check the region and revision before trying another source.",
+        "If the source is correct and a structural check still fails, preserve it and collect the exact failed check. Obtain another verified dump or a documented explanation before editing."
+      ],
+      "result": "Repeat the relevant check after the correction. Keep the original, the earlier build and your backup available until the new result is confirmed.",
+      "note": "A warning explains a limited check. It is not permission to bypass a failed precondition. If the cause remains unknown, keep that resource unchanged and include the operation and measured result in a reviewed support report.",
+      "details": [
+        {
+          "title": "CRC32 mismatch",
+          "text": "The measured bytes differ from the entered reference. Confirm whole-file versus payload scope, copier prefix, trainer, region and revision. A blank expected value means no reference comparison was performed, not that the dump matched."
+        },
+        {
+          "title": "Unknown game or missing named tools",
+          "text": "A valid system header does not identify a game revision. Import a trusted local hash catalog. Use generic inspection or a separately checked definition; a similar filename or another game's offsets are insufficient."
+        },
+        {
+          "title": "BPS source mismatch / IPS has no source checksum",
+          "text": "BPS validates its embedded source identity. Choose the exact source required by the patch. IPS does not supply this proof: check an external source reference and the resulting output rather than treating a successful apply as compatibility."
+        },
+        {
+          "title": "Header, size or startup warning",
+          "text": "Read which structure failed. Unusual homebrew headers can produce warnings. Unknown mapper state or an unsupported branch form can be Not checked. Investigate those limits; do not call them successful execution."
+        },
+        {
+          "title": "Scan limited or interrupted",
+          "text": "A byte, time or result budget limits that analysis. Review completed findings and the named unavailable part. Retry the bounded operation or inspect a smaller declared range. Increasing a budget does not establish missing game semantics."
+        }
+      ],
+      "related": [
+        "checks",
+        "patches",
+        "startup-verification",
+        "resources"
+      ],
+      "terms": [
+        "term-crc",
+        "term-revision",
+        "term-scope"
+      ]
+    },
+    {
+      "id": "support-editing",
+      "title": "Editing and preview problems",
+      "part": "Advanced",
+      "kicker": "Troubleshooting / symptom, meaning, next step",
+      "intro": "Use these checks when a proposed edit is blocked, a preview looks wrong or the game still shows an older value.",
+      "steps": [
+        "Keep the current text or proposal before reloading. Check the selected source/build and the exact resource definition.",
+        "Correct the narrow issue, then request a fresh review. An old plan cannot authorize changed source bytes or a different proposal.",
+        "Create a separate build and reload that build in Playtest. Compare the intended scene and one nearby unchanged behavior."
+      ],
+      "result": "Repeat the relevant check after the correction. Keep the original, the earlier build and your backup available until the new result is confirmed.",
+      "note": "A warning explains a limited check. It is not permission to bypass a failed precondition. If the cause remains unknown, keep that resource unchanged and include the operation and measured result in a reviewed support report.",
+      "details": [
+        {
+          "title": "The edit is saved, but the game did not change",
+          "text": "Saved refers to the draft. Review changes, create a build, select it in the top bar and reload it in Playtest. A preview notification does not mean that playable ROM bytes were written."
+        },
+        {
+          "title": "Text too long, unmapped character or damaged spreadsheet",
+          "text": "Use encoded bytes, not character count. Preserve control codes, stable IDs and original columns; edit only translations. Re-export a fresh sheet and try one short row. Shorten text or establish a supported allocation instead of dropping controls."
+        },
+        {
+          "title": "Wrong colors, scrambled tiles or shared edits",
+          "text": "Check codec, source bank, stored palette and tile arrangement. Editor preview colors may be metadata rather than palette bytes. Inspect declared shared consumers before approving a change that appears in several frames or rooms."
+        },
+        {
+          "title": "Stale definition, changed source or overlapping edits",
+          "text": "Reinspect the exact source and declared ranges. Reuse a parent definition only through its guarded workflow. Reconcile overlaps and dependencies; obtain a fresh plan rather than forcing expected bytes to match."
+        },
+        {
+          "title": "Map, animation, audio or compressed resource unavailable",
+          "text": "A system label does not decode a game-specific format. Use only supported definitions. A sample codec does not find instruments, a frame layout does not decode an animation script, and a map preview does not prove collision. Respect compressed allocation limits."
+        }
+      ],
+      "related": [
+        "drafts",
+        "translation",
+        "sprites",
+        "palettes",
+        "levels",
+        "sound"
+      ],
+      "terms": [
+        "term-draft",
+        "term-plan",
+        "term-allocation"
+      ]
+    },
+    {
+      "id": "support-playback",
+      "title": "Playback, saving and recovery problems",
+      "part": "Advanced",
+      "kicker": "Troubleshooting / symptom, meaning, next step",
+      "intro": "Protect progress first. Check the selected output and session before replacing data or restarting.",
+      "steps": [
+        "Preserve unsaved text and download a backup of exposed battery-save RAM before experimenting with imports or restarts.",
+        "Confirm the selected ROM, engine, input device, audio controls and save format. Reproduce one small problem at a time.",
+        "Use Projects > Trash to restore an accidentally deleted project. Run fresh checks after restore, then review a sanitized support report if the issue persists."
+      ],
+      "result": "Repeat the relevant check after the correction. Keep the original, the earlier build and your backup available until the new result is confirmed.",
+      "note": "A warning explains a limited check. It is not permission to bypass a failed precondition. If the cause remains unknown, keep that resource unchanged and include the operation and measured result in a reviewed support report.",
+      "details": [
+        {
+          "title": "Application will not finish opening",
+          "text": "Keep the complete portable folder together. Use the supplied launcher or installed shortcut; inspect startup details. Check file access and the local service. Retry after correcting the reported problem. Preserve the workspace when reinstalling."
+        },
+        {
+          "title": "No game input or sound",
+          "text": "Load the intended build in Playtest. Select the connected controller/type and give the game focus. Check mute, volume and output controls. An unknown sequence driver does not prevent supported native audio recording."
+        },
+        {
+          "title": "Save state refused / battery save has the wrong size",
+          "text": "States require the same ROM bytes, engine and setup. Use the state with its matching output. Battery files are separate raw persistent RAM; use the expected exact size or export raw data from the originating emulator. Do not pad or truncate an unknown format."
+        },
+        {
+          "title": "Test failed or is inconclusive",
+          "text": "Open Original, Build and Difference pictures where recorded. Check route, start state, frame, comparison region and assertion. An incomplete run is not a pass; a visual difference can be intended. Rerun after correcting the specific test setup or edit."
+        },
+        {
+          "title": "Draft save, backup or restore failed",
+          "text": "Keep the window open and copy unsaved text. Check write access, available space and the active workspace. Do not remove an active writer's lock. Restore from a complete private backup or Trash, then recheck files and run fresh tests."
+        }
+      ],
+      "related": [
+        "play",
+        "saves",
+        "regression",
+        "projects",
+        "troubleshooting"
+      ],
+      "terms": [
+        "term-state",
+        "term-battery",
+        "term-evidence"
       ]
     },
     {
@@ -2039,6 +2384,12 @@
       ]
     },
     {
+      "term": "Audio waveform preview",
+      "topics": [
+        "sound-appearance"
+      ]
+    },
+    {
       "term": "Auto deep scan on ROM load",
       "topics": [
         "settings",
@@ -2197,6 +2548,13 @@
       "term": "CRC32",
       "topics": [
         "checks"
+      ]
+    },
+    {
+      "term": "CRC32 mismatch",
+      "topics": [
+        "support-identity",
+        "checks-appearance"
       ]
     },
     {
@@ -2369,6 +2727,13 @@
       ]
     },
     {
+      "term": "Inconclusive tests",
+      "topics": [
+        "support-playback",
+        "regression"
+      ]
+    },
+    {
       "term": "Installation and portable ZIP",
       "topics": [
         "install"
@@ -2513,6 +2878,13 @@
       ]
     },
     {
+      "term": "Patch source mismatch",
+      "topics": [
+        "support-identity",
+        "patches"
+      ]
+    },
+    {
       "term": "Pixel painting",
       "topics": [
         "sprites"
@@ -2555,6 +2927,13 @@
       "term": "Project checks",
       "topics": [
         "checks"
+      ]
+    },
+    {
+      "term": "Project recovery pictures",
+      "topics": [
+        "projects-appearance",
+        "support-playback"
       ]
     },
     {
@@ -2639,6 +3018,13 @@
       ]
     },
     {
+      "term": "Saved but unchanged",
+      "topics": [
+        "support-editing",
+        "drafts-appearance"
+      ]
+    },
+    {
       "term": "Screenshot checkpoints",
       "topics": [
         "regression"
@@ -2697,6 +3083,12 @@
       ]
     },
     {
+      "term": "Startup problems",
+      "topics": [
+        "support-playback"
+      ]
+    },
+    {
       "term": "Startup vectors and branches",
       "topics": [
         "startup-verification"
@@ -2720,6 +3112,13 @@
       "topics": [
         "text",
         "translation"
+      ]
+    },
+    {
+      "term": "Text overflow",
+      "topics": [
+        "support-editing",
+        "translation-appearance"
       ]
     },
     {
@@ -2753,6 +3152,13 @@
       "topics": [
         "settings",
         "play"
+      ]
+    },
+    {
+      "term": "Wrong colors",
+      "topics": [
+        "support-editing",
+        "palettes-appearance"
       ]
     }
   ]
