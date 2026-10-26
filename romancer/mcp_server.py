@@ -21,7 +21,7 @@ MAX_MESSAGE=1024*1024
 MAX_RESULT=256*1024
 READ_OPERATIONS=frozenset('''system.capabilities system.operations projects.list project.open
 games.inspect games.maps.catalog games.maps.inspect cheats.catalog cheats.inspect engines.inspect systems.reference systems.classify_address rom.check catalog.list resource.inspect resources.explain resources.relationships
-hex.search hex.numbers hex.bookmarks builds.timeline builds.compare project.validate investigations.get investigations.probe debugger.capabilities debugger.get structures.survey structures.definition
+hex.search hex.numbers hex.bookmarks builds.timeline builds.compare project.validate investigations.get investigations.probe debugger.capabilities debugger.get structures.survey structures.definition relocation.table_definition
 assets.inspect script.inspect tables.inspect tables.batch levels.inspect sound.inspect revision.lookup
 profiles.get profiles.validate runtime.checkpoints reports.list exports.list jobs.get
 systems.address resources.address_uses watches.compare debug.inspect compression.inspect'''.split())
@@ -32,7 +32,7 @@ rom.scan.run release.prepare release.verify resources.declare_assets resources.d
 runtime.load_profile runtime.advance runtime.step runtime.capture runtime.memory runtime.close
 runtime.checkpoint runtime.restore runtime.save_state runtime.load_state profiles.controller saves.capture saves.export saves.import saves.restore
 recipes.from_plan recipes.preview recipes.import recipes.export jobs.cancel
-values.start values.narrow investigations.start investigations.capture debugger.prepare debugger.capture debugger.investigate watches.save video.inspect compression.extract compression.plan_reinsert
+values.start values.narrow investigations.start investigations.capture debugger.prepare debugger.capture debugger.investigate relocation.plan watches.save video.inspect compression.extract compression.plan_reinsert
 definitions.export definitions.import'''.split())
 DESCRIPTIONS={
  'project.create':'Create a separate ROM project. Never overwrite an original.',
@@ -68,6 +68,8 @@ DESCRIPTIONS={
  'debugger.get':'Read a page of application-authenticated native trace events and source-bound execution contexts. Historical captures are labeled; imported JSON never becomes fresh native evidence.',
  'structures.survey':'Test bounded repeated numeric record layouts without game profiles. Reports exact tested widths, byte orders, sampling, target bounds and in-window previews. These are structural hypotheses, not named properties or observed dereferences.',
  'structures.definition':'Reproduce a structural hypothesis from current source bytes and generate a validated neutral table editor definition. Numeric interpretation is separate from an explicitly selected linear-pointer hypothesis. Does not save a definition or modify ROM bytes.',
+ 'relocation.plan':'Review a data move or growing replacement into an explicitly reserved filled allocation. Checks source identity, same-bank constraints, alignment, reference before-bytes, pointer widths and cartridge integrity. Reference completeness and reservation are author declarations, not conclusions from numeric searches. Returns a separate-build plan; position-dependent code and embedded pointers are unsupported.',
+ 'relocation.table_definition':'Generate a checked preview of a parent neutral numeric table at its recorded relocation destination. Validates current payload identity and coverage. Does not save the declaration, infer extra rows, or reuse pointer-bearing layouts.',
  'watches.save':'Save at most 32 named byte ranges on the selected source; does not write native memory.',
  'watches.compare':'Compare two identity-bound memory observations of at most 256 bytes. No instruction or write event is inferred.',
  'video.inspect':'Observe at most 4096 bytes of exposed video memory and decode a tested tile format. Palette and ROM ownership remain unknown.',
@@ -99,6 +101,17 @@ def _investigation_properties(operation):
     def obj(properties):return {'type':'object','properties':properties,'required':list(properties),'additionalProperties':False}
     def array(items,maximum,minimum=0):return {'type':'array','items':items,'minItems':minimum,'maxItems':maximum}
     source={'project_id':string(),'artifact_id':string()}
+    if operation=='relocation.table_definition':return source
+    if operation=='relocation.plan':
+        reference=obj({'offset':integer(0,64*1024**2),'width':integer(2,4),'endian':enum(['little','big']),
+            'base':integer(-0xffffffff,0xffffffff),'target_delta':integer(0,48*1024-1)})
+        spec=obj({'source_offset':integer(0,64*1024**2),'source_length':integer(1,48*1024),
+            'target_offset':integer(0,64*1024**2),'target_capacity':integer(1,48*1024),'fill_byte':integer(0,255),
+            'alignment':{'type':'integer','enum':[1,2,4,8,16,32]},'bank_size':{'type':'integer','enum':[0,8192,16384,32768,65536]},
+            'bank_origin':integer(0,64*1024**2),'references':array(reference,128,1),
+            'references_complete':{'type':'boolean'},'destination_reserved':{'type':'boolean'},
+            'replacement_input_id':nullable(string(64))})
+        return {**source,'spec':spec}
     if operation in ('structures.survey','structures.definition'):
         window={**source,'offset':integer(0,64*1024**2),'length':integer(1,65536)}
         return window if operation=='structures.survey' else {**window,'candidate_id':string(64),'interpretation':enum(['numeric','linear-pointer'])}

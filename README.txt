@@ -101,10 +101,52 @@ Mixed publication/community TXT extracts keep explicit code formats and source
 paths. Action Replay and other unsupported formats are retained without ROM
 locations. Duplicate references do not imply additional unique tested effects.
 
-Troubleshooting -> Hardware & address help distinguishes CPU, video and audio
+Investigation -> Hardware & address help distinguishes CPU, video and audio
 address domains. These descriptions never activate cheats, access devices or
 automatically turn a RAM value into a ROM edit. The offline guide explains
 these tools and the separate evidence needed before making a build.
+
+UNIVERSAL INVESTIGATION
+
+Investigation records native before/changed/control observations and tests
+8/16/24/32-bit binary, signed and packed-BCD values in either byte order.
+Hypotheses retain their tested scope; a matching number does not establish meaning.
+Investigate accesses derives a physical watch from the pinned engine interface
+and replays a short controller route in a separate native debugger from power on.
+It does not resume Playtest or convert emulator save states.
+
+Advanced native capture uses optional official MesenCE (NES/SNES/GB/GBC/GBA) or
+MAME (Genesis) downloads. Choose Prepare debugger deliberately once; Windows x64
+is required, and the Genesis debugger requires an x86-64-v2 CPU. Exact hashes,
+source links and applicable notices are checked and retained in the local cache.
+These debugger binaries are not distributed in this release. Preparation uploads
+no ROM. Subsequent captures reuse the verified cache offline. Normal editing and
+included-engine playtesting do not require this download.
+
+Capture reports distinguish completed routes, capped samples, mapped source
+locations and candidate pattern matches. Genesis instruction and access samples
+have separate ordering. Access width, DMA ownership and game meaning remain
+unknown where the backend does not establish them.
+
+Explore ROM structure tests bounded repeated numeric layouts and possible linear
+pointer arrays. Open a neutral table editor, then Save this layout to retain it.
+Deep scan includes sampled structural tests and reports coverage. A candidate
+layout is not a decoded game format or proof that every reference was found.
+
+Resources -> Move declared data (Advanced) can copy or grow declared data into
+an explicitly reserved fixed-size cartridge range, update exact linear pointers,
+and create a separate build. Fill bytes alone do not establish unused space.
+Every required reference and bank constraint must be declared; code relocation,
+embedded references and automatic proof of reference completeness are unsupported.
+Original data is preserved. Old fixed-offset definitions are not automatically
+reused after relocation; a wholly covered neutral numeric table can be rebased,
+previewed and saved. Playtest before exporting.
+
+Gameplay graphics can group captured pixel matches into editable sprite-layout
+proposals, including flips and repeated observations. Source use and semantic
+ownership stay unproven until supported by evidence. Music & sound edits explicit
+supported sample codecs and the identified original practice sequence driver.
+Unknown commercial music or scripting grammars are not silently reinterpreted.
 
 EVERYDAY CONTROLS
 
@@ -314,7 +356,9 @@ The bridge does not expose a shell or execute code supplied by an agent.
 It also exposes supported address mappings, declared references, memory searches,
 watch comparisons and checked compression operations. Level and sound definitions
 can be exchanged as JSON. These operations retain their source and runtime bounds;
-they do not expose an arbitrary native-debugger bridge or instruction breakpoints.
+bounded native access captures, durable value investigations, structural experiments
+and checked data relocation use the same source-bound services. There is no
+arbitrary debugger script, shell access or continuous live break/continue control.
 
 From a Python/Pillow source installation, with this directory as the working folder:
   python -B -m romancer.mcp_server --workspace <workspace-folder>

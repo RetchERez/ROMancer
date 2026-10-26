@@ -9,7 +9,7 @@ from .asset_schema import label
 from .assets import checked_path
 from .script_schema import load_script_json
 
-LIMITS={'patch':64*1024**2,'catalog':16*1024**2,'save':8*1024**2,'translation':4*1024**2,'audio':2*1024**2}
+LIMITS={'patch':64*1024**2,'catalog':16*1024**2,'save':8*1024**2,'translation':4*1024**2,'audio':2*1024**2,'resource':48*1024}
 
 
 def read_bounded(path,limit,expected=None,*,cancelled=lambda:False):
@@ -44,7 +44,7 @@ def list_inputs(project):
 
 
 def import_input(project,source,name,kind,*,cancelled=lambda:False):
-    if kind not in LIMITS:raise ValueError('Choose a patch, catalog, battery save or translation sheet.')
+    if kind not in LIMITS:raise ValueError('Choose a patch, catalog, battery save, translation sheet, audio or data resource.')
     label(name,240)
     if Path(name).name!=name or any(c in name for c in '\\/:'):raise ValueError('Use a filename without a directory.')
     project=checked_path(Path(project));source=checked_path(Path(source))

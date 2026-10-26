@@ -2,7 +2,7 @@
   "schema_version": 1,
   "product": "ROMancer v1.0",
   "subtitle": "A practical guide to the current editing tools: small first edits, advanced workflows, actual editing and appearance examples, a glossary and an alphabetical index.",
-  "scope": "Work on a project copy, review exact changes, create a separate build, playtest that build and verify its patch. Examples require the exact matched revisions and declared layouts shown. A measured check covers its recorded scope; it does not certify every game or scene.",
+  "scope": "Investigate unfamiliar cartridges without a game definition, review exact edits, create separate builds, playtest and verify patches. Named game workflows require their exact supported revision. Observations, candidate layouts and unknown behavior remain distinct.",
   "basic_summary": "Start the application, choose saved preferences, identify a source, make a focused edit, preserve progress and export a checked patch. These procedures build the habits used throughout the guide.",
   "advanced_summary": "Use explicit definitions for graphics, text, tables, connected-room layouts, audio and bounded automation. Follow declared ranges to exact bytes, and keep editor metadata, native observations and unknown game semantics separate.",
   "attribution": "By RetchEWretched. ROMancer code and original fixtures use the project MIT license. Instructional screenshots show third-party games, including Castlevania, Chrono Trigger, The Immortal, Wario Land 4, Final Fantasy Legend II and Deja Vu I & II; their imagery and trademarks remain those of their respective rights holders and are separate from the code license. No ROM files, game saves, emulator states, firmware dumps or authentication data are included in this guide. The prebuilt PDF and HTML work offline; PDF rebuilding optionally uses ReportLab.",
@@ -1336,7 +1336,7 @@
         "Create the parent build only when the stream fits. Inspect the independently decoded comparison, then playtest the actual game resource."
       ],
       "result": "The encoded stream fits without overwriting neighbors, and independent decoding reconstructs every intended decoded byte.",
-      "note": "Unrecognized compression remains read-only. A run of zeroes or another fill pattern does not establish unowned capacity. Do not increase an allocation or move a stream to clear an error without a separately supported ownership and pointer model.",
+      "note": "Unrecognized compression remains read-only. A run of zeroes or another fill pattern does not establish unowned capacity. Do not increase an allocation or move a stream to clear an error without a separately supported ownership and pointer model. Recompression is checked by the primary decoder and a separate original token parser; this is implementation diversity, not independent emulator certification.",
       "details": [
         {
           "title": "Parent and child",
@@ -1407,7 +1407,7 @@
         "Start with exact source/build bytes and a known offset. Use the number inspector to choose signedness and byte order rather than guessing from a displayed decimal value.",
         "In <b>Address explorer</b>, choose the supported <b>Declared mapping</b> and required bank/bounds, then <b>Resolve address</b>. Use <b>Inspect mapped bytes</b> to open that current source location. An active hardware bank is not observed by this declaration.",
         "Load a matching Playtest session. Under <b>Find a changing value</b>, use <b>Start RAM search</b>, play one action, pause, then <b>Capture & narrow</b> by changed, unchanged, increased, decreased or exact value. Add a watch to a measured result.",
-        "Record what was measured and under which setup. Use an instruction-level feature only with a proven matching debugger adapter; keep imported traces labeled as imported observations."
+        "Use the native capture workflow for actual access events. Declared mappings, imported traces and changed RAM values remain separate evidence types. The recorded context is a lead, not proof of game meaning or DMA ownership."
       ],
       "result": "The translated location uses the intended mapping and bank. A watch reports the selected memory value for the actual loaded session.",
       "note": "A changed value does not identify the instruction that wrote it. A byte pattern match is not proof that the same code or structure exists in a different revision.",
@@ -1425,7 +1425,9 @@
         "investigation",
         "hex-editor",
         "tables",
-        "checks"
+        "checks",
+        "universal-values",
+        "native-accesses"
       ],
       "terms": [
         "term-mapping",
@@ -1953,7 +1955,7 @@
         "For ordinary LoROM/HiROM up to 4 MiB, checksum verification handles standard tail mirroring and an identified copier header. The size declaration uses the rounded-up payload size. Enhancement chips, extended maps and unresolved layouts remain outside this checksum rule."
       ],
       "result": "A valid non-power-of-two standard SNES image can be checked correctly, and all six systems get startup checks within their supported mappings and encodings.",
-      "note": "NES has no standard whole-cartridge checksum. A standard header logo and an in-bounds branch do not prove game identity, valid target instructions, authentic firmware, or successful gameplay. Instruction breakpoints and full code tracing require a debugger that exposes those events.",
+      "note": "NES has no standard whole-cartridge checksum. A standard header logo and an in-bounds branch do not prove game identity, valid target instructions, authentic firmware, or successful gameplay. Use native capture for bounded actual access events. It is separate from these static cartridge checks and does not provide continuous live break/continue control.",
       "related": [
         "checks",
         "hardware-addresses",
@@ -1996,6 +1998,275 @@
           "text": "The supported linear GBA cartridge format is limited to 32 MiB. An engine detector that reaches its own budget reports that limit separately; the other cartridge and resource checks remain available."
         }
       ]
+    },
+    {
+      "id": "universal-values",
+      "title": "Investigate a changing value without a game profile",
+      "part": "Basic",
+      "kicker": "Investigate / record / narrow",
+      "intro": "ROMancer can gather evidence from an unfamiliar ROM. Start with one number or a controlled change rather than guessing a game property from byte values.",
+      "steps": [
+        "Load and pause the selected ROM in <b>Playtest</b>, then open <b>Investigation</b>. Name the experiment and enter the visible number, or leave it blank for change-only tests.",
+        "Choose <b>Capture before</b>. Perform one controlled action, pause and capture again. Record whether the target increased, decreased, changed, or changed by an exact amount.",
+        "Add an unchanged control while unrelated activity continues. This helps reject background counters. Keep before, changed and control observations together.",
+        "Compare surviving RAM offsets, widths, byte order, signed/BCD encoding and display relationships. Additional observations help separate equally fitting hypotheses.",
+        "Use <b>Add watch</b> to retain a range or <b>Investigate accesses</b> for a native physical watch. Continue with the native capture chapter."
+      ],
+      "result": "A source-bound observation history and tested numeric hypotheses, without a game-specific profile or a memory write.",
+      "note": "Each observation covers at most 4096 bytes; an experiment keeps at most 32 observations. A new worker, reset or loaded state requires a fresh series. Restored project evidence remains historical and cannot supply fresh native proof.",
+      "related": [
+        "native-accesses",
+        "debug"
+      ],
+      "terms": [
+        "term-control-observation",
+        "term-hypothesis",
+        "term-evidence"
+      ],
+      "image": "26-universal-value-series",
+      "caption": "Original controller-byte experiment: 0 -> 1 -> 1 survives the unchanged control. The unrelated background counter is filtered out.",
+      "image_layout": "following-page",
+      "visual_page": {
+        "title": "Investigate a changing value / actual interface",
+        "kicker": "Actual application capture / original redistributable example",
+        "intro": "Recorded controller input identifies a changing byte without supplying a game definition.",
+        "panels": [
+          {
+            "image": "26-universal-value-series",
+            "title": "Investigate a changing value",
+            "x": 48,
+            "top": 846,
+            "width": 1170,
+            "crop": [
+              180,
+              60,
+              1390,
+              860
+            ],
+            "caption": "Actual headless application capture. The offline HTML edition links the full-resolution image."
+          }
+        ]
+      }
+    },
+    {
+      "id": "native-accesses",
+      "title": "Trace native accesses and inspect their source context",
+      "part": "Advanced",
+      "kicker": "Native capture / observed mappings",
+      "intro": "A changed RAM value is a lead. A native capture adds real access callbacks, execution context and supported source mappings.",
+      "steps": [
+        "Choose <b>Investigate accesses</b> beside a value hypothesis. ROMancer derives a physical watch from the pinned core interface. Unknown core layouts are refused.",
+        "Choose <b>Prepare debugger</b> if needed. Official tools are downloaded once and hash-checked. No ROM is uploaded. Normal playtesting needs no debugger download.",
+        "Set a short route of frames and held buttons. It replays from power on in a separate debugger; Playtest and libretro save states are not resumed.",
+        "Set the first recording frame and sample limit, then replay. Check route completion and truncation separately. Empty results may require another route or watch range.",
+        "Inspect access address, value, execution context and registers. A source button opens its recorded file location; Resources explains the association and links back."
+      ],
+      "result": "Application-authenticated native evidence that humans and MCP clients can reopen and page through.",
+      "note": "MesenCE covers NES/SNES/GB/GBC/GBA; Genesis uses MAME. Width, DMA ownership and meaning may remain unknown. Genesis pattern matches stay candidates; instruction/access ordering is separate. No live break/continue control.",
+      "related": [
+        "universal-values",
+        "debugger-setup",
+        "debug",
+        "game-knowledge"
+      ],
+      "terms": [
+        "term-native-capture",
+        "term-hypothesis",
+        "term-mapping",
+        "term-evidence"
+      ],
+      "image": "27-native-access-capture",
+      "caption": "Actual capture of writes to the original experiment byte. Each row retains CPU context and a supported source link.",
+      "extra_images": [
+        {
+          "image": "28-native-source-context",
+          "title": "The hex editor retains the authenticated reason for opening these source bytes."
+        }
+      ],
+      "image_layout": "following-page",
+      "visual_page": {
+        "title": "Trace actual accesses / actual interface",
+        "kicker": "Actual application capture / original redistributable example",
+        "intro": "A separate input replay records native accesses; source associations keep their measured scope.",
+        "panels": [
+          {
+            "image": "27-native-access-capture",
+            "title": "Trace actual accesses",
+            "x": 48,
+            "top": 846,
+            "width": 1170,
+            "crop": [
+              180,
+              60,
+              1390,
+              860
+            ],
+            "caption": "Actual headless application capture. The offline HTML edition links the full-resolution image."
+          }
+        ]
+      }
+    },
+    {
+      "id": "structural-experiments",
+      "title": "Test repeated layouts and open a neutral table editor",
+      "part": "Advanced",
+      "kicker": "Structural experiments / generated editors",
+      "intro": "Repeated numeric layouts can help locate tables or possible pointer arrays. ROMancer tests the bytes without assigning invented game labels.",
+      "steps": [
+        "Open <b>Investigation > Explore ROM structure</b>. Test a window up to 65536 bytes. Deep-scan summaries state their smaller sampled coverage.",
+        "Compare candidate starts, counts, strides, widths and byte orders. Target previews use only bytes inside the inspected window.",
+        "Keep <b>Neutral numeric values</b> for ordinary editing. A linear-pointer interpretation is an explicit hypothesis: file offset = stored value - base.",
+        "Choose <b>Open table editor</b>. ROMancer reproduces the candidate from current bytes and validates its layout. Finish existing staged table edits first. Choose <b>Save this layout</b> to retain it.",
+        "Edit a value, review the before/after plan and create a separate build. Playtest. Gather access evidence before assigning names such as health or damage."
+      ],
+      "result": "A checked neutral editor connected to the normal review, build and verified patch workflow.",
+      "note": "Tests cover 16/24/32-bit runs, both byte orders, bounded strides and supported GBA ROM bases. Several layouts can fit. A generated editor does not prove all consumers, relocation safety or game meaning.",
+      "related": [
+        "native-accesses",
+        "tables",
+        "checks",
+        "compression"
+      ],
+      "terms": [
+        "term-hypothesis",
+        "term-stride",
+        "term-pointer",
+        "term-evidence"
+      ],
+      "image": "30-generated-table-editor",
+      "caption": "Actual generated editor: a reviewed change from 5376 to 5380 produced a separate build changing only the intended byte, followed by a verified patch.",
+      "extra_images": [
+        {
+          "image": "29-structural-experiments",
+          "title": "The preceding bounded structural experiment and its sample records."
+        }
+      ],
+      "image_layout": "following-page",
+      "visual_page": {
+        "title": "Edit a discovered record layout / actual interface",
+        "kicker": "Actual application capture / original redistributable example",
+        "intro": "A generated neutral table uses the same before/after preview and reviewed-build controls as other edits.",
+        "panels": [
+          {
+            "image": "30-generated-table-editor",
+            "title": "Edit a discovered record layout",
+            "x": 48,
+            "top": 846,
+            "width": 1170,
+            "crop": [
+              180,
+              60,
+              1390,
+              860
+            ],
+            "caption": "Actual headless application capture. The offline HTML edition links the full-resolution image."
+          }
+        ]
+      }
+    },
+    {
+      "id": "debugger-setup",
+      "title": "Prepare or repair the optional native debugger tools",
+      "part": "Advanced",
+      "kicker": "Setup / source records / recovery",
+      "intro": "Native investigation tools are separate from the emulator engines included for everyday playtesting.",
+      "steps": [
+        "Open <b>Investigation > Trace actual accesses</b>. Read the one-time download size, upstream source link and external license. Windows x64 is required for the pinned debugger builds; the Genesis build also requires an x86-64-v2 CPU.",
+        "Choose <b>Prepare debugger</b>. ROMancer downloads only fixed official HTTPS artifacts, checks their exact sizes and SHA-256 hashes, and rejects unexpected archive layouts. It accepts no caller-supplied download URL or executable path.",
+        "After preparation, reuse the verified cache offline. MesenCE retains its exact upstream project source snapshot and GPL license; MAME retains its COPYING and supplied legal texts with pinned source links. These external programs keep their own licenses.",
+        "If cache checks fail, prepare a verified replacement. The old changed cache is preserved while a fresh generation becomes active. A locked temporary download is marked for bounded cleanup retries; it does not contain user ROM data."
+      ],
+      "result": "A verified local debugger cache that can be used by both the interface and the typed MCP operations.",
+      "note": "ROMancer release assets do not redistribute these debugger binaries. The original wrapper remains MIT licensed. Source links and snapshots identify upstream material; they are not a claim that every transitive upstream build input has been independently audited.",
+      "related": [
+        "native-accesses",
+        "checks"
+      ],
+      "terms": [
+        "term-native-capture",
+        "term-evidence"
+      ],
+      "image": "31-debugger-preparation",
+      "caption": "Actual first-use screen before the official download; basic playtesting remains available separately.",
+      "image_layout": "following-page",
+      "visual_page": {
+        "title": "Prepare native investigation tools / actual interface",
+        "kicker": "Actual application capture / original redistributable example",
+        "intro": "The one-time preparation is explicit; normal editing and included-engine playtesting remain offline.",
+        "panels": [
+          {
+            "image": "31-debugger-preparation",
+            "title": "Prepare native investigation tools",
+            "x": 48,
+            "top": 846,
+            "width": 1170,
+            "crop": [
+              180,
+              60,
+              1390,
+              860
+            ],
+            "caption": "Actual headless application capture. The offline HTML edition links the full-resolution image."
+          }
+        ]
+      }
+    },
+    {
+      "id": "data-relocation",
+      "title": "Move or grow declared data without losing its references",
+      "part": "Advanced",
+      "kicker": "Declared data / exact references / separate build",
+      "intro": "Move data only after investigating its consumers and reserving the destination. Matching fill bytes cannot prove unused space.",
+      "steps": [
+        "Open <b>Resources > Move declared data</b>. Enter source allocation, reserved destination, sizes, fill and alignment. Banked cartridges require an explicit same-bank constraint.",
+        "Optionally import edited data up to 48 KiB. It must fit the destination. Cartridge size and the original extent are preserved.",
+        "Declare every external linear pointer: file offset, width, byte order, encoding adjustment and interior offset. Existing stored values are checked. Code and embedded pointers are unsupported.",
+        "Confirm reference completeness and destination reservation. Review pointer before/after values, then create a separate build. These confirmations are author declarations.",
+        "Choose <b>Inspect moved data</b>. Old fixed-offset declarations are not reused. A wholly covered neutral table can be rebased; inspect it and <b>Save this layout</b>.",
+        "Playtest the effect, compare bytes and export a verified patch. A successful byte move does not establish every gameplay path."
+      ],
+      "result": "A separate build with source-bound relocation metadata, checked linear references and preserved original data.",
+      "note": "An original native fixture verified PPU output changing 33 to 22 after relocation. The pictured UI run moves 24 bytes, then previews 23 to 38 at the new location. No game profile was used.",
+      "related": [
+        "structural-experiments",
+        "native-accesses",
+        "tables",
+        "checks"
+      ],
+      "terms": [
+        "term-pointer",
+        "term-hypothesis"
+      ],
+      "image": "33-moved-table",
+      "caption": "Actual moved-data table at file offset 0x1800. Its saved layout and 23 to 38 edit preview refer to the new build, not preserved inactive source bytes.",
+      "extra_images": [
+        {
+          "image": "32-data-relocation",
+          "title": "Actual reviewed data move with explicit reservation and pointer before/after values."
+        }
+      ],
+      "image_layout": "following-page",
+      "visual_page": {
+        "title": "Edit the moved allocation / actual interface",
+        "kicker": "Actual application capture / original redistributable example",
+        "intro": "The moved table retains its checked location and normal before/after editing controls.",
+        "panels": [
+          {
+            "image": "33-moved-table",
+            "title": "Data at its new location",
+            "x": 48,
+            "top": 846,
+            "width": 1170,
+            "crop": [
+              180,
+              60,
+              1390,
+              860
+            ],
+            "caption": "Original data remains intact. This neutral layout is saved for the moved build."
+          }
+        ]
+      }
     }
   ],
   "glossary": [
@@ -2303,6 +2574,21 @@
       "id": "term-tilemap",
       "term": "Tilemap",
       "definition": "A grid of references to tiles, sometimes including palette banks or flip bits. Its storage format must be established."
+    },
+    {
+      "id": "term-control-observation",
+      "term": "Control observation",
+      "definition": "A recorded sample where the target stays unchanged while unrelated activity continues. It helps reject coincidental numeric matches."
+    },
+    {
+      "id": "term-hypothesis",
+      "term": "Hypothesis",
+      "definition": "An interpretation that fits the tested observations. It stays a candidate until additional evidence supports its meaning and scope."
+    },
+    {
+      "id": "term-native-capture",
+      "term": "Native capture",
+      "definition": "Application-owned evidence recorded through actual emulator callbacks or native instruction tracing, bound to the source and capture setup. Imported JSON does not become fresh native proof."
     }
   ],
   "index": [
@@ -3159,6 +3445,63 @@
       "topics": [
         "support-editing",
         "palettes-appearance"
+      ]
+    },
+    {
+      "term": "Unfamiliar ROMs",
+      "topics": [
+        "universal-values",
+        "structural-experiments"
+      ]
+    },
+    {
+      "term": "Unchanged controls",
+      "topics": [
+        "universal-values"
+      ]
+    },
+    {
+      "term": "Native memory accesses",
+      "topics": [
+        "native-accesses"
+      ]
+    },
+    {
+      "term": "Generated table editors",
+      "topics": [
+        "structural-experiments"
+      ]
+    },
+    {
+      "term": "Debugger preparation and repair",
+      "topics": [
+        "debugger-setup"
+      ]
+    },
+    {
+      "term": "Historical investigation evidence",
+      "topics": [
+        "universal-values",
+        "native-accesses"
+      ]
+    },
+    {
+      "term": "Data relocation",
+      "topics": [
+        "data-relocation"
+      ]
+    },
+    {
+      "term": "Reserved free space",
+      "topics": [
+        "data-relocation"
+      ]
+    },
+    {
+      "term": "Moved table layouts",
+      "topics": [
+        "data-relocation",
+        "structural-experiments"
       ]
     }
   ]

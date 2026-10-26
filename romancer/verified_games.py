@@ -75,6 +75,7 @@ BYTE_NOTES={
 def _resolve(project,row,cancelled):
     current=row;seen=set()
     for _ in range(64):
+        if current.get('layout_changed'):return None,None
         if current['artifact_id'] in seen:raise ValueError('cyclic game-definition ancestry')
         seen.add(current['artifact_id']);projects._measure(current['path'],current,cancelled=cancelled)
         if current['kind']=='source':

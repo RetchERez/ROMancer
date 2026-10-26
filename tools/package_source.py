@@ -157,6 +157,8 @@ APPROVED_FILES = APPROVED_FILES | frozenset({
     'romancer/structural_lab.py','romancer/structure_tools.py','tests/test_structural_lab.py','tests/test_structure_tools.py',
     'romancer/compression_oracle.py',
     'romancer/debugger_provision.py','tests/test_debugger_provision.py',
+    'romancer/data_relocation.py','tests/test_data_relocation.py',
+    'romancer/ui/data_relocation.js','tests/ui_data_relocation.mjs',
     'romancer/core_memory_layout.py','tests/test_core_memory_layout.py',
     'tests/test_native_debugger.py',
     'romancer/ui/investigation_series.js','tests/ui_investigation_series.mjs',
@@ -189,7 +191,7 @@ APPROVED_FILES = APPROVED_FILES | frozenset({
         '09-playtest-states','10-verified-patch','11-hex-inspection','12-tutorials',
         '13-settings','14-light-theme','15-dark-theme','16-connected-rooms',
         '17-object-inspector','18-byte-explanation','19-chrono-armor','20-ffl2-map-browser','21-game-knowledge',
-        '22-engine-recognition','23-address-domains','24-code-references','25-cartridge-verification','26-mod-byte-comparison','27-crc-mismatch','28-text-overflow','29-audio-preview','30-project-recovery')),
+        '22-engine-recognition','23-address-domains','24-code-references','25-cartridge-verification','26-mod-byte-comparison','27-crc-mismatch','28-text-overflow','29-audio-preview','30-project-recovery','26-universal-value-series','27-native-access-capture','28-native-source-context','29-structural-experiments','30-generated-table-editor','31-debugger-preparation','32-data-relocation','33-moved-table')),
 })
 
 

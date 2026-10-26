@@ -205,6 +205,8 @@ class WorkbenchAPI:
         self.debugger=DebuggerTools(self);self.routes.update(self.debugger.routes())
         from .structure_tools import StructureTools
         self.structures=StructureTools(self);self.routes.update(self.structures.routes())
+        from .data_relocation import RelocationTools
+        self.relocation=RelocationTools(self);self.routes.update(self.relocation.routes())
         for operation in tuple(self.routes):
             if operation.startswith('containers.') or operation in ('runtime.load_disc','route.run_disc','release.disc_set'):
                 del self.routes[operation]
@@ -581,13 +583,13 @@ class WorkbenchAPI:
             value['builds'].append(record);projects.write_json(project/'project.json',value)
         return {'ok':True,'status':'BUILT',**record,'independent_container_check':True}
 
-    def _integrity_plan(self,p,c):
+    def _integrity_plan(self,p,c,*,annotations=None):
         from .system_integrity import integrity_edits
         project,row,path=self.source(p)
         from .system_identify import identify_system
         system=identify_system(path,expected_sha256=row['sha256'],cancelled=c)['system_id']
         edits=integrity_edits(path,row['sha256'],system,p['edits'])
-        result=projects.plan_byte_edits(project,row['artifact_id'],edits)
+        result=projects.plan_byte_edits(project,row['artifact_id'],edits,annotations=annotations)
         return {**result,'system_id':system,'integrity_planned':True,'integrity_edit_count':len(edits)-len(p['edits'])}
 
     def _compression_inspect(self,p,c):
@@ -685,6 +687,9 @@ class WorkbenchAPI:
         import copy
         from .workflow_recipes import definition_document
         project,row,path=self.source(p)
+        context=row.get('plan_annotations')
+        if isinstance(context,dict) and context.get('kind')=='declared-data-relocation-v1':
+            raise ValueError('Data moved to new offsets. Inspect the relocation evidence and declare resources at their current locations; old fixed-offset definitions are not reused.')
         if not row.get('source_id'):raise ValueError('select a build with an owned parent source')
         parent=projects.artifact(project,row['source_id']);projects._measure(parent['path'],parent);definitions={};issues=[]
         for kind,definition in parent.get('descriptors',{}).items():

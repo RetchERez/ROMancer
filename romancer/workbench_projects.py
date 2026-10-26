@@ -220,7 +220,7 @@ def inspect_resource(project:Path,artifact_id:str,offset:int,length:int)->dict:
             'offset':offset,'length':len(raw),'hex':raw.hex(),'text':''.join(chr(b) if 32<=b<127 else '·' for b in raw)}
 
 
-def plan_byte_edits(project:Path,artifact_id:str,edits:list[dict])->dict:
+def plan_byte_edits(project:Path,artifact_id:str,edits:list[dict],*,annotations=None)->dict:
     project=Path(project)
     with locked(project):
         row=artifact(project,artifact_id);_measure(row['path'],row)
@@ -241,6 +241,7 @@ def plan_byte_edits(project:Path,artifact_id:str,edits:list[dict])->dict:
         plan={'schema_version':1,'operation':'byte-build','source_id':artifact_id,'source_sha256':row['sha256'],
               'source_size':row['size'],'edits':sorted(edits,key=lambda e:e['offset']),
               'integrity':'Generic byte edit; console checksums and game semantics have not been verified.'}
+        if annotations is not None:plan['annotations']=json.loads(canonical_bytes(annotations,max_bytes=65536))
         plan_id=digest(plan);plan['plan_id']=plan_id;path=project/'plans'/(plan_id+'.json')
         if not path.exists():write_json(path,plan)
         return {**plan,'ok':True,'status':'PLANNED','changed_bytes':total}
@@ -261,6 +262,9 @@ def apply_build(project:Path,plan_id:str,*,cancelled=lambda:False)->dict:
         record={'artifact_id':uuid.uuid4().hex,'name':'Build '+str(len(value['builds'])+1),'kind':'build',
                 'path':str(destination.absolute()),'system':row['system'],**measured,
                 'source_id':row['artifact_id'],'plan_id':plan_id,'build_id':registered['build_id']}
+        if 'annotations' in plan:record['plan_annotations']=plan['annotations']
+        moved=isinstance(plan.get('annotations'),dict) and plan['annotations'].get('kind')=='declared-data-relocation-v1'
+        if row.get('layout_changed') or moved:record['layout_changed']=True
         if 'container_parent' in row:record['container_parent']=row['container_parent']
         assess_artifact(record,cancelled)
         value['builds'].append(record);write_json(project/'project.json',value)

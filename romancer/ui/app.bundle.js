@@ -1157,7 +1157,7 @@
     (_b = state2.soundPlayer) == null ? void 0 : _b.close();
     state2.soundPlayer = null;
     state2.soundPreview = null;
-    for (const key3 of ["nativeSourceContext", "structuralLab", "structuralPrefill", "tableProposal", "nativeTrace", "nativeProbe", "investigationSeries", "gameMapsView", "gameMapEditor", "levelEditor", "levelClipboard", "levelRect", "paint", "pixelHistories", "pixelHistoryScope", "spriteHistory", "hexDraft", "hexReview", "hexSearch", "hexNumbers", "hexExplanation", "hexBookmarks", "hexComparison", "historyComparison", "translationSheet", "translationReview"]) state2[key3] = null;
+    for (const key3 of ["tablePreview", "dataRelocation", "nativeSourceContext", "structuralLab", "structuralPrefill", "tableProposal", "nativeTrace", "nativeProbe", "investigationSeries", "gameMapsView", "gameMapEditor", "levelEditor", "levelClipboard", "levelRect", "paint", "pixelHistories", "pixelHistoryScope", "spriteHistory", "hexDraft", "hexReview", "hexSearch", "hexNumbers", "hexExplanation", "hexBookmarks", "hexComparison", "historyComparison", "translationSheet", "translationReview"]) state2[key3] = null;
     state2.drafts = {};
     state2.romScans = {};
     state2.graphicsInvestigations = {};
@@ -1561,9 +1561,9 @@
       return [c, Math.round(value / maximum * 255)];
     }));
   }
-  function quantizeColor(hex5, channels) {
-    if (typeof hex5 !== "string" || !/^#[a-f0-9]{6}$/i.test(hex5)) throw Error("Choose a valid RGB color.");
-    return Object.fromEntries(["r", "g", "b"].map((c, i) => [c, Math.round(parseInt(hex5.slice(1 + i * 2, 3 + i * 2), 16) / 255 * channelMaximum(channels[c]))]));
+  function quantizeColor(hex6, channels) {
+    if (typeof hex6 !== "string" || !/^#[a-f0-9]{6}$/i.test(hex6)) throw Error("Choose a valid RGB color.");
+    return Object.fromEntries(["r", "g", "b"].map((c, i) => [c, Math.round(parseInt(hex6.slice(1 + i * 2, 3 + i * 2), 16) / 255 * channelMaximum(channels[c]))]));
   }
   function editedPalette(palette2, changes) {
     if (!palette2) return palette2;
@@ -1639,7 +1639,7 @@
     return (row == null ? void 0 : row.label) !== void 0 ? row.label + " · ID 0x" + row.record_id.toString(16).toUpperCase().padStart(2, "0") : "Row " + row.index;
   }
   async function render3(ctx2) {
-    var _a, _b, _c, _d, _e, _f;
+    var _a, _b, _c, _d, _e, _f, _g;
     const { state: state2 } = ctx2, missing = requireProject(ctx2);
     if (missing) return missing;
     const artifact = state2.artifact;
@@ -1657,6 +1657,7 @@
       state2.tableProposal = null;
       state2.results["tables.inspect"] = proposal.inspection;
       state2.pending = null;
+      state2.tablePreview = { scope: selectionKey(state2), document_id: proposal.inspection.document_id };
       const d = proposal.definition;
       for (const [key3, value] of Object.entries({ "table-name": d.name, "table-offset": d.offset, "table-count": d.count, "table-stride": d.stride, "table-fields": JSON.stringify(d.fields) })) ctx2.setDraft(key3, typeof value === "string" ? value : String(value));
     }
@@ -1713,6 +1714,7 @@
       "table-inspect": async () => {
         const result = await ctx2.run("tables.save_definition", { ...ctx2.sourceParams(), definition: definition() }, { render: false });
         state2.results["tables.inspect"] = result.inspection;
+        state2.tablePreview = null;
         state2.pending = null;
         await ctx2.render();
       },
@@ -1795,7 +1797,7 @@
       }
     });
     const pending = ((_e = state2.pending) == null ? void 0 : _e.kind) === "table" && state2.pending.artifact_id === artifact.artifact_id;
-    return `${heading("", "Data tables", "")}<section class="card"><div class="card-heading"><h3>${esc((model == null ? void 0 : model.definition.name) || "Define a table")}</h3><span>${model ? model.total + " records" : "No table loaded"}</span></div><details class="config" ${model ? "" : "open"}><summary>Table layout</summary><div class="field-row">${field("table-name", "Table name", ctx2.draft("table-name", (saved == null ? void 0 : saved.name) || "Data table"))}${field("table-offset", "First record offset", ctx2.draft("table-offset", (saved == null ? void 0 : saved.offset) ?? "0"))}${field("table-count", "Record count", ctx2.draft("table-count", (saved == null ? void 0 : saved.count) ?? "16"))}${field("table-stride", "Bytes per record", ctx2.draft("table-stride", (saved == null ? void 0 : saved.stride) ?? "1"))}</div><div class="table-wrap"><table><thead><tr><th>Field</th><th>Offset</th><th>Type</th><th>Order</th><th>Pointer base</th><th></th></tr></thead><tbody>${columns2.map((field2, index) => `<tr><td>${esc(field2.name)}</td><td>${field2.offset}</td><td>${esc(field2.type)}</td><td>${esc(field2.endian)}</td><td>${field2.pointer_base ?? "None"}</td><td>${button("Remove", "table-remove-field", { id: String(index) })}</td></tr>`).join("")}</tbody></table></div><details class="config"><summary>Add a field</summary><div class="field-row">${field("table-field-name", "Field name", ctx2.draft("table-field-name", ""))}${field("table-field-offset", "Offset within record", ctx2.draft("table-field-offset", "0"))}${select("table-field-type", "Numeric type", numericTypes.map((type) => [type, type]), ctx2.draft("table-field-type", "u8"))}${select("table-field-endian", "Byte order", [["little", "Little endian"], ["big", "Big endian"]], ctx2.draft("table-field-endian", "little"))}${field("table-field-base", "Pointer base (optional)", ctx2.draft("table-field-base", ""))}</div><p>For a linear pointer: target file offset = stored value − base.</p>${button("Add field", "table-add-field")}</details>${button("Load table definition", "table-inspect", { primary: !model })}</details></section>${model ? `<section class="card"><div class="card-heading"><h3>Records</h3><span>${changes.length} staged changes</span></div>${catalog.length ? `<div class="field-row">${field("table-name-query", "Search record names or IDs", query)}${button("Find records", "table-search")}</div><div class="field-row">${select("table-record-choice", "Named record", matches.map((row) => [row.index, recordName(row)]), String(((_f = matches[0]) == null ? void 0 : _f.index) ?? ""))}${button("Show selected record", "table-select-record", { disabled: !matches.length, reason: "No matching record names." })}</div><p>${matches.length} matching records. Names come from this source revision; blank and unsupported text are marked.</p>` : ""}<div class="table-wrap"><table class="numeric-table"><thead><tr><th>Row</th>${model.definition.fields.map((field2) => `<th>${esc(field2.name)}${Number.isFinite(bounds(field2).minimum) && Number.isFinite(bounds(field2).maximum) ? `<br><small>Range ${bounds(field2).minimum}–${bounds(field2).maximum}</small>` : ""}</th>`).join("")}</tr></thead><tbody>${model.rows.map((row) => `<tr><td>${esc(recordName(row))}<br>${row.label !== void 0 ? `<small>Row ${row.index}${row.label_status === "unsupported" ? " · Unsupported name bytes" : row.label_status === "blank" ? " · Blank name" : ""}</small><br>` : ""}<code>0x${row.offset.toString(16)}</code></td>${row.cells.map((cell, index) => {
+    return `${heading("", "Data tables", "")}<section class="card"><div class="card-heading"><h3>${esc((model == null ? void 0 : model.definition.name) || "Define a table")}</h3><span>${model ? model.total + " records" : "No table loaded"}</span>${model && ((_f = state2.tablePreview) == null ? void 0 : _f.scope) === selectionKey(state2) && state2.tablePreview.document_id === model.document_id ? button("Save this layout", "table-inspect") : ""}</div><details class="config" ${model ? "" : "open"}><summary>Table layout</summary><div class="field-row">${field("table-name", "Table name", ctx2.draft("table-name", (saved == null ? void 0 : saved.name) || "Data table"))}${field("table-offset", "First record offset", ctx2.draft("table-offset", (saved == null ? void 0 : saved.offset) ?? "0"))}${field("table-count", "Record count", ctx2.draft("table-count", (saved == null ? void 0 : saved.count) ?? "16"))}${field("table-stride", "Bytes per record", ctx2.draft("table-stride", (saved == null ? void 0 : saved.stride) ?? "1"))}</div><div class="table-wrap"><table><thead><tr><th>Field</th><th>Offset</th><th>Type</th><th>Order</th><th>Pointer base</th><th></th></tr></thead><tbody>${columns2.map((field2, index) => `<tr><td>${esc(field2.name)}</td><td>${field2.offset}</td><td>${esc(field2.type)}</td><td>${esc(field2.endian)}</td><td>${field2.pointer_base ?? "None"}</td><td>${button("Remove", "table-remove-field", { id: String(index) })}</td></tr>`).join("")}</tbody></table></div><details class="config"><summary>Add a field</summary><div class="field-row">${field("table-field-name", "Field name", ctx2.draft("table-field-name", ""))}${field("table-field-offset", "Offset within record", ctx2.draft("table-field-offset", "0"))}${select("table-field-type", "Numeric type", numericTypes.map((type) => [type, type]), ctx2.draft("table-field-type", "u8"))}${select("table-field-endian", "Byte order", [["little", "Little endian"], ["big", "Big endian"]], ctx2.draft("table-field-endian", "little"))}${field("table-field-base", "Pointer base (optional)", ctx2.draft("table-field-base", ""))}</div><p>For a linear pointer: target file offset = stored value − base.</p>${button("Add field", "table-add-field")}</details>${button("Load table definition", "table-inspect", { primary: !model })}</details></section>${model ? `<section class="card"><div class="card-heading"><h3>Records</h3><span>${changes.length} staged changes</span></div>${catalog.length ? `<div class="field-row">${field("table-name-query", "Search record names or IDs", query)}${button("Find records", "table-search")}</div><div class="field-row">${select("table-record-choice", "Named record", matches.map((row) => [row.index, recordName(row)]), String(((_g = matches[0]) == null ? void 0 : _g.index) ?? ""))}${button("Show selected record", "table-select-record", { disabled: !matches.length, reason: "No matching record names." })}</div><p>${matches.length} matching records. Names come from this source revision; blank and unsupported text are marked.</p>` : ""}<div class="table-wrap"><table class="numeric-table"><thead><tr><th>Row</th>${model.definition.fields.map((field2) => `<th>${esc(field2.name)}${Number.isFinite(bounds(field2).minimum) && Number.isFinite(bounds(field2).maximum) ? `<br><small>Range ${bounds(field2).minimum}–${bounds(field2).maximum}</small>` : ""}</th>`).join("")}</tr></thead><tbody>${model.rows.map((row) => `<tr><td>${esc(recordName(row))}<br>${row.label !== void 0 ? `<small>Row ${row.index}${row.label_status === "unsupported" ? " · Unsupported name bytes" : row.label_status === "blank" ? " · Blank name" : ""}</small><br>` : ""}<code>0x${row.offset.toString(16)}</code></td>${row.cells.map((cell, index) => {
       var _a2, _b2;
       return `<td><label class="field"><span class="sr-only">${esc(cell.field)}, ${esc(recordName(row))}</span><input id="${inputId(row.index, index)}" value="${esc(ctx2.draft(inputId(row.index, index), ((_a2 = changes.find((change) => change.row === row.index && change.field === cell.field)) == null ? void 0 : _a2.after) ?? cell.value))}" inputmode="numeric" aria-label="${esc(cell.field)}, ${esc(recordName(row))}"></label><div data-number-input="${inputId(row.index, index)}" data-before="${cell.value}" data-compact="true" data-minimum="${bounds(model.definition.fields[index]).minimum}" data-maximum="${bounds(model.definition.fields[index]).maximum}">${numberComparison(cell.value, ctx2.draft(inputId(row.index, index), ((_b2 = changes.find((change) => change.row === row.index && change.field === cell.field)) == null ? void 0 : _b2.after) ?? cell.value), { compact: true, ...bounds(model.definition.fields[index]) })}</div>${cell.target_offset !== null ? button("Open target 0x" + cell.target_offset.toString(16), "table-target", { id: String(cell.target_offset) }) : cell.pointer_resolution ? "<span>Unresolved target</span>" : ""}</td>`;
     }).join("")}</tr>`).join("")}</tbody></table></div><div class="actions">${button("Previous records", "table-page", { id: "-1", disabled: !model.page })}<span>Page ${model.page + 1}</span>${button("Next records", "table-page", { id: "1", disabled: (model.page + 1) * model.limit >= model.total })}${button("Review changes", "table-review", { primary: !pending })}${pending ? button("Create build", "table-build", { primary: true }) : ""}${button("Discard changes", "table-discard")}</div></section>${changes.length ? `<details class="card"><summary>Staged changes by record</summary><ul>${changes.map((change) => `<li>${esc(recordName(catalog[change.row] || { index: change.row }))}: ${esc(change.field)} ${change.before} → ${change.after}</li>`).join("")}</ul></details>` : ""}<details class="card"><summary>Batch change</summary><p>Preview up to1024 source records. Percent changes round halves away from zero. Numeric overflow is refused; declared field limits are also enforced. First row refers to the row number shown with each record.</p><div class="field-row">${select("table-batch-field", "Field", model.definition.fields.map((field2) => [field2.name, field2.name]), ctx2.draft("table-batch-field", model.definition.fields[0].name))}${select("table-batch-operation", "Operation", [["set", "Set value"], ["add", "Add"], ["multiply", "Multiply"], ["percent", "Change by percent"]], ctx2.draft("table-batch-operation", "add"))}${field("table-batch-value", "Value", ctx2.draft("table-batch-value", "1"))}${field("table-batch-first", "First row", ctx2.draft("table-batch-first", "0"))}${field("table-batch-count", "Record count", ctx2.draft("table-batch-count", String(Math.min(10, model.total))))}</div>${button("Preview batch changes", "table-batch")}</details>` : ""}${report(state2.results["tables.plan"], "Table change plan")}${report(state2.results["build.apply"], "Built output")}`;
@@ -1871,9 +1873,9 @@
   }
   var api = {
     async uploadInput(project_id, file, kind) {
-      const limits = { patch: 64, catalog: 16, save: 8, translation: 4, audio: 2 };
+      const limits = { patch: 64, catalog: 16, save: 8, translation: 4, audio: 2, resource: 48 / 1024 };
       if (!file || !limits[kind]) throw new Error("Choose a supported input file.");
-      if (file.size > limits[kind] * 1024 * 1024) throw new Error(`This ${kind} exceeds the ${limits[kind]} MiB limit.`);
+      if (file.size > limits[kind] * 1024 * 1024) throw new Error(kind === "resource" ? "Choose edited data up to 48 KiB." : `This ${kind} exceeds the ${limits[kind]} MiB limit.`);
       const controller = new AbortController(), timer = setTimeout(() => controller.abort(), 3e4);
       try {
         const response = await fetch(`/api/upload?project_id=${encodeURIComponent(project_id)}&name=${encodeURIComponent(file.name)}&kind=${encodeURIComponent(kind)}`, { method: "POST", headers: headers(false), body: file, signal: controller.signal });
@@ -2595,6 +2597,143 @@
     return `<section class="card observed-source-context"><div class="card-heading"><h3>Why these bytes are open</h3>${button("Dismiss", "source-capture-dismiss")}</div><p>${r.runtime_trusted ? "Authenticated native capture" : "Historical capture"} · ${esc(((_a = r.backend) == null ? void 0 : _a.backend) || "Debugger")} ${esc(((_b = r.backend) == null ? void 0 : _b.version) || "")} · event ${event.id}</p><p>Observed <strong>${esc(event.kind)}</strong> at CPU address <code>${hex2(event.address)}</code>, value <code>${hex2(event.value)}</code>. Execution context: <code>${hex2(context == null ? void 0 : context.pc)}</code>.</p><p>${candidate ? "This source location is a unique byte-pattern candidate. Active mapper state was not established." : "This source location was mapped in the captured native event."} Game meaning and causal ownership remain separate questions.</p>${button("Back to captured evidence", "source-capture-back")}</section>`;
   }
 
+  // romancer/ui/data_relocation.js
+  function integer4(id) {
+    const text = read(id), value = Number(text);
+    if (!text.trim() || !Number.isSafeInteger(value)) throw Error("Enter a whole number for " + id + ".");
+    return value;
+  }
+  var hex3 = (value) => "0x" + value.toString(16);
+  async function relocationControls(ctx2) {
+    var _a, _b, _c, _d, _e, _f;
+    const { state: state2 } = ctx2, scope = selectionKey(state2), params = { ...ctx2.sourceParams() };
+    let entry = state2.dataRelocation;
+    if ((entry == null ? void 0 : entry.scope) !== scope) state2.dataRelocation = entry = { scope, references: [{}], generation: 0, plan: null, replacement: null };
+    const current2 = () => selectionKey(state2) === scope && state2.dataRelocation === entry;
+    const bankDefault = { nes: 8192, snes: 32768, gb: 16384, gbc: 16384 }[state2.artifact.system_id] || 0;
+    const assessment = state2.artifact.system_assessment;
+    const prg = ((_a = assessment == null ? void 0 : assessment.source) == null ? void 0 : _a.sha256) === state2.artifact.sha256 ? (_b = assessment.candidates) == null ? void 0 : _b.filter((c) => c.layout_valid).flatMap((c) => c.regions || []).find((r) => r.id === "prg-rom") : null;
+    const originDefault = state2.artifact.system_id === "nes" ? (prg == null ? void 0 : prg.offset) ?? 16 : 0;
+    const baseDefault = state2.artifact.system_id === "nes" ? 32768 - originDefault : state2.artifact.system_id === "gba" ? 134217728 : 0;
+    const references = () => entry.references.map((_, i) => ({
+      offset: integer4("reloc-ref-offset-" + i),
+      width: integer4("reloc-ref-width-" + i),
+      endian: read("reloc-ref-endian-" + i),
+      base: integer4("reloc-ref-base-" + i),
+      target_delta: integer4("reloc-ref-delta-" + i)
+    }));
+    const spec = () => {
+      var _a2;
+      return {
+        source_offset: integer4("reloc-source"),
+        source_length: integer4("reloc-length"),
+        target_offset: integer4("reloc-target"),
+        target_capacity: integer4("reloc-capacity"),
+        fill_byte: integer4("reloc-fill"),
+        alignment: integer4("reloc-alignment"),
+        bank_size: integer4("reloc-bank"),
+        bank_origin: integer4("reloc-origin"),
+        references: references(),
+        references_complete: document.getElementById("reloc-references-complete").checked,
+        destination_reserved: document.getElementById("reloc-destination-reserved").checked,
+        replacement_input_id: ((_a2 = entry.replacement) == null ? void 0 : _a2.input_id) || null
+      };
+    };
+    const invalidate = () => {
+      if (entry.plan && state2.pending === entry.plan) state2.pending = null;
+      entry.plan = null;
+    };
+    ctx2.use({
+      "reloc-add-reference": () => {
+        if (!current2()) throw Error("The source changed.");
+        if (entry.references.length >= 128) throw Error("Use at most 128 references.");
+        entry.references = references();
+        entry.references.push({});
+        invalidate();
+        return ctx2.render();
+      },
+      "reloc-remove-reference": () => {
+        if (!current2()) throw Error("The source changed.");
+        if (entry.references.length > 1) {
+          entry.references = references().slice(0, -1);
+          invalidate();
+          return ctx2.render();
+        }
+      },
+      "reloc-upload": async () => {
+        if (!current2()) throw Error("The source changed.");
+        const file = document.getElementById("reloc-file").files[0];
+        if (!file || !file.size || file.size > 48 * 1024) throw Error("Choose edited data up to 48 KiB.");
+        const generation = ++entry.generation;
+        const result = await ctx2.api.uploadInput(params.project_id, file, "resource");
+        if (!current2() || entry.generation !== generation) return;
+        entry.replacement = result;
+        invalidate();
+        await ctx2.render();
+      },
+      "reloc-copy-original": () => {
+        if (!current2()) throw Error("The source changed.");
+        ++entry.generation;
+        entry.replacement = null;
+        invalidate();
+        return ctx2.render();
+      },
+      "reloc-review": async () => {
+        if (!current2()) throw Error("The selected source changed.");
+        const declaration = spec(), signature = JSON.stringify(declaration), generation = ++entry.generation;
+        invalidate();
+        const result = await ctx2.run("relocation.plan", { ...params, spec: declaration }, { render: false, refresh: false });
+        if (!current2() || entry.generation !== generation) return;
+        if ((result == null ? void 0 : result.ok) === false || result.source_sha256 !== state2.artifact.sha256 || result.artifact_id !== state2.artifact.artifact_id) throw Error(result.error || "Relocation plan belongs to another source.");
+        if (JSON.stringify(spec()) !== signature) {
+          ctx2.notify("The declaration changed during review. Review it again.");
+          return;
+        }
+        entry.references = declaration.references;
+        entry.lastSpec = declaration;
+        state2.pending = entry.plan = { kind: "relocation", plan_id: result.plan_id, artifact_id: params.artifact_id, spec: declaration, report: result };
+        await ctx2.render();
+      },
+      "reloc-build": async () => {
+        if (!current2() || !entry.plan || state2.pending !== entry.plan) throw Error("Review this source relocation first.");
+        if (JSON.stringify(spec()) !== JSON.stringify(entry.plan.spec)) {
+          invalidate();
+          throw Error("The declaration changed. Review it again before building.");
+        }
+        const pending2 = entry.plan, result = await ctx2.run("build.apply", { project_id: params.project_id, plan_id: pending2.plan_id }, { render: false });
+        if (!current2()) return;
+        entry.built = { artifact_id: result.artifact_id, sha256: result.sha256, offset: pending2.report.relocation.target_offset };
+        if (entry.plan === pending2) {
+          let latest;
+          try {
+            latest = spec();
+          } catch {
+            latest = null;
+          }
+          const changed2 = !latest || JSON.stringify(latest) !== JSON.stringify(pending2.spec);
+          if (latest) {
+            entry.references = latest.references;
+            entry.lastSpec = latest;
+          } else entry.lastSpec = { ...entry.lastSpec, references_complete: document.getElementById("reloc-references-complete").checked, destination_reserved: document.getElementById("reloc-destination-reserved").checked };
+          invalidate();
+          await ctx2.render();
+          ctx2.notify(changed2 ? "Build created. Your newer declaration remains." : "Separate relocated build created. Playtest it before exporting.");
+        }
+      },
+      "reloc-inspect-build": async () => {
+        var _a2, _b2;
+        if (!current2() || !entry.built) throw Error("Create the reviewed relocated build first.");
+        const built = entry.built;
+        await ctx2.setArtifact(built.artifact_id);
+        if (((_a2 = state2.artifact) == null ? void 0 : _a2.artifact_id) !== built.artifact_id || ((_b2 = state2.artifact) == null ? void 0 : _b2.sha256) !== built.sha256) throw Error("The selection changed. Open the relocated build again.");
+        state2.resourceJump = built.offset;
+        await ctx2.navigate("resources");
+      }
+    });
+    const report2 = (_d = (_c = entry.plan) == null ? void 0 : _c.report) == null ? void 0 : _d.relocation, pending = entry.plan && state2.pending === entry.plan;
+    return `<details class="card data-relocation"><summary>Move declared data · Advanced</summary><p>Move or grow data inside this cartridge and update explicitly declared linear references. The original extent is preserved. This does not move position-dependent code or discover every consumer.</p><div class="field-row">${field("reloc-source", "Original data offset", ctx2.draft("reloc-source", "0"))}${field("reloc-length", "Original allocation bytes", ctx2.draft("reloc-length", "16"))}${field("reloc-target", "Reserved destination offset", ctx2.draft("reloc-target", "0"))}${field("reloc-capacity", "Reserved destination bytes", ctx2.draft("reloc-capacity", "64"))}</div><div class="field-row">${field("reloc-fill", "Expected destination fill byte", ctx2.draft("reloc-fill", "255"))}${select("reloc-alignment", "Declared alignment", [[1, "1 byte"], [2, "2 bytes"], [4, "4 bytes"], [8, "8 bytes"], [16, "16 bytes"], [32, "32 bytes"]], ctx2.draft("reloc-alignment", "1"))}${select("reloc-bank", "Declared bank bytes", [[0, "Linear (GBA / Genesis)"], [8192, "8192"], [16384, "16384"], [32768, "32768"], [65536, "65536"]], ctx2.draft("reloc-bank", String(bankDefault)))}${field("reloc-origin", "Bank file origin", ctx2.draft("reloc-origin", String(originDefault)))}</div><p>Replacement: <strong>${entry.replacement ? esc(entry.replacement.name) + " · " + entry.replacement.size + " bytes" : "Copy the original allocation"}</strong></p><div class="field-row"><label class="field">Edited data file (optional, up to 48 KiB)<input type="file" id="reloc-file"></label><div class="actions">${button("Use edited data file", "reloc-upload")}${button("Copy original data instead", "reloc-copy-original")}</div></div>${entry.built ? button("Inspect moved data in the new build", "reloc-inspect-build") : ""}<h3>External linear references</h3><p>Stored pointer = destination file offset + interior offset + encoding adjustment. Before-bytes must already match the original location. Bank constraints are your declarations; an active mapper is not inferred.</p><div class="table-wrap"><table><thead><tr><th>Pointer file offset</th><th>Bytes</th><th>Order</th><th>Encoding adjustment</th><th>Interior offset</th></tr></thead><tbody>${entry.references.map((ref, i) => `<tr><td>${field("reloc-ref-offset-" + i, "Pointer file offset", ctx2.draft("reloc-ref-offset-" + i, String(ref.offset ?? 0)))}</td><td>${select("reloc-ref-width-" + i, "Pointer bytes", [[2, "2"], [3, "3"], [4, "4"]], ctx2.draft("reloc-ref-width-" + i, String(ref.width ?? (state2.artifact.system_id === "gba" ? 4 : 2))))}</td><td>${select("reloc-ref-endian-" + i, "Byte order", [["little", "Little"], ["big", "Big"]], ctx2.draft("reloc-ref-endian-" + i, ref.endian || (state2.artifact.system_id === "genesis" ? "big" : "little")))}</td><td>${field("reloc-ref-base-" + i, "Encoding adjustment", ctx2.draft("reloc-ref-base-" + i, String(ref.base ?? baseDefault)))}</td><td>${field("reloc-ref-delta-" + i, "Interior offset", ctx2.draft("reloc-ref-delta-" + i, String(ref.target_delta ?? 0)))}</td></tr>`).join("")}</tbody></table></div><div class="actions">${button("Add reference", "reloc-add-reference", { disabled: entry.references.length >= 128 })}${button("Remove last reference", "reloc-remove-reference", { disabled: entry.references.length <= 1 })}</div><label class="settings-check"><input type="checkbox" id="reloc-references-complete" ${((_e = entry.lastSpec) == null ? void 0 : _e.references_complete) ? "checked" : ""}><span>I have declared every external reference required by this move.</span></label><label class="settings-check"><input type="checkbox" id="reloc-destination-reserved" ${((_f = entry.lastSpec) == null ? void 0 : _f.destination_reserved) ? "checked" : ""}><span>I have reserved this destination. Matching fill bytes alone do not prove unused space.</span></label><div class="actions">${button("Review data move", "reloc-review", { primary: !pending })}${pending ? button("Create separate build", "reloc-build", { primary: true }) : ""}</div>${report2 ? `<div class="notice"><p>${report2.payload_size} bytes proposed at ${hex3(report2.target_offset)}. ${report2.pointer_updates.length} declared references checked. The original data remains at ${hex3(report2.source_offset)}.</p><p>Reference completeness and reservation are author declarations. Native gameplay verification is still required.</p></div><div class="table-wrap"><table><thead><tr><th>Reference offset</th><th>Before</th><th>After</th></tr></thead><tbody>${report2.pointer_updates.slice(0, 16).map((r) => `<tr><td>${hex3(r.offset)}</td><td>${hex3(r.before)}</td><td>${hex3(r.after)}</td></tr>`).join("")}</tbody></table></div>` : ""}</details>`;
+  }
+
   // romancer/ui/hex_editor.js
   var HexDraft = class {
     constructor(state2, data) {
@@ -2623,7 +2762,7 @@
       return [...this.changes].sort(([a], [b]) => a - b).map(([offset, after]) => ({ offset, before: this.original.get(offset), after }));
     }
   };
-  var integer4 = (value) => {
+  var integer5 = (value) => {
     const n = Number(value);
     if (!Number.isSafeInteger(n) || n < 0) throw Error("Enter a nonnegative decimal or 0x hex offset.");
     return n;
@@ -2684,7 +2823,7 @@
       return result;
     };
     const go = async (offset) => {
-      const result = await scoped("resource.inspect", { offset: Math.min(integer4(offset), Math.max(0, state2.artifact.size - 1)), length: 256 });
+      const result = await scoped("resource.inspect", { offset: Math.min(integer5(offset), Math.max(0, state2.artifact.size - 1)), length: 256 });
       state2.results["resource.inspect"] = result;
       draft.selected = result.offset;
       ctx2.setDraft("hex-offset", String(result.offset));
@@ -2701,7 +2840,7 @@
         return ctx2.render();
       },
       "hex-search": async () => {
-        state2.hexSearch = { scope: ticket, result: await scoped("hex.search", { kind: read("hex-search-kind"), query: read("hex-search-query"), start: integer4(read("hex-search-start")), endian: read("hex-endian"), width: Number(read("hex-width")), signed: read("hex-signed") === "true" }) };
+        state2.hexSearch = { scope: ticket, result: await scoped("hex.search", { kind: read("hex-search-kind"), query: read("hex-search-query"), start: integer5(read("hex-search-start")), endian: read("hex-endian"), width: Number(read("hex-width")), signed: read("hex-signed") === "true" }) };
         await ctx2.render();
       },
       "hex-search-more": async () => {
@@ -2933,7 +3072,7 @@
   }
 
   // romancer/ui/compression_controls.js
-  function integer5(id) {
+  function integer6(id) {
     const text = read(id).trim(), value = Number(text);
     if (!text || !Number.isSafeInteger(value)) throw new Error("Enter a whole number for " + id + ".");
     return value;
@@ -2966,7 +3105,7 @@
       var _a2;
       return ((_a2 = compressedRoot(state2, row)) == null ? void 0 : _a2.artifact_id) === root.artifact_id;
     }) : [];
-    const parameters = () => ({ ...ctx2.sourceParams(), offset: integer5("compression-offset"), allocation: integer5("compression-allocation"), codec: read("compression-codec") });
+    const parameters = () => ({ ...ctx2.sourceParams(), offset: integer6("compression-offset"), allocation: integer6("compression-allocation"), codec: read("compression-codec") });
     ctx2.use({
       "compression-inspect": () => ctx2.run("compression.inspect", parameters()),
       "compression-extract": () => ctx2.run("compression.extract", parameters()),
@@ -3005,7 +3144,7 @@
 
   // romancer/ui/discovery_controls.js
   var systems2 = [["nes", "NES"], ["snes", "SNES"], ["genesis", "GEN"], ["gb", "Game Boy"], ["gbc", "Game Boy Color"], ["gba", "GBA"]];
-  function integer6(id) {
+  function integer7(id) {
     const text = read(id).trim(), value = Number(text);
     if (!text || !Number.isSafeInteger(value)) throw new Error("Enter a whole number for " + id + ".");
     return value;
@@ -3020,8 +3159,8 @@
         const kind = read("discover-kind");
         state2.discoveryPage = 0;
         const kinds = kind === "all" ? ["text", "graphics", "compression"] : [kind];
-        const target = kind === "pointers" ? { offset: integer6("discover-target"), width: integer6("discover-width"), endian: read("discover-endian"), base: integer6("discover-base") } : null;
-        return ctx2.run("resources.discover", { ...ctx2.sourceParams(), config: { system_id: read("discover-system"), start: integer6("discover-start"), length: integer6("discover-length"), kinds, target } });
+        const target = kind === "pointers" ? { offset: integer7("discover-target"), width: integer7("discover-width"), endian: read("discover-endian"), base: integer7("discover-base") } : null;
+        return ctx2.run("resources.discover", { ...ctx2.sourceParams(), config: { system_id: read("discover-system"), start: integer7("discover-start"), length: integer7("discover-length"), kinds, target } });
       },
       "discover-compressed": async (node) => {
         const row = result == null ? void 0 : result.candidates.find((row2) => row2.candidate_id === node.dataset.id);
@@ -3059,7 +3198,7 @@
 
   // romancer/ui/views/resources.js
   async function render6(ctx2) {
-    var _a, _b, _c;
+    var _a, _b, _c, _d, _e, _f;
     const { state: state2 } = ctx2, missing = requireProject(ctx2);
     if (missing) return missing;
     const a = state2.artifact, ticket = selectionKey(state2), generation = (state2.resourceRenderGeneration || 0) + 1;
@@ -3087,6 +3226,8 @@
     }
     const observed = a ? await observedSourceContext(ctx2) : "";
     if (!current2()) return "";
+    const relocation = a ? await relocationControls(ctx2) : "";
+    if (!current2()) return "";
     const relationships = a ? await resourceRelationships(ctx2) : "";
     if (!current2()) return "";
     let assessment = state2.results["systems.identify"];
@@ -3109,6 +3250,22 @@
         for (const key3 of ["assets.inspect", "script.inspect", "tables.inspect", "levels.inspect", "sound.inspect"]) delete state2.results[key3];
         await ctx2.render();
         ctx2.notify("Resource setup rechecked against this build.");
+      },
+      "resource-moved-open": () => {
+        var _a2;
+        if (!current2()) throw Error("The source changed.");
+        const offset = (_a2 = a.plan_annotations) == null ? void 0 : _a2.target_offset;
+        if (!Number.isSafeInteger(offset) || offset < 0 || offset >= a.size) throw Error("Relocation metadata is incomplete. Inspect this build manually.");
+        state2.resourceJump = offset;
+        return ctx2.render();
+      },
+      "resource-moved-table": async () => {
+        if (!current2()) throw Error("The source changed.");
+        const result = await ctx2.run("relocation.table_definition", params, { render: false, refresh: false });
+        if (!current2()) return;
+        if (result.source_sha256 !== a.sha256 || result.artifact_id !== a.artifact_id) throw Error("The moved table belongs to another source.");
+        state2.tableProposal = { scope: ticket, result };
+        return ctx2.navigate("tables");
       },
       "system-identify": () => ctx2.run("systems.identify", ctx2.sourceParams()),
       "system-chr-open": async () => {
@@ -3155,7 +3312,7 @@
     });
     if (!a) return `${heading("Workspace", "Resources", "")}${empty("Import a source", "Choose a cartridge image.", button("Import source", "import", { primary: true }))}`;
     const pending = ((_c = state2.pending) == null ? void 0 : _c.kind) === "bytes" && state2.pending.artifact_id === a.artifact_id;
-    return `${heading("Resource investigator", "Resources", "Inspect the exact selected revision. Generic edits require explicit old bytes and preserve file size.", button("Import source", "import", { icon: "plus" }))}<div class="identity">${badge(a.kind, a.kind === "build" ? "good" : "neutral")}<strong>${esc(a.name)}</strong><span>${esc(a.system)} · ${size(a.size)}</span><code title="${a.sha256}">SHA-256 ${short(a.sha256)}…</code></div>${a.source_id ? `<section class="card"><h3>Continue editing this build</h3>${button("Reuse parent resource setup", "definitions-reuse")}<p class="subtle">Re-read declared offsets against this build.</p></section>` : ""}${observed}<div class="investigation-grid">${hexEditor(ctx2, data)}${byteNotes}</div>${comparison}${sourceSupport(ctx2)}${relationships}${scanControls(ctx2)}<details class="card"><summary>ROM health & revision</summary>${romHealthPanel(ctx2)}${revisionControls(ctx2)}${cheatControls(ctx2)}</details><details class="card"><summary>Find resources</summary>${discoveryControls(ctx2)}</details>${compressionControls(ctx2)}<details class="card"><summary>Declared resource catalog</summary>${catalogSection(ctx2, catalog)}</details><details class="card"><summary>System layout</summary>${systemSection(ctx2, assessment)}</details>${report(state2.results["bytes.plan"], "Proposed byte changes")}${report(state2.results["build.apply"], "Build result")}`;
+    return `${heading("Resource investigator", "Resources", "Inspect the exact selected revision. Generic edits require explicit old bytes and preserve file size.", button("Import source", "import", { icon: "plus" }))}<div class="identity">${badge(a.kind, a.kind === "build" ? "good" : "neutral")}<strong>${esc(a.name)}</strong><span>${esc(a.system)} · ${size(a.size)}</span><code title="${a.sha256}">SHA-256 ${short(a.sha256)}…</code></div>${a.source_id ? `<section class="card"><h3>Continue editing this build</h3>${((_d = a.plan_annotations) == null ? void 0 : _d.kind) === "declared-data-relocation-v1" ? "<p>Data moved. Original fixed-offset declarations are not reused.</p>" + button("Inspect moved bytes", "resource-moved-open") + (((_f = (_e = state2.project.sources.concat(state2.project.builds).find((r) => r.artifact_id === a.source_id)) == null ? void 0 : _e.descriptors) == null ? void 0 : _f.tables) ? button("Open moved table layout", "resource-moved-table") : "") : button("Reuse parent resource setup", "definitions-reuse") + '<p class="subtle">Re-read declared offsets against this build.</p>'}</section>` : ""}${observed}<div class="investigation-grid">${hexEditor(ctx2, data)}${byteNotes}</div>${comparison}${sourceSupport(ctx2)}${relationships}${scanControls(ctx2)}<details class="card"><summary>ROM health & revision</summary>${romHealthPanel(ctx2)}${revisionControls(ctx2)}${cheatControls(ctx2)}</details><details class="card"><summary>Find resources</summary>${discoveryControls(ctx2)}</details>${compressionControls(ctx2)}${relocation}<details class="card"><summary>Declared resource catalog</summary>${catalogSection(ctx2, catalog)}</details><details class="card"><summary>System layout</summary>${systemSection(ctx2, assessment)}</details>${report(state2.results["bytes.plan"], "Proposed byte changes")}${report(state2.results["build.apply"], "Build result")}`;
   }
   function parseInteger(value) {
     const n = Number(value);
@@ -3182,7 +3339,7 @@
   });
 
   // romancer/ui/menu_preview.js
-  var integer7 = (value, min, max, label) => {
+  var integer8 = (value, min, max, label) => {
     if (!Number.isSafeInteger(value) || value < min || value > max) throw Error("Invalid declared " + label + ".");
     return value;
   };
@@ -3219,13 +3376,13 @@
     const result = /* @__PURE__ */ new Map();
     let budget = 0;
     for (const glyph of metrics.glyphs) {
-      const bitmap = glyph.bitmap || {}, width = integer7(bitmap.width, 1, 32, "glyph width"), height = integer7(bitmap.height, 1, 32, "glyph height"), stride = integer7(bitmap.row_stride, 1, 4, "glyph row stride");
+      const bitmap = glyph.bitmap || {}, width = integer8(bitmap.width, 1, 32, "glyph width"), height = integer8(bitmap.height, 1, 32, "glyph height"), stride = integer8(bitmap.row_stride, 1, 4, "glyph row stride");
       if (stride !== Math.ceil(width / 8) || typeof bitmap.raw_hex !== "string" || bitmap.raw_hex.length !== stride * height * 2 || !/^[a-f0-9]+$/i.test(bitmap.raw_hex) || result.has(glyph.id)) throw Error("Measured glyph bitmap data is unavailable or ambiguous.");
       const raw = Uint8Array.from(bitmap.raw_hex.match(/../g), (value) => parseInt(value, 16)), mask = (1 << (8 - width % 8) % 8) - 1;
       for (let y = 0; y < height; y++) if (raw[(y + 1) * stride - 1] & mask) throw Error("Measured glyph has unsupported padding bits.");
-      integer7((_a = glyph.bearing) == null ? void 0 : _a.x, -64, 64, "glyph bearing");
-      integer7((_b = glyph.bearing) == null ? void 0 : _b.y, -64, 64, "glyph bearing");
-      integer7(glyph.advance_pixels, 0, 128, "glyph advance");
+      integer8((_a = glyph.bearing) == null ? void 0 : _a.x, -64, 64, "glyph bearing");
+      integer8((_b = glyph.bearing) == null ? void 0 : _b.y, -64, 64, "glyph bearing");
+      integer8(glyph.advance_pixels, 0, 128, "glyph advance");
       budget += raw.length;
       if (budget > 65536) throw Error("Measured font bitmap budget exceeded.");
       result.set(glyph.id, { ...glyph, width, height, stride, raw });
@@ -3248,8 +3405,8 @@
     if (((_b = config.font_schema) == null ? void 0 : _b.codec) !== "mono-row-msb-v1") throw Error("This font storage format has no declared bitmap preview.");
     if (preview.source_sha256 !== doc.source_sha256 || preview.document_id !== doc.document_id || preview.schema_sha256 !== doc.schema_sha256 || ((_c = preview.script) == null ? void 0 : _c.document_id) !== doc.document_id) throw Error("Menu layout belongs to different source text.");
     if (preview.font_sha256 !== metrics.source_sha256 || metrics.source_sha256 !== ((_d = config.font_schema.source) == null ? void 0 : _d.sha256) || preview.font_schema_sha256 !== metrics.font_schema_sha256 || preview.metrics_id !== metrics.metrics_id) throw Error("Menu placements and font measurements have different identities.");
-    const viewport = (_e = preview.profile) == null ? void 0 : _e.viewport, width = integer7(viewport == null ? void 0 : viewport.width, 1, 1024, "viewport width"), height = integer7(viewport == null ? void 0 : viewport.height, 1, 1024, "viewport height");
-    integer7(preview.profile.line_height_px, 1, 64, "line height");
+    const viewport = (_e = preview.profile) == null ? void 0 : _e.viewport, width = integer8(viewport == null ? void 0 : viewport.width, 1, 1024, "viewport width"), height = integer8(viewport == null ? void 0 : viewport.height, 1, 1024, "viewport height");
+    integer8(preview.profile.line_height_px, 1, 64, "line height");
     if (!Array.isArray(preview.cases) || !preview.cases.length || preview.cases.length > 32 || width * height * preview.cases.length > 8 * 1024 ** 2) throw Error("Declared cases exceed the menu canvas budget.");
     let cells = 0, placements = 0;
     for (const row of preview.cases) {
@@ -3318,14 +3475,14 @@
     for (const cell of row.cells) {
       const bounds2 = cell.box_bounds;
       if (!Array.isArray(bounds2) || bounds2.length !== 4) throw Error("Declared cell bounds are unavailable.");
-      for (const value of bounds2) integer7(value, -131072, 131072, "cell bounds");
+      for (const value of bounds2) integer8(value, -131072, 131072, "cell bounds");
       const { placements, advance } = placementsFor(cell, edited, drafts, owned.prepared);
       if (Number.isSafeInteger(advance) && advance > bounds2[2] - bounds2[0]) warnings.add("Text advance exceeds a declared box.");
       if (owned.preview.profile.line_height_px > bounds2[3] - bounds2[1]) warnings.add("Declared line height exceeds its box.");
       for (const placement of placements) {
         const glyph = font.get(placement.glyph_id);
         if (!glyph) throw Error("A placed glyph is missing from the measured font.");
-        const left = integer7(placement.x, -131072, 131072, "glyph position") + glyph.bearing.x, top = integer7(placement.y, -131072, 131072, "glyph position") + glyph.bearing.y;
+        const left = integer8(placement.x, -131072, 131072, "glyph position") + glyph.bearing.x, top = integer8(placement.y, -131072, 131072, "glyph position") + glyph.bearing.y;
         for (let y = 0; y < glyph.height; y++) for (let x = 0; x < glyph.width; x++) if (glyph.raw[y * glyph.stride + (x >> 3)] & 128 >> x % 8) {
           const px = left + x, py = top + y;
           if (px < bounds2[0] || px >= bounds2[2] || py < bounds2[1] || py >= bounds2[3]) warnings.add("Glyph ink exceeds a declared box.");
@@ -3473,12 +3630,12 @@
 
   // romancer/ui/declarations.js
   var systems3 = [["nes", "NES"], ["snes", "SNES"], ["genesis", "Genesis"], ["gb", "Game Boy"], ["gbc", "Game Boy Color"], ["gba", "GBA"]];
-  var integer8 = (id) => {
+  var integer9 = (id) => {
     const text = read(id).trim(), value = Number(text);
     if (!text || !Number.isSafeInteger(value)) throw new Error("Enter a whole number for " + id + ".");
     return value;
   };
-  var optional = (id) => read(id).trim() ? integer8(id) : null;
+  var optional = (id) => read(id).trim() ? integer9(id) : null;
   function system(ctx2, prefix) {
     return select(prefix + "-system", "System", systems3, ctx2.draft(prefix + "-system", resourceSystem(ctx2.state)));
   }
@@ -3505,14 +3662,14 @@
         const [id, opcode, args, role] = line.split(",").map((s) => s.trim());
         return { id, opcode: parseInt(opcode, 16), argument_length: Number(args), position_independent: true, layout_role: role };
       });
-      return declared(ctx2, "script", { system_id: read("text-system"), offset: integer8("text-offset"), capacity: integer8("text-capacity"), count: integer8("text-count"), stride: integer8("text-stride"), pointer_offset: optional("text-pointer"), pointer_width: integer8("text-pointer-width"), pointer_endian: read("text-endian"), pointer_base: integer8("text-base"), terminator: integer8("text-terminator"), padding: integer8("text-padding"), encoding: read("text-encoding"), table: read("text-table"), controls });
+      return declared(ctx2, "script", { system_id: read("text-system"), offset: integer9("text-offset"), capacity: integer9("text-capacity"), count: integer9("text-count"), stride: integer9("text-stride"), pointer_offset: optional("text-pointer"), pointer_width: integer9("text-pointer-width"), pointer_endian: read("text-endian"), pointer_base: integer9("text-base"), terminator: integer9("text-terminator"), padding: integer9("text-padding"), encoding: read("text-encoding"), table: read("text-table"), controls });
     } });
     return `<details class="config" ${ctx2.state.openDeclaration === "text" ? "open" : ""}><summary>Declare text slots</summary>${system(ctx2, "text")}<div class="field-row">${number(ctx2, "text-offset", "First text offset", "0")}${number(ctx2, "text-capacity", "Bytes per slot", "64")}${number(ctx2, "text-count", "Slot count", "1")}${number(ctx2, "text-stride", "Slot stride", "64")}${number(ctx2, "text-pointer", "Pointer table offset (optional)", "")}${number(ctx2, "text-pointer-width", "Pointer bytes", "2")}${number(ctx2, "text-base", "Add to stored pointer for file offset", "0")}${select("text-endian", "Pointer byte order", [["little", "Little endian"], ["big", "Big endian"]], ctx2.draft("text-endian", "little"))}${number(ctx2, "text-terminator", "Terminator byte", "0")}${number(ctx2, "text-padding", "Padding byte", "255")}</div>${select("text-encoding", "Encoding", [["ascii", "ASCII"], ["table", "Custom single-byte table"]], ctx2.draft("text-encoding", "ascii"))}${area("text-table", "Custom table (HH=character)", ctx2.draft("text-table", ""), 3)}${area("text-controls", "Controls (name, hex opcode, argument bytes, line/page/pause/opaque)", ctx2.draft("text-controls", ""), 2)}<p class="subtle">Text pointer formula: file offset = stored value + adjustment. For a GBA ROM window beginning at 0x08000000, use -134217728. This differs from the subtraction base in Data tables.</p>${button("Load text declaration", "declare-text")}</details>`;
   }
   function graphicsDeclaration(ctx2) {
     prefill(ctx2, "gfx");
     ctx2.use({ "declare-graphics": () => {
-      const config = { system_id: read("gfx-system"), offset: integer8("gfx-offset"), count: integer8("gfx-count"), codec: read("gfx-codec"), width: integer8("gfx-width"), height: integer8("gfx-height"), palette_offset: optional("gfx-palette"), palette_banks: integer8("gfx-banks"), palette_format: read("gfx-palette-format"), map_offset: optional("gfx-map"), map_width: integer8("gfx-map-width"), map_height: integer8("gfx-map-height"), font_chars: read("gfx-chars"), advance_offset: optional("gfx-advance"), advance_pixels: integer8("gfx-advance-pixels") };
+      const config = { system_id: read("gfx-system"), offset: integer9("gfx-offset"), count: integer9("gfx-count"), codec: read("gfx-codec"), width: integer9("gfx-width"), height: integer9("gfx-height"), palette_offset: optional("gfx-palette"), palette_banks: integer9("gfx-banks"), palette_format: read("gfx-palette-format"), map_offset: optional("gfx-map"), map_width: integer9("gfx-map-width"), map_height: integer9("gfx-map-height"), font_chars: read("gfx-chars"), advance_offset: optional("gfx-advance"), advance_pixels: integer9("gfx-advance-pixels") };
       return declared(ctx2, "assets", config);
     } });
     return `<details class="config" ${ctx2.state.openDeclaration === "gfx" ? "open" : ""}><summary>Declare graphics or font</summary>${system(ctx2, "gfx")}${select("gfx-codec", "Storage layout", [["", "System tile template"], ["mono-row-msb-v1", "Mono font rows"], ["tile8-planar2-msb-v1", "NES 2bpp separate planes"], ["tile8-paired2-msb-v1", "Game Boy 2bpp paired planes"], ["tile8-paired4-msb-v1", "4bpp paired planes"], ["tile8-packed4-high-v1", "4bpp high nibble first"], ["tile8-packed4-low-v1", "4bpp low nibble first"]], ctx2.draft("gfx-codec", ""))}<div class="field-row">${number(ctx2, "gfx-offset", "Bitmap offset", "0")}${number(ctx2, "gfx-count", "Tile or glyph count", "1")}${number(ctx2, "gfx-width", "Cell width", "8")}${number(ctx2, "gfx-height", "Cell height", "8")}${number(ctx2, "gfx-palette", "Palette offset (optional)", "")}${number(ctx2, "gfx-banks", "Palette banks", "1")}${select("gfx-palette-format", "Palette layout", [["rgb555-le", "RGB555 little endian"], ["rgb555-be", "RGB555 big endian"], ["genesis", "Genesis RGB333"]], ctx2.draft("gfx-palette-format", ctx2.state.artifact.system_id === "genesis" ? "genesis" : "rgb555-le"))}${number(ctx2, "gfx-map", "Tilemap offset (optional)", "")}${number(ctx2, "gfx-map-width", "Map columns", "1")}${number(ctx2, "gfx-map-height", "Map rows", "1")}</div>${field("gfx-chars", "Font characters in cell order (optional)", ctx2.draft("gfx-chars", ""))}<div class="field-row">${number(ctx2, "gfx-advance", "Stored advance table offset (optional)", "")}${number(ctx2, "gfx-advance-pixels", "Fixed advance in pixels", "8")}</div>${button("Load graphics declaration", "declare-graphics")}</details>`;
@@ -3524,11 +3681,11 @@
       return (_a2 = r.descriptors) == null ? void 0 : _a2.font;
     });
     ctx2.use({ "configure-menu": async () => {
-      const result = await ctx2.run("resources.menu_form", { ...ctx2.sourceParams(), font_artifact_id: read("layout-font"), width: integer8("layout-width"), height: integer8("layout-height"), line_height: integer8("layout-line-height") }, { render: false });
+      const result = await ctx2.run("resources.menu_form", { ...ctx2.sourceParams(), font_artifact_id: read("layout-font"), width: integer9("layout-width"), height: integer9("layout-height"), line_height: integer9("layout-line-height") }, { render: false });
       ctx2.setDraft("menu-config", JSON.stringify({ font_artifact_id: result.font_artifact_id, font_schema: result.font_schema, profile: result.profile, cases: result.cases, request: {} }, null, 2));
       await ctx2.render();
     }, "configure-layout": async () => {
-      const result = await ctx2.run("resources.layout_form", { ...ctx2.sourceParams(), font_artifact_id: read("layout-font"), width: integer8("layout-width"), height: integer8("layout-height"), line_height: integer8("layout-line-height") }, { render: false });
+      const result = await ctx2.run("resources.layout_form", { ...ctx2.sourceParams(), font_artifact_id: read("layout-font"), width: integer9("layout-width"), height: integer9("layout-height"), line_height: integer9("layout-line-height") }, { render: false });
       ctx2.setDraft("layout-config", JSON.stringify({ font_artifact_id: result.font_artifact_id, font_schema: result.font_schema, policy: result.policy, request: result.request }, null, 2));
       await ctx2.render();
     } });
@@ -5421,12 +5578,12 @@ ${font ? `<section class="card"><h3>Font metrics · ${esc(font.id)}</h3><div cla
   });
 
   // romancer/ui/structural_lab.js
-  var hex3 = (v) => "0x" + v.toString(16);
+  var hex4 = (v) => "0x" + v.toString(16);
   var bound = (state2, r) => {
     var _a, _b;
     return (r == null ? void 0 : r.source_sha256) === ((_a = state2.artifact) == null ? void 0 : _a.sha256) && r.artifact_id === ((_b = state2.artifact) == null ? void 0 : _b.artifact_id);
   };
-  function integer9(id, min, max) {
+  function integer10(id, min, max) {
     const text = read(id), value = Number(text);
     if (!text.trim() || !Number.isSafeInteger(value) || value < min || value > max) throw Error("Choose a whole number from " + min + " to " + max + ".");
     return value;
@@ -5447,7 +5604,7 @@ ${font ? `<section class="card"><h3>Font metrics · ${esc(font.id)}</h3><div cla
     ctx2.use({
       "lab-survey": async () => {
         if (!current2()) throw Error("The selected source changed.");
-        const window2 = { offset: integer9("lab-offset", 0, 64 * 1024 ** 2), length: integer9("lab-length", 1, 65536) }, generation = ++entry.generation;
+        const window2 = { offset: integer10("lab-offset", 0, 64 * 1024 ** 2), length: integer10("lab-length", 1, 65536) }, generation = ++entry.generation;
         const r = await ctx2.run("structures.survey", { ...params, ...window2 }, { render: false, refresh: false });
         if (!current2() || entry.generation !== generation) return;
         if ((r == null ? void 0 : r.ok) === false || !bound(state2, r)) throw Error(r.error || "Experiment belongs to another source.");
@@ -5466,7 +5623,7 @@ ${font ? `<section class="card"><h3>Font metrics · ${esc(font.id)}</h3><div cla
         await ctx2.navigate("tables");
       }
     });
-    return `<section class="card structural-lab"><h2>Explore ROM structure</h2><p>Test repeated numeric layouts, inspect sample records, and open a neutral editor. These are hypotheses; game meaning and pointer use need behavioral evidence.</p><div class="field-row">${field("lab-offset", "Window file offset", ctx2.draft("lab-offset", "0"))}${field("lab-length", "Window bytes (up to 65536)", ctx2.draft("lab-length", "4096"))}</div>${button("Test this range", "lab-survey", { primary: true })}${result ? `<p>${result.coverage.positions_tested} layouts tested · start positions sampled every ${result.coverage.position_stride} bytes · ${result.total_candidates} surviving hypotheses${result.truncated ? " · result limit reached" : ""}</p><p class="notice">${esc(result.next_experiment)}</p>${select("lab-interpretation", "Open editor as", [["numeric", "Neutral numeric values"], ["linear-pointer", "An explicit linear-pointer hypothesis"]], ctx2.draft("lab-interpretation", "numeric"))}${result.candidates.length ? `<div class="table-wrap"><table><thead><tr><th>First record</th><th>Layout</th><th>Sample values and possible targets</th><th></th></tr></thead><tbody>${result.candidates.slice(0, 12).map((c) => `<tr><td><code>${hex3(c.offset)}</code></td><td>${c.count} records · ${c.stride} bytes/record<br>${c.width * 8} bit · ${esc(c.endian)}<br>Target hypothesis: stored − ${hex3(c.base)}</td><td>${c.samples.slice(0, 3).map((s) => `<div><code>${hex3(s.stored_value)} → ${hex3(s.target_offset)}</code>${s.target_preview ? " · " + esc(s.target_preview) : ""}</div>`).join("")}</td><td>${button("Open table editor", "lab-open", { id: c.candidate_id })}</td></tr>`).join("")}</tbody></table></div><p class="subtle">Showing ${Math.min(12, result.candidates.length)} of ${result.candidates.length} retained hypotheses. Use a smaller range to separate layouts. Opening an editor does not modify ROM bytes.</p>` : "<p>No repeated layout survived these tests. Try another range or use native access evidence to locate data.</p>"}` : ""}</section>`;
+    return `<section class="card structural-lab"><h2>Explore ROM structure</h2><p>Test repeated numeric layouts, inspect sample records, and open a neutral editor. These are hypotheses; game meaning and pointer use need behavioral evidence.</p><div class="field-row">${field("lab-offset", "Window file offset", ctx2.draft("lab-offset", "0"))}${field("lab-length", "Window bytes (up to 65536)", ctx2.draft("lab-length", "4096"))}</div>${button("Test this range", "lab-survey", { primary: true })}${result ? `<p>${result.coverage.positions_tested} layouts tested · start positions sampled every ${result.coverage.position_stride} bytes · ${result.total_candidates} surviving hypotheses${result.truncated ? " · result limit reached" : ""}</p><p class="notice">${esc(result.next_experiment)}</p>${select("lab-interpretation", "Open editor as", [["numeric", "Neutral numeric values"], ["linear-pointer", "An explicit linear-pointer hypothesis"]], ctx2.draft("lab-interpretation", "numeric"))}${result.candidates.length ? `<div class="table-wrap"><table><thead><tr><th>First record</th><th>Layout</th><th>Sample values and possible targets</th><th></th></tr></thead><tbody>${result.candidates.slice(0, 12).map((c) => `<tr><td><code>${hex4(c.offset)}</code></td><td>${c.count} records · ${c.stride} bytes/record<br>${c.width * 8} bit · ${esc(c.endian)}<br>Target hypothesis: stored − ${hex4(c.base)}</td><td>${c.samples.slice(0, 3).map((s) => `<div><code>${hex4(s.stored_value)} → ${hex4(s.target_offset)}</code>${s.target_preview ? " · " + esc(s.target_preview) : ""}</div>`).join("")}</td><td>${button("Open table editor", "lab-open", { id: c.candidate_id })}</td></tr>`).join("")}</tbody></table></div><p class="subtle">Showing ${Math.min(12, result.candidates.length)} of ${result.candidates.length} retained hypotheses. Use a smaller range to separate layouts. Opening an editor does not modify ROM bytes.</p>` : "<p>No repeated layout survived these tests. Try another range or use native access evidence to locate data.</p>"}` : ""}</section>`;
   }
 
   // romancer/ui/value_finder.js
@@ -6318,7 +6475,7 @@ ${font ? `<section class="card"><h3>Font metrics · ${esc(font.id)}</h3><div cla
   }
 
   // romancer/ui/level_canvas.js
-  var integer10 = (v, min, max) => {
+  var integer11 = (v, min, max) => {
     if (!Number.isSafeInteger(v) || v < min || v > max) throw Error("Level value is outside declared bounds.");
     return v;
   };
@@ -6326,7 +6483,7 @@ ${font ? `<section class="card"><h3>Font metrics · ${esc(font.id)}</h3><div cla
   function levelScale(width, height, viewportHeight, availableWidth, mode) {
     if (mode === "fit") return Math.max(0.25, Math.min(3, Math.max(160, viewportHeight - 420) / height, availableWidth / width));
     const value = Number(mode);
-    integer10(value, 1, 3);
+    integer11(value, 1, 3);
     return value;
   }
   var LevelDraft = class {
@@ -6348,27 +6505,27 @@ ${font ? `<section class="card"><h3>Font metrics · ${esc(font.id)}</h3><div cla
       var _a, _b, _c, _d, _e, _f;
       let original, max;
       if (c.kind === "metatile") {
-        integer10(c.index, 0, this.doc.metatiles.length - 1);
-        integer10(c.part, 0, this.doc.metatiles[c.index].length - 1);
+        integer11(c.index, 0, this.doc.metatiles.length - 1);
+        integer11(c.part, 0, this.doc.metatiles[c.index].length - 1);
         original = this.doc.metatiles[c.index][c.part];
         max = this.doc.tiles.length - 1;
       } else {
         const r = this.room(c.room_id);
         if (c.kind === "object") {
-          integer10(c.index, 0, r.objects.length - 1);
+          integer11(c.index, 0, r.objects.length - 1);
           if (!(c.field in r.objects[c.index])) throw Error("Unknown object field.");
           original = r.objects[c.index][c.field];
           const declared2 = (_c = (_b = (_a = this.doc.definition) == null ? void 0 : _a.rooms.find((x) => x.id === r.id)) == null ? void 0 : _b.objects) == null ? void 0 : _c.fields.find((f) => f.name === c.field);
           max = Math.min((declared2 == null ? void 0 : declared2.maximum) ?? 65535, c.field === "x" ? r.width - 1 : c.field === "y" ? r.height - 1 : c.field === "exit_room" ? this.doc.rooms.length - 1 : 65535);
         } else {
           if (!["terrain", "collision"].includes(c.kind) || !r[c.kind]) throw Error("This layer is not declared.");
-          integer10(c.index, 0, r[c.kind].length - 1);
+          integer11(c.index, 0, r[c.kind].length - 1);
           original = r[c.kind][c.index];
           const declared2 = (_e = (_d = this.doc.definition) == null ? void 0 : _d.rooms.find((x) => x.id === r.id)) == null ? void 0 : _e[c.kind];
           max = c.kind === "terrain" ? this.doc.metatiles.length - 1 : 2 ** (8 * ((declared2 == null ? void 0 : declared2.entry_bytes) || 1)) - 1;
         }
       }
-      integer10(c.value, 0, max);
+      integer11(c.value, 0, max);
       if (c.kind === "object") {
         const metadata = objectMetadata(this.doc, c.room_id, c.index);
         if ((metadata == null ? void 0 : metadata.role) === "exit" && ((_f = metadata.reference) == null ? void 0 : _f.field) === c.field && !metadata.reference.targets.some((target) => target.value === c.value)) throw Error("Exit destination is not mapped.");
@@ -6439,8 +6596,8 @@ ${font ? `<section class="card"><h3>Font metrics · ${esc(font.id)}</h3><div cla
     }
     fill(id, layer, index, value) {
       const r = this.room(id), cells = this.cells(id, layer);
-      integer10(index, 0, cells.length - 1);
-      integer10(value, 0, layer === "terrain" ? this.doc.metatiles.length - 1 : 65535);
+      integer11(index, 0, cells.length - 1);
+      integer11(value, 0, layer === "terrain" ? this.doc.metatiles.length - 1 : 65535);
       const old = cells[index];
       if (old === value) return;
       const queue = [index], seen = /* @__PURE__ */ new Set();
@@ -6455,15 +6612,15 @@ ${font ? `<section class="card"><h3>Font metrics · ${esc(font.id)}</h3><div cla
     }
     copy(id, layer, rect) {
       const r = this.room(id);
-      for (const k of ["x", "y"]) integer10(rect[k], 0, (k === "x" ? r.width : r.height) - 1);
-      integer10(rect.width, 1, r.width - rect.x);
-      integer10(rect.height, 1, r.height - rect.y);
+      for (const k of ["x", "y"]) integer11(rect[k], 0, (k === "x" ? r.width : r.height) - 1);
+      integer11(rect.width, 1, r.width - rect.x);
+      integer11(rect.height, 1, r.height - rect.y);
       const cells = this.cells(id, layer);
       return { width: rect.width, height: rect.height, values: Array.from({ length: rect.width * rect.height }, (_, i) => cells[(rect.y + Math.floor(i / rect.width)) * r.width + rect.x + i % rect.width]) };
     }
     paste(id, layer, index, clip) {
       const r = this.room(id);
-      integer10(index, 0, r.width * r.height - 1);
+      integer11(index, 0, r.width * r.height - 1);
       if (!clip || !Array.isArray(clip.values)) throw Error("Copy a rectangle first.");
       const x = index % r.width, y = Math.floor(index / r.width);
       if (clip.width < 1 || clip.height < 1 || clip.values.length !== clip.width * clip.height || x + clip.width > r.width || y + clip.height > r.height) throw Error("Copied rectangle must fit inside room bounds.");
@@ -6496,7 +6653,7 @@ ${font ? `<section class="card"><h3>Font metrics · ${esc(font.id)}</h3><div cla
     return [...result].sort((a, b) => a - b);
   }
   function blockPixels(doc, model, index) {
-    integer10(index, 0, doc.metatiles.length - 1);
+    integer11(index, 0, doc.metatiles.length - 1);
     const width = doc.block_width * 8, height = doc.block_height * 8, pixels = new Uint8ClampedArray(width * height * 4);
     for (const [part, tile] of model.blocks()[index].entries()) for (const [pixel, value] of doc.tiles[tile].entries()) {
       const x = part % doc.block_width * 8 + pixel % 8, y = Math.floor(part / doc.block_width) * 8 + Math.floor(pixel / 8);
@@ -6506,14 +6663,14 @@ ${font ? `<section class="card"><h3>Font metrics · ${esc(font.id)}</h3><div cla
   }
   function pickLevelBrush(model, id, layer, index) {
     const cells = model.cells(id, layer);
-    integer10(index, 0, cells.length - 1);
+    integer11(index, 0, cells.length - 1);
     return cells[index];
   }
   function moveLevelObject(model, id, index, x, y) {
     const room = model.room(id);
-    integer10(index, 0, room.objects.length - 1);
-    integer10(x, 0, room.width - 1);
-    integer10(y, 0, room.height - 1);
+    integer11(index, 0, room.objects.length - 1);
+    integer11(x, 0, room.width - 1);
+    integer11(y, 0, room.height - 1);
     const object = room.objects[index];
     if (!Object.hasOwn(object, "x") || !Object.hasOwn(object, "y")) throw Error("Object coordinates are not declared.");
     model.set({ kind: "object", room_id: id, index, field: "x", value: x });
@@ -6727,7 +6884,7 @@ ${font ? `<section class="card"><h3>Font metrics · ${esc(font.id)}</h3><div cla
   }
 
   // romancer/ui/game_maps.js
-  var hex4 = (n) => "0x" + Number(n).toString(16).toUpperCase();
+  var hex5 = (n) => "0x" + Number(n).toString(16).toUpperCase();
   var clone = (value) => JSON.parse(JSON.stringify(value));
   var key2 = (c) => c.kind === "arrival" ? `arrival:${c.table}:${c.id}` : `${c.kind}:${c.offset}`;
   var number2 = (value, max = 63) => {
@@ -7083,15 +7240,15 @@ ${font ? `<section class="card"><h3>Font metrics · ${esc(font.id)}</h3><div cla
     if (doc.error) return browser + `<section class="card"><h3>Room unavailable</h3><p>${esc(doc.error)}</p></section>`;
     if (doc.map.status !== "decoded") return browser + `<section class="card"><h3>${esc(doc.room.label)}</h3><p class="notice">Terrain preview unavailable: ${esc(doc.map.reason)}</p><p>Conditional terrain needs an explicit game-state value. Unsupported circle paths remain unavailable. No state is assumed.</p>${definitions(doc)}</section>`;
     const model = view.model, chosen = currentTarget(view), editable = canEdit(view, chosen), pending = ((_d = view.pending) == null ? void 0 : _d.revision) === model.revision && view.pending.signature === JSON.stringify(model.values()) ? view.pending : null;
-    const options = [...doc.map.commands.filter((c) => "x" in c).map((c) => [targetKey("command", c), `${c.name || "Command"} ${hex4(c.offset)}${c.editable ? "" : " · read-only"}`]), ...doc.objects.map((n) => [targetKey("npc", n), objectName(doc.room, n) + (n.editable ? "" : " · conditional/read-only")]), ...doc.arrivals.map((a) => [targetKey("arrival", a), `Arrival ${a.table} ${hex4(a.id)}`])];
+    const options = [...doc.map.commands.filter((c) => "x" in c).map((c) => [targetKey("command", c), `${c.name || "Command"} ${hex5(c.offset)}${c.editable ? "" : " · read-only"}`]), ...doc.objects.map((n) => [targetKey("npc", n), objectName(doc.room, n) + (n.editable ? "" : " · conditional/read-only")]), ...doc.arrivals.map((a) => [targetKey("arrival", a), `Arrival ${a.table} ${hex5(a.id)}`])];
     const form = chosen ? `<aside class="card game-map-inspector"><h3>${chosen.kind === "npc" ? esc(objectName(doc.room, chosen.entity)) : chosen.kind === "arrival" ? "Arrival position" : "Existing terrain command"}</h3>${select("maps-target", "Selection", options, view.selection)}<div class="field-row">${field("maps-x", "X · 0–63", chosen.entity.x, { type: "number", min: 0, readonly: !editable })}${field("maps-y", "Y · 0–63", chosen.entity.y, { type: "number", min: 0, readonly: !editable })}${chosen.kind === "command" && "tile" in chosen.entity ? field("maps-tile", "Tile · 0–63", chosen.entity.tile, { type: "number", min: 0, readonly: !editable }) : ""}</div>${chosen.kind === "npc" ? `<p class="notice">NPCs are stored definitions. Their conditions may hide them in Playtest.${chosen.entity.event === 274 ? " Mother participates in the opening story. Moving her can affect the narrative; playtest the full conversation." : ""}</p>` : ""}${chosen.kind === "command" ? `<p>${chosen.entity.final_cells || 0} final terrain cells currently come from this command. Later commands can overwrite its drawing.</p><p>Edits preserve collision behavior, region bits and existing trigger bindings. Changes that fail these checks are refused.</p>` : ""}${chosen.kind === "arrival" ? "<p>Changes only the arrival position. Destination, facing and packed flags stay protected. Enter through its real door when playtesting.</p>" : ""}${button("Stage position / tile", "maps-stage", { disabled: !editable, reason: "This definition is read-only; writable scope is the initial shared atlas." })}</aside>` : "<p>Select an existing terrain command, NPC definition or arrival.</p>";
-    return browser + `<section class="card game-map-workbench"><h3>${header === 18539 ? "Opening bedroom / shared interiors" : esc(doc.room.label)}</h3><p>Terrain ${hex4(doc.room.map_pointer)} · shared by ${doc.room.shared_headers.map(hex4).join(", ")}. A terrain edit affects every listed definition.</p>${!doc.map.palette ? '<p class="notice">Color-index grayscale preview. This room’s live palette has not been verified.</p>' : ""}<div class="field-row">${select("maps-mode", "Canvas tool", [["inspect", "Inspect terrain command"], ["place", "Place selected definition"]], view.mode)}${button(view.overview ? "Return to readable crop" : "Show full overview", "maps-overview")}${button("Left", "maps-pan", { id: "-8,0" })}${button("Right", "maps-pan", { id: "8,0" })}${button("Up", "maps-pan", { id: "0,-6" })}${button("Down", "maps-pan", { id: "0,6" })}</div><div class="level-editor-layout game-map-layout"><div><div class="preview-pair game-map-previews"><div><span>Original for this edit · selected ROM</span><canvas id="maps-original" aria-label="Original decoded game terrain"></canvas></div><div><span>${(pending == null ? void 0 : pending.result.preview_map) ? "Reviewed terrain · exact planned bytes" : "Staged placement overlay"}</span><canvas id="maps-edit" tabindex="0" aria-label="Decoded game map: inspect or place selected definition"></canvas></div></div><p id="maps-position" role="status">Readable crop around (${view.center.join(", ")}). NPC and arrival markers are outlines, not character artwork.</p><p>${(pending == null ? void 0 : pending.result.preview_map) ? "The reviewed terrain comes from the server’s bounded decoder." : "Placement outlines show staged coordinates. Review computes exact terrain, including restored and overwritten cells."}</p></div>${form}</div><div class="actions">${button("Undo staged edit", "maps-undo", { disabled: !model.past.length })}${button("Redo staged edit", "maps-redo", { disabled: !model.future.length })}${button("Clear staged edits", "maps-clear", { disabled: !model.values().length })}${button("Review map changes", "maps-review", { disabled: !model.values().length, primary: !pending })}</div><p>${model.values().length} staged records. The selected ROM remains unchanged.</p>${pending ? review(pending.result) : ""}${definitions(doc)}</section>`;
+    return browser + `<section class="card game-map-workbench"><h3>${header === 18539 ? "Opening bedroom / shared interiors" : esc(doc.room.label)}</h3><p>Terrain ${hex5(doc.room.map_pointer)} · shared by ${doc.room.shared_headers.map(hex5).join(", ")}. A terrain edit affects every listed definition.</p>${!doc.map.palette ? '<p class="notice">Color-index grayscale preview. This room’s live palette has not been verified.</p>' : ""}<div class="field-row">${select("maps-mode", "Canvas tool", [["inspect", "Inspect terrain command"], ["place", "Place selected definition"]], view.mode)}${button(view.overview ? "Return to readable crop" : "Show full overview", "maps-overview")}${button("Left", "maps-pan", { id: "-8,0" })}${button("Right", "maps-pan", { id: "8,0" })}${button("Up", "maps-pan", { id: "0,-6" })}${button("Down", "maps-pan", { id: "0,6" })}</div><div class="level-editor-layout game-map-layout"><div><div class="preview-pair game-map-previews"><div><span>Original for this edit · selected ROM</span><canvas id="maps-original" aria-label="Original decoded game terrain"></canvas></div><div><span>${(pending == null ? void 0 : pending.result.preview_map) ? "Reviewed terrain · exact planned bytes" : "Staged placement overlay"}</span><canvas id="maps-edit" tabindex="0" aria-label="Decoded game map: inspect or place selected definition"></canvas></div></div><p id="maps-position" role="status">Readable crop around (${view.center.join(", ")}). NPC and arrival markers are outlines, not character artwork.</p><p>${(pending == null ? void 0 : pending.result.preview_map) ? "The reviewed terrain comes from the server’s bounded decoder." : "Placement outlines show staged coordinates. Review computes exact terrain, including restored and overwritten cells."}</p></div>${form}</div><div class="actions">${button("Undo staged edit", "maps-undo", { disabled: !model.past.length })}${button("Redo staged edit", "maps-redo", { disabled: !model.future.length })}${button("Clear staged edits", "maps-clear", { disabled: !model.values().length })}${button("Review map changes", "maps-review", { disabled: !model.values().length, primary: !pending })}</div><p>${model.values().length} staged records. The selected ROM remains unchanged.</p>${pending ? review(pending.result) : ""}${definitions(doc)}</section>`;
   }
   function definitions(doc) {
-    return `<details><summary>NPC conditions and interactions</summary><p>These records are conditional definitions, not a list of characters guaranteed to be visible now. Interaction destinations remain read-only.</p><table><thead><tr><th>NPC definition</th><th>Position</th><th>Condition</th></tr></thead><tbody>${doc.objects.map((n) => `<tr><td>${esc(objectName(doc.room, n))}</td><td>${n.x}, ${n.y}</td><td>${esc(n.state_status || "Live condition unobserved")}</td></tr>`).join("")}</tbody></table><table><thead><tr><th>Interaction</th><th>Destination</th></tr></thead><tbody>${doc.links.map((l) => `<tr><td>${l.index}</td><td>${l.transition.kind === "saved-return" ? "Saved return to the previous location" : l.destination ? `Room ${esc(hex4(l.destination.header))} · ${l.destination.x}, ${l.destination.y}` : `Event reference ${esc(hex4(l.word))} · not a direct room destination`}</td></tr>`).join("")}</tbody></table></details>`;
+    return `<details><summary>NPC conditions and interactions</summary><p>These records are conditional definitions, not a list of characters guaranteed to be visible now. Interaction destinations remain read-only.</p><table><thead><tr><th>NPC definition</th><th>Position</th><th>Condition</th></tr></thead><tbody>${doc.objects.map((n) => `<tr><td>${esc(objectName(doc.room, n))}</td><td>${n.x}, ${n.y}</td><td>${esc(n.state_status || "Live condition unobserved")}</td></tr>`).join("")}</tbody></table><table><thead><tr><th>Interaction</th><th>Destination</th></tr></thead><tbody>${doc.links.map((l) => `<tr><td>${l.index}</td><td>${l.transition.kind === "saved-return" ? "Saved return to the previous location" : l.destination ? `Room ${esc(hex5(l.destination.header))} · ${l.destination.x}, ${l.destination.y}` : `Event reference ${esc(hex5(l.word))} · not a direct room destination`}</td></tr>`).join("")}</tbody></table></details>`;
   }
   function review(plan) {
-    return `<section class="game-review"><h3>Review map changes</h3><p>${plan.edits.length} checked byte spans${plan.integrity_edit_count ? ` including ${plan.integrity_edit_count} integrity updates` : ""}. A separate build needs its own door and story playtests.</p><details><summary>Exact changed bytes</summary><table><thead><tr><th>Offset</th><th>Before</th><th>After</th></tr></thead><tbody>${plan.edits.map((e) => `<tr><td>${hex4(e.offset)}</td><td><code>${esc(e.before)}</code></td><td><code>${esc(e.after)}</code></td></tr>`).join("")}</tbody></table></details>${button("Create separate map build", "maps-build", { primary: true })}</section>`;
+    return `<section class="game-review"><h3>Review map changes</h3><p>${plan.edits.length} checked byte spans${plan.integrity_edit_count ? ` including ${plan.integrity_edit_count} integrity updates` : ""}. A separate build needs its own door and story playtests.</p><details><summary>Exact changed bytes</summary><table><thead><tr><th>Offset</th><th>Before</th><th>After</th></tr></thead><tbody>${plan.edits.map((e) => `<tr><td>${hex5(e.offset)}</td><td><code>${esc(e.before)}</code></td><td><code>${esc(e.after)}</code></td></tr>`).join("")}</tbody></table></details>${button("Create separate map build", "maps-build", { primary: true })}</section>`;
   }
   function mountGameMaps(ctx2) {
     var _a, _b, _c, _d;

@@ -3,7 +3,7 @@
   "builder": "esbuild@0.25.12",
   "sources": {
     "romancer/ui/animation_studio.js": "e476a432518c32367106f6ff35885f519b4e632fa12af31187231fd377e313a5",
-    "romancer/ui/api.js": "fecedda3d58703597f5d5f3d958d86c6474e52d1942b5b3d0c430f075afc0487",
+    "romancer/ui/api.js": "f70ef8ff761597611651f49266ccf785d799923ec4a11e28a3ca1b6b39d40688",
     "romancer/ui/app.js": "047b15d250d486d889660f45a2ea4dae658f7262f267bdd1b082f59d42e97adc",
     "romancer/ui/app_settings.js": "3d5a4acd1b898120e707bbb78751cf1a63c7da89e83d230b053c7e4f0aed369e",
     "romancer/ui/asset_controls.js": "1df6ee0f5b41edc370c95ac1af9b52aab1e61036fb819da2e6dec491dc98aa1b",
@@ -13,6 +13,7 @@
     "romancer/ui/cheat_clues.js": "74d3b4dc912bba39f3d7bc7ae54ccb19b3ef087f3153781ee10bc41d998d8dab",
     "romancer/ui/common.js": "0a47136c4c8d810a3a12cb55d40eea4aa0e816086cae0e91f7745f8ba38b7c15",
     "romancer/ui/compression_controls.js": "90e00c2e3e7cfed9c55544bf4dd3fafc6becc6bcca331efcc3ab6487b35f6b48",
+    "romancer/ui/data_relocation.js": "8bd0d9a8068fd568ab3bdec94dc13a87a4b7c7cc9f3c504a97fa23611d086a44",
     "romancer/ui/declarations.js": "7a790c79973253857a3a44dc028e505ef9bec3e78ae234773c523499b17787d8",
     "romancer/ui/desktop_entry.js": "45d1ae7522cd7b6aa4f80b983c9c80e2da800320ca1ed9e787b084a1b03e215a",
     "romancer/ui/discovery_controls.js": "c4ddb17ce1771be9df2fa6028135e027ee034e278761a0a825c1417bfdd29dc9",
@@ -37,7 +38,7 @@
     "romancer/ui/playback_controls.js": "51a0c8e910d8bd0ecf856a3644fe4c8e4ceee7c0177cc9e3dac8c44b34e63448",
     "romancer/ui/preferences.js": "2d126b0107c726a9cb915c44d821dfe47ad96930a20e095f7b4b8a7721b97ad9",
     "romancer/ui/project_checks.js": "522a68761bef6e8789e3330a2c040764e507d564177fb27f5aaa7f8f41b8e894",
-    "romancer/ui/project_flow.js": "9e5ecd1de88f9993fdaaef5c48dacd5782cdc536c3574cc8cf9594233dfcf315",
+    "romancer/ui/project_flow.js": "d62823ae59dc85133d4bf80f8f8418d506ed83141a0923822227d9ae231b5753",
     "romancer/ui/project_manager.js": "3a997b08289f4caddc8c880b054b3152eb86fb3dba7d0af626fe12ce6b0ab217",
     "romancer/ui/revision_controls.js": "ef2eaeba192f2cffd8bbef2c5742cadc4d37f0551ff277acd757b619217e0871",
     "romancer/ui/rom_health.js": "f1c022d40363d2deaf6268af498608260f9bb8d4230b497d54732ffd1e50715d",
@@ -68,17 +69,17 @@
     "romancer/ui/views/playtest.js": "994a269703e1deb8aa34f83fc28df9b485afbe65345306e019843852b6314444",
     "romancer/ui/views/regression.js": "7a12aabc0106f732f660358e6811d913c5cf35844edac22ab23c9f02867e3ff2",
     "romancer/ui/views/release.js": "de29655328d3e5c38a15c30420518fb7c88f6eae46ed694ec23d73bc8b11e12c",
-    "romancer/ui/views/resources.js": "98eb141fb21dcc525509c21e75444be70ac42695e91ed5df2179d4b9c49f2851",
+    "romancer/ui/views/resources.js": "500d715014f531df05ca70a5ad20d7e59d85101b178862505b1bfa8c8229a45f",
     "romancer/ui/views/routes.js": "fa7948c7755fa32608253373d38327b9ba0cbcff1a0b852561a0a7fb665179cd",
     "romancer/ui/views/scripts.js": "30e3bf641f6e2d3bd0659fe07626df6437147d77e569c1bbe2d6fb7753e69842",
     "romancer/ui/views/settings.js": "dc23e84e7fd4edc17d01a0e13bf22f14d685678653012eed182a17b973f9f51c",
     "romancer/ui/views/sound.js": "d69d13626c34e14d199ca2d72a0d9c7f9856e47389efdc1dd24e5e569ffc4761",
-    "romancer/ui/views/tables.js": "eff9e53204563b16263817745813374c1574894bdabdb86f7fc4fe8b3da03edc",
+    "romancer/ui/views/tables.js": "c33411c1390395d8e451fd9afa019fc69a7913bd90d024c16d0b004228b2e2ba",
     "romancer/ui/views/tutorials.js": "71040bcf05cf941b748491a8d37712e61b47feba094c2509eebce9142810e075",
     "romancer/ui/visual_controls.js": "539d9babe397128eba73d4513d8de1b973988afb38409935bbe0c66ac8bb75fb",
     "romancer/ui/workbench_usability.js": "0c5a533d332339a36979be06f0c0486927abcab388baab5cdf926de806169e9b",
     "romancer/ui/workspace_resume.js": "a2b946a51d67fb470e6821205faac6d2521a0f24a0ad4611dd7134a0ba879ee7",
     "romancer/ui/workspace_status.js": "36ab851ac108b56ae4bdc1274eb52b62139397c83c90c18ca5efc9767dc5172c"
   },
-  "sha256": "d7285ac5b6db8691b8a2d3306e61d2da3759c77635a2d1530277ba2d0e4fd09f"
+  "sha256": "385074e46b1b2fcce0cbd17b23f4a20a5b3eca1ba52564b46e2876ee87d57f5a"
 }
