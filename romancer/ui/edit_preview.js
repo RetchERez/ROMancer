@@ -63,7 +63,7 @@ export const rgbHex=rgb=>'#'+['r','g','b'].map(c=>rgb[c].toString(16).padStart(2
 export function paletteComparison(original,edited){
  const chips=palette=>palette.entries.slice(0,256).map(e=>`<svg class="preview-swatch" viewBox="0 0 1 1" width="100%" role="img" aria-label="Bank ${e.bank}, color ${e.index}: RGB ${e.rgb.r},${e.rgb.g},${e.rgb.b}"><title>Bank ${e.bank}, color ${e.index}: RGB ${e.rgb.r},${e.rgb.g},${e.rgb.b}</title><rect width="1" height="1" fill="rgb(${e.rgb.r},${e.rgb.g},${e.rgb.b})"/></svg>`).join('');
  const changed=original.entries.filter((e,i)=>['r','g','b'].some(c=>e.rgb[c]!==edited.entries[i]?.rgb[c])).length;
- return `<div class="palette-comparison"><div class="preview-pair"><div><span>Original</span><div class="preview-swatches">${chips(original)}</div></div><div><span>Edited</span><div class="preview-swatches">${chips(edited)}</div></div></div><p class="preview-caption" role="status">${changed?'Preview updated':'Unchanged'} · ${changed} changed colors${original.entries.length>256?' · first 256 shown':''}</p></div>`;
+ return `<div class="palette-comparison"><div class="preview-pair"><div><span>Original</span><div class="preview-swatches">${chips(original)}</div></div><div><span>Edited</span><div class="preview-swatches">${chips(edited)}</div></div></div><p class="preview-caption" role="status">${changed?'Preview updated':'Unchanged'} · ${changed} changed color${changed===1?'':'s'}${original.entries.length>256?' · first 256 shown':''}</p></div>`;
 }
 
 export function mountNumberPreviews(root=document){

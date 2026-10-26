@@ -1990,7 +1990,7 @@
       var _a;
       return e.rgb[c] !== ((_a = edited.entries[i]) == null ? void 0 : _a.rgb[c]);
     })).length;
-    return `<div class="palette-comparison"><div class="preview-pair"><div><span>Original</span><div class="preview-swatches">${chips(original)}</div></div><div><span>Edited</span><div class="preview-swatches">${chips(edited)}</div></div></div><p class="preview-caption" role="status">${changed2 ? "Preview updated" : "Unchanged"} · ${changed2} changed colors${original.entries.length > 256 ? " · first 256 shown" : ""}</p></div>`;
+    return `<div class="palette-comparison"><div class="preview-pair"><div><span>Original</span><div class="preview-swatches">${chips(original)}</div></div><div><span>Edited</span><div class="preview-swatches">${chips(edited)}</div></div></div><p class="preview-caption" role="status">${changed2 ? "Preview updated" : "Unchanged"} · ${changed2} changed color${changed2 === 1 ? "" : "s"}${original.entries.length > 256 ? " · first 256 shown" : ""}</p></div>`;
   }
   function mountNumberPreviews(root = document) {
     var _a;
