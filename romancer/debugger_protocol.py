@@ -2,17 +2,19 @@
 import re
 from .asset_schema import fields,number
 
-LIMITS={'nes':0xffff,'snes':0xffffff,'gb':0xffff,'gbc':0xffff,'gba':0xfffffff}
+LIMITS={'nes':0xffff,'snes':0xffffff,'gb':0xffff,'gbc':0xffff,'gba':0xfffffff,'genesis':0xffffff}
 PHYSICAL_DOMAINS={'nes':{'nesInternalRam':2047,'nesPrgRom':64*1024**2-1},
     'snes':{'snesWorkRam':131071,'snesPrgRom':8*1024**2-1},
     'gb':{'gbWorkRam':8191,'gbPrgRom':8*1024**2-1},
     'gbc':{'gbWorkRam':32767,'gbPrgRom':8*1024**2-1},
-    'gba':{'gbaExtWorkRam':262143,'gbaIntWorkRam':32767,'gbaPrgRom':32*1024**2-1}}
+    'gba':{'gbaExtWorkRam':262143,'gbaIntWorkRam':32767,'gbaPrgRom':32*1024**2-1},
+    'genesis':{'genesisWorkRam':65535}}
 BUTTONS={'nes':{'a','b','select','start','up','down','left','right'},
     'snes':{'a','b','x','y','l','r','select','start','up','down','left','right'},
     'gb':{'a','b','select','start','up','down','left','right'},
     'gbc':{'a','b','select','start','up','down','left','right'},
-    'gba':{'a','b','l','r','select','start','up','down','left','right'}}
+    'gba':{'a','b','l','r','select','start','up','down','left','right'},
+    'genesis':{'a','b','c','start','up','down','left','right'}}
 
 
 def validate_capture(system,config):

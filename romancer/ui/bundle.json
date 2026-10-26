@@ -18,7 +18,7 @@
     "romancer/ui/discovery_controls.js": "c4ddb17ce1771be9df2fa6028135e027ee034e278761a0a825c1417bfdd29dc9",
     "romancer/ui/edit_preview.js": "0392cd757131827277f7593e44861134bdd5eaaf5f3b462e8323e5bdfd42dc50",
     "romancer/ui/engine_findings.js": "655d480ce6dbefd8350bbb6e39b4e4736daaf6d5e36c26e39a7d3ef4d15ab0d0",
-    "romancer/ui/execution_trace.js": "b170a385da77c9b618d739cfe7f892dd4b748a2d19ebd4dd8b899e612afce4f7",
+    "romancer/ui/execution_trace.js": "7401bb4addf2fc765900117b7e4929a5e389cd6f0767b47c6d26f59dcb246be7",
     "romancer/ui/game_maps.js": "0a12a4abb326925d63f6b047980ac1e95ef49f4f4c47af1e18b82a0617badd77",
     "romancer/ui/game_visuals.js": "6df11b065b205146be44e9d1b0673d98a57ab6f3836e5a756ae92605e66be655",
     "romancer/ui/graphics_investigation.js": "cc3455e76ad62b1513fe22afa95f9c4d2653900a3bb7ffdc6e272f2e710d39db",
@@ -79,5 +79,5 @@
     "romancer/ui/workspace_resume.js": "a2b946a51d67fb470e6821205faac6d2521a0f24a0ad4611dd7134a0ba879ee7",
     "romancer/ui/workspace_status.js": "36ab851ac108b56ae4bdc1274eb52b62139397c83c90c18ca5efc9767dc5172c"
   },
-  "sha256": "c33a30c4a74403c8926d909416ef4007f924a1076ad3b64ba042554564d38d31"
+  "sha256": "41fedd354e66538f295bbf4b1f9a2b90ae2b517f57f86caf4e9fa9f1a4f00f76"
 }

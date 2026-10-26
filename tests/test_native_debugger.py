@@ -26,7 +26,8 @@ class NativeDebuggerTests(unittest.TestCase):
         for steps in [[],[{'frames':0,'buttons':[],'port':0}],[{'frames':4,'buttons':['unknown'],'port':0}],[{'frames':4,'buttons':[],'port':1}]]:
             with self.subTest(steps=steps),self.assertRaises(ValueError):m.validate_capture('nes',{**config(),'steps':steps})
         with self.assertRaises(ValueError):m.validate_capture('nes',{**config(),'probes':[{'kind':'write','start':0,'end':0x10000}]})
-        self.assertFalse(m.backend_capabilities('genesis')['instruction_events'])
+        self.assertTrue(m.backend_capabilities('genesis')['instruction_events'])
+        self.assertFalse(m.backend_capabilities('genesis')['observed_mapping'])
 
     def test_protocol_keeps_execution_context_separate_from_post_access_register_pc(self):
         m=self.module();raw=bytearray(16+16384+8192);raw[:6]=b'NES\x1a\x01\x01'

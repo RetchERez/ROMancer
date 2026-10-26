@@ -29,22 +29,33 @@ CPU={'nes':('nes','nesMemory'),'snes':('snes','snesMemory'),'gb':('gameboy','gam
  'gbc':('gameboy','gameboyMemory'),'gba':('gba','gbaMemory')}
 
 
-def backend_root():return Path(__file__).resolve().parents[2]/'debuggers'/'mesence-2.2.1'
+def backend_root(system=None):
+    if system=='genesis':
+        from .genesis_debugger import backend_root as genesis_root
+        return genesis_root()
+    return Path(__file__).resolve().parents[2]/'debuggers'/'mesence-2.2.1'
 
 
-def verify_backend(root):
+def verify_backend(root,system=None):
+    if system=='genesis':
+        from .genesis_debugger import verify_backend as genesis_verify
+        return genesis_verify(root)
     root=checked_path(Path(root))
     for name,(size,digest) in MEMBERS.items():
         path=checked_path(root/name)
         if not path.is_file() or path.stat().st_size!=size or path.stat().st_nlink!=1:
             raise ValueError('Pinned native debugger is missing or changed: '+name)
-        if hashlib.sha256(path.read_bytes()).hexdigest()!=digest:raise ValueError('Pinned native debugger hash differs: '+name)
+        with path.open('rb') as stream:actual=hashlib.file_digest(stream,'sha256').hexdigest()
+        if actual!=digest:raise ValueError('Pinned native debugger hash differs: '+name)
     return {'backend':'MesenCE','version':VERSION,'source_commit':SOURCE_COMMIT,
         'executable_sha256':MEMBERS['Mesen.exe'][1],'core_sha256':MEMBERS['MesenCore.dll'][1],
         'license':'GPL-3.0-or-later','upstream':UPSTREAM}
 
 
 def backend_capabilities(system):
+    if system=='genesis':
+        from .genesis_debugger import backend_capabilities as genesis_capabilities
+        return genesis_capabilities()
     supported=system in CPU;host=os.name=='nt' and platform.machine().lower() in ('amd64','x86_64')
     return {'ok':True,'system_id':system,'backend':'MesenCE','version':VERSION,
         'supported_system':supported,'host_supported':host,'instruction_events':supported,
@@ -79,6 +90,9 @@ def make_script(system,config,nonce):
 
 
 def capture_native(project,row,config,*,root=None,cancelled=lambda:False):
+    if row.get('system_id')=='genesis':
+        from .genesis_debugger import capture_genesis
+        return capture_genesis(project,row,config,root=root,cancelled=cancelled)
     system=row.get('system_id');v=validate_capture(system,config)
     if not backend_capabilities(system)['host_supported']:raise ValueError('this pinned native debugger build requires Windows x64')
     root=checked_path(Path(root) if root is not None else backend_root());backend=verify_backend(root)

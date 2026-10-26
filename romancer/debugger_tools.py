@@ -40,7 +40,7 @@ class DebuggerTools:
         _,row,_=self.api.source(p);result=backend_capabilities(row.get('system_id'))
         result.update(source_sha256=row['sha256'],artifact_id=row['artifact_id'],available=False)
         try:
-            backend=verify_backend(backend_root());result['backend_identity']=backend
+            backend=verify_backend(backend_root(row.get('system_id')),system=row.get('system_id'));result['backend_identity']=backend
             result['available']=result['supported_system'] and result['host_supported']
             if not result['available']:result['reason']='This pinned debugger build does not support the selected system or host.'
         except (ValueError,OSError) as error:result['reason']=str(error)
@@ -48,11 +48,13 @@ class DebuggerTools:
 
     def _response(self,record,offset,limit):
         number(offset,0,2000);number(limit,1,100);report=record['report'];events=report['events']
-        if type(events) is not list or len(events)>2000:raise ValueError('native event evidence exceeds its budget')
-        return {**{k:v for k,v in report.items() if k not in ('events','kind')},'ok':True,
+        samples=report.get('instruction_samples',[])
+        if type(events) is not list or len(events)>2000 or type(samples) is not list or len(samples)>2000:raise ValueError('native event evidence exceeds its budget')
+        return {**{k:v for k,v in report.items() if k not in ('events','kind','instruction_samples')},'ok':True,
             'evidence_id':record['evidence_id'],'runtime_trusted':record.get('runtime_trusted',True),
             'authentication':record.get('authentication','current_application'),
             'events':events[offset:offset+limit],'total_events':len(events),'offset':offset,'limit':limit,
+            'instruction_samples':samples[offset:offset+limit],'total_instruction_samples':len(samples),
             'summary':summarize_events(events)}
 
     def capture(self,p,c):

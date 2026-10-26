@@ -54,3 +54,13 @@ class DebuggerAPITests(unittest.TestCase):
         with patch('romancer.native_debugger.verify_backend',side_effect=ValueError('not installed')):
             r=self.api.dispatch('debugger.capabilities',self.params)
         self.assertTrue(r['ok'],r);self.assertFalse(r['available']);self.assertIn('not installed',r['reason'])
+
+    def test_instruction_sequences_are_paged_separately_without_inventing_event_order(self):
+        from romancer.workbench_evidence import store_evidence
+        report={'kind':'native-debugger-capture-v1','source_sha256':self.sha,'artifact_id':self.params['artifact_id'],
+            'events':[],'instruction_samples':[{'id':i+1,'pc':512,'assembly':'bra $200'} for i in range(150)],
+            'status':'CAPTURED','system_id':'genesis','merged_instruction_access_order_known':False}
+        evidence=store_evidence(self.api.project(self.params),'runtime',report)
+        result=self.api.dispatch('debugger.get',{**self.params,'evidence_id':evidence['evidence_id'],'offset':100,'limit':30})
+        self.assertTrue(result['ok'],result);self.assertEqual(len(result['instruction_samples']),30)
+        self.assertEqual(result['total_instruction_samples'],150);self.assertEqual(result['events'],[])

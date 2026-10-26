@@ -8,7 +8,8 @@ const {releaseProjectResources}=await import('../romancer/ui/project_flow.js');
 const report={ok:true,source_sha256:'sha',artifact_id:'a',evidence_id:'e',status:'BUDGET_EXCEEDED',
  runtime_trusted:true,total_events:130,events:[{id:1,kind:'write',address:17,value:3,frame:8,file_offset:null,
  execution_context:{pc:32768,file_offset:16},registers:{pc:32771}}],offset:0,limit:100,omitted_events:52,
- route_complete:true,summary:{event_counts:{write:130,read:0,exec:0}},backend:{backend:'MesenCE',version:'2.2.1'}};
+ route_complete:true,summary:{event_counts:{write:130,read:0,exec:0}},backend:{backend:'MesenCE',version:'2.2.1'},
+ total_instruction_samples:1,instruction_samples:[{id:1,pc:512,assembly:'move #$2700, SR'}]};
 function fixture(){
  const actions={},drafts={},state={project:{project_id:'p'},artifact:{artifact_id:'a',sha256:'sha',system_id:'nes',size:40976}};
  const calls=[],ctx={state,use:r=>Object.assign(actions,r),draft:(k,d)=>drafts[k]??d,setDraft:(k,v)=>drafts[k]=v,
@@ -28,6 +29,7 @@ globalThis.document={getElementById:id=>({value:({'trace-frames-0':'8','trace-bu
  assert.equal(calls[0][1].candidate_id,'c');assert.equal(calls[0][1].replay.steps[0].frames,8);
  assert.deepEqual(calls[0][1].replay.steps[0].buttons,['a']);assert.equal(calls[0][1].replay.probes,undefined);
  const shown=await executionTrace(ctx);assert.match(shown,/52/);assert.match(shown,/partial|limit/i);assert.match(shown,/0x8000/);
+ assert.match(shown,/Native instruction samples/);assert.match(shown,/move #\$2700, SR/);
  await actions['trace-open']({dataset:{id:'16'}});assert.equal(state.resourceJump,16);
  state.artifact={...state.artifact,artifact_id:'other'};
  await assert.rejects(async()=>actions['trace-capture'](),/source|selection/i);

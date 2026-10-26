@@ -106,10 +106,10 @@ def _investigation_properties(operation):
     if operation=='debugger.capabilities':return source
     if operation=='debugger.get':return {**source,'evidence_id':string(64),'offset':integer(0,2000),'limit':integer(1,100)}
     if operation in ('debugger.capture','debugger.investigate'):
-        step=obj({'frames':integer(1,3600),'buttons':array(enum(['a','b','x','y','l','r','select','start','up','down','left','right']),12),'port':integer(0,0)})
+        step=obj({'frames':integer(1,3600),'buttons':array(enum(['a','b','c','x','y','l','r','select','start','up','down','left','right']),12),'port':integer(0,0)})
         probe=obj({'kind':enum(['read','write','exec']),'start':integer(0,0xfffffff),'end':integer(0,0xfffffff)})
         probe['properties']['domain']=enum(['cpu','nesInternalRam','nesPrgRom','snesWorkRam','snesPrgRom',
-            'gbWorkRam','gbPrgRom','gbaExtWorkRam','gbaIntWorkRam','gbaPrgRom'])
+            'gbWorkRam','gbPrgRom','gbaExtWorkRam','gbaIntWorkRam','gbaPrgRom','genesisWorkRam'])
         configuration=obj({'steps':array(step,64,1),'probes':array(probe,8,1),'event_limit':integer(1,2000),
             'instruction_limit':integer(1000,20000000),'timeout':integer(1,60)})
         configuration['properties']['start_frame']=integer(0,3599)
