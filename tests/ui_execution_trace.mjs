@@ -50,3 +50,11 @@ globalThis.document={getElementById:id=>({value:({'trace-frames-0':'8','trace-bu
  await assert.rejects(async()=>actions['trace-capture'](),/missing/i);
 }
 console.log('Native trace UI uses authenticated candidates, clear replay scope, partial evidence and source guards.');
+{
+ const {ctx,state,actions}=fixture();let prepared=false;
+ ctx.api.call=async()=>({ok:true,available:prepared,source_sha256:'sha',artifact_id:'a',
+  download:{preparable:true,download_bytes:38000000,upstream:'https://github.com/official',source_url:'https://github.com/official/tree/pin',license:'GPL-3.0-or-later'}});
+ ctx.run=async operation=>{assert.equal(operation,'debugger.prepare');prepared=true;return {ok:true,source_sha256:'sha',artifact_id:'a'};};
+ assert.match(await executionTrace(ctx),/Prepare debugger/);
+ await actions['trace-prepare']();await executionTrace(ctx);assert.equal(state.nativeTrace.capabilities.available,true);
+}

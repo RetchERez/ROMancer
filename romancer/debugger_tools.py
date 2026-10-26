@@ -31,20 +31,32 @@ class DebuggerTools:
 
     def routes(self):
         return {'debugger.capabilities':('project_id artifact_id',self.capabilities),
+            'debugger.prepare':('project_id artifact_id',self.prepare),
             'debugger.capture':('project_id artifact_id config',self.capture),
             'debugger.investigate':('project_id artifact_id investigation_id candidate_id replay',self.investigate),
             'debugger.get':('project_id artifact_id evidence_id offset limit',self.get)}
 
     def capabilities(self,p,c):
-        from .native_debugger import backend_capabilities,verify_backend,backend_root
+        from .native_debugger import backend_capabilities,verify_backend
+        from .debugger_provision import preferred_root,download_info,verify_prepared
         _,row,_=self.api.source(p);result=backend_capabilities(row.get('system_id'))
         result.update(source_sha256=row['sha256'],artifact_id=row['artifact_id'],available=False)
         try:
-            backend=verify_backend(backend_root(row.get('system_id')),system=row.get('system_id'));result['backend_identity']=backend
+            root=preferred_root(self.api.workspace,row.get('system_id'))
+            backend=verify_prepared(root,row['system_id']) if root.resolve().is_relative_to((self.api.workspace/'debuggers').resolve()) else verify_backend(root,system=row.get('system_id'))
+            result['backend_identity']=backend
             result['available']=result['supported_system'] and result['host_supported']
             if not result['available']:result['reason']='This pinned debugger build does not support the selected system or host.'
         except (ValueError,OSError) as error:result['reason']=str(error)
+        if result['supported_system']:result['download']=download_info(row['system_id'])
         return result
+
+    def prepare(self,p,c):
+        from .debugger_provision import prepare_backend
+        _,row,_=self.api.source(p);require_supported(row)
+        result=prepare_backend(self.api.workspace,row['system_id'],cancelled=c)
+        self.api.source(p)
+        return {**result,'source_sha256':row['sha256'],'artifact_id':row['artifact_id'],'available':True}
 
     def _response(self,record,offset,limit):
         number(offset,0,2000);number(limit,1,100);report=record['report'];events=report['events']
@@ -71,10 +83,16 @@ class DebuggerTools:
 
     def _capture(self,p,c,config,link=None):
         from .native_debugger import capture_native,validate_capture
+        from .debugger_provision import preferred_root,verify_prepared,cleanup_pending_stages
         project,row,_=self.api.source(p);require_supported(row);validate_capture(row['system_id'],config)
         if not self.capacity.acquire(blocking=False):raise ValueError('two native investigations are running; wait for one to finish')
         try:
-            report=capture_native(project,row,config,cancelled=c)
+            if c():raise KeyboardInterrupt
+            maintenance=cleanup_pending_stages(self.api.workspace)
+            root=preferred_root(self.api.workspace,row['system_id'])
+            if root.resolve().is_relative_to((self.api.workspace/'debuggers').resolve()):verify_prepared(root,row['system_id'])
+            report=capture_native(project,row,config,root=root,cancelled=c)
+            report={**report,'preparation_cleanup':maintenance}
             if report.get('source_sha256')!=row['sha256'] or report.get('artifact_id')!=row['artifact_id']:
                 raise ValueError('native capture source identity differs')
             if c():raise KeyboardInterrupt

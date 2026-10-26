@@ -2435,7 +2435,7 @@
     return v;
   }
   async function executionTrace(ctx2) {
-    var _a, _b, _c, _d, _e, _f;
+    var _a, _b, _c, _d, _e, _f, _g;
     const { state: state2 } = ctx2, scope = selectionKey(state2), params = { ...ctx2.sourceParams() };
     let entry = state2.nativeTrace;
     if ((entry == null ? void 0 : entry.scope) !== scope) state2.nativeTrace = entry = { scope, generation: 0, result: null, steps: [{}] };
@@ -2516,6 +2516,17 @@
         entry.checked = false;
         return ctx2.render();
       },
+      "trace-prepare": async () => {
+        var _a2, _b2;
+        if (!current2()) throw Error("The selected source changed.");
+        if (!((_b2 = (_a2 = entry.capabilities) == null ? void 0 : _a2.download) == null ? void 0 : _b2.preparable)) throw Error("No pinned preparation is available for this source and host.");
+        const r = await ctx2.run("debugger.prepare", params, { render: false, refresh: false });
+        if (!current2()) return;
+        if ((r == null ? void 0 : r.ok) === false || !identity(state2, r)) throw Error(r.error || "Preparation result belongs to another source.");
+        entry.checked = false;
+        entry.error = null;
+        await ctx2.render();
+      },
       "trace-page": (node) => {
         if (!current2() || !result) throw Error("Open a capture first.");
         return accept("debugger.get", { evidence_id: result.evidence_id, offset: Math.max(0, result.offset + Number(node.dataset.id) * 100), limit: 100 });
@@ -2548,7 +2559,8 @@
     }).join("")}</tbody></table></div>` : "<p>No matching access was sampled. Check the route, start frame and watch range. An empty capture does not prove that the location is unused.</p>"}<div class="actions">${button("Previous events", "trace-page", { id: "-1", disabled: result.offset === 0 })}<span>${result.total_events ? result.offset + 1 : 0}–${Math.min(result.offset + result.events.length, result.total_events)} of ${result.total_events}</span>${button("Next events", "trace-page", { id: "1", disabled: result.offset + 100 >= Math.max(result.total_events, result.total_instruction_samples || 0) })}</div>`;
     const instructions = !((_f = result == null ? void 0 : result.instruction_samples) == null ? void 0 : _f.length) ? "" : `<details><summary>Native instruction samples · ${esc(result.total_instruction_samples)}</summary><p>Ordered within this instruction sample only. The memory-access sequence has separate ordering.</p><div class="table-wrap"><table><thead><tr><th>Sample</th><th>CPU PC</th><th>Disassembly</th></tr></thead><tbody>${result.instruction_samples.map((row) => `<tr><td>${esc(row.id)}</td><td><code>${hex2(row.pc)}</code></td><td><code>${esc(row.assembly)}</code></td></tr>`).join("")}</tbody></table></div></details>`;
     const budget = state2.artifact.system_id === "genesis" ? "At most 3,600 frames and 30 seconds. Native instruction sampling stops after at most 2,000 records; it does not count every instruction executed during the rest of the replay." : "At most 3,600 frames, 20 million instruction callbacks and 30 seconds.";
-    return `<section class="card native-execution-trace" id="native-accesses"><div class="card-heading"><h2>Trace actual accesses</h2>${button("Check debugger", "trace-recheck")}</div><p>Replay from power on with normal controller input. Record accesses and their execution context, then inspect mapped source bytes. This is a separate session; it does not resume Playtest.</p>${!available ? `<p class="notice warm">${esc(reason)}</p>` : ""}${entry.error ? `<p class="notice warm">${esc(entry.error)}</p>` : ""}${watched}${route}${button(proposal ? "Replay & investigate this value" : "Replay & capture accesses", "trace-capture", { primary: true, disabled: !available, reason })}<p class="subtle">${budget} Context is a lead; DMA ownership and the meaning of a value remain unproven.</p>${evidence2}${instructions}</section>`;
+    const download = (_g = entry.capabilities) == null ? void 0 : _g.download, preparation = !available && (download == null ? void 0 : download.preparable) ? `<div class="notice"><p>Prepare the official debugger once · ${(download.download_bytes / 1048576).toFixed(1)} MiB download. Later captures work offline. No ROM data is uploaded.</p><p>External tool license: ${esc(download.license)} · <a href="${esc(download.source_url)}" target="_blank" rel="noopener noreferrer">Upstream source and notices</a></p>${button("Prepare debugger", "trace-prepare", { primary: true })}</div>` : "";
+    return `<section class="card native-execution-trace" id="native-accesses"><div class="card-heading"><h2>Trace actual accesses</h2>${button("Check debugger", "trace-recheck")}</div><p>Replay from power on with normal controller input. Record accesses and their execution context, then inspect mapped source bytes. This is a separate session; it does not resume Playtest.</p>${!available ? `<p class="notice warm">${esc(reason)}</p>` : ""}${entry.error ? `<p class="notice warm">${esc(entry.error)}</p>` : ""}${preparation}${watched}${route}${button(proposal ? "Replay & investigate this value" : "Replay & capture accesses", "trace-capture", { primary: true, disabled: !available, reason })}<p class="subtle">${budget} Context is a lead; DMA ownership and the meaning of a value remain unproven.</p>${evidence2}${instructions}</section>`;
   }
   async function observedSourceContext(ctx2) {
     var _a, _b;

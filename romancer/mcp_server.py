@@ -32,7 +32,7 @@ rom.scan.run release.prepare release.verify resources.declare_assets resources.d
 runtime.load_profile runtime.advance runtime.step runtime.capture runtime.memory runtime.close
 runtime.checkpoint runtime.restore runtime.save_state runtime.load_state profiles.controller saves.capture saves.export saves.import saves.restore
 recipes.from_plan recipes.preview recipes.import recipes.export jobs.cancel
-values.start values.narrow investigations.start investigations.capture debugger.capture debugger.investigate watches.save video.inspect compression.extract compression.plan_reinsert
+values.start values.narrow investigations.start investigations.capture debugger.prepare debugger.capture debugger.investigate watches.save video.inspect compression.extract compression.plan_reinsert
 definitions.export definitions.import'''.split())
 DESCRIPTIONS={
  'project.create':'Create a separate ROM project. Never overwrite an original.',
@@ -63,6 +63,7 @@ DESCRIPTIONS={
  'investigations.probe':'Derive a physical native watch from an authenticated numeric hypothesis and the pinned core buffer interface. No game definition is needed; active banks and a matching replay state are not assumed.',
  'debugger.investigate':'Replay bounded controller input from power on and capture real writes to an authenticated candidate. Derives physical probes server-side, including banked RAM. Links evidence without claiming the replay resumes Playtest or proves causation.',
  'debugger.capabilities':'Inspect actual system/host/pinned-backend availability for bounded native instruction and memory-access investigations. A documented capability does not mean an installed backend.',
+ 'debugger.prepare':'Deliberately download pinned official upstream debugger artifacts into the workspace cache and verify hashes before any helper runs. Requires network once; no caller URL, executable or path is accepted. Nothing is uploaded; external binaries are separate from ROMancer release assets.',
  'debugger.capture':'Run a bounded cold-start input route with the pinned headless debugger, recording real access callbacks, instruction context and observed mappings. No arbitrary script/executable/path is accepted. Access width, DMA actor and causation remain explicit unknowns.',
  'debugger.get':'Read a page of application-authenticated native trace events and source-bound execution contexts. Historical captures are labeled; imported JSON never becomes fresh native evidence.',
  'structures.survey':'Test bounded repeated numeric record layouts without game profiles. Reports exact tested widths, byte orders, sampling, target bounds and in-window previews. These are structural hypotheses, not named properties or observed dereferences.',
@@ -108,7 +109,7 @@ def _investigation_properties(operation):
         'delta':nullable(integer(-2**32,2**32))}
     if operation=='investigations.get':return {**source,'investigation_id':string(64)}
     if operation=='investigations.probe':return {**source,'investigation_id':string(64),'candidate_id':string(64)}
-    if operation=='debugger.capabilities':return source
+    if operation in ('debugger.capabilities','debugger.prepare'):return source
     if operation=='debugger.get':return {**source,'evidence_id':string(64),'offset':integer(0,2000),'limit':integer(1,100)}
     if operation in ('debugger.capture','debugger.investigate'):
         step=obj({'frames':integer(1,3600),'buttons':array(enum(['a','b','c','x','y','l','r','select','start','up','down','left','right']),12),'port':integer(0,0)})
