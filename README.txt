@@ -67,6 +67,8 @@ The source and Windows packages also include user-guide/index.html and guide.pdf
 The default 100% app size now matches the earlier 75% layout. Browser zoom can stay
 at 100%; Settings -> Preferences offers larger interface sizes.
 ROMancer is the default theme; Dark and Light are also available.
+ROMancer and Dark use deeper menu backgrounds; Light uses grey panels and menu
+boxes with dark labels. Theme choices do not change ROM graphics or palettes.
 OK saves and closes Settings. Apply saves while staying there. Cancel discards
 unapplied preference changes. Restore defaults fills the standard values; use
 Apply or OK to save them. Auto deep scan on ROM load is enabled by default.

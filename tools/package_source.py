@@ -191,7 +191,7 @@ APPROVED_FILES = APPROVED_FILES | frozenset({
         '09-playtest-states','10-verified-patch','11-hex-inspection','12-tutorials',
         '13-settings','14-light-theme','15-dark-theme','16-connected-rooms',
         '17-object-inspector','18-byte-explanation','19-chrono-armor','20-ffl2-map-browser','21-game-knowledge',
-        '22-engine-recognition','23-address-domains','24-code-references','25-cartridge-verification','26-mod-byte-comparison','27-crc-mismatch','28-text-overflow','29-audio-preview','30-project-recovery','26-universal-value-series','27-native-access-capture','28-native-source-context','29-structural-experiments','30-generated-table-editor','31-debugger-preparation','32-data-relocation','33-moved-table')),
+        '22-engine-recognition','23-address-domains','24-code-references','25-cartridge-verification','26-mod-byte-comparison','27-crc-mismatch','28-text-overflow','29-audio-preview','30-project-recovery','26-universal-value-series','27-native-access-capture','28-native-source-context','29-structural-experiments','30-generated-table-editor','31-debugger-preparation','32-data-relocation','33-moved-table','34-menu-contrast')),
 })
 
 

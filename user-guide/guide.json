@@ -48,12 +48,12 @@
       "intro": "Settings control the working environment: appearance, startup behavior, automatic analysis and audio defaults. Apply the choices you want to keep before closing the application.",
       "steps": [
         "Open <b>Settings</b>. Review appearance and startup preferences. <b>100%</b> is the standard interface size; it uses the more compact layout previously shown at 75%. Choose another offered size when useful.",
-        "Choose a theme: <b>ROMancer (default)</b>, <b>Dark</b> for neutral graphite or <b>Light</b> for white surfaces. Adjust <b>Reduce interface motion</b> and <b>Show advanced tools in navigation</b> to suit your work.",
+        "Choose a theme: <b>ROMancer (default)</b>, <b>Dark</b> for neutral graphite or <b>Light</b> for grey panels on a light background. Adjust <b>Reduce interface motion</b> and <b>Show advanced tools in navigation</b> to suit your work.",
         "Review <b>Auto deep scan on ROM load</b>, enabled by default, and <b>Inspect gameplay graphics automatically</b>. Set <b>Remember my workspace</b> to reopen the last project, ROM, page and editing position. These preferences choose automatic work, not a new level of game-format verification.",
         "Set <b>Volume</b> from 0 to 100, <b>Start game audio muted</b> and <b>Loop audio previews</b>. Choose <b>Apply</b> to save and continue, or <b>OK</b> to save and close. <b>Cancel</b> discards unapplied changes. <b>Restore defaults</b> prepares the standard choices; use Apply or OK to keep that reset."
       ],
       "result": "Applied preferences persist across launches for this workspace. The chosen theme and size make the controls comfortable to read, and automatic scan/audio behavior follows the saved choices.",
-      "note": "A theme changes appearance, not ROM bytes. Disabling automatic analysis does not invalidate an existing definition; it changes when that analysis runs. Manual investigation and review remain available.",
+      "note": "ROMancer and Dark use deeper menu backgrounds; Light uses darker grey panels and menu boxes with dark labels. Selected items and keyboard focus remain distinct. Themes change appearance, not ROM bytes. Manual investigation remains available when automatic analysis is disabled.",
       "details": [
         {
           "title": "When to change automatic work",
@@ -83,11 +83,11 @@
       "image": "13-settings",
       "image_layout": "following-page",
       "image_alt": "Actual ROMancer Settings showing Appearance, Automatic tasks, Audio and Workspace tools preferences",
-      "caption": "Actual saved Settings in the ROMancer default theme. Open the image for full resolution.",
+      "caption": "Updated actual Settings in the default ROMancer theme, with automatic deep scanning enabled. Menus use slightly deeper dark surfaces; Light uses grey panels and menu boxes.",
       "extra_images": [
         {
           "image": "14-light-theme",
-          "title": "Light theme / readable white surfaces"
+          "title": "Light theme / grey panels and dark labels"
         },
         {
           "image": "15-dark-theme",
@@ -97,7 +97,7 @@
       "visual_page": {
         "title": "Settings / appearance examples",
         "kicker": "Basic / actual application captures",
-        "intro": "Saved preferences in ROMancer, Light and Dark. Themes change application appearance, not game palettes.",
+        "intro": "Updated ROMancer, Light and Dark menus. Themes affect the interface; game palettes stay unchanged.",
         "panels": [
           {
             "image": "13-settings",
@@ -115,7 +115,7 @@
           },
           {
             "image": "14-light-theme",
-            "title": "Light theme / readable white surfaces",
+            "title": "Light theme / grey panels and dark labels",
             "x": 48,
             "top": 304,
             "width": 540,
@@ -559,26 +559,46 @@
       "image_alt": "Recover a deleted project",
       "caption": "The restoration was checked in this private test workspace. Delete project affects the project-owned copies; an external source ROM is preserved.",
       "visual_page": {
-        "title": "Recover a deleted project",
+        "title": "Create and recover a project",
         "kicker": "Basic / actual application capture",
-        "intro": "An empty practice project was moved to Trash through the confirmation dialog, then restored through the button shown here.",
+        "intro": "Create a project, import a ROM, or restore a deleted project. Actual practice-workspace captures.",
         "panels": [
           {
-            "image": "30-project-recovery",
-            "title": "Projects / Trash / Restore",
+            "image": "34-menu-contrast",
+            "title": "New project / choose how to begin",
             "x": 48,
             "top": 846,
-            "width": 1100,
+            "width": 600,
             "crop": [
               550,
               370,
               500,
               260
             ],
-            "caption": "The restoration was checked in this private test workspace. Delete project affects the project-owned copies; an external source ROM is preserved."
+            "caption": "Create and import a ROM, or start with an empty project. Menu colors follow the chosen theme."
+          },
+          {
+            "image": "30-project-recovery",
+            "title": "Projects / Trash / Restore",
+            "x": 748,
+            "top": 846,
+            "width": 600,
+            "crop": [
+              550,
+              370,
+              500,
+              260
+            ],
+            "caption": "The original recovery example. Removing a project preserves the external source ROM."
           }
         ]
-      }
+      },
+      "extra_images": [
+        {
+          "image": "34-menu-contrast",
+          "title": "New project / readable menu with source import and empty-project choices"
+        }
+      ]
     },
     {
       "id": "help",
