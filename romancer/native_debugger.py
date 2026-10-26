@@ -59,7 +59,7 @@ def backend_capabilities(system):
     supported=system in CPU;host=os.name=='nt' and platform.machine().lower() in ('amd64','x86_64')
     return {'ok':True,'system_id':system,'backend':'MesenCE','version':VERSION,
         'supported_system':supported,'host_supported':host,'instruction_events':supported,
-        'memory_access_events':supported,'observed_mapping':supported,
+        'execution_range_probes':supported,'memory_access_events':supported,'observed_mapping':supported,
         'transport':'bounded headless cold-start capture','continuous_live_control':False,
         'access_width_available':False,'dma_actor_available':False,'upstream':UPSTREAM}
 

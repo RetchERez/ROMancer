@@ -44,7 +44,7 @@ export async function render(ctx){
   }
   return [...result.values()];
  }
- function definition(){const names=model?.definition.label_source||saved?.label_source;return {schema_version:1,name:read('table-name').trim(),offset:integer('table-offset'),count:integer('table-count'),stride:integer('table-stride'),fields:columns,...(names?{label_source:names}:{})};}
+ function definition(){const names=model?model.definition.label_source:saved?.label_source;return {schema_version:1,name:read('table-name').trim(),offset:integer('table-offset'),count:integer('table-count'),stride:integer('table-stride'),fields:columns,...(names?{label_source:names}:{})};}
  ctx.use({
   'table-add-field':()=>{
    const name=read('table-field-name').trim();if(!name)throw new Error('Name the field first.');

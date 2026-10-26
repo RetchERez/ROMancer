@@ -125,7 +125,8 @@ included-engine playtesting do not require this download.
 
 Capture reports distinguish completed routes, capped samples, mapped source
 locations and candidate pattern matches. Genesis instruction and access samples
-have separate ordering. Access width, DMA ownership and game meaning remain
+have separate ordering. Genesis execution-range watches are unavailable; its
+global instruction samples do not filter by the watched read/write range. Access width, DMA ownership and game meaning remain
 unknown where the backend does not establish them.
 
 Explore ROM structure tests bounded repeated numeric layouts and possible linear

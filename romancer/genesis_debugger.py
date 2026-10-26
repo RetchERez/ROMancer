@@ -37,7 +37,7 @@ def verify_backend(root):
 def backend_capabilities():
     return {'ok':True,'system_id':'genesis','backend':'MAME','version':VERSION,'supported_system':True,
         'host_supported':os.name=='nt' and platform.machine().lower() in ('amd64','x86_64'),
-        'instruction_events':True,'memory_access_events':True,'observed_mapping':False,'continuous_live_control':False,
+        'instruction_events':True,'execution_range_probes':False,'instruction_sample_scope':'global separately ordered samples; not an execution-range watch','memory_access_events':True,'observed_mapping':False,'continuous_live_control':False,
         'access_width_available':False,'bus_lane_masks_available':True,'dma_actor_available':False,
         'transport':'bounded headless cold-start capture','instruction_sample_limit':2000,
         'controller':'3-button pad','upstream':UPSTREAM,

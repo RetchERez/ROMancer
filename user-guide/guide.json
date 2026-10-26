@@ -2062,7 +2062,7 @@
         "Inspect access address, value, execution context and registers. A source button opens its recorded file location; Resources explains the association and links back."
       ],
       "result": "Application-authenticated native evidence that humans and MCP clients can reopen and page through.",
-      "note": "MesenCE covers NES/SNES/GB/GBC/GBA; Genesis uses MAME. Width, DMA ownership and meaning may remain unknown. Genesis pattern matches stay candidates; instruction/access ordering is separate. No live break/continue control.",
+      "note": "MesenCE covers NES/SNES/GB/GBC/GBA; Genesis uses MAME. Width, DMA ownership and meaning may remain unknown. Genesis has read/write watches and separate global instruction samples; no execution-range watch. Pattern matches stay candidates. No live break/continue.",
       "related": [
         "universal-values",
         "debugger-setup",

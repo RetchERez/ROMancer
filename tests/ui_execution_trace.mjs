@@ -58,3 +58,10 @@ console.log('Native trace UI uses authenticated candidates, clear replay scope, 
  assert.match(await executionTrace(ctx),/Prepare debugger/);
  await actions['trace-prepare']();await executionTrace(ctx);assert.equal(state.nativeTrace.capabilities.available,true);
 }
+
+{
+ const {ctx,state}=fixture();state.artifact.system_id='genesis';
+ const html=await executionTrace(ctx);
+ assert.doesNotMatch(html,/<option value="exec"/,'Genesis has instruction samples, not an execution-range watch.');
+ assert.match(html,/instruction sampling/);
+}

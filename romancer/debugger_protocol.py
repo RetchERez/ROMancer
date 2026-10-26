@@ -35,6 +35,7 @@ def validate_capture(system,config):
     for probe in config['probes']:
         fields(probe,'kind start end'+(' domain' if 'domain' in probe else ''))
         if probe['kind'] not in ('read','write','exec'):raise ValueError('choose read, write or execution events')
+        if system=='genesis' and probe['kind']=='exec':raise ValueError('Genesis execution range watches are unavailable; use read/write probes and separately ordered global instruction samples.')
         domain=probe.get('domain','cpu');limit=LIMITS[system] if domain=='cpu' else PHYSICAL_DOMAINS[system].get(domain)
         if limit is None:raise ValueError('choose a supported CPU or physical memory domain')
         number(probe['start'],0,limit);number(probe['end'],probe['start'],limit)

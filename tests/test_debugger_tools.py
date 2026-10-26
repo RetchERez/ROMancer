@@ -17,6 +17,24 @@ class DebuggerAPITests(unittest.TestCase):
         a=self.api.dispatch('source.import',{'project_id':p['project_id'],'path':str(path),'system':None})
         self.params={'project_id':p['project_id'],'artifact_id':a['artifact_id']};self.sha=a['sha256']
 
+    def test_genesis_execution_watch_is_rejected_through_api_and_mcp_before_launch(self):
+        from romancer.mcp_server import MCPServer
+        demo=self.api.dispatch('project.demo_system',{'system_id':'genesis'})
+        row=self.api.dispatch('project.open',{'project_id':demo['project_id']})['sources'][0]
+        request={'project_id':demo['project_id'],'artifact_id':row['artifact_id'],
+            'config':{**config(),'probes':[{'kind':'exec','start':512,'end':515}]}}
+        with patch('romancer.native_debugger.capture_native') as launch:
+            result=self.api.dispatch('debugger.capture',request)
+            self.assertFalse(result['ok']);self.assertIn('execution range watches are unavailable',result['error'])
+            server=MCPServer(self.api.workspace,allow_writes=True)
+            try:
+                server.handle({'jsonrpc':'2.0','id':1,'method':'initialize','params':{'protocolVersion':'2025-11-25','capabilities':{},'clientInfo':{'name':'review-test','version':'1'}}})
+                server.handle({'jsonrpc':'2.0','method':'notifications/initialized'})
+                result=server.handle({'jsonrpc':'2.0','id':2,'method':'tools/call','params':{'name':'romancer_debugger_capture','arguments':request}})['result']
+                self.assertTrue(result['isError']);self.assertIn('execution range watches are unavailable',result['content'][0]['text'])
+            finally:server.close()
+            launch.assert_not_called()
+
     def test_capture_is_owned_authenticated_and_paginated(self):
         result={'ok':True,'status':'CAPTURED','system_id':'nes','source_sha256':self.sha,
             'artifact_id':self.params['artifact_id'],'native_callbacks_observed':True,

@@ -62,6 +62,15 @@ class GenesisDebuggerTests(unittest.TestCase):
         self.assertEqual(args[args.index('-video')+1],'none');self.assertIn('-noreadconfig',args)
         self.assertIn('-noplugins',args);self.assertIn('-noconsole',args)
 
+    def test_execution_range_probe_is_rejected_instead_of_silently_ignored(self):
+        from romancer.debugger_protocol import validate_capture
+        request=self.request(probes=[{'kind':'exec','start':0x200,'end':0x203}])
+        with self.assertRaisesRegex(ValueError,'execution.*unavailable'):
+            validate_capture('genesis',request)
+        self.assertFalse(self.module().backend_capabilities()['execution_range_probes'])
+        self.assertTrue(self.module().backend_capabilities()['instruction_events'])
+        self.assertEqual(validate_capture('nes',request)['probes'][0]['kind'],'exec')
+
     def test_missing_backend_is_rejected(self):
         m=self.module()
         with tempfile.TemporaryDirectory() as d:
