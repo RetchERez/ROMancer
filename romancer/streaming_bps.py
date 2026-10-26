@@ -162,16 +162,43 @@ def create_patch(source,target,destination,metadata=None,*,cancelled=lambda:Fals
                 nonlocal crc
                 output.write(raw);crc=zlib.crc32(raw,crc)
             write(b'BPS1'+_number(original['size'])+_number(changed['size'])+_number(len(meta))+meta)
-            same_run=0
+            same_run=0;literals=bytearray()
+            def action(kind,length,data=None):
+                nonlocal actions
+                actions+=1
+                if actions>1000000:raise ValueError('patch action budget exceeded')
+                write(_number(((length-1)<<2)|kind))
+                if data is not None:write(data)
+            def flush_literals():
+                if literals:
+                    action(1,len(literals),literals);literals.clear()
             while True:
                 _cancel(cancelled);right=b.read(CHUNK)
                 if not right:break
                 left=a.read(len(right))
-                if left==right:same_run+=len(right);continue
-                if same_run:write(_number((same_run-1)<<2));same_run=0;actions+=1
-                write(_number(((len(right)-1)<<2)|1));write(right);actions+=1
-                if actions>1000000:raise ValueError('patch action budget exceeded')
-            if same_run:write(_number((same_run-1)<<2))
+                if left==right:
+                    flush_literals();same_run+=len(right);continue
+                # Preserve byte runs inside changed blocks; unchanged neighbors
+                # belong in SourceRead actions rather than literal patch payloads.
+                position=0
+                while position<len(right):
+                    _cancel(cancelled)
+                    same=position<len(left) and left[position]==right[position]
+                    end=position+1
+                    while end<len(right) and (end<len(left) and left[end]==right[end])==same:
+                        if end%4096==0:_cancel(cancelled)
+                        end+=1
+                    if same:
+                        flush_literals();same_run+=end-position
+                    else:
+                        if same_run:action(0,same_run);same_run=0
+                        while position<end:
+                            amount=min(CHUNK-len(literals),end-position)
+                            literals.extend(right[position:position+amount]);position+=amount
+                            if len(literals)==CHUNK:flush_literals()
+                    position=end
+            flush_literals()
+            if same_run:action(0,same_run)
             write(struct.pack('<II',original['crc32'],changed['crc32']));output.write(struct.pack('<I',crc));output.flush();os.fsync(output.fileno())
         verify=destination.parent/('.bps-verification-'+uuid.uuid4().hex)
         rebuilt=apply_patch(source,temporary,verify,cancelled=cancelled)

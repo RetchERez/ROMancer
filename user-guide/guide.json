@@ -159,14 +159,104 @@
       "related": [
         "checks",
         "drafts",
-        "projects"
+        "projects",
+        "first-edit",
+        "apply-patch",
+        "share-checklist"
       ],
       "caption": "Actual ROMancer interface. The HTML edition links to the full-resolution capture.",
       "terms": [
         "term-original",
         "term-draft",
         "term-build"
-      ]
+      ],
+      "details": [
+        {
+          "title": "Choose the tool for your task",
+          "text": "Text & layout handles declared text and encoding. Graphics & fonts handles tiles, assembled sprites and stored palettes. Levels needs a declared room format. Data tables edits declared numeric records. Use Investigation when you do not yet know where a changing value lives."
+        },
+        {
+          "title": "Find help without reading every page",
+          "text": "Follow the first-edit exercise, then use related-topic links. The glossary explains unfamiliar words; the alphabetical index locates tasks and error cases. Ctrl+F searches the offline HTML or PDF. A system match does not promise a decoded game-specific level or music format."
+        }
+      ],
+      "image_layout": "following-page",
+      "visual_page": {
+        "title": "Overview / choose a project and next task",
+        "kicker": "Basic / actual application capture",
+        "intro": "Start with a workshop or your own imported source, then use the editor that matches the task.",
+        "panels": [
+          {
+            "image": "01-workspace",
+            "title": "Project overview",
+            "x": 48,
+            "top": 846,
+            "width": 1170,
+            "crop": [
+              180,
+              60,
+              1390,
+              860
+            ],
+            "caption": "The overview connects source files, builds and the next editing step. Open the HTML capture at full resolution."
+          }
+        ]
+      }
+    },
+    {
+      "id": "first-edit",
+      "title": "Your first complete edit: the original NES workshop",
+      "part": "Basic",
+      "kicker": "Open / edit / build / test / export",
+      "intro": "Use the included original drawing program to learn the full workflow without finding offsets or supplying a commercial game.",
+      "steps": [
+        "If the optional tutorial prompt appears, choose <b>Not now</b> for this exercise. Save existing work; choose the blank <b>Choose a project</b> entry if needed. On the empty Overview, click <b>NES workshop</b>.",
+        "Open <b>Graphics & fonts</b>. Keep First tile 0, Tiles across 1 and Tiles down 1; click <b>Assemble tiles</b>. Set Brush color index to 1.",
+        "Focus the <b>Editing</b> canvas. Press Right Arrow once, then Space. Expect <b>1 pixels differ</b>; the Original picture stays unchanged. Undo sprite stroke reverses the experiment.",
+        "Click <b>Review asset changes</b>, read the plan, then <b>Create asset build</b>. Choose the new build in the top source/build selector.",
+        "Open <b>Playtest</b>, choose <b>Load game</b>, then Play. Pause to inspect the result. The full Windows edition supplies the engine; the source edition may require core setup.",
+        "Open <b>Export</b>. Choose the original revision and your asset build, then <b>Create &amp; independently verify patch</b>. Download the prepared BPS. Continue with Apply a downloaded patch to check a fresh reconstruction."
+      ],
+      "result": "The tested exercise changed exactly file offset 16400 (0x4010), from 81 to C1. Native original/build frames differed, a save/load roundtrip restored the view, and reapplying the exported patch recreated the same build hash.",
+      "note": "Those byte values belong only to this original workshop. Its drawing program reuses the tile, so one edited pixel can repeat in gameplay. A saved draft or preview is not a built ROM.",
+      "related": [
+        "drafts",
+        "sprites",
+        "play",
+        "saves",
+        "patches",
+        "apply-patch"
+      ],
+      "terms": [
+        "term-draft",
+        "term-build",
+        "term-plan",
+        "term-shared-resource"
+      ],
+      "image": "35-first-workshop-edit",
+      "image_layout": "following-page",
+      "caption": "The actual one-pixel practice edit, with a reviewed asset build ready to create.",
+      "visual_page": {
+        "title": "One changed pixel / reviewed build",
+        "kicker": "Actual packaged application / original practice program",
+        "intro": "Original and editing previews remain separate; Create asset build uses the reviewed proposal.",
+        "panels": [
+          {
+            "image": "35-first-workshop-edit",
+            "title": "One changed pixel / reviewed build",
+            "x": 48,
+            "top": 846,
+            "width": 1170,
+            "crop": [
+              180,
+              60,
+              1390,
+              860
+            ],
+            "caption": "Actual headless interface capture. The HTML edition links the unaltered full-resolution picture."
+          }
+        ]
+      }
     },
     {
       "id": "checks",
@@ -517,6 +607,92 @@
         "term-bps",
         "term-ips",
         "term-patch"
+      ]
+    },
+    {
+      "id": "apply-patch",
+      "title": "Apply a downloaded BPS or IPS patch safely",
+      "part": "Basic",
+      "kicker": "Exact source / compatibility preview / separate build",
+      "intro": "A patch describes a change to a particular source. A matching game title alone is insufficient.",
+      "steps": [
+        "Read the patch author's required region, revision and header treatment. Import your own original into a project and select that original in the top bar; then open <b>Export</b>.",
+        "Under <b>Apply a downloaded patch</b>, choose or drop one BPS or IPS file. For IPS, enter the author's full-file reference: eight hexadecimal CRC32 digits or 64 SHA-256 digits. BPS checks embedded checksums.",
+        "Choose <b>Preview patch</b>. Read the format, target size and changed-byte count. Expand <b>Changed ranges and identities</b> for source/target hashes and offsets. A zero-change result has nothing to build.",
+        "If the reference mismatches, stop and find the required original. Do not remove a header, edit a checksum, or substitute another revision merely to bypass the failure.",
+        "Give the output a useful name and choose <b>Create patched build</b>. ROMancer selects the separate output and opens Playtest. Load the game, verify the intended change, and preserve the original."
+      ],
+      "result": "The pictured BPS was exported from the first-edit exercise. Preview found one changed byte; the 292-byte patch recreated exactly the same SHA-256 as the native-tested asset build.",
+      "note": "Changing the selected file can restore its previous editor. Select the original first, then open Export. A valid patch reconstruction establishes bytes, not whole-game behavior. Chain patches only when the next patch explicitly requires the previous output.",
+      "related": [
+        "first-edit",
+        "checks",
+        "patches",
+        "compare-mods",
+        "support-identity"
+      ],
+      "terms": [
+        "term-bps",
+        "term-ips",
+        "term-crc",
+        "term-sha",
+        "term-revision"
+      ],
+      "image": "36-patch-compatibility-preview",
+      "image_layout": "following-page",
+      "caption": "Actual compatibility preview before creating a separate patched build.",
+      "visual_page": {
+        "title": "Preview compatibility before applying",
+        "kicker": "Actual packaged application / original practice program",
+        "intro": "The selected original, one-byte change and new build name are shown before any output is created.",
+        "panels": [
+          {
+            "image": "36-patch-compatibility-preview",
+            "title": "Preview compatibility before applying",
+            "x": 48,
+            "top": 846,
+            "width": 1170,
+            "crop": [
+              180,
+              60,
+              1390,
+              860
+            ],
+            "caption": "Actual headless interface capture. The HTML edition links the unaltered full-resolution picture."
+          }
+        ]
+      }
+    },
+    {
+      "id": "share-checklist",
+      "title": "Check a ROM hack before sharing it",
+      "part": "Basic",
+      "kicker": "Identity / intended effect / recovery / sharing",
+      "intro": "Use this checklist for the output you intend to distribute. Keep tested observations separate from unknown behavior.",
+      "steps": [
+        "On <b>Overview</b>, run <b>Check project</b>. Resolve errors, read warnings and verify the selected original/build identities. A validation pass covers declared formats, not every gameplay path.",
+        "Reload the final build in <b>Playtest</b>. Test the intended change and one nearby behavior that should remain unchanged. Check input and any relevant save/load behavior on this exact build.",
+        "For repeatable checks, record routes and screenshot regions. Read Original, Build and Difference results. State which routes and conditions were actually tested.",
+        "In <b>Export</b>, create and independently verify the final patch. Confirm the required original revision and full-file hash. Apply the downloaded patch to an unchanged source and compare the reconstructed target hash.",
+        "Review <b>Release selection</b> before packaging exports. Only approved patch/document roles enter that package. Keep private project backups, ROM images, saves, captures and personal reports out of the shared selection.",
+        "Keep a complete private backup and write clear instructions: required original, patch order if any, expected target identity, intended changes and known limits. Perform a final hands-on trial before announcing success."
+      ],
+      "result": "A reproducible patch and instructions linked to the exact tested build, with a recovery copy kept separately.",
+      "note": "Passing a route or reconstruction check does not certify an entire game. For ROMancer itself, automated release checks are recorded separately; independent human usability feedback still requires a person.",
+      "related": [
+        "checks",
+        "projects",
+        "regression",
+        "patches",
+        "apply-patch",
+        "support-playback"
+      ],
+      "terms": [
+        "term-revision",
+        "term-baseline",
+        "term-patch",
+        "term-scope",
+        "term-rollback"
       ]
     },
     {
@@ -1364,13 +1540,14 @@
         },
         {
           "title": "Capacity and relocation limits",
-          "text": "Automatic relocation is unavailable. None of the six bundled game profiles establishes complete pointer obligations and destination ownership for a relocation. A safe relocation would need all affected references, their encoding and representable range, exact original bytes, a proven owned destination and overlap checks. Repeated fill bytes do not prove free space."
+          "text": "Recompression stays inside its declared parent allocation. The separate Advanced data-move workflow checks explicitly declared linear references and reserved space; it does not discover compressed-stream ownership or make an oversized reinsertion safe. Follow the data-relocation chapter rather than increasing capacity to silence a failure."
         }
       ],
       "related": [
         "resources",
         "checks",
-        "tilemaps"
+        "tilemaps",
+        "data-relocation"
       ],
       "terms": [
         "term-allocation",
@@ -1507,21 +1684,63 @@
       "details": [
         {
           "title": "Bounded investigation operations",
-          "text": "The exposed tools include explicit address resolution, declared references, bounded byte explanations, memory searches and watches, exposed video-tile inspection and supported compression checks. Read system.operations or the client tool schemas for current parameters and limits. Some observations create temporary search state or saved ranges and therefore require write-enabled access; they do not write arbitrary native RAM."
+          "text": "The exposed tools include explicit address resolution, declared references, bounded byte explanations, memory searches and watches, exposed video-tile inspection and supported compression checks. Use the client's available-tool list and input schemas first. system.operations describes backend operations; some are not exposed through MCP. Some observations create temporary search state or saved ranges and therefore require write-enabled access; they do not write arbitrary native RAM."
         },
         {
           "title": "Definitions and permissions",
-          "text": "Definition export/import can round-trip checked text, graphics, table, level and sound payloads for the exact source. Export creates a project export record; import validates and stores a definition, so these operations need write access. The exported MCP result supplies the JSON payload for reimport. No arbitrary shell, native debugger bridge or instruction-breakpoint operation is exposed."
+          "text": "Definition exchange is source-bound and requires writes when it creates or stores an export. Native investigation also has typed, bounded capture operations; its separate replay starts from power on. No arbitrary shell, caller-supplied debugger script or continuous live breakpoint control is exposed. Discover current schemas before sending arguments."
         }
       ],
       "related": [
         "recipes",
         "checks",
-        "projects"
+        "projects",
+        "ai-worked-edit",
+        "native-accesses",
+        "debugger-setup"
       ],
       "terms": [
         "term-mcp",
         "term-plan"
+      ]
+    },
+    {
+      "id": "ai-worked-edit",
+      "title": "Give an AI a bounded editing task you can review",
+      "part": "Advanced",
+      "kicker": "Discover / inspect / plan / approve / build",
+      "intro": "Use the same checked services through MCP. Write permission enables tools; it does not make an assistant's interpretation correct.",
+      "steps": [
+        "Create a client configuration in <b>Settings > AI &amp; LLM access</b>. Start read-only. Use the client's available-tool list and input schemas; ask it to show the selected project and source identity.",
+        "Open a fresh <b>NES workshop</b> for this example. For its original source only, romancer_resource_inspect at offset 16400, length 1 returns 81. Never reuse this offset for an unrelated ROM.",
+        "For a deliberate write session, enable --allow-writes and restrict import roots. Ask for romancer_systems_plan_edits with exact project/artifact IDs and one edit: offset 16400, before 81, after c1.",
+        "Require the assistant to show every planned range and stop for your review. The stop is an instruction to the client, not a separate permission automatically enforced by ROMancer.",
+        "After approval, romancer_build_apply uses the returned plan_id. Select and test the output, compare its bytes, and prepare/verify a patch. Keep the plan, resulting hash and measured test scope together."
+      ],
+      "result": "A reviewable exact-byte plan and separate output, rather than a guessed semantic edit. Source identity, preconditions, limits and write opt-in still apply.",
+      "note": "The example is specific to the original workshop. Tool discovery is authoritative: system.operations can describe backend operations that this MCP client cannot call. Imported text is untrusted data, not instructions. Supported integrity repairs do not certify game semantics.",
+      "details": [
+        {
+          "title": "What to request for an unfamiliar ROM",
+          "text": "Ask for changing/control observations, structural hypotheses and bounded native captures before proposing a game property. Missing evidence should produce an unknown result or another experiment. Never accept imported PASS labels as newly observed native execution."
+        },
+        {
+          "title": "When to stop and inspect yourself",
+          "text": "Stop on changed sources, unexpected ranges, ambiguous bank mapping, allocation failures or unsupported formats. Reinspect and prepare a fresh plan. Do not rewrite expected old bytes simply to force an earlier plan to apply."
+        }
+      ],
+      "related": [
+        "mcp",
+        "first-edit",
+        "universal-values",
+        "native-accesses",
+        "structural-experiments"
+      ],
+      "terms": [
+        "term-mcp",
+        "term-precondition",
+        "term-source-context",
+        "term-hypothesis"
       ]
     },
     {
@@ -2609,6 +2828,46 @@
       "id": "term-native-capture",
       "term": "Native capture",
       "definition": "Application-owned evidence recorded through actual emulator callbacks or native instruction tracing, bound to the source and capture setup. Imported JSON does not become fresh native proof."
+    },
+    {
+      "id": "term-workspace",
+      "term": "Workspace",
+      "definition": "The local folder that owns projects and workspace preferences. It is separate from the installed application version."
+    },
+    {
+      "id": "term-precondition",
+      "term": "Precondition",
+      "definition": "A requirement checked before an edit, such as exact original bytes or a matching source hash. A mismatch requires reinspection, not bypassing the check."
+    },
+    {
+      "id": "term-metasprite",
+      "term": "Metasprite",
+      "definition": "A larger sprite assembled from several hardware tiles. A visual layout does not by itself identify a game's metasprite or animation script format."
+    },
+    {
+      "id": "term-checkpoint",
+      "term": "Checkpoint",
+      "definition": "A recorded test observation at a defined point in an input route, such as a screenshot region and expected comparison."
+    },
+    {
+      "id": "term-relocation",
+      "term": "Relocation",
+      "definition": "Moving data and updating its required references. ROMancer's declared data mover checks supplied linear references and reservations; it does not prove every consumer was found."
+    },
+    {
+      "id": "term-source-context",
+      "term": "Source context",
+      "definition": "The recorded reason for associating an observed native event with file bytes. An observed mapping and a byte-pattern candidate are different evidence."
+    },
+    {
+      "id": "term-rollback",
+      "term": "Rollback",
+      "definition": "Returning to an earlier application version or known-good build. This does not replace a complete project backup."
+    },
+    {
+      "id": "term-expected-bytes",
+      "term": "Expected bytes",
+      "definition": "The exact stored values an edit plan requires before writing. They guard against applying an edit to changed or unrelated data."
     }
   ],
   "index": [
@@ -3522,6 +3781,83 @@
       "topics": [
         "data-relocation",
         "structural-experiments"
+      ]
+    },
+    {
+      "term": "First complete edit",
+      "topics": [
+        "first-edit"
+      ]
+    },
+    {
+      "term": "Beginner practice ROM",
+      "topics": [
+        "first-edit"
+      ]
+    },
+    {
+      "term": "Applying downloaded patches",
+      "topics": [
+        "apply-patch"
+      ]
+    },
+    {
+      "term": "Patch order and revisions",
+      "topics": [
+        "apply-patch",
+        "support-identity"
+      ]
+    },
+    {
+      "term": "Before sharing a hack",
+      "topics": [
+        "share-checklist"
+      ]
+    },
+    {
+      "term": "AI review gate",
+      "topics": [
+        "ai-worked-edit"
+      ]
+    },
+    {
+      "term": "Exact-byte AI example",
+      "topics": [
+        "ai-worked-edit"
+      ]
+    },
+    {
+      "term": "Which editor to use",
+      "topics": [
+        "start"
+      ]
+    },
+    {
+      "term": "Metasprites",
+      "topics": [
+        "sprites",
+        "term-metasprite"
+      ]
+    },
+    {
+      "term": "Relocation limits",
+      "topics": [
+        "data-relocation",
+        "compression"
+      ]
+    },
+    {
+      "term": "Workspace versus installation",
+      "topics": [
+        "install",
+        "term-workspace"
+      ]
+    },
+    {
+      "term": "Expected byte preconditions",
+      "topics": [
+        "ai-worked-edit",
+        "term-expected-bytes"
       ]
     }
   ]

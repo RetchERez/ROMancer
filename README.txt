@@ -64,6 +64,11 @@ workflows, actual editing screenshots, a linked glossary and an alphabetical ind
 The source and Windows packages also include user-guide/index.html and guide.pdf
 (inside app/user-guide in the Windows package). Keep the screenshots folder with it.
 
+New users can follow the complete original NES-workshop exercise: edit one pixel,
+create a build, test it, and reconstruct it from a patch. No commercial ROM is
+needed for practice. The guide also includes a checked MCP editing example and
+a checklist for testing and sharing a hack.
+
 The default 100% app size now matches the earlier 75% layout. Browser zoom can stay
 at 100%; Settings -> Preferences offers larger interface sizes.
 ROMancer is the default theme; Dark and Light are also available.

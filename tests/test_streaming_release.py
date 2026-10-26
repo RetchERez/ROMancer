@@ -18,6 +18,47 @@ def require_directory_publication(test):
 
 
 class StreamingBPSTests(unittest.TestCase):
+    def test_sparse_edits_emit_only_changed_bytes_across_stream_boundaries(self):
+        from romancer.streaming_bps import create_patch,apply_patch,CHUNK
+        from romancer.release import apply_bps
+        with tempfile.TemporaryDirectory() as temp:
+            root=Path(temp);raw=bytearray(bytes(range(256))*600)
+            marker=b'UNCHANGED-NEIGHBOR-MUST-STAY-IN-SOURCE';raw[7000:7000+len(marker)]=marker
+            target=bytearray(raw);positions=[1,CHUNK-1,CHUNK,CHUNK+10,len(raw)-1]
+            for offset in positions:target[offset]^=128
+            source=root/'source';source.write_bytes(raw);changed=root/'target';changed.write_bytes(target)
+            patch=root/'change.bps';create_patch(source,changed,patch,{})
+            encoded=patch.read_bytes();self.assertLess(len(encoded),1024)
+            self.assertNotIn(marker,encoded,'Unchanged source neighbors must be referenced, not embedded.')
+            cursor=4
+            def integer():
+                nonlocal cursor
+                value=0;shift=1
+                while True:
+                    byte=encoded[cursor];cursor+=1;value+=(byte&127)*shift
+                    if byte&128:return value
+                    shift<<=7;value+=shift
+            self.assertEqual(integer(),len(raw));self.assertEqual(integer(),len(target));metadata=integer();cursor+=metadata
+            literals=0;output=0
+            while cursor<len(encoded)-12:
+                command=integer();length=(command>>2)+1;kind=command&3
+                self.assertIn(kind,(0,1))
+                if kind==1:
+                    self.assertEqual(encoded[cursor:cursor+length],target[output:output+length]);literals+=length;cursor+=length
+                output+=length
+            self.assertEqual(literals,len(positions));self.assertEqual(output,len(target))
+            self.assertEqual(apply_bps(bytes(raw),encoded),bytes(target))
+            rebuilt=root/'rebuilt';apply_patch(source,patch,rebuilt);self.assertEqual(rebuilt.read_bytes(),target)
+
+    def test_stream_runs_handle_empty_extension_truncation_and_long_literals(self):
+        from romancer.streaming_bps import create_patch,apply_patch,CHUNK
+        for original,target in [(b'',b'new'),(b'old',b''),(b'',b''),(b'abc',b'abc-more'),
+                                (b'abcdef',b'abc'),(b'A'*(2*CHUNK+3),b'B'*(2*CHUNK+3))]:
+            with self.subTest(source_size=len(original),target_size=len(target)),tempfile.TemporaryDirectory() as temp:
+                root=Path(temp);source=root/'source';source.write_bytes(original);changed=root/'target';changed.write_bytes(target)
+                patch=root/'patch';create_patch(source,changed,patch,{})
+                rebuilt=root/'rebuilt';apply_patch(source,patch,rebuilt);self.assertEqual(rebuilt.read_bytes(),target)
+
     def test_image_above_old_limit_reconstructs_with_bounded_memory(self):
         from romancer.streaming_bps import create_patch,apply_patch
         with tempfile.TemporaryDirectory() as temp:
