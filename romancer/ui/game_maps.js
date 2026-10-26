@@ -1,3 +1,4 @@
+import {rememberPreview} from './clean_preview.js';
 import {esc,button,field,select,read} from './common.js';
 import {selectionKey} from './tool_inputs.js';
 
@@ -118,7 +119,7 @@ export function mountGameMaps(ctx){
  const original=document.getElementById('maps-original'),canvas=document.getElementById('maps-edit');if(!canvas||!original)return;
  const scope=view.scope,epoch=view.epoch,current=()=>scope===selectionKey(ctx.state)&&ctx.state.gameMapsView===view&&view.active&&view.epoch===epoch&&(ctx.state.page===undefined||ctx.state.page==='levels');
  const map=view.model.doc.map,crop=cropMap(view.center,view.overview),pending=view.pending?.revision===view.model.revision?view.pending:null;
- function draw(node,cells,editing){const image=mapPixels(map,crop,cells),g=node.getContext('2d');node.width=image.width;node.height=image.height;node.style.imageRendering='pixelated';node.style.maxWidth='100%';const frame=g.createImageData(image.width,image.height);frame.data.set(image.pixels);g.putImageData(frame,0,0);
+ function draw(node,cells,editing){const image=mapPixels(map,crop,cells),g=node.getContext('2d');node.width=image.width;node.height=image.height;node.style.imageRendering='pixelated';node.style.maxWidth='100%';const frame=g.createImageData(image.width,image.height);frame.data.set(image.pixels);g.putImageData(frame,0,0);rememberPreview(node,image.width,image.height,frame.data,{note:'Map tile graphics only; entity markers are separate overlays.'});
   const scale=crop.scale,doc=view.model.doc,objects=editing?(pending?.result.preview_objects||doc.objects.map(n=>view.model.changed(n,'npc'))):doc.objects,arrivals=editing?(pending?.result.preview_arrivals||doc.arrivals.map(a=>view.model.changed(a,'arrival'))):doc.arrivals;
   const mark=(entity,color,label)=>{if(entity.x<crop.x||entity.y<crop.y||entity.x>=crop.x+crop.width||entity.y>=crop.y+crop.height)return;const x=(entity.x-crop.x)*scale,y=(entity.y-crop.y)*scale;g.strokeStyle=color;g.lineWidth=1;g.strokeRect(x+1,y+1,scale-2,scale-2);if(scale>=12&&g.fillText){g.fillStyle=color;g.font='10px sans-serif';g.fillText(label,x+2,y+11);}};
   arrivals.forEach(a=>mark(a,'#3ba9ff','A'));objects.forEach(n=>mark(n,'#ffbc49','N'));const chosen=editing?currentTarget(view):selected(view);if(chosen)mark(chosen.entity,'#f7478c','•');

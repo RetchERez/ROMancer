@@ -68,7 +68,7 @@ tutorials is allowed; record any need for another person to explain the controls
     index 1, focus Editing, press Right Arrow then Space. One pixel changes;
     Original stays unchanged. Fit makes the comparison readable.
 [ ] Undo the sprite stroke, then redo it. See the pixel disappear and return.
-[ ] Review asset changes and create a build. Identify it in the top selector
+[ ] Review graphics changes and create a build. Identify it in the top selector
     or Overview -> Build history; distinguish it from the original ROM.
 [ ] Choose Playtest build, confirm the top bar says BUILD and shows your output,
     then Load game. Play and pause the original drawing program.
@@ -237,6 +237,19 @@ or open Help -> Keyboard shortcuts. No operating-system hotkeys are registered.
 Text fields keep their native undo/redo; game input and dialogs are left alone.
 Closing with pending saves, staged changes or an active job asks for confirmation.
 Short field explanations appear on hover or keyboard focus, with more in Help.
+
+- Search for palette, sprite, hex or save state to find tools; matching files
+  are clickable and open the exact selected revision in Resources.
+- Sprite brush swatches retain their stored indices. Declared, observed and
+  unknown grayscale colors are labeled; a missing game palette is not guessed.
+- Supported decoded image/palette pairs offer Original, Edited, Changes only,
+  Side by side and optional slow blink. Comparisons exclude editor outlines;
+  terrain-only views do not measure object or collision records. Reduced motion
+  disables blink. Save edited PNG exports the full edited sprite, not a mask.
+- Review summaries count exact bytes, including listed checksum/header updates.
+  Optional build names and multiline notes preserve the output identity.
+- Patch downloads use the release title. Download started means the browser
+  handles the save request; check its Downloads list for the resulting file.
 
 YOUR FIRST EDIT
 

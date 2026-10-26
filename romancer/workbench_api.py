@@ -1443,14 +1443,17 @@ class WorkbenchAPI:
         # Recover the initial development index format without discarding exports.
         rows=value if type(value) is list else value.get('exports')
         if type(rows) is not list or len(rows)>4096:raise ValueError('invalid export index')
-        return rows
+        from .export_names import download_name
+        return [{**row,'download_name':download_name(row)} for row in rows]
 
     def _export_path(self,project,suffix):
         if suffix not in ('txt','html','bps','zip','pcm','wav','json','png','sav','csv','tsv'):raise ValueError('unsupported export type')
         return project/'exports'/(uuid.uuid4().hex+'.'+suffix)
 
-    def _record_export(self,project,path,role,result=None):
-        row={'export_id':path.stem,'name':path.name,'role':role,**projects._measure(path)}
+    def _record_export(self,project,path,role,result=None,*,title=None):
+        from .export_names import readable_name
+        title=title if title is not None else projects.read_project(project)['name']+'-'+role
+        row={'export_id':path.stem,'name':path.name,'download_name':readable_name(title,path.suffix[1:]),'role':role,**projects._measure(path)}
         if result:
             for key in ('source_sha256','target_sha256','format'): 
                 if key in result:row[key]=result[key]
@@ -1495,10 +1498,10 @@ class WorkbenchAPI:
         path=self._export_path(project,'bps');result=prepare_patch(Path(source['path']),Path(target['path']),path,{'title':p['title'],'description':p['description']},cancelled=c)
         # Atomic BPS publication is the commit point. Finish its small index/docs transaction
         # even if a cancellation arrives afterward; the completed publication stays visible.
-        result['export']=self._record_export(project,path,'patch',result)
+        result['export']=self._record_export(project,path,'patch',result,title=p['title'])
         instructions=('ROMancer patch instructions\n\n'+p['title']+'\n\nOriginal SHA-256: '+source['sha256']+'\nTarget SHA-256: '+target['sha256']+
             '\nApply the BPS patch with a compatible patcher to your own exact source revision. Keep the original unchanged.\nVerify the output SHA-256 before use.\n\nBy RetchEWretched\n')
-        doc=self._export_path(project,'txt');publish_bytes(doc,instructions.encode());result['instructions']=self._record_export(project,doc,'documentation')
+        doc=self._export_path(project,'txt');publish_bytes(doc,instructions.encode());result['instructions']=self._record_export(project,doc,'documentation',title=p['title']+'-instructions')
         return result
 
     def _verify_patch(self,p,c):
@@ -1519,8 +1522,8 @@ class WorkbenchAPI:
         selected=[]
         for index,export_id in enumerate(p['export_ids']):
             path,row=self.download(p['project_id'],export_id)
-            selected.append({'source':str(path),'path':('patch-'+str(index)+'.bps' if row['role']=='patch' else 'document-'+str(index)+path.suffix),'role':row['role']})
+            selected.append({'source':str(path),'path':f'{index+1:02d}-'+row['download_name'],'role':row['role']})
         path=self._export_path(project,'zip');result=package_release(path,{'title':p['title'],'files':selected},cancelled=c)
-        result['export']=self._record_export(project,path,'package');return result
+        result['export']=self._record_export(project,path,'package',title=p['title']+'-release');return result
 
     def close(self):self.jobs.close();self.runtime.close()

@@ -16,7 +16,7 @@ assert.throws(()=>assemblyChanges(bitmap,layout,[1]),/dimensions/);
 console.log('Sprite assemblies preserve tile mapping and stage edits across tile boundaries together.');
 const doc={ok:true,document_id:'doc',bitmaps:[bitmap]},drafts={'sprite-layout':JSON.stringify({document_id:'doc',bitmap_id:'tiles',first:0,columns:2,rows:2,order:'rows'}),'asset-changes':'[]'},events={};let actions={};
 const canvas={style:{},getContext:()=>({createImageData:(w,h)=>({data:new Uint8ClampedArray(w*h*4)}),putImageData(){}}),addEventListener:(name,handler)=>events[name]=handler,getBoundingClientRect:()=>({left:0,top:0,width:4,height:4}),setPointerCapture(){},focus(){}};
-globalThis.document={getElementById:id=>id==='sprite-canvas'?canvas:id==='sprite-color'?{value:'3'}:Object.hasOwn(drafts,id)?{value:drafts[id]}:null};
+globalThis.document={getElementById:id=>id==='sprite-canvas'?canvas:id==='sprite-color'?{value:'3',addEventListener(){}}:Object.hasOwn(drafts,id)?{value:drafts[id]}:null};
 const ctx={state:{project:{project_id:'p'},artifact:{artifact_id:'a',sha256:'sha'},paint:null},draft:(id,fallback)=>drafts[id]??fallback,setDraft:(id,value)=>drafts[id]=value,use:handlers=>Object.assign(actions,handlers),notify(){},render:async()=>{}};
 spriteAssembly(ctx,doc,bitmap);mountSprite(ctx,doc,bitmap,null);
 const event=x=>({pointerId:1,button:0,clientX:x,clientY:0,preventDefault(){}});

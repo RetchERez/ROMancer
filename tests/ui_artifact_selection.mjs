@@ -9,3 +9,5 @@ calls=0;const oldProject=setArtifactSelection(ctx,'b',hooks);state.project={proj
 state.project={project_id:'p',sources:[a],builds:[b,d]};state.runtime={};let finishClose;hooks.flushDrafts=async()=>{};ctx.api.call=()=>new Promise(resolve=>finishClose=resolve);
 const closing=setArtifactSelection(ctx,'b',hooks);await Promise.resolve();await Promise.resolve();state.runtime=null;await setArtifactSelection(ctx,'d',hooks);finishClose();assert.equal(await closing,false);assert.equal(state.artifact,d);
 console.log('A newer artifact or project selection wins over delayed draft saves and runtime closure.');
+
+state.runtime=null;state.navigationRevision=1;let resumeCount=0;hooks.resumeLocation=()=>resumeCount++;let endSave;let saveCount=0;hooks.flushDrafts=()=>++saveCount===1?new Promise(r=>endSave=r):Promise.resolve();const navigation=setArtifactSelection(ctx,'b',hooks);state.navigationRevision=2;endSave();await navigation;assert.equal(resumeCount,0,'artifact restore does not override a newer page choice');

@@ -1,50 +1,50 @@
 WEBVTT
 
-00:00:00.000 --> 00:00:10.011
+00:00:00.000 --> 00:00:10.012
 01 · Start with a workshop
 Open the original NES workshop. Your own ROMs are not needed for this exercise.
 
-00:00:10.018 --> 00:00:24.027
+00:00:10.015 --> 00:00:24.027
 02 · Assemble a sprite
-Graphics & fonts → Assemble tiles. Fit enlarges the preview without resizing the stored image.
+Graphics & fonts: assemble tiles, then pick a brush swatch. Grayscale is labeled when the game palette is unknown.
 
-00:00:24.029 --> 00:00:36.036
+00:00:24.028 --> 00:00:36.030
 03 · Make one small change
-Focus Editing, press Right Arrow, then Space. Compare the edited pixel with Original.
+Press Right Arrow, then Space in Editing. Changes only isolates the changed pixel; side by side restores context.
 
-00:00:36.037 --> 00:00:48.052
+00:00:36.030 --> 00:00:48.041
 04 · Undo and redo
 Undo restores the original stroke. Redo brings the staged edit back.
 
-00:00:48.057 --> 00:01:06.066
+00:00:48.043 --> 00:01:06.043
 05 · Review and create a build
-Review asset changes, then Create asset build. The original file stays unchanged.
+Review graphics changes, optionally name the build, then create it. The original file stays unchanged.
 
-00:01:06.070 --> 00:01:18.078
+00:01:06.045 --> 00:01:18.054
 06 · Select and load your build
 Playtest build selects the recorded output. Load game uses the included NES engine.
 
-00:01:18.080 --> 00:01:30.091
+00:01:18.057 --> 00:01:30.072
 07 · Play and pause
 This original drawing program repeats the edited tile. Pause before saving a state.
 
-00:01:30.097 --> 00:01:48.105
+00:01:30.074 --> 00:01:48.089
 08 · Save and load a state
 Save state, then Load state. States belong to the exact build and engine setup.
 
-00:01:48.109 --> 00:02:10.119
+00:01:48.090 --> 00:02:10.098
 09 · Export a verified patch
-Choose the original and your build. Create a BPS patch, then download it.
+Create a verified patch from the original and build. Download First-sprite-edit.bps; your browser chooses its save location.
 
-00:02:10.123 --> 00:02:26.137
+00:02:10.099 --> 00:02:26.105
 10 · Reopen the project
 Close the project with Choose a project. Open it again: the source and build remain available.
 
-00:02:26.143 --> 00:02:44.154
+00:02:26.106 --> 00:02:44.107
 11 · Recover a saved draft
 Make another small edit on the original. Wait for Saved, then reload: the draft is still there.
 
-00:02:44.159 --> 00:02:52.161
+00:02:44.109 --> 00:02:52.115
 12 · Try it yourself
 A saved draft is not a new build. Follow the beginner checklist and note anything unclear.
 

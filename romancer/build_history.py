@@ -7,12 +7,19 @@ from .script_schema import load_script_json
 from .binary_tools import compare_files
 
 
+def build_note(value):
+    if type(value) is not str:raise ValueError('Invalid build notes')
+    value=value.replace('\r\n','\n')
+    label(value.replace('\n',' '),2000,blank=True)
+    return value
+
+
 def _notes(project):
     path=checked_path(Path(project)/'build-notes.json')
     if not path.exists():return {}
     value=load_script_json(path,max_bytes=1024*1024)
     if type(value) is not dict or value.get('format')!='romancer-build-notes-v1' or type(value.get('notes')) is not dict:raise ValueError('Build notes are invalid. Restore a backup.')
-    for key,text in value['notes'].items():p.identifier(key);label(text,2000,blank=True)
+    for key,text in value['notes'].items():p.identifier(key);build_note(text)
     return value['notes']
 
 
@@ -25,7 +32,7 @@ def timeline(project):
 
 
 def annotate(project,artifact_id,name,notes):
-    label(name,120);label(notes,2000,blank=True)
+    label(name,120);notes=build_note(notes)
     with p.locked(project) as value:
         row=next((r for r in value['builds'] if r['artifact_id']==artifact_id),None)
         if row is None:raise ValueError('Choose a build; original source labels are preserved.')

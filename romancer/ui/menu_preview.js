@@ -1,3 +1,4 @@
+import {rememberPreview} from './clean_preview.js';
 import {esc} from './common.js';
 import {selectionKey} from './tool_inputs.js';
 
@@ -97,7 +98,7 @@ export function mountMenuPreview(ctx,doc){
   const drafts=new Map(names(ctx,doc).map(row=>[row.record.id,row]));
   for(const [i,row] of owned.preview.cases.entries()){
    let before=null,after=null;const errors=[];
-   for(const [kind,edited] of [['original',false],['edited',true]]){const canvas=document.getElementById(`menu-${kind}-${i}`);if(!canvas)continue;try{const image=rasterCase(owned,row,drafts,edited),c=canvas.getContext('2d'),data=c.createImageData(image.width,image.height);canvas.width=image.width;canvas.height=image.height;data.data.set(image.pixels);c.putImageData(data,0,0);canvas.hidden=false;if(edited)after=image;else before=image;}catch(error){canvas.hidden=true;canvas.width=1;canvas.height=1;errors.push((edited?'Editing':'Original')+' preview unavailable: '+error.message);}}
+   for(const [kind,edited] of [['original',false],['edited',true]]){const canvas=document.getElementById(`menu-${kind}-${i}`);if(!canvas)continue;try{const image=rasterCase(owned,row,drafts,edited),c=canvas.getContext('2d'),data=c.createImageData(image.width,image.height);canvas.width=image.width;canvas.height=image.height;data.data.set(image.pixels);c.putImageData(data,0,0);rememberPreview(canvas,image.width,image.height,data.data);canvas.hidden=false;if(edited)after=image;else before=image;}catch(error){canvas.hidden=true;canvas.width=1;canvas.height=1;errors.push((edited?'Editing':'Original')+' preview unavailable: '+error.message);}}
    const status=document.getElementById('menu-case-status-'+i);if(status){let changed=0;if(before&&after)for(let n=0;n<before.pixels.length;n+=4)if([0,1,2].some(c=>before.pixels[n+c]!==after.pixels[n+c]))changed++;status.textContent=errors.length?errors.join(' '):(changed?'Preview updated · '+changed+' declared pixels differ · not built.':'Unchanged declared menu preview.')+' '+[...new Set([...(before?.warnings||[]),...(after?.warnings||[])])].join(' ');status.className=errors.length?'error':'preview-caption';}
   }
  };

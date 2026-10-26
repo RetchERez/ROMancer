@@ -9,10 +9,11 @@ export function createdBuild(state){
 export async function playtestCreatedBuild(ctx,id){
  const build=createdBuild(ctx.state),project=ctx.state.project?.project_id;
  if(!build||build.artifact_id!==id)throw Error('The selected build changed. Choose it again from Build history.');
- const target=build.sha256;
+ const target=build.sha256,navigation=ctx.state.navigationRevision;
  const selected=await ctx.setArtifact(id);
  if(selected===false)throw Error('The selection changed. Choose your build before playtesting.');
  if(ctx.state.project?.project_id!==project||ctx.state.artifact?.artifact_id!==id||ctx.state.artifact.sha256!==target)throw Error('The selection changed. Choose your build before playtesting.');
+ if(ctx.state.navigationRevision!==navigation)return;
  const scope=selectionKey(ctx.state);
  await ctx.navigate('playtest');
  if(selectionKey(ctx.state)!==scope)throw Error('The selection changed while opening Playtest.');

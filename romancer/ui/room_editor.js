@@ -1,3 +1,4 @@
+import {rememberPreview} from './clean_preview.js';
 export function roomValue(v,point){
  if(!v.object.allowed.some(p=>p[0]===point[0]&&p[1]===point[1]))throw Error('Choose a verified floor tile highlighted in the room.');
  if(point[0]===v.original[0]&&point[1]===v.original[1])return 'original';
@@ -39,7 +40,7 @@ export function mountRoomPreview(ctx,v,value,change){
  for(const id of layerIds){const input=document.getElementById(id);if(input&&Object.hasOwn(ctx.state.roomLayers,id))input.checked=ctx.state.roomLayers[id];}
  const enabled=id=>document.getElementById(id)?.checked??true;
  const paint=(node,position,targets=false)=>{
-  node.width=width;node.height=height;const c=node.getContext('2d'),image=c.createImageData(width,height);image.data.set(roomPixels(v,position,{terrain:enabled('room-show-terrain'),object:enabled('room-show-object')}));c.putImageData(image,0,0);
+  node.width=width;node.height=height;const c=node.getContext('2d'),image=c.createImageData(width,height);image.data.set(roomPixels(v,position,{terrain:enabled('room-show-terrain'),object:enabled('room-show-object')}));c.putImageData(image,0,0);rememberPreview(node,width,height,image.data,{note:'Decoded room pixels; grid, targets and selection outlines are excluded.'});
   if(v.collision_values&&enabled('room-show-collision'))v.collision_values.forEach((value,index)=>{const x=index%v.size[0]*v.tile_size,y=Math.floor(index/v.size[0])*v.tile_size;c.fillStyle=value===1?'#16775b88':'#74427288';c.fillRect(x,y,v.tile_size,v.tile_size);c.fillStyle='#fff';c.font='6px monospace';c.fillText(value.toString(16).padStart(2,'0'),x+2,y+8);});
   if(enabled('room-show-grid')){c.strokeStyle='#ffffff60';c.lineWidth=.5;for(let y=0;y<v.size[1];y++)for(let x=0;x<v.size[0];x++)c.strokeRect(x*v.tile_size+.5,y*v.tile_size+.5,v.tile_size-1,v.tile_size-1);}
   if(targets&&document.getElementById('room-show-targets')?.checked){c.strokeStyle='#26b99a';c.lineWidth=1;for(const p of v.object.allowed)c.strokeRect((p[0]-v.origin[0])*v.tile_size+.5,(p[1]-v.origin[1])*v.tile_size+.5,v.tile_size-1,v.tile_size-1);}

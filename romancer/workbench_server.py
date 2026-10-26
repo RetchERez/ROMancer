@@ -144,7 +144,7 @@ class Handler(BaseHTTPRequestHandler):
             elif path=='/api/download':
                 fields(document,'project_id export_id');file,row=self.server.api.download(**document)
                 self._headers(200,'application/octet-stream',row['size'])
-                self.send_header('Content-Disposition','attachment; filename="'+row['name']+'"');self.end_headers()
+                self.send_header('Content-Disposition','attachment; filename="'+row.get('download_name',row['name'])+'"');self.end_headers()
                 with file.open('rb') as stream:
                     while chunk:=stream.read(65536):self.wfile.write(chunk)
             else:self._json(404,{'ok':False,'error':'Unknown endpoint'})

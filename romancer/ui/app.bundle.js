@@ -5,6 +5,51 @@
       __defProp(target, name, { get: all[name], enumerable: true });
   };
 
+  // romancer/ui/change_summary.js
+  function merged(rows) {
+    const output = [];
+    for (const row of rows.sort((a, b) => a[0] - b[0])) {
+      const last = output.at(-1);
+      if (last && row[0] <= last[1]) last[1] = Math.max(last[1], row[1]);
+      else output.push([...row]);
+    }
+    return output;
+  }
+  function changeSummary(result) {
+    if (!(result == null ? void 0 : result.ok) || !(result.workbench_plan_id || result.plan_id)) return null;
+    const primary = result.hunks || result.edits;
+    if (!Array.isArray(primary) || !primary.length) return null;
+    const changed2 = [], integrity = [];
+    let budget = 0;
+    for (const [rows, isIntegrity] of [[primary, false], [result.integrity_edits || [], true]]) {
+      if (!Array.isArray(rows)) return null;
+      for (const row of rows) {
+        const before = row.before_hex ?? row.before, after = row.after_hex ?? row.after;
+        if (!Number.isSafeInteger(row.offset) || row.offset < 0 || typeof before !== "string" || typeof after !== "string" || before.length !== after.length || before.length % 2 || !/^[a-f\d]*$/i.test(before + after)) return null;
+        budget += before.length / 2;
+        if (budget > 4 * 1024 * 1024) return null;
+        let start = null;
+        for (let i = 0; i <= before.length; i += 2) {
+          const differs = i < before.length && before.slice(i, i + 2).toLowerCase() !== after.slice(i, i + 2).toLowerCase();
+          if (differs && start === null) start = row.offset + i / 2;
+          if (!differs && start !== null) {
+            const range = [start, row.offset + i / 2];
+            changed2.push(range);
+            if (isIntegrity) integrity.push(range);
+            start = null;
+            if (changed2.length > 65536) return null;
+          }
+        }
+      }
+    }
+    const union = merged(changed2);
+    return { changedBytes: union.reduce((n, r) => n + r[1] - r[0], 0), ranges: union.length, integrityBytes: merged(integrity).reduce((n, r) => n + r[1] - r[0], 0) };
+  }
+  function summaryText(result) {
+    const value = changeSummary(result);
+    return value ? `${value.changedBytes} byte${value.changedBytes === 1 ? "" : "s"} changed across ${value.ranges} range${value.ranges === 1 ? "" : "s"}${value.integrityBytes ? ` · includes ${value.integrityBytes} checksum/header byte${value.integrityBytes === 1 ? "" : "s"}` : ""}. A separate build preserves the original.` : "";
+  }
+
   // romancer/ui/icons.js
   var paths = { overview: "M3 3h7v7H3z M14 3h7v7h-7z M3 14h7v7H3z M14 14h7v7h-7z", resources: "M4 4h16v16H4z M8 8h2 M14 8h2 M8 12h2 M14 12h2 M8 16h8", scripts: "M5 3h10l4 4v14H5z M9 11h6 M9 15h6 M15 3v5h4", assets: "M3 3h18v18H3z M3 16l5-5 4 4 4-7 5 8 M8 7h.01", playtest: "M8 4l12 8-12 8z", debug: "M8 8h8v10H8z M10 8V5h4v3 M4 10h4 M16 10h4 M4 16h4 M16 16h4 M10 18v3 M14 18v3", routes: "M5 5h.01 M19 19h.01 M5 7v6a4 4 0 004 4h6 M17 15l2 2-2 2 M5 3a2 2 0 100 4 2 2 0 000-4 M19 17a2 2 0 100 4 2 2 0 000-4", regression: "M4 20V4 M4 16h4l4-6 4 3 5-8 M17 5h4v4", release: "M12 3v12 M7 8l5-5 5 5 M4 15v6h16v-6", settings: "M12 8a4 4 0 100 8 4 4 0 000-8 M12 3v2 M12 19v2 M3 12h2 M19 12h2 M5.6 5.6L7 7 M17 17l1.4 1.4 M5.6 18.4L7 17 M17 7l1.4-1.4", plus: "M12 5v14 M5 12h14", arrow: "M5 12h14 M13 6l6 6-6 6", folder: "M3 7V4h7l2 3h9v13H3z", search: "M10 3a7 7 0 100 14 7 7 0 000-14 M15 15l6 6", check: "M5 12l4 4L19 6", close: "M6 6l12 12 M18 6L6 18", download: "M12 3v12 M7 10l5 5 5-5 M4 17v4h16v-4", chevron: "M9 5l7 7-7 7", clock: "M12 3a9 9 0 100 18 9 9 0 000-18 M12 7v5l3 2", shield: "M12 3l8 3v6c0 5-8 9-8 9s-8-4-8-9V6z M8 12l3 3 5-6" };
   paths.levels = "M3 3h18v18H3z M3 9h18 M9 9v12 M15 3v6 M15 15h6";
@@ -128,12 +173,12 @@
   };
   function report(result, title = "Result") {
     if (!result) return "";
-    const tone = result.ok === false || ["FAIL", "BLOCKED", "REGRESSION"].includes(result.status) ? "danger" : ["PASS", "BUILT", "VERIFIED", "SCOPE_COVERED"].includes(result.status) ? "good" : "neutral";
-    return `<section class="card result"><div class="card-heading"><h3>${esc(title)}</h3>${badge(result.status || "READY", tone)}</div>${result.error ? `<p class="error">${esc(typeof result.error === "string" ? result.error : result.error.message)}</p>` : ""}<details><summary>Inspect the full report</summary><pre>${esc(JSON.stringify(result, null, 2))}</pre></details></section>`;
+    const summary = summaryText(result), tone = result.ok === false || ["FAIL", "BLOCKED", "REGRESSION"].includes(result.status) ? "danger" : ["PASS", "BUILT", "VERIFIED", "SCOPE_COVERED"].includes(result.status) ? "good" : "neutral";
+    return `<section class="card result"><div class="card-heading"><h3>${esc(title)}</h3>${badge(result.status || "READY", tone)}</div>${summary ? `<p class="notice change-summary" role="status">${esc(summary)}</p>` : ""}${result.error ? `<p class="error">${esc(typeof result.error === "string" ? result.error : result.error.message)}</p>` : ""}<details><summary>Inspect the full report</summary><pre>${esc(JSON.stringify(result, null, 2))}</pre></details></section>`;
   }
   var empty = (title, message, action = "") => `<div class="empty">${icon("folder")}<h3>${esc(title)}</h3><p>${esc(message)}</p>${action}</div>`;
-  function heading(kicker, title, description, actions2 = "") {
-    return `<header class="page-heading"><div><h1>${esc(title)}</h1></div><div class="actions">${actions2}${title === "Help" ? "" : button("Help", "help-topic", { icon: "shield" })}</div></header>`;
+  function heading(kicker, title, description, actions3 = "") {
+    return `<header class="page-heading"><div><h1>${esc(title)}</h1></div><div class="actions">${actions3}${title === "Help" ? "" : button("Help", "help-topic", { icon: "shield" })}</div></header>`;
   }
   function requireProject(ctx2) {
     if (!ctx2.state.project) return empty("Open a project to begin", "Import your own source or explore the original demonstration fixture.", button("Open demonstration", "demo", { primary: true, icon: "arrow" }));
@@ -328,8 +373,8 @@
   }
 
   // romancer/ui/workspace_status.js
-  function saveStatus(snapshot) {
-    return snapshot.failed ? { label: "Save failed", tone: "danger" } : snapshot.pending ? { label: "Saving…", tone: "warm" } : { label: "Saved", tone: "good" };
+  function saveStatus(snapshot2) {
+    return snapshot2.failed ? { label: "Save failed", tone: "danger" } : snapshot2.pending ? { label: "Saving…", tone: "warm" } : { label: "Saved", tone: "good" };
   }
   function guardClose(event, queue, state2 = {}) {
     const active = state2.job && !["COMPLETED", "FAILED", "CANCELLED", "INTERRUPTED"].includes(state2.job.status);
@@ -396,9 +441,293 @@
     }
     return ((_l = state2.hexDraft) == null ? void 0 : _l.scope) === selectionKey(state2) && !!((_n = (_m = state2.hexDraft) == null ? void 0 : _m.changes) == null ? void 0 : _n.size);
   }
-  function workspaceStatus(state2, snapshot, includeFile = true) {
-    const file = artifactStatus(state2.artifact), save = saveStatus(snapshot);
-    return `<div class="workspace-state" aria-label="File and edit status">${includeFile ? badge(file.label, file.tone) : ""}${hasStagedChanges(state2) ? badge("Staged changes · build required", "warm") : ""}<span id="draft-save-status" role="status" aria-live="polite" class="save-state ${save.tone}">${esc(save.label)}</span>${snapshot.failed ? '<button type="button" data-action="draft-retry">Retry save</button>' : ""}</div>`;
+  function workspaceStatus(state2, snapshot2, includeFile = true) {
+    const file = artifactStatus(state2.artifact), save = saveStatus(snapshot2);
+    return `<div class="workspace-state" aria-label="File and edit status">${includeFile ? badge(file.label, file.tone) : ""}${hasStagedChanges(state2) ? badge("Staged changes · build required", "warm") : ""}<span id="draft-save-status" role="status" aria-live="polite" class="save-state ${save.tone}">${esc(save.label)}</span>${snapshot2.failed ? '<button type="button" data-action="draft-retry">Retry save</button>' : ""}</div>`;
+  }
+
+  // romancer/ui/clean_preview.js
+  var previews = /* @__PURE__ */ new WeakMap();
+  function rememberPreview(canvas, width, height, pixels, { note = "" } = {}) {
+    if (!canvas || !Number.isSafeInteger(width) || !Number.isSafeInteger(height) || width < 1 || height < 1 || width * height > 1024 * 1024 || pixels.length !== width * height * 4) {
+      if (canvas) previews.delete(canvas);
+      return false;
+    }
+    previews.set(canvas, { width, height, pixels: new Uint8ClampedArray(pixels), kind: "pixels", note });
+    return true;
+  }
+  function cleanPreview(canvas) {
+    const value = previews.get(canvas);
+    return value && value.width === canvas.width && value.height === canvas.height ? value : null;
+  }
+
+  // romancer/ui/visual_comparison.js
+  var blinkAllowed = (appReduced, systemReduced) => !appReduced && !systemReduced;
+  function differencePixels(before, after) {
+    if (before.length !== after.length || before.length % 4 || before.length > 4 * 1024 * 1024) throw Error("Comparison dimensions differ or exceed the preview budget.");
+    const pixels = new Uint8ClampedArray(after.length);
+    let changed2 = 0;
+    for (let i = 0; i < after.length; i += 4) if ([0, 1, 2, 3].some((c) => before[i + c] !== after[i + c])) {
+      pixels.set(after.subarray(i, i + 4), i);
+      changed2++;
+    }
+    return { pixels, changed: changed2 };
+  }
+  function snapshot(panel2) {
+    const canvas = panel2.querySelector("canvas");
+    if (canvas) return cleanPreview(canvas);
+    const chips = [...panel2.querySelectorAll("svg.preview-swatch rect")];
+    if (chips.length) {
+      const width = 16, height = Math.ceil(chips.length / 16), pixels = new Uint8ClampedArray(width * height * 4);
+      for (const [i, chip] of chips.entries()) {
+        const match = /^rgb\(\s*(\d+)\s*,\s*(\d+)\s*,\s*(\d+)\s*\)$/.exec(chip.getAttribute("fill"));
+        if (!match) return null;
+        const rgb = match.slice(1).map(Number);
+        if (rgb.some((n) => n > 255)) return null;
+        pixels.set([...rgb, 255], i * 4);
+      }
+      return { width, height, pixels, kind: "colors" };
+    }
+    return null;
+  }
+  function mountVisualComparisons(root, state2, { reduceMotion = false } = {}) {
+    var _a, _b;
+    const pairs = /* @__PURE__ */ new Map(), preferences = state2.comparisonModes ??= /* @__PURE__ */ new Map();
+    let stopped = false, scheduled = 0;
+    const motion = (_a = globalThis.matchMedia) == null ? void 0 : _a.call(globalThis, "(prefers-reduced-motion: reduce)");
+    let allowBlink = blinkAllowed(reduceMotion, motion == null ? void 0 : motion.matches);
+    function attach(pair, key3) {
+      const panels = [...pair.children];
+      if (panels.length !== 2) return;
+      try {
+        if (!snapshot(panels[0]) || !snapshot(panels[1])) return;
+      } catch {
+        return;
+      }
+      const controls = document.createElement("div");
+      controls.className = "comparison-controls";
+      controls.innerHTML = '<label>Compare <select aria-label="Comparison view"><option value="side">Side by side</option><option value="original">Original</option><option value="edited">Edited</option><option value="changes">Changes only</option></select></label><label class="comparison-blink"><input type="checkbox" aria-label="Blink original and edited"> Blink slowly</label><span class="subtle comparison-note"></span>';
+      const select3 = controls.querySelector("select"), blink = controls.querySelector("input"), note = controls.querySelector(".comparison-note");
+      select3.value = preferences.get(key3) || "side";
+      blink.disabled = !allowBlink;
+      if (!allowBlink) blink.parentElement.title = "Blink follows reduced-motion settings.";
+      const difference = document.createElement("div");
+      difference.className = "comparison-difference";
+      difference.hidden = true;
+      difference.innerHTML = '<span>Changes only · read-only</span><div class="comparison-mask"><canvas role="img" aria-label="Changed pixels only"></canvas></div><p class="subtle comparison-count"></p>';
+      let holder = null;
+      if (pair.classList.contains("game-map-previews")) {
+        holder = document.createElement("div");
+        holder.className = "comparison-widget";
+        pair.before(holder);
+        holder.append(controls, pair);
+      } else pair.before(controls);
+      pair.append(difference);
+      const canvas = difference.querySelector("canvas");
+      let timer = null, phase = 0, disposed = false;
+      const originalInert = panels.map((node) => node.inert);
+      const current2 = () => !disposed && !stopped && root.isConnected && pair.isConnected;
+      function update() {
+        if (!current2()) return;
+        const value = select3.value;
+        const derived = value === "changes" || blink.checked;
+        pair.classList.toggle("comparison-single", value !== "side" || blink.checked);
+        difference.hidden = !derived;
+        panels[0].hidden = derived || !["side", "original"].includes(value);
+        panels[1].hidden = derived || !["side", "edited"].includes(value);
+        panels.forEach((panel2, i) => panel2.inert = blink.checked || originalInert[i]);
+        note.textContent = blink.checked ? "Blink comparison · painting paused" : "";
+        if (derived) try {
+          const a = snapshot(panels[0]), b = snapshot(panels[1]);
+          if (!a || !b || a.width !== b.width || a.height !== b.height) throw Error("Preview dimensions differ. Use side by side.");
+          const diff = blink.checked ? null : differencePixels(a.pixels, b.pixels), pixels = blink.checked ? phase ? b.pixels : a.pixels : diff.pixels;
+          canvas.width = b.width;
+          canvas.height = b.height;
+          const context = canvas.getContext("2d"), image = context.createImageData(b.width, b.height);
+          image.data.set(pixels);
+          context.putImageData(image, 0, 0);
+          canvas.style.width = Math.min(512, b.width * 32) + "px";
+          difference.querySelector(":scope > span").textContent = blink.checked ? (phase ? "Edited" : "Original") + " · blink preview" : "Changes only · read-only";
+          difference.querySelector(".comparison-count").textContent = (blink.checked ? "Content preview only" : diff.changed + " changed " + (b.kind === "colors" ? diff.changed === 1 ? "color" : "colors" : diff.changed === 1 ? "pixel" : "pixels") + " · checkerboard marks unchanged areas") + (b.note ? " · " + b.note : "");
+        } catch (error) {
+          difference.querySelector(".comparison-count").textContent = error.message;
+          canvas.width = 1;
+          canvas.height = 1;
+        }
+      }
+      select3.addEventListener("change", () => {
+        preferences.set(key3, select3.value);
+        while (preferences.size > 64) preferences.delete(preferences.keys().next().value);
+        update();
+      });
+      blink.addEventListener("change", () => {
+        clearInterval(timer);
+        timer = null;
+        select3.disabled = blink.checked;
+        if (blink.checked) {
+          phase = 0;
+          timer = setInterval(() => {
+            if (current2() && !document.hidden) {
+              phase = 1 - phase;
+              update();
+            }
+          }, 1200);
+        }
+        update();
+      });
+      const record = { update, setMotion(allowed) {
+        blink.disabled = !allowed;
+        if (!allowed) {
+          blink.checked = false;
+          select3.disabled = false;
+          clearInterval(timer);
+          timer = null;
+        }
+        update();
+      }, dispose() {
+        if (disposed) return;
+        disposed = true;
+        clearInterval(timer);
+        controls.remove();
+        difference.remove();
+        if (holder) {
+          holder.before(pair);
+          holder.remove();
+        }
+        pair.classList.remove("comparison-single");
+        panels.forEach((node, i) => {
+          node.hidden = false;
+          node.inert = originalInert[i];
+        });
+      } };
+      pairs.set(pair, record);
+      update();
+    }
+    function scan() {
+      var _a2, _b2;
+      scheduled = 0;
+      if (stopped || !root.isConnected) return;
+      for (const [pair, record] of pairs) if (!pair.isConnected || !root.contains(pair)) {
+        record.dispose();
+        pairs.delete(pair);
+      }
+      let index = 0;
+      for (const pair of root.querySelectorAll(".preview-pair,.game-map-previews")) {
+        const key3 = [(_a2 = state2.project) == null ? void 0 : _a2.project_id, (_b2 = state2.artifact) == null ? void 0 : _b2.artifact_id, state2.page, pair.className, index++].join(":");
+        if (!pairs.has(pair)) attach(pair, key3);
+      }
+      for (const record of pairs.values()) record.update();
+    }
+    const queue = () => {
+      if (!stopped && !scheduled) scheduled = requestAnimationFrame(scan);
+    };
+    const observer = new MutationObserver((records) => {
+      if (records.some((record) => {
+        var _a2, _b2;
+        return !((_b2 = (_a2 = record.target).closest) == null ? void 0 : _b2.call(_a2, ".comparison-controls,.comparison-difference"));
+      })) queue();
+    });
+    observer.observe(root, { childList: true, subtree: true });
+    const events = ["input", "change", "pointerup", "keydown", "sprite-refresh", "map-refresh", "animation-refresh"];
+    for (const event of events) root.addEventListener(event, queue, true);
+    const motionChanged = () => {
+      allowBlink = blinkAllowed(reduceMotion, motion == null ? void 0 : motion.matches);
+      for (const record of pairs.values()) record.setMotion(allowBlink);
+    };
+    (_b = motion == null ? void 0 : motion.addEventListener) == null ? void 0 : _b.call(motion, "change", motionChanged);
+    scan();
+    return { dispose() {
+      var _a2;
+      if (stopped) return;
+      stopped = true;
+      (_a2 = motion == null ? void 0 : motion.removeEventListener) == null ? void 0 : _a2.call(motion, "change", motionChanged);
+      observer.disconnect();
+      cancelAnimationFrame(scheduled);
+      for (const event of events) root.removeEventListener(event, queue, true);
+      for (const record of pairs.values()) record.dispose();
+      pairs.clear();
+    } };
+  }
+
+  // romancer/ui/build_details.js
+  var actions = /* @__PURE__ */ new Set(["asset-apply", "script-apply", "translation-apply", "table-build", "levels-build", "sound-build", "bytes-apply", "hex-apply", "game-apply", "maps-build", "reloc-build", "compression-build", "recipe-build"]);
+  var pendingKinds = { "asset-apply": "assets", "script-apply": "script", "table-build": "table", "levels-build": "levels", "sound-build": "sound", "bytes-apply": "bytes", "reloc-build": "relocation", "compression-build": "compression", "recipe-build": "recipe" };
+  function planForBuildAction(state2, action) {
+    var _a, _b, _c;
+    if (action === "hex-apply") {
+      const row = state2.hexReview;
+      return (row == null ? void 0 : row.scope) === selectionKey(state2) && state2.hexDraft && row.signature === JSON.stringify(state2.hexDraft.edits(state2)) ? row.plan : null;
+    }
+    if (action === "game-apply") return ((_a = state2.gameEditPlan) == null ? void 0 : _a.scope) === selectionKey(state2) ? state2.gameEditPlan.result : null;
+    const kind = pendingKinds[action], pending = state2.pending;
+    if (!kind || (pending == null ? void 0 : pending.kind) !== kind || pending.artifact_id !== ((_b = state2.artifact) == null ? void 0 : _b.artifact_id) || pending.project_id && pending.project_id !== ((_c = state2.project) == null ? void 0 : _c.project_id)) return null;
+    return [...Object.values(state2.results || {}), pending.report].find((row) => row && (row.workbench_plan_id || row.plan_id) === pending.plan_id) || null;
+  }
+  function mountBuildDetails(ctx2, root = document.getElementById("main")) {
+    const target = [...root.querySelectorAll("[data-action]")].find((node) => actions.has(node.dataset.action) && !node.disabled && !node.textContent.includes("Open existing build"));
+    if (!target || root.querySelector("#next-build-name")) return;
+    const panel2 = document.createElement("details");
+    panel2.className = "build-details";
+    panel2.innerHTML = `<summary>Name and notes for this build (optional)</summary><label class="field"><span>Build name</span><input id="next-build-name" maxlength="120" value="${esc(ctx2.draft("next-build-name", ""))}" placeholder="Keep the automatic name"></label><label class="field"><span>Build notes</span><textarea id="next-build-notes" maxlength="2000" rows="2">${esc(ctx2.draft("next-build-notes", ""))}</textarea></label>`;
+    (target.closest(".actions") || target).before(panel2);
+    const text = summaryText(planForBuildAction(ctx2.state, target.dataset.action));
+    if (text) {
+      const note = document.createElement("p");
+      note.className = "notice build-change-summary";
+      note.setAttribute("role", "status");
+      note.textContent = text;
+      panel2.before(note);
+    }
+  }
+  async function runNamedBuild(ctx2, operation, parameters, options, runner) {
+    var _a;
+    if (!["build.apply", "structured.apply"].includes(operation)) return runner(operation, parameters, options);
+    const name = ctx2.draft("next-build-name", "").trim(), notes = ctx2.draft("next-build-notes", "").replace(/\r\n/g, "\n"), scope = selectionKey(ctx2.state), project = (_a = ctx2.state.project) == null ? void 0 : _a.project_id;
+    if (name.length > 120 || notes.length > 2e3) throw Error("Use up to 120 characters for the build name and 2000 for notes.");
+    if (/[\x00-\x1f\x7f-\x9f]/.test(name) || /[\x00-\x09\x0b-\x1f\x7f-\x9f]/.test(notes)) throw Error("Remove control characters from the build name or notes.");
+    if (!name && !notes) return runner(operation, parameters, options);
+    const current2 = () => scope === selectionKey(ctx2.state), changed2 = () => Error("Build completed for the previous selection. Open that file to review it.");
+    let result = await runner(operation, parameters, { ...options, render: false });
+    if (!current2()) throw changed2();
+    if ((result == null ? void 0 : result.kind) === "build" && result.artifact_id) {
+      try {
+        await ctx2.api.call("builds.annotate", { project_id: project, artifact_id: result.artifact_id, name: name || result.name, notes });
+      } catch (error) {
+        if (!current2()) throw changed2();
+        ctx2.notify("Build created, but its name/notes were not saved. Use Build history to retry. " + error.message, true);
+        result = { ...result, metadata_warning: true };
+      }
+      if (!current2()) throw changed2();
+      await ctx2.refreshProject();
+      if (!current2()) throw changed2();
+      const row = ctx2.state.project.builds.find((r) => r.artifact_id === result.artifact_id);
+      if (row) result = { ...result, name: row.name };
+      if (!result.metadata_warning) {
+        if (ctx2.draft("next-build-name", "").trim() === name) ctx2.setDraft("next-build-name", "");
+        if (ctx2.draft("next-build-notes", "") === notes) ctx2.setDraft("next-build-notes", "");
+      }
+      ctx2.state.results ??= {};
+      ctx2.state.results[operation] = result;
+    }
+    if (options.render !== false) await ctx2.render();
+    return result;
+  }
+
+  // romancer/ui/workspace_search.js
+  var aliases = { assets: "palette color colour sprite tiles graphics font", resources: "hex bytes offsets compare files checksums crc rom", scripts: "text dialogue translation encoding layout", tables: "numbers stats balance values table", levels: "map rooms terrain objects level", sound: "music sound audio samples", playtest: "play emulator controller save state load state", debug: "investigate find value memory watch trace", release: "export patch bps ips download", settings: "theme light dark size zoom preferences", help: "guide tutorial help shortcuts" };
+  function workspaceMatches(query, names4, project) {
+    const words = String(query).toLowerCase().trim().split(/\s+/).filter(Boolean), matches = [];
+    for (const [page, label] of Object.entries(names4)) if (words.every((w) => (label + " " + (aliases[page] || "")).toLowerCase().includes(w))) matches.push({ page, label, kind: "tool" });
+    for (const row of [...(project == null ? void 0 : project.sources) || [], ...(project == null ? void 0 : project.builds) || []]) if (words.every((w) => (row.name + " " + row.kind).toLowerCase().includes(w))) matches.push({ artifact_id: row.artifact_id, sha256: row.sha256, project_id: project.project_id, label: row.name, kind: row.kind });
+    return matches.slice(0, 32);
+  }
+  async function openSearchFile(ctx2, project, id, sha) {
+    var _a, _b, _c, _d, _e;
+    const navigation = ctx2.state.navigationRevision;
+    const row = [...((_a = ctx2.state.project) == null ? void 0 : _a.sources) || [], ...((_b = ctx2.state.project) == null ? void 0 : _b.builds) || []].find((r) => r.artifact_id === id && r.sha256 === sha);
+    if (((_c = ctx2.state.project) == null ? void 0 : _c.project_id) !== project || !row) throw Error("This file changed. Search again.");
+    if (await ctx2.setArtifact(id, { restore: false }) === false) return;
+    if (ctx2.state.navigationRevision === navigation && ((_d = ctx2.state.project) == null ? void 0 : _d.project_id) === project && ((_e = ctx2.state.artifact) == null ? void 0 : _e.artifact_id) === id && ctx2.state.artifact.sha256 === sha) await ctx2.navigate("resources");
   }
 
   // romancer/ui/build_handoff.js
@@ -414,10 +743,11 @@
     var _a, _b, _c;
     const build = createdBuild(ctx2.state), project = (_a = ctx2.state.project) == null ? void 0 : _a.project_id;
     if (!build || build.artifact_id !== id) throw Error("The selected build changed. Choose it again from Build history.");
-    const target = build.sha256;
+    const target = build.sha256, navigation = ctx2.state.navigationRevision;
     const selected2 = await ctx2.setArtifact(id);
     if (selected2 === false) throw Error("The selection changed. Choose your build before playtesting.");
     if (((_b = ctx2.state.project) == null ? void 0 : _b.project_id) !== project || ((_c = ctx2.state.artifact) == null ? void 0 : _c.artifact_id) !== id || ctx2.state.artifact.sha256 !== target) throw Error("The selection changed. Choose your build before playtesting.");
+    if (ctx2.state.navigationRevision !== navigation) return;
     const scope = selectionKey(ctx2.state);
     await ctx2.navigate("playtest");
     if (selectionKey(ctx2.state) !== scope) throw Error("The selection changed while opening Playtest.");
@@ -583,9 +913,9 @@
   }
 
   // romancer/ui/artifact_selection.js
-  async function setArtifactSelection(ctx2, id, hooks) {
+  async function setArtifactSelection(ctx2, id, hooks, options = {}) {
     var _a, _b;
-    const { state: state2 } = ctx2, project = (_a = state2.project) == null ? void 0 : _a.project_id, ticket = selectionTicket(state2);
+    const { state: state2 } = ctx2, project = (_a = state2.project) == null ? void 0 : _a.project_id, ticket = selectionTicket(state2), navigation = state2.navigationRevision;
     const current2 = () => {
       var _a2;
       return selectionCurrent(state2, ticket) && ((_a2 = state2.project) == null ? void 0 : _a2.project_id) === project;
@@ -614,7 +944,7 @@
     state2.catalogPage = 0;
     state2.catalogQuery = "";
     state2.pending = null;
-    hooks.resumeLocation();
+    if (options.restore !== false && state2.navigationRevision === navigation) hooks.resumeLocation();
     await ctx2.render();
     return current2();
   }
@@ -1273,7 +1603,7 @@
     const manager = async () => {
       const [live, trash] = await Promise.all([ctx2.api.call("projects.list", {}), ctx2.api.call("projects.trash", {})]);
       state2.projects = live.projects;
-      ctx2.modal("Projects", `<div class="actions">${button("New project", "new-project", { primary: true, icon: "plus" })}</div>${live.projects.length ? live.projects.map((p) => `<div class="resource-row"><div class="resource-meta"><strong>${esc(p.name)}</strong><small>${p.sources.length} sources · ${p.builds.length} builds</small></div><div class="actions">${button("Open", "manager-open", { id: p.project_id })}${button("Delete project", "manager-delete", { id: p.project_id })}</div></div>`).join("") : "<p>No projects yet.</p>"}<details><summary>Trash · ${trash.projects.length}</summary><p>Restore a deleted project with its sources and builds intact.</p>${trash.projects.map((p) => `<div class="resource-row"><strong class="resource-meta">${esc(p.name)}</strong>${button("Restore", "manager-restore", { id: p.trash_id })}</div>`).join("") || "<p>Trash is empty.</p>"}</details>`);
+      ctx2.modal("Projects", `<div class="actions">${button("New project", "new-project", { primary: true, icon: "plus" })}</div>${live.projects.length ? live.projects.map((p) => `<div class="resource-row"><div class="resource-meta"><strong>${esc(p.name)}</strong><small>${p.sources.length} source${p.sources.length === 1 ? "" : "s"} · ${p.builds.length} build${p.builds.length === 1 ? "" : "s"}</small></div><div class="actions">${button("Open", "manager-open", { id: p.project_id })}${button("Delete project", "manager-delete", { id: p.project_id })}</div></div>`).join("") : "<p>No projects yet.</p>"}<details><summary>Trash · ${trash.projects.length}</summary><p>Restore a deleted project with its sources and builds intact.</p>${trash.projects.map((p) => `<div class="resource-row"><strong class="resource-meta">${esc(p.name)}</strong>${button("Restore", "manager-restore", { id: p.trash_id })}</div>`).join("") || "<p>Trash is empty.</p>"}</details>`);
     };
     return {
       "new-project": () => {
@@ -1570,8 +1900,8 @@
   function numericBounds(type) {
     const match = /^([us])(8|16|24|32)$/.exec(type);
     if (!match) return { minimum: -Infinity, maximum: Infinity };
-    const bits = Number(match[2]), signed2 = match[1] === "s";
-    return { minimum: signed2 ? -(2 ** (bits - 1)) : 0, maximum: 2 ** (bits - Number(signed2)) - 1 };
+    const bits2 = Number(match[2]), signed2 = match[1] === "s";
+    return { minimum: signed2 ? -(2 ** (bits2 - 1)) : 0, maximum: 2 ** (bits2 - Number(signed2)) - 1 };
   }
   function numberComparison(before, after, { minimum = -Infinity, maximum = Infinity, compact = false } = {}) {
     let d;
@@ -1833,13 +2163,13 @@
         const current2 = collectVisible();
         const result = await ctx2.run("tables.batch", { ...ctx2.sourceParams(), definition: model.definition, field: read("table-batch-field"), operation: read("table-batch-operation"), value: integer2("table-batch-value"), first: integer2("table-batch-first"), count: integer2("table-batch-count") }, { render: false });
         if (((_a2 = state2.results["tables.inspect"]) == null ? void 0 : _a2.document_id) !== model.document_id || result.document_id !== model.document_id) throw Error("Table definition changed. Repeat the batch preview.");
-        const merged = new Map(current2.map((change) => [change.row + ":" + change.field, change]));
+        const merged2 = new Map(current2.map((change) => [change.row + ":" + change.field, change]));
         for (const change of result.changes) {
-          merged.set(change.row + ":" + change.field, change);
+          merged2.set(change.row + ":" + change.field, change);
           const index = model.definition.fields.findIndex((field2) => field2.name === change.field);
           ctx2.setDraft(inputId(change.row, index), String(change.after));
         }
-        saveChanges([...merged.values()]);
+        saveChanges([...merged2.values()]);
         await ctx2.render();
         ctx2.notify(result.changes.length + " batch changes staged. Review before building.");
       },
@@ -1972,13 +2302,16 @@
       return result;
     },
     async download(project_id, export_id, name) {
+      var _a;
       const response = await fetch("/api/download", { method: "POST", headers: headers(), body: JSON.stringify({ project_id, export_id }) });
       if (!response.ok) throw new Error("Export could not be downloaded. Refresh the export list and try again.");
       const blob = await response.blob(), url = URL.createObjectURL(blob), a = document.createElement("a");
       a.href = url;
-      a.download = name;
+      const suggested = ((_a = /filename="([A-Za-z0-9_-]+\.[a-z]+)"/.exec(response.headers.get("Content-Disposition") || "")) == null ? void 0 : _a[1]) || name;
+      a.download = suggested;
       a.click();
       setTimeout(() => URL.revokeObjectURL(url), 2e3);
+      return { name: suggested };
     }
   };
 
@@ -2104,6 +2437,7 @@
       const c = node.getContext("2d"), image = c.createImageData(width, height);
       image.data.set(roomPixels(v, position, { terrain: enabled("room-show-terrain"), object: enabled("room-show-object") }));
       c.putImageData(image, 0, 0);
+      rememberPreview(node, width, height, image.data, { note: "Decoded room pixels; grid, targets and selection outlines are excluded." });
       if (v.collision_values && enabled("room-show-collision")) v.collision_values.forEach((value2, index) => {
         const x = index % v.size[0] * v.tile_size, y = Math.floor(index / v.size[0]) * v.tile_size;
         c.fillStyle = value2 === 1 ? "#16775b88" : "#74427288";
@@ -3604,6 +3938,7 @@
             canvas.height = image.height;
             data.data.set(image.pixels);
             c.putImageData(data, 0, 0);
+            rememberPreview(canvas, image.width, image.height, data.data);
             canvas.hidden = false;
             if (edited) after = image;
             else before = image;
@@ -3989,6 +4324,25 @@
     });
   }
 
+  // romancer/ui/brush_colors.js
+  var bits = { "mono-row-msb-v1": 1, "tile8-paired2-msb-v1": 2, "tile8-planar2-msb-v1": 2, "tile8-paired4-msb-v1": 4, "tile8-packed4-high-v1": 4, "tile8-packed4-low-v1": 4 };
+  var valid = (rgb) => Array.isArray(rgb) && rgb.length === 3 && rgb.every((v) => Number.isInteger(v) && v >= 0 && v <= 255);
+  function brushColors(bitmap, palette2, layout) {
+    const count = bits[bitmap == null ? void 0 : bitmap.codec] ? Math.min(2 ** bits[bitmap.codec], (palette2 == null ? void 0 : palette2.colors_per_bank) || 256) : 0;
+    return Array.from({ length: count }, (_, index) => {
+      const entry = palette2 == null ? void 0 : palette2.entries.find((e) => e.bank === 0 && e.index === index), declared2 = entry && [entry.rgb.r, entry.rgb.g, entry.rgb.b];
+      if (valid(declared2)) return { index, rgb: declared2, colors: [declared2], origin: "declared" };
+      const observed = [...new Map(((layout == null ? void 0 : layout.colors) || []).map((part) => part == null ? void 0 : part[index]).filter(valid).map((rgb2) => [rgb2.join(","), rgb2])).values()];
+      if (observed.length) return { index, rgb: observed[0], colors: observed, origin: "observed" };
+      const shade = Math.round(18 + index / Math.max(1, count - 1) * 216), rgb = [shade, shade, shade];
+      return { index, rgb, colors: [rgb], origin: "grayscale" };
+    });
+  }
+  function brushSwatches(colors, selected2) {
+    const kinds = new Set(colors.map((c) => c.origin)), label = kinds.size === 1 && kinds.has("declared") ? "Declared palette colors" : kinds.size === 1 && kinds.has("grayscale") ? "Grayscale preview · actual game palette unknown" : kinds.has("grayscale") ? "Declared/observed colors where available · grayscale for unknown entries" : "Observed/declared preview colors";
+    return `<div class="brush-swatches" role="group" aria-label="Sprite brush colors">${colors.map((color) => `<button type="button" data-action="sprite-brush" data-id="${color.index}" data-brush-index="${color.index}" aria-pressed="${color.index === Number(selected2)}" aria-label="Color index ${color.index} · ${color.origin}${color.colors.length > 1 ? " · varies across sprite parts" : ""}"><svg viewBox="0 0 32 24" width="32" height="24" aria-hidden="true">${color.colors.slice(0, 8).map((rgb, i, rows) => `<rect x="${i * 32 / rows.length}" width="${32 / rows.length}" height="24" fill="rgb(${rgb.join(",")})"/>`).join("")}</svg><span>${color.index}</span></button>`).join("")}</div><p class="subtle brush-color-source">${esc(label)}</p>`;
+  }
+
   // romancer/ui/pixel_history.js
   var PixelHistory = class {
     constructor(scope, pixels, limit = 64) {
@@ -4086,8 +4440,8 @@
     const paint = (event) => {
       const rect = canvas.getBoundingClientRect(), x = Math.floor((event.clientX - rect.left) / rect.width * bitmap.width), y = Math.floor((event.clientY - rect.top) / rect.height * bitmap.height);
       if (x < 0 || y < 0 || x >= bitmap.width || y >= bitmap.height) return;
-      const color = Number(document.getElementById("paint-color").value), bits = { "mono-row-msb-v1": 1, "tile8-paired2-msb-v1": 2, "tile8-planar2-msb-v1": 2, "tile8-paired4-msb-v1": 4, "tile8-packed4-high-v1": 4, "tile8-packed4-low-v1": 4 }[bitmap.codec];
-      if (!Number.isInteger(color) || color < 0 || color >= 2 ** bits) throw Error("Choose a valid color index.");
+      const color = Number(document.getElementById("paint-color").value), bits2 = { "mono-row-msb-v1": 1, "tile8-paired2-msb-v1": 2, "tile8-planar2-msb-v1": 2, "tile8-paired4-msb-v1": 4, "tile8-packed4-high-v1": 4, "tile8-packed4-low-v1": 4 }[bitmap.codec];
+      if (!Number.isInteger(color) || color < 0 || color >= 2 ** bits2) throw Error("Choose a valid color index.");
       const pixels = [...pixelBuffer(ctx2, doc, bitmap, index())];
       pixels[y * bitmap.width + x] = color;
       ctx2.state.pixelCursor = { x, y };
@@ -4166,9 +4520,9 @@
       if (change.kind !== "cell" || typeof change.bitmap_id !== "string" || !Number.isSafeInteger(change.cell_index) || change.cell_index < 0 || !Array.isArray(change.before_pixels) || !Array.isArray(change.after_pixels) || change.before_pixels.length !== change.after_pixels.length || change.before_pixels.length > 1024) throw new Error("Invalid staged tile change.");
       keys2.add(change.bitmap_id + ":" + change.cell_index);
     }
-    const merged = [...changes.filter((change) => change.kind !== "cell" || !keys2.has(change.bitmap_id + ":" + change.cell_index)), ...incoming.filter((change) => JSON.stringify(change.before_pixels) !== JSON.stringify(change.after_pixels))];
-    if (merged.length > 1024) throw new Error("Review at most1024 asset changes at a time.");
-    return JSON.parse(JSON.stringify(merged));
+    const merged2 = [...changes.filter((change) => change.kind !== "cell" || !keys2.has(change.bitmap_id + ":" + change.cell_index)), ...incoming.filter((change) => JSON.stringify(change.before_pixels) !== JSON.stringify(change.after_pixels))];
+    if (merged2.length > 1024) throw new Error("Review at most1024 asset changes at a time.");
+    return JSON.parse(JSON.stringify(merged2));
   }
 
   // romancer/ui/tilemap_editor.js
@@ -4242,7 +4596,7 @@
       return ctx2.render();
     } });
     return `<section class="card" id="tilemap-editor"><h3>Tilemap · ${esc(map.id)}</h3><div class="actions">${doc.tilemaps.length > 1 ? doc.tilemaps.map((r) => button(r.id, "asset-map-group", { id: r.id })).join("") : ""}</div><p>Pick a tile, then paint map cells. Review asset changes to create a build.</p>
- <div class="hex-scroll"><canvas id="map-preview" tabindex="0" aria-label="Tilemap editor: arrows move, Space paints the selected tile"></canvas></div><p id="map-position">Cell 0</p><p id="map-preview-status" class="preview-caption" role="status" aria-live="polite"></p>
+ <div class="preview-pair map-comparison"><div><span>Original</span><div class="hex-scroll"><canvas id="map-original" aria-label="Original tilemap"></canvas></div></div><div><span>Editing · paint here</span><div class="hex-scroll"><canvas id="map-preview" tabindex="0" aria-label="Tilemap editor: arrows move, Space paints the selected tile"></canvas></div></div></div><p id="map-position">Cell 0</p><p id="map-preview-status" class="preview-caption" role="status" aria-live="polite"></p>
  <div class="field-row">${field("map-tile", "Brush tile index", ctx2.draft("map-tile", String(map.fields.tile_index.kind === "constant" ? map.fields.tile_index.value : 0)), { readonly: map.fields.tile_index.kind === "constant" })}${field("map-bank", "Palette bank", ctx2.draft("map-bank", String(map.fields.palette_bank.kind === "constant" ? map.fields.palette_bank.value : 0)), { readonly: map.fields.palette_bank.kind === "constant" })}${flipSelect(ctx2, map, "flip_x", "Horizontal flip")}${flipSelect(ctx2, map, "flip_y", "Vertical flip")}</div>
  <div class="pixel-grid map-tile-picker">${tiles.cells.slice(page * 64, page * 64 + 64).map((c) => `<div class="pixel-card"><canvas width="${tiles.width}" height="${tiles.height}" data-map-tile="${c.index}" aria-label="Brush tile ${c.index}"></canvas>${button(String(c.index), "map-pick-tile", { id: String(c.index), disabled: map.fields.tile_index.kind === "constant" && c.index !== map.fields.tile_index.value })}</div>`).join("")}</div><div class="actions">${button("Previous tiles", "map-tiles-page", { id: "-1", disabled: !page })}${button("Next tiles", "map-tiles-page", { id: "1", disabled: (page + 1) * 64 >= tiles.count })}${button("Use selected pixel tile", "map-use-pixel-tile", { disabled: ((_a = ctx2.state.paint) == null ? void 0 : _a.bitmap_id) !== tiles.id })}</div><details><summary>Single-cell controls</summary>${field("map-entry", "Cell index", ctx2.draft("map-entry", "0"))}${button("Load map entry", "asset-open-map-entry")}${button("Stage map change", "asset-map-change")}</details></section>`;
   }
@@ -4260,6 +4614,17 @@
       const context = canvas.getContext("2d"), image = context.createImageData(canvas.width, canvas.height);
       image.data.set(mapPixels(doc, map, current2));
       context.putImageData(image, 0, 0);
+      rememberPreview(canvas, canvas.width, canvas.height, image.data);
+      const before = document.getElementById("map-original");
+      if (before) {
+        before.width = canvas.width;
+        before.height = canvas.height;
+        before.style.width = canvas.style.width;
+        const g = before.getContext("2d"), original = g.createImageData(canvas.width, canvas.height);
+        original.data.set(mapPixels(doc, map, []));
+        g.putImageData(original, 0, 0);
+        rememberPreview(before, canvas.width, canvas.height, original.data);
+      }
     };
     const persist = (save = true) => {
       var _a;
@@ -4278,7 +4643,7 @@
       draw2();
       previewStatus();
       const label = document.getElementById("map-position");
-      if (label) label.textContent = "Cell " + selected2 + " · " + current2.filter((c) => c.kind === "map" && c.tilemap_id === map.id).length + " staged cells";
+      if (label) label.textContent = "Cell " + selected2 + " · " + current2.filter((c) => c.kind === "map" && c.tilemap_id === map.id).length + " staged cell" + (current2.filter((c) => c.kind === "map" && c.tilemap_id === map.id).length === 1 ? "" : "s");
     };
     const eventPaint = (event) => {
       const index = canvasCell(canvas.getBoundingClientRect(), event.clientX, event.clientY, map.width, map.height);
@@ -4379,9 +4744,9 @@
     if (!paint || paint.document_id !== doc.document_id) return changes;
     const bitmap = doc.bitmaps.find((row) => row.id === paint.bitmap_id), cell = bitmap == null ? void 0 : bitmap.cells[paint.cell_index];
     if (!cell) return changes;
-    const merged = mergeCellChanges(changes, [{ kind: "cell", bitmap_id: bitmap.id, cell_index: paint.cell_index, before_pixels: cell.pixels, after_pixels: paint.pixels }]);
-    if (JSON.stringify(merged) !== JSON.stringify(changes)) ctx2.setDraft("asset-changes", JSON.stringify(merged, null, 2));
-    return merged;
+    const merged2 = mergeCellChanges(changes, [{ kind: "cell", bitmap_id: bitmap.id, cell_index: paint.cell_index, before_pixels: cell.pixels, after_pixels: paint.pixels }]);
+    if (JSON.stringify(merged2) !== JSON.stringify(changes)) ctx2.setDraft("asset-changes", JSON.stringify(merged2, null, 2));
+    return merged2;
   }
   function activateCell(ctx2, doc, bitmapId, index) {
     const changes = stageCurrentPaint(ctx2, doc), bitmap = doc.bitmaps.find((row) => row.id === bitmapId), cell = bitmap == null ? void 0 : bitmap.cells[index];
@@ -4520,11 +4885,11 @@
           recordPixels(ctx2, doc, bitmap.id, cell.index, before, after);
         }
         const unrelated = json("asset-changes").filter((change) => change.kind !== "cell" || change.bitmap_id !== bitmap.id);
-        const merged = mergeCellChanges(unrelated, result.changes);
+        const merged2 = mergeCellChanges(unrelated, result.changes);
         state2.results["resources.image_map"] = result;
         state2.paint = null;
         ctx2.setDraft("paint-buffer", "");
-        ctx2.setDraft("asset-changes", JSON.stringify(merged, null, 2));
+        ctx2.setDraft("asset-changes", JSON.stringify(merged2, null, 2));
         state2.assetAcknowledgements = [];
         state2.pending = null;
         await ctx2.render();
@@ -4554,8 +4919,8 @@ ${font ? `<section class="card"><h3>Font metrics · ${esc(font.id)}</h3><div cla
         if (event.key === "ArrowDown") cursor.y = Math.min(bitmap.height - 1, cursor.y + 1);
         state2.pixelCursor = cursor;
         if ([" ", "Enter"].includes(event.key)) {
-          const color = Number(read("paint-color")), bits = { "mono-row-msb-v1": 1, "tile8-paired2-msb-v1": 2, "tile8-planar2-msb-v1": 2, "tile8-paired4-msb-v1": 4, "tile8-packed4-high-v1": 4, "tile8-packed4-low-v1": 4 }[bitmap.codec];
-          if (!Number.isInteger(color) || color < 0 || color >= 2 ** bits) {
+          const color = Number(read("paint-color")), bits2 = { "mono-row-msb-v1": 1, "tile8-paired2-msb-v1": 2, "tile8-planar2-msb-v1": 2, "tile8-paired4-msb-v1": 4, "tile8-packed4-high-v1": 4, "tile8-packed4-low-v1": 4 }[bitmap.codec];
+          if (!Number.isInteger(color) || color < 0 || color >= 2 ** bits2) {
             ctx2.notify("Choose a valid palette index.", true);
             return;
           }
@@ -4670,13 +5035,23 @@ ${font ? `<section class="card"><h3>Font metrics · ${esc(font.id)}</h3><div cla
     ctx2.state.pending = null;
     ctx2.state.assetAcknowledgements = [];
   }
-  function spriteAssembly(ctx2, doc, bitmap) {
+  function spriteAssembly(ctx2, doc, bitmap, palette2 = null) {
     if (!(doc == null ? void 0 : doc.ok) || !bitmap) return "";
     const scope = selectionKey(ctx2.state), current2 = () => selectionKey(ctx2.state) === scope, layout = layoutFor(ctx2, doc, bitmap), image = layout && imageFor(ctx2, doc, bitmap, layout), undo = image && history2(ctx2, doc, bitmap, layout, image);
     const checkHistory = () => {
       if (JSON.stringify(imageFor(ctx2, doc, bitmap, layout).pixels) !== JSON.stringify(undo.current)) throw Error("Tiles changed in another editor. Start a fresh sprite stroke before undo or redo.");
     };
+    const colors = brushColors(bitmap, editorPalette(ctx2, palette2), layout);
     ctx2.use({
+      "sprite-brush": (node) => {
+        if (!current2()) return;
+        const index = Number(node.dataset.id);
+        if (!colors.some((c) => c.index === index)) throw Error("Choose a declared brush index.");
+        ctx2.setDraft("sprite-color", String(index));
+        const input = document.getElementById("sprite-color");
+        if (input) input.value = String(index);
+        document.querySelectorAll("[data-brush-index]").forEach((button2) => button2.setAttribute("aria-pressed", String(Number(button2.dataset.brushIndex) === index)));
+      },
       "sprite-assemble": () => {
         if (!current2()) return;
         const settings = { first: Number(read("sprite-first")), columns: Number(read("sprite-columns")), rows: Number(read("sprite-rows")), order: read("sprite-order"), ...mapSettings(read("sprite-map")) };
@@ -4704,26 +5079,26 @@ ${font ? `<section class="card"><h3>Font metrics · ${esc(font.id)}</h3><div cla
         canvas.dispatchEvent(new Event("sprite-refresh"));
         const link = document.createElement("a");
         link.href = canvas.toDataURL("image/png");
-        link.download = "sprite-preview.png";
+        link.download = "edited-sprite.png";
         link.click();
       }
     });
-    return `<section class="card sprite-assembly"><div class="card-heading"><h3>Sprite assembly</h3>${layout ? button("Save preview PNG", "sprite-export") : ""}</div><p class="subtle">Arrange declared tiles, then paint the whole image. Shared tiles update everywhere in this editing layout.</p><div class="field-row">${field("sprite-first", "First tile", ctx2.draft("sprite-first", (layout == null ? void 0 : layout.first) ?? 0), { type: "number", min: 0 })}${field("sprite-columns", "Tiles across", ctx2.draft("sprite-columns", (layout == null ? void 0 : layout.columns) ?? Math.min(2, bitmap.count)), { type: "number", min: 1, max: 8 })}${field("sprite-rows", "Tiles down", ctx2.draft("sprite-rows", (layout == null ? void 0 : layout.rows) ?? Math.min(2, Math.floor(bitmap.count / 2) || 1)), { type: "number", min: 1, max: 8 })}${select("sprite-order", "Tile order", [["rows", "Across, then down"], ["columns", "Down, then across"]], ctx2.draft("sprite-order", (layout == null ? void 0 : layout.order) || "rows"))}</div><details><summary>Custom tile placement</summary>${field("sprite-map", "Tile map", ctx2.draft("sprite-map", (layout == null ? void 0 : layout.indices) ? layout.indices.map((v, i) => v === null ? "." : String(v) + (layout.flips[i] & 1 ? "h" : "") + (layout.flips[i] & 2 ? "v" : "")).join(", ") : ""))}<p>One tile per grid position; use h/v for flips and . for an unmapped part.</p></details>${button("Assemble tiles", "sprite-assemble", { primary: !layout })}${image ? `${layout.provenance === "pixel_candidate" ? '<p class="notice warm">Gameplay pixel candidates. Source use still needs native verification.</p>' : ""}${layout.colors ? '<p class="subtle">Gameplay colors are a preview; palette bytes are unchanged.</p>' : ""}<div class="toolbar">${field("sprite-color", "Brush color index", ctx2.draft("sprite-color", "1"), { type: "number", min: 0 })}${select("sprite-zoom", "Preview size", [["fit", "Fit"], ["8", "8×"], ["16", "16×"], ["32", "32×"]], ctx2.draft("sprite-zoom", "fit"))}<span id="sprite-zoom-label" class="subtle" role="status"></span></div><div class="preview-pair sprite-comparison"><div><span>Original</span><div class="sprite-preview"><canvas id="sprite-original" aria-label="Original assembled sprite"></canvas></div></div><div><span>Editing · paint here</span><div class="sprite-preview"><canvas id="sprite-canvas" width="${image.width}" height="${image.height}" tabindex="0" role="application" aria-label="Assembled sprite editor: arrows move, Space paints"></canvas></div></div></div><p id="sprite-difference-count" class="preview-caption" role="status" aria-live="polite"></p><div class="actions">${button("Undo sprite stroke", "sprite-undo", { disabled: !undo.canUndo })}${button("Redo sprite stroke", "sprite-redo", { disabled: !undo.canRedo })}<span class="subtle">${image.width} × ${image.height} pixels · ${layout.tiles.length} tiles</span></div><p class="subtle">Drag across tile boundaries; review all changed tiles together with Review asset changes.</p><details><summary>Tile placement</summary><p>${layout.tiles.map((index, i) => esc(`(${i % layout.columns}, ${Math.floor(i / layout.columns)}) → tile ${index}`)).join(" · ")}</p><p>This source-bound layout is explicit. OAM, animation frames and game-specific metasprite tables still need their own declared mapping.</p></details>` : ""}</section>`;
+    return `<section class="card sprite-assembly"><div class="card-heading"><h3>Sprite assembly</h3>${layout ? button("Save edited PNG", "sprite-export") : ""}</div><p class="subtle">Arrange declared tiles, then paint the whole image. Shared tiles update everywhere in this editing layout.</p><div class="field-row">${field("sprite-first", "First tile", ctx2.draft("sprite-first", (layout == null ? void 0 : layout.first) ?? 0), { type: "number", min: 0 })}${field("sprite-columns", "Tiles across", ctx2.draft("sprite-columns", (layout == null ? void 0 : layout.columns) ?? Math.min(2, bitmap.count)), { type: "number", min: 1, max: 8 })}${field("sprite-rows", "Tiles down", ctx2.draft("sprite-rows", (layout == null ? void 0 : layout.rows) ?? Math.min(2, Math.floor(bitmap.count / 2) || 1)), { type: "number", min: 1, max: 8 })}${select("sprite-order", "Tile order", [["rows", "Across, then down"], ["columns", "Down, then across"]], ctx2.draft("sprite-order", (layout == null ? void 0 : layout.order) || "rows"))}</div><details><summary>Custom tile placement</summary>${field("sprite-map", "Tile map", ctx2.draft("sprite-map", (layout == null ? void 0 : layout.indices) ? layout.indices.map((v, i) => v === null ? "." : String(v) + (layout.flips[i] & 1 ? "h" : "") + (layout.flips[i] & 2 ? "v" : "")).join(", ") : ""))}<p>One tile per grid position; use h/v for flips and . for an unmapped part.</p></details>${button("Assemble tiles", "sprite-assemble", { primary: !layout })}${image ? `${layout.provenance === "pixel_candidate" ? '<p class="notice warm">Gameplay pixel candidates. Source use still needs native verification.</p>' : ""}${layout.colors ? '<p class="subtle">Gameplay colors are a preview; palette bytes are unchanged.</p>' : ""}<div id="sprite-brush-palette">${brushSwatches(colors, ctx2.draft("sprite-color", "1"))}</div><div class="toolbar">${field("sprite-color", "Brush index", ctx2.draft("sprite-color", "1"), { type: "number", min: 0, max: Math.max(0, colors.length - 1) })}${select("sprite-zoom", "Preview size", [["fit", "Fit"], ["8", "8×"], ["16", "16×"], ["32", "32×"]], ctx2.draft("sprite-zoom", "fit"))}<span id="sprite-zoom-label" class="subtle" role="status"></span></div><div class="preview-pair sprite-comparison"><div><span>Original</span><div class="sprite-preview"><canvas id="sprite-original" aria-label="Original assembled sprite"></canvas></div></div><div><span>Editing · paint here</span><div class="sprite-preview"><canvas id="sprite-canvas" width="${image.width}" height="${image.height}" tabindex="0" role="application" aria-label="Assembled sprite editor: arrows move, Space paints"></canvas></div></div></div><p id="sprite-difference-count" class="preview-caption" role="status" aria-live="polite"></p><div class="actions">${button("Undo sprite stroke", "sprite-undo", { disabled: !undo.canUndo })}${button("Redo sprite stroke", "sprite-redo", { disabled: !undo.canRedo })}<span class="subtle">${image.width} × ${image.height} pixels · ${layout.tiles.filter((index) => index !== null).length} tile${layout.tiles.filter((index) => index !== null).length === 1 ? "" : "s"}</span></div><p class="subtle">Drag across tile boundaries; review all changed tiles together with Review asset changes.</p><details><summary>Tile placement</summary><p>${layout.tiles.map((index, i) => esc(`(${i % layout.columns}, ${Math.floor(i / layout.columns)}) → tile ${index}`)).join(" · ")}</p><p>This source-bound layout is explicit. OAM, animation frames and game-specific metasprite tables still need their own declared mapping.</p></details>` : ""}</section>`;
   }
   function mountSprite(ctx2, doc, bitmap, palette2) {
-    var _a, _b;
+    var _a, _b, _c;
     const canvas = document.getElementById("sprite-canvas"), layout = layoutFor(ctx2, doc, bitmap);
     if (!canvas || !layout) return;
     const scope = selectionKey(ctx2.state), current2 = () => selectionKey(ctx2.state) === scope;
     const image = imageFor(ctx2, doc, bitmap, layout), undo = history2(ctx2, doc, bitmap, layout, image);
     let pixels = [...image.pixels], pointer = null, cursor = { x: 0, y: 0 };
-    const bits = { "mono-row-msb-v1": 1, "tile8-paired2-msb-v1": 2, "tile8-planar2-msb-v1": 2, "tile8-paired4-msb-v1": 4, "tile8-packed4-high-v1": 4, "tile8-packed4-low-v1": 4 }[bitmap.codec], count = Math.min(2 ** bits, (palette2 == null ? void 0 : palette2.colors_per_bank) || 256);
+    const bits2 = { "mono-row-msb-v1": 1, "tile8-paired2-msb-v1": 2, "tile8-planar2-msb-v1": 2, "tile8-paired4-msb-v1": 4, "tile8-packed4-high-v1": 4, "tile8-packed4-low-v1": 4 }[bitmap.codec], count = Math.min(2 ** bits2, (palette2 == null ? void 0 : palette2.colors_per_bank) || 256);
     const beforeCanvas = document.getElementById("sprite-original"), original = assemblePixels(bitmap, layout, (index) => bitmap.cells[index].pixels);
     const rgba = (values, colors) => {
       const data = new Uint8ClampedArray(values.length * 4);
       values.forEach((value, i) => {
-        var _a2, _b2, _c;
-        const part = Math.floor(Math.floor(i / image.width) / bitmap.height) * layout.columns + Math.floor(i % image.width / bitmap.width), observed = (_b2 = (_a2 = layout.colors) == null ? void 0 : _a2[part]) == null ? void 0 : _b2[value], color = (_c = colors == null ? void 0 : colors.entries.find((e) => e.index === value && e.bank === 0)) == null ? void 0 : _c.rgb, shade = Math.round(18 + value / Math.max(1, count - 1) * 216);
+        var _a2, _b2, _c2;
+        const part = Math.floor(Math.floor(i / image.width) / bitmap.height) * layout.columns + Math.floor(i % image.width / bitmap.width), observed = (_b2 = (_a2 = layout.colors) == null ? void 0 : _a2[part]) == null ? void 0 : _b2[value], color = (_c2 = colors == null ? void 0 : colors.entries.find((e) => e.index === value && e.bank === 0)) == null ? void 0 : _c2.rgb, shade = Math.round(18 + value / Math.max(1, count - 1) * 216);
         data.set([(color == null ? void 0 : color.r) ?? (observed == null ? void 0 : observed[0]) ?? shade, (color == null ? void 0 : color.g) ?? (observed == null ? void 0 : observed[1]) ?? shade, (color == null ? void 0 : color.b) ?? (observed == null ? void 0 : observed[2]) ?? shade, 255], i * 4);
       });
       return data;
@@ -4735,11 +5110,13 @@ ${font ? `<section class="card"><h3>Font metrics · ${esc(font.id)}</h3><div cla
       const c = beforeCanvas.getContext("2d"), frame = c.createImageData(image.width, image.height);
       frame.data.set(originalPixels);
       c.putImageData(frame, 0, 0);
+      rememberPreview(beforeCanvas, image.width, image.height, frame.data);
     }
     const draw2 = () => {
       const context = canvas.getContext("2d"), frame = context.createImageData(image.width, image.height);
       frame.data.set(rgba(pixels, editorPalette(ctx2, palette2)));
       context.putImageData(frame, 0, 0);
+      rememberPreview(canvas, image.width, image.height, frame.data);
       let changed2 = 0;
       for (let i = 0; i < frame.data.length; i += 4) if ([0, 1, 2].some((c) => frame.data[i + c] !== originalPixels[i + c])) changed2++;
       const n = document.getElementById("sprite-difference-count");
@@ -4762,6 +5139,12 @@ ${font ? `<section class="card"><h3>Font metrics · ${esc(font.id)}</h3><div cla
       pixels = [...imageFor(ctx2, doc, bitmap, layout).pixels];
       undo.begin(pixels);
     };
+    const updateSwatches = () => {
+      var _a2;
+      const host = document.getElementById("sprite-brush-palette");
+      if (host) host.innerHTML = brushSwatches(brushColors(bitmap, editorPalette(ctx2, palette2), layout), ((_a2 = document.getElementById("sprite-color")) == null ? void 0 : _a2.value) ?? ctx2.draft("sprite-color", "1"));
+    };
+    (_a = document.getElementById("sprite-color")) == null ? void 0 : _a.addEventListener("input", updateSwatches);
     const resize = () => {
       if (!current2()) return;
       const panes = [beforeCanvas, canvas].filter(Boolean).map((node) => node.parentElement), width = Math.min(...panes.map((node) => Math.max(1, ((node == null ? void 0 : node.clientWidth) || 416) - 32)));
@@ -4773,7 +5156,7 @@ ${font ? `<section class="card"><h3>Font metrics · ${esc(font.id)}</h3><div cla
       const label = document.getElementById("sprite-zoom-label");
       if (label) label.textContent = size2.scale + "× preview";
     };
-    (_a = document.getElementById("sprite-zoom")) == null ? void 0 : _a.addEventListener("change", (event) => {
+    (_b = document.getElementById("sprite-zoom")) == null ? void 0 : _b.addEventListener("change", (event) => {
       if (!current2()) return;
       ctx2.setDraft("sprite-zoom", event.target.value);
       resize();
@@ -4784,13 +5167,14 @@ ${font ? `<section class="card"><h3>Font metrics · ${esc(font.id)}</h3><div cla
     if (typeof ResizeObserver !== "undefined") {
       const observer = new ResizeObserver(resize);
       observer.observe(canvas.parentElement);
-      (_b = ctx2.state.spritePreviewObserver) == null ? void 0 : _b.disconnect();
+      (_c = ctx2.state.spritePreviewObserver) == null ? void 0 : _c.disconnect();
       ctx2.state.spritePreviewObserver = observer;
     }
     canvas.addEventListener("sprite-refresh", () => {
       if (current2() && pointer === null) {
         pixels = [...imageFor(ctx2, doc, bitmap, layout).pixels];
         draw2();
+        updateSwatches();
       }
     });
     canvas.addEventListener("pointerdown", (event) => {
@@ -4947,7 +5331,7 @@ ${font ? `<section class="card"><h3>Font metrics · ${esc(font.id)}</h3><div cla
         return;
       }
       if (!frames[index]) return;
-      const colors = editorPalette(ctx2, palette2), bits = { "mono-row-msb-v1": 1, "tile8-paired2-msb-v1": 2, "tile8-planar2-msb-v1": 2, "tile8-paired4-msb-v1": 4, "tile8-packed4-high-v1": 4, "tile8-packed4-low-v1": 4 }[bitmap.codec], count = Math.min(2 ** bits, (palette2 == null ? void 0 : palette2.colors_per_bank) || 256);
+      const colors = editorPalette(ctx2, palette2), bits2 = { "mono-row-msb-v1": 1, "tile8-paired2-msb-v1": 2, "tile8-planar2-msb-v1": 2, "tile8-paired4-msb-v1": 4, "tile8-packed4-high-v1": 4, "tile8-packed4-low-v1": 4 }[bitmap.codec], count = Math.min(2 ** bits2, (palette2 == null ? void 0 : palette2.colors_per_bank) || 256);
       const image = assemblePixels(bitmap, frames[index], (tile) => pixelBuffer(ctx2, doc, bitmap, tile));
       canvas.width = image.width;
       canvas.height = image.height;
@@ -4974,8 +5358,8 @@ ${font ? `<section class="card"><h3>Font metrics · ${esc(font.id)}</h3><div cla
   // romancer/ui/views/assets.js
   var codecBits = { "tile8-packed4-low-v1": 4, "mono-row-msb-v1": 1, "tile8-paired2-msb-v1": 2, "tile8-planar2-msb-v1": 2, "tile8-paired4-msb-v1": 4, "tile8-packed4-high-v1": 4 };
   function literalColorCount(bitmap, palette2) {
-    const bits = codecBits[bitmap.codec];
-    return bits ? Math.min(2 ** bits, (palette2 == null ? void 0 : palette2.colors_per_bank) || 2 ** bits) : 0;
+    const bits2 = codecBits[bitmap.codec];
+    return bits2 ? Math.min(2 ** bits2, (palette2 == null ? void 0 : palette2.colors_per_bank) || 2 ** bits2) : 0;
   }
   function literalRGB(bitmap, value) {
     const count = literalColorCount(bitmap);
@@ -5104,7 +5488,7 @@ ${font ? `<section class="card"><h3>Font metrics · ${esc(font.id)}</h3><div cla
     });
     if (((_k = state2.candidateReview) == null ? void 0 : _k.artifact_id) === state2.artifact.artifact_id) return `${heading("", "Confirm graphics candidate", "")}<section class="card"><p>${esc(state2.candidateReview.reason)}</p><p>Confirm the format and allocation, then load the declaration.</p>${graphicsDeclaration(ctx2)}${button("Cancel candidate", "candidate-cancel")}</section>`;
     const pending = ((_l = state2.pending) == null ? void 0 : _l.kind) === "assets" && state2.pending.artifact_id === state2.artifact.artifact_id;
-    return `${heading("Asset workshop", "Graphics & fonts", "Inspect declared tiles, palettes, maps, and fonts. Shared consumers require explicit acknowledgment.")}<div class="identity"><strong>${esc(state2.artifact.name)}</strong><code>${short(state2.artifact.sha256)}</code>${badge((document2 == null ? void 0 : document2.write_supported) ? "Editable" : "Declaration needed", (document2 == null ? void 0 : document2.write_supported) ? "good" : "warm")}</div><div class="grid-two asset-workspace"><div class="asset-editors">${spriteAssembly(ctx2, document2, bitmap)}${animationStudio(ctx2, document2, bitmap)}${paletteEditor(ctx2, palette2)}${assetTools(ctx2, document2, bitmap, palette2)}<section class="card asset-collection"><div class="card-heading"><h3>Tile collection</h3><span class="subtle">${(bitmap == null ? void 0 : bitmap.count) || 0} cells · ${esc((bitmap == null ? void 0 : bitmap.codec) || "No codec loaded")}</span></div>${bitmap ? `<div class="pixel-grid">${bitmap.cells.slice((state2.assetPage || 0) * 64, (state2.assetPage || 0) * 64 + 64).map((cell) => `<div class="pixel-card"><canvas width="${bitmap.width}" height="${bitmap.height}" data-cell="${cell.index}" aria-label="Tile ${cell.index}"></canvas>${button("Edit tile " + cell.index, "asset-select-cell", { id: String(cell.index) })}</div>`).join("")}</div>` : empty("Load a declared asset descriptor", "Unknown compression and codecs remain read only.")}<div class="actions">${button("Previous page", "asset-page", { id: "-1", disabled: !(state2.assetPage > 0) })}${button("Next page", "asset-page", { id: "1", disabled: !bitmap || (state2.assetPage || 0) * 64 + 64 >= bitmap.count })}</div><div class="swatches" aria-label="Declared palette colors">${(palette2 == null ? void 0 : palette2.entries.slice(0, 64).map((entry, i) => `<span class="swatch" data-color-index="${i}" title="Color ${entry.index} (${entry.components.r}, ${entry.components.g}, ${entry.components.b})"></span>`).join("")) || ""}</div></section>${bitmap ? `<section class="card asset-pixel-editor"><div class="card-heading"><h3>Pixel editor · cell ${selected2}</h3><span id="pixel-edit-status">${JSON.stringify(pixelBuffer(ctx2, document2, bitmap, selected2)) !== JSON.stringify(bitmap.cells[selected2].pixels) ? badge("Staged", "warm") : badge("Unchanged")}</span></div><div class="preview-pair pixel-comparison"><div><span>Original tile</span><div class="pixel-card"><canvas id="paint-original" aria-label="Original selected tile"></canvas></div></div><div><span>Editing · paint here</span><div class="pixel-card"><canvas id="paint-canvas" width="${bitmap.width}" height="${bitmap.height}" tabindex="0" role="img" aria-label="Pixel editor: arrows move; Space paints selected index"></canvas><small>Drag to paint. Undo restores a complete stroke.</small></div></div></div><p id="pixel-preview-status" class="preview-caption" role="status" aria-live="polite"></p><div>${field("paint-color", "Palette index", ctx2.draft("paint-color", "1"), { type: "number", min: 0 })}<p class="subtle small">Grayscale shows stored indices when no palette is declared.</p>${button("Discard pending pixels", "asset-discard")}</div></section>` : ""}</div><section class="card"><h3>Graphics setup</h3>${graphicsDeclaration(ctx2)}${jsonEditor("asset-schema", "Advanced asset schema", ctx2.draft("asset-schema", JSON.stringify(fallback, null, 2)), false)}${button("Inspect assets", "asset-inspect", { icon: "assets" })}${jsonEditor("asset-changes", "Additional cell / palette / map / advance changes", ctx2.draft("asset-changes", "[]"), false)}<div class="actions">${button("Review asset changes", "asset-plan", { primary: !pending, disabled: !(document2 == null ? void 0 : document2.write_supported) })}${pending ? button("Create asset build", "asset-apply", { primary: true, icon: "check" }) : ""}</div>${((_n = (_m = state2.results["assets.plan"]) == null ? void 0 : _m.required_consumers) == null ? void 0 : _n.length) && !((_o = state2.results["assets.plan"]) == null ? void 0 : _o.ok) ? `<div class="notice warm">${state2.results["assets.plan"].required_consumers.length} declared consumers are affected. Read the report below before acknowledging them.</div>${button("Acknowledge listed consumers", "asset-acknowledge")}` : ""}</section></div>${report(state2.results["assets.plan"], "Asset plan & affected consumers")}${report(state2.results["structured.apply"], "Structured build")}`;
+    return `${heading("Asset workshop", "Graphics & fonts", "Inspect declared tiles, palettes, maps, and fonts. Shared consumers require explicit acknowledgment.")}<div class="identity"><strong>${esc(state2.artifact.name)}</strong><code>${short(state2.artifact.sha256)}</code>${badge((document2 == null ? void 0 : document2.write_supported) ? "Editable" : "Declaration needed", (document2 == null ? void 0 : document2.write_supported) ? "good" : "warm")}</div><div class="grid-two asset-workspace"><div class="asset-editors">${spriteAssembly(ctx2, document2, bitmap, palette2)}${animationStudio(ctx2, document2, bitmap)}${paletteEditor(ctx2, palette2)}${assetTools(ctx2, document2, bitmap, palette2)}<section class="card asset-collection"><div class="card-heading"><h3>Tile collection</h3><span class="subtle">${(bitmap == null ? void 0 : bitmap.count) || 0} cells · ${esc((bitmap == null ? void 0 : bitmap.codec) || "No codec loaded")}</span></div>${bitmap ? `<div class="pixel-grid">${bitmap.cells.slice((state2.assetPage || 0) * 64, (state2.assetPage || 0) * 64 + 64).map((cell) => `<div class="pixel-card"><canvas width="${bitmap.width}" height="${bitmap.height}" data-cell="${cell.index}" aria-label="Tile ${cell.index}"></canvas>${button("Edit tile " + cell.index, "asset-select-cell", { id: String(cell.index) })}</div>`).join("")}</div>` : empty("Load a declared asset descriptor", "Unknown compression and codecs remain read only.")}<div class="actions">${button("Previous page", "asset-page", { id: "-1", disabled: !(state2.assetPage > 0) })}${button("Next page", "asset-page", { id: "1", disabled: !bitmap || (state2.assetPage || 0) * 64 + 64 >= bitmap.count })}</div><div class="swatches" aria-label="Declared palette colors">${(palette2 == null ? void 0 : palette2.entries.slice(0, 64).map((entry, i) => `<span class="swatch" data-color-index="${i}" title="Color ${entry.index} (${entry.components.r}, ${entry.components.g}, ${entry.components.b})"></span>`).join("")) || ""}</div></section>${bitmap ? `<section class="card asset-pixel-editor"><div class="card-heading"><h3>Pixel editor · cell ${selected2}</h3><span id="pixel-edit-status">${JSON.stringify(pixelBuffer(ctx2, document2, bitmap, selected2)) !== JSON.stringify(bitmap.cells[selected2].pixels) ? badge("Staged", "warm") : badge("Unchanged")}</span></div><div class="preview-pair pixel-comparison"><div><span>Original tile</span><div class="pixel-card"><canvas id="paint-original" aria-label="Original selected tile"></canvas></div></div><div><span>Editing · paint here</span><div class="pixel-card"><canvas id="paint-canvas" width="${bitmap.width}" height="${bitmap.height}" tabindex="0" role="img" aria-label="Pixel editor: arrows move; Space paints selected index"></canvas><small>Drag to paint. Undo restores a complete stroke.</small></div></div></div><p id="pixel-preview-status" class="preview-caption" role="status" aria-live="polite"></p><div>${field("paint-color", "Palette index", ctx2.draft("paint-color", "1"), { type: "number", min: 0 })}<p class="subtle small">Grayscale shows stored indices when no palette is declared.</p>${button("Discard pending pixels", "asset-discard")}</div></section>` : ""}</div><section class="card"><h3>Graphics setup</h3>${graphicsDeclaration(ctx2)}${jsonEditor("asset-schema", "Advanced asset schema", ctx2.draft("asset-schema", JSON.stringify(fallback, null, 2)), false)}${button("Inspect assets", "asset-inspect", { icon: "assets" })}${jsonEditor("asset-changes", "Additional cell / palette / map / advance changes", ctx2.draft("asset-changes", "[]"), false)}<div class="actions">${button("Review graphics changes", "asset-plan", { primary: !pending, disabled: !(document2 == null ? void 0 : document2.write_supported) })}${pending ? button("Create graphics build", "asset-apply", { primary: true, icon: "check" }) : ""}</div>${((_n = (_m = state2.results["assets.plan"]) == null ? void 0 : _m.required_consumers) == null ? void 0 : _n.length) && !((_o = state2.results["assets.plan"]) == null ? void 0 : _o.ok) ? `<div class="notice warm">${state2.results["assets.plan"].required_consumers.length} declared consumers are affected. Read the report below before acknowledging them.</div>${button("Acknowledge listed consumers", "asset-acknowledge")}` : ""}</section></div>${report(state2.results["assets.plan"], "Asset plan & affected consumers")}${report(state2.results["structured.apply"], "Build result")}`;
   }
   function documentNode(id) {
     return document.getElementById(id);
@@ -5117,6 +5501,7 @@ ${font ? `<section class="card"><h3>Font metrics · ${esc(font.id)}</h3><div cla
       image.data.set([color.r, color.g, color.b, 255], index * 4);
     });
     context.putImageData(image, 0, 0);
+    rememberPreview(canvas, bitmap.width, bitmap.height, image.data);
   }
   function drawPaint(ctx2, doc) {
     var _a, _b, _c, _d;
@@ -5923,11 +6308,11 @@ ${font ? `<section class="card"><h3>Font metrics · ${esc(font.id)}</h3><div cla
       "watch-remove": (node) => save(watches.filter((_, i) => i !== Number(node.dataset.id))),
       "watch-read": async () => {
         if (!current2() || !runtime) throw Error("Load this source in Playtest before reading watches.");
-        const generation = ++state2.watchGeneration, baseline = state2.watchBaseline, valid = () => current2() && state2.watchGeneration === generation && state2.watchBaseline === baseline, readings = {}, changes = {};
+        const generation = ++state2.watchGeneration, baseline = state2.watchBaseline, valid2 = () => current2() && state2.watchGeneration === generation && state2.watchBaseline === baseline, readings = {}, changes = {};
         let context = null;
         for (const watch of watches) {
           const result = await ctx2.api.call("runtime.memory", { ...params, region: watch.region, offset: watch.offset, length: watch.length });
-          if (!valid()) return;
+          if (!valid2()) return;
           if (result.game_sha256 !== source.sha256) throw new Error("The loaded game differs from the selected source. Load this source in Playtest.");
           const binding = JSON.stringify([result.worker_session_id, result.epoch, result.game_sha256, result.core_sha256, Object.entries(result.core_options || {}).sort()]);
           if (context !== null && context !== binding) throw Error("The runtime context changed while reading watches. Read them again.");
@@ -5938,11 +6323,11 @@ ${font ? `<section class="card"><h3>Font metrics · ${esc(font.id)}</h3><div cla
           const before = baseline[watch.name];
           if (before) {
             const compared = await ctx2.api.call("watches.compare", { before, after: readings[watch.name] });
-            if (!valid()) return;
+            if (!valid2()) return;
             changes[watch.name] = compared;
           }
         }
-        if (!valid()) return;
+        if (!valid2()) return;
         state2.watchReadings = readings;
         state2.watchChanges = changes;
         return ctx2.render();
@@ -6300,7 +6685,7 @@ ${font ? `<section class="card"><h3>Font metrics · ${esc(font.id)}</h3><div cla
 
   // romancer/ui/views/release.js
   async function render13(ctx2) {
-    var _a;
+    var _a, _b;
     const { state: state2 } = ctx2, missing = requireProject(ctx2);
     if (missing) return missing;
     const p = state2.project, exports = (await ctx2.api.call("exports.list", ctx2.projectParams())).exports;
@@ -6312,7 +6697,7 @@ ${font ? `<section class="card"><h3>Font metrics · ${esc(font.id)}</h3><div cla
       "release-package": () => ctx2.run("release.package", { ...ctx2.projectParams(), export_ids: [...document.querySelectorAll('[name="release-export"]:checked')].map((n) => n.value), title: read("release-title") }),
       "walkthrough-export": () => ctx2.run("docs.walkthrough", { ...ctx2.projectParams(), evidence_id: read("walkthrough-id"), annotations: json("walkthrough-annotations") })
     });
-    return `${heading("Release preparation", "Export", "Generate a BPS patch, apply it independently to the exact original, and package selected public artifacts.")}${patchControls(ctx2)}<div class="grid-two"><section class="card"><div class="card-heading"><h3>Prepare a verified patch</h3>${badge("BPS1", "good")}</div><div class="field-row">${select2("release-source", "Original revision", p.sources)}${select2("release-target", "Target build", p.builds)}</div>${field("release-title", "Release title", ctx2.draft("release-title", p.name))}${field("release-description", "Release notes", ctx2.draft("release-description", ""))}<div class="notice">BPS carries source, target, and patch checksums. ROMancer also binds SHA-256 identities and verifies the target with a separate decoder.</div>${button("Create & independently verify patch", "release-patch", { primary: true, icon: "shield", disabled: !p.sources.length || !p.builds.length })}<p class="subtle small">Images up to 8 GiB. Complete reconstruction is checked before export.</p></section><section class="card"><h3>Release selection</h3><p class="subtle">Only approved patch and text roles can enter a release package. Game images, saves, runtime captures, and private reports are excluded.</p><div class="checklist">${exports.filter((e) => ["patch", "documentation", "credits", "notice"].includes(e.role)).map((e) => `<label><input type="checkbox" name="release-export" value="${e.export_id}" checked>${esc(e.role)} · ${size(e.size)} · ${short(e.sha256)}</label>`).join("") || '<p class="subtle">Prepare a patch or export documentation first.</p>'}</div><div class="actions">${button("Package selected exports", "release-package", { icon: "release", disabled: !exports.some((e) => ["patch", "documentation", "credits", "notice"].includes(e.role)) })}</div><div class="notice">Default credit<br><strong>By RetchEWretched</strong></div></section></div><section class="card"><div class="card-heading"><h3>Prepared exports</h3><span class="subtle">${exports.length} artifacts</span></div>${exports.length ? `<div class="table-wrap"><table><thead><tr><th>Artifact</th><th>Role</th><th>Size</th><th>Identity</th><th>Actions</th></tr></thead><tbody>${exports.map((e) => `<tr><td>${esc(e.name)}</td><td>${badge(e.role)}</td><td>${size(e.size)}</td><td><code>${short(e.sha256)}</code></td><td><div class="actions">${button("Download", "download", { id: e.export_id, name: e.name, icon: "download" })}${e.role === "patch" ? button("Verify", "release-verify", { id: e.export_id, icon: "shield" }) : ""}</div></td></tr>`).join("")}</tbody></table></div>` : empty("Your first release starts with a build", "Edit a source and create a separate build, then return here to prepare its patch.")}</section><section class="card"><h3>Walkthrough documentation</h3><p class="subtle">Export author annotations for measured objectives. Unknown directions retain an explicit uncertainty label.</p>${field("walkthrough-id", "Stored coverage evidence ID", ctx2.draft("walkthrough-id", ((_a = state2.results["coverage.build"]) == null ? void 0 : _a.evidence_id) || ""))}${jsonEditor("walkthrough-annotations", "Player-facing objective annotations", ctx2.draft("walkthrough-annotations", "{}"))}${button("Export walkthrough", "walkthrough-export", { icon: "download" })}</section><details class="card"><summary>Disc patch sets (advanced)</summary><div class="field-row">${containerSelect("disc-release-source", "Original set", p.containers || [])}${containerSelect("disc-release-target", "Built set", p.containers || [])}</div>${button("Create verified patch set", "release-disc", { disabled: (p.containers || []).length < 2 })}${field("set-original", "Original CUE path", ctx2.draft("set-original", ""))}${field("set-archive", "Patch set ZIP", ctx2.draft("set-archive", ""))}${field("set-destination", "New output folder", ctx2.draft("set-destination", ""))}${button("Apply & verify complete set", "release-apply-set")}</details>${report(state2.results["release.disc_set"], "Disc patch set")}${report(state2.results["release.apply_set"], "Reconstructed set")}${report(state2.results["release.prepare"], "Independent patch verification")}${report(state2.results["release.verify"], "Reverification")}${report(state2.results["release.package"], "Positive-manifest package")}`;
+    return `${heading("Release preparation", "Export", "Generate a BPS patch, apply it independently to the exact original, and package selected public artifacts.")}${((_a = state2.downloadFeedback) == null ? void 0 : _a.project_id) === p.project_id ? `<p class="notice" role="status">Download started: ${esc(state2.downloadFeedback.name)}. Your browser handles the save location; check its Downloads list.</p>` : ""}${patchControls(ctx2)}<div class="grid-two"><section class="card"><div class="card-heading"><h3>Prepare a verified patch</h3>${badge("BPS1", "good")}</div><div class="field-row">${select2("release-source", "Original revision", p.sources)}${select2("release-target", "Target build", p.builds)}</div>${field("release-title", "Release title", ctx2.draft("release-title", p.name))}${field("release-description", "Release notes", ctx2.draft("release-description", ""))}<div class="notice">BPS carries source, target, and patch checksums. ROMancer also binds SHA-256 identities and verifies the target with a separate decoder.</div>${button("Create verified patch", "release-patch", { primary: true, icon: "shield", disabled: !p.sources.length || !p.builds.length })}<p class="subtle small">Images up to 8 GiB. Complete reconstruction is checked before export.</p></section><section class="card"><h3>Release selection</h3><p class="subtle">Choose the patches and documents to include. ROMs, saves and private reports are excluded.</p><div class="checklist">${exports.filter((e) => ["patch", "documentation", "credits", "notice"].includes(e.role)).map((e) => `<label><input type="checkbox" name="release-export" value="${e.export_id}" checked>${esc(e.role)} · ${size(e.size)} · ${short(e.sha256)}</label>`).join("") || '<p class="subtle">Prepare a patch or export documentation first.</p>'}</div><div class="actions">${button("Package selected exports", "release-package", { icon: "release", disabled: !exports.some((e) => ["patch", "documentation", "credits", "notice"].includes(e.role)) })}</div><div class="notice">Default credit<br><strong>By RetchEWretched</strong></div></section></div><section class="card"><div class="card-heading"><h3>Prepared exports</h3><span class="subtle">${exports.length} artifacts</span></div>${exports.length ? `<div class="table-wrap"><table><thead><tr><th>File</th><th>Type</th><th>Size</th><th>SHA-256</th><th>Actions</th></tr></thead><tbody>${exports.map((e) => `<tr><td>${esc(e.download_name || e.name)}</td><td>${badge(e.role)}</td><td>${size(e.size)}</td><td><code>${short(e.sha256)}</code></td><td><div class="actions">${button("Download", "download", { id: e.export_id, name: e.download_name || e.name, icon: "download" })}${e.role === "patch" ? button("Verify", "release-verify", { id: e.export_id, icon: "shield" }) : ""}</div></td></tr>`).join("")}</tbody></table></div>` : empty("Your first release starts with a build", "Edit a source and create a separate build, then return here to prepare its patch.")}</section><section class="card"><h3>Walkthrough documentation</h3><p class="subtle">Export author annotations for measured objectives. Unknown directions retain an explicit uncertainty label.</p>${field("walkthrough-id", "Stored coverage evidence ID", ctx2.draft("walkthrough-id", ((_b = state2.results["coverage.build"]) == null ? void 0 : _b.evidence_id) || ""))}${jsonEditor("walkthrough-annotations", "Player-facing objective annotations", ctx2.draft("walkthrough-annotations", "{}"))}${button("Export walkthrough", "walkthrough-export", { icon: "download" })}</section><details class="card"><summary>Disc patch sets (advanced)</summary><div class="field-row">${containerSelect("disc-release-source", "Original set", p.containers || [])}${containerSelect("disc-release-target", "Built set", p.containers || [])}</div>${button("Create verified patch set", "release-disc", { disabled: (p.containers || []).length < 2 })}${field("set-original", "Original CUE path", ctx2.draft("set-original", ""))}${field("set-archive", "Patch set ZIP", ctx2.draft("set-archive", ""))}${field("set-destination", "New output folder", ctx2.draft("set-destination", ""))}${button("Apply & verify complete set", "release-apply-set")}</details>${report(state2.results["release.disc_set"], "Disc patch set")}${report(state2.results["release.apply_set"], "Reconstructed set")}${report(state2.results["release.prepare"], "Independent patch verification")}${report(state2.results["release.verify"], "Reverification")}${report(state2.results["release.package"], "Positive-manifest package")}`;
   }
   function select2(id, label, rows) {
     return `<label class="field"><span>${label}</span><select id="${id}">${rows.length ? rows.map((r) => `<option value="${r.artifact_id}">${esc(r.name)} · ${short(r.sha256)}</option>`).join("") : '<option value="">No matching artifact</option>'}</select></label>`;
@@ -6817,6 +7202,7 @@ ${font ? `<section class="card"><h3>Font metrics · ${esc(font.id)}</h3><div cla
       const c = canvas.getContext("2d"), image = c.createImageData(canvas.width, canvas.height);
       image.data.set(roomPixels2(doc, model, id));
       c.putImageData(image, 0, 0);
+      rememberPreview(canvas, canvas.width, canvas.height, image.data, { note: "Terrain graphics only; collision values and object markers are separate overlays." });
       const w = doc.block_width * 8, h = doc.block_height * 8;
       if (read("level-overlay") === "collision" && room.collision) {
         const colors = ["#e75d6d88", "#66b9f088", "#ffca5c88"];
@@ -6841,7 +7227,7 @@ ${font ? `<section class="card"><h3>Font metrics · ${esc(font.id)}</h3><div cla
       c.lineWidth = 2;
       for (const cell of changes) c.strokeRect(cell % room.width * w + 1, Math.floor(cell / room.width) * h + 1, w - 2, h - 2);
       const label = document.getElementById("level-difference-count");
-      if (label) label.textContent = changes.length ? "Preview updated · " + changes.length + " room cells changed · not built" : "Unchanged room preview";
+      if (label) label.textContent = changes.length ? "Preview updated · " + changes.length + " room cell" + (changes.length === 1 ? "" : "s") + " changed · not built" : "Unchanged room preview";
       if (originalCanvas) {
         originalCanvas.width = canvas.width;
         originalCanvas.height = canvas.height;
@@ -6849,6 +7235,7 @@ ${font ? `<section class="card"><h3>Font metrics · ${esc(font.id)}</h3><div cla
         const before = originalCanvas.getContext("2d"), picture = before.createImageData(canvas.width, canvas.height);
         picture.data.set(originalPixels);
         before.putImageData(picture, 0, 0);
+        rememberPreview(originalCanvas, canvas.width, canvas.height, picture.data);
       }
       c.strokeStyle = "#70d4b4";
       c.lineWidth = 1;
@@ -7289,10 +7676,10 @@ ${font ? `<section class="card"><h3>Font metrics · ${esc(font.id)}</h3><div cla
       }
     });
     const token2 = ++view.request, header = view.header, offset = view.offset, query = view.query;
-    const valid = () => current2() && view.request === token2 && view.header === header && view.offset === offset && view.query === query && (!ctx2.isCurrentRender || ctx2.isCurrentRender());
+    const valid2 = () => current2() && view.request === token2 && view.header === header && view.offset === offset && view.query === query && (!ctx2.isCurrentRender || ctx2.isCurrentRender());
     const tasks = [view.catalog ? Promise.resolve(view.catalog) : ctx2.api.call("games.maps.catalog", { ...params, offset, limit: 12, query }), ((_b = (_a = view.inspection) == null ? void 0 : _a.room) == null ? void 0 : _b.header) === header ? Promise.resolve(view.inspection) : ctx2.api.call("games.maps.inspect", { ...params, header, state: null })];
     const [catalogResult, inspectResult] = await Promise.allSettled(tasks);
-    if (!valid()) return "";
+    if (!valid2()) return "";
     const response = (result) => {
       var _a2;
       if (result.status === "rejected") return { error: ((_a2 = result.reason) == null ? void 0 : _a2.message) || "Map inspection failed." };
@@ -7367,6 +7754,7 @@ ${font ? `<section class="card"><h3>Font metrics · ${esc(font.id)}</h3><div cla
       const frame = g.createImageData(image.width, image.height);
       frame.data.set(image.pixels);
       g.putImageData(frame, 0, 0);
+      rememberPreview(node, image.width, image.height, frame.data, { note: "Map tile graphics only; entity markers are separate overlays." });
       const scale = crop.scale, doc = view.model.doc, objects = editing ? (pending == null ? void 0 : pending.result.preview_objects) || doc.objects.map((n) => view.model.changed(n, "npc")) : doc.objects, arrivals = editing ? (pending == null ? void 0 : pending.result.preview_arrivals) || doc.arrivals.map((a) => view.model.changed(a, "arrival")) : doc.arrivals;
       const mark = (entity, color, label) => {
         if (entity.x < crop.x || entity.y < crop.y || entity.x >= crop.x + crop.width || entity.y >= crop.y + crop.height) return;
@@ -8004,7 +8392,7 @@ ${font ? `<section class="card"><h3>Font metrics · ${esc(font.id)}</h3><div cla
   var views = { tutorials: tutorials_exports, overview: overview_exports, resources: resources_exports, scripts: scripts_exports, assets: assets_exports, levels: levels_exports, sound: sound_exports, tables: tables_exports, automation: automation_exports, playtest: playtest_exports, debug: debug_exports, routes: routes_exports, regression: regression_exports, release: release_exports, help: help_exports, settings: settings_exports };
   var names3 = { tutorials: "Tutorials", automation: "Recipes & definitions", overview: "Overview", resources: "Resources", scripts: "Text & layout", assets: "Graphics & fonts", levels: "Levels", sound: "Music & sound", tables: "Data tables", playtest: "Playtest", debug: "Investigation", routes: "Routes", regression: "Regression", release: "Export", settings: "Settings", help: "Help" };
   var state = { page: "overview", projects: [], project: null, artifact: null, capabilities: null, drafts: {}, results: {}, pending: null, job: null, runtime: null, frame: null, snapshot: null };
-  var actions = {};
+  var actions2 = {};
   var renderRevision = 0;
   var toastTimer;
   var lastRenderedScope = null;
@@ -8052,7 +8440,7 @@ ${font ? `<section class="card"><h3>Font metrics · ${esc(font.id)}</h3><div cla
     const action = localHistoryAction(direction);
     if (!historyAvailable(direction)) throw Error(direction < 0 ? "No earlier edit to undo." : "No edit to redo.");
     if (action === "draft-" + (direction < 0 ? "undo" : "redo")) return moveDraft(direction);
-    return (_a = actions[action]) == null ? void 0 : _a.call(actions, document.getElementById("main").querySelector(`[data-action="${action}"]`));
+    return (_a = actions2[action]) == null ? void 0 : _a.call(actions2, document.getElementById("main").querySelector(`[data-action="${action}"]`));
   }
   async function saveNow() {
     await flushDrafts();
@@ -8149,11 +8537,11 @@ ${font ? `<section class="card"><h3>Font metrics · ${esc(font.id)}</h3><div cla
     closeModal: () => document.getElementById("modal").close(),
     draft: (id, fallback) => state.drafts[draftKey(id)] ?? fallback,
     setDraft: saveDraft,
-    use: (handlers) => Object.assign(actions, handlers),
+    use: (handlers) => Object.assign(actions2, handlers),
     run,
     projectParams: () => ({ project_id: state.project.project_id }),
     sourceParams: () => ({ project_id: state.project.project_id, artifact_id: state.artifact.artifact_id }),
-    setArtifact: (id) => setArtifactSelection(ctx, id, { rememberLocation, stopPlayback, flushDrafts, clearDraftCache, writePreference, resumeLocation })
+    setArtifact: (id, options) => setArtifactSelection(ctx, id, { rememberLocation, stopPlayback, flushDrafts, clearDraftCache, writePreference, resumeLocation }, options)
   };
   var tutorial = createTutorial({ ...ctx, openProject, closeProject });
   function draftFieldKey(id) {
@@ -8215,7 +8603,7 @@ ${font ? `<section class="card"><h3>Font metrics · ${esc(font.id)}</h3><div cla
     if (tray) tray.outerHTML = jobTray();
   }
   async function run(operation, parameters, options = {}) {
-    return runScoped(ctx, operation, parameters, options, updateJob);
+    return runNamedBuild(ctx, operation, parameters, options, (op, params, opts) => runScoped(ctx, op, params, opts, updateJob));
   }
   async function openProject(id) {
     rememberLocation();
@@ -8267,6 +8655,7 @@ ${font ? `<section class="card"><h3>Font metrics · ${esc(font.id)}</h3><div cla
   async function navigate(page) {
     var _a, _b, _c, _d, _e;
     const revision = ++navigationRevision, project = (_a = state.project) == null ? void 0 : _a.project_id, artifact = (_b = state.artifact) == null ? void 0 : _b.artifact_id, selection2 = state.selectionRevision;
+    state.navigationRevision = revision;
     rememberLocation();
     stopPlayback(state);
     state.animationPlaying = false;
@@ -8282,9 +8671,9 @@ ${font ? `<section class="card"><h3>Font metrics · ${esc(font.id)}</h3><div cla
     modal(state.project ? "Import ROM" : "New ROM project", `${!state.project ? field("new-project-name", "Project name", dropped ? dropped.name.replace(/\.[^.]+$/, "") : "My ROM project") : ""}<p>Your original file stays unchanged.</p>${dropped ? `<p class="notice">Selected: <strong>${esc(dropped.name)}</strong></p>` : ""}<label class="field"><span>Choose a ROM file</span><input type="file" id="import-file" accept=".nes,.sfc,.smc,.md,.gen,.bin,.gb,.gbc,.gba,.rom"></label><details class="config"><summary>Advanced path import</summary>${field("import-path", "Absolute file path", "", { placeholder: "C:\\Games\\My game.sfc" })}${button("Browse this computer", "choose-input", { icon: "folder" })}<p>Use a path for files larger than64MiB.</p></details><div class="actions">${button("Import ROM", "import-confirm", { primary: true, icon: "plus" })}${button("Import help", "help-topic", { id: "import" }) + button("Start a new project", "new-project")}</div>`);
   }
   function showSearch() {
-    const query = document.getElementById("global-search").value.toLowerCase().trim();
-    const matches = Object.entries(names3).filter(([key3, value]) => value.toLowerCase().includes(query));
-    modal("Workspace search", `<div class="search-results">${matches.map(([key3, value]) => button(value, "search-open", { id: key3, class: "search-result", icon: key3 })).join("") || '<p class="subtle">No matching views.</p>'}${state.project ? [...state.project.sources, ...state.project.builds].filter((a) => a.name.toLowerCase().includes(query)).map((a) => `<p class="subtle">${esc(a.name)} · ${esc(a.system)}<br>${esc(a.sha256)}</p>`).join("") : ""}</div>`);
+    const query = document.getElementById("global-search").value, matches = workspaceMatches(query, names3, state.project);
+    modal("Find tools or files", `<div class="search-results">${matches.map((row, index) => row.page ? button(row.label, "search-open", { id: row.page, class: "search-result", icon: row.page }) : button(row.label + " · " + (row.kind === "build" ? "Build" : "Original"), "search-file", { id: String(index), class: "search-result", icon: "folder" })).join("") || '<p class="subtle">No matching tools or file names. Try palette, sprite, hex or save state.</p>'}</div>`);
+    state.searchMatches = matches;
   }
   function baseActions() {
     return {
@@ -8368,7 +8757,21 @@ ${font ? `<section class="card"><h3>Font metrics · ${esc(font.id)}</h3><div cla
         var _a, _b, _c, _d;
         return modal("About ROMancer", `<div class="brand"><img src="/mark.svg" alt=""><div><strong>ROMancer</strong><small>By RetchEWretched</small></div></div><p>A local workbench for investigating, editing, and testing retro game resources.</p><div class="notice">Version ${esc(((_a = state.capabilities) == null ? void 0 : _a.display_version) || ((_b = state.capabilities) == null ? void 0 : _b.version))} · NES · SNES · GEN · Game Boy · Game Boy Color · GBA</div><p class="subtle">Python ${esc((_c = state.capabilities) == null ? void 0 : _c.python)} · ${esc((_d = state.capabilities) == null ? void 0 : _d.platform)}<br>Local projects · Content-bound builds · Independent BPS verification</p>${button("Capabilities & settings", "navigate", { id: "settings" })}`);
       },
-      "download": async (node) => api.download(state.project.project_id, node.dataset.id, node.dataset.name || "romancer-export"),
+      "download": async (node) => {
+        var _a;
+        const project = state.project.project_id, requested = node.dataset.name || "romancer-export", download = await api.download(project, node.dataset.id, requested), name = download.name;
+        if (((_a = state.project) == null ? void 0 : _a.project_id) !== project) return;
+        state.downloadFeedback = { project_id: project, name };
+        notify("Download started: " + name + ". Check your browser’s Downloads list.");
+        if (state.page === "release") await render17();
+      },
+      "search-file": async (node) => {
+        var _a;
+        const row = (_a = state.searchMatches) == null ? void 0 : _a[Number(node.dataset.id)];
+        if (!(row == null ? void 0 : row.artifact_id)) throw Error("Search again to select this file.");
+        document.getElementById("modal").close();
+        await openSearchFile(ctx, row.project_id, row.artifact_id, row.sha256);
+      },
       "search-open": (node) => {
         document.getElementById("modal").close();
         navigate(node.dataset.id);
@@ -8377,21 +8780,23 @@ ${font ? `<section class="card"><h3>Font metrics · ${esc(font.id)}</h3><div cla
     };
   }
   async function render17() {
-    var _a, _b, _c, _d, _e, _f, _g, _h, _i, _j, _k, _l, _m;
+    var _a, _b, _c, _d, _e, _f, _g, _h, _i, _j, _k, _l, _m, _n;
     if (((_a = document.getElementById("app")) == null ? void 0 : _a.dataset.startupRecovered) === "true") return;
     rememberLocation();
-    (_b = state.spritePreviewObserver) == null ? void 0 : _b.disconnect();
+    (_b = state.visualComparison) == null ? void 0 : _b.dispose();
+    state.visualComparison = null;
+    (_c = state.spritePreviewObserver) == null ? void 0 : _c.disconnect();
     state.spritePreviewObserver = null;
     disposeAudio();
-    (_c = state.soundPlayer) == null ? void 0 : _c.close();
+    (_d = state.soundPlayer) == null ? void 0 : _d.close();
     state.soundPlayer = null;
-    (_d = state.animationClock) == null ? void 0 : _d.stop();
+    (_e = state.animationClock) == null ? void 0 : _e.stop();
     state.animationClock = null;
-    const revision = ++renderRevision, previousScroll = ((_e = document.getElementById("main")) == null ? void 0 : _e.scrollTop) || 0, renderScope = [(_f = state.project) == null ? void 0 : _f.project_id, (_g = state.artifact) == null ? void 0 : _g.artifact_id, state.page].join(":"), details = rememberDetails(document.getElementById("main"));
-    actions = baseActions();
+    const revision = ++renderRevision, previousScroll = ((_f = document.getElementById("main")) == null ? void 0 : _f.scrollTop) || 0, renderScope = [(_g = state.project) == null ? void 0 : _g.project_id, (_h = state.artifact) == null ? void 0 : _h.artifact_id, state.page].join(":"), details = rememberDetails(document.getElementById("main"));
+    actions2 = baseActions();
     tutorial.bind();
     const project = state.project, artifacts = project ? [...project.sources, ...project.builds] : [];
-    document.getElementById("app").innerHTML = `<div class="shell"><aside class="sidebar"><a class="brand" href="#" data-action="navigate" data-id="overview"><img src="/mark.svg" alt=""><div><strong>ROMancer</strong><small>By RetchEWretched</small></div></a><div class="nav-label">Workspace</div><nav aria-label="Workbench">${["overview", "resources", "debug", "scripts", "assets", "levels", "sound", "playtest", "release"].map((k) => `<button class="nav-item ${state.page === k ? "active" : ""}" data-action="navigate" data-id="${k}" title="${names3[k]}" ${state.page === k ? 'aria-current="page"' : ""}>${icon(k)}<span>${names3[k]}</span></button>`).join("")}<details class="more-tools" ${getSettings().advancedTools || ["tables", "automation", "routes", "regression"].includes(state.page) ? "open" : ""}><summary title="More tools">More tools</summary>${["tables", "automation", "routes", "regression"].map((k) => `<button class="nav-item ${state.page === k ? "active" : ""}" data-action="navigate" data-id="${k}" title="${names3[k]}">${icon(k)}<span>${names3[k]}</span></button>`).join("")}</details></nav><div class="sidebar-bottom"><button class="nav-item" data-action="navigate" data-id="help" title="Help">${icon("shield")}<span>Help</span></button><button class="nav-item" data-action="projects-manage" title="Projects">${icon("folder")}<span>Projects</span></button><button class="nav-item ${state.page === "settings" ? "active" : ""}" data-action="navigate" data-id="settings" title="Settings">${icon("settings")}<span>Settings</span></button><button class="nav-item" data-action="about" title="About ROMancer">${icon("shield")}<span>About</span></button><div class="local-label"><span class="dot"></span>Runs on your computer</div></div></aside><header class="topbar"><div class="project-control">${icon("folder")}<div><small>ACTIVE PROJECT</small><br><select id="project-select" aria-label="Active project"><option value="">Choose a project</option>${state.projects.map((p) => `<option value="${p.project_id}" ${(project == null ? void 0 : project.project_id) === p.project_id ? "selected" : ""}>${esc(p.name)}</option>`).join("")}</select></div>${button("New project", "new-project", { icon: "plus", class: "compact" })}</div>${artifacts.length ? `<div class="project-control source-selector"><div><small>${((_h = state.artifact) == null ? void 0 : _h.kind) === "source" ? "ORIGINAL ROM" : "BUILD"}</small><br><select id="artifact-select" aria-label="Selected source or build">${[["Original ROMs", project.sources], ["Builds", project.builds]].filter(([, rows]) => rows.length).map(([label, rows]) => `<optgroup label="${label}">${rows.map((a) => {
+    document.getElementById("app").innerHTML = `<div class="shell"><aside class="sidebar"><a class="brand" href="#" data-action="navigate" data-id="overview"><img src="/mark.svg" alt=""><div><strong>ROMancer</strong><small>By RetchEWretched</small></div></a><div class="nav-label">Workspace</div><nav aria-label="Workbench">${["overview", "resources", "debug", "scripts", "assets", "levels", "sound", "playtest", "release"].map((k) => `<button class="nav-item ${state.page === k ? "active" : ""}" data-action="navigate" data-id="${k}" title="${names3[k]}" ${state.page === k ? 'aria-current="page"' : ""}>${icon(k)}<span>${names3[k]}</span></button>`).join("")}<details class="more-tools" ${getSettings().advancedTools || ["tables", "automation", "routes", "regression"].includes(state.page) ? "open" : ""}><summary title="More tools">More tools</summary>${["tables", "automation", "routes", "regression"].map((k) => `<button class="nav-item ${state.page === k ? "active" : ""}" data-action="navigate" data-id="${k}" title="${names3[k]}">${icon(k)}<span>${names3[k]}</span></button>`).join("")}</details></nav><div class="sidebar-bottom"><button class="nav-item" data-action="navigate" data-id="help" title="Help">${icon("shield")}<span>Help</span></button><button class="nav-item" data-action="projects-manage" title="Projects">${icon("folder")}<span>Projects</span></button><button class="nav-item ${state.page === "settings" ? "active" : ""}" data-action="navigate" data-id="settings" title="Settings">${icon("settings")}<span>Settings</span></button><button class="nav-item" data-action="about" title="About ROMancer">${icon("shield")}<span>About</span></button><div class="local-label"><span class="dot"></span>Runs on your computer</div></div></aside><header class="topbar"><div class="project-control">${icon("folder")}<div><small>ACTIVE PROJECT</small><br><select id="project-select" aria-label="Active project"><option value="">Choose a project</option>${state.projects.map((p) => `<option value="${p.project_id}" ${(project == null ? void 0 : project.project_id) === p.project_id ? "selected" : ""}>${esc(p.name)}</option>`).join("")}</select></div>${button("New project", "new-project", { icon: "plus", class: "compact" })}</div>${artifacts.length ? `<div class="project-control source-selector"><div><small>${((_i = state.artifact) == null ? void 0 : _i.kind) === "source" ? "ORIGINAL ROM" : "BUILD"}</small><br><select id="artifact-select" aria-label="Selected source or build">${[["Original ROMs", project.sources], ["Builds", project.builds]].filter(([, rows]) => rows.length).map(([label, rows]) => `<optgroup label="${label}">${rows.map((a) => {
       var _a2;
       return `<option value="${a.artifact_id}" ${((_a2 = state.artifact) == null ? void 0 : _a2.artifact_id) === a.artifact_id ? "selected" : ""}>${esc(a.name)}</option>`;
     }).join("")}</optgroup>`).join("")}</select></div></div>` : ""}<label class="search">${icon("search")}<input id="global-search" placeholder="Search workspace" aria-label="Search workspace"><kbd>Ctrl K</kbd><button type="button" data-action="workspace-search" aria-label="Run workspace search" class="search-go">Go</button></label></header><main id="main" tabindex="-1"><div class="loading">Opening ${names3[state.page]}…</div></main>${jobTray()}${tutorial.panel()}</div>`;
@@ -8422,17 +8827,19 @@ ${font ? `<section class="card"><h3>Font metrics · ${esc(font.id)}</h3><div cla
       html = `${heading("Workspace", names3[state.page], "")}<div class="card"><p class="error">${esc(error.message)}</p>${button("Return to overview", "navigate", { id: "overview" })}</div>`;
     }
     if (revision !== renderRevision) return;
-    if (((_i = document.getElementById("app")) == null ? void 0 : _i.dataset.startupRecovered) === "true") return;
+    if (((_j = document.getElementById("app")) == null ? void 0 : _j.dataset.startupRecovered) === "true") return;
     document.getElementById("main").innerHTML = `<div id="error-panel">${errorNotice()}</div>` + html;
     if (lastRenderedScope === renderScope) restoreDetails(document.getElementById("main"), details);
-    await ((_j = view.mount) == null ? void 0 : _j.call(view, ctx));
+    await ((_k = view.mount) == null ? void 0 : _k.call(view, ctx));
+    mountBuildDetails(ctx);
+    state.visualComparison = mountVisualComparisons(document.getElementById("main"), state, { reduceMotion: getSettings().reduceMotion });
     tutorial.mount();
     updateWorkspaceStatus();
     document.getElementById("main").scrollTop = retainedScroll(lastRenderedScope, renderScope, previousScroll);
     lastRenderedScope = renderScope;
     const main = document.getElementById("main");
     main.dataset.locationScope = renderScope;
-    const identity2 = [(_k = state.project) == null ? void 0 : _k.project_id, (_l = state.artifact) == null ? void 0 : _l.artifact_id, (_m = state.artifact) == null ? void 0 : _m.sha256].join(":");
+    const identity2 = [(_l = state.project) == null ? void 0 : _l.project_id, (_m = state.artifact) == null ? void 0 : _m.artifact_id, (_n = state.artifact) == null ? void 0 : _n.sha256].join(":");
     if (state.resumeIdentity === identity2 && state.resumeScroll !== void 0) {
       main.scrollTop = state.resumeScroll;
       delete state.resumeScroll;
@@ -8446,7 +8853,7 @@ ${font ? `<section class="card"><h3>Font metrics · ${esc(font.id)}</h3><div cla
     const node = event.target.closest("[data-action]");
     if (!node || node.disabled) return;
     event.preventDefault();
-    const handler = actions[node.dataset.action];
+    const handler = actions2[node.dataset.action];
     if (!handler) return;
     node.disabled = true;
     try {
@@ -8458,8 +8865,12 @@ ${font ? `<section class="card"><h3>Font metrics · ${esc(font.id)}</h3><div cla
     }
   });
   document.addEventListener("input", (event) => {
+    var _a;
     if (shouldSaveField(event.target)) {
-      if (event.target.id !== "sprite-zoom") state.pending = null;
+      if (!["sprite-zoom", "sprite-color", "paint-color", "next-build-name", "next-build-notes"].includes(event.target.id)) {
+        state.pending = null;
+        (_a = document.querySelector(".build-change-summary")) == null ? void 0 : _a.remove();
+      }
       saveDraft(event.target.id, event.target.value);
     }
   });
@@ -8550,15 +8961,17 @@ ${font ? `<section class="card"><h3>Font metrics · ${esc(font.id)}</h3><div cla
     }
   });
   window.addEventListener("pagehide", () => {
-    var _a, _b, _c;
+    var _a, _b, _c, _d;
     clearTimeout(locationTimer);
     rememberLocation();
-    (_a = state.spritePreviewObserver) == null ? void 0 : _a.disconnect();
+    (_a = state.visualComparison) == null ? void 0 : _a.dispose();
+    state.visualComparison = null;
+    (_b = state.spritePreviewObserver) == null ? void 0 : _b.disconnect();
     state.spritePreviewObserver = null;
     stopPlayback(state);
     disposeAudio();
-    (_b = state.soundPlayer) == null ? void 0 : _b.close();
-    (_c = state.animationClock) == null ? void 0 : _c.stop();
+    (_c = state.soundPlayer) == null ? void 0 : _c.close();
+    (_d = state.animationClock) == null ? void 0 : _d.stop();
   });
   document.getElementById("modal").addEventListener("cancel", (event) => {
     if (document.getElementById("tutorial-never")) {

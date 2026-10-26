@@ -266,9 +266,9 @@
       "video": true,
       "steps": [
         "Open the HTML guide chapter <b>Watch the first-edit walkthrough</b> and use the video controls. The adjacent ROMancer-v1.0-Walkthrough.mp4 also opens in an ordinary local video player.",
-        "Follow the original NES workshop: assemble a tile, paint one pixel, compare Original and Editing, then undo and redo the stroke.",
-        "Review and create the asset build. Choose Playtest build, Load game, Play and Pause. Save and load a state for that exact output.",
-        "Export a verified BPS patch and download it. Close and reopen the project, then check that its source and build remain available.",
+        "Follow the original NES workshop: assemble a tile, select brush swatch 1, paint one pixel, compare Changes only with Side by side, then undo and redo the stroke.",
+        "Review graphics changes and optionally name the build. Choose Playtest build, Load game, Play and Pause. Save and load a state for that exact output.",
+        "Export and download the readable First-sprite-edit.bps patch. Close and reopen the project, then check that its source and named build remain available.",
         "Make one more staged edit, wait for Saved, reload, and confirm its draft returns. Use the beginner acceptance checklist for your own independent trial."
       ],
       "result": "The recorded example changed exactly one source byte at file offset 16400 (0x4010), from 81 to C1, in a separate build. The sequence also checks undo/redo, native playback, save/load, patch download, project reopening and a saved draft surviving a new document load.",
@@ -300,11 +300,11 @@
       "intro": "Use the included original drawing program to learn the full workflow without finding offsets or supplying a commercial game.",
       "steps": [
         "If the optional tutorial prompt appears, choose <b>Not now</b> for this exercise. Save existing work; choose the blank <b>Choose a project</b> entry if needed. On the empty Overview, click <b>NES workshop</b>.",
-        "Open <b>Graphics &amp; fonts</b>. Keep First tile 0, Tiles across 1 and Tiles down 1; click <b>Assemble tiles</b>. Leave Preview size on Fit and set Brush color index to 1.",
+        "Open <b>Graphics &amp; fonts</b>. Keep First tile 0, Tiles across 1 and Tiles down 1; click <b>Assemble tiles</b>. Leave Preview size on Fit and click brush swatch <b>1</b>.",
         "Focus the <b>Editing</b> canvas. Press Right Arrow once, then Space. Expect <b>1 pixel differs</b>; the Original picture stays unchanged. Undo sprite stroke reverses the experiment.",
-        "Click <b>Review asset changes</b>, read the plan, then <b>Create asset build</b>. Click <b>Playtest build</b> in the bottom bar to select that output and open Playtest.",
+        "Click <b>Review graphics changes</b>, read the byte summary, then <b>Create graphics build</b>. Name and notes are optional. Click <b>Playtest build</b> in the bottom bar to select that output and open Playtest.",
         "Choose <b>Load game</b>, then Play. Pause to inspect the result. The full Windows edition supplies the engine; the source edition may require core setup.",
-        "Open <b>Export</b>. Choose the original revision and your asset build, then <b>Create &amp; independently verify patch</b>. Download the prepared BPS. Continue with Apply a downloaded patch to check a fresh reconstruction."
+        "Open <b>Export</b>. Choose the original revision and your asset build, then <b>Create verified patch</b>. Download the prepared BPS. Continue with Apply a downloaded patch to check a fresh reconstruction."
       ],
       "result": "The tested exercise changed exactly file offset 16400 (0x4010), from 81 to C1. Native original/build frames differed, a save/load roundtrip restored the view, and reapplying the exported patch recreated the same build hash.",
       "note": "Those byte values belong only to this original workshop. Its drawing program reuses the tile, so one edited pixel can repeat in gameplay. A saved draft or preview is not a built ROM.",
@@ -322,17 +322,17 @@
         "term-plan",
         "term-shared-resource"
       ],
-      "image": "38-sprite-preview",
+      "image": "46-brush-build-review",
       "image_layout": "following-page",
       "caption": "The actual one-pixel practice edit, with a reviewed asset build ready to create.",
       "visual_page": {
-        "title": "One changed pixel / reviewed build",
+        "title": "Brush swatches / reviewed and named build",
         "kicker": "Actual application / original practice program",
-        "intro": "Original and editing previews remain separate; Create asset build uses the reviewed proposal.",
+        "intro": "Original and editing previews remain separate; Create graphics build uses the reviewed proposal.",
         "panels": [
           {
-            "image": "38-sprite-preview",
-            "title": "One changed pixel / reviewed build",
+            "image": "46-brush-build-review",
+            "title": "One edited pixel / optional build details",
             "x": 48,
             "top": 846,
             "width": 1170,
@@ -346,6 +346,86 @@
           }
         ]
       }
+    },
+    {
+      "id": "everyday-controls",
+      "title": "Use search, swatches and comparison views",
+      "part": "Basic",
+      "kicker": "Everyday editing / small controls that matter",
+      "intro": "Find the right tool, select a visible brush color, compare an edit and give the output a useful name. The same byte checks still protect the original.",
+      "steps": [
+        "Search the workspace for <b>palette</b>, <b>sprite</b>, <b>hex</b> or <b>save state</b>. Choose a tool result. Click a matching file to select its exact revision and inspect it in Resources.",
+        "In Sprite assembly, choose a brush swatch. Labels distinguish declared colors, observed gameplay colors and grayscale placeholders. An unknown game palette is not silently guessed.",
+        "Use <b>Compare</b>: Side by side, Original, Edited or Changes only. Difference and blink views are read-only. Slow blink is optional and follows app and operating-system reduced-motion settings.",
+        "Review the planned changes. Read the measured byte summary; open the full report for offsets and technical detail. Name and notes for this build are optional.",
+        "Create the build and playtest that output. On Export, choose Create verified patch. Human-readable filenames follow your release title; Download started points you to the browser’s save workflow."
+      ],
+      "result": "The tested original-workshop edit changed one file byte. Its build name and multiline notes persisted, the patch downloaded under a readable filename, and comparison modes left the edited PNG unchanged.",
+      "note": "Comparison controls change only the view. Save edited PNG exports the whole edited sprite. Use Side by side or Edited to paint again. A saved draft still needs a reviewed build.",
+      "details": [
+        {
+          "title": "What a difference picture measures",
+          "text": "Changes only compares clean decoded pixels or palette colors. Cursors, selection outlines and editor highlights are excluded. A terrain comparison does not measure object records or collision values; its scope note identifies those separate overlays. Unsupported or oversized previews keep their existing view."
+        },
+        {
+          "title": "What a review summary counts",
+          "text": "Counts come from exact before/after bytes, with overlapping ranges merged. Listed checksum/header updates are included. Large or unfamiliar reports retain their technical detail instead of an invented count. No game-specific meaning is inferred from a changed byte."
+        }
+      ],
+      "related": [
+        "first-edit",
+        "sprites",
+        "palettes",
+        "drafts",
+        "patches"
+      ],
+      "terms": [
+        "term-palette",
+        "term-build",
+        "term-plan"
+      ],
+      "image": "46-brush-build-review",
+      "image_layout": "following-page",
+      "caption": "Actual editor with clickable swatches, comparison controls and optional build name/notes.",
+      "visual_page": {
+        "title": "One edit / clear controls and output names",
+        "kicker": "Basic / actual application capture",
+        "intro": "Choose a brush, compare the edit and optionally name the reviewed build.",
+        "panels": [
+          {
+            "image": "46-brush-build-review",
+            "title": "Brush swatches / optional build details",
+            "x": 48,
+            "top": 846,
+            "width": 1170,
+            "crop": [
+              180,
+              60,
+              1390,
+              860
+            ],
+            "caption": "Original and edited pixels remain distinct. The viewing mode never changes saved image dimensions."
+          }
+        ]
+      },
+      "extra_images": [
+        {
+          "image": "45-changes-only",
+          "title": "Changes only isolates one edited pixel without altering the saved sprite"
+        },
+        {
+          "image": "47-search-files",
+          "title": "Search finds a named build and opens its exact revision"
+        },
+        {
+          "image": "48-readable-download",
+          "title": "Readable patch filename and truthful download-start feedback"
+        },
+        {
+          "image": "49-palette-difference",
+          "title": "One changed palette color; unchanged entries are checkerboard"
+        }
+      ]
     },
     {
       "id": "beginner-trial",
@@ -469,6 +549,10 @@
         {
           "title": "Returning to earlier work",
           "text": "Playtest build appears for an output created in this session from the selected input. Newer staged edits still need another build. Overview &gt; Build history keeps all recorded versions. Give outputs meaningful names and keep private project backups."
+        },
+        {
+          "title": "Name the output before creating it",
+          "text": "Open Name and notes for this build (optional), enter up to 120 name characters and 2000 note characters, then create the reviewed build. Notes can span lines. Names and notes are metadata; they do not alter the output bytes. Existing builds remain editable through Build history."
         }
       ],
       "related": [
@@ -717,7 +801,7 @@
       "image": "10-verified-patch",
       "steps": [
         "Open <b>Export</b>. Select the exact <b>Original revision</b> and the intended <b>Target build</b>. Add a useful title and notes.",
-        "Click <b>Create & independently verify patch</b>. ROMancer reconstructs the target with a separate BPS decoder and checks its identity.",
+        "Click <b>Create verified patch</b>. ROMancer reconstructs the target with a separate BPS decoder and checks its identity.",
         "Download the prepared patch. Include the expected original revision and instructions with your release, then test applying that patch to a fresh source copy."
       ],
       "result": "The capture follows a successful patch preparation from the modified Chrono Trigger build.",
@@ -727,14 +811,16 @@
       "related": [
         "regression",
         "projects",
-        "checks"
+        "checks",
+        "everyday-controls"
       ],
       "caption": "Actual ROMancer interface. The HTML edition links to the full-resolution capture.",
       "terms": [
         "term-bps",
         "term-ips",
         "term-patch"
-      ]
+      ],
+      "details": []
     },
     {
       "id": "apply-patch",
@@ -1142,11 +1228,11 @@
       "image": "02-castlevania-sprite",
       "steps": [
         "Open <b>Graphics & fonts</b>. With verified or declared tiles loaded, use <b>Sprite assembly</b> to arrange the parts.",
-        "Choose a brush color index. Set <b>Preview size</b> to Fit or 8x, 16x or 32x, then paint in <b>Editing - paint here</b>. Compare Original with Editing. Zoom changes the view; saved PNG dimensions and ROM tiles stay unchanged.",
-        "Use <b>Undo sprite stroke</b> or <b>Redo sprite stroke</b>, then <b>Review asset changes</b> and create a build."
+        "Click a brush color swatch, set Preview size to Fit or a fixed zoom, then paint in <b>Editing · paint here</b>. Declared, observed and unknown grayscale colors are labeled. The numeric Brush index remains available.",
+        "Use <b>Undo sprite stroke</b> or <b>Redo sprite stroke</b>, then <b>Review graphics changes</b> and create a build."
       ],
       "result": "The capture shows an actual changed pixel on a 16 x 32 Simon assembly made from eight tiles.",
-      "note": "This example uses a declared tile layout and observed gameplay colors. It does not prove automatic sprite assembly for every game. Preview colors do not change palette bytes.",
+      "note": "This example uses a declared tile layout and observed gameplay colors. It does not prove automatic sprite assembly for every game. Preview colors do not change palette bytes. Compare changes in the viewing controls. Save edited PNG always exports the complete edited image, not a difference mask.",
       "part": "Advanced",
       "intro": "An explicit assembly places known tiles into a useful sprite view. Painting edits the referenced tiles; the arrangement itself does not discover game logic.",
       "related": [
@@ -1170,7 +1256,7 @@
         "Load a declared graphics resource and inspect <b>Palette colors</b>. Select the bank and entry before editing. Confirm the original swatch matches the intended resource.",
         "Use <b>Choose color</b> for an RGB proposal, or <b>Color storage values</b> for the declared channels. Read the Original/Edited comparison as the change is staged.",
         "Review the channel limits and shared consumers. RGB555 stores 5-bit channels, so a chosen screen color is quantized to a representable value.",
-        "Review asset changes, create the build and inspect every scene known to share that palette. Verify the color in the actual game, not just the swatch."
+        "Review graphics changes, create the build and inspect every scene known to share that palette. Verify the color in the actual game, not just the swatch."
       ],
       "result": "The proposed color is representable in the declared format; the build changes the intended palette bytes and the scene uses them as expected.",
       "note": "Preview colors used to arrange a sprite are not necessarily stored palette edits. Transparency, banks and a game's dynamic palette changes can affect the observed result.",
@@ -1264,7 +1350,7 @@
         "Inspect a graphics definition that includes the tilemap location, dimensions, entry format and associated tile/palette resources. Confirm the original map preview.",
         "Select the map brush or entry and stage the intended tile index, palette bank and flip values. Compare the map preview while keeping the original as the reference.",
         "Use the tilemap editor's supported painting tools and undo controls for bounded strokes. For a specific entry, inspect its stored values before staging a change.",
-        "Review asset changes and shared consumers. Create a build and load the game location that uses the map, including scrolling or transitions that might load other banks."
+        "Review graphics changes and shared consumers. Create a build and load the game location that uses the map, including scrolling or transitions that might load other banks."
       ],
       "result": "The reviewed map entry references a valid tile and allowed bank/flip values. The rendered game screen shows the intended arrangement.",
       "note": "A tilemap is a display arrangement. Collision, objects and exits can live in separate records and will not automatically follow a visual change.",
@@ -4030,6 +4116,45 @@
       "term": "Human usability trial",
       "topics": [
         "beginner-trial"
+      ]
+    },
+    {
+      "term": "Brush swatches",
+      "topics": [
+        "everyday-controls",
+        "sprites"
+      ]
+    },
+    {
+      "term": "Changes only",
+      "topics": [
+        "everyday-controls"
+      ]
+    },
+    {
+      "term": "Blink comparison",
+      "topics": [
+        "everyday-controls"
+      ]
+    },
+    {
+      "term": "Readable filenames",
+      "topics": [
+        "patches",
+        "everyday-controls"
+      ]
+    },
+    {
+      "term": "Build notes",
+      "topics": [
+        "drafts",
+        "everyday-controls"
+      ]
+    },
+    {
+      "term": "Workspace search aliases",
+      "topics": [
+        "everyday-controls"
       ]
     }
   ]
