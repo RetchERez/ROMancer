@@ -623,7 +623,7 @@
         "Give the output a useful name and choose <b>Create patched build</b>. ROMancer selects the separate output and opens Playtest. Load the game, verify the intended change, and preserve the original."
       ],
       "result": "The pictured BPS was exported from the first-edit exercise. Preview found one changed byte; the 292-byte patch recreated exactly the same SHA-256 as the native-tested asset build.",
-      "note": "Changing the selected file can restore its previous editor. Select the original first, then open Export. A valid patch reconstruction establishes bytes, not whole-game behavior. Chain patches only when the next patch explicitly requires the previous output.",
+      "note": "Changing the selected file can restore its previous editor. Select the original first, then open Export. A valid patch reconstruction establishes bytes, not whole-game behavior. Chain patches only when the next patch explicitly requires the previous output. Patch size includes metadata; sparse runs and dense edits can encode differently. Export does not promise the smallest possible patch.",
       "related": [
         "first-edit",
         "checks",

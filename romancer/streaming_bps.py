@@ -163,6 +163,10 @@ def create_patch(source,target,destination,metadata=None,*,cancelled=lambda:Fals
                 output.write(raw);crc=zlib.crc32(raw,crc)
             write(b'BPS1'+_number(original['size'])+_number(changed['size'])+_number(len(meta))+meta)
             same_run=0;literals=bytearray()
+            # Reserve command slots per block, including carry/flush overhead.
+            # Very fragmented blocks use one bounded literal run instead.
+            blocks=max(1,(changed['size']+CHUNK-1)//CHUNK)
+            run_budget=max(1,min(4096,(1000000-2)//blocks-2))
             def action(kind,length,data=None):
                 nonlocal actions
                 actions+=1
@@ -180,7 +184,7 @@ def create_patch(source,target,destination,metadata=None,*,cancelled=lambda:Fals
                     flush_literals();same_run+=len(right);continue
                 # Preserve byte runs inside changed blocks; unchanged neighbors
                 # belong in SourceRead actions rather than literal patch payloads.
-                position=0
+                position=0;spans=[]
                 while position<len(right):
                     _cancel(cancelled)
                     same=position<len(left) and left[position]==right[position]
@@ -188,6 +192,10 @@ def create_patch(source,target,destination,metadata=None,*,cancelled=lambda:Fals
                     while end<len(right) and (end<len(left) and left[end]==right[end])==same:
                         if end%4096==0:_cancel(cancelled)
                         end+=1
+                    spans.append((same,position,end));position=end
+                    if len(spans)>run_budget:
+                        spans=[(False,0,len(right))];break
+                for same,position,end in spans:
                     if same:
                         flush_literals();same_run+=end-position
                     else:
@@ -196,7 +204,6 @@ def create_patch(source,target,destination,metadata=None,*,cancelled=lambda:Fals
                             amount=min(CHUNK-len(literals),end-position)
                             literals.extend(right[position:position+amount]);position+=amount
                             if len(literals)==CHUNK:flush_literals()
-                    position=end
             flush_literals()
             if same_run:action(0,same_run)
             write(struct.pack('<II',original['crc32'],changed['crc32']));output.write(struct.pack('<I',crc));output.flush();os.fsync(output.fileno())

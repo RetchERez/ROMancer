@@ -50,6 +50,15 @@ class StreamingBPSTests(unittest.TestCase):
             self.assertEqual(apply_bps(bytes(raw),encoded),bytes(target))
             rebuilt=root/'rebuilt';apply_patch(source,patch,rebuilt);self.assertEqual(rebuilt.read_bytes(),target)
 
+    def test_dense_alternating_edits_coalesce_without_exhausting_action_budget(self):
+        from romancer.streaming_bps import create_patch,apply_patch
+        with tempfile.TemporaryDirectory() as temp:
+            root=Path(temp);original=bytes(2*1024**2);target=b'\x00\x01'*(1024**2)
+            source=root/'source';source.write_bytes(original);changed=root/'target';changed.write_bytes(target)
+            patch=root/'patch';create_patch(source,changed,patch,{})
+            self.assertLess(patch.stat().st_size,len(target)+65536)
+            rebuilt=root/'rebuilt';apply_patch(source,patch,rebuilt);self.assertEqual(rebuilt.read_bytes(),target)
+
     def test_stream_runs_handle_empty_extension_truncation_and_long_literals(self):
         from romancer.streaming_bps import create_patch,apply_patch,CHUNK
         for original,target in [(b'',b'new'),(b'old',b''),(b'',b''),(b'abc',b'abc-more'),
