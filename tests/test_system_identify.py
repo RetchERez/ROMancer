@@ -91,6 +91,13 @@ def cd_bytes(*,raw_sector=False):
 
 
 class RecognitionTests(unittest.TestCase):
+    def test_gba_linear_image_over_hardware_rom_capacity_is_not_editable_layout(self):
+        raw=gba_bytes()+bytes(32*1024**2-1024+1)
+        result=self.investigate(raw)
+        self.assertEqual(result['status'],'BLOCKED',result)
+        self.assertFalse(result['candidates'][0]['layout_valid'])
+        self.assertTrue(any('32 MiB' in warning for warning in result['warnings']))
+
     def test_snes_non_power_of_two_size_uses_rounded_header_declaration(self):
         raw=bytearray(snes_bytes())+bytearray(3*1024**2-32768)
         raw[0x7fd7]=12  # 3 MiB payload conventionally declares 4 MiB.

@@ -18,7 +18,7 @@ from .audio_systems import audio_system_info
 MAX_SCAN=64*1024**2
 WINDOW=1024**2
 PER_KIND=100
-VERSION=10
+VERSION=11
 
 
 def cache_path(project,row):
@@ -96,8 +96,11 @@ def run(project,row,*,cancelled=lambda:False,publish=None):
     from .cheat_catalog import inspect_catalog
     cheat_references=inspect_catalog(project,row,path,page=0,limit=10,cancelled=cancelled)
     if system=='gba':
-        from .engine_recognition import recognize_engines
-        engines=recognize_engines(path,row['sha256'],system,cancelled=cancelled)
+        from .engine_recognition import recognize_engines,MAX_ROM_BYTES
+        if row['size']>MAX_ROM_BYTES:
+            engines={'ok':True,'status':'BUDGET_EXCEEDED','source_sha256':row['sha256'],'system_id':system,'findings':[],
+                     'budget_reason':'Source exceeds the bounded engine-recognition size limit. Other scan checks are reported separately.','write_authorized':False}
+        else:engines=recognize_engines(path,row['sha256'],system,cancelled=cancelled)
     else:engines={'ok':True,'status':'NOT_IMPLEMENTED','source_sha256':row['sha256'],'findings':[],'write_authorized':False}
     projects._measure(path,row,cancelled=cancelled)
     if cancelled():raise KeyboardInterrupt

@@ -80,6 +80,8 @@ Automatic cartridge verification includes conservative startup-vector/entry
 checks, documented boot-header fingerprints and standard mirrored SNES checksums
 for ordinary LoROM/HiROM up to 4 MiB. Warnings and unsupported checks stay distinct
 from passed checks. It does not execute startup instructions or certify gameplay.
+The supported linear GBA cartridge format is limited to 32 MiB. A bounded
+engine analysis reports its own limit without discarding the other scan checks.
 
 Overview -> Build history -> Compare files compares original and modified ROMs.
 Select a changed range to view both byte columns in Resources. Highlights mark

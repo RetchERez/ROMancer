@@ -1644,7 +1644,13 @@
             "caption": "Unaltered full-resolution capture is linked in the offline HTML edition."
           }
         ]
-      }
+      },
+      "details": [
+        {
+          "title": "Size and analysis limits",
+          "text": "The supported linear GBA cartridge format is limited to 32 MiB. An engine detector that reaches its own budget reports that limit separately; the other cartridge and resource checks remain available."
+        }
+      ]
     }
   ],
   "glossary": [

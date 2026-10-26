@@ -11,6 +11,18 @@ from romancer.boot_fixtures import make_boot_fixture
 
 
 class RomScanTests(unittest.TestCase):
+    def test_engine_budget_preserves_the_other_scan_results(self):
+        from romancer import rom_scan,workbench_projects
+        source=self.root/'bounded.gba';source.write_bytes(make_boot_fixture('gba')['data'])
+        project=Path(self.p['path']);registered=workbench_projects.register_source(project,source,None)
+        row=workbench_projects.artifact(project,registered['artifact_id'])
+        with patch('romancer.engine_recognition.MAX_ROM_BYTES',16),patch('romancer.engine_recognition.recognize_engines',side_effect=AssertionError('over-budget detector must not run')):
+            result=rom_scan.run(project,row)
+        self.assertTrue(result['ok']);self.assertIsNotNone(result['health'])
+        self.assertEqual(result['engine_recognition']['status'],'BUDGET_EXCEEDED')
+        self.assertEqual(result['engine_recognition']['findings'],[])
+        self.assertFalse(result['write_authorized'])
+
     def setUp(self):
         self.tmp=tempfile.TemporaryDirectory();self.addCleanup(self.tmp.cleanup)
         self.root=Path(self.tmp.name);self.api=WorkbenchAPI(self.root/'workspace');self.addCleanup(self.api.close)
