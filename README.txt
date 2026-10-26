@@ -4,6 +4,38 @@ By RetchEWretched
 Local ROM editing for NES, SNES, Genesis, Game Boy, Game Boy Color and GBA.
 Everyday use works offline. No AI account, model, API key or subscription is required.
 
+WHAT WORKS / WHAT NEEDS A DEFINITION
+
+Ready to use in the full Windows edition:
+- Open the included original workshops without supplying a game.
+- Inspect bytes and checksums, compare files, make reviewed byte edits, and
+  apply or export patches into separate builds. Originals stay unchanged.
+- Load supported cartridges in Playtest using the included engines. Test
+  controller input, pause, and save/load states for the exact selected build.
+
+Editors need an understood layout:
+- Text, numeric tables, assembled sprites, palettes, levels and sound need a
+  verified definition or an explicit declaration of the format and byte ranges.
+- An exact game/revision match can provide named editing controls. A matching
+  console header alone does not identify all of a game's resources.
+
+Still unknown until investigated:
+- Deep scans provide checks, documented structures and candidates. They do not
+  automatically decode every game's compression, scripts, maps or music.
+- Unknown is not a failed checksum or proof of a bad ROM. Read matched,
+  mismatched, unsupported and unknown results separately.
+- Tested system/data formats cover NES, SNES, Genesis, GB, GBC and GBA.
+  This does not certify every commercial game or every edit within a game.
+
+SHORT WALKTHROUGH
+
+Watch ROMancer-v1.0-Walkthrough.mp4, or open Help -> User guide -> Watch the
+first-edit walkthrough. The captioned video shows the original NES workshop,
+actual editing, undo/redo, a build, native playtesting, states, patch export,
+reopening the project and recovering a saved draft. No commercial ROM is used.
+The video is inside user-guide/ in source, app/user-guide/ in Windows packages,
+and is also supplied separately with the release. It works offline.
+
 START ON WINDOWS
 
 1. Run ROMancer-v1.0-Setup.exe and follow the installation steps.
@@ -20,6 +52,42 @@ firmware dumps are not distributed. Editing and patching also work without emula
 Installed projects: %LOCALAPPDATA%\ROMancer\workspace
 Upgrades retain projects and prior versions. Rollback restores the previous
 launcher. Uninstall preserves projects and installed versions for recovery.
+
+BEGINNER ACCEPTANCE CHECKLIST (YOUR HANDS-ON TRIAL)
+
+Copy this checklist into your own notes, or print it; leave installed program
+files unchanged. Do the trial using the original NES workshop. Leave a box
+unchecked if you
+skip it, need outside help, or cannot tell whether it worked. Note the step,
+expected result, observed result and any unclear label. These boxes are not
+claims that a human trial has already passed. Using the built-in guide and
+tutorials is allowed; record any need for another person to explain the controls.
+
+[ ] Open the app and the NES workshop without manually configuring an engine.
+[ ] Find Graphics & fonts. Assemble one tile (1 across, 1 down), choose color
+    index 1, focus Editing, press Right Arrow then Space. One pixel changes;
+    Original stays unchanged. Fit makes the comparison readable.
+[ ] Undo the sprite stroke, then redo it. See the pixel disappear and return.
+[ ] Review asset changes and create a build. Identify it in the top selector
+    or Overview -> Build history; distinguish it from the original ROM.
+[ ] Choose Playtest build, confirm the top bar says BUILD and shows your output,
+    then Load game. Play and pause the original drawing program.
+[ ] Save a state and load it for that same build. See the success confirmation.
+[ ] Export an independently verified BPS patch and download it. The original
+    and the edited build remain separate; the patch is a third file.
+[ ] Close the project using Choose a project, then reopen it. Find the same
+    source and build without assistance, and identify which one is selected.
+[ ] Select the original, make one more small sprite edit, and wait for Saved.
+    Reload or reopen the app; confirm any reload prompt only after saving.
+    The draft and its staged-change status must return. Saved drafts still
+    need review and a new build before their edits can appear in Playtest.
+[ ] Complete the steps comfortably at your preferred window size and theme.
+    Read the labels and original/edited previews without changing browser zoom.
+
+Pass this trial only when every box is completed without outside assistance.
+If a step is confusing, record it as a usability issue even if the operation
+technically succeeds. The automated video demonstrates a workflow; it does not
+replace this independent human trial.
 
 PLAYTESTING
 

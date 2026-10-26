@@ -6,6 +6,7 @@ import json
 import mimetypes
 import os
 from pathlib import Path
+import re
 import secrets
 import tempfile
 from urllib.parse import urlsplit,parse_qs
@@ -21,6 +22,8 @@ MAX_BODY=1024**2
 MAX_UPLOAD=64*1024**2
 UI_ROOT=Path(__file__).parent/'ui'
 GUIDE_ROOT=Path(__file__).resolve().parent.parent/'user-guide'
+GUIDE_VIDEO='ROMancer-v1.0-Walkthrough.mp4'
+GUIDE_CAPTIONS='walkthrough.en.vtt'
 
 
 class Handler(BaseHTTPRequestHandler):
@@ -65,6 +68,34 @@ class Handler(BaseHTTPRequestHandler):
             self._json(401,{'ok':False,'error':'This workbench session has expired. Reopen it from the launcher.'});return False
         return True
 
+    def _guide_video(self,file):
+        size=file.stat().st_size;start=0;end=size-1;status=200
+        interval=self.headers.get('Range')
+        if interval is not None:
+            match=re.fullmatch(r'bytes=([0-9]{0,20})-([0-9]{0,20})',interval)
+            valid=match is not None and any(match.groups()) and size>0
+            if valid:
+                first,last=match.groups()
+                if first:
+                    start=int(first);end=min(int(last),size-1) if last else size-1
+                    valid=start<size and end>=start
+                else:
+                    count=int(last);valid=count>0;start=max(0,size-count)
+            if not valid:
+                self._headers(416,'video/mp4',0);self.send_header('Content-Range','bytes */'+str(size));self.send_header('Accept-Ranges','bytes');self.end_headers();return
+            status=206
+        length=max(0,end-start+1);self._headers(status,'video/mp4',length);self.send_header('Accept-Ranges','bytes')
+        if status==206:self.send_header('Content-Range',f'bytes {start}-{end}/{size}')
+        self.end_headers()
+        try:
+            with file.open('rb') as stream:
+                stream.seek(start);remaining=length
+                while remaining:
+                    chunk=stream.read(min(65536,remaining))
+                    if not chunk:break
+                    self.wfile.write(chunk);remaining-=len(chunk)
+        except (BrokenPipeError,ConnectionResetError):pass
+
     def do_GET(self):
         if not self._host():self._json(403,{'ok':False,'error':'Invalid local host'});return
         path=urlsplit(self.path).path
@@ -75,15 +106,17 @@ class Handler(BaseHTTPRequestHandler):
         root=GUIDE_ROOT if guide else UI_ROOT
         name=path[len('/user-guide/'):] if guide else ('index.html' if path=='/' else path.lstrip('/'))
         if (not name or '\\' in name or '%' in name or any(p in ('','.','..') for p in name.split('/'))
-                or Path(name).suffix not in (('.html','.css','.pdf','.png','.js') if guide else ('.html','.css','.js','.svg'))
-                or (guide and Path(name).suffix=='.js' and name!='guide.js')):
+                or Path(name).suffix not in (('.html','.css','.pdf','.png','.js','.mp4','.vtt') if guide else ('.html','.css','.js','.svg'))
+                or (guide and Path(name).suffix=='.js' and name!='guide.js')
+                or (guide and Path(name).suffix in ('.mp4','.vtt') and name not in (GUIDE_VIDEO,GUIDE_CAPTIONS))):
             self._json(404,{'ok':False,'error':'Page not found'});return
         file=root/name
         if (root.is_symlink() or root.is_junction() or not file.is_file() or file.is_symlink() or file.is_junction()
                 or not file.resolve().is_relative_to(root.resolve())
                 or any(p.is_symlink() or p.is_junction() for p in file.parents if p!=root and root in p.parents)):
             self._json(404,{'ok':False,'error':'Page not found'});return
-        raw=file.read_bytes();kind=mimetypes.guess_type(file.name)[0] or 'application/octet-stream'
+        if guide and name==GUIDE_VIDEO:self._guide_video(file);return
+        raw=file.read_bytes();kind='text/vtt' if guide and name==GUIDE_CAPTIONS else mimetypes.guess_type(file.name)[0] or 'application/octet-stream'
         self._headers(200,kind+('; charset=utf-8' if kind.startswith('text/') or kind in ('application/javascript',) else ''),len(raw));self.end_headers()
         try:self.wfile.write(raw)
         except (BrokenPipeError,ConnectionResetError):pass

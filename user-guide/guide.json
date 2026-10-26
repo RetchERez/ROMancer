@@ -258,6 +258,41 @@
       }
     },
     {
+      "id": "walkthrough",
+      "title": "Watch the first-edit walkthrough",
+      "part": "Basic",
+      "kicker": "Short offline video / original NES workshop",
+      "intro": "Watch an actual local application recording, then try the same steps yourself. The video has instructional captions and a highlighted pointer, with no commercial game content.",
+      "video": true,
+      "steps": [
+        "Open the HTML guide chapter <b>Watch the first-edit walkthrough</b> and use the video controls. The adjacent ROMancer-v1.0-Walkthrough.mp4 also opens in an ordinary local video player.",
+        "Follow the original NES workshop: assemble a tile, paint one pixel, compare Original and Editing, then undo and redo the stroke.",
+        "Review and create the asset build. Choose Playtest build, Load game, Play and Pause. Save and load a state for that exact output.",
+        "Export a verified BPS patch and download it. Close and reopen the project, then check that its source and build remain available.",
+        "Make one more staged edit, wait for Saved, reload, and confirm its draft returns. Use the beginner acceptance checklist for your own independent trial."
+      ],
+      "result": "The recorded example changed exactly one source byte at file offset 16400 (0x4010), from 81 to C1, in a separate build. The sequence also checks undo/redo, native playback, save/load, patch download, project reopening and a saved draft surviving a new document load.",
+      "note": "The drawing program intentionally repeats the edited tile. This is an automated demonstration, not evidence that a beginner has passed the independent usability trial. The PDF cannot play video; open the MP4 or the HTML edition.",
+      "details": [
+        {
+          "title": "Video chapter times",
+          "text": "00:00 01 · Start with a workshop<br/>00:10 02 · Assemble a sprite<br/>00:24 03 · Make one small change<br/>00:36 04 · Undo and redo<br/>00:48 05 · Review and create a build<br/>01:06 06 · Select and load your build<br/>01:18 07 · Play and pause<br/>01:30 08 · Save and load a state<br/>01:48 09 · Export a verified patch<br/>02:10 10 · Reopen the project<br/>02:26 11 · Recover a saved draft<br/>02:44 12 · Try it yourself"
+        }
+      ],
+      "related": [
+        "first-edit",
+        "beginner-trial",
+        "drafts",
+        "play"
+      ],
+      "terms": [
+        "term-original",
+        "term-draft",
+        "term-build",
+        "term-plan"
+      ]
+    },
+    {
       "id": "first-edit",
       "title": "Your first complete edit: the original NES workshop",
       "part": "Basic",
@@ -311,6 +346,44 @@
           }
         ]
       }
+    },
+    {
+      "id": "beginner-trial",
+      "title": "Complete the beginner acceptance checklist",
+      "part": "Basic",
+      "kicker": "Independent hands-on usability trial",
+      "intro": "Check that you can finish a small edit comfortably, without outside assistance. Copy the unmarked checklist from README.txt into your own notes, or print it. Leave installed program files unchanged.",
+      "steps": [
+        "Open the app and original NES workshop. Find Graphics &amp; fonts, assemble one tile and make one visible pixel change. Confirm that the fixed Original preview stays unchanged.",
+        "Undo and redo the stroke, review the change, and create a build. Identify the selected file as Original or Build before loading it in Playtest.",
+        "Play and pause the build. Save and load a matching state, then export and download a verified BPS patch. Identify the original, build and patch as separate files.",
+        "Close and reopen the project, then find the same source and build. On the original, stage one more edit, wait for Saved and reload. If a confirmation appears, continue only after saving. Confirm the draft and its staged-change status return.",
+        "Read the labels and previews at your preferred window size and theme. Mark a box in your checklist copy complete only when you can explain the result without outside help. Skipped or confusing steps stay unchecked."
+      ],
+      "result": "Every copied checklist checkbox is completed by the person doing the trial. For a problem, record the step, expected result, observed result, application build and any unclear label. Screenshots help reproduce visual problems.",
+      "note": "A saved editing draft still needs a new reviewed build before it affects gameplay. Automated checks and the walkthrough video are separate evidence; they do not fill in the human-trial boxes.",
+      "details": [
+        {
+          "title": "What counts as a usability issue",
+          "text": "Needing someone to find a button, confusing a draft with a build, losing track of the selected file, unreadable labels or an unclear recovery prompt all count, even if the underlying operation eventually succeeds."
+        },
+        {
+          "title": "Record a useful report",
+          "text": "Describe what you clicked and what you expected. Attach a screenshot or a sanitized support report if useful. Keep ROM data, private paths and personal saves out of a public report."
+        }
+      ],
+      "related": [
+        "walkthrough",
+        "first-edit",
+        "drafts",
+        "projects",
+        "support-playback"
+      ],
+      "terms": [
+        "term-original",
+        "term-draft",
+        "term-build"
+      ]
     },
     {
       "id": "checks",
@@ -3939,6 +4012,24 @@
       "topics": [
         "sprites",
         "first-edit"
+      ]
+    },
+    {
+      "term": "Walkthrough video",
+      "topics": [
+        "walkthrough"
+      ]
+    },
+    {
+      "term": "Beginner acceptance checklist",
+      "topics": [
+        "beginner-trial"
+      ]
+    },
+    {
+      "term": "Human usability trial",
+      "topics": [
+        "beginner-trial"
       ]
     }
   ]

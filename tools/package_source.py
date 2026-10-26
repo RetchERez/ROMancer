@@ -150,6 +150,7 @@ APPROVED_FILES = frozenset(ROOT_FILES | {
 
 
 APPROVED_FILES = APPROVED_FILES | frozenset({
+    'user-guide/ROMancer-v1.0-Walkthrough.mp4','user-guide/walkthrough.en.vtt',
     'romancer/ui/artifact_selection.js','tests/ui_artifact_selection.mjs','romancer/ui/build_handoff.js','romancer/ui/overview_tasks.js','tests/ui_build_handoff.mjs','tests/ui_overview_tasks.mjs','tests/ui_sprite_zoom.mjs','tests/ui_guide_search.mjs','user-guide/guide.js',
     'romancer/observation_series.py','romancer/investigation_tools.py',
     'romancer/native_debugger.py','romancer/debugger_protocol.py','romancer/debugger_capture.lua',

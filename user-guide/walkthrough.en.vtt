@@ -1,0 +1,50 @@
+WEBVTT
+
+00:00:00.000 --> 00:00:10.011
+01 · Start with a workshop
+Open the original NES workshop. Your own ROMs are not needed for this exercise.
+
+00:00:10.018 --> 00:00:24.027
+02 · Assemble a sprite
+Graphics & fonts → Assemble tiles. Fit enlarges the preview without resizing the stored image.
+
+00:00:24.029 --> 00:00:36.036
+03 · Make one small change
+Focus Editing, press Right Arrow, then Space. Compare the edited pixel with Original.
+
+00:00:36.037 --> 00:00:48.052
+04 · Undo and redo
+Undo restores the original stroke. Redo brings the staged edit back.
+
+00:00:48.057 --> 00:01:06.066
+05 · Review and create a build
+Review asset changes, then Create asset build. The original file stays unchanged.
+
+00:01:06.070 --> 00:01:18.078
+06 · Select and load your build
+Playtest build selects the recorded output. Load game uses the included NES engine.
+
+00:01:18.080 --> 00:01:30.091
+07 · Play and pause
+This original drawing program repeats the edited tile. Pause before saving a state.
+
+00:01:30.097 --> 00:01:48.105
+08 · Save and load a state
+Save state, then Load state. States belong to the exact build and engine setup.
+
+00:01:48.109 --> 00:02:10.119
+09 · Export a verified patch
+Choose the original and your build. Create a BPS patch, then download it.
+
+00:02:10.123 --> 00:02:26.137
+10 · Reopen the project
+Close the project with Choose a project. Open it again: the source and build remain available.
+
+00:02:26.143 --> 00:02:44.154
+11 · Recover a saved draft
+Make another small edit on the original. Wait for Saved, then reload: the draft is still there.
+
+00:02:44.159 --> 00:02:52.161
+12 · Try it yourself
+A saved draft is not a new build. Follow the beginner checklist and note anything unclear.
+

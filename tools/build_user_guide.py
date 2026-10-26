@@ -24,6 +24,8 @@ CSS += '''
 #guide-search{margin:26px 0;padding:24px;background:#e1e5e9;border:1px solid #b5c0c9;border-radius:8px}#guide-search h2{font-size:26px}#guide-search label{display:block;font-weight:650}.guide-search-controls{display:flex;flex-wrap:wrap;gap:10px;margin:8px 0 14px}.guide-search-controls input{flex:1;min-width:180px;background:white;color:#19252d;border:1px solid #788d94;border-radius:6px;padding:12px;font:inherit}.guide-search-controls button{background:#143038;color:white;border:1px solid #143038;border-radius:6px;padding:10px 18px;font:inherit;cursor:pointer}#guide-search :focus-visible{outline:3px solid #9b5e00;outline-offset:3px}#guide-results{margin:0}#guide-results li{margin:16px 0}#guide-results a{font-weight:700}#guide-results p{margin:4px 0;font-size:16px}#guide-search-status{margin:12px 0}
 '''
 
+CSS += '.walkthrough-video{max-width:1200px}.walkthrough-video video{display:block;width:100%;aspect-ratio:8/5;background:#10191f;border:1px solid #788d94;border-radius:8px}@media print{.walkthrough-video video{display:none}}'
+
 def load_content(folder):
     data = json.loads((folder / 'guide.json').read_text(encoding='utf-8'))
     if data.get('schema_version') != 1:
@@ -42,6 +44,15 @@ def load_content(folder):
     for chapter in data['chapters']:
         if chapter['part'] not in ('Basic', 'Advanced'):
             raise ValueError('Every chapter needs a Basic or Advanced part')
+        if chapter.get('video'):
+            movie=folder/'ROMancer-v1.0-Walkthrough.mp4';captions=folder/'walkthrough.en.vtt'
+            if chapter['video'] is not True or not movie.is_file() or not captions.is_file():
+                raise ValueError('The walkthrough needs its approved local video and captions')
+            if not 32<=movie.stat().st_size<=16*1024*1024 or captions.stat().st_size>128*1024:
+                raise ValueError('Walkthrough media exceeds the guide budget')
+            with movie.open('rb') as stream:signature=stream.read(12)
+            if signature[4:8]!=b'ftyp' or not captions.read_text(encoding='utf-8').startswith('WEBVTT\n'):
+                raise ValueError('Walkthrough media has an unexpected format')
         if chapter.get('image'):
             image = chapter['image']
             if not re.fullmatch(r'[a-z0-9-]+', image):
@@ -112,6 +123,9 @@ def build_html(data, folder, pages):
         navigation.append(f'<h2><a href="#{part.lower()}">{part}</a></h2>' + ''.join(f'<a href="#{row["id"]}">{esc(row["title"])}</a>' for row in rows))
         sections.append(f'<div class="part" id="{part.lower()}"><p class="eyebrow">{part.upper()}</p><h2>{part} workflows</h2><p>{esc(summary)}</p></div>')
         for row in rows:
+            movie=''
+            if row.get('video'):
+                movie='<figure class="walkthrough-video"><video controls playsinline preload="none" poster="screenshots/38-sprite-preview.png" aria-label="Original NES workshop editing walkthrough"><source src="ROMancer-v1.0-Walkthrough.mp4" type="video/mp4"><track kind="captions" src="walkthrough.en.vtt" srclang="en" label="English"><p>Open ROMancer-v1.0-Walkthrough.mp4 in a local video player.</p></video><figcaption>Actual application recording with instructional captions and a pointer highlight. <a href="ROMancer-v1.0-Walkthrough.mp4" download>Download MP4</a> · <a href="walkthrough.en.vtt" download>English captions</a>. The steps below are the text alternative.</figcaption></figure>'
             steps = ''.join('<li>' + text + '</li>' for text in row['steps'])
             details = ''.join(f'<h3>{esc(block["title"])}</h3><p>{block["text"]}</p>' for block in row.get('details', []))
             result = '<aside><b>Check the result</b><p>' + row['result'] + '</p></aside>'
@@ -130,7 +144,7 @@ def build_html(data, folder, pages):
                     figure += '</div>'
             related = ' | '.join(f'<a href="#{topic}">{esc(titles[topic])}</a>' for topic in row.get('related', []))
             term_links = ' | '.join(f'<a href="#{topic}">{esc(titles[topic])}</a>' for topic in row.get('terms', []))
-            sections.append(f'<section class="chapter" id="{row["id"]}"><p class="eyebrow">{part.upper()} / {esc(row["kicker"])}</p><h2>{esc(row["title"])}</h2><p class="intro">{row["intro"]}</p><div class="lesson{ "" if figure else " no-image"}"><div><h3>Do this</h3><ol>{steps}</ol>{note}</div><div>{figure}{result}{details}</div></div><p class="related">Key terms: {term_links}</p><p class="related">Related: {related}</p><a class="back" href="#contents">Back to contents</a> <span class="page-ref">PDF page {pages[row["id"]]}</span></section>')
+            sections.append(f'<section class="chapter" id="{row["id"]}"><p class="eyebrow">{part.upper()} / {esc(row["kicker"])}</p><h2>{esc(row["title"])}</h2><p class="intro">{row["intro"]}</p>{movie}<div class="lesson{ "" if figure else " no-image"}"><div><h3>Do this</h3><ol>{steps}</ol>{note}</div><div>{figure}{result}{details}</div></div><p class="related">Key terms: {term_links}</p><p class="related">Related: {related}</p><a class="back" href="#contents">Back to contents</a> <span class="page-ref">PDF page {pages[row["id"]]}</span></section>')
     terms = ''.join(f'<div class="term" id="{row["id"]}"><dt>{esc(row["term"])}</dt><dd>{row["definition"]}</dd></div>' for row in sorted(data['glossary'], key=lambda row: row['term'].casefold()))
     index = ''.join('<li><strong>' + esc(row['term']) + '</strong>' + ' | '.join(f'<a href="#{topic}">{esc(titles[topic])} <span class="page-ref">(PDF {pages[topic]})</span></a>' for topic in row['topics']) + '</li>' for row in sorted(data['index'], key=lambda row: row['term'].casefold()))
     page = f'''<!doctype html>
