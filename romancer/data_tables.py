@@ -83,7 +83,7 @@ def _read(stream,definition,row,field,size):
 
 
 def _check_value(value,field,*,declared=True):
-    width,signed=TYPES[field['type']];bits=width*8
+    width,signed=TYPES[field['type']];
     minimum,maximum=_storage_bounds(field)
     if declared:minimum=field.get('minimum',minimum);maximum=field.get('maximum',maximum)
     if type(value) is not int or not minimum<=value<=maximum:raise ValueError(f"{field['name']} must be an integer from{minimum} to{maximum}")

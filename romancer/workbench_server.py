@@ -12,7 +12,7 @@ from urllib.parse import urlsplit,parse_qs
 import webbrowser
 from . import ROMANCER_VERSION,ROMANCER_RELEASE_NAME
 from .asset_schema import fields
-from .assets import checked_path
+
 from .script_schema import canonical_bytes
 from .workbench_api import WorkbenchAPI
 from .workbench_projects import write_json

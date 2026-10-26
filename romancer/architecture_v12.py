@@ -7,7 +7,7 @@ from collections import Counter, defaultdict
 from pathlib import Path
 from typing import Any
 from .trace_parser import parse_trace
-from .util import write_json, parse_int
+from .util import write_json
 
 CALL_MNEMONICS={"JSR","JSL","BSR","CALL"}
 RETURN_MNEMONICS={"RTS","RTL","RTI","RTE"}

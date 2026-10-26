@@ -81,7 +81,7 @@ class RuntimePool:
                     'timing':copy.deepcopy(value['runtime'].load_result.get('av',{}).get('timing',{}))}
 
     def audio_snapshot(self,project):
-        from .runtime_session import snapshot_json
+        
         with self.lock:
             value=self.sessions.get(str(project))
             if value is None or 'last_audio' not in value:raise ValueError('drain captured audio first')

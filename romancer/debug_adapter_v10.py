@@ -9,9 +9,9 @@ no machine-readable bridge has been configured.
 """
 
 from dataclasses import dataclass, asdict
-from pathlib import Path
-from typing import Any, Callable
-import json, shutil
+
+from typing import Any
+import shutil
 
 
 CAPABILITIES = {

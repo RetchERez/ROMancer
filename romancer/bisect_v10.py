@@ -4,7 +4,7 @@ from __future__ import annotations
 
 from pathlib import Path
 from typing import Any, Callable
-import hashlib, json, math, shlex, subprocess, tempfile
+import shlex, subprocess, tempfile
 from .util import write_json
 
 

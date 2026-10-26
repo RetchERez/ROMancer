@@ -31,8 +31,8 @@ at pixels with asking direct, verifiable questions of the underlying
 data structures the game itself is manipulating.
 """
 
-import json
-from typing import Any
+
+
 
 from .v5 import Sim65816
 from .util import parse_int, write_json

@@ -5,8 +5,8 @@ from typing import Any
 import json
 import math
 
-from .util import read_bytes, write_json, parse_int, hexdump
-from .systems.snes import snes_to_offset
+from .util import read_bytes, write_json, parse_int
+
 
 PNG_SIG = b'\x89PNG\r\n\x1a\n'
 
@@ -166,7 +166,7 @@ def palette_dump(rom:str, system:str, offset:str, count:int=16, out:str|None=Non
     return {'tool':'ROMancer','feature':'v0.5 palette-dump','rom':rom,'system':system,'offset':_hex(off),'count':len(colors),'colors':colors,'out':out}
 
 def record_scan(rom:str, start:str, end:str, stride:int, out:str|None=None)->dict[str,Any]:
-    data=read_bytes(rom); s=parse_int(start); e=parse_int(end); recs=[]; field_scores={}
+    data=read_bytes(rom); s=parse_int(start); e=parse_int(end); recs=[]; 
     for off in range(s,min(e,len(data)),stride):
         raw=data[off:off+stride]
         if len(raw)<stride: break

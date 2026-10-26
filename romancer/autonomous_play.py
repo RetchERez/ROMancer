@@ -10,7 +10,7 @@ unknown and cause conservative information-gathering behavior.
 
 from pathlib import Path
 from typing import Any
-import json
+
 
 from .frame_analysis import compare_frames
 from .game_profiles import load_profile
@@ -87,7 +87,7 @@ def runtime_autoplay(core:str|Path, game:str|Path, out_dir:str|Path, *, profile:
         load=f.load_game(game); f.clear_buttons(); f.run_frames(max(0,boot_frames))
         for i in range(1,max(0,decisions)+1):
             if f.shutdown_requested: break
-            anchor=f.serialize(); base_frame=f.last_frame; base_mem=f.memory_region(memory_region)
+            anchor=f.serialize(); base_frame=f.last_frame; f.memory_region(memory_region)
             match=_state_match(f,library,state_threshold)
             match_status=(match or {}).get("status")
             context=_normalize_context((match or {}).get("context"))

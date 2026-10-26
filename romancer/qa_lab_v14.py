@@ -2,10 +2,10 @@ from __future__ import annotations
 
 """ROMancer v14 whole-game QA laboratory primitives."""
 
-import json, math, shlex, subprocess, time
+import json, shlex, subprocess, time
 from concurrent.futures import ThreadPoolExecutor, as_completed
 from pathlib import Path
-from statistics import mean, median
+from statistics import mean
 from typing import Any
 from .util import write_json
 

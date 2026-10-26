@@ -69,8 +69,8 @@ def _historical_index(project):
     if not path.exists():return {}
     value=load_script_json(path,max_bytes=2*1024**2)
     if type(value) is not dict or value.get('schema_version')!=1 or type(value.get('records')) is not dict or len(value['records'])>8192:raise ValueError('invalid historical evidence index')
-    for identifier,key in value['records'].items():
-        if not re.fullmatch('[0-9a-f]{32}',identifier) or type(key) is not str or not re.fullmatch('[0-9a-f]{64}',key):raise ValueError('invalid historical evidence identity')
+    for evidence_id,key in value['records'].items():
+        if not re.fullmatch('[0-9a-f]{32}',evidence_id) or type(key) is not str or not re.fullmatch('[0-9a-f]{64}',key):raise ValueError('invalid historical evidence identity')
     return value['records']
 
 

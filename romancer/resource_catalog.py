@@ -1,5 +1,5 @@
 """Paged source-bound resource labels. Catalog entries never grant edit authority."""
-import json
+
 import os
 from pathlib import Path
 import tempfile
@@ -29,7 +29,7 @@ def _rows(project,row):
 
 
 def _entry(row,item):
-    item=dict(item);identifier=item.pop('resource_id',None);fields(item,'name kind offset length format')
+    item=dict(item);item.pop('resource_id', None);fields(item,'name kind offset length format')
     label(item['name'],128);label(item['kind'],32);label(item['format'],128,blank=True)
     number(item['offset'],0,row['size']);number(item['length'],1,row['size'])
     if item['offset']+item['length']>row['size']:raise ValueError('catalog resource exceeds source')

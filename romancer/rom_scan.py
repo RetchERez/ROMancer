@@ -4,7 +4,7 @@ import json
 import hmac
 from pathlib import Path
 from . import workbench_projects as projects
-from .assets import checked_path,digest
+from .assets import checked_path
 from .resource_discovery import discover
 from .revision_catalog import load_catalog,lookup_revision
 from .rom_health import check_rom

@@ -1,7 +1,7 @@
 from __future__ import annotations
 from pathlib import Path
 from typing import Any
-import json, os, shutil, subprocess, time
+import json, shutil, subprocess
 
 CONFIG=Path.home()/'.config'/'romancer'/'backends.json'
 

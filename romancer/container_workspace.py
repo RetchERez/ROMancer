@@ -4,7 +4,7 @@ ISO directory record layout follows ECMA-119 (2019), sections8.4 and9.1.
 Supported disc sets use one BINARY track per file: MODE1/2048, MODE1/2352,
 or preserved AUDIO. Shared-file mixed-mode and interleaved ISO files refuse.
 """
-import hashlib
+
 import os
 from pathlib import Path
 import re

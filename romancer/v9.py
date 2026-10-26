@@ -2,12 +2,12 @@ from __future__ import annotations
 
 """ROMancer v9 autonomous game-understanding and play-intelligence CLI layer."""
 
-import argparse, json, shutil, subprocess, sys, tempfile, time
+import json, shutil, subprocess, sys, tempfile, time
 from pathlib import Path
 from typing import Any
 
 from .autonomous_play import runtime_autoplay
-from .gameplay_beliefs import Belief, BeliefLedger, BeliefStatus
+from .gameplay_beliefs import BeliefLedger, BeliefStatus
 from .gameplay_failures import classify_failure
 from .gameplay_genres import list_packs, load_pack, hypotheses
 from .gameplay_objectives import extract_candidate_objective, compile_structured_objective, objective_information_gaps

@@ -2,8 +2,11 @@
 from pathlib import Path
 
 from . import ROMANCER_VERSION
-from .script_cli import encode_result, emit_result
+from . import script_cli as _script_cli
 from .script_schema import load_script_json, MAX_SCHEMA_JSON_BYTES
+
+encode_result = _script_cli.encode_result
+emit_result = _script_cli.emit_result
 
 COMMANDS = {'font-measure', 'layout-check', 'layout-plan'}
 MAX_DESCRIPTOR_BYTES = 1024 * 1024

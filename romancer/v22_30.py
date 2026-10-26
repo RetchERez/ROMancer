@@ -8,12 +8,12 @@ reports, and v30 certification orchestration. It is deliberately conservative:
 executable discovery does not establish live emulator control.
 """
 
-import csv
+
 import hashlib
 import json
 import ntpath
 import os
-import re
+
 import shutil
 import stat
 import struct
@@ -22,7 +22,7 @@ import unicodedata
 import zipfile
 import zlib
 from contextlib import ExitStack
-from dataclasses import dataclass, asdict
+
 from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any, Iterable

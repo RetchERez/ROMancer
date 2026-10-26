@@ -69,7 +69,7 @@ def verify(root,cores=None,restore=True):
                 if decoded_result!=changed:raise ValueError('compressed result decoded bytes differ')
                 expected[0x3040:0x3080]=finalraw[0x3040:0x3080]
                 if finalraw!=checksum(expected,system) or source.read_bytes()!=original:raise ValueError('complete final output or original preservation differs')
-                patch=call(api,'release.prepare',{**p,'source_id':owned['artifact_id'],'target_id':final['artifact_id'],'title':'Original '+system,'description':'1.0 complete workflow'})
+                call(api, 'release.prepare', {**p, 'source_id': owned['artifact_id'], 'target_id': final['artifact_id'], 'title': 'Original ' + system, 'description': '1.0 complete workflow'})
                 export=next(row for row in api.exports(api.project(p)) if row['role']=='patch');call(api,'release.verify',{**p,'export_id':export['export_id'],'source_id':owned['artifact_id']})
                 patchfile,_=api.download(p['project_id'],export['export_id']);rebuilt=folder/('reconstructed'+fixture['suffix']);apply_patch(Path(owned['path']),patchfile,rebuilt)
                 if rebuilt.read_bytes()!=finalraw:raise ValueError('independent BPS reconstruction differs')

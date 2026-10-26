@@ -1,8 +1,8 @@
 from __future__ import annotations
 from pathlib import Path
 from typing import Any
-import json, shutil, time
-from .util import read_bytes, sha1, sha256, crc32_hex, write_json
+import json, time
+from .util import read_bytes, sha1, write_json
 from .ips import create_ips
 from .diffing import byte_diff
 

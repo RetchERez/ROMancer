@@ -17,7 +17,7 @@ def validate_project(project,*,cancelled=lambda:False):
             'location':location,'offset':offset,'remedy':remedy})
     for row in rows:
         if cancelled():raise KeyboardInterrupt
-        checked+=1;aid=row['artifact_id'];where=row['name'];ranges=[]
+        checked+=1;where=row['name'];ranges=[]
         try:path=checked_path(Path(row['path']));p._measure(path,row,cancelled=cancelled)
         except FileNotFoundError:issue('ARTIFACT_MISSING','error',row,where,'Restore this owned file from a private project backup.');continue
         except (OSError,ValueError):issue('ARTIFACT_CHANGED','error',row,where,'Restore the original owned copy or import the changed file as a new source.');continue

@@ -1,7 +1,7 @@
 from __future__ import annotations
 from pathlib import Path
 from typing import Any
-import hashlib, json, os, shutil, subprocess, sys, zipfile
+import hashlib, shutil, zipfile
 from .patching import ROMANCER_VERSION, self_test, doctor
 from .rom_ident import identify_rom
 from .util import write_json
@@ -106,11 +106,11 @@ def full_self_test(out:str|None=None)->dict[str,Any]:
     cheat_archive=v21_self_test()
     v30_lab=v30_self_test()
     v31_lab=v31_self_test()
-    cumulative=v31_lab
+    
     ok = ok and bool(runtime.get('ok',False)) and bool(cognition.get('ok',False)) and bool(engineering.get('ok',False)) and bool(live_debug.get('ok',False)) and bool(architecture.get('ok',False)) and bool(repair.get('ok',False)) and bool(qa.get('ok',False)) and bool(self_improving.get('ok',False)) and bool(commons.get('ok',False)) and bool(proof.get('ok',False)) and bool(cross_engine.get('ok',False)) and bool(creator.get('ok',False)) and bool(final_lab.get('ok',False)) and bool(cheat_archive.get('ok',False)) and bool(v30_lab.get('ok',False)) and bool(v31_lab.get('ok',False))
     result={'tool':'ROMancer','version':ROMANCER_VERSION,'feature':'full self-test','ok':ok,'base_self_test':base,'v7_self_test':runtime,'v9_self_test':cognition,'v10_self_test':engineering,'v11_self_test':live_debug,'v12_self_test':architecture,'v13_self_test':repair,'v14_self_test':qa,'v15_self_test':self_improving,'v16_self_test':commons,'v17_self_test':proof,'v18_self_test':cross_engine,'v19_self_test':creator,'v20_self_test':final_lab,'v21_self_test':cheat_archive,'v30_self_test':v30_lab,'v31_self_test':v31_lab,'doctor':doc,
             'notes':['Full self-test uses bundled deterministic fixtures, including a source-built mock libretro core when gcc/cc is available.',
-                     'Real-console-core compatibility still requires a user-supplied libretro core and legally supplied game content.']}
+                     'The Windows package includes pinned console engines; source installations need compatible cores. Real-game coverage requires user-supplied game content.']}
     if out: write_json(out,result)
     return result
 

@@ -26,10 +26,7 @@ from .workflow import (
     plan_breakpoints, debugger_guide, trace_window, correlate_trace,
     find_routine, resolve_pc, report_trace, ai_bundle_v2,
 )
-from .patching import (
-    ROMANCER_VERSION, patch_plan, validate_patch, risk_score,
-    asar_skeleton, ips_manifest, doctor, self_test, project_status,
-)
+from .patching import patch_plan, validate_patch, risk_score, asar_skeleton, ips_manifest, doctor, self_test, project_status
 from .recon import text_scan, pointer_scan, tile_dump, palette_dump, record_scan, table_report
 from .backend import backend_config, backend_capabilities, launch, session_template, watch_traces
 from .knowledge import symbol_cmd, finding_cmd, routine_cmd, ai_prompt
@@ -39,26 +36,26 @@ from .hardening import capabilities, rom_doctor, clean_tree, full_self_test, bui
 from .advanced_trace import trace_compare, trace_hot_pc, trace_memory_flow, trace_register_flow, trace_call_tree, trace_loop_detect
 from .advanced_recon import tile_hunt, font_hunt
 from .debug_export import export_debug_script
-from .v3 import (VERSION as ROMANCER_V3_VERSION, plugin_list, plugin_doctor, backend_profile, backend_script, trace_corpus_test, disasm, cfg_from_trace, cfg_from_disasm, value_flow, infer_table, tbl_validate, tbl_decode, tbl_encode, tbl_brute_hint, sandbox_patch, rollback_ips, compat, regression_bundle, package_release_strict, tui_report)
-from .v4 import (VERSION as ROMANCER_V4_VERSION, graph_build, graph_query, graph_export, graph_dot, confidence_recompute, confidence_explain, trace_batch_correlate, classify_routine, recommend_patch, symbols_import, symbols_export, disasm_routine, compression_hint, fixture_run, state_diff, patch_rank, code_map)
-from .v5 import VERSION as ROMANCER_V5_VERSION, sim_run
-from .v6 import VERSION as ROMANCER_V6_VERSION, sim_ppu_query
-from .v7 import VERSION as ROMANCER_V7_VERSION, add_v7_parsers, dispatch_v7
-from .v9 import VERSION as ROMANCER_V9_VERSION, add_v9_parsers, dispatch_v9
-from .v10 import VERSION as ROMANCER_V10_VERSION, add_v10_parsers, dispatch_v10
-from .v11 import VERSION as ROMANCER_V11_VERSION, add_v11_parsers, dispatch_v11
-from .v12 import VERSION as ROMANCER_V12_VERSION, add_v12_parsers, dispatch_v12
-from .v13 import VERSION as ROMANCER_V13_VERSION, add_v13_parsers, dispatch_v13
-from .v14 import VERSION as ROMANCER_V14_VERSION, add_v14_parsers, dispatch_v14
-from .v15 import VERSION as ROMANCER_V15_VERSION, add_v15_parsers, dispatch_v15
-from .v16 import VERSION as ROMANCER_V16_VERSION, add_v16_parsers, dispatch_v16
-from .v17 import VERSION as ROMANCER_V17_VERSION, add_v17_parsers, dispatch_v17
-from .v18 import VERSION as ROMANCER_V18_VERSION, add_v18_parsers, dispatch_v18
-from .v19 import VERSION as ROMANCER_V19_VERSION, add_v19_parsers, dispatch_v19
-from .v20 import VERSION as ROMANCER_V20_VERSION, add_v20_parsers, dispatch_v20
-from .v21 import VERSION as ROMANCER_V21_VERSION, add_v21_parsers, dispatch_v21
-from .v22_30 import VERSION as ROMANCER_V30_VERSION, add_v22_30_parsers, dispatch_v22_30
-from .v31 import VERSION as ROMANCER_V31_VERSION, add_v31_parsers, dispatch_v31
+from .v3 import plugin_list, plugin_doctor, backend_profile, backend_script, trace_corpus_test, disasm, cfg_from_trace, cfg_from_disasm, value_flow, infer_table, tbl_validate, tbl_decode, tbl_encode, tbl_brute_hint, sandbox_patch, rollback_ips, compat, regression_bundle, package_release_strict, tui_report
+from .v4 import graph_build, graph_query, graph_export, graph_dot, confidence_recompute, confidence_explain, trace_batch_correlate, classify_routine, recommend_patch, symbols_import, symbols_export, disasm_routine, compression_hint, fixture_run, state_diff, patch_rank, code_map
+from .v5 import sim_run
+from .v6 import sim_ppu_query
+from .v7 import add_v7_parsers, dispatch_v7
+from .v9 import add_v9_parsers, dispatch_v9
+from .v10 import add_v10_parsers, dispatch_v10
+from .v11 import add_v11_parsers, dispatch_v11
+from .v12 import add_v12_parsers, dispatch_v12
+from .v13 import add_v13_parsers, dispatch_v13
+from .v14 import add_v14_parsers, dispatch_v14
+from .v15 import add_v15_parsers, dispatch_v15
+from .v16 import add_v16_parsers, dispatch_v16
+from .v17 import add_v17_parsers, dispatch_v17
+from .v18 import add_v18_parsers, dispatch_v18
+from .v19 import add_v19_parsers, dispatch_v19
+from .v20 import add_v20_parsers, dispatch_v20
+from .v21 import add_v21_parsers, dispatch_v21
+from .v22_30 import add_v22_30_parsers, dispatch_v22_30
+from .v31 import dispatch_v31
 
 
 def emit(obj, as_json=False):

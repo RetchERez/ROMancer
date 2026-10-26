@@ -2,7 +2,7 @@
 import base64,hashlib,json,math
 from .asset_schema import fields,number,label
 from .script_schema import canonical_bytes
-from .sound_codecs import CODECS,decode_sample,encode_sample,wav_bytes,read_wav
+from .sound_codecs import decode_sample, encode_sample, wav_bytes, read_wav
 
 
 def inspect_sound(raw,definition,source_sha256):

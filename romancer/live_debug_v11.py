@@ -8,9 +8,9 @@ neutral; individual emulator-side bridges must expose only capabilities that
 the emulator truly supports.
 """
 
-import json, socket, threading, time
+import json, socket, threading
 from dataclasses import dataclass, field
-from typing import Any, Callable
+from typing import Any
 
 PROTOCOL_VERSION = 1
 

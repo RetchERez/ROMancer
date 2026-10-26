@@ -1,5 +1,5 @@
 """Offline, revision-bound edit recipes. No commands, paths or executable hooks."""
-import hashlib
+
 import json
 import re
 from pathlib import Path

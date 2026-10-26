@@ -2,7 +2,7 @@ from __future__ import annotations
 
 """Causal evidence and offline trace slicing for ROMancer v10."""
 
-from pathlib import Path
+
 from typing import Any
 from .trace_parser import parse_trace
 from .v3 import value_flow

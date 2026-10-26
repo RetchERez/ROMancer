@@ -3,7 +3,7 @@ import base64
 import hashlib
 import uuid
 from .asset_schema import fields
-from .assets import failure
+
 from .debug_runtime import _observation
 from .replay_schema import validate_route
 from .runtime_session import OwnedRuntime,preflight_load,validate_timeout

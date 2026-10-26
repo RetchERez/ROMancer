@@ -7,7 +7,7 @@ folders. It does not bundle ROMs, BIOS files, emulator cores, save states, or
 commercial game assets.
 """
 
-import argparse
+
 import csv
 import hashlib
 import json

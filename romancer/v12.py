@@ -1,7 +1,7 @@
 from __future__ import annotations
 import json, tempfile
 from pathlib import Path
-from typing import Any
+
 from .util import write_json
 from .architecture_v12 import reconstruct_call_graph, infer_record_schema, learn_event_opcodes, architecture_reference, ghidra_export
 

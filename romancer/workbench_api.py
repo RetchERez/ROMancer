@@ -914,7 +914,7 @@ class WorkbenchAPI:
         checked=self._profile_load_config(p['system_id']);config={**checked,'game':str(path),'expected_game_sha256':row['sha256'],'session_dir':str(project/'sessions'/('check-'+uuid.uuid4().hex))}
         load=preflight_load(config,project)
         with OwnedRuntime(load,30,cancelled=c) as runtime:
-            advanced=runtime.request('advance',frames=120,buttons=[],port=0);frame=runtime.request('capture');audio=runtime.request('audio')
+            runtime.request('advance', frames=120, buttons=[], port=0);frame=runtime.request('capture');audio=runtime.request('audio')
             rgb=base64.b64decode(frame['rgb24_base64'],validate=True);pcm=base64.b64decode(audio['pcm_s16le_base64'],validate=True)
             if len(rgb)!=frame['width']*frame['height']*3 or hashlib.sha256(rgb).hexdigest()!=frame['sha256']:raise ValueError('ROM check video identity differs')
             if len(pcm)!=audio['captured_frames']*4:raise ValueError('ROM check audio sample count differs')

@@ -21,10 +21,10 @@ import hashlib
 import json
 import re
 import tempfile
-from dataclasses import dataclass, asdict
+
 from datetime import datetime, timezone
 from pathlib import Path
-from typing import Any, Iterable
+from typing import Any
 
 from .util import write_json
 from . import ROMANCER_VERSION

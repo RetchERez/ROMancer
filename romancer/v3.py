@@ -1,14 +1,14 @@
 from __future__ import annotations
 
-import json, os, re, shutil, zipfile, hashlib
+import json
 from collections import Counter, defaultdict
 from pathlib import Path
 from typing import Any
 
-from .util import read_bytes, write_json, read_json, parse_int, sha1, sha256, crc32_hex, hexdump
-from .trace_parser import parse_trace, detect_trace_format
+from .util import read_bytes, write_json, read_json, parse_int, sha1
+from .trace_parser import parse_trace
 from .systems.snes import snes_to_offset
-from .diffing import byte_diff
+
 from .ips import create_ips
 from .rom_ident import identify_rom
 from .patching import _hex_bytes, _bytes_to_hex
@@ -63,7 +63,7 @@ def backend_profile(name: str|None=None, out: str|None=None) -> dict[str, Any]:
 
 def backend_script(backend: str, system: str, addr: str, access: str="write", out: str|None=None) -> dict[str, Any]:
     b=backend.lower(); access=access.lower(); system=system.lower()
-    lines=[f"ROMancer backend script/profile helper", f"Backend: {b}", f"System: {system}", f"Target: {addr}", f"Access: {access}", ""]
+    lines=["ROMancer backend script/profile helper", f"Backend: {b}", f"System: {system}", f"Target: {addr}", f"Access: {access}", ""]
     if b == "blastem":
         if access != "execute":
             lines.append("BlastEm command debugger is most reliable for execute breakpoints. Data breakpoints may require manual emulator support or trace-side filtering.")
@@ -98,7 +98,7 @@ def _fmt_operand(fmt: str, payload: bytes) -> str:
 
 def _disasm_6502(data: bytes, start: int, count: int, cpu: str) -> list[dict[str, Any]]:
     table = _OP65816 if cpu == "65816" else _OP6502
-    out=[]; off=start; end=min(len(data), start+max(count,1)*4); n=0
+    out=[]; off=start; n=0
     while off < len(data) and n < count:
         op=data[off]; mnem, fmt, size = table.get(op,("DB","${:02X}",1))
         payload=data[off+1:off+size]
@@ -224,8 +224,7 @@ def infer_table(rom: str, start: str, end: str, stride: int, system: str="snes",
     for pos in range(stride):
         vals=fields[pos]; uniq=len(set(vals)); note=[]
         if uniq==1: note.append("constant field")
-        if pos+1<stride:
-            nums=[r for r in rows]
+        
         if pos+2<stride and system.lower()=="snes":
             ptrs=0
             for off in range(s, min(e,len(data)), stride):

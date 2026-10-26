@@ -3,7 +3,7 @@ from __future__ import annotations
 """Dependency-free visual evidence primitives for ROMancer v7."""
 
 import hashlib
-from dataclasses import dataclass
+
 from typing import Any
 
 from .libretro_frontend import Frame

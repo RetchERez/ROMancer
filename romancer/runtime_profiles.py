@@ -2,8 +2,8 @@
 import json
 import os
 from pathlib import Path
-import platform
-import re
+
+
 import struct
 from .assets import checked_path,digest
 from .asset_schema import fields

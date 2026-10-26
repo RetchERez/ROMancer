@@ -2,7 +2,7 @@
 import json
 from pathlib import Path
 import uuid
-from .asset_schema import fields,label,number
+from .asset_schema import fields, label
 from .replay_schema import validate_route
 from .script_schema import canonical_bytes,load_script_json
 from . import workbench_projects as p

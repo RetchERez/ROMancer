@@ -19,7 +19,7 @@ from .runtime_agent import discover_controls, novelty_explore
 from .runtime_regression import run_regression, run_suite
 from .runtime_goal import goal_search
 from .state_model import capture_state_signature, compare_state_signature, load_state_library, match_state_library, save_state_signature
-from .rom_ident import identify_rom
+
 from .systems.gba import identify_gba
 from .systems.segacd import identify_segacd_bytes
 from .util import write_json

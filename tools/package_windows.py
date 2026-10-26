@@ -83,7 +83,7 @@ try {
 
 
 def generated_root_files(*,readme=None):
-    from romancer import ROMANCER_RELEASE_NAME,ROMANCER_BUILD_LABEL
+    
     files={}
     files['Open ROMancer.ps1']=LAUNCHER.encode('utf-8-sig')
     files['Open ROMancer.cmd']=b'@echo off\r\npowershell.exe -NoProfile -ExecutionPolicy Bypass -WindowStyle Hidden -File "%~dp0Open ROMancer.ps1"\r\n'

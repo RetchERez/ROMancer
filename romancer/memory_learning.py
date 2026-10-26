@@ -7,7 +7,7 @@ by a libretro core. They do not invent CPU bus addresses. A game/system profile 
 verified mapping from exposed-buffer offset to CPU address later.
 """
 
-import json
+
 from pathlib import Path
 from typing import Any
 

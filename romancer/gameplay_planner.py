@@ -2,7 +2,7 @@ from __future__ import annotations
 
 """Risk-aware action selection for ROMancer v9."""
 
-from dataclasses import dataclass, asdict, field
+from dataclasses import dataclass, field
 from typing import Any
 from .gameplay_beliefs import BeliefLedger
 

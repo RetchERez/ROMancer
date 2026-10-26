@@ -1,7 +1,7 @@
 from __future__ import annotations
 from pathlib import Path
 from typing import Any
-import math, os
+
 from .recon import tile_dump, text_scan
 from .util import write_json
 

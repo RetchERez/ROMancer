@@ -20,8 +20,8 @@ assumptions, stack balance) before ever touching a real emulator, not
 replacing one.
 """
 
-import json
-from typing import Any
+
+
 
 from .systems.snes import snes_to_offset
 from .util import parse_int, write_json
@@ -623,7 +623,7 @@ class Sim65816:
 
     def run(self, max_steps: int, stop_at: tuple[int, int] | None = None,
             stop_on_jsr_to: set[int] | None = None) -> dict:
-        hit_jsr = None
+        
         while self.steps_run < max_steps:
             if stop_at is not None and (self.PB, self.PC) == stop_at:
                 return {"stopped": "stop_at", "pc": f"{self.PB:02X}:{self.PC:04X}"}

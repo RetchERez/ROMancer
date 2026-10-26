@@ -10,7 +10,7 @@ import tempfile
 import time
 import uuid
 from .asset_schema import fields, label, number
-from .assets import checked_path, hash_stream, identity, digest
+from .assets import checked_path, identity, digest
 from .history import init_history, register_build
 from .script_schema import canonical_bytes, load_script_json
 

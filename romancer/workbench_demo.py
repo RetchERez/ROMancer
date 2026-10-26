@@ -38,7 +38,7 @@ def create_demo(root,incoming):
     raw[0x1a4:0x1a8]=(len(raw)-1).to_bytes(4,'big')
     raw[0x18e:0x190]=(sum(int.from_bytes(raw[i:i+2],'big') for i in range(0x200,len(raw),2))&65535).to_bytes(2,'big')
     path=Path(incoming)/(uuid.uuid4().hex+'.bin');path.write_bytes(raw)
-    try:source=register_source(project,path,None)
+    try:register_source(project, path, None)
     finally:path.unlink(missing_ok=True)
     value=read_project(project);value['demo']=True;value['sources'][0]['name']='Horizon original fixture.bin'
     sha=hashlib.sha256(raw).hexdigest()

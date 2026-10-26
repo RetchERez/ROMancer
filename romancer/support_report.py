@@ -5,7 +5,7 @@ import platform
 import shutil
 from . import ROMANCER_VERSION,ROMANCER_RELEASE_NAME,workbench_projects as p
 from .assets import checked_path
-from .script_schema import load_script_json
+
 
 
 def collect_report(workspace,project=None,*,cancelled=lambda:False):

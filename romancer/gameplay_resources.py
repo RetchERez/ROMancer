@@ -2,7 +2,7 @@ from __future__ import annotations
 
 """Resource, purchase, and farming economics for ROMancer v9."""
 
-from dataclasses import dataclass, asdict, field
+from dataclasses import dataclass, field
 from math import ceil
 from typing import Any
 

@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-import json
+
 import re
 from pathlib import Path
 from typing import Any
@@ -89,7 +89,7 @@ def plan_breakpoints(system: str, addr: str, access: str = "write", goal: str = 
         "recommended_steps": steps,
         "caveats": caveats,
         "followup_commands": [
-            f"./run.sh trace-window TRACE.log --line BREAKPOINT_LINE --before 80 --after 20 --out reports/window.txt",
+            "./run.sh trace-window TRACE.log --line BREAKPOINT_LINE --before 80 --after 20 --out reports/window.txt",
             f"./run.sh find-routine TRACE.log --addr {addr}",
             f"./run.sh report-trace TRACE.log --addr {addr} --out reports/trace_report.txt",
         ],

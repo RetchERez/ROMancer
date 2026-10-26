@@ -2,7 +2,7 @@ from __future__ import annotations
 
 """ROMancer v13 semantic, minimal, evidence-scoped repair engineering."""
 
-import json, shutil, subprocess, tempfile
+import json, subprocess, tempfile
 from pathlib import Path
 from typing import Any
 from .util import write_json, parse_int

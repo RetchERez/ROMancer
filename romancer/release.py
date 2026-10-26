@@ -6,7 +6,7 @@ https://floating.muncher.se/byuu/bps/bps_spec.html
 import hashlib
 import json
 import os
-from pathlib import Path,PurePosixPath
+from pathlib import Path
 import struct
 import tempfile
 import zipfile

@@ -3,8 +3,8 @@ import csv
 import io
 from pathlib import Path
 from . import workbench_projects as p
-from .script import inspect_script,compile_changes,ScriptError
-from .script_schema import canonical_bytes
+from .script import inspect_script, compile_changes
+
 from .workbench_files import input_file,read_bounded
 
 COLUMNS=('record_id','segment','document_id','source_sha256','schema_sha256','original','translation','capacity','controls')

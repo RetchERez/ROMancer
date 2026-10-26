@@ -5,7 +5,7 @@ from pathlib import Path
 import re
 import tempfile
 
-from .cdrom import PAYLOAD_SIZE, SECTOR_SIZE, payload_spans, repair_mode1, validate_mode1
+from .cdrom import SECTOR_SIZE, payload_spans, repair_mode1, validate_mode1
 
 MAX_REPLACEMENT = 16 * 1024 * 1024
 

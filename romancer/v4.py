@@ -1,15 +1,15 @@
 from __future__ import annotations
 
-import json, math, os, re, shutil, zipfile
-from collections import Counter, defaultdict
+import json, math, re
+from collections import Counter
 from pathlib import Path
 from typing import Any
 
-from .util import read_bytes, write_json, read_json, parse_int, sha1, sha256, crc32_hex
+from .util import read_bytes
 from .trace_parser import parse_trace
-from .v3 import disasm, cfg_from_disasm, value_flow
-from .workflow import correlate_trace, find_routine
-from .systems.snes import snes_to_offset
+from .v3 import disasm
+
+
 
 VERSION = "4.0.0"
 

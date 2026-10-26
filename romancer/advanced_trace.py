@@ -1,8 +1,8 @@
 from __future__ import annotations
-from collections import Counter, defaultdict
-from pathlib import Path
+from collections import Counter
+
 from typing import Any
-import json, re
+
 from .trace_parser import parse_trace
 from .util import write_json
 

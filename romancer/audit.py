@@ -2,7 +2,7 @@ from __future__ import annotations
 from pathlib import Path
 from typing import Any
 import json, zipfile
-from .util import read_bytes, sha1, sha256, crc32_hex
+from .util import sha1, sha256, crc32_hex
 
 
 def audit_project(project:str)->dict[str,Any]:
@@ -39,7 +39,7 @@ def package_release(workspace:str, out:str)->dict[str,Any]:
     copied=[]
     for pat in ['*.ips','README.txt','manifest.json','reports/*.txt','reports/*.json','build/*.ips']:
         for f in src.glob(pat):
-            target=dst/f.name; shutil_copy=False
+            target=dst/f.name; 
             import shutil; shutil.copy2(f,target); copied.append(str(target))
     checks=[]
     for f in dst.iterdir():

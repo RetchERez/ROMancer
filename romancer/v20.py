@@ -1,6 +1,6 @@
 
 from __future__ import annotations
-import json, tempfile
+import tempfile
 from pathlib import Path
 from .util import write_json
 from .final_lab_v20 import lab_lifecycle, final_certify, self_certify, publish_report, lab_plan

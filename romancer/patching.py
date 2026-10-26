@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-import json
+
 import os
 import platform
 import shutil
@@ -239,8 +239,8 @@ def asar_skeleton(mapping: str, offset: str | None = None, addr: str | None = No
     elif not addr.startswith("$"):
         addr = "$" + addr.replace(":", "")
     asm = [
-        "; ROMancer v0.4 generated Asar skeleton",
-        f"; Status: candidate only, requires debugger/runtime validation",
+        f"; ROMancer {ROMANCER_VERSION} generated Asar skeleton",
+        "; Status: candidate only, requires debugger/runtime validation",
         f"; Note: {comment}",
         f"; Mapping: {m}",
     ]

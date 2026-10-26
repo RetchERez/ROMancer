@@ -1,10 +1,10 @@
 """Positive patch-only CUE releases and verified complete-set reconstruction."""
 import ctypes
-import hashlib
+
 import json
 import os
 from pathlib import Path
-import shutil
+
 import tempfile
 import zipfile
 import errno

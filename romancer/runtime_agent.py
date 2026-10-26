@@ -3,11 +3,11 @@ from __future__ import annotations
 """Controlled input discovery and conservative novelty exploration for ROMancer v7."""
 
 import hashlib
-import json
+
 from pathlib import Path
 from typing import Any
 
-from .frame_analysis import compare_frames, frame_signature, thumbnail_luma
+from .frame_analysis import compare_frames, thumbnail_luma
 from .libretro_frontend import BUTTON_IDS, LibretroFrontend
 from .playtest import memory_diff
 from .util import write_json
@@ -38,7 +38,7 @@ def discover_controls(frontend: LibretroFrontend, out_dir: str | Path, *, button
     frontend.clear_buttons(); frontend.run_frames(max(0, boot_frames))
     anchor = frontend.serialize()
     baseline_frame = frontend.last_frame
-    baseline_mem = frontend.memory_region(memory_region)
+    frontend.memory_region(memory_region)
     if baseline_frame:
         baseline_frame.save_png(frames_dir / "000_baseline.png")
     trials = []
@@ -113,7 +113,7 @@ def novelty_explore(frontend: LibretroFrontend, out_dir: str | Path, *, decision
             raise ValueError(f"Unknown action button {a}")
     frontend.clear_buttons(); frontend.run_frames(max(0, boot_frames))
     # Fail early and honestly if the core cannot branch.
-    initial_state = frontend.serialize()
+    frontend.serialize()
     visited: dict[str, int] = {}
     nodes = []
     edges = []

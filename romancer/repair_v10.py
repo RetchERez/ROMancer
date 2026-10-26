@@ -4,7 +4,7 @@ from __future__ import annotations
 
 from pathlib import Path
 from typing import Any
-import hashlib, json, subprocess, tempfile
+import hashlib, subprocess
 from .bisect_v10 import _oracle_args
 from .util import parse_int, write_json
 
