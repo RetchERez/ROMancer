@@ -21,7 +21,7 @@ MAX_MESSAGE=1024*1024
 MAX_RESULT=256*1024
 READ_OPERATIONS=frozenset('''system.capabilities system.operations projects.list project.open
 games.inspect games.maps.catalog games.maps.inspect cheats.catalog cheats.inspect engines.inspect systems.reference systems.classify_address rom.check catalog.list resource.inspect resources.explain resources.relationships
-hex.search hex.numbers hex.bookmarks builds.timeline builds.compare project.validate investigations.get
+hex.search hex.numbers hex.bookmarks builds.timeline builds.compare project.validate investigations.get debugger.capabilities debugger.get
 assets.inspect script.inspect tables.inspect tables.batch levels.inspect sound.inspect revision.lookup
 profiles.get profiles.validate runtime.checkpoints reports.list exports.list jobs.get
 systems.address resources.address_uses watches.compare debug.inspect compression.inspect'''.split())
@@ -32,7 +32,7 @@ rom.scan.run release.prepare release.verify resources.declare_assets resources.d
 runtime.load_profile runtime.advance runtime.step runtime.capture runtime.memory runtime.close
 runtime.checkpoint runtime.restore runtime.save_state runtime.load_state profiles.controller saves.capture saves.export saves.import saves.restore
 recipes.from_plan recipes.preview recipes.import recipes.export jobs.cancel
-values.start values.narrow investigations.start investigations.capture watches.save video.inspect compression.extract compression.plan_reinsert
+values.start values.narrow investigations.start investigations.capture debugger.capture watches.save video.inspect compression.extract compression.plan_reinsert
 definitions.export definitions.import'''.split())
 DESCRIPTIONS={
  'project.create':'Create a separate ROM project. Never overwrite an original.',
@@ -60,6 +60,9 @@ DESCRIPTIONS={
  'investigations.start':'Start a durable investigation from an owned native memory capture. Tests numeric formats without a game profile; persists authenticated observations and never writes game memory.',
  'investigations.capture':'Capture another owned observation and analyze numeric widths, byte orders, signed/BCD formats, display offsets and unchanged controls. Returns a new immutable evidence ID; correlation does not establish a writer or ROM location.',
  'investigations.get':'Read an authenticated investigation and its automatic numeric hypotheses. Restored history is labeled historical and cannot append fresh native evidence.',
+ 'debugger.capabilities':'Inspect actual system/host/pinned-backend availability for bounded native instruction and memory-access investigations. A documented capability does not mean an installed backend.',
+ 'debugger.capture':'Run a bounded cold-start input route with the pinned headless debugger, recording real access callbacks, instruction context and observed mappings. No arbitrary script/executable/path is accepted. Access width, DMA actor and causation remain explicit unknowns.',
+ 'debugger.get':'Read a page of application-authenticated native trace events and source-bound execution contexts. Historical captures are labeled; imported JSON never becomes fresh native evidence.',
  'watches.save':'Save at most 32 named byte ranges on the selected source; does not write native memory.',
  'watches.compare':'Compare two identity-bound memory observations of at most 256 bytes. No instruction or write event is inferred.',
  'video.inspect':'Observe at most 4096 bytes of exposed video memory and decode a tested tile format. Palette and ROM ownership remain unknown.',
@@ -97,6 +100,17 @@ def _investigation_properties(operation):
         'value':nullable(integer(-2**31,2**32-1)),'relation':enum(['changed','unchanged','increased','decreased','delta']),
         'delta':nullable(integer(-2**32,2**32))}
     if operation=='investigations.get':return {**source,'investigation_id':string(64)}
+    if operation=='debugger.capabilities':return source
+    if operation=='debugger.get':return {**source,'evidence_id':string(64),'offset':integer(0,2000),'limit':integer(1,100)}
+    if operation=='debugger.capture':
+        step=obj({'frames':integer(1,3600),'buttons':array(enum(['a','b','x','y','l','r','select','start','up','down','left','right']),12),'port':integer(0,0)})
+        probe=obj({'kind':enum(['read','write','exec']),'start':integer(0,0xfffffff),'end':integer(0,0xfffffff)})
+        probe['properties']['domain']=enum(['cpu','nesInternalRam','nesPrgRom','snesWorkRam','snesPrgRom',
+            'gbWorkRam','gbPrgRom','gbaExtWorkRam','gbaIntWorkRam','gbaPrgRom'])
+        configuration=obj({'steps':array(step,64,1),'probes':array(probe,8,1),'event_limit':integer(1,2000),
+            'instruction_limit':integer(1000,20000000),'timeout':integer(1,60)})
+        configuration['properties']['start_frame']=integer(0,3599)
+        return {**source,'config':configuration}
     if operation=='cheats.inspect':return {**source,'query':string(240),'page':integer(0,20000),'limit':integer(1,20)}
     if operation=='systems.reference':return {'system_id':enum(['nes','snes','genesis','gb','gbc','gba'])}
     if operation=='systems.classify_address':return {'system_id':enum(['nes','snes','genesis','gb','gbc','gba']),'address':integer(0,0xffffffff),'domain':enum(['cpu','ppu','vram','apu'])}

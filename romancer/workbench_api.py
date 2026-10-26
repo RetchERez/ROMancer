@@ -201,6 +201,8 @@ class WorkbenchAPI:
         self.studio=StudioTools(self);self.routes.update(self.studio.routes())
         from .investigation_tools import InvestigationTools
         self.investigations=InvestigationTools(self);self.routes.update(self.investigations.routes())
+        from .debugger_tools import DebuggerTools
+        self.debugger=DebuggerTools(self);self.routes.update(self.debugger.routes())
         for operation in tuple(self.routes):
             if operation.startswith('containers.') or operation in ('runtime.load_disc','route.run_disc','release.disc_set'):
                 del self.routes[operation]

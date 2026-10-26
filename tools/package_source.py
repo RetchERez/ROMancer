@@ -151,6 +151,10 @@ APPROVED_FILES = frozenset(ROOT_FILES | {
 
 APPROVED_FILES = APPROVED_FILES | frozenset({
     'romancer/observation_series.py','romancer/investigation_tools.py',
+    'romancer/native_debugger.py','romancer/debugger_protocol.py','romancer/debugger_capture.lua',
+    'romancer/debugger_tools.py','tests/test_debugger_tools.py',
+    'romancer/core_memory_layout.py','tests/test_core_memory_layout.py',
+    'tests/test_native_debugger.py',
     'romancer/ui/investigation_series.js','tests/ui_investigation_series.mjs',
     'tests/test_observation_series.py','tests/test_investigation_tools.py',
     'romancer/cartridge_startup.py','romancer/cartridge_integrity.py','romancer/ui/cartridge_verification.js',
