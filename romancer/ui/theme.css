@@ -1,13 +1,17 @@
-:root{--bg:#10191f;--panel:#18242b;--panel2:#1e2d35;--text:#e5e9e6;--muted:#91a5af;--accent:#76dbc3;--line:#2d3d46}
+:root{--bg:#10191f;--panel:#18242b;--panel2:#1e2d35;--text:#e5e9e6;--muted:#91a5af;--accent:#76dbc3;--line:#2d3d46;--theme-nav:#0b1418;--theme-top:#101a20;--theme-menu:#111d23;color-scheme:dark}
 
-/* ROMancer keeps the original palette. Themes affect interface chrome only. */
+/* Menu surfaces stay distinct from editor panels in each appearance. */
+:root .sidebar{background:var(--theme-nav)}
+:root .topbar{background:var(--theme-top)}
+:root dialog{background:var(--theme-menu)}
+:root select option,:root .topbar select option{background:var(--theme-menu);color:var(--text)}
 html[data-theme="dark"]{
  --bg:#151719;--panel:#22262b;--panel2:#2d3239;--text:#eef0f3;--muted:#adb6c2;--accent:#9dbddd;--line:#444c57;
- --theme-nav:#181b1f;--theme-top:#1e2227;--theme-input:#171b20;--theme-hover:#363e48;--theme-soft:#2b343f;--theme-ink:#172231;--border:#444c57;color-scheme:dark;
+ --theme-nav:#111518;--theme-top:#171c21;--theme-menu:#191e24;--theme-input:#171b20;--theme-hover:#363e48;--theme-soft:#2b343f;--theme-ink:#172231;--border:#444c57;color-scheme:dark;
 }
 html[data-theme="light"]{
  --bg:#f2f5f7;--panel:#ffffff;--panel2:#e8eef2;--text:#19252d;--muted:#526470;--accent:#176c5c;--line:#c6d1d9;
- --theme-nav:#e6edf1;--theme-top:#ffffff;--theme-input:#ffffff;--theme-hover:#dce7ec;--theme-soft:#e2f0ec;--theme-ink:#ffffff;--border:#c6d1d9;color-scheme:light;
+ --theme-nav:#e6edf1;--theme-top:#ffffff;--theme-menu:#ffffff;--theme-input:#ffffff;--theme-hover:#dce7ec;--theme-soft:#e2f0ec;--theme-ink:#ffffff;--border:#c6d1d9;color-scheme:light;
 }
 html[data-theme="dark"] .sidebar,html[data-theme="light"] .sidebar{background:var(--theme-nav)}
 html[data-theme="dark"] .topbar,html[data-theme="light"] .topbar{background:var(--theme-top)}
