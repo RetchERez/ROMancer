@@ -108,6 +108,9 @@ WHAT IS SUPPORTED
 - Live text/capacity and numeric comparisons with explicit preview status.
 - Explicit animation-frame layouts and shared-tile information.
 - Declared fixed-capacity terrain, metatiles, collision values and object fields.
+- Room thumbnails, explicitly declared connections and named object controls.
+- Checked level and sound definition exchange for the same source revision.
+- Byte explanations for declared room cells, object fields and numeric storage.
 - Tested PCM8/16, Game Boy wave, NES DPCM and standalone SNES BRR sample codecs.
 - Sample gain/reverse/silence/WAV replacement and play/pause/seek previews.
 - Documented console sound hardware, evidence-scoped driver identification,
@@ -120,7 +123,7 @@ WHAT IS SUPPORTED
 - Recoverable project deletion, private backup/restore and persisted editor drafts.
 
 Exact-revision examples include Final Fantasy Legend II USA (opening-bedroom
-stool placement) and Deja Vu I & II USA (startup and first Case Book 1 interface
+stool placement and a source-bound real-map browser) and Deja Vu I & II USA (startup and first Case Book 1 interface
 colors), alongside the four earlier game definitions. Only matched originals or
 owned derived builds expose these edits. Different revisions remain unknown.
 
@@ -156,6 +159,16 @@ Declared rooms and object fields use existing fixed storage. They do not add a
 game engine, infer collision meanings or allocate new rooms. Unsupported layouts,
 compression and drivers remain unavailable. Original workshops are redistributable
 practice programs; their behavior is tested separately from commercial games.
+
+Object names, roles and exit targets come from explicit checked declarations.
+Levels shows a clear availability message when a ROM has no supported level map.
+Advanced practice -> Open test layout opens a separate two-room test project.
+That workshop demonstrates editor navigation and object records;
+its native program renders Hillside and plays music, without executing the extra
+Courtyard or object/connection records. It is not a complete game authoring engine.
+Playtest exposes frames and bounded memory observations, not CPU breakpoints or
+instruction stepping. Relocation and ROM expansion are not enabled: unused-looking
+bytes do not establish destination ownership or every incoming pointer.
 
 CRC32 is calculated for the selected file or payload scope. A mismatch requires
 an expected reference for that same scope. Without a reference, comparison is
@@ -266,6 +279,10 @@ No model is built in and no AI account is needed. AI clients can inspect source
 identities, bytes and supported definitions; propose exact edits; create separate
 builds; run configured playtests; capture measured frames; and verify BPS exports.
 The bridge does not expose a shell or execute code supplied by an agent.
+It also exposes supported address mappings, declared references, memory searches,
+watch comparisons and checked compression operations. Level and sound definitions
+can be exchanged as JSON. These operations retain their source and runtime bounds;
+they do not expose an arbitrary native-debugger bridge or instruction breakpoints.
 
 From a Python/Pillow source installation, with this directory as the working folder:
   python -B -m romancer.mcp_server --workspace <workspace-folder>
@@ -306,7 +323,23 @@ may differ with the toolchain, paths and timestamps; official release pins ident
 the tested distributed DLLs. Upstream optional test ROMs, unused standalone profiles
 and mobile-platform links are omitted from that Windows libretro source archive.
 
-The exact Chrono Trigger USA definition also provides a 90-record weapon attack
-table. Only the documented attack byte is named; the other four bytes in each
-record are preserved. Open it from Game edits. Record numbers are not guessed
-weapon names, and stored attack values do not predict the final damage formula.
+The exact Chrono Trigger USA definition provides named equipment and enemy-stat
+tables: attack/critical rates, armor/helm defense, gear base prices, and enemy HP
+and core stats. Names are decoded from the selected ROM; IDs distinguish blank,
+duplicate and unused slots. Effects, flags, rewards and scripts are preserved.
+Stored values do not predict every final game formula. The older 90-record
+attack-only resource ID remains compatible with saved workflows.
+
+Final Fantasy Legend II USA includes a catalog of 219 header variants, 164 shared
+terrain streams and 543 arrivals. Supported opening-atlas edits preserve collision
+and trigger bindings for every shared header. NPC conditions and packed flags
+remain protected; even an unconditional NPC may participate in the story.
+Some map opcodes and unknown palettes remain unavailable or explicitly marked.
+Map destinations are inspection-only in the visual editor.
+
+Game edits -> What is known about this game separates supported workflows,
+checked reference layouts and research leads, with pinned source links. Public
+disassemblies and hack documentation are references, not automatic edit authority.
+A binary patch describes differences, not the meaning of every changed byte.
+Reference facts are bound to matched originals; external hacks can relocate data.
+No research caches, commercial ROMs or upstream editor implementation are bundled.

@@ -67,6 +67,9 @@ def list_resources(project,artifact_id,query,page,limit):
 
 def index_declared(project,artifact_id):
     row=p.artifact(project,artifact_id);entries=[];schemas=row.get('descriptors',{})
+    p._measure(row['path'],row)
+    def add(name,kind,offset,length,format):
+        entries.append({'name':name[:128],'kind':kind,'offset':offset,'length':length,'format':format[:128]})
     if schemas.get('assets'):
         from .assets import inspect_assets
         from .asset_schema import validate_asset_schema
@@ -83,6 +86,35 @@ def index_declared(project,artifact_id):
         result=inspect_script(Path(row['path']),schemas['script'])
         if not result['ok']:raise ValueError('text declaration cannot be indexed')
         for record in result['records']:entries.append({'name':record['id'],'kind':'text','offset':record['offset'],'length':record['capacity'],'format':'declared text slot'})
+    table=schemas.get('tables')
+    if table:
+        if table.get('source_sha256')!=row['sha256']:raise ValueError('table catalog declaration source differs')
+        from .data_tables import inspect_table
+        d=inspect_table(row['path'],row['sha256'],table['definition'],0,1)['definition']
+        add(d['name'],'table',d['offset'],d['count']*d['stride'],str(d['count'])+' declared records; '+', '.join(f['name'] for f in d['fields']))
+    if schemas.get('levels') or schemas.get('sound'):
+        from .workbench_files import read_bounded
+        raw=read_bounded(row['path'],64*1024**2,row)
+        if schemas.get('levels'):
+            from .level_design import inspect_level
+            doc=inspect_level(raw,schemas['levels'],row['sha256']);definition=doc['definition']
+            for span in doc['ranges']:
+                if span['name'] in ('tiles','metatiles','palette'):
+                    add(definition['name']+' / '+span['name'],span['name'],span['offset'],span['length'],'declared level '+span['name'])
+            for room in definition['rooms']:
+                for key,kind in (('terrain','room'),('collision','collision')):
+                    grid=room[key]
+                    if grid:add(room['name']+' / '+key,kind,grid['offset'],room['width']*room['height']*grid['entry_bytes'],'declared '+str(room['width'])+' x '+str(room['height'])+' grid')
+                objects=room['objects']
+                if objects:
+                    add(room['name']+' / object slots','objects',objects['offset'],objects['count']*objects['stride'],'declared fixed records')
+                    for metadata in room.get('object_metadata',[]):
+                        add(room['name']+' / '+metadata['name'],'object',objects['offset']+metadata['index']*objects['stride'],objects['stride'],'declared '+metadata['role'])
+        if schemas.get('sound'):
+            from .sound_studio import inspect_sound
+            doc=inspect_sound(raw,schemas['sound'],row['sha256'])
+            for sample in doc['samples']:add(sample['name'],'sample',sample['offset'],sample['length'],sample['codec'])
+            for song in doc['songs']:add(song['name'],'song',song['offset'],song['count']*song['stride'],song['driver'])
     if not entries:return {'ok':True,'status':'EMPTY','total':0,'write_authorized':False}
     for start in range(0,len(entries),500):add_resources(project,artifact_id,entries[start:start+500])
     return {'ok':True,'status':'INDEXED','total':len(entries),'write_authorized':False}

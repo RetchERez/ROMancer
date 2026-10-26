@@ -30,3 +30,9 @@ const unavailable=button('Create build','asset-build',{disabled:true,reason:'Rev
 assert.match(unavailable,/aria-describedby="unavailable-/);assert.match(unavailable,/Review &lt;this&gt; source first\./);assert.match(unavailable,/tabindex="0"/);
 assert.doesNotMatch(button('Create build','asset-build'),/unavailable-reason/);
 console.log('Saving, failure/retry, pending-close protection and exact source/build/draft labels passed.');
+
+const mapState={project:{project_id:'p'},artifact:{artifact_id:'a',sha256:'sha'},drafts:{},results:{}};
+mapState.drafts['p:a:levels:game-map-changes']=JSON.stringify({source_sha256:'sha',changes_by_header:{18539:[{kind:'npc',offset:80,x:15}]}});
+assert.equal(hasStagedChanges(mapState),true,'Restored map drafts still need a separate build.');
+mapState.drafts['p:a:levels:game-map-changes']=JSON.stringify({source_sha256:'other',changes_by_header:{18539:[{kind:'npc',offset:80,x:15}]}});
+assert.equal(hasStagedChanges(mapState),false,'Stale map drafts do not belong to the current source.');

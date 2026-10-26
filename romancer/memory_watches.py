@@ -19,7 +19,7 @@ def validate_watches(watches):
 
 def compare_watch(before,after):
     before=json.loads(canonical_bytes(before,max_bytes=32768));after=json.loads(canonical_bytes(after,max_bytes=32768))
-    binding=('worker_session_id','epoch','region','offset','length','game_sha256','core_sha256')
+    binding=('worker_session_id','epoch','region','region_size','offset','length','game_sha256','core_sha256','core_options')
     if any(key not in before or key not in after or before[key]!=after[key] for key in binding):raise ValueError('memory snapshots belong to different sessions or ranges')
     if type(before.get('sequence')) is not int or type(after.get('sequence')) is not int or after['sequence']<=before['sequence']:raise ValueError('capture a newer observation for comparison')
     arrays=[]

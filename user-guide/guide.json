@@ -4,7 +4,7 @@
   "subtitle": "A practical guide to the current editing tools: small first edits, advanced workflows, actual editing and appearance examples, a glossary and an alphabetical index.",
   "scope": "Work on a project copy, review exact changes, create a separate build, playtest that build and verify its patch. Examples require the exact matched revisions and declared layouts shown. A measured check covers its recorded scope; it does not certify every game or scene.",
   "basic_summary": "Start the application, choose saved preferences, identify a source, make a focused edit, preserve progress and export a checked patch. These procedures build the habits used throughout the guide.",
-  "advanced_summary": "Use explicit storage definitions for deeper graphics, text, tables, rooms, audio and automation. Keep supported formats, observed results and unknown game semantics separate.",
+  "advanced_summary": "Use explicit definitions for graphics, text, tables, connected-room layouts, audio and bounded automation. Follow declared ranges to exact bytes, and keep editor metadata, native observations and unknown game semantics separate.",
   "attribution": "By RetchEWretched. ROMancer code and original fixtures use the project MIT license. Instructional screenshots show third-party games, including Castlevania, Chrono Trigger, The Immortal, Wario Land 4, Final Fantasy Legend II and Deja Vu I & II; their imagery and trademarks remain those of their respective rights holders and are separate from the code license. No ROM files, game saves, emulator states, firmware dumps or authentication data are included in this guide. The prebuilt PDF and HTML work offline; PDF rebuilding optionally uses ReportLab.",
   "chapters": [
     {
@@ -93,7 +93,54 @@
           "image": "15-dark-theme",
           "title": "Dark theme / neutral graphite surfaces"
         }
-      ]
+      ],
+      "visual_page": {
+        "title": "Settings / appearance examples",
+        "kicker": "Basic / actual application captures",
+        "intro": "Saved preferences in ROMancer, Light and Dark. Themes change application appearance, not game palettes.",
+        "panels": [
+          {
+            "image": "13-settings",
+            "title": "ROMancer (default) / saved preferences",
+            "x": 48,
+            "top": 846,
+            "width": 1100,
+            "crop": [
+              180,
+              116,
+              1390,
+              588
+            ],
+            "caption": "Actual Settings panel detail. Full-resolution captures are linked in the offline HTML edition."
+          },
+          {
+            "image": "14-light-theme",
+            "title": "Light theme / readable white surfaces",
+            "x": 48,
+            "top": 304,
+            "width": 540,
+            "crop": [
+              180,
+              116,
+              1390,
+              588
+            ]
+          },
+          {
+            "image": "15-dark-theme",
+            "title": "Dark theme / neutral graphite surfaces",
+            "x": 748,
+            "top": 304,
+            "width": 540,
+            "crop": [
+              180,
+              116,
+              1390,
+              588
+            ]
+          }
+        ]
+      }
     },
     {
       "id": "start",
@@ -276,13 +323,13 @@
       "steps": [
         "On the matched source, open <b>Opening-bedroom stool</b> on Overview or open its matched room in <b>Levels</b>. Compare the actual ROM-decoded original and edited terrain.",
         "In <b>Layers</b>, toggle <b>Terrain</b>, <b>Objects</b>, <b>Collision values</b>, <b>Tile grid</b> and <b>Allowed floor tiles</b>. Keep Objects visible to edit the stool.",
-        "Drag the stool or click a highlighted allowed floor tile. With the room control focused, arrow keys select guarded positions. The stool-position dropdown is an alternative.",
+        "Drag the stool onto a highlighted floor tile, click an allowed tile or use arrow keys while the map has focus. The stool-position dropdown is an alternative. The status reminds you to create a build to keep the previewed change.",
         "Review the source-bound command, create a separate build and visit the bedroom. Check the stool, surrounding movement and protected doorway in Playtest."
       ],
       "result": "Original and edited maps use actual decoded opening-bedroom data. The five supported stool positions are (12, 31), (14, 31), (12, 32), (13, 32) and (14, 32).",
-      "note": "The doorway at (13, 33) and other room commands are protected. Collision values are raw hexadecimal data, not inferred walkability labels. Actors and dialogue are excluded from this terrain preview. Hiding Objects prevents stool edits.",
+      "note": "The doorway at (13, 33) and other room commands are protected. Preview details contains technical bounds and raw collision information. Actors and dialogue are excluded from this terrain preview. Hiding Objects prevents stool edits.",
       "part": "Basic",
-      "intro": "Change one documented room object on the exact matched revision. Check the surrounding room and movement after building.",
+      "intro": "This is an actual ROM-decoded bedroom on a matched commercial-game revision. Change only the documented stool command, then check its appearance and surrounding movement in native Playtest.",
       "related": [
         "levels",
         "checks",
@@ -480,6 +527,7 @@
       "part": "Advanced",
       "intro": "Inspect exact stored bytes with a known purpose and an explicit address scope. Use higher-level tools when their definitions describe the change.",
       "related": [
+        "investigation",
         "debug",
         "checks",
         "tables"
@@ -490,6 +538,95 @@
         "term-offset",
         "term-byte-order"
       ]
+    },
+    {
+      "id": "investigation",
+      "title": "Trace a declared range to the exact bytes",
+      "part": "Advanced",
+      "kicker": "Resources / catalog, relationships and explanations",
+      "intro": "Follow a named room, object field, table or sound range into the selected source. Explanations describe established encodings and declared relationships, while unknown byte purposes remain unknown.",
+      "steps": [
+        "In Resources, open <b>Declared resource catalog</b>, choose <b>Index declared resources</b> and search a name. Checked definitions can expose rooms, object slots, table ranges, samples and songs. Use <b>Inspect</b> on the intended range.",
+        "Select a byte in the hex editor. Open <b>Number inspector & bookmarks</b>, then <b>Explain selected bytes</b>. Read its source-bound name, offset, stored bytes, numeric value, byte order and declared bounds when available.",
+        "For room data, compare the cell X/Y or object slot and field. For a mapped exit field, read the declared destination. Use <b>Declared resource relationships</b> to follow named source ranges; these relationships do not establish arbitrary code references.",
+        "In Troubleshooting, use <b>Find declared references</b> or <b>Resolve address</b>, then <b>Inspect mapped bytes</b>. Confirm the current source, mapping and bank. Recompute after switching sources; do not reuse a stale result."
+      ],
+      "result": "The hex selection belongs to the intended artifact and declared file offset. The explanation identifies its bounded stored meaning, or explicitly reports that no interpretation has been established.",
+      "note": "A declared room target is not a measured traversal. Raw collision values are not inferred walkability labels. Sound samples and identified sequence fields do not establish an unknown commercial driver, and imported traces do not establish native instruction events.",
+      "details": [
+        {
+          "title": "What a declaration can explain",
+          "text": "A terrain/collision cell can identify its room and coordinates; an object field can identify the named slot, value and declared target. Metatile parts, table fields, samples and supported song events retain their own range and format context."
+        },
+        {
+          "title": "Use the matching kind of tool",
+          "text": "A source editor changes checked stored data. A game-authoring engine needs its own executable runtime and event system. Instruction breakpoints require a real CPU-debugging adapter. The current investigation tools provide byte comparisons and bounded observations, not a full instruction debugger."
+        },
+        {
+          "title": "Protect the selected context",
+          "text": "Reference jumps, mapped-address inspection and memory watches belong to a source/runtime context. Re-selecting a file, build or session requires a fresh compatible observation. A changed RAM value alone does not identify a ROM address or the instruction that wrote it."
+        }
+      ],
+      "related": [
+        "investigation-appearance",
+        "hex-editor",
+        "debug",
+        "connections",
+        "resources"
+      ],
+      "terms": [
+        "term-offset",
+        "term-metadata",
+        "term-evidence"
+      ],
+      "image": "18-byte-explanation",
+      "image_alt": "Actual source-bound hex byte explanation for a declared room cell or object field",
+      "caption": "Actual declared-byte explanation. Names, coordinates and destinations retain their declaration scope.",
+      "image_layout": "following-page",
+      "visual_page": {
+        "title": "Bytes / a declared object field explained",
+        "kicker": "Advanced / actual source-bound inspection",
+        "intro": "The selected source byte has a declared slot, field, value and numeric range. A declaration is separate from observed game behavior.",
+        "panels": [
+          {
+            "image": "18-byte-explanation",
+            "title": "Current source / selected offset and declaration",
+            "x": 48,
+            "top": 846,
+            "width": 780,
+            "crop": [
+              180,
+              60,
+              920,
+              860
+            ],
+            "caption": "Actual hex-editor detail. The HTML edition links to the complete capture."
+          }
+        ],
+        "notes": [
+          {
+            "title": "Read the stored value",
+            "text": "This capture selects 0x3515 and explains the Hillside / Courtyard connection / x field as an 8-bit declared value of 12, bounded from 0 to 15. The separate byte-reference panel correctly does not claim verified game semantics.",
+            "x": 900,
+            "y": 846,
+            "width": 490
+          },
+          {
+            "title": "Drafts and source bytes differ",
+            "text": "An inspector can show a staged X position of 13 while the selected original source still stores 12. Create and select the separate build before expecting a byte explanation to describe that built edit.",
+            "x": 900,
+            "y": 603,
+            "width": 490
+          },
+          {
+            "title": "Keep navigation current",
+            "text": "Go selects the visible byte cursor. After moving or switching sources, request the explanation again. A previous number interpretation or reference result does not describe a newly selected byte automatically.",
+            "x": 900,
+            "y": 360,
+            "width": 490
+          }
+        ]
+      }
     },
     {
       "id": "resources",
@@ -512,7 +649,7 @@
         },
         {
           "title": "Six supported modes",
-          "text": "NES, SNES, Genesis, GB, GBC and GBA are separate user choices. Bank switching, enhancement hardware and game-specific data need their own supported mapping or verified definition. Unknown bytes remain inspectable, with editing or execution refused when support is not established."
+          "text": "NES, SNES, Genesis, GB, GBC and GBA are separate user choices. Bank switching, enhancement hardware and game-specific data need their own supported mapping or verified definition. Unknown bytes remain inspectable, with editing or execution refused when support is not established. The declared catalog also exposes checked level and sound ranges; it does not discover arbitrary room identities or music-driver commands."
         },
         {
           "title": "Automatic versus manual investigation",
@@ -520,6 +657,7 @@
         }
       ],
       "related": [
+        "investigation",
         "compression",
         "checks",
         "recipes"
@@ -660,19 +798,19 @@
     },
     {
       "id": "tables",
-      "title": "Edit a declared data table",
+      "title": "Rebalance named equipment and enemy stats",
       "kicker": "ADVANCED / DOCUMENTED RECORDS",
-      "image": "04-chrono-table",
+      "image": "19-chrono-armor",
       "steps": [
-        "From the matched Chrono Trigger definition, choose <b>Open Weapon base attack table</b>. It opens under <b>More tools > Data tables</b>.",
-        "For your own table, open <b>Table layout</b>. Declare <b>First record offset</b>, <b>Record count</b> and <b>Bytes per record</b>; add each field's relative offset, numeric type and byte order, then choose <b>Load table definition</b>.",
-        "Edit a row value. The inline Original/Edited comparison updates as you type. Review changes before creating a build.",
-        "For several rows, open <b>Batch change</b>, choose the field and operation, and preview the affected records before review."
+        "In <b>Overview > Game edits</b>, open the desired attack, armor, helm, base-price or enemy-stat table. The original attack-only resource ID remains compatible with older definitions.",
+        "Search by name or ID, choose the record, and select <b>Show selected record</b>. Edit only the exposed numeric fields. The Original/Edited preview updates as you type.",
+        "Keep critical rates within 0 to 100. HP and prices use the declared integer widths; batch changes refuse numeric overflow and field-limit violations. Blank or unused slots are not promises of gameplay content.",
+        "Choose <b>Review changes</b>, inspect the exact records, then <b>Create build</b>. Playtest the new build. Stored attack, defense and prices can be transformed by game formulas or battle scripts."
       ],
-      "result": "The screenshot shows record 1, at 0xC0267, with a live 3-to-30 preview. The verified table contains 90 records.",
-      "note": "Only the documented base-attack byte is exposed here; other record bytes are preserved. Row IDs are not guessed weapon names. A table needs a verified or declared layout. A linear pointer uses target file offset = stored value - base. Bounds, overlap and stale-source checks do not establish item names or game-specific balance limits.",
+      "result": "A named record receives a checked fixed-width edit. The screenshot shows a real armor record and its changed defense preview.",
+      "note": "The current definitions cover 85 weapon slots (74 named), 32 named armor slots, 24 named helms and 251 enemy slots (212 named). Effects, flags, rewards and scripts are preserved. These counts describe the exact original, not every external hack. For other games, table layouts still require a verified definition.",
       "part": "Advanced",
-      "intro": "A declared table turns exact bytes into named numeric fields. Inspect its layout and numeric meaning before using a broad batch operation.",
+      "intro": "The exact USA Chrono Trigger profile supplies named equipment and enemy tables. Names are decoded from your selected ROM, with record IDs kept beside duplicates and blank slots.",
       "related": [
         "numbers",
         "debug",
@@ -683,7 +821,29 @@
         "term-record",
         "term-field",
         "term-stride"
-      ]
+      ],
+      "image_layout": "following-page",
+      "visual_page": {
+        "title": "Rebalance named equipment and enemy stats / actual interface",
+        "kicker": "Advanced / actual application capture",
+        "intro": "Actual ROMancer interface. The HTML edition links to the full-resolution capture.",
+        "panels": [
+          {
+            "image": "19-chrono-armor",
+            "title": "Rebalance named equipment and enemy stats",
+            "x": 48,
+            "top": 846,
+            "width": 1170,
+            "crop": [
+              180,
+              60,
+              1390,
+              860
+            ],
+            "caption": "Unaltered full-resolution capture is linked in the offline HTML edition."
+          }
+        ]
+      }
     },
     {
       "id": "translation",
@@ -760,26 +920,27 @@
       "title": "Edit declared terrain, objects and collision",
       "part": "Advanced",
       "kicker": "Levels and bounded game definitions",
-      "intro": "A useful room editor needs verified tile, metatile and grid formats. Object meanings, collision labels and exits need their own game-specific evidence.",
+      "intro": "Levels needs a checked game-specific definition. The matched FFL II bedroom is a bounded real-game example. An unsupported source has no level definition; optional Advanced practice teaches the declared format without pretending to decode that game.",
       "steps": [
-        "Open <b>Levels</b> on a source with a checked definition, or use <b>Open design workshop</b> for original practice content. Inspect <b>Level setup</b> before using a layout form.",
+        "Open <b>Levels</b> for the selected source. If it says <b>No supported level map for this ROM yet</b>, investigate the source or supply a checked map definition through Advanced level setup. The separate collapsed <b>Advanced practice > Open test layout</b> is a learning exercise, not your game.",
         "Choose <b>Room</b> and <b>Paint layer</b>: Terrain or declared Collision values. Select a Terrain brushes thumbnail, or use <b>Pick from room</b> to sample a cell. Compare Original room with the editing canvas; paint, fill or select/copy/paste within the declared grid.",
-        "Use <b>Undo stroke</b> and <b>Redo stroke</b>. Choose the Object slots overlay and <b>Move object</b> to drag a numbered declared slot. Inspect <b>Metatiles & shared uses</b> before changing a shared block, and <b>Objects, starts & exits</b> for declared object fields.",
+        "Use <b>Undo stroke</b> and <b>Redo stroke</b>. With <b>Named objects</b> and <b>Move object</b>, select or drag a named label. Use <b>Objects > Update preview</b> for a declared destination. Raw coordinates and fields stay inside <b>Position & advanced values</b>; unnamed slots require All records (Advanced).",
         "Choose <b>Review level changes</b>, inspect the exact changes, then <b>Create level build</b>. Visit the room and test walking, collision, boundaries and transitions."
       ],
       "result": "Changed grid/object fields stay within the declared ranges. The game renders the room, moves through it and follows the intended transitions.",
-      "note": "Terrain appearance does not establish collision semantics. Collision values are raw stored values. Numbered object markers identify declared slots; unknown kind values are not enemy or door names. A named one-room edit is a bounded capability, not universal room discovery.",
+      "note": "Visual terrain does not establish collision semantics. Collision values are raw stored data. Only declared names appear by default; raw slot kinds and records stay Advanced. Named roles do not establish native actors or doors, and the practice layout is not an executable game-authoring workflow.",
       "details": [
         {
           "title": "Shared metatiles",
           "text": "A block can be used in many cells or rooms. Changing its component tile changes every declared use; changing one terrain cell selects a different block for that cell."
         },
         {
-          "title": "Game-specific room edits",
-          "text": "Use a matched definition for the exact supported room. Inspect the original and proposed position, review the bounded command and test surrounding movement. The supported command range does not imply arbitrary map reconstruction."
+          "title": "Optional practice is not your game",
+          "text": "The artificial Hillside/Courtyard layouts demonstrate checked storage and declared relationships. Only Hillside graphics and music are rendered by the native test program. Their other room, objects and connections are editor practice data, not implemented doors or events. Actual game-room editing requires a verified definition for that game and revision."
         }
       ],
       "related": [
+        "connections",
         "room",
         "tilemaps",
         "regression"
@@ -789,6 +950,95 @@
         "term-collision",
         "term-layer"
       ]
+    },
+    {
+      "id": "connections",
+      "title": "Advanced practice: objects and room connections",
+      "part": "Advanced",
+      "kicker": "Optional practice / synthetic editor-layout data",
+      "intro": "This optional Advanced practice uses original synthetic test terrain and declared records to demonstrate the editor format. It is not a decoded commercial-game level. For an actual supported game-room edit, start with the matched Final Fantasy Legend II bedroom example.",
+      "steps": [
+        "Open <b>Advanced practice > Open test layout</b> only to learn the declared format. Read the Practice layout warning. Under <b>Choose a room</b>, choose Hillside or Courtyard: these are synthetic test layouts, not decoded commercial levels.",
+        "Keep <b>Named objects</b> selected in Overlay. Select a named map label or use <b>Selected object</b> under <b>Objects</b>. Choose <b>Move object</b> and drag its label within the guarded room bounds.",
+        "For a declared exit, select <b>Destination room</b> and choose <b>Update preview</b>. Exact X/Y and raw fields are inside <b>Position & advanced values</b>. Unnamed raw slots appear only with <b>All records (Advanced)</b>.",
+        "Inspect the staged room link, follow its destination button and use Undo stroke to undo a grouped edit. Review and build only the intended stored changes; the workshop's room links and records still do not run as gameplay."
+      ],
+      "result": "The practice inspector stages bounded declared fields, and editor navigation follows an explicit stored-value mapping. These checks demonstrate data handling, not an executable level or door system.",
+      "note": "This is editor-format practice, not normal beginner game editing. The native test program renders Hillside and plays music only. Courtyard, object records and declared connections are not executed as actors, doors or events. Use the real FFL II bedroom example for a native-supported room edit.",
+      "details": [
+        {
+          "title": "What a connection declares",
+          "text": "An optional per-slot annotation supplies its index, name and role. A declared exit names a stored integer field and lists allowed value/room-ID pairs. Unmapped current values, duplicate destination values, unknown rooms and out-of-range edits are rejected."
+        },
+        {
+          "title": "Existing definitions still work",
+          "text": "The optional object metadata does not replace the fixed-record storage layout or require a new schema version. Older definitions remain usable; unnamed slots stay unnamed, and objects without established X/Y coordinates are not given invented positions."
+        },
+        {
+          "title": "Workshop versus game engine",
+          "text": "Hillside and Courtyard demonstrate source-bound layouts, named fields and declared navigation in the editor. These data do not provide a game-authoring engine, executable door events or an event compiler. Verify a real game's consumers before claiming an edited destination works in native play."
+        }
+      ],
+      "related": [
+        "room",
+        "connections-appearance",
+        "levels",
+        "investigation",
+        "recipes",
+        "regression"
+      ],
+      "terms": [
+        "term-connection",
+        "term-metadata",
+        "term-declared"
+      ],
+      "image": "16-connected-rooms",
+      "image_layout": "following-page",
+      "image_alt": "Clearly labelled Advanced editor-layout practice with artificial test terrain and declared room connections",
+      "caption": "Optional Advanced practice with synthetic test terrain. Declared room connections do not establish native doors, actors or events.",
+      "extra_images": [
+        {
+          "image": "17-object-inspector",
+          "title": "Advanced practice inspector / declared record fields"
+        }
+      ],
+      "appearance_title": "Rooms / connections and object inspector",
+      "appearance_kicker": "Advanced / original editor-layout workshop",
+      "appearance_intro": "Actual checked workshop layouts. Hillside renders and plays music natively; Courtyard, objects and connections remain editor practice data.",
+      "visual_page": {
+        "title": "Advanced practice / synthetic layouts and records",
+        "kicker": "Optional practice / not a decoded commercial-game level",
+        "intro": "Artificial test data for learning the editor format. Only Hillside graphics and music run natively; these records do not execute doors, actors or events.",
+        "panels": [
+          {
+            "image": "16-connected-rooms",
+            "title": "Advanced practice / staged synthetic room records",
+            "x": 48,
+            "top": 846,
+            "width": 1200,
+            "crop": [
+              180,
+              60,
+              1390,
+              500
+            ],
+            "caption": "Synthetic editor-format exercise. Use the FFL II bedroom procedure for a supported real-game room change."
+          },
+          {
+            "image": "17-object-inspector",
+            "title": "Advanced practice / selected declared record",
+            "x": 48,
+            "top": 350,
+            "width": 900,
+            "crop": [
+              180,
+              210,
+              1390,
+              430
+            ]
+          }
+        ]
+      }
     },
     {
       "id": "sound",
@@ -837,15 +1087,15 @@
         "Create the parent build only when the stream fits. Inspect the independently decoded comparison, then playtest the actual game resource."
       ],
       "result": "The encoded stream fits without overwriting neighbors, and independent decoding reconstructs every intended decoded byte.",
-      "note": "Unrecognized compression remains read-only. A run of zero bytes after a stream does not by itself establish free space or permission to relocate it.",
+      "note": "Unrecognized compression remains read-only. A run of zeroes or another fill pattern does not establish unowned capacity. Do not increase an allocation or move a stream to clear an error without a separately supported ownership and pointer model.",
       "details": [
         {
           "title": "Parent and child",
           "text": "Extraction creates a resource with an explicit relationship to its parent bytes. Editing a child does not automatically modify the game. Reinsert the selected child build and test the resulting parent ROM."
         },
         {
-          "title": "Capacity failure",
-          "text": "Shorten or simplify the resource, or establish a separately supported allocation/relocation workflow. Do not increase a length field merely to make the review accept a larger stream."
+          "title": "Capacity and relocation limits",
+          "text": "Automatic relocation is unavailable. None of the six bundled game profiles establishes complete pointer obligations and destination ownership for a relocation. A safe relocation would need all affected references, their encoding and representable range, exact original bytes, a proven owned destination and overlap checks. Repeated fill bytes do not prove free space."
         }
       ],
       "related": [
@@ -854,8 +1104,9 @@
         "tilemaps"
       ],
       "terms": [
-        "term-codec",
-        "term-allocation"
+        "term-allocation",
+        "term-pointer",
+        "term-ownership"
       ]
     },
     {
@@ -905,7 +1156,7 @@
       "intro": "File offsets, console addresses and emulator memory regions describe different spaces. Declare the mapping before comparing or editing them.",
       "steps": [
         "Start with exact source/build bytes and a known offset. Use the number inspector to choose signedness and byte order rather than guessing from a displayed decimal value.",
-        "Use the supported system address mapping. Supply bank information for ambiguous windows and distinguish file positions from CPU or bus addresses.",
+        "In <b>Address explorer</b>, choose the supported <b>Declared mapping</b> and required bank/bounds, then <b>Resolve address</b>. Use <b>Inspect mapped bytes</b> to open that current source location. An active hardware bank is not observed by this declaration.",
         "Load a matching Playtest session. Under <b>Find a changing value</b>, use <b>Start RAM search</b>, play one action, pause, then <b>Capture & narrow</b> by changed, unchanged, increased, decreased or exact value. Add a watch to a measured result.",
         "Record what was measured and under which setup. Use an instruction-level feature only with a proven matching debugger adapter; keep imported traces labeled as imported observations."
       ],
@@ -914,7 +1165,7 @@
       "details": [
         {
           "title": "Tables and pointers",
-          "text": "For a declared linear table pointer, target file offset = stored value - base. Record stride is the distance between entries; a field offset is relative to each record. Bank switching needs additional mapping evidence."
+          "text": "For a declared linear table pointer, target file offset = stored value - base. Record stride is the distance between entries; a field offset is relative to each record. Bank switching needs additional mapping evidence. Find declared references follows only supplied mappings; undeclared code uses remain unknown."
         },
         {
           "title": "Memory is not a ROM location",
@@ -922,6 +1173,7 @@
         }
       ],
       "related": [
+        "investigation",
         "hex-editor",
         "tables",
         "checks"
@@ -942,7 +1194,7 @@
         "Open <b>More tools > Recipes & definitions</b> and select the exact original source revision.",
         "After reviewing or building edits, use <b>Save a plan as a recipe</b>, or import an existing recipe JSON file. Keep the recipe with its source identity and intended purpose.",
         "Preview every operation and affected range on rerun. Resolve wrong hashes, overlaps and unsupported commands before creating a new build.",
-        "Export checked text, graphics or table definitions when useful. Reimport on the same source context and inspect the decoded result before editing."
+        "Export checked <b>Text</b>, <b>Graphics & fonts</b>, <b>Data tables</b>, <b>Levels & objects</b> or <b>Music & sound</b> definitions in Resource definitions. Reimport the JSON on the same source, choose <b>Check and import definition</b> and inspect the decoded result before editing."
       ],
       "result": "The recipe produces a fresh reviewable plan for the exact source and rejects stale or incompatible assumptions. The new build remains separate.",
       "note": "A recipe from a trusted person can still target a different revision. Inspect the plan rather than treating the filename or previous success as authority.",
@@ -952,13 +1204,14 @@
           "text": "The table editor previews up to 1,024 source records. Choose set, add, multiply or percent, then inspect the range. Percent changes round halves away from zero; numeric overflow is refused. Game-specific limits still require evidence."
         },
         {
-          "title": "Reusable does not mean universal",
-          "text": "Keep a short note explaining the format, region and observed behavior the definition covers. Declared consumer lists, capacity and source preconditions remain part of every review."
+          "title": "Checked definition exchange",
+          "text": "The exported envelope records source SHA-256 and size, resource kind and checked definition. Level object metadata and sound layouts travel as declarations, not runtime proof. Wrong sources or invalid definitions refuse; ROM files and native reports are excluded. Existing version-1 definitions keep their format."
         }
       ],
       "related": [
+        "connections",
+        "investigation",
         "tables",
-        "resources",
         "mcp"
       ],
       "terms": [
@@ -979,15 +1232,15 @@
         "Require the same inspect, plan, build, playtest and patch-verification cycle. Review generated plans and sharing content yourself. Keep ROMs, save data and personal paths private."
       ],
       "result": "The client uses structured supported operations against the intended workspace. Read-only mode refuses writes, and imported sources stay within explicitly allowed roots.",
-      "note": "MCP is a transport and tool interface, not a built-in model. A client's confident explanation does not turn an unknown layout into verified game semantics.",
+      "note": "MCP is an optional transport, not a built-in model or proof of game semantics. Source identity, numeric budgets, current runtime context and read/write permissions still apply to each structured call.",
       "details": [
         {
-          "title": "Useful requests",
-          "text": "Ask the client to identify the selected source, describe a checked definition, propose one bounded edit, show the plan and verify patch reconstruction. Add explicit gameplay assertions when asking it to test behavior."
+          "title": "Bounded investigation operations",
+          "text": "The exposed tools include explicit address resolution, declared references, bounded byte explanations, memory searches and watches, exposed video-tile inspection and supported compression checks. Read system.operations or the client tool schemas for current parameters and limits. Some observations create temporary search state or saved ranges and therefore require write-enabled access; they do not write arbitrary native RAM."
         },
         {
-          "title": "Permission and protocol",
-          "text": "Do not grant a whole drive when a dedicated folder is sufficient. The bridge exposes no shell execution operation. Protocol data uses stdin/stdout; diagnostics must not be mixed into that stream."
+          "title": "Definitions and permissions",
+          "text": "Definition export/import can round-trip checked text, graphics, table, level and sound payloads for the exact source. Export creates a project export record; import validates and stores a definition, so these operations need write access. The exported MCP result supplies the JSON payload for reimport. No arbitrary shell, native debugger bridge or instruction-breakpoint operation is exposed."
         }
       ],
       "related": [
@@ -999,6 +1252,105 @@
         "term-mcp",
         "term-plan"
       ]
+    },
+    {
+      "id": "game-knowledge",
+      "title": "Use public knowledge without confusing it with proof",
+      "part": "Advanced",
+      "kicker": "REFERENCES / EXACT REVISIONS",
+      "intro": "Public disassemblies, editor definitions and hack documentation help locate data. The application keeps implemented workflows, checked reference layouts and research leads distinct.",
+      "image": "21-game-knowledge",
+      "steps": [
+        "Import your original ROM and let the default deep scan identify its exact revision. In <b>Overview > Known locations</b>, expand <b>What is known about this game</b>.",
+        "Use a <b>Supported workflow</b> through its editing tool. <b>Reference checked</b> means the original layout was examined; it does not enable an editor. <b>Research lead</b> still needs validation.",
+        "Open a pinned source reference when you need its origin. Names, pointers and assumptions must apply to your exact revision; a similar title or matching console is insufficient.",
+        "Treat a downloaded patch as evidence of byte differences. BPS checksums verify its source and result; they do not describe the purpose of every changed byte. Read the author documentation and test focused changes."
+      ],
+      "result": "Known information becomes useful context without silently turning an unverified offset into a supported edit.",
+      "note": "References are attached only to matched originals or owned descendants. A derived build can change data layouts; reference counts do not freshly certify it. Research caches, ROM files and upstream implementation code are not included in the release.",
+      "related": [
+        "checks",
+        "resources",
+        "tables",
+        "mcp"
+      ],
+      "terms": [
+        "term-revision",
+        "term-evidence"
+      ],
+      "caption": "Actual ROMancer reference panel, showing supported workflows separately from checked layouts and research leads.",
+      "image_layout": "following-page",
+      "visual_page": {
+        "title": "Use public knowledge without confusing it with proof / actual interface",
+        "kicker": "Advanced / actual application capture",
+        "intro": "Actual ROMancer reference panel, showing supported workflows separately from checked layouts and research leads.",
+        "panels": [
+          {
+            "image": "21-game-knowledge",
+            "title": "Use public knowledge without confusing it with proof",
+            "x": 48,
+            "top": 846,
+            "width": 1170,
+            "crop": [
+              180,
+              60,
+              1390,
+              860
+            ],
+            "caption": "Unaltered full-resolution capture is linked in the offline HTML edition."
+          }
+        ]
+      }
+    },
+    {
+      "id": "game-maps",
+      "title": "Browse real FFL2 maps and edit supported records",
+      "part": "Advanced",
+      "kicker": "GAME MAPS / SHARED DATA",
+      "intro": "The exact USA Final Fantasy Legend II profile includes a real room catalog. Numbered headers are used where scene names have not been established.",
+      "image": "20-ffl2-map-browser",
+      "steps": [
+        "Open <b>Levels</b>. The simple bedroom editor remains available; choose <b>Browse game maps</b> for actual map thumbnails and their arrival/object counts.",
+        "Select a map and an arrival or existing record. The editor shows a readable crop. Other maps can share the same drawing stream, so read the shared-use notice before changing terrain.",
+        "In the supported opening atlas, stage an existing command, unconditional NPC position or arrival position. Conditions, event references, facing bits, collision behavior and trigger ordering are protected. Mother is a story character even though her placement record is unconditional.",
+        "Review the changes to obtain the exact decoded terrain preview, then create a separate build. Walk the relevant route in Playtest, test interactions and both exits, and save a state only for its matching build."
+      ],
+      "result": "The selected supported record changes through a source-bound plan, with an original/edited map preview and a separate playable build.",
+      "note": "The catalog has 219 header variants and 164 drawing streams. Conditional branches require explicit state; unsupported decoding stays unavailable. Non-opening maps use clearly marked neutral color-index previews until a native palette is known. Object records are not a claim that every object is visible in the current game state. Destination changes remain inspection-only in this UI.",
+      "related": [
+        "room",
+        "play",
+        "regression",
+        "game-knowledge"
+      ],
+      "terms": [
+        "term-metatile",
+        "term-shared-resource",
+        "term-arrival"
+      ],
+      "caption": "Actual cartridge terrain and source-bound record editing; this is not the synthetic Advanced practice layout.",
+      "image_layout": "following-page",
+      "visual_page": {
+        "title": "Browse real FFL2 maps and edit supported records / actual interface",
+        "kicker": "Advanced / actual application capture",
+        "intro": "Actual cartridge terrain and source-bound record editing; this is not the synthetic Advanced practice layout.",
+        "panels": [
+          {
+            "image": "20-ffl2-map-browser",
+            "title": "Browse real FFL2 maps and edit supported records",
+            "x": 48,
+            "top": 846,
+            "width": 1170,
+            "crop": [
+              180,
+              60,
+              1390,
+              860
+            ],
+            "caption": "Unaltered full-resolution capture is linked in the offline HTML edition."
+          }
+        ]
+      }
     },
     {
       "id": "troubleshooting",
@@ -1021,7 +1373,7 @@
         },
         {
           "title": "Recovery order",
-          "text": "Keep unsaved text, back up the project, check the source identity, reproduce one small step, inspect the failure and restore or correct the narrow change. Historical reports are references; run fresh native checks for a current claim."
+          "text": "Keep unsaved text, back up the project, check the source identity, reproduce one small step, inspect the failure and restore or correct the narrow change. Historical reports are references; run fresh native checks for a current claim. For a room destination or mapped-address issue, inspect its checked definition and exact source bytes before treating the result as runtime behavior."
         }
       ],
       "related": [
@@ -1129,7 +1481,7 @@
     {
       "id": "term-declared",
       "term": "Declared definition",
-      "definition": "An explicitly supplied description of storage, fields, mappings and limits. It is not automatically independent proof of game meaning."
+      "definition": "An explicitly supplied description of storage, fields, mappings and limits. It is not automatically independent proof of game meaning. Names and editor relationships remain declarations until their runtime consumers are established."
     },
     {
       "id": "term-draft",
@@ -1219,7 +1571,7 @@
     {
       "id": "term-pointer",
       "term": "Pointer",
-      "definition": "A stored value interpreted through a declared mapping. A linear pointer base does not establish a bank-switched CPU address."
+      "definition": "A stored value interpreted through a declared mapping. A linear pointer base does not establish a bank-switched CPU address. Relocation also needs the complete set of affected pointer obligations and representable destination values."
     },
     {
       "id": "term-record",
@@ -1290,6 +1642,31 @@
       "id": "term-layer",
       "term": "Layer",
       "definition": "A selectable view or declared editing plane. Terrain, raw collision values and object slots describe different information; hiding a visual overlay does not establish new game semantics."
+    },
+    {
+      "id": "term-connection",
+      "term": "Declared connection",
+      "definition": "An explicit mapping from one stored exit-field value to a declared room ID. It supports editor navigation; it does not prove a game executes a door transition."
+    },
+    {
+      "id": "term-metadata",
+      "term": "Object metadata",
+      "definition": "Optional per-slot index, name, role and declared reference annotations. Metadata does not replace the checked record layout or establish actor/event behavior."
+    },
+    {
+      "id": "term-ownership",
+      "term": "Destination ownership",
+      "definition": "Evidence that a destination allocation belongs to the resource being moved and can be written without overwriting other data. A repeated fill pattern is not that evidence."
+    },
+    {
+      "id": "term-shared-resource",
+      "term": "Shared resource",
+      "definition": "One stored byte range referenced by several rooms, objects, difficulties or scenes. An edit can affect every use."
+    },
+    {
+      "id": "term-arrival",
+      "term": "Arrival record",
+      "definition": "A game-specific destination record, often containing a room reference, coordinates and packed flags. It is distinct from the trigger that selects it."
     }
   ],
   "index": [
@@ -1457,7 +1834,8 @@
       "term": "Definitions",
       "topics": [
         "resources",
-        "recipes"
+        "recipes",
+        "connections"
       ]
     },
     {
@@ -1509,7 +1887,7 @@
       "term": "File offsets",
       "topics": [
         "hex-editor",
-        "debug"
+        "investigation"
       ]
     },
     {
@@ -1591,7 +1969,8 @@
     {
       "term": "MCP permissions",
       "topics": [
-        "mcp"
+        "mcp",
+        "recipes"
       ]
     },
     {
@@ -1691,7 +2070,7 @@
       "term": "Room objects",
       "topics": [
         "room",
-        "levels"
+        "connections"
       ]
     },
     {
@@ -1905,6 +2284,113 @@
       "topics": [
         "settings",
         "play"
+      ]
+    },
+    {
+      "term": "Byte explanations",
+      "topics": [
+        "investigation",
+        "hex-editor"
+      ]
+    },
+    {
+      "term": "Connected rooms",
+      "topics": [
+        "connections"
+      ]
+    },
+    {
+      "term": "Declared connections",
+      "topics": [
+        "connections",
+        "investigation"
+      ]
+    },
+    {
+      "term": "Destination ownership",
+      "topics": [
+        "compression"
+      ]
+    },
+    {
+      "term": "Destination room picker",
+      "topics": [
+        "connections"
+      ]
+    },
+    {
+      "term": "Hillside and Courtyard Advanced practice",
+      "topics": [
+        "connections",
+        "levels"
+      ]
+    },
+    {
+      "term": "Levels and sound definition exchange",
+      "topics": [
+        "recipes"
+      ]
+    },
+    {
+      "term": "Named object inspector",
+      "topics": [
+        "connections"
+      ]
+    },
+    {
+      "term": "Object metadata and roles",
+      "topics": [
+        "connections"
+      ]
+    },
+    {
+      "term": "Relocation prerequisites",
+      "topics": [
+        "compression"
+      ]
+    },
+    {
+      "term": "Advanced synthetic layout practice",
+      "topics": [
+        "connections"
+      ]
+    },
+    {
+      "term": "Source-bound navigation",
+      "topics": [
+        "investigation",
+        "debug"
+      ]
+    },
+    {
+      "term": "Public format references",
+      "topics": [
+        "game-knowledge"
+      ]
+    },
+    {
+      "term": "Named equipment and enemies",
+      "topics": [
+        "tables"
+      ]
+    },
+    {
+      "term": "FFL2 real map catalog",
+      "topics": [
+        "game-maps"
+      ]
+    },
+    {
+      "term": "Arrival records",
+      "topics": [
+        "game-maps"
+      ]
+    },
+    {
+      "term": "Shared resources",
+      "topics": [
+        "game-maps",
+        "palettes"
       ]
     }
   ]

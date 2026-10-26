@@ -49,19 +49,32 @@ def make_studio_example():
     for i in range(16):raw[0x3210+i*4:0x3214+i*4]=bytes([i]*4)
     terrain=[3 if y>=12 else 2 if (x+y)%13==0 else 1 if y==11 and 3<=x<=7 else 0 for y in range(14) for x in range(16)]
     raw[0x3010:0x3010+224]=bytes(terrain);raw[0x3410:0x3410+224]=bytes(1 if v==3 else 0 for v in terrain)
-    raw[0x3510:0x3530]=bytes([1,2,10,0,2,12,10,0]+[0]*24)
+    raw[0x3510:0x3530]=bytes([1,2,10,0,2,12,10,1]+[0]*24)
     melody=[60,64,67,72,71,67,64,62,60,62,65,69,67,65,62,60]
     for i,note in enumerate(melody):raw[0x3810+i*6:0x3816+i*6]=bytes([note,30,0,96,0,0])
     for note in range(128):
         period=max(8,min(2047,round(1789773/(16*440*2**((note-69)/12))-1)))
         raw[0x3a10+note*2:0x3a12+note*2]=period.to_bytes(2,'little')
     raw[0x1000:0x1200]=bytes(255 if math.sin(i/11)>0 else 0 for i in range(512))
+    # Additional editor practice data. The unchanged native renderer reads only
+    # Hillside terrain and music; it does not interpret objects or room exits.
+    courtyard=[3 if y in (0,13) or x in (0,15) else 1 if x in (4,11) and 3<=y<=9 else 0 for y in range(14) for x in range(16)]
+    raw[0x3b10:0x3b10+224]=bytes(courtyard);raw[0x3c10:0x3c10+224]=bytes(1 if value==3 else 0 for value in courtyard)
+    raw[0x3d10:0x3d18]=bytes([2,1,10,0,1,4,10,1])
     sha=hashlib.sha256(raw).hexdigest()
-    levels={'schema_version':1,'source_sha256':sha,'name':'Hillside',
+    object_fields=[{'name':name,'offset':i,'bytes':1,'endian':'little','maximum':maximum} for i,(name,maximum) in enumerate([('kind',15),('x',15),('y',13),('exit_room',1)])]
+    targets=[{'value':0,'room_id':'hillside'},{'value':1,'room_id':'courtyard'}]
+    levels={'schema_version':1,'source_sha256':sha,'name':'Hillside editor-layout workshop',
       'tiles':{'offset':16400,'count':16,'codec':'tile8-planar2-msb-v1','palette_offset':0x3700,'palette_format':'rgb888'},
       'metatiles':{'offset':0x3210,'count':16,'width':2,'height':2,'entry_bytes':1,'endian':'little'},
       'rooms':[{'id':'hillside','name':'Hillside','width':16,'height':14,'terrain':{'offset':0x3010,'entry_bytes':1,'endian':'little'},'collision':{'offset':0x3410,'entry_bytes':1,'endian':'little'},
-        'objects':{'offset':0x3510,'count':8,'stride':4,'fields':[{'name':name,'offset':i,'bytes':1,'endian':'little','maximum':maximum} for i,(name,maximum) in enumerate([('kind',15),('x',15),('y',13),('exit_room',0)])]}}]}
+        'objects':{'offset':0x3510,'count':8,'stride':4,'fields':object_fields},
+        'object_metadata':[{'index':0,'name':'Practice start','role':'start','reference':None},
+          {'index':1,'name':'Courtyard connection','role':'exit','reference':{'field':'exit_room','targets':targets}}]},
+       {'id':'courtyard','name':'Courtyard','width':16,'height':14,'terrain':{'offset':0x3b10,'entry_bytes':1,'endian':'little'},'collision':{'offset':0x3c10,'entry_bytes':1,'endian':'little'},
+        'objects':{'offset':0x3d10,'count':2,'stride':4,'fields':object_fields},
+        'object_metadata':[{'index':0,'name':'Hillside connection','role':'exit','reference':{'field':'exit_room','targets':targets}},
+          {'index':1,'name':'Practice actor slot','role':'actor','reference':None}]}]}
     sound={'schema_version':1,'source_sha256':sha,'samples':[{'id':'pulse-sample','name':'DPCM practice','offset':0x1000,'length':512,'codec':'nes-dpcm','sample_rate':16000,'initial_level':64}],
       'songs':[{'id':'hillside','name':'Hillside melody','driver':'hillside-pulse-v1','offset':0x3810,'count':16,'stride':6,'tempo':150,'ticks_per_beat':24,'channels':1}]}
     return {'raw':bytes(raw),'levels':levels,'sound':sound,'driver_length':len(code)}

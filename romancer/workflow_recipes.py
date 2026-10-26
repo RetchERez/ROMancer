@@ -82,7 +82,17 @@ def definition_document(path,sha,kind,definition):
     elif kind=='script':
         from .script import inspect_script
         checked=inspect_script(path,definition)
-    else:raise ValueError('choose text, graphics or table definitions')
+    elif kind in ('levels','sound'):
+        from .workbench_files import read_bounded
+        raw=read_bounded(path,64*1024**2,source)
+        if kind=='levels':
+            from .level_design import inspect_level
+            checked=inspect_level(raw,definition,sha)
+        else:
+            from .sound_studio import inspect_sound
+            checked=inspect_sound(raw,definition,sha)
+        definition=checked['definition']
+    else:raise ValueError('choose text, graphics, tables, levels or sound definitions')
     if not checked['ok']:raise ValueError(str(checked.get('error','definition cannot inspect this revision')))
     return json.loads(canonical_bytes({'format':'romancer-definition-v1','source':source,'kind':kind,'definition':definition},max_bytes=1024**2))
 

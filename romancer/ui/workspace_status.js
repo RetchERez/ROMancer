@@ -9,11 +9,13 @@ function changed(items){return Array.isArray(items)&&items.some(c=>c.before_pixe
 export function hasStagedChanges(state){
  if(!state.project||!state.artifact)return false;
  if(state.pending?.artifact_id===state.artifact.artifact_id||state.gameEditPlan?.scope===selectionKey(state))return true;
+ if(state.gameMapsView?.scope===selectionKey(state)&&[...(state.gameMapsView.models?.values()||[])].some(model=>model.values().length))return true;
  const prefix=state.project.project_id+':'+state.artifact.artifact_id+':';
  for(const [key,value] of Object.entries(state.drafts||{})){
   if(!key.startsWith(prefix))continue;
   if(/:(?:asset-changes|table-changes|level-changes|sound-changes)$/.test(key)){try{const data=JSON.parse(value);if(changed(Array.isArray(data)?data:data?.changes))return true;}catch{}}
   if(key.endsWith(':hex-changes')){try{const saved=JSON.parse(value);if(saved.artifact_id===state.artifact.artifact_id&&saved.sha256===state.artifact.sha256&&saved.edits?.length)return true;}catch{}}
+  if(key.endsWith(':game-map-changes')){try{const saved=JSON.parse(value);if(saved.source_sha256===state.artifact.sha256&&Object.values(saved.changes_by_header||{}).some(changed))return true;}catch{}}
   if(key.includes(':game-')){const field=state.gameVisualModel?.model?.fields?.find(f=>key.endsWith(':game-'+f.id));if(field&&String(field.value)!==String(value))return true;}
   if(key.endsWith(':paint-buffer')){try{const paint=JSON.parse(value),doc=state.results?.['assets.inspect'];const bitmap=doc?.document_id===paint.document_id?doc.bitmaps.find(b=>b.id===paint.bitmap_id):null;if(bitmap?.cells[paint.cell_index]&&!equal(paint.pixels,bitmap.cells[paint.cell_index].pixels))return true;}catch{}}
   const table=state.results?.['tables.inspect'];

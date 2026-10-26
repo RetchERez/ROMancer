@@ -11,6 +11,44 @@ def _identity(raw,definition,source_sha256):
     if hashlib.sha256(raw).hexdigest()!=source_sha256 or definition.get('source_sha256')!=source_sha256:raise ValueError('level definition source differs')
 
 
+def object_maximum(field,room,room_count):
+    return min(field['maximum'],room['width']-1 if field['name']=='x' else room['height']-1 if field['name']=='y' else room_count-1 if field['name']=='exit_room' else field['maximum'])
+
+
+def _connections(rooms,definitions):
+    """Explicit editor annotations describe references, never runtime behavior."""
+    room_ids={room['id'] for room in rooms};connections=[]
+    for room,definition in zip(rooms,definitions):
+        metadata=definition.get('object_metadata',[]);storage=definition['objects'];seen=set()
+        if type(metadata) is not list or len(metadata)>256:raise ValueError('declare at most 256 object metadata entries per room')
+        for entry in metadata:
+            fields(entry,'index name role reference');number(entry['index'],0,len(room['objects'])-1);label(entry['name'])
+            if entry['index'] in seen:raise ValueError('duplicate object metadata slot')
+            seen.add(entry['index'])
+            if entry['role'] not in ('object','actor','start','exit','trigger'):raise ValueError('unknown declared object role')
+            reference=entry['reference']
+            if entry['role']!='exit':
+                if reference is not None:raise ValueError('only declared exits have room references')
+                continue
+            fields(reference,'field targets');label(reference['field'])
+            field=next((field for field in storage['fields'] if field['name']==reference['field']),None)
+            if field is None or field['name'] in ('x','y'):raise ValueError('exit reference needs a declared destination integer field')
+            targets=reference['targets']
+            if type(targets) is not list or not 1<=len(targets)<=32:raise ValueError('exit reference needs 1 to 32 declared destinations')
+            by_value={}
+            for target in targets:
+                fields(target,'value room_id');number(target['value'],0,object_maximum(field,room,len(rooms)));label(target['room_id'])
+                if target['value'] in by_value:raise ValueError('duplicate exit destination value')
+                if target['room_id'] not in room_ids:raise ValueError('exit destination room is not declared')
+                by_value[target['value']]=target['room_id']
+            value=room['objects'][entry['index']][field['name']]
+            if value not in by_value:raise ValueError('current exit destination is not mapped')
+            connections.append({'room_id':room['id'],'index':entry['index'],'name':entry['name'],
+              'field':field['name'],'value':value,'target_room_id':by_value[value]})
+        room['object_metadata']=metadata
+    return connections
+
+
 def inspect_level(raw,definition,source_sha256):
     _identity(raw,definition,source_sha256)
     d=__import__('json').loads(canonical_bytes(definition,max_bytes=256*1024))
@@ -45,7 +83,7 @@ def inspect_level(raw,definition,source_sha256):
     if type(d['rooms']) is not list or not 1<=len(d['rooms'])<=32:raise ValueError('declare 1 to 32 rooms')
     rooms=[];ids=set();uses={str(i):[] for i in range(m['count'])};total=0
     for r in d['rooms']:
-        fields(r,'id name width height terrain collision objects');label(r['id']);label(r['name'])
+        fields(r,'id name width height terrain collision objects'+(' object_metadata' if type(r) is dict and 'object_metadata' in r else ''));label(r['id']);label(r['name'])
         if r['id'] in ids:raise ValueError('duplicate room ID')
         ids.add(r['id']);number(r['width'],1,128);number(r['height'],1,128);count=r['width']*r['height'];total+=count
         if total>32768 or count*parts*64>4*1024**2:raise ValueError('level preview exceeds pixel budget')
@@ -67,13 +105,14 @@ def inspect_level(raw,definition,source_sha256):
                 obj={}
                 for f in o['fields']:
                     at=o['offset']+index*o['stride']+f['offset'];value=int.from_bytes(raw[at:at+f['bytes']],f['endian'])
-                    maximum=min(f['maximum'],r['width']-1 if f['name']=='x' else r['height']-1 if f['name']=='y' else len(d['rooms'])-1 if f['name']=='exit_room' else f['maximum'])
+                    maximum=object_maximum(f,r,len(d['rooms']))
                     number(value,0,maximum);obj[f['name']]=value
                 objects.append(obj)
         for i,value in enumerate(terrain):uses[str(value)].append({'room_id':r['id'],'cell':i})
         rooms.append({'id':r['id'],'name':r['name'],'width':r['width'],'height':r['height'],'terrain':terrain,'collision':collision,'objects':objects})
+    connections=_connections(rooms,d['rooms'])
     document_id=hashlib.sha256(canonical_bytes(d,max_bytes=256*1024)).hexdigest()
-    result={'ok':True,'document_id':document_id,'source_sha256':source_sha256,'definition':d,'tiles':tiles,'palette':palette,'metatiles':blocks,'block_width':m['width'],'block_height':m['height'],'rooms':rooms,'uses':uses,'ranges':[{'offset':a,'length':b-a,'name':name} for a,b,name in ranges],'game_semantics_verified':False}
+    result={'ok':True,'document_id':document_id,'source_sha256':source_sha256,'definition':d,'tiles':tiles,'palette':palette,'metatiles':blocks,'block_width':m['width'],'block_height':m['height'],'rooms':rooms,'connections':connections,'uses':uses,'ranges':[{'offset':a,'length':b-a,'name':name} for a,b,name in ranges],'game_semantics_verified':False}
     try:canonical_bytes(result,max_bytes=2*1024**2)
     except ValueError as exc:raise ValueError('combined level preview budget exceeded; declare fewer rooms, cells or tiles') from exc
     return result
@@ -100,7 +139,9 @@ def plan_level(raw,definition,document_id,changes,source_sha256):
                 if o is None:raise ValueError('objects are not declared')
                 number(change['index'],0,o['count']-1);f=next((f for f in o['fields'] if f['name']==change['field']),None)
                 if f is None:raise ValueError('unknown object field')
-                maximum=min(f['maximum'],r['width']-1 if f['name']=='x' else r['height']-1 if f['name']=='y' else len(d['rooms'])-1 if f['name']=='exit_room' else f['maximum'])
+                maximum=object_maximum(f,r,len(d['rooms']))
+                metadata=next((entry for entry in r.get('object_metadata',[]) if entry['index']==change['index']),None)
+                if metadata and metadata['role']=='exit' and metadata['reference']['field']==f['name'] and change['value'] not in [target['value'] for target in metadata['reference']['targets']]:raise ValueError('exit destination is not mapped')
                 number(change['value'],0,maximum);offset=o['offset']+change['index']*o['stride']+f['offset'];width=f['bytes'];endian=f['endian']
             else:
                 fields(change,'kind room_id index value');number(change['index'],0,r['width']*r['height']-1);g=r[kind]

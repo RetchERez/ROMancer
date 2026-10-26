@@ -14,7 +14,7 @@ export function shortcutFor(event,{modalOpen=false,gameFocused=false}={}){
 }
 export function historyAction(page,editor,direction,available){
  const suffix=direction<0?'undo':'redo';
- const prefix=page==='levels'&&editor==='level-canvas'?'levels':page==='assets'?(editor==='sprite-canvas'?'sprite':editor==='paint-canvas'?'pixel':null):null;
+ const prefix=page==='levels'?(editor==='level-canvas'?'levels':editor==='maps-edit'?'maps':null):page==='assets'?(editor==='sprite-canvas'?'sprite':editor==='paint-canvas'?'pixel':null):null;
  const action=prefix&&prefix+'-'+suffix;
  return action&&available(action)?action:'draft-'+suffix;
 }

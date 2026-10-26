@@ -20,7 +20,7 @@ def scan_structures(raw,system,start,file_size,*,cancelled=lambda:False):
 
 def resource_relationships(raw,descriptors,source_sha256):
     if hashlib.sha256(raw).hexdigest()!=source_sha256:raise ValueError('relationship source differs')
-    nodes=[];edges=[]
+    nodes=[];edges=[];connection_count=0
     if descriptors.get('levels'):
         from .level_design import inspect_level
         doc=inspect_level(raw,descriptors['levels'],source_sha256)
@@ -28,9 +28,15 @@ def resource_relationships(raw,descriptors,source_sha256):
         for room in doc['rooms']:edges.append({'from':'level:'+room['id']+' terrain','to':'level:metatiles','relation':'indexes metatiles'})
         edges.extend([{'from':'level:metatiles','to':'level:tiles','relation':'indexes tiles'},
           {'from':'level:tiles','to':'level:palette','relation':'declared preview palette'}])
+        connection_count=len(doc.get('connections',[]))
+        for connection in doc.get('connections',[])[:128]:
+            edges.append({'from':'level:'+connection['room_id']+' objects','to':'level:'+connection['target_room_id']+' terrain',
+                          'relation':'declared exit '+connection['name']+' (slot '+str(connection['index'])+')'})
     if descriptors.get('sound'):
         from .sound_studio import inspect_sound
         doc=inspect_sound(raw,descriptors['sound'],source_sha256)
         for r in doc['ranges']:nodes.append({'id':'sound:'+r['name'],'name':r['name'],**r,'confidence':'DECLARED'})
     if len(nodes)>256 or len(edges)>512:raise ValueError('resource relationship budget exceeded')
-    return {'ok':True,'source_sha256':source_sha256,'nodes':nodes,'edges':edges,'game_semantics_verified':False,'write_authorized':False}
+    return {'ok':True,'source_sha256':source_sha256,'nodes':nodes,'edges':edges,'game_semantics_verified':False,'write_authorized':False,
+            'relationship_coverage':'declared_only','partial':connection_count>128,
+            'exit_connections':{'declared':connection_count,'listed':min(128,connection_count)}}

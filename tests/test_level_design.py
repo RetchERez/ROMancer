@@ -101,3 +101,76 @@ class LevelDesignTests(unittest.TestCase):
                 inspect_level(raw,malformed,sha)
         with self.assertRaisesRegex(ValueError,'change'):
             plan_level(raw,d,doc['document_id'],[None],sha)
+
+
+def connected_fixture():
+    raw,d,sha=fixture()
+    other=copy.deepcopy(d['rooms'][0]);other.update(id='room-1',name='Garden',objects=None,collision=None)
+    other['terrain']['offset']=256;d['rooms'].append(other)
+    d['rooms'][0]['objects']['fields'][-1]['maximum']=1
+    d['rooms'][0]['object_metadata']=[{'index':0,'name':'Garden gate','role':'exit','reference':{
+      'field':'exit_room','targets':[{'value':0,'room_id':'room-0'},{'value':1,'room_id':'room-1'}]}}]
+    return raw,d,sha
+
+
+class DeclaredRoomConnectionTests(unittest.TestCase):
+    def test_original_workshop_has_two_editor_rooms_and_explicit_practice_connections(self):
+        from romancer.studio_examples import make_studio_example
+        from romancer.level_design import inspect_level
+        example=make_studio_example();doc=inspect_level(example['raw'],example['levels'],hashlib.sha256(example['raw']).hexdigest())
+        self.assertEqual([room['id'] for room in doc['rooms']],['hillside','courtyard'])
+        self.assertEqual([(row['room_id'],row['target_room_id']) for row in doc['connections']],[('hillside','courtyard'),('courtyard','hillside')])
+        self.assertFalse(doc['game_semantics_verified'])
+
+    def test_legacy_exit_named_fields_never_create_undeclared_connections(self):
+        from romancer.level_design import inspect_level
+        doc=inspect_level(*fixture())
+        self.assertEqual(doc['connections'],[])
+        self.assertEqual(doc['rooms'][0]['object_metadata'],[])
+
+    def test_only_explicit_exit_metadata_creates_a_named_connection(self):
+        from romancer.level_design import inspect_level
+        doc=inspect_level(*connected_fixture())
+        self.assertEqual(doc['connections'],[{'room_id':'room-0','index':0,'name':'Garden gate',
+          'field':'exit_room','value':0,'target_room_id':'room-0'}])
+        self.assertFalse(doc['game_semantics_verified'])
+        self.assertEqual(doc['rooms'][0]['object_metadata'][0]['name'],'Garden gate')
+
+    def test_connection_destination_plan_changes_only_the_existing_integer_field(self):
+        from romancer.level_design import inspect_level,plan_level
+        raw,d,sha=connected_fixture();doc=inspect_level(raw,d,sha)
+        result=plan_level(raw,d,doc['document_id'],[{'kind':'object','room_id':'room-0','index':0,'field':'exit_room','value':1}],sha)
+        self.assertEqual(result['edits'],[{'offset':195,'before':'00','after':'01'}])
+        output=bytearray(raw);output[195]=1;new_sha=hashlib.sha256(output).hexdigest();d['source_sha256']=new_sha
+        self.assertEqual(inspect_level(bytes(output),d,new_sha)['connections'][0]['target_room_id'],'room-1')
+
+    def test_metadata_is_strict_and_checks_slots_fields_targets_and_roles(self):
+        from romancer.level_design import inspect_level
+        for mutation in ('unknown-room','unknown-field','duplicate-slot','duplicate-value','slot-range','unknown-role','exit-without-reference','actor-with-reference','extra-key','too-wide-target','current-unmapped'):
+            raw,d,sha=connected_fixture();entry=d['rooms'][0]['object_metadata'][0]
+            if mutation=='unknown-room':entry['reference']['targets'][0]['room_id']='missing'
+            elif mutation=='unknown-field':entry['reference']['field']='missing'
+            elif mutation=='duplicate-slot':d['rooms'][0]['object_metadata'].append(copy.deepcopy(entry))
+            elif mutation=='duplicate-value':entry['reference']['targets'][1]['value']=0
+            elif mutation=='slot-range':entry['index']=2
+            elif mutation=='unknown-role':entry['role']='teleport-opcode'
+            elif mutation=='exit-without-reference':entry['reference']=None
+            elif mutation=='actor-with-reference':entry['role']='actor'
+            elif mutation=='extra-key':entry['inferred']=True
+            elif mutation=='too-wide-target':entry['reference']['targets'][1]['value']=2
+            elif mutation=='current-unmapped':entry['reference']['targets']=entry['reference']['targets'][1:]
+            with self.subTest(mutation=mutation),self.assertRaises(ValueError):inspect_level(raw,d,sha)
+
+    def test_planner_refuses_unmapped_destination_even_inside_numeric_bounds(self):
+        from romancer.level_design import inspect_level,plan_level
+        raw,d,sha=connected_fixture();d['rooms'][0]['object_metadata'][0]['reference']['targets'].pop()
+        doc=inspect_level(raw,d,sha)
+        with self.assertRaisesRegex(ValueError,'destination'):
+            plan_level(raw,d,doc['document_id'],[{'kind':'object','room_id':'room-0','index':0,'field':'exit_room','value':1}],sha)
+
+    def test_actor_start_and_trigger_labels_do_not_create_connections(self):
+        from romancer.level_design import inspect_level
+        for role in ('object','actor','start','trigger'):
+            raw,d,sha=fixture();d['rooms'][0]['object_metadata']=[{'index':0,'name':'Named slot','role':role,'reference':None}]
+            doc=inspect_level(raw,d,sha)
+            self.assertEqual(doc['connections'],[])

@@ -150,7 +150,13 @@ APPROVED_FILES = frozenset(ROOT_FILES | {
 
 
 APPROVED_FILES = APPROVED_FILES | frozenset({
+    'romancer/chrono_tables.py','romancer/ffl2_maps.py','romancer/game_knowledge.py',
+    'romancer/ui/game_maps.js','tests/test_chrono_tables.py','tests/ui_chrono_tables.mjs',
+    'tests/test_ffl2_maps.py','tests/test_known_maps_api.py','tests/test_game_knowledge.py','tests/ui_game_maps.mjs',
     'romancer/verified_room.py','romancer/ui/room_editor.js',
+    'romancer/ui/room_navigation.js','tests/ui_level_rooms.mjs',
+    'tests/test_declared_workbench.py','tests/test_investigation_mcp.py',
+    'tests/ui_debug_navigation.mjs','tests/ui_memory_watch_scope.mjs',
     'tests/test_verified_room.py','tests/test_user_guide.py','tests/ui_interface_scale.mjs',
     'tests/ui_room_editor.mjs','tests/ui_sound_live_preview.mjs','tests/ui_asset_pagination.mjs',
     'tests/ui_level_visual_tools.mjs','tests/ui_menu_preview.mjs','romancer/ui/menu_preview.js',
@@ -160,7 +166,8 @@ APPROVED_FILES = APPROVED_FILES | frozenset({
         '01-workspace','02-castlevania-sprite','03-chrono-weapon','04-chrono-table',
         '05-immortal-text','06-wario-palettes','07-ffl2-room','08-dejavu-colors',
         '09-playtest-states','10-verified-patch','11-hex-inspection','12-tutorials',
-        '13-settings','14-light-theme','15-dark-theme')),
+        '13-settings','14-light-theme','15-dark-theme','16-connected-rooms',
+        '17-object-inspector','18-byte-explanation','19-chrono-armor','20-ffl2-map-browser','21-game-knowledge')),
 })
 
 

@@ -37,6 +37,9 @@ class WorkbenchAPI:
             'settings.workspace.save':('location',self._settings_workspace_save),
             'system.operations':('',self._operations),
             'games.inspect':('project_id artifact_id',self._game_inspect),
+            'games.maps.catalog':('project_id artifact_id offset limit query',lambda p,c:self._game_maps(p,c,'catalog')),
+            'games.maps.inspect':('project_id artifact_id header state',lambda p,c:self._game_maps(p,c,'inspect')),
+            'games.maps.plan':('project_id artifact_id header changes',lambda p,c:self._game_maps(p,c,'plan')),
             'games.plan':('project_id artifact_id profile_id values',self._game_plan),
             'graphics.observe':('project_id artifact_id frame_sha256 region offset length',self._graphics_observe),
             'graphics.declare':('project_id artifact_id evidence_id matches',self._graphics_declare),
@@ -209,6 +212,10 @@ class WorkbenchAPI:
         from .verified_games import inspect
         project,row,path=self.source(p)
         return inspect(project,row,path,cancelled=c)
+
+    def _game_maps(self,p,c,operation):
+        from .verified_games import maps
+        return maps(self,p,operation,cancelled=c)
 
     def _operations(self,p,c):
         return {'ok':True,'operations':[{'name':name,'required_parameters':entry[0].split()} for name,entry in sorted(self.routes.items())],

@@ -27,3 +27,6 @@ assert.equal(canUndo,true);assert.equal(refreshed,1,'Changing editors must refre
 assert.ok(SHORTCUTS.length<=7);
 assert.ok(SHORTCUTS.every(row=>!row[0].includes('Win')&&!row[0].includes('Alt')));
 console.log('Scoped shortcuts preserve Windows keys, typing, composition, dialogs and game input; undo targets the active editor.');
+
+assert.equal(historyAction('levels','maps-edit',-1,a=>a==='maps-undo'),'maps-undo');
+assert.equal(historyAction('levels','maps-edit',1,a=>a==='maps-redo'),'maps-redo');

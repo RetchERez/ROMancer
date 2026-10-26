@@ -10,9 +10,20 @@ from .workbench_projects import _measure
 TYPES={prefix+str(bits):(bits//8,prefix=='s') for prefix in ('u','s') for bits in (8,16,24,32)}
 
 
+def _optional_fields(value,required,optional):
+    if type(value) is not dict:raise ValueError('descriptor must be an object')
+    present=set(value)&set(optional.split())
+    fields(value,' '.join(required.split()+sorted(present)))
+
+
+def _storage_bounds(field):
+    width,signed=TYPES[field['type']];bits=width*8
+    return (-(1<<(bits-1)) if signed else 0),(1<<(bits-1 if signed else bits))-1
+
+
 def validate_definition(definition,size):
     definition=json.loads(canonical_bytes(definition,max_bytes=65536))
-    fields(definition,'schema_version name offset count stride fields')
+    _optional_fields(definition,'schema_version name offset count stride fields','label_source')
     if type(definition['schema_version']) is not int or definition['schema_version']!=1:raise ValueError('unsupported table definition version')
     label(definition['name'],64);number(definition['offset'],0,size);number(definition['count'],1,65536);number(definition['stride'],1,65536)
     if definition['offset']+definition['count']*definition['stride']>size:raise ValueError('table records extend beyond the source')
@@ -20,12 +31,15 @@ def validate_definition(definition,size):
     if type(rows) is not list or not 1<=len(rows)<=32:raise ValueError('define1..32 named table fields')
     occupied=[];names=set()
     for field in rows:
-        fields(field,'name offset type endian pointer_base');label(field['name'],64)
+        _optional_fields(field,'name offset type endian pointer_base','minimum maximum');label(field['name'],64)
         key=field['name'].casefold()
         if key in names:raise ValueError('table field names must be unique')
         names.add(key)
         if field['type'] not in TYPES or field['endian'] not in ('little','big'):raise ValueError('choose a supported numeric type and byte order')
         width,signed=TYPES[field['type']];number(field['offset'],0,definition['stride']-1)
+        lower,upper=_storage_bounds(field)
+        minimum=number(field.get('minimum',lower),lower,upper)
+        number(field.get('maximum',upper),minimum,upper)
         if field['offset']+width>definition['stride']:raise ValueError('table field extends beyond its record stride')
         if field['pointer_base'] is not None:
             number(field['pointer_base'],0,0xffffffff)
@@ -33,6 +47,16 @@ def validate_definition(definition,size):
         for start,end in occupied:
             if field['offset']<end and start<field['offset']+width:raise ValueError('table fields overlap')
         occupied.append((field['offset'],field['offset']+width))
+    if 'label_source' in definition:
+        source=definition['label_source'];fields(source,'offset stride length skip encoding id_base')
+        if source['encoding']!='chrono-name':raise ValueError('unsupported table label encoding')
+        number(definition['count'],1,4096);number(source['offset'],0,size)
+        number(source['stride'],1,256);number(source['length'],1,256)
+        number(source['skip'],0,source['length']-1);number(source['id_base'],0,65535)
+        if source['length']>source['stride']:raise ValueError('table labels overlap')
+        if source['offset']+(definition['count']-1)*source['stride']+source['length']>size:
+            raise ValueError('table labels extend beyond the source')
+        if source['id_base']+definition['count']>65536:raise ValueError('table label IDs exceed supported bounds')
     return definition
 
 
@@ -58,21 +82,36 @@ def _read(stream,definition,row,field,size):
             'pointer_resolution':('declared-linear-file-offset' if resolved else 'unresolved') if field['pointer_base'] is not None else None}
 
 
-def _check_value(value,field):
+def _check_value(value,field,*,declared=True):
     width,signed=TYPES[field['type']];bits=width*8
-    minimum=-(1<<(bits-1)) if signed else 0;maximum=(1<<(bits-1 if signed else bits))-1
+    minimum,maximum=_storage_bounds(field)
+    if declared:minimum=field.get('minimum',minimum);maximum=field.get('maximum',maximum)
     if type(value) is not int or not minimum<=value<=maximum:raise ValueError(f"{field['name']} must be an integer from{minimum} to{maximum}")
     return value.to_bytes(width,field['endian'],signed=signed)
+
+
+def _row_catalog(stream,definition):
+    source=definition.get('label_source')
+    if source is None:return []
+    from .chrono_tables import decode_name
+    rows=[]
+    for index in range(definition['count']):
+        stream.seek(source['offset']+index*source['stride']);raw=stream.read(source['length'])
+        if len(raw)!=source['length']:raise ValueError('table name source changed while reading')
+        rows.append({'index':index,'record_id':source['id_base']+index,**decode_name(raw[source['skip']:])})
+    return rows
 
 
 def inspect_table(path,sha,definition,page=0,limit=50):
     number(page,0,65535);number(limit,1,100)
     with _context(path,sha,definition) as (stream,source,definition):
+        catalog=_row_catalog(stream,definition)
         rows=[{'index':row,'offset':definition['offset']+row*definition['stride'],
+               **(catalog[row] if catalog else {}),
                'cells':[_read(stream,definition,row,field,source['size']) for field in definition['fields']]}
               for row in range(page*limit,min((page+1)*limit,definition['count']))]
     return {'ok':True,'status':'INSPECTED','source_sha256':sha,'document_id':digest({'source_sha256':sha,'definition':definition}),
-            'definition':definition,'rows':rows,'page':page,'limit':limit,'total':definition['count'],'pointer_formula':'target file offset = stored value - base'}
+            'definition':definition,'rows':rows,'row_catalog':catalog,'page':page,'limit':limit,'total':definition['count'],'pointer_formula':'target file offset = stored value - base'}
 
 
 def table_edits(path,sha,definition,changes):
@@ -88,7 +127,7 @@ def table_edits(path,sha,definition,changes):
             key=(change['row'],change['field'])
             if key in seen:raise ValueError('duplicate changes target the same table field')
             seen.add(key);current=_read(stream,definition,change['row'],field,source['size'])
-            _check_value(change['before'],field);replacement=_check_value(change['after'],field)
+            _check_value(change['before'],field,declared=False);replacement=_check_value(change['after'],field)
             if current['value']!=change['before']:raise ValueError('table old-value precondition failed; inspect the current revision')
             if current['raw_hex']!=replacement.hex():edits.append({'offset':current['offset'],'before':current['raw_hex'],'after':replacement.hex()})
     if not edits:raise ValueError('change at least one table value before reviewing a build')

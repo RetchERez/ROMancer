@@ -152,12 +152,33 @@ def palette_visuals(profile,root,path):
 
 def resource_definitions(profile):
     if profile['id']!='chrono-trigger-usa':return []
-    # The disassembly documents 90 five-byte records. Only the attack byte is
-    # exposed here; inferred meanings for the remaining bytes are not promoted.
-    return [{'id':'weapon-power-table','name':'Weapon base attack table','kind':'tables',
-             'reference':profile['reference'],'scope':'90 documented records; base attack byte only. Other record bytes are preserved. Row numbers are record IDs, not guessed weapon names.',
-             'definition':{'schema_version':1,'name':'Weapon base attack','offset':0xc0262,'count':90,'stride':5,
-                           'fields':[{'name':'Base attack','offset':0,'type':'u8','endian':'little','pointer_base':None}]}}]
+    from .chrono_tables import resource_definitions as named_definitions
+    resources=named_definitions()
+    # Preserve the public legacy resource ID and its original numeric indexing.
+    return [r for r in resources if r.get('legacy')]+[r for r in resources if not r.get('legacy')]
+
+
+def maps(api,parameters,operation,*,cancelled=lambda:False):
+    from . import ffl2_maps
+    from .asset_schema import number
+    project,row,path=api.source(parameters);profile,root=_resolve(project,row,cancelled)
+    if profile is None or profile['id']!='ffl2-usa':
+        raise ValueError('game maps require the exact supported source or an owned build descended from it')
+    identity={'artifact_id':row['artifact_id'],'source_sha256':row['sha256'],
+              'verified_original_sha256':root['sha256'],'profile_id':profile['id']}
+    if operation=='catalog':
+        number(parameters['limit'],1,24)
+        result=ffl2_maps.catalog(path,root['path'],offset=parameters['offset'],limit=parameters['limit'],
+                                 query=parameters['query'],cancelled=cancelled)
+    elif operation=='inspect':
+        result=ffl2_maps.inspect_room(path,root['path'],parameters['header'],state=parameters['state'],cancelled=cancelled)
+    else:
+        result=ffl2_maps.plan_edits(path,root['path'],parameters['header'],parameters['changes'],cancelled=cancelled)
+        planned=api._integrity_plan({'project_id':parameters['project_id'],'artifact_id':row['artifact_id'],
+                                     'edits':result['edits']},cancelled)
+        result={**result,**planned}
+    projects._measure(path,row,cancelled=cancelled);projects._measure(root['path'],root,cancelled=cancelled)
+    return {**result,**identity,'ok':True}
 
 
 def configure_resource(api,parameters,*,cancelled=lambda:False):
@@ -172,11 +193,22 @@ def configure_resource(api,parameters,*,cancelled=lambda:False):
 def inspect(project,row,path,*,cancelled=lambda:False):
     profile,root=_resolve(project,row,cancelled)
     if profile is None:return {'ok':True,'status':'UNSUPPORTED','profile':None,'artifact_id':row['artifact_id'],'source_sha256':row['sha256']}
-    model=_model(profile,root,path);visual=palette_visuals(profile,root,path);projects._measure(path,row,cancelled=cancelled)
+    availability=None
+    try:model=_model(profile,root,path);visual=palette_visuals(profile,root,path)
+    except ValueError as error:
+        if profile['id']!='ffl2-usa':raise
+        # Broader map edits can invalidate the deliberately narrow stool widget.
+        # Keep the exact identity visible; the separate map service applies its
+        # own structural guards rather than treating this as an unknown game.
+        model=[];visual=None;availability=str(error)
+    from .game_knowledge import reference_knowledge
+    knowledge=reference_knowledge(profile['id'],root['sha256'],row['kind']!='source')
+    projects._measure(path,row,cancelled=cancelled)
     if visual:projects._measure(root['path'],root,cancelled=cancelled)
     return {'ok':True,'status':'MATCHED' if row['kind']=='source' else 'DERIVED','artifact_id':row['artifact_id'],
             'source_sha256':row['sha256'],'verified_original_sha256':root['sha256'],'gameplay_verified':False,
             'profile':{k:profile[k] for k in ('id','name','system','reference','scope')},'fields':model,'visual':visual,'resources':resource_definitions(profile),
+            'knowledge':knowledge,'map_workbench':profile['id']=='ffl2-usa','simple_editor_unavailable':availability,
             'locations':[{'offset':o,'length':n,'label':label,**BYTE_NOTES[profile['id']][i]} for i,(o,n,label) in enumerate(profile['offsets'])],
             'note':'Definition locations were tested on the matched original. A new build still needs playtesting.'}
 

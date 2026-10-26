@@ -2,7 +2,7 @@ import assert from 'node:assert/strict';
 import {LevelDraft,mountLevel,levelBrushPalette} from '../romancer/ui/level_canvas.js';
 import {render} from '../romancer/ui/views/levels.js';
 
-const doc={ok:true,document_id:'synthetic',source_sha256:'sha',uses:{},tiles:[Array(64).fill(0),Array(64).fill(1)],palette:[[10,20,30],[200,210,220]],block_width:1,block_height:1,metatiles:[[0],[1]],rooms:[{id:'room',name:'Practice',width:3,height:2,terrain:[0,1,0,0,0,0],collision:[0,3,0,0,0,0],objects:[{kind:0,x:0,y:0}]}]};
+const doc={ok:true,document_id:'synthetic',source_sha256:'sha',uses:{},tiles:[Array(64).fill(0),Array(64).fill(1)],palette:[[10,20,30],[200,210,220]],block_width:1,block_height:1,metatiles:[[0],[1]],rooms:[{id:'room',name:'Practice',width:3,height:2,terrain:[0,1,0,0,0,0],collision:[0,3,0,0,0,0],objects:[{kind:0,x:0,y:0}],object_metadata:[{index:0,name:'Practice marker',role:'object',reference:null}]}]};
 function node(value=''){
  const graphics={fillRect(){this.markers=(this.markers||0)+1;},strokeRect(){},fillText(){},createImageData:(w,h)=>({data:new Uint8ClampedArray(w*h*4)}),putImageData(picture){this.last=picture;}};
  return {value,style:{},attrs:{},events:{},parentElement:{clientWidth:600},getContext:()=>graphics,graphics,addEventListener(name,fn){this.events[name]=fn;},setAttribute(name,value){this.attrs[name]=value;},focus(){},setPointerCapture(){},getBoundingClientRect:()=>({left:0,top:0,width:240,height:160})};
@@ -14,7 +14,7 @@ globalThis.document={getElementById:name=>nodes[name]||null,querySelectorAll:()=
 const model=new LevelDraft(doc),drafts=new Map(),state={page:'levels',project:{project_id:'p'},artifact:{artifact_id:'a',sha256:'sha'},results:{}};
 let persisted=0,renders=0;const ctx={state,setDraft:(name,value)=>drafts.set(name,value),render:()=>renders++,notify:message=>{throw Error(message);}};
 mountLevel(ctx,doc,model,'room',()=>persisted++);
-assert.ok(nodes['level-canvas'].graphics.markers>0,'kind zero is still an object marker when semantics are unknown');
+assert.ok(nodes['level-canvas'].graphics.markers>0,'an explicitly named marker remains visible without interpreting kind zero');
 const event=(clientX,clientY)=>({pointerId:1,button:0,clientX,clientY,preventDefault(){}}),canvas=nodes['level-canvas'];
 canvas.events.pointerdown(event(5,5));canvas.events.pointermove(event(200,100));canvas.events.pointerup(event(200,100));
 assert.deepEqual(model.objects('room')[0],{kind:0,x:2,y:1});assert.equal(model.past.length,1);assert.equal(persisted,1);

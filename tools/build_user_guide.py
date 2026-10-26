@@ -79,7 +79,7 @@ def pagination(data):
         for term in group:
             pages[term['id']] = next_page
         next_page += 1
-    index_groups = chunks(sorted(data['index'], key=lambda row: row['term'].casefold()), 48)
+    index_groups = chunks(sorted(data['index'], key=lambda row: row['term'].casefold()), 54)
     pages['index'] = next_page
     pages['contents'] = 2
     for part in ('Basic', 'Advanced'):
@@ -115,7 +115,9 @@ def build_html(data, folder, pages):
                     figure = '<div id="' + row['id'] + '-appearance">' + figure
                     for extra in row.get('extra_images', []):
                         src = 'screenshots/' + extra['image'] + '.png'
-                        figure += f'<figure><a href="{src}" target="_blank" rel="noopener"><img src="{src}" width="1600" height="1000" loading="lazy" alt="{esc(extra["title"], quote=True)}"></a><figcaption>{esc(extra["title"])}. Open for the full-resolution theme example.</figcaption></figure>'
+                        figure += f'<figure><a href="{src}" target="_blank" rel="noopener"><img src="{src}" width="1600" height="1000" loading="lazy" alt="{esc(extra["title"], quote=True)}"></a><figcaption>{esc(extra["title"])}. Open for the full-resolution example.</figcaption></figure>'
+                    for note in row.get('visual_page', {}).get('notes', []):
+                        figure += f'<h3>{esc(note["title"])}</h3><p>{note["text"]}</p>'
                     figure += '</div>'
             related = ' | '.join(f'<a href="#{topic}">{esc(titles[topic])}</a>' for topic in row.get('related', []))
             term_links = ' | '.join(f'<a href="#{topic}">{esc(titles[topic])}</a>' for topic in row.get('terms', []))
@@ -202,13 +204,15 @@ def build_pdf(data, folder, pages, glossary_groups, index_groups):
         y = frame(part + ' contents', 'Contents / clickable topics and page numbers', 'contents' if part == 'Basic' else 'contents-advanced')
         rows = [row for row in data['chapters'] if row['part'] == part]
         y = para(html.escape(data[part.lower() + '_summary']), 48, y, 1200, 19) - 28
+        row_gap=min(35,(y-185)/max(1,len(rows)))
+        if row_gap<29:raise ValueError('Contents requires another page; do not overlap reference links')
         for row in rows:
             number = pages[row['id']]
             pdf.linkRect('', row['id'], (48, y - 23, width - 48, y + 7), relative=0, thickness=0)
             label(row['title'], 54, y - 13, 20, ink)
             pdf.setFont('Helvetica-Bold', 17); pdf.setFillColor(HexColor(accent)); pdf.drawRightString(width - 61, y - 13, str(number))
             pdf.setStrokeColor(HexColor(line)); pdf.line(48, y - 28, width - 48, y - 28)
-            y -= 35
+            y -= row_gap
         para(f'<link href="#glossary" color="{accent}">Glossary, page {pages["glossary"]}</link>  /  <link href="#index" color="{accent}">Alphabetical index, page {pages["index"]}</link>', 54, 130, 1180, 18)
         end('contents')
 
@@ -250,18 +254,24 @@ def build_pdf(data, folder, pages, glossary_groups, index_groups):
         para('Key terms: ' + terms, 48, 105, 1310, 14, muted)
         end('chapter:' + row['id'])
         if row.get('image_layout') == 'following-page':
-            frame('Settings / appearance examples', 'Basic / actual application captures', row['id'] + '-appearance')
-            para('Saved preferences in ROMancer, Light and Dark. Themes change application appearance, not game palettes.', 48, 922, 1320, 19)
+            visual = row['visual_page']
+            frame(visual['title'], visual['kicker'], row['id'] + '-appearance')
+            para(visual['intro'], 48, 922, 1320, 19)
 
-            def screenshot_detail(name, x, top, display_width):
-                # Display a real UI detail: clip navigation and lower utility
-                # cards only. Full unaltered captures remain in the HTML guide.
+            def screenshot_detail(name, x, top, display_width, crop):
+                # Show a detail of an actual capture without redrawing content.
+                # The unaltered full-resolution image remains linked in HTML.
                 image = ImageReader(str(folder / 'screenshots' / (name + '.png')))
                 iw, ih = image.getSize()
-                crop_left, crop_top, crop_width, crop_height = 180, 116, 1390, 588
+                crop_left, crop_top, crop_width, crop_height = crop
+                if (min(crop_left, crop_top) < 0 or min(crop_width, crop_height) <= 0
+                        or crop_left + crop_width > iw or crop_top + crop_height > ih):
+                    raise ValueError('Screenshot detail lies outside its source capture')
                 factor = display_width / crop_width
                 display_height = crop_height * factor
                 bottom = top - display_height
+                if bottom < 65 or x < 0 or x + display_width > width:
+                    raise ValueError('Screenshot detail lies outside the PDF content area')
                 pdf.saveState()
                 clip = pdf.beginPath(); clip.rect(x, bottom, display_width, display_height)
                 pdf.clipPath(clip, stroke=0, fill=0)
@@ -270,13 +280,13 @@ def build_pdf(data, folder, pages, glossary_groups, index_groups):
                 pdf.setStrokeColor(HexColor('#b8cec8')); pdf.rect(x, bottom, display_width, display_height, fill=0, stroke=1)
                 return bottom
 
-            label('ROMancer (default) / saved preferences', 48, 869, 17, accent, True)
-            bottom = screenshot_detail(row['image'], 48, 846, 1100)
-            para('Actual Settings panel detail. Full-resolution captures are linked in the offline HTML edition.', 48, bottom - 12, 1300, 13, muted)
-            for n, extra in enumerate(row.get('extra_images', [])):
-                x = 48 + n * 700
-                label(extra['title'], x, 327, 17, accent, True)
-                screenshot_detail(extra['image'], x, 304, 540)
+            for panel in visual['panels']:
+                label(panel['title'], panel['x'], panel['top'] + 23, 17, accent, True)
+                bottom = screenshot_detail(panel['image'], panel['x'], panel['top'], panel['width'], panel['crop'])
+                if panel.get('caption'):
+                    para(panel['caption'], panel['x'], bottom - 12, panel['width'], 13, muted)
+            for note in visual.get('notes', []):
+                para('<b>' + html.escape(note['title']) + '</b><br/>' + note['text'], note['x'], note['y'], note['width'], 19)
             end('appearance:' + row['id'])
 
     for group_n, group in enumerate(glossary_groups):
@@ -293,7 +303,7 @@ def build_pdf(data, folder, pages, glossary_groups, index_groups):
     titles.update({row['id']: row['term'] for row in data['glossary']})
     for group_n, group in enumerate(index_groups):
         frame('Alphabetical index / ' + group[0]['term'] + ' - ' + group[-1]['term'], 'Reference / topic links and PDF pages', 'index' if not group_n else 'index-' + str(group_n + 1))
-        for column, subset in enumerate(chunks(group, 24)):
+        for column, subset in enumerate(chunks(group, 27)):
             x = 48 + column * 700; y = height - 170
             for item in subset:
                 links = ', '.join(f'<link href="#{topic}" color="{accent}">{pages[topic]}</link>' for topic in item['topics'])
