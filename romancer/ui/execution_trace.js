@@ -1,0 +1,61 @@
+import {selectionKey} from './tool_inputs.js';
+import {esc,button,field,select,read} from './common.js';
+const hex=v=>Number.isSafeInteger(v)?'0x'+v.toString(16):'Unknown';
+const identity=(state,r)=>r?.source_sha256===state.artifact?.sha256&&r.artifact_id===state.artifact?.artifact_id;
+function integer(id,min,max){const text=read(id),v=Number(text);if(!text.trim()||!Number.isSafeInteger(v)||v<min||v>max)throw Error('Enter a whole number from '+min+' to '+max+'.');return v;}
+
+export async function executionTrace(ctx){
+ const {state}=ctx,scope=selectionKey(state),params={...ctx.sourceParams()};let entry=state.nativeTrace;
+ if(entry?.scope!==scope)state.nativeTrace=entry={scope,generation:0,result:null,steps:[{}]};
+ const current=()=>selectionKey(state)===scope&&state.nativeTrace===entry;
+ const proposal=state.nativeProbe?.scope===scope&&identity(state,state.nativeProbe.result)?state.nativeProbe.result:null;
+ if(!entry.checked){
+  entry.checked=true;
+  try{const r=await ctx.api.call('debugger.capabilities',params);if(current()){
+   if(r?.ok===false||!identity(state,r))throw Error(r.error||'Backend identity differs.');entry.capabilities=r;
+  }}catch(error){if(current())entry.error=error.message;}
+ }
+ const remembered=ctx.draft('native-trace-id','');
+ if(!entry.loaded&&remembered){
+  entry.loaded=true;const generation=++entry.generation;
+  try{const r=await ctx.api.call('debugger.get',{...params,evidence_id:remembered,offset:0,limit:100});
+   if(current()&&entry.generation===generation){if(r?.ok===false||!identity(state,r))throw Error(r.error||'Capture belongs to another source.');entry.result=r;}
+  }catch(error){if(current()&&entry.generation===generation)entry.error=error.message;}
+ }
+ const result=identity(state,entry.result)?entry.result:null,available=entry.capabilities?.available===true;
+ const reason=entry.capabilities?.reason||entry.error||'The native debugger is unavailable for this source or host.';
+ const steps=()=>entry.steps.map((_,i)=>({frames:integer('trace-frames-'+i,1,3600),buttons:read('trace-buttons-'+i).split(/[\s,]+/).filter(Boolean),port:0}));
+ const accept=async(operation,parameters)=>{
+  if(!current())throw Error('The selected source changed. Open its native capture again.');
+  const generation=++entry.generation;entry.error=null;
+  const r=await ctx.run(operation,{...params,...parameters},{render:false,refresh:false});
+  if(!current()||entry.generation!==generation)return;
+  if(r?.ok===false||!identity(state,r))throw Error(r.error||'Native capture belongs to another source.');
+  entry.result=r;entry.loaded=true;ctx.setDraft('native-trace-id',r.evidence_id);await ctx.render();
+ };
+ ctx.use({
+  'trace-capture':()=>{
+   if(!current())throw Error('The selected source changed.');if(!available)throw Error(reason);
+   const replay={steps:steps(),start_frame:integer('trace-start',0,3599),event_limit:integer('trace-limit',1,2000),instruction_limit:20000000,timeout:30};
+   if(proposal)return accept('debugger.investigate',{investigation_id:proposal.investigation_id,candidate_id:proposal.candidate.candidate_id,replay});
+   const start=integer('trace-address',0,0xfffffff),length=integer('trace-length',1,4096);
+   return accept('debugger.capture',{config:{...replay,probes:[{kind:read('trace-kind'),start,end:start+length-1}]}});
+  },
+  'trace-add-step':async()=>{if(!current())throw Error('The source changed.');if(entry.steps.length>=64)throw Error('Use at most 64 input steps.');entry.steps=steps();entry.steps.push({});await ctx.render();},
+  'trace-remove-step':async()=>{if(!current())throw Error('The source changed.');if(entry.steps.length>1){entry.steps=steps();entry.steps.pop();await ctx.render();}},
+  'trace-manual':()=>{if(!current())throw Error('The source changed.');state.nativeProbe=null;return ctx.render();},
+  'trace-recheck':()=>{if(!current())throw Error('The source changed.');entry.checked=false;return ctx.render();},
+  'trace-page':node=>{if(!current()||!result)throw Error('Open a capture first.');return accept('debugger.get',{evidence_id:result.evidence_id,offset:Math.max(0,result.offset+Number(node.dataset.id)*100),limit:100});},
+  'trace-open':node=>{
+   if(!current()||!result)throw Error('Open a capture for the selected source first.');const offset=Number(node.dataset.id);
+   if(!Number.isSafeInteger(offset)||offset<0||offset>=state.artifact.size||!result.events.some(e=>e.file_offset===offset||e.execution_context?.file_offset===offset))throw Error('Choose a captured source location.');
+   state.resourceJump=offset;return ctx.navigate('resources');
+  }
+ });
+ const open=offset=>Number.isSafeInteger(offset)?button(hex(offset),'trace-open',{id:String(offset)}):'Unresolved';
+ const watched=proposal?`<div class="notice"><strong>Investigating RAM ${hex(proposal.candidate.offset)} · ${proposal.candidate.width} bytes</strong><p>Physical watch derived from the observed core buffer, including banked RAM.</p>${button('Use a manual address instead','trace-manual')}</div>`:
+  `<details><summary>Manual CPU address watch</summary><div class="field-row">${select('trace-kind','Access type',[['write','Writes'],['read','Reads'],['exec','Execution']],ctx.draft('trace-kind','write'))}${field('trace-address','CPU start address',ctx.draft('trace-address','0x100'))}${field('trace-length','Address bytes',ctx.draft('trace-length','1'))}</div></details>`;
+ const route=`<h3>Replay input</h3><div class="table-wrap"><table><thead><tr><th>Step</th><th>Frames</th><th>Buttons held</th></tr></thead><tbody>${entry.steps.map((step,i)=>`<tr><td>${i+1}</td><td>${field('trace-frames-'+i,'Frames',ctx.draft('trace-frames-'+i,String(step.frames??120)))}</td><td>${field('trace-buttons-'+i,'Buttons (blank for none)',ctx.draft('trace-buttons-'+i,step.buttons?.join(' ')||''),{placeholder:'For example start or a right'})}</td></tr>`).join('')}</tbody></table></div><div class="actions">${button('Add input step','trace-add-step',{disabled:entry.steps.length>=64})}${button('Remove last step','trace-remove-step',{disabled:entry.steps.length<=1})}</div><div class="field-row">${field('trace-start','Start recording after frame',ctx.draft('trace-start','0'))}${field('trace-limit','Maximum sampled events',ctx.draft('trace-limit','200'))}</div>`;
+ const evidence=!result?'':`<h3>Captured evidence · ${esc(result.total_events)} events</h3><p>${esc(result.backend?.backend||'Native debugger')} ${esc(result.backend?.version||'')} · ${result.runtime_trusted?'Authenticated capture':'Historical capture'}</p>${result.status==='BUDGET_EXCEEDED'||result.omitted_events?`<p class="notice warm">Partial capture: an event or instruction limit was reached. ${esc(result.omitted_events??0)} events were omitted. Narrow the watch or recording window.</p>`:''}<p>${result.route_complete?'Replay reached its requested end.':'Replay did not reach its requested end.'}</p>${result.events.length?`<div class="table-wrap"><table><thead><tr><th>Event</th><th>CPU address</th><th>Value</th><th>Execution context</th><th>Context in source</th><th>Access in source</th></tr></thead><tbody>${result.events.map(e=>`<tr><td>${esc(e.id)} · ${esc(e.kind)}</td><td><code>${hex(e.address)}</code></td><td><code>${hex(e.value)}</code></td><td><code>${hex(e.execution_context?.pc)}</code>${e.registers?`<details><summary>Registers</summary><pre>${esc(Object.entries(e.registers).map(([k,v])=>k+' = '+hex(v)).join('\n'))}</pre></details>`:''}</td><td>${open(e.execution_context?.file_offset)}</td><td>${open(e.file_offset)}</td></tr>`).join('')}</tbody></table></div>`:'<p>No matching access was sampled. Check the route, start frame and watch range. An empty capture does not prove that the location is unused.</p>'}<div class="actions">${button('Previous events','trace-page',{id:'-1',disabled:result.offset===0})}<span>${result.total_events?result.offset+1:0}–${Math.min(result.offset+result.events.length,result.total_events)} of ${result.total_events}</span>${button('Next events','trace-page',{id:'1',disabled:result.offset+result.events.length>=result.total_events})}</div>`;
+ return `<section class="card native-execution-trace" id="native-accesses"><div class="card-heading"><h2>Trace actual accesses</h2>${button('Check debugger','trace-recheck')}</div><p>Replay from power on with normal controller input. Record accesses and their execution context, then inspect mapped source bytes. This is a separate session; it does not resume Playtest.</p>${!available?`<p class="notice warm">${esc(reason)}</p>`:''}${entry.error?`<p class="notice warm">${esc(entry.error)}</p>`:''}${watched}${route}${button(proposal?'Replay & investigate this value':'Replay & capture accesses','trace-capture',{primary:true,disabled:!available,reason})}<p class="subtle">At most 3,600 frames, 20 million instruction callbacks and 30 seconds. Context is a lead; DMA ownership and the meaning of a value remain unproven.</p>${evidence}</section>`;
+}

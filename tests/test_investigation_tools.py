@@ -73,3 +73,48 @@ class InvestigationAPITests(unittest.TestCase):
         properties=_investigation_properties('investigations.capture')
         self.assertEqual(properties['value']['type'],['integer','null'])
         self.assertNotIn('snapshot',properties)
+
+    def correlated(self):
+        from romancer.core_pins import CORE_PINS
+        def packet(n,value):
+            p=self.packet(n,value);p.update(core_sha256=CORE_PINS['nes']['sha256'],region_size=2048);return p
+        with patch.object(self.api.studio,'observe',return_value=packet(1,1000)):started=self.start()
+        with patch.object(self.api.studio,'observe',return_value=packet(2,950)):
+            result=self.api.dispatch('investigations.capture',{**self.params,'investigation_id':started['investigation_id'],
+                'label':'Changed','value':950,'relation':'decreased','delta':None})
+        self.assertTrue(result['ok'],result)
+        candidate=next(c for c in result['candidates'] if c['offset']==17 and c['width']==2 and c['model']=='exact')
+        return {**self.params,'investigation_id':result['investigation_id'],'candidate_id':candidate['candidate_id']}
+
+    def test_candidate_becomes_a_source_bound_physical_watch_without_game_profile(self):
+        p=self.correlated();result=self.api.dispatch('investigations.probe',p)
+        self.assertTrue(result['ok'],result);self.assertEqual(result['source_sha256'],self.source['sha256'])
+        self.assertEqual(result['physical_probe'],{'kind':'write','start':17,'end':18,'domain':'nesInternalRam'})
+        self.assertFalse(result['same_runtime_state_claimed']);self.assertFalse(result['causation_proven'])
+        self.assertEqual(result['candidate']['candidate_id'],p['candidate_id'])
+        forged=self.api.dispatch('investigations.probe',{**p,'candidate_id':'f'*64})
+        self.assertFalse(forged['ok'])
+        from romancer.workbench_evidence import quarantine_restored_evidence
+        quarantine_restored_evidence(self.api.project(p))
+        self.assertFalse(self.api.dispatch('investigations.probe',p)['ok'])
+
+    def test_native_investigation_derives_probe_server_side_and_retains_provenance(self):
+        p=self.correlated();replay={'steps':[{'frames':8,'buttons':[],'port':0}],
+            'start_frame':4,'event_limit':30,'instruction_limit':100000,'timeout':10}
+        def native(project,row,config,**kwargs):
+            self.assertEqual(config['probes'],[{'kind':'write','start':17,'end':18,'domain':'nesInternalRam'}])
+            return {'source_sha256':row['sha256'],'artifact_id':row['artifact_id'],'system_id':'nes',
+                'events':[],'status':'CAPTURED','route_complete':True}
+        with patch('romancer.native_debugger.capture_native',side_effect=native) as worker:
+            result=self.api.dispatch('debugger.investigate',{**p,'replay':replay})
+        self.assertTrue(result['ok'],result);worker.assert_called_once()
+        self.assertEqual(result['investigation_link']['candidate_id'],p['candidate_id'])
+        self.assertFalse(result['investigation_link']['same_runtime_state_claimed'])
+        with patch('romancer.native_debugger.capture_native',side_effect=AssertionError('invalid replay must not execute')):
+            self.assertFalse(self.api.dispatch('debugger.investigate',{**p,'replay':{**replay,'probes':[]}})['ok'])
+
+    def test_linked_ai_operations_have_typed_evidence_inputs_and_no_client_mapping(self):
+        from romancer.mcp_server import READ_OPERATIONS,WRITE_OPERATIONS,_investigation_properties
+        self.assertIn('investigations.probe',READ_OPERATIONS);self.assertIn('debugger.investigate',WRITE_OPERATIONS)
+        props=_investigation_properties('debugger.investigate')
+        self.assertIn('candidate_id',props);self.assertNotIn('probes',props['replay']['properties'])

@@ -156,6 +156,7 @@ APPROVED_FILES = APPROVED_FILES | frozenset({
     'romancer/core_memory_layout.py','tests/test_core_memory_layout.py',
     'tests/test_native_debugger.py',
     'romancer/ui/investigation_series.js','tests/ui_investigation_series.mjs',
+    'romancer/ui/execution_trace.js','tests/ui_execution_trace.mjs',
     'tests/test_observation_series.py','tests/test_investigation_tools.py',
     'romancer/cartridge_startup.py','romancer/cartridge_integrity.py','romancer/ui/cartridge_verification.js',
     'tests/test_cartridge_startup.py','tests/test_cartridge_integrity.py','tests/ui_cartridge_verification.mjs','tests/ui_hex_comparison.mjs',

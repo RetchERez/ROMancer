@@ -1145,7 +1145,7 @@
     (_b = state2.soundPlayer) == null ? void 0 : _b.close();
     state2.soundPlayer = null;
     state2.soundPreview = null;
-    for (const key3 of ["investigationSeries", "gameMapsView", "gameMapEditor", "levelEditor", "levelClipboard", "levelRect", "paint", "pixelHistories", "pixelHistoryScope", "spriteHistory", "hexDraft", "hexReview", "hexSearch", "hexNumbers", "hexExplanation", "hexBookmarks", "hexComparison", "historyComparison", "translationSheet", "translationReview"]) state2[key3] = null;
+    for (const key3 of ["nativeTrace", "nativeProbe", "investigationSeries", "gameMapsView", "gameMapEditor", "levelEditor", "levelClipboard", "levelRect", "paint", "pixelHistories", "pixelHistoryScope", "spriteHistory", "hexDraft", "hexReview", "hexSearch", "hexNumbers", "hexExplanation", "hexBookmarks", "hexComparison", "historyComparison", "translationSheet", "translationReview"]) state2[key3] = null;
     state2.drafts = {};
     state2.romScans = {};
     state2.graphicsInvestigations = {};
@@ -1549,9 +1549,9 @@
       return [c, Math.round(value / maximum * 255)];
     }));
   }
-  function quantizeColor(hex3, channels) {
-    if (typeof hex3 !== "string" || !/^#[a-f0-9]{6}$/i.test(hex3)) throw Error("Choose a valid RGB color.");
-    return Object.fromEntries(["r", "g", "b"].map((c, i) => [c, Math.round(parseInt(hex3.slice(1 + i * 2, 3 + i * 2), 16) / 255 * channelMaximum(channels[c]))]));
+  function quantizeColor(hex4, channels) {
+    if (typeof hex4 !== "string" || !/^#[a-f0-9]{6}$/i.test(hex4)) throw Error("Choose a valid RGB color.");
+    return Object.fromEntries(["r", "g", "b"].map((c, i) => [c, Math.round(parseInt(hex4.slice(1 + i * 2, 3 + i * 2), 16) / 255 * channelMaximum(channels[c]))]));
   }
   function editedPalette(palette2, changes) {
     if (!palette2) return palette2;
@@ -5218,6 +5218,127 @@ ${font ? `<section class="card"><h3>Font metrics · ${esc(font.id)}</h3><div cla
     render: () => render10
   });
 
+  // romancer/ui/execution_trace.js
+  var hex2 = (v) => Number.isSafeInteger(v) ? "0x" + v.toString(16) : "Unknown";
+  var identity = (state2, r) => {
+    var _a, _b;
+    return (r == null ? void 0 : r.source_sha256) === ((_a = state2.artifact) == null ? void 0 : _a.sha256) && r.artifact_id === ((_b = state2.artifact) == null ? void 0 : _b.artifact_id);
+  };
+  function integer8(id, min, max) {
+    const text = read(id), v = Number(text);
+    if (!text.trim() || !Number.isSafeInteger(v) || v < min || v > max) throw Error("Enter a whole number from " + min + " to " + max + ".");
+    return v;
+  }
+  async function executionTrace(ctx2) {
+    var _a, _b, _c, _d, _e;
+    const { state: state2 } = ctx2, scope = selectionKey(state2), params = { ...ctx2.sourceParams() };
+    let entry = state2.nativeTrace;
+    if ((entry == null ? void 0 : entry.scope) !== scope) state2.nativeTrace = entry = { scope, generation: 0, result: null, steps: [{}] };
+    const current2 = () => selectionKey(state2) === scope && state2.nativeTrace === entry;
+    const proposal = ((_a = state2.nativeProbe) == null ? void 0 : _a.scope) === scope && identity(state2, state2.nativeProbe.result) ? state2.nativeProbe.result : null;
+    if (!entry.checked) {
+      entry.checked = true;
+      try {
+        const r = await ctx2.api.call("debugger.capabilities", params);
+        if (current2()) {
+          if ((r == null ? void 0 : r.ok) === false || !identity(state2, r)) throw Error(r.error || "Backend identity differs.");
+          entry.capabilities = r;
+        }
+      } catch (error) {
+        if (current2()) entry.error = error.message;
+      }
+    }
+    const remembered = ctx2.draft("native-trace-id", "");
+    if (!entry.loaded && remembered) {
+      entry.loaded = true;
+      const generation = ++entry.generation;
+      try {
+        const r = await ctx2.api.call("debugger.get", { ...params, evidence_id: remembered, offset: 0, limit: 100 });
+        if (current2() && entry.generation === generation) {
+          if ((r == null ? void 0 : r.ok) === false || !identity(state2, r)) throw Error(r.error || "Capture belongs to another source.");
+          entry.result = r;
+        }
+      } catch (error) {
+        if (current2() && entry.generation === generation) entry.error = error.message;
+      }
+    }
+    const result = identity(state2, entry.result) ? entry.result : null, available = ((_b = entry.capabilities) == null ? void 0 : _b.available) === true;
+    const reason = ((_c = entry.capabilities) == null ? void 0 : _c.reason) || entry.error || "The native debugger is unavailable for this source or host.";
+    const steps2 = () => entry.steps.map((_, i) => ({ frames: integer8("trace-frames-" + i, 1, 3600), buttons: read("trace-buttons-" + i).split(/[\s,]+/).filter(Boolean), port: 0 }));
+    const accept = async (operation, parameters) => {
+      if (!current2()) throw Error("The selected source changed. Open its native capture again.");
+      const generation = ++entry.generation;
+      entry.error = null;
+      const r = await ctx2.run(operation, { ...params, ...parameters }, { render: false, refresh: false });
+      if (!current2() || entry.generation !== generation) return;
+      if ((r == null ? void 0 : r.ok) === false || !identity(state2, r)) throw Error(r.error || "Native capture belongs to another source.");
+      entry.result = r;
+      entry.loaded = true;
+      ctx2.setDraft("native-trace-id", r.evidence_id);
+      await ctx2.render();
+    };
+    ctx2.use({
+      "trace-capture": () => {
+        if (!current2()) throw Error("The selected source changed.");
+        if (!available) throw Error(reason);
+        const replay = { steps: steps2(), start_frame: integer8("trace-start", 0, 3599), event_limit: integer8("trace-limit", 1, 2e3), instruction_limit: 2e7, timeout: 30 };
+        if (proposal) return accept("debugger.investigate", { investigation_id: proposal.investigation_id, candidate_id: proposal.candidate.candidate_id, replay });
+        const start = integer8("trace-address", 0, 268435455), length = integer8("trace-length", 1, 4096);
+        return accept("debugger.capture", { config: { ...replay, probes: [{ kind: read("trace-kind"), start, end: start + length - 1 }] } });
+      },
+      "trace-add-step": async () => {
+        if (!current2()) throw Error("The source changed.");
+        if (entry.steps.length >= 64) throw Error("Use at most 64 input steps.");
+        entry.steps = steps2();
+        entry.steps.push({});
+        await ctx2.render();
+      },
+      "trace-remove-step": async () => {
+        if (!current2()) throw Error("The source changed.");
+        if (entry.steps.length > 1) {
+          entry.steps = steps2();
+          entry.steps.pop();
+          await ctx2.render();
+        }
+      },
+      "trace-manual": () => {
+        if (!current2()) throw Error("The source changed.");
+        state2.nativeProbe = null;
+        return ctx2.render();
+      },
+      "trace-recheck": () => {
+        if (!current2()) throw Error("The source changed.");
+        entry.checked = false;
+        return ctx2.render();
+      },
+      "trace-page": (node) => {
+        if (!current2() || !result) throw Error("Open a capture first.");
+        return accept("debugger.get", { evidence_id: result.evidence_id, offset: Math.max(0, result.offset + Number(node.dataset.id) * 100), limit: 100 });
+      },
+      "trace-open": (node) => {
+        if (!current2() || !result) throw Error("Open a capture for the selected source first.");
+        const offset = Number(node.dataset.id);
+        if (!Number.isSafeInteger(offset) || offset < 0 || offset >= state2.artifact.size || !result.events.some((e) => {
+          var _a2;
+          return e.file_offset === offset || ((_a2 = e.execution_context) == null ? void 0 : _a2.file_offset) === offset;
+        })) throw Error("Choose a captured source location.");
+        state2.resourceJump = offset;
+        return ctx2.navigate("resources");
+      }
+    });
+    const open = (offset) => Number.isSafeInteger(offset) ? button(hex2(offset), "trace-open", { id: String(offset) }) : "Unresolved";
+    const watched = proposal ? `<div class="notice"><strong>Investigating RAM ${hex2(proposal.candidate.offset)} · ${proposal.candidate.width} bytes</strong><p>Physical watch derived from the observed core buffer, including banked RAM.</p>${button("Use a manual address instead", "trace-manual")}</div>` : `<details><summary>Manual CPU address watch</summary><div class="field-row">${select("trace-kind", "Access type", [["write", "Writes"], ["read", "Reads"], ["exec", "Execution"]], ctx2.draft("trace-kind", "write"))}${field("trace-address", "CPU start address", ctx2.draft("trace-address", "0x100"))}${field("trace-length", "Address bytes", ctx2.draft("trace-length", "1"))}</div></details>`;
+    const route = `<h3>Replay input</h3><div class="table-wrap"><table><thead><tr><th>Step</th><th>Frames</th><th>Buttons held</th></tr></thead><tbody>${entry.steps.map((step, i) => {
+      var _a2;
+      return `<tr><td>${i + 1}</td><td>${field("trace-frames-" + i, "Frames", ctx2.draft("trace-frames-" + i, String(step.frames ?? 120)))}</td><td>${field("trace-buttons-" + i, "Buttons (blank for none)", ctx2.draft("trace-buttons-" + i, ((_a2 = step.buttons) == null ? void 0 : _a2.join(" ")) || ""), { placeholder: "For example start or a right" })}</td></tr>`;
+    }).join("")}</tbody></table></div><div class="actions">${button("Add input step", "trace-add-step", { disabled: entry.steps.length >= 64 })}${button("Remove last step", "trace-remove-step", { disabled: entry.steps.length <= 1 })}</div><div class="field-row">${field("trace-start", "Start recording after frame", ctx2.draft("trace-start", "0"))}${field("trace-limit", "Maximum sampled events", ctx2.draft("trace-limit", "200"))}</div>`;
+    const evidence2 = !result ? "" : `<h3>Captured evidence · ${esc(result.total_events)} events</h3><p>${esc(((_d = result.backend) == null ? void 0 : _d.backend) || "Native debugger")} ${esc(((_e = result.backend) == null ? void 0 : _e.version) || "")} · ${result.runtime_trusted ? "Authenticated capture" : "Historical capture"}</p>${result.status === "BUDGET_EXCEEDED" || result.omitted_events ? `<p class="notice warm">Partial capture: an event or instruction limit was reached. ${esc(result.omitted_events ?? 0)} events were omitted. Narrow the watch or recording window.</p>` : ""}<p>${result.route_complete ? "Replay reached its requested end." : "Replay did not reach its requested end."}</p>${result.events.length ? `<div class="table-wrap"><table><thead><tr><th>Event</th><th>CPU address</th><th>Value</th><th>Execution context</th><th>Context in source</th><th>Access in source</th></tr></thead><tbody>${result.events.map((e) => {
+      var _a2, _b2;
+      return `<tr><td>${esc(e.id)} · ${esc(e.kind)}</td><td><code>${hex2(e.address)}</code></td><td><code>${hex2(e.value)}</code></td><td><code>${hex2((_a2 = e.execution_context) == null ? void 0 : _a2.pc)}</code>${e.registers ? `<details><summary>Registers</summary><pre>${esc(Object.entries(e.registers).map(([k, v]) => k + " = " + hex2(v)).join("\n"))}</pre></details>` : ""}</td><td>${open((_b2 = e.execution_context) == null ? void 0 : _b2.file_offset)}</td><td>${open(e.file_offset)}</td></tr>`;
+    }).join("")}</tbody></table></div>` : "<p>No matching access was sampled. Check the route, start frame and watch range. An empty capture does not prove that the location is unused.</p>"}<div class="actions">${button("Previous events", "trace-page", { id: "-1", disabled: result.offset === 0 })}<span>${result.total_events ? result.offset + 1 : 0}–${Math.min(result.offset + result.events.length, result.total_events)} of ${result.total_events}</span>${button("Next events", "trace-page", { id: "1", disabled: result.offset + result.events.length >= result.total_events })}</div>`;
+    return `<section class="card native-execution-trace" id="native-accesses"><div class="card-heading"><h2>Trace actual accesses</h2>${button("Check debugger", "trace-recheck")}</div><p>Replay from power on with normal controller input. Record accesses and their execution context, then inspect mapped source bytes. This is a separate session; it does not resume Playtest.</p>${!available ? `<p class="notice warm">${esc(reason)}</p>` : ""}${entry.error ? `<p class="notice warm">${esc(entry.error)}</p>` : ""}${watched}${route}${button(proposal ? "Replay & investigate this value" : "Replay & capture accesses", "trace-capture", { primary: true, disabled: !available, reason })}<p class="subtle">At most 3,600 frames, 20 million instruction callbacks and 30 seconds. Context is a lead; DMA ownership and the meaning of a value remain unproven.</p>${evidence2}</section>`;
+  }
+
   // romancer/ui/value_finder.js
   function finderTarget(text) {
     if (!text.trim()) return null;
@@ -5355,6 +5476,20 @@ ${font ? `<section class="card"><h3>Font metrics · ${esc(font.id)}</h3><div cla
         entry.page = Math.max(0, entry.page + Number(node.dataset.id));
         return ctx2.render();
       },
+      "series-probe": async (node) => {
+        var _a2, _b2, _c;
+        if (!owned() || !result) throw Error("Analyze the selected source first.");
+        if (!result.runtime_trusted) throw Error("Capture a fresh investigation before tracing accesses.");
+        const candidate = result.candidates.find((c) => c.candidate_id === node.dataset.id);
+        if (!candidate) throw Error("Select a current hypothesis.");
+        const generation = ++entry.generation;
+        const proposed = await ctx2.api.call("investigations.probe", { ...params, investigation_id: result.investigation_id, candidate_id: candidate.candidate_id });
+        if (!owned() || entry.generation !== generation) return;
+        if ((proposed == null ? void 0 : proposed.ok) === false || !currentResult(state2, scope, proposed)) throw Error(proposed.error || "Probe belongs to another source.");
+        state2.nativeProbe = { scope, result: proposed };
+        await ctx2.render();
+        (_c = (_b2 = (_a2 = globalThis.document) == null ? void 0 : _a2.getElementById("native-accesses")) == null ? void 0 : _b2.scrollIntoView) == null ? void 0 : _c.call(_b2, { block: "start", behavior: "smooth" });
+      },
       "series-watch": (node) => {
         var _a2;
         if (!owned() || !result) throw Error("Analyze the current source first.");
@@ -5365,7 +5500,7 @@ ${font ? `<section class="card"><h3>Font metrics · ${esc(font.id)}</h3><div cla
       }
     });
     const ready = ((_a = state2.runtime) == null ? void 0 : _a.game_sha256) === ((_b = state2.artifact) == null ? void 0 : _b.sha256), candidates = (result == null ? void 0 : result.candidates) || [], rows = candidates.slice(entry.page * 24, (entry.page + 1) * 24);
-    return `<section class="card investigation-series"><div class="card-heading"><h2>Find out what changes</h2>${result ? button("Reopen evidence", "series-refresh") : ""}</div><p>Pause the game, record a number or change, then repeat. ROMancer tests numeric formats and filters the results. No game profile is required.</p>${entry.error ? `<p class="notice warm">${esc(entry.error)}</p>` : ""}<div class="field-row">${field("series-title", "What are you investigating?", ctx2.draft("series-title", "A changing number"))}${field("series-value", "Value on screen (optional)", ctx2.draft("series-value", ""), { placeholder: "Leave blank if unknown" })}</div><details><summary>Memory range</summary><div class="field-row">${field("series-offset", "System RAM offset", ctx2.draft("series-offset", "0"))}${field("series-length", "Bytes to observe (1–4096)", ctx2.draft("series-length", "2048"))}</div><p>Offsets refer to the memory region exposed by the emulator. ROMancer does not invent a CPU address from this number.</p></details><div class="actions">${button(result ? "Start a separate investigation" : "Capture before", "series-start", { primary: !result, disabled: !ready })}${button("Open Playtest", "navigate", { id: "playtest" })}</div>${!ready ? '<p class="subtle">Load the selected ROM in Playtest to record observations. Saved evidence can be read without a running game.</p>' : ""}${result ? `<div class="identity"><strong>${esc(result.title)}</strong><span>${result.observation_count} observations · ${result.unchanged_controls} unchanged controls</span>${result.runtime_trusted ? "" : "<strong>Historical evidence · read only</strong>"}</div><div class="field-row">${field("series-label", "Observation label", ctx2.draft("series-label", ""))}${select("series-relation", "What happened?", [["changed", "It changed"], ["increased", "It increased"], ["decreased", "It decreased"], ["unchanged", "It stayed unchanged (control)"], ["delta", "It changed by an exact amount"]], ctx2.draft("series-relation", "changed"))}${field("series-delta", "Exact change, when selected", ctx2.draft("series-delta", ""), { placeholder: "For example -5" })}</div>${button("Capture & investigate", "series-capture", { primary: true, disabled: !ready || !result.runtime_trusted || result.observation_count >= 32 })}<p class="notice">${esc(result.next_experiment)}</p><details><summary>Observation history · ${result.history.length}</summary><div class="table-wrap"><table><thead><tr><th>Observation</th><th>Number supplied</th><th>Change</th><th>Native sequence</th></tr></thead><tbody>${result.history.map((row) => `<tr><td>${esc(row.label)}</td><td>${esc(row.value ?? "—")}</td><td>${esc(row.relation)}</td><td>${esc(row.sequence)}</td></tr>`).join("")}</tbody></table></div></details><h3>Correlated hypotheses · ${result.total}</h3><p class="subtle">Agreement across observations does not yet identify a named property, writing instruction or ROM location.</p>${result.truncated ? `<p class="notice warm">Showing the best ${candidates.length} of ${result.total} matching hypotheses. Narrow the range or add an observation to separate them.</p>` : ""}${rows.length ? `<div class="table-wrap"><table><thead><tr><th>RAM offset</th><th>Format tested</th><th>Values observed</th><th>Display relationship</th><th></th></tr></thead><tbody>${rows.map((row) => `<tr><td><code>0x${row.offset.toString(16)}</code></td><td>${row.width * 8} bit · ${esc(row.endian)} · ${esc(row.encoding)}${row.signed ? " · signed" : ""}</td><td>${row.values.map(esc).join(" → ")}</td><td>${row.model === "exact" ? "Matches supplied numbers" : row.model === "constant_offset" ? "Stored = displayed " + (row.bias < 0 ? "− " + Math.abs(row.bias) : "+ " + row.bias) : "Matches change/control observations"}</td><td>${button("Add watch", "series-watch", { id: row.candidate_id })}</td></tr>`).join("")}</tbody></table></div><div class="actions">${button("Previous hypotheses", "series-page", { id: "-1", disabled: !entry.page })}<span>Page ${entry.page + 1}</span>${button("Next hypotheses", "series-page", { id: "1", disabled: (entry.page + 1) * 24 >= candidates.length })}</div>` : "<p>No surviving numeric hypotheses yet. Keep the earlier observations and try the suggested next experiment.</p>"}` : ""}</section>`;
+    return `<section class="card investigation-series"><div class="card-heading"><h2>Find out what changes</h2>${result ? button("Reopen evidence", "series-refresh") : ""}</div><p>Pause the game, record a number or change, then repeat. ROMancer tests numeric formats and filters the results. No game profile is required.</p>${entry.error ? `<p class="notice warm">${esc(entry.error)}</p>` : ""}<div class="field-row">${field("series-title", "What are you investigating?", ctx2.draft("series-title", "A changing number"))}${field("series-value", "Value on screen (optional)", ctx2.draft("series-value", ""), { placeholder: "Leave blank if unknown" })}</div><details><summary>Memory range</summary><div class="field-row">${field("series-offset", "System RAM offset", ctx2.draft("series-offset", "0"))}${field("series-length", "Bytes to observe (1–4096)", ctx2.draft("series-length", "2048"))}</div><p>Offsets refer to the memory region exposed by the emulator. ROMancer does not invent a CPU address from this number.</p></details><div class="actions">${button(result ? "Start a separate investigation" : "Capture before", "series-start", { primary: !result, disabled: !ready })}${button("Open Playtest", "navigate", { id: "playtest" })}</div>${!ready ? '<p class="subtle">Load the selected ROM in Playtest to record observations. Saved evidence can be read without a running game.</p>' : ""}${result ? `<div class="identity"><strong>${esc(result.title)}</strong><span>${result.observation_count} observations · ${result.unchanged_controls} unchanged controls</span>${result.runtime_trusted ? "" : "<strong>Historical evidence · read only</strong>"}</div><div class="field-row">${field("series-label", "Observation label", ctx2.draft("series-label", ""))}${select("series-relation", "What happened?", [["changed", "It changed"], ["increased", "It increased"], ["decreased", "It decreased"], ["unchanged", "It stayed unchanged (control)"], ["delta", "It changed by an exact amount"]], ctx2.draft("series-relation", "changed"))}${field("series-delta", "Exact change, when selected", ctx2.draft("series-delta", ""), { placeholder: "For example -5" })}</div>${button("Capture & investigate", "series-capture", { primary: true, disabled: !ready || !result.runtime_trusted || result.observation_count >= 32 })}<p class="notice">${esc(result.next_experiment)}</p><details><summary>Observation history · ${result.history.length}</summary><div class="table-wrap"><table><thead><tr><th>Observation</th><th>Number supplied</th><th>Change</th><th>Native sequence</th></tr></thead><tbody>${result.history.map((row) => `<tr><td>${esc(row.label)}</td><td>${esc(row.value ?? "—")}</td><td>${esc(row.relation)}</td><td>${esc(row.sequence)}</td></tr>`).join("")}</tbody></table></div></details><h3>Correlated hypotheses · ${result.total}</h3><p class="subtle">Agreement across observations does not yet identify a named property, writing instruction or ROM location.</p>${result.truncated ? `<p class="notice warm">Showing the best ${candidates.length} of ${result.total} matching hypotheses. Narrow the range or add an observation to separate them.</p>` : ""}${rows.length ? `<div class="table-wrap"><table><thead><tr><th>RAM offset</th><th>Format tested</th><th>Values observed</th><th>Display relationship</th><th></th></tr></thead><tbody>${rows.map((row) => `<tr><td><code>0x${row.offset.toString(16)}</code></td><td>${row.width * 8} bit · ${esc(row.endian)} · ${esc(row.encoding)}${row.signed ? " · signed" : ""}</td><td>${row.values.map(esc).join(" → ")}</td><td>${row.model === "exact" ? "Matches supplied numbers" : row.model === "constant_offset" ? "Stored = displayed " + (row.bias < 0 ? "− " + Math.abs(row.bias) : "+ " + row.bias) : "Matches change/control observations"}</td><td>${button("Add watch", "series-watch", { id: row.candidate_id })} ${button("Investigate accesses", "series-probe", { id: row.candidate_id, disabled: !result.runtime_trusted, reason: "Capture a fresh investigation first." })}</td></tr>`).join("")}</tbody></table></div><div class="actions">${button("Previous hypotheses", "series-page", { id: "-1", disabled: !entry.page })}<span>Page ${entry.page + 1}</span>${button("Next hypotheses", "series-page", { id: "1", disabled: (entry.page + 1) * 24 >= candidates.length })}</div>` : "<p>No surviving numeric hypotheses yet. Keep the earlier observations and try the suggested next experiment.</p>"}` : ""}</section>`;
   }
 
   // romancer/ui/memory_watches.js
@@ -5513,7 +5648,9 @@ ${font ? `<section class="card"><h3>Font metrics · ${esc(font.id)}</h3><div cla
     const result = state2.results["debug.observe"] || state2.results["debug.inspect"];
     const investigation = await investigationSeries(ctx2);
     if (!current2()) return "";
-    return `${heading("", "Investigation", "")}${investigation}<details class="card"><summary>Additional memory tools</summary>${valueFinder(ctx2)}${memoryWatches(ctx2)}</details>${hardwareReference(ctx2)}<section class="card"><h3>Declared references</h3>${field("uses-offset", "Target file offset", ctx2.draft("uses-offset", "0"))}${button("Find declared references", "uses-read")}${(references == null ? void 0 : references.ok) ? `<div>${references.uses.map((row) => `<div class="actions"><span>${esc(row.name)} · ${esc(row.kind)}</span>${button("Inspect0x" + row.offset.toString(16), "uses-open", { id: String(row.offset) })}</div>`).join("") || "<p>No declared references to this offset.</p>"}<p class="subtle">${references.partial ? "Partial scan (first4,096 table records)." : "Undeclared uses remain unknown."}</p></div>` : ""}</section><div class="grid-even"><section class="card"><h3>Address explorer</h3>${select("address-system", "System", [["nes", "NES"], ["snes", "SNES"], ["genesis", "Genesis"], ["gb", "Game Boy"], ["gbc", "Game Boy Color"], ["gba", "GBA"]], ctx2.draft("address-system", state2.artifact.system_id || "nes"))}${field("cpu-address", "CPU address", ctx2.draft("cpu-address", "0x8000"))}${select("address-mapping", "Declared mapping", [["nrom", "NES NROM"], ["prg-bank", "NES explicit PRG bank"], ["lorom", "SNES LoROM"], ["hirom", "SNES HiROM"], ["linear", "Genesis linear"], ["gb-rom", "Game Boy explicit ROM bank"], ["rom", "GBA ROM windows"]], ctx2.draft("address-mapping", { nes: "nrom", snes: "lorom", genesis: "linear", gb: "gb-rom", gbc: "gb-rom", gba: "rom" }[state2.artifact.system_id] || "nrom"))}<details class="config"><summary>Mapping bounds</summary><div class="field-row">${field("address-bank", "Explicit bank (optional)", ctx2.draft("address-bank", ""))}${field("address-prg", "PRG file offset", ctx2.draft("address-prg", "16"))}${field("address-prg-size", "NROM PRG bytes", ctx2.draft("address-prg-size", "16384"))}${field("address-bank-size", "Bank bytes", ctx2.draft("address-bank-size", "8192"))}${field("address-window", "CPU window start", ctx2.draft("address-window", "0x8000"))}${field("address-prefix", "Copier header bytes", ctx2.draft("address-prefix", "0"))}${field("address-file", "Loaded-file offset", ctx2.draft("address-file", "0"))}${field("address-window-length", "Loaded-file bytes", ctx2.draft("address-window-length", "8192"))}</div></details>${button("Resolve address", "address-resolve", { primary: true })}${resolved ? button("Inspect mapped bytes", "address-open") + '<p class="subtle">Declared mapping only; active bank state was not observed.</p>' : ""}${report(mapped, "Mapped bytes")}</section><section class="card"><h3>Compare bytes</h3>${select("compare-other", "Compare selected source with", [...state2.project.sources, ...state2.project.builds].filter((r) => r.artifact_id !== state2.artifact.artifact_id).map((r) => [r.artifact_id, r.name]), ctx2.draft("compare-other", ""))}<div class="field-row">${field("compare-offset", "File offset", ctx2.draft("compare-offset", "0"))}${field("compare-length", "Bytes", ctx2.draft("compare-length", "256"))}</div>${button("Compare range", "compare-bytes")}${report(state2.results["resources.compare"], "Byte differences")}<h3>Native memory</h3><div class="field-row">${select("memory-region", "Region", [["2", "System RAM"], ["3", "Video RAM"], ["0", "Save RAM"]], ctx2.draft("memory-region", "2"))}${field("memory-offset", "Region offset", ctx2.draft("memory-offset", "0"))}${field("memory-length", "Bytes to observe", ctx2.draft("memory-length", "32"))}</div>${button("Capture memory snapshot", "memory-read", { disabled: !state2.runtime })}${report(state2.results["runtime.memory"], "Measured memory")}</section></div><details class="card"><summary>Advanced trace case</summary><div class="grid-two"><section class="card"><div class="card-heading"><h3>Case workspace</h3>${badge("EXPLICIT MAPPINGS")}</div><p class="subtle">Import your revision-bound case and trace JSON below. A bank or address space that has not been established stays unresolved.</p>${jsonEditor("debug-case", "Troubleshooting case", ctx2.draft("debug-case", "{}"), false)}${jsonEditor("debug-trace", "Explicit imported trace", ctx2.draft("debug-trace", "{}"), false)}<div class="actions">${button("Inspect case & source", "debug-inspect", { primary: true, icon: "debug" })}</div><div class="notice">Imported reads and writes are candidates. They do not establish an emulator write event or prove causation.</div></section><section class="card"><h3>Native observations</h3><p class="subtle">Use a fresh owned worker to compare declared memory probes before and after real controller input.</p>${jsonEditor("debug-runtime", "Observation configuration", ctx2.draft("debug-runtime", JSON.stringify({ load: {}, steps: [{ frames: 1, buttons: [], port: 0 }], initial_state_file: null, timeout: 30, frame_region: [0, 0, 1, 1], memory_probe_ids: [] }, null, 2)), true)}${button("Observe in native worker", "debug-observe", { icon: "playtest" })}<div class="notice warm">Memory snapshots are bounded observations. A changed value alone does not show which instruction wrote it.</div>${(result == null ? void 0 : result.probes) ? `<div class="table-wrap"><table><thead><tr><th>Probe</th><th>Resolution</th><th>Source bytes</th></tr></thead><tbody>${result.probes.map((p) => {
+    const native = await executionTrace(ctx2);
+    if (!current2()) return "";
+    return `${heading("", "Investigation", "")}${investigation}${native}<details class="card"><summary>Additional memory tools</summary>${valueFinder(ctx2)}${memoryWatches(ctx2)}</details>${hardwareReference(ctx2)}<section class="card"><h3>Declared references</h3>${field("uses-offset", "Target file offset", ctx2.draft("uses-offset", "0"))}${button("Find declared references", "uses-read")}${(references == null ? void 0 : references.ok) ? `<div>${references.uses.map((row) => `<div class="actions"><span>${esc(row.name)} · ${esc(row.kind)}</span>${button("Inspect0x" + row.offset.toString(16), "uses-open", { id: String(row.offset) })}</div>`).join("") || "<p>No declared references to this offset.</p>"}<p class="subtle">${references.partial ? "Partial scan (first4,096 table records)." : "Undeclared uses remain unknown."}</p></div>` : ""}</section><div class="grid-even"><section class="card"><h3>Address explorer</h3>${select("address-system", "System", [["nes", "NES"], ["snes", "SNES"], ["genesis", "Genesis"], ["gb", "Game Boy"], ["gbc", "Game Boy Color"], ["gba", "GBA"]], ctx2.draft("address-system", state2.artifact.system_id || "nes"))}${field("cpu-address", "CPU address", ctx2.draft("cpu-address", "0x8000"))}${select("address-mapping", "Declared mapping", [["nrom", "NES NROM"], ["prg-bank", "NES explicit PRG bank"], ["lorom", "SNES LoROM"], ["hirom", "SNES HiROM"], ["linear", "Genesis linear"], ["gb-rom", "Game Boy explicit ROM bank"], ["rom", "GBA ROM windows"]], ctx2.draft("address-mapping", { nes: "nrom", snes: "lorom", genesis: "linear", gb: "gb-rom", gbc: "gb-rom", gba: "rom" }[state2.artifact.system_id] || "nrom"))}<details class="config"><summary>Mapping bounds</summary><div class="field-row">${field("address-bank", "Explicit bank (optional)", ctx2.draft("address-bank", ""))}${field("address-prg", "PRG file offset", ctx2.draft("address-prg", "16"))}${field("address-prg-size", "NROM PRG bytes", ctx2.draft("address-prg-size", "16384"))}${field("address-bank-size", "Bank bytes", ctx2.draft("address-bank-size", "8192"))}${field("address-window", "CPU window start", ctx2.draft("address-window", "0x8000"))}${field("address-prefix", "Copier header bytes", ctx2.draft("address-prefix", "0"))}${field("address-file", "Loaded-file offset", ctx2.draft("address-file", "0"))}${field("address-window-length", "Loaded-file bytes", ctx2.draft("address-window-length", "8192"))}</div></details>${button("Resolve address", "address-resolve", { primary: true })}${resolved ? button("Inspect mapped bytes", "address-open") + '<p class="subtle">Declared mapping only; active bank state was not observed.</p>' : ""}${report(mapped, "Mapped bytes")}</section><section class="card"><h3>Compare bytes</h3>${select("compare-other", "Compare selected source with", [...state2.project.sources, ...state2.project.builds].filter((r) => r.artifact_id !== state2.artifact.artifact_id).map((r) => [r.artifact_id, r.name]), ctx2.draft("compare-other", ""))}<div class="field-row">${field("compare-offset", "File offset", ctx2.draft("compare-offset", "0"))}${field("compare-length", "Bytes", ctx2.draft("compare-length", "256"))}</div>${button("Compare range", "compare-bytes")}${report(state2.results["resources.compare"], "Byte differences")}<h3>Native memory</h3><div class="field-row">${select("memory-region", "Region", [["2", "System RAM"], ["3", "Video RAM"], ["0", "Save RAM"]], ctx2.draft("memory-region", "2"))}${field("memory-offset", "Region offset", ctx2.draft("memory-offset", "0"))}${field("memory-length", "Bytes to observe", ctx2.draft("memory-length", "32"))}</div>${button("Capture memory snapshot", "memory-read", { disabled: !state2.runtime })}${report(state2.results["runtime.memory"], "Measured memory")}</section></div><details class="card"><summary>Advanced trace case</summary><div class="grid-two"><section class="card"><div class="card-heading"><h3>Case workspace</h3>${badge("EXPLICIT MAPPINGS")}</div><p class="subtle">Import your revision-bound case and trace JSON below. A bank or address space that has not been established stays unresolved.</p>${jsonEditor("debug-case", "Troubleshooting case", ctx2.draft("debug-case", "{}"), false)}${jsonEditor("debug-trace", "Explicit imported trace", ctx2.draft("debug-trace", "{}"), false)}<div class="actions">${button("Inspect case & source", "debug-inspect", { primary: true, icon: "debug" })}</div><div class="notice">Imported reads and writes are candidates. They do not establish an emulator write event or prove causation.</div></section><section class="card"><h3>Native observations</h3><p class="subtle">Use a fresh owned worker to compare declared memory probes before and after real controller input.</p>${jsonEditor("debug-runtime", "Observation configuration", ctx2.draft("debug-runtime", JSON.stringify({ load: {}, steps: [{ frames: 1, buttons: [], port: 0 }], initial_state_file: null, timeout: 30, frame_region: [0, 0, 1, 1], memory_probe_ids: [] }, null, 2)), true)}${button("Observe in native worker", "debug-observe", { icon: "playtest" })}<div class="notice warm">Memory snapshots are bounded observations. A changed value alone does not show which instruction wrote it.</div>${(result == null ? void 0 : result.probes) ? `<div class="table-wrap"><table><thead><tr><th>Probe</th><th>Resolution</th><th>Source bytes</th></tr></thead><tbody>${result.probes.map((p) => {
       var _a2;
       return `<tr><td>${esc(p.probe_id)}</td><td>${esc(p.status)}</td><td><code>${esc(((_a2 = p.source) == null ? void 0 : _a2.raw_hex) || "Unresolved")}</code></td></tr>`;
     }).join("")}</tbody></table></div>` : ""}</section></div></details>${report(state2.results["debug.inspect"], "Case inspection")}${report(state2.results["debug.observe"], "Measured before & after")}`;
@@ -6049,7 +6186,7 @@ ${font ? `<section class="card"><h3>Font metrics · ${esc(font.id)}</h3><div cla
   }
 
   // romancer/ui/level_canvas.js
-  var integer8 = (v, min, max) => {
+  var integer9 = (v, min, max) => {
     if (!Number.isSafeInteger(v) || v < min || v > max) throw Error("Level value is outside declared bounds.");
     return v;
   };
@@ -6057,7 +6194,7 @@ ${font ? `<section class="card"><h3>Font metrics · ${esc(font.id)}</h3><div cla
   function levelScale(width, height, viewportHeight, availableWidth, mode) {
     if (mode === "fit") return Math.max(0.25, Math.min(3, Math.max(160, viewportHeight - 420) / height, availableWidth / width));
     const value = Number(mode);
-    integer8(value, 1, 3);
+    integer9(value, 1, 3);
     return value;
   }
   var LevelDraft = class {
@@ -6079,27 +6216,27 @@ ${font ? `<section class="card"><h3>Font metrics · ${esc(font.id)}</h3><div cla
       var _a, _b, _c, _d, _e, _f;
       let original, max;
       if (c.kind === "metatile") {
-        integer8(c.index, 0, this.doc.metatiles.length - 1);
-        integer8(c.part, 0, this.doc.metatiles[c.index].length - 1);
+        integer9(c.index, 0, this.doc.metatiles.length - 1);
+        integer9(c.part, 0, this.doc.metatiles[c.index].length - 1);
         original = this.doc.metatiles[c.index][c.part];
         max = this.doc.tiles.length - 1;
       } else {
         const r = this.room(c.room_id);
         if (c.kind === "object") {
-          integer8(c.index, 0, r.objects.length - 1);
+          integer9(c.index, 0, r.objects.length - 1);
           if (!(c.field in r.objects[c.index])) throw Error("Unknown object field.");
           original = r.objects[c.index][c.field];
           const declared2 = (_c = (_b = (_a = this.doc.definition) == null ? void 0 : _a.rooms.find((x) => x.id === r.id)) == null ? void 0 : _b.objects) == null ? void 0 : _c.fields.find((f) => f.name === c.field);
           max = Math.min((declared2 == null ? void 0 : declared2.maximum) ?? 65535, c.field === "x" ? r.width - 1 : c.field === "y" ? r.height - 1 : c.field === "exit_room" ? this.doc.rooms.length - 1 : 65535);
         } else {
           if (!["terrain", "collision"].includes(c.kind) || !r[c.kind]) throw Error("This layer is not declared.");
-          integer8(c.index, 0, r[c.kind].length - 1);
+          integer9(c.index, 0, r[c.kind].length - 1);
           original = r[c.kind][c.index];
           const declared2 = (_e = (_d = this.doc.definition) == null ? void 0 : _d.rooms.find((x) => x.id === r.id)) == null ? void 0 : _e[c.kind];
           max = c.kind === "terrain" ? this.doc.metatiles.length - 1 : 2 ** (8 * ((declared2 == null ? void 0 : declared2.entry_bytes) || 1)) - 1;
         }
       }
-      integer8(c.value, 0, max);
+      integer9(c.value, 0, max);
       if (c.kind === "object") {
         const metadata = objectMetadata(this.doc, c.room_id, c.index);
         if ((metadata == null ? void 0 : metadata.role) === "exit" && ((_f = metadata.reference) == null ? void 0 : _f.field) === c.field && !metadata.reference.targets.some((target) => target.value === c.value)) throw Error("Exit destination is not mapped.");
@@ -6170,8 +6307,8 @@ ${font ? `<section class="card"><h3>Font metrics · ${esc(font.id)}</h3><div cla
     }
     fill(id, layer, index, value) {
       const r = this.room(id), cells = this.cells(id, layer);
-      integer8(index, 0, cells.length - 1);
-      integer8(value, 0, layer === "terrain" ? this.doc.metatiles.length - 1 : 65535);
+      integer9(index, 0, cells.length - 1);
+      integer9(value, 0, layer === "terrain" ? this.doc.metatiles.length - 1 : 65535);
       const old = cells[index];
       if (old === value) return;
       const queue = [index], seen = /* @__PURE__ */ new Set();
@@ -6186,15 +6323,15 @@ ${font ? `<section class="card"><h3>Font metrics · ${esc(font.id)}</h3><div cla
     }
     copy(id, layer, rect) {
       const r = this.room(id);
-      for (const k of ["x", "y"]) integer8(rect[k], 0, (k === "x" ? r.width : r.height) - 1);
-      integer8(rect.width, 1, r.width - rect.x);
-      integer8(rect.height, 1, r.height - rect.y);
+      for (const k of ["x", "y"]) integer9(rect[k], 0, (k === "x" ? r.width : r.height) - 1);
+      integer9(rect.width, 1, r.width - rect.x);
+      integer9(rect.height, 1, r.height - rect.y);
       const cells = this.cells(id, layer);
       return { width: rect.width, height: rect.height, values: Array.from({ length: rect.width * rect.height }, (_, i) => cells[(rect.y + Math.floor(i / rect.width)) * r.width + rect.x + i % rect.width]) };
     }
     paste(id, layer, index, clip) {
       const r = this.room(id);
-      integer8(index, 0, r.width * r.height - 1);
+      integer9(index, 0, r.width * r.height - 1);
       if (!clip || !Array.isArray(clip.values)) throw Error("Copy a rectangle first.");
       const x = index % r.width, y = Math.floor(index / r.width);
       if (clip.width < 1 || clip.height < 1 || clip.values.length !== clip.width * clip.height || x + clip.width > r.width || y + clip.height > r.height) throw Error("Copied rectangle must fit inside room bounds.");
@@ -6227,7 +6364,7 @@ ${font ? `<section class="card"><h3>Font metrics · ${esc(font.id)}</h3><div cla
     return [...result].sort((a, b) => a - b);
   }
   function blockPixels(doc, model, index) {
-    integer8(index, 0, doc.metatiles.length - 1);
+    integer9(index, 0, doc.metatiles.length - 1);
     const width = doc.block_width * 8, height = doc.block_height * 8, pixels = new Uint8ClampedArray(width * height * 4);
     for (const [part, tile] of model.blocks()[index].entries()) for (const [pixel, value] of doc.tiles[tile].entries()) {
       const x = part % doc.block_width * 8 + pixel % 8, y = Math.floor(part / doc.block_width) * 8 + Math.floor(pixel / 8);
@@ -6237,14 +6374,14 @@ ${font ? `<section class="card"><h3>Font metrics · ${esc(font.id)}</h3><div cla
   }
   function pickLevelBrush(model, id, layer, index) {
     const cells = model.cells(id, layer);
-    integer8(index, 0, cells.length - 1);
+    integer9(index, 0, cells.length - 1);
     return cells[index];
   }
   function moveLevelObject(model, id, index, x, y) {
     const room = model.room(id);
-    integer8(index, 0, room.objects.length - 1);
-    integer8(x, 0, room.width - 1);
-    integer8(y, 0, room.height - 1);
+    integer9(index, 0, room.objects.length - 1);
+    integer9(x, 0, room.width - 1);
+    integer9(y, 0, room.height - 1);
     const object = room.objects[index];
     if (!Object.hasOwn(object, "x") || !Object.hasOwn(object, "y")) throw Error("Object coordinates are not declared.");
     model.set({ kind: "object", room_id: id, index, field: "x", value: x });
@@ -6458,7 +6595,7 @@ ${font ? `<section class="card"><h3>Font metrics · ${esc(font.id)}</h3><div cla
   }
 
   // romancer/ui/game_maps.js
-  var hex2 = (n) => "0x" + Number(n).toString(16).toUpperCase();
+  var hex3 = (n) => "0x" + Number(n).toString(16).toUpperCase();
   var clone = (value) => JSON.parse(JSON.stringify(value));
   var key2 = (c) => c.kind === "arrival" ? `arrival:${c.table}:${c.id}` : `${c.kind}:${c.offset}`;
   var number2 = (value, max = 63) => {
@@ -6814,15 +6951,15 @@ ${font ? `<section class="card"><h3>Font metrics · ${esc(font.id)}</h3><div cla
     if (doc.error) return browser + `<section class="card"><h3>Room unavailable</h3><p>${esc(doc.error)}</p></section>`;
     if (doc.map.status !== "decoded") return browser + `<section class="card"><h3>${esc(doc.room.label)}</h3><p class="notice">Terrain preview unavailable: ${esc(doc.map.reason)}</p><p>Conditional terrain needs an explicit game-state value. Unsupported circle paths remain unavailable. No state is assumed.</p>${definitions(doc)}</section>`;
     const model = view.model, chosen = currentTarget(view), editable = canEdit(view, chosen), pending = ((_d = view.pending) == null ? void 0 : _d.revision) === model.revision && view.pending.signature === JSON.stringify(model.values()) ? view.pending : null;
-    const options = [...doc.map.commands.filter((c) => "x" in c).map((c) => [targetKey("command", c), `${c.name || "Command"} ${hex2(c.offset)}${c.editable ? "" : " · read-only"}`]), ...doc.objects.map((n) => [targetKey("npc", n), objectName(doc.room, n) + (n.editable ? "" : " · conditional/read-only")]), ...doc.arrivals.map((a) => [targetKey("arrival", a), `Arrival ${a.table} ${hex2(a.id)}`])];
+    const options = [...doc.map.commands.filter((c) => "x" in c).map((c) => [targetKey("command", c), `${c.name || "Command"} ${hex3(c.offset)}${c.editable ? "" : " · read-only"}`]), ...doc.objects.map((n) => [targetKey("npc", n), objectName(doc.room, n) + (n.editable ? "" : " · conditional/read-only")]), ...doc.arrivals.map((a) => [targetKey("arrival", a), `Arrival ${a.table} ${hex3(a.id)}`])];
     const form = chosen ? `<aside class="card game-map-inspector"><h3>${chosen.kind === "npc" ? esc(objectName(doc.room, chosen.entity)) : chosen.kind === "arrival" ? "Arrival position" : "Existing terrain command"}</h3>${select("maps-target", "Selection", options, view.selection)}<div class="field-row">${field("maps-x", "X · 0–63", chosen.entity.x, { type: "number", min: 0, readonly: !editable })}${field("maps-y", "Y · 0–63", chosen.entity.y, { type: "number", min: 0, readonly: !editable })}${chosen.kind === "command" && "tile" in chosen.entity ? field("maps-tile", "Tile · 0–63", chosen.entity.tile, { type: "number", min: 0, readonly: !editable }) : ""}</div>${chosen.kind === "npc" ? `<p class="notice">NPCs are stored definitions. Their conditions may hide them in Playtest.${chosen.entity.event === 274 ? " Mother participates in the opening story. Moving her can affect the narrative; playtest the full conversation." : ""}</p>` : ""}${chosen.kind === "command" ? `<p>${chosen.entity.final_cells || 0} final terrain cells currently come from this command. Later commands can overwrite its drawing.</p><p>Edits preserve collision behavior, region bits and existing trigger bindings. Changes that fail these checks are refused.</p>` : ""}${chosen.kind === "arrival" ? "<p>Changes only the arrival position. Destination, facing and packed flags stay protected. Enter through its real door when playtesting.</p>" : ""}${button("Stage position / tile", "maps-stage", { disabled: !editable, reason: "This definition is read-only; writable scope is the initial shared atlas." })}</aside>` : "<p>Select an existing terrain command, NPC definition or arrival.</p>";
-    return browser + `<section class="card game-map-workbench"><h3>${header === 18539 ? "Opening bedroom / shared interiors" : esc(doc.room.label)}</h3><p>Terrain ${hex2(doc.room.map_pointer)} · shared by ${doc.room.shared_headers.map(hex2).join(", ")}. A terrain edit affects every listed definition.</p>${!doc.map.palette ? '<p class="notice">Color-index grayscale preview. This room’s live palette has not been verified.</p>' : ""}<div class="field-row">${select("maps-mode", "Canvas tool", [["inspect", "Inspect terrain command"], ["place", "Place selected definition"]], view.mode)}${button(view.overview ? "Return to readable crop" : "Show full overview", "maps-overview")}${button("Left", "maps-pan", { id: "-8,0" })}${button("Right", "maps-pan", { id: "8,0" })}${button("Up", "maps-pan", { id: "0,-6" })}${button("Down", "maps-pan", { id: "0,6" })}</div><div class="level-editor-layout game-map-layout"><div><div class="preview-pair game-map-previews"><div><span>Original for this edit · selected ROM</span><canvas id="maps-original" aria-label="Original decoded game terrain"></canvas></div><div><span>${(pending == null ? void 0 : pending.result.preview_map) ? "Reviewed terrain · exact planned bytes" : "Staged placement overlay"}</span><canvas id="maps-edit" tabindex="0" aria-label="Decoded game map: inspect or place selected definition"></canvas></div></div><p id="maps-position" role="status">Readable crop around (${view.center.join(", ")}). NPC and arrival markers are outlines, not character artwork.</p><p>${(pending == null ? void 0 : pending.result.preview_map) ? "The reviewed terrain comes from the server’s bounded decoder." : "Placement outlines show staged coordinates. Review computes exact terrain, including restored and overwritten cells."}</p></div>${form}</div><div class="actions">${button("Undo staged edit", "maps-undo", { disabled: !model.past.length })}${button("Redo staged edit", "maps-redo", { disabled: !model.future.length })}${button("Clear staged edits", "maps-clear", { disabled: !model.values().length })}${button("Review map changes", "maps-review", { disabled: !model.values().length, primary: !pending })}</div><p>${model.values().length} staged records. The selected ROM remains unchanged.</p>${pending ? review(pending.result) : ""}${definitions(doc)}</section>`;
+    return browser + `<section class="card game-map-workbench"><h3>${header === 18539 ? "Opening bedroom / shared interiors" : esc(doc.room.label)}</h3><p>Terrain ${hex3(doc.room.map_pointer)} · shared by ${doc.room.shared_headers.map(hex3).join(", ")}. A terrain edit affects every listed definition.</p>${!doc.map.palette ? '<p class="notice">Color-index grayscale preview. This room’s live palette has not been verified.</p>' : ""}<div class="field-row">${select("maps-mode", "Canvas tool", [["inspect", "Inspect terrain command"], ["place", "Place selected definition"]], view.mode)}${button(view.overview ? "Return to readable crop" : "Show full overview", "maps-overview")}${button("Left", "maps-pan", { id: "-8,0" })}${button("Right", "maps-pan", { id: "8,0" })}${button("Up", "maps-pan", { id: "0,-6" })}${button("Down", "maps-pan", { id: "0,6" })}</div><div class="level-editor-layout game-map-layout"><div><div class="preview-pair game-map-previews"><div><span>Original for this edit · selected ROM</span><canvas id="maps-original" aria-label="Original decoded game terrain"></canvas></div><div><span>${(pending == null ? void 0 : pending.result.preview_map) ? "Reviewed terrain · exact planned bytes" : "Staged placement overlay"}</span><canvas id="maps-edit" tabindex="0" aria-label="Decoded game map: inspect or place selected definition"></canvas></div></div><p id="maps-position" role="status">Readable crop around (${view.center.join(", ")}). NPC and arrival markers are outlines, not character artwork.</p><p>${(pending == null ? void 0 : pending.result.preview_map) ? "The reviewed terrain comes from the server’s bounded decoder." : "Placement outlines show staged coordinates. Review computes exact terrain, including restored and overwritten cells."}</p></div>${form}</div><div class="actions">${button("Undo staged edit", "maps-undo", { disabled: !model.past.length })}${button("Redo staged edit", "maps-redo", { disabled: !model.future.length })}${button("Clear staged edits", "maps-clear", { disabled: !model.values().length })}${button("Review map changes", "maps-review", { disabled: !model.values().length, primary: !pending })}</div><p>${model.values().length} staged records. The selected ROM remains unchanged.</p>${pending ? review(pending.result) : ""}${definitions(doc)}</section>`;
   }
   function definitions(doc) {
-    return `<details><summary>NPC conditions and interactions</summary><p>These records are conditional definitions, not a list of characters guaranteed to be visible now. Interaction destinations remain read-only.</p><table><thead><tr><th>NPC definition</th><th>Position</th><th>Condition</th></tr></thead><tbody>${doc.objects.map((n) => `<tr><td>${esc(objectName(doc.room, n))}</td><td>${n.x}, ${n.y}</td><td>${esc(n.state_status || "Live condition unobserved")}</td></tr>`).join("")}</tbody></table><table><thead><tr><th>Interaction</th><th>Destination</th></tr></thead><tbody>${doc.links.map((l) => `<tr><td>${l.index}</td><td>${l.transition.kind === "saved-return" ? "Saved return to the previous location" : l.destination ? `Room ${esc(hex2(l.destination.header))} · ${l.destination.x}, ${l.destination.y}` : `Event reference ${esc(hex2(l.word))} · not a direct room destination`}</td></tr>`).join("")}</tbody></table></details>`;
+    return `<details><summary>NPC conditions and interactions</summary><p>These records are conditional definitions, not a list of characters guaranteed to be visible now. Interaction destinations remain read-only.</p><table><thead><tr><th>NPC definition</th><th>Position</th><th>Condition</th></tr></thead><tbody>${doc.objects.map((n) => `<tr><td>${esc(objectName(doc.room, n))}</td><td>${n.x}, ${n.y}</td><td>${esc(n.state_status || "Live condition unobserved")}</td></tr>`).join("")}</tbody></table><table><thead><tr><th>Interaction</th><th>Destination</th></tr></thead><tbody>${doc.links.map((l) => `<tr><td>${l.index}</td><td>${l.transition.kind === "saved-return" ? "Saved return to the previous location" : l.destination ? `Room ${esc(hex3(l.destination.header))} · ${l.destination.x}, ${l.destination.y}` : `Event reference ${esc(hex3(l.word))} · not a direct room destination`}</td></tr>`).join("")}</tbody></table></details>`;
   }
   function review(plan) {
-    return `<section class="game-review"><h3>Review map changes</h3><p>${plan.edits.length} checked byte spans${plan.integrity_edit_count ? ` including ${plan.integrity_edit_count} integrity updates` : ""}. A separate build needs its own door and story playtests.</p><details><summary>Exact changed bytes</summary><table><thead><tr><th>Offset</th><th>Before</th><th>After</th></tr></thead><tbody>${plan.edits.map((e) => `<tr><td>${hex2(e.offset)}</td><td><code>${esc(e.before)}</code></td><td><code>${esc(e.after)}</code></td></tr>`).join("")}</tbody></table></details>${button("Create separate map build", "maps-build", { primary: true })}</section>`;
+    return `<section class="game-review"><h3>Review map changes</h3><p>${plan.edits.length} checked byte spans${plan.integrity_edit_count ? ` including ${plan.integrity_edit_count} integrity updates` : ""}. A separate build needs its own door and story playtests.</p><details><summary>Exact changed bytes</summary><table><thead><tr><th>Offset</th><th>Before</th><th>After</th></tr></thead><tbody>${plan.edits.map((e) => `<tr><td>${hex3(e.offset)}</td><td><code>${esc(e.before)}</code></td><td><code>${esc(e.after)}</code></td></tr>`).join("")}</tbody></table></details>${button("Create separate map build", "maps-build", { primary: true })}</section>`;
   }
   function mountGameMaps(ctx2) {
     var _a, _b, _c, _d;
@@ -7927,8 +8064,8 @@ ${font ? `<section class="card"><h3>Font metrics · ${esc(font.id)}</h3><div cla
     lastRenderedScope = renderScope;
     const main = document.getElementById("main");
     main.dataset.locationScope = renderScope;
-    const identity = [(_j = state.project) == null ? void 0 : _j.project_id, (_k = state.artifact) == null ? void 0 : _k.artifact_id, (_l = state.artifact) == null ? void 0 : _l.sha256].join(":");
-    if (state.resumeIdentity === identity && state.resumeScroll !== void 0) {
+    const identity2 = [(_j = state.project) == null ? void 0 : _j.project_id, (_k = state.artifact) == null ? void 0 : _k.artifact_id, (_l = state.artifact) == null ? void 0 : _l.sha256].join(":");
+    if (state.resumeIdentity === identity2 && state.resumeScroll !== void 0) {
       main.scrollTop = state.resumeScroll;
       delete state.resumeScroll;
       delete state.resumeIdentity;

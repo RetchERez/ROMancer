@@ -22,6 +22,11 @@ globalThis.document={getElementById:id=>({value:({'series-title':'A number','ser
  const html=await investigationSeries(ctx);assert.match(html,/A &lt;number&gt;/);assert.match(html,/After &lt;change&gt;/);
  assert.match(html,/0x11/);assert.match(html,/1000.*950/);assert.match(html,/correlat|hypothes/i);
  assert.match(html,/unchanged.*control/i);assert.equal(drafts['investigation-id'],'e');
+ assert.match(html,/Investigate accesses/);
+ const oldCall=ctx.api.call;ctx.api.call=async operation=>operation==='investigations.probe'?{
+  ok:true,source_sha256:'sha',artifact_id:'a',candidate:result.candidates[0],investigation_id:'e'}:oldCall(operation);
+ await actions['series-probe']({dataset:{id:'candidate'}});
+ assert.equal(state.nativeProbe.result.candidate.candidate_id,'candidate');
  assert.doesNotMatch(html,/Edit ROM directly|Verified stat/);
  state.artifact={artifact_id:'same-bytes-other-source',sha256:'sha'};
  await assert.rejects(actions['series-capture'](),/selected|changed|source/i);

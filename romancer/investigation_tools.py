@@ -11,7 +11,8 @@ class InvestigationTools:
     def routes(self):
         return {'investigations.start':('project_id artifact_id title region offset length value',self.start),
             'investigations.capture':('project_id artifact_id investigation_id label value relation delta',self.capture),
-            'investigations.get':('project_id artifact_id investigation_id',self.get)}
+            'investigations.get':('project_id artifact_id investigation_id',self.get),
+            'investigations.probe':('project_id artifact_id investigation_id candidate_id',self.probe)}
 
     def _load(self,p):
         project,row,_=self.api.source(p);require_supported(row)
@@ -67,3 +68,17 @@ class InvestigationTools:
 
     def get(self,p,c):
         _,_,record=self._load(p);return self._public(record,c)
+
+    def probe(self,p,c):
+        from .core_memory_layout import memory_probe
+        _,row,record=self._load(p)
+        if not record['runtime_trusted']:raise ValueError('Historical investigations cannot supply a fresh native probe; capture a new investigation.')
+        report=record['report'];observations=report['observations']
+        if len(observations)<2:raise ValueError('Capture a controlled change before investigating accesses.')
+        analysis=analyze_series(observations,cancelled=c)
+        candidate=next((r for r in analysis['candidates'] if r['candidate_id']==p['candidate_id']),None)
+        if candidate is None:raise ValueError('Candidate is not a current authenticated investigation hypothesis.')
+        proposed=memory_probe(row['system_id'],observations[0]['snapshot'],candidate['offset'],candidate['width'])
+        return {**proposed,'source_sha256':row['sha256'],'artifact_id':row['artifact_id'],
+            'investigation_id':record['evidence_id'],'candidate':candidate,'causation_proven':False,
+            'replay_scope':'A new debugger replay starts from power on. It does not resume the Playtest worker or convert its save state.'}

@@ -32,6 +32,7 @@ class DebuggerTools:
     def routes(self):
         return {'debugger.capabilities':('project_id artifact_id',self.capabilities),
             'debugger.capture':('project_id artifact_id config',self.capture),
+            'debugger.investigate':('project_id artifact_id investigation_id candidate_id replay',self.investigate),
             'debugger.get':('project_id artifact_id evidence_id offset limit',self.get)}
 
     def capabilities(self,p,c):
@@ -55,14 +56,27 @@ class DebuggerTools:
             'summary':summarize_events(events)}
 
     def capture(self,p,c):
+        return self._capture(p,c,p['config'])
+
+    def investigate(self,p,c):
+        from .investigation_tools import InvestigationTools
+        proposed=InvestigationTools(self.api).probe(p,c);replay=p['replay']
+        if type(replay) is not dict or set(replay)-{'steps','start_frame','event_limit','instruction_limit','timeout'}:
+            raise ValueError('Replay accepts bounded steps and budgets only; its probe is derived from the authenticated candidate.')
+        link={key:proposed[key] for key in ('investigation_id','candidate','physical_probe','core_sha256','same_runtime_state_claimed','replay_scope')}
+        link['candidate_id']=proposed['candidate']['candidate_id']
+        return self._capture(p,c,{**replay,'probes':[proposed['physical_probe']]},link)
+
+    def _capture(self,p,c,config,link=None):
         from .native_debugger import capture_native,validate_capture
-        project,row,_=self.api.source(p);require_supported(row);validate_capture(row['system_id'],p['config'])
+        project,row,_=self.api.source(p);require_supported(row);validate_capture(row['system_id'],config)
         if not self.capacity.acquire(blocking=False):raise ValueError('two native investigations are running; wait for one to finish')
         try:
-            report=capture_native(project,row,p['config'],cancelled=c)
+            report=capture_native(project,row,config,cancelled=c)
             if report.get('source_sha256')!=row['sha256'] or report.get('artifact_id')!=row['artifact_id']:
                 raise ValueError('native capture source identity differs')
             if c():raise KeyboardInterrupt
+            if link is not None:report={**report,'investigation_link':link}
             record=store_evidence(project,'runtime',{'kind':'native-debugger-capture-v1',**report})
             return self._response(record,0,100)
         finally:self.capacity.release()
