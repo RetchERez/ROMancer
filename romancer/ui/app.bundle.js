@@ -1157,7 +1157,7 @@
     (_b = state2.soundPlayer) == null ? void 0 : _b.close();
     state2.soundPlayer = null;
     state2.soundPreview = null;
-    for (const key3 of ["structuralLab", "structuralPrefill", "tableProposal", "nativeTrace", "nativeProbe", "investigationSeries", "gameMapsView", "gameMapEditor", "levelEditor", "levelClipboard", "levelRect", "paint", "pixelHistories", "pixelHistoryScope", "spriteHistory", "hexDraft", "hexReview", "hexSearch", "hexNumbers", "hexExplanation", "hexBookmarks", "hexComparison", "historyComparison", "translationSheet", "translationReview"]) state2[key3] = null;
+    for (const key3 of ["nativeSourceContext", "structuralLab", "structuralPrefill", "tableProposal", "nativeTrace", "nativeProbe", "investigationSeries", "gameMapsView", "gameMapEditor", "levelEditor", "levelClipboard", "levelRect", "paint", "pixelHistories", "pixelHistoryScope", "spriteHistory", "hexDraft", "hexReview", "hexSearch", "hexNumbers", "hexExplanation", "hexBookmarks", "hexComparison", "historyComparison", "translationSheet", "translationReview"]) state2[key3] = null;
     state2.drafts = {};
     state2.romScans = {};
     state2.graphicsInvestigations = {};
@@ -2423,6 +2423,166 @@
     render: () => render6
   });
 
+  // romancer/ui/execution_trace.js
+  var hex2 = (v) => Number.isSafeInteger(v) ? "0x" + v.toString(16) : "Unknown";
+  var identity = (state2, r) => {
+    var _a, _b;
+    return (r == null ? void 0 : r.source_sha256) === ((_a = state2.artifact) == null ? void 0 : _a.sha256) && r.artifact_id === ((_b = state2.artifact) == null ? void 0 : _b.artifact_id);
+  };
+  function integer3(id, min, max) {
+    const text = read(id), v = Number(text);
+    if (!text.trim() || !Number.isSafeInteger(v) || v < min || v > max) throw Error("Enter a whole number from " + min + " to " + max + ".");
+    return v;
+  }
+  async function executionTrace(ctx2) {
+    var _a, _b, _c, _d, _e, _f;
+    const { state: state2 } = ctx2, scope = selectionKey(state2), params = { ...ctx2.sourceParams() };
+    let entry = state2.nativeTrace;
+    if ((entry == null ? void 0 : entry.scope) !== scope) state2.nativeTrace = entry = { scope, generation: 0, result: null, steps: [{}] };
+    const current2 = () => selectionKey(state2) === scope && state2.nativeTrace === entry;
+    const proposal = ((_a = state2.nativeProbe) == null ? void 0 : _a.scope) === scope && identity(state2, state2.nativeProbe.result) ? state2.nativeProbe.result : null;
+    if (!entry.checked) {
+      entry.checked = true;
+      try {
+        const r = await ctx2.api.call("debugger.capabilities", params);
+        if (current2()) {
+          if ((r == null ? void 0 : r.ok) === false || !identity(state2, r)) throw Error(r.error || "Backend identity differs.");
+          entry.capabilities = r;
+        }
+      } catch (error) {
+        if (current2()) entry.error = error.message;
+      }
+    }
+    const remembered = ctx2.draft("native-trace-id", "");
+    if (!entry.loaded && remembered) {
+      entry.loaded = true;
+      const generation = ++entry.generation;
+      try {
+        const r = await ctx2.api.call("debugger.get", { ...params, evidence_id: remembered, offset: 0, limit: 100 });
+        if (current2() && entry.generation === generation) {
+          if ((r == null ? void 0 : r.ok) === false || !identity(state2, r)) throw Error(r.error || "Capture belongs to another source.");
+          entry.result = r;
+        }
+      } catch (error) {
+        if (current2() && entry.generation === generation) entry.error = error.message;
+      }
+    }
+    const result = identity(state2, entry.result) ? entry.result : null, available = ((_b = entry.capabilities) == null ? void 0 : _b.available) === true;
+    const reason = ((_c = entry.capabilities) == null ? void 0 : _c.reason) || entry.error || "The native debugger is unavailable for this source or host.";
+    const steps2 = () => entry.steps.map((_, i) => ({ frames: integer3("trace-frames-" + i, 1, 3600), buttons: read("trace-buttons-" + i).split(/[\s,]+/).filter(Boolean), port: 0 }));
+    const accept = async (operation, parameters) => {
+      if (!current2()) throw Error("The selected source changed. Open its native capture again.");
+      const generation = ++entry.generation;
+      entry.error = null;
+      const r = await ctx2.run(operation, { ...params, ...parameters }, { render: false, refresh: false });
+      if (!current2() || entry.generation !== generation) return;
+      if ((r == null ? void 0 : r.ok) === false || !identity(state2, r)) throw Error(r.error || "Native capture belongs to another source.");
+      entry.result = r;
+      entry.loaded = true;
+      ctx2.setDraft("native-trace-id", r.evidence_id);
+      await ctx2.render();
+    };
+    ctx2.use({
+      "trace-capture": () => {
+        if (!current2()) throw Error("The selected source changed.");
+        if (!available) throw Error(reason);
+        const replay = { steps: steps2(), start_frame: integer3("trace-start", 0, 3599), event_limit: integer3("trace-limit", 1, 2e3), instruction_limit: 2e7, timeout: 30 };
+        if (proposal) return accept("debugger.investigate", { investigation_id: proposal.investigation_id, candidate_id: proposal.candidate.candidate_id, replay });
+        const start = integer3("trace-address", 0, 268435455), length = integer3("trace-length", 1, 4096);
+        return accept("debugger.capture", { config: { ...replay, probes: [{ kind: read("trace-kind"), start, end: start + length - 1 }] } });
+      },
+      "trace-add-step": async () => {
+        if (!current2()) throw Error("The source changed.");
+        if (entry.steps.length >= 64) throw Error("Use at most 64 input steps.");
+        entry.steps = steps2();
+        entry.steps.push({});
+        await ctx2.render();
+      },
+      "trace-remove-step": async () => {
+        if (!current2()) throw Error("The source changed.");
+        if (entry.steps.length > 1) {
+          entry.steps = steps2();
+          entry.steps.pop();
+          await ctx2.render();
+        }
+      },
+      "trace-manual": () => {
+        if (!current2()) throw Error("The source changed.");
+        state2.nativeProbe = null;
+        return ctx2.render();
+      },
+      "trace-recheck": () => {
+        if (!current2()) throw Error("The source changed.");
+        entry.checked = false;
+        return ctx2.render();
+      },
+      "trace-page": (node) => {
+        if (!current2() || !result) throw Error("Open a capture first.");
+        return accept("debugger.get", { evidence_id: result.evidence_id, offset: Math.max(0, result.offset + Number(node.dataset.id) * 100), limit: 100 });
+      },
+      "trace-open": (node) => {
+        if (!current2() || !result) throw Error("Open a capture for the selected source first.");
+        const offset = Number(node.dataset.id);
+        if (!Number.isSafeInteger(offset) || offset < 0 || offset >= state2.artifact.size || !result.events.some((e) => {
+          var _a2, _b2;
+          return e.file_offset === offset || ((_a2 = e.execution_context) == null ? void 0 : _a2.file_offset) === offset || ((_b2 = e.execution_context) == null ? void 0 : _b2.source_candidate_offset) === offset;
+        })) throw Error("Choose a captured source location.");
+        const event = result.events.find((e) => {
+          var _a2, _b2;
+          return e.file_offset === offset || ((_a2 = e.execution_context) == null ? void 0 : _a2.file_offset) === offset || ((_b2 = e.execution_context) == null ? void 0 : _b2.source_candidate_offset) === offset;
+        });
+        state2.nativeSourceContext = { scope, evidence_id: result.evidence_id, offset: result.offset, event_id: event.id, source_offset: offset };
+        state2.resourceJump = offset;
+        return ctx2.navigate("resources");
+      }
+    });
+    const open = (offset) => Number.isSafeInteger(offset) ? button(hex2(offset), "trace-open", { id: String(offset) }) : "Unresolved";
+    const watched = proposal ? `<div class="notice"><strong>Investigating RAM ${hex2(proposal.candidate.offset)} · ${proposal.candidate.width} bytes</strong><p>Physical watch derived from the observed core buffer, including banked RAM.</p>${button("Use a manual address instead", "trace-manual")}</div>` : `<details><summary>Manual CPU address watch</summary><div class="field-row">${select("trace-kind", "Access type", [["write", "Writes"], ["read", "Reads"], ["exec", "Execution"]], ctx2.draft("trace-kind", "write"))}${field("trace-address", "CPU start address", ctx2.draft("trace-address", "0x100"))}${field("trace-length", "Address bytes", ctx2.draft("trace-length", "1"))}</div></details>`;
+    const route = `<h3>Replay input</h3><div class="table-wrap"><table><thead><tr><th>Step</th><th>Frames</th><th>Buttons held</th></tr></thead><tbody>${entry.steps.map((step, i) => {
+      var _a2;
+      return `<tr><td>${i + 1}</td><td>${field("trace-frames-" + i, "Frames", ctx2.draft("trace-frames-" + i, String(step.frames ?? 120)))}</td><td>${field("trace-buttons-" + i, "Buttons (blank for none)", ctx2.draft("trace-buttons-" + i, ((_a2 = step.buttons) == null ? void 0 : _a2.join(" ")) || ""), { placeholder: "For example start or a right" })}</td></tr>`;
+    }).join("")}</tbody></table></div><div class="actions">${button("Add input step", "trace-add-step", { disabled: entry.steps.length >= 64 })}${button("Remove last step", "trace-remove-step", { disabled: entry.steps.length <= 1 })}</div><div class="field-row">${field("trace-start", "Start recording after frame", ctx2.draft("trace-start", "0"))}${field("trace-limit", "Maximum sampled events", ctx2.draft("trace-limit", "200"))}</div>`;
+    const evidence2 = !result ? "" : `<h3>Captured evidence · ${esc(result.total_events)} events</h3><p>${esc(((_d = result.backend) == null ? void 0 : _d.backend) || "Native debugger")} ${esc(((_e = result.backend) == null ? void 0 : _e.version) || "")} · ${result.runtime_trusted ? "Authenticated capture" : "Historical capture"}</p>${result.status === "BUDGET_EXCEEDED" || result.omitted_events ? `<p class="notice warm">Partial capture: an event or instruction limit was reached. ${esc(result.omitted_events ?? 0)} events were omitted. Narrow the watch or recording window.</p>` : ""}<p>${result.route_complete ? "Replay reached its requested end." : "Replay did not reach its requested end."}</p>${result.events.length ? `<div class="table-wrap"><table><thead><tr><th>Event</th><th>CPU address</th><th>Value</th><th>Execution context</th><th>Context in source</th><th>Access in source</th></tr></thead><tbody>${result.events.map((e) => {
+      var _a2, _b2, _c2;
+      return `<tr><td>${esc(e.id)} · ${esc(e.kind)}</td><td><code>${hex2(e.address)}</code></td><td><code>${hex2(e.value)}</code></td><td><code>${hex2((_a2 = e.execution_context) == null ? void 0 : _a2.pc)}</code>${e.registers ? `<details><summary>Registers</summary><pre>${esc(Object.entries(e.registers).map(([k, v]) => k + " = " + hex2(v)).join("\n"))}</pre></details>` : ""}</td><td>${Number.isSafeInteger((_b2 = e.execution_context) == null ? void 0 : _b2.source_candidate_offset) ? button("Possible " + hex2(e.execution_context.source_candidate_offset), "trace-open", { id: String(e.execution_context.source_candidate_offset) }) + "<small>Unique byte-pattern candidate; mapper unresolved.</small>" : open((_c2 = e.execution_context) == null ? void 0 : _c2.file_offset)}</td><td>${open(e.file_offset)}</td></tr>`;
+    }).join("")}</tbody></table></div>` : "<p>No matching access was sampled. Check the route, start frame and watch range. An empty capture does not prove that the location is unused.</p>"}<div class="actions">${button("Previous events", "trace-page", { id: "-1", disabled: result.offset === 0 })}<span>${result.total_events ? result.offset + 1 : 0}–${Math.min(result.offset + result.events.length, result.total_events)} of ${result.total_events}</span>${button("Next events", "trace-page", { id: "1", disabled: result.offset + 100 >= Math.max(result.total_events, result.total_instruction_samples || 0) })}</div>`;
+    const instructions = !((_f = result == null ? void 0 : result.instruction_samples) == null ? void 0 : _f.length) ? "" : `<details><summary>Native instruction samples · ${esc(result.total_instruction_samples)}</summary><p>Ordered within this instruction sample only. The memory-access sequence has separate ordering.</p><div class="table-wrap"><table><thead><tr><th>Sample</th><th>CPU PC</th><th>Disassembly</th></tr></thead><tbody>${result.instruction_samples.map((row) => `<tr><td>${esc(row.id)}</td><td><code>${hex2(row.pc)}</code></td><td><code>${esc(row.assembly)}</code></td></tr>`).join("")}</tbody></table></div></details>`;
+    const budget = state2.artifact.system_id === "genesis" ? "At most 3,600 frames and 30 seconds. Native instruction sampling stops after at most 2,000 records; it does not count every instruction executed during the rest of the replay." : "At most 3,600 frames, 20 million instruction callbacks and 30 seconds.";
+    return `<section class="card native-execution-trace" id="native-accesses"><div class="card-heading"><h2>Trace actual accesses</h2>${button("Check debugger", "trace-recheck")}</div><p>Replay from power on with normal controller input. Record accesses and their execution context, then inspect mapped source bytes. This is a separate session; it does not resume Playtest.</p>${!available ? `<p class="notice warm">${esc(reason)}</p>` : ""}${entry.error ? `<p class="notice warm">${esc(entry.error)}</p>` : ""}${watched}${route}${button(proposal ? "Replay & investigate this value" : "Replay & capture accesses", "trace-capture", { primary: true, disabled: !available, reason })}<p class="subtle">${budget} Context is a lead; DMA ownership and the meaning of a value remain unproven.</p>${evidence2}${instructions}</section>`;
+  }
+  async function observedSourceContext(ctx2) {
+    var _a, _b;
+    const { state: state2 } = ctx2, scope = selectionKey(state2), entry = state2.nativeSourceContext;
+    if (!entry || entry.scope !== scope) return "";
+    const current2 = () => selectionKey(state2) === scope && state2.nativeSourceContext === entry;
+    if (!entry.result) {
+      try {
+        const r2 = await ctx2.api.call("debugger.get", { ...ctx2.sourceParams(), evidence_id: entry.evidence_id, offset: entry.offset, limit: 100 });
+        if (!current2()) return "";
+        if ((r2 == null ? void 0 : r2.ok) === false || !identity(state2, r2)) throw Error(r2.error || "Capture belongs to another source.");
+        entry.result = r2;
+      } catch (error) {
+        if (!current2()) return "";
+        return `<p class="notice warm">Access evidence could not be reopened: ${esc(error.message)}</p>`;
+      }
+    }
+    const r = entry.result, event = r.events.find((e) => e.id === entry.event_id), context = event == null ? void 0 : event.execution_context;
+    if (!event || ![event.file_offset, context == null ? void 0 : context.file_offset, context == null ? void 0 : context.source_candidate_offset].includes(entry.source_offset)) return "";
+    ctx2.use({
+      "source-capture-back": () => {
+        if (!current2()) throw Error("The selected source changed.");
+        return ctx2.navigate("debug");
+      },
+      "source-capture-dismiss": () => {
+        if (!current2()) return;
+        state2.nativeSourceContext = null;
+        return ctx2.render();
+      }
+    });
+    const candidate = (context == null ? void 0 : context.source_candidate_offset) === entry.source_offset && (context == null ? void 0 : context.file_offset) !== entry.source_offset;
+    return `<section class="card observed-source-context"><div class="card-heading"><h3>Why these bytes are open</h3>${button("Dismiss", "source-capture-dismiss")}</div><p>${r.runtime_trusted ? "Authenticated native capture" : "Historical capture"} · ${esc(((_a = r.backend) == null ? void 0 : _a.backend) || "Debugger")} ${esc(((_b = r.backend) == null ? void 0 : _b.version) || "")} · event ${event.id}</p><p>Observed <strong>${esc(event.kind)}</strong> at CPU address <code>${hex2(event.address)}</code>, value <code>${hex2(event.value)}</code>. Execution context: <code>${hex2(context == null ? void 0 : context.pc)}</code>.</p><p>${candidate ? "This source location is a unique byte-pattern candidate. Active mapper state was not established." : "This source location was mapped in the captured native event."} Game meaning and causal ownership remain separate questions.</p>${button("Back to captured evidence", "source-capture-back")}</section>`;
+  }
+
   // romancer/ui/hex_editor.js
   var HexDraft = class {
     constructor(state2, data) {
@@ -2451,7 +2611,7 @@
       return [...this.changes].sort(([a], [b]) => a - b).map(([offset, after]) => ({ offset, before: this.original.get(offset), after }));
     }
   };
-  var integer3 = (value) => {
+  var integer4 = (value) => {
     const n = Number(value);
     if (!Number.isSafeInteger(n) || n < 0) throw Error("Enter a nonnegative decimal or 0x hex offset.");
     return n;
@@ -2512,7 +2672,7 @@
       return result;
     };
     const go = async (offset) => {
-      const result = await scoped("resource.inspect", { offset: Math.min(integer3(offset), Math.max(0, state2.artifact.size - 1)), length: 256 });
+      const result = await scoped("resource.inspect", { offset: Math.min(integer4(offset), Math.max(0, state2.artifact.size - 1)), length: 256 });
       state2.results["resource.inspect"] = result;
       draft.selected = result.offset;
       ctx2.setDraft("hex-offset", String(result.offset));
@@ -2529,7 +2689,7 @@
         return ctx2.render();
       },
       "hex-search": async () => {
-        state2.hexSearch = { scope: ticket, result: await scoped("hex.search", { kind: read("hex-search-kind"), query: read("hex-search-query"), start: integer3(read("hex-search-start")), endian: read("hex-endian"), width: Number(read("hex-width")), signed: read("hex-signed") === "true" }) };
+        state2.hexSearch = { scope: ticket, result: await scoped("hex.search", { kind: read("hex-search-kind"), query: read("hex-search-query"), start: integer4(read("hex-search-start")), endian: read("hex-endian"), width: Number(read("hex-width")), signed: read("hex-signed") === "true" }) };
         await ctx2.render();
       },
       "hex-search-more": async () => {
@@ -2761,7 +2921,7 @@
   }
 
   // romancer/ui/compression_controls.js
-  function integer4(id) {
+  function integer5(id) {
     const text = read(id).trim(), value = Number(text);
     if (!text || !Number.isSafeInteger(value)) throw new Error("Enter a whole number for " + id + ".");
     return value;
@@ -2794,7 +2954,7 @@
       var _a2;
       return ((_a2 = compressedRoot(state2, row)) == null ? void 0 : _a2.artifact_id) === root.artifact_id;
     }) : [];
-    const parameters = () => ({ ...ctx2.sourceParams(), offset: integer4("compression-offset"), allocation: integer4("compression-allocation"), codec: read("compression-codec") });
+    const parameters = () => ({ ...ctx2.sourceParams(), offset: integer5("compression-offset"), allocation: integer5("compression-allocation"), codec: read("compression-codec") });
     ctx2.use({
       "compression-inspect": () => ctx2.run("compression.inspect", parameters()),
       "compression-extract": () => ctx2.run("compression.extract", parameters()),
@@ -2833,7 +2993,7 @@
 
   // romancer/ui/discovery_controls.js
   var systems2 = [["nes", "NES"], ["snes", "SNES"], ["genesis", "GEN"], ["gb", "Game Boy"], ["gbc", "Game Boy Color"], ["gba", "GBA"]];
-  function integer5(id) {
+  function integer6(id) {
     const text = read(id).trim(), value = Number(text);
     if (!text || !Number.isSafeInteger(value)) throw new Error("Enter a whole number for " + id + ".");
     return value;
@@ -2848,8 +3008,8 @@
         const kind = read("discover-kind");
         state2.discoveryPage = 0;
         const kinds = kind === "all" ? ["text", "graphics", "compression"] : [kind];
-        const target = kind === "pointers" ? { offset: integer5("discover-target"), width: integer5("discover-width"), endian: read("discover-endian"), base: integer5("discover-base") } : null;
-        return ctx2.run("resources.discover", { ...ctx2.sourceParams(), config: { system_id: read("discover-system"), start: integer5("discover-start"), length: integer5("discover-length"), kinds, target } });
+        const target = kind === "pointers" ? { offset: integer6("discover-target"), width: integer6("discover-width"), endian: read("discover-endian"), base: integer6("discover-base") } : null;
+        return ctx2.run("resources.discover", { ...ctx2.sourceParams(), config: { system_id: read("discover-system"), start: integer6("discover-start"), length: integer6("discover-length"), kinds, target } });
       },
       "discover-compressed": async (node) => {
         const row = result == null ? void 0 : result.candidates.find((row2) => row2.candidate_id === node.dataset.id);
@@ -2913,6 +3073,8 @@
         state2.resourceJump = null;
       }
     }
+    const observed = a ? await observedSourceContext(ctx2) : "";
+    if (!current2()) return "";
     const relationships = a ? await resourceRelationships(ctx2) : "";
     if (!current2()) return "";
     let assessment = state2.results["systems.identify"];
@@ -2981,7 +3143,7 @@
     });
     if (!a) return `${heading("Workspace", "Resources", "")}${empty("Import a source", "Choose a cartridge image.", button("Import source", "import", { primary: true }))}`;
     const pending = ((_c = state2.pending) == null ? void 0 : _c.kind) === "bytes" && state2.pending.artifact_id === a.artifact_id;
-    return `${heading("Resource investigator", "Resources", "Inspect the exact selected revision. Generic edits require explicit old bytes and preserve file size.", button("Import source", "import", { icon: "plus" }))}<div class="identity">${badge(a.kind, a.kind === "build" ? "good" : "neutral")}<strong>${esc(a.name)}</strong><span>${esc(a.system)} · ${size(a.size)}</span><code title="${a.sha256}">SHA-256 ${short(a.sha256)}…</code></div>${a.source_id ? `<section class="card"><h3>Continue editing this build</h3>${button("Reuse parent resource setup", "definitions-reuse")}<p class="subtle">Re-read declared offsets against this build.</p></section>` : ""}<div class="investigation-grid">${hexEditor(ctx2, data)}${byteNotes}</div>${comparison}${sourceSupport(ctx2)}${relationships}${scanControls(ctx2)}<details class="card"><summary>ROM health & revision</summary>${romHealthPanel(ctx2)}${revisionControls(ctx2)}${cheatControls(ctx2)}</details><details class="card"><summary>Find resources</summary>${discoveryControls(ctx2)}</details>${compressionControls(ctx2)}<details class="card"><summary>Declared resource catalog</summary>${catalogSection(ctx2, catalog)}</details><details class="card"><summary>System layout</summary>${systemSection(ctx2, assessment)}</details>${report(state2.results["bytes.plan"], "Proposed byte changes")}${report(state2.results["build.apply"], "Build result")}`;
+    return `${heading("Resource investigator", "Resources", "Inspect the exact selected revision. Generic edits require explicit old bytes and preserve file size.", button("Import source", "import", { icon: "plus" }))}<div class="identity">${badge(a.kind, a.kind === "build" ? "good" : "neutral")}<strong>${esc(a.name)}</strong><span>${esc(a.system)} · ${size(a.size)}</span><code title="${a.sha256}">SHA-256 ${short(a.sha256)}…</code></div>${a.source_id ? `<section class="card"><h3>Continue editing this build</h3>${button("Reuse parent resource setup", "definitions-reuse")}<p class="subtle">Re-read declared offsets against this build.</p></section>` : ""}${observed}<div class="investigation-grid">${hexEditor(ctx2, data)}${byteNotes}</div>${comparison}${sourceSupport(ctx2)}${relationships}${scanControls(ctx2)}<details class="card"><summary>ROM health & revision</summary>${romHealthPanel(ctx2)}${revisionControls(ctx2)}${cheatControls(ctx2)}</details><details class="card"><summary>Find resources</summary>${discoveryControls(ctx2)}</details>${compressionControls(ctx2)}<details class="card"><summary>Declared resource catalog</summary>${catalogSection(ctx2, catalog)}</details><details class="card"><summary>System layout</summary>${systemSection(ctx2, assessment)}</details>${report(state2.results["bytes.plan"], "Proposed byte changes")}${report(state2.results["build.apply"], "Build result")}`;
   }
   function parseInteger(value) {
     const n = Number(value);
@@ -3008,7 +3170,7 @@
   });
 
   // romancer/ui/menu_preview.js
-  var integer6 = (value, min, max, label) => {
+  var integer7 = (value, min, max, label) => {
     if (!Number.isSafeInteger(value) || value < min || value > max) throw Error("Invalid declared " + label + ".");
     return value;
   };
@@ -3045,13 +3207,13 @@
     const result = /* @__PURE__ */ new Map();
     let budget = 0;
     for (const glyph of metrics.glyphs) {
-      const bitmap = glyph.bitmap || {}, width = integer6(bitmap.width, 1, 32, "glyph width"), height = integer6(bitmap.height, 1, 32, "glyph height"), stride = integer6(bitmap.row_stride, 1, 4, "glyph row stride");
+      const bitmap = glyph.bitmap || {}, width = integer7(bitmap.width, 1, 32, "glyph width"), height = integer7(bitmap.height, 1, 32, "glyph height"), stride = integer7(bitmap.row_stride, 1, 4, "glyph row stride");
       if (stride !== Math.ceil(width / 8) || typeof bitmap.raw_hex !== "string" || bitmap.raw_hex.length !== stride * height * 2 || !/^[a-f0-9]+$/i.test(bitmap.raw_hex) || result.has(glyph.id)) throw Error("Measured glyph bitmap data is unavailable or ambiguous.");
       const raw = Uint8Array.from(bitmap.raw_hex.match(/../g), (value) => parseInt(value, 16)), mask = (1 << (8 - width % 8) % 8) - 1;
       for (let y = 0; y < height; y++) if (raw[(y + 1) * stride - 1] & mask) throw Error("Measured glyph has unsupported padding bits.");
-      integer6((_a = glyph.bearing) == null ? void 0 : _a.x, -64, 64, "glyph bearing");
-      integer6((_b = glyph.bearing) == null ? void 0 : _b.y, -64, 64, "glyph bearing");
-      integer6(glyph.advance_pixels, 0, 128, "glyph advance");
+      integer7((_a = glyph.bearing) == null ? void 0 : _a.x, -64, 64, "glyph bearing");
+      integer7((_b = glyph.bearing) == null ? void 0 : _b.y, -64, 64, "glyph bearing");
+      integer7(glyph.advance_pixels, 0, 128, "glyph advance");
       budget += raw.length;
       if (budget > 65536) throw Error("Measured font bitmap budget exceeded.");
       result.set(glyph.id, { ...glyph, width, height, stride, raw });
@@ -3074,8 +3236,8 @@
     if (((_b = config.font_schema) == null ? void 0 : _b.codec) !== "mono-row-msb-v1") throw Error("This font storage format has no declared bitmap preview.");
     if (preview.source_sha256 !== doc.source_sha256 || preview.document_id !== doc.document_id || preview.schema_sha256 !== doc.schema_sha256 || ((_c = preview.script) == null ? void 0 : _c.document_id) !== doc.document_id) throw Error("Menu layout belongs to different source text.");
     if (preview.font_sha256 !== metrics.source_sha256 || metrics.source_sha256 !== ((_d = config.font_schema.source) == null ? void 0 : _d.sha256) || preview.font_schema_sha256 !== metrics.font_schema_sha256 || preview.metrics_id !== metrics.metrics_id) throw Error("Menu placements and font measurements have different identities.");
-    const viewport = (_e = preview.profile) == null ? void 0 : _e.viewport, width = integer6(viewport == null ? void 0 : viewport.width, 1, 1024, "viewport width"), height = integer6(viewport == null ? void 0 : viewport.height, 1, 1024, "viewport height");
-    integer6(preview.profile.line_height_px, 1, 64, "line height");
+    const viewport = (_e = preview.profile) == null ? void 0 : _e.viewport, width = integer7(viewport == null ? void 0 : viewport.width, 1, 1024, "viewport width"), height = integer7(viewport == null ? void 0 : viewport.height, 1, 1024, "viewport height");
+    integer7(preview.profile.line_height_px, 1, 64, "line height");
     if (!Array.isArray(preview.cases) || !preview.cases.length || preview.cases.length > 32 || width * height * preview.cases.length > 8 * 1024 ** 2) throw Error("Declared cases exceed the menu canvas budget.");
     let cells = 0, placements = 0;
     for (const row of preview.cases) {
@@ -3144,14 +3306,14 @@
     for (const cell of row.cells) {
       const bounds2 = cell.box_bounds;
       if (!Array.isArray(bounds2) || bounds2.length !== 4) throw Error("Declared cell bounds are unavailable.");
-      for (const value of bounds2) integer6(value, -131072, 131072, "cell bounds");
+      for (const value of bounds2) integer7(value, -131072, 131072, "cell bounds");
       const { placements, advance } = placementsFor(cell, edited, drafts, owned.prepared);
       if (Number.isSafeInteger(advance) && advance > bounds2[2] - bounds2[0]) warnings.add("Text advance exceeds a declared box.");
       if (owned.preview.profile.line_height_px > bounds2[3] - bounds2[1]) warnings.add("Declared line height exceeds its box.");
       for (const placement of placements) {
         const glyph = font.get(placement.glyph_id);
         if (!glyph) throw Error("A placed glyph is missing from the measured font.");
-        const left = integer6(placement.x, -131072, 131072, "glyph position") + glyph.bearing.x, top = integer6(placement.y, -131072, 131072, "glyph position") + glyph.bearing.y;
+        const left = integer7(placement.x, -131072, 131072, "glyph position") + glyph.bearing.x, top = integer7(placement.y, -131072, 131072, "glyph position") + glyph.bearing.y;
         for (let y = 0; y < glyph.height; y++) for (let x = 0; x < glyph.width; x++) if (glyph.raw[y * glyph.stride + (x >> 3)] & 128 >> x % 8) {
           const px = left + x, py = top + y;
           if (px < bounds2[0] || px >= bounds2[2] || py < bounds2[1] || py >= bounds2[3]) warnings.add("Glyph ink exceeds a declared box.");
@@ -3299,12 +3461,12 @@
 
   // romancer/ui/declarations.js
   var systems3 = [["nes", "NES"], ["snes", "SNES"], ["genesis", "Genesis"], ["gb", "Game Boy"], ["gbc", "Game Boy Color"], ["gba", "GBA"]];
-  var integer7 = (id) => {
+  var integer8 = (id) => {
     const text = read(id).trim(), value = Number(text);
     if (!text || !Number.isSafeInteger(value)) throw new Error("Enter a whole number for " + id + ".");
     return value;
   };
-  var optional = (id) => read(id).trim() ? integer7(id) : null;
+  var optional = (id) => read(id).trim() ? integer8(id) : null;
   function system(ctx2, prefix) {
     return select(prefix + "-system", "System", systems3, ctx2.draft(prefix + "-system", resourceSystem(ctx2.state)));
   }
@@ -3331,14 +3493,14 @@
         const [id, opcode, args, role] = line.split(",").map((s) => s.trim());
         return { id, opcode: parseInt(opcode, 16), argument_length: Number(args), position_independent: true, layout_role: role };
       });
-      return declared(ctx2, "script", { system_id: read("text-system"), offset: integer7("text-offset"), capacity: integer7("text-capacity"), count: integer7("text-count"), stride: integer7("text-stride"), pointer_offset: optional("text-pointer"), pointer_width: integer7("text-pointer-width"), pointer_endian: read("text-endian"), pointer_base: integer7("text-base"), terminator: integer7("text-terminator"), padding: integer7("text-padding"), encoding: read("text-encoding"), table: read("text-table"), controls });
+      return declared(ctx2, "script", { system_id: read("text-system"), offset: integer8("text-offset"), capacity: integer8("text-capacity"), count: integer8("text-count"), stride: integer8("text-stride"), pointer_offset: optional("text-pointer"), pointer_width: integer8("text-pointer-width"), pointer_endian: read("text-endian"), pointer_base: integer8("text-base"), terminator: integer8("text-terminator"), padding: integer8("text-padding"), encoding: read("text-encoding"), table: read("text-table"), controls });
     } });
     return `<details class="config" ${ctx2.state.openDeclaration === "text" ? "open" : ""}><summary>Declare text slots</summary>${system(ctx2, "text")}<div class="field-row">${number(ctx2, "text-offset", "First text offset", "0")}${number(ctx2, "text-capacity", "Bytes per slot", "64")}${number(ctx2, "text-count", "Slot count", "1")}${number(ctx2, "text-stride", "Slot stride", "64")}${number(ctx2, "text-pointer", "Pointer table offset (optional)", "")}${number(ctx2, "text-pointer-width", "Pointer bytes", "2")}${number(ctx2, "text-base", "Add to stored pointer for file offset", "0")}${select("text-endian", "Pointer byte order", [["little", "Little endian"], ["big", "Big endian"]], ctx2.draft("text-endian", "little"))}${number(ctx2, "text-terminator", "Terminator byte", "0")}${number(ctx2, "text-padding", "Padding byte", "255")}</div>${select("text-encoding", "Encoding", [["ascii", "ASCII"], ["table", "Custom single-byte table"]], ctx2.draft("text-encoding", "ascii"))}${area("text-table", "Custom table (HH=character)", ctx2.draft("text-table", ""), 3)}${area("text-controls", "Controls (name, hex opcode, argument bytes, line/page/pause/opaque)", ctx2.draft("text-controls", ""), 2)}<p class="subtle">Text pointer formula: file offset = stored value + adjustment. For a GBA ROM window beginning at 0x08000000, use -134217728. This differs from the subtraction base in Data tables.</p>${button("Load text declaration", "declare-text")}</details>`;
   }
   function graphicsDeclaration(ctx2) {
     prefill(ctx2, "gfx");
     ctx2.use({ "declare-graphics": () => {
-      const config = { system_id: read("gfx-system"), offset: integer7("gfx-offset"), count: integer7("gfx-count"), codec: read("gfx-codec"), width: integer7("gfx-width"), height: integer7("gfx-height"), palette_offset: optional("gfx-palette"), palette_banks: integer7("gfx-banks"), palette_format: read("gfx-palette-format"), map_offset: optional("gfx-map"), map_width: integer7("gfx-map-width"), map_height: integer7("gfx-map-height"), font_chars: read("gfx-chars"), advance_offset: optional("gfx-advance"), advance_pixels: integer7("gfx-advance-pixels") };
+      const config = { system_id: read("gfx-system"), offset: integer8("gfx-offset"), count: integer8("gfx-count"), codec: read("gfx-codec"), width: integer8("gfx-width"), height: integer8("gfx-height"), palette_offset: optional("gfx-palette"), palette_banks: integer8("gfx-banks"), palette_format: read("gfx-palette-format"), map_offset: optional("gfx-map"), map_width: integer8("gfx-map-width"), map_height: integer8("gfx-map-height"), font_chars: read("gfx-chars"), advance_offset: optional("gfx-advance"), advance_pixels: integer8("gfx-advance-pixels") };
       return declared(ctx2, "assets", config);
     } });
     return `<details class="config" ${ctx2.state.openDeclaration === "gfx" ? "open" : ""}><summary>Declare graphics or font</summary>${system(ctx2, "gfx")}${select("gfx-codec", "Storage layout", [["", "System tile template"], ["mono-row-msb-v1", "Mono font rows"], ["tile8-planar2-msb-v1", "NES 2bpp separate planes"], ["tile8-paired2-msb-v1", "Game Boy 2bpp paired planes"], ["tile8-paired4-msb-v1", "4bpp paired planes"], ["tile8-packed4-high-v1", "4bpp high nibble first"], ["tile8-packed4-low-v1", "4bpp low nibble first"]], ctx2.draft("gfx-codec", ""))}<div class="field-row">${number(ctx2, "gfx-offset", "Bitmap offset", "0")}${number(ctx2, "gfx-count", "Tile or glyph count", "1")}${number(ctx2, "gfx-width", "Cell width", "8")}${number(ctx2, "gfx-height", "Cell height", "8")}${number(ctx2, "gfx-palette", "Palette offset (optional)", "")}${number(ctx2, "gfx-banks", "Palette banks", "1")}${select("gfx-palette-format", "Palette layout", [["rgb555-le", "RGB555 little endian"], ["rgb555-be", "RGB555 big endian"], ["genesis", "Genesis RGB333"]], ctx2.draft("gfx-palette-format", ctx2.state.artifact.system_id === "genesis" ? "genesis" : "rgb555-le"))}${number(ctx2, "gfx-map", "Tilemap offset (optional)", "")}${number(ctx2, "gfx-map-width", "Map columns", "1")}${number(ctx2, "gfx-map-height", "Map rows", "1")}</div>${field("gfx-chars", "Font characters in cell order (optional)", ctx2.draft("gfx-chars", ""))}<div class="field-row">${number(ctx2, "gfx-advance", "Stored advance table offset (optional)", "")}${number(ctx2, "gfx-advance-pixels", "Fixed advance in pixels", "8")}</div>${button("Load graphics declaration", "declare-graphics")}</details>`;
@@ -3350,11 +3512,11 @@
       return (_a2 = r.descriptors) == null ? void 0 : _a2.font;
     });
     ctx2.use({ "configure-menu": async () => {
-      const result = await ctx2.run("resources.menu_form", { ...ctx2.sourceParams(), font_artifact_id: read("layout-font"), width: integer7("layout-width"), height: integer7("layout-height"), line_height: integer7("layout-line-height") }, { render: false });
+      const result = await ctx2.run("resources.menu_form", { ...ctx2.sourceParams(), font_artifact_id: read("layout-font"), width: integer8("layout-width"), height: integer8("layout-height"), line_height: integer8("layout-line-height") }, { render: false });
       ctx2.setDraft("menu-config", JSON.stringify({ font_artifact_id: result.font_artifact_id, font_schema: result.font_schema, profile: result.profile, cases: result.cases, request: {} }, null, 2));
       await ctx2.render();
     }, "configure-layout": async () => {
-      const result = await ctx2.run("resources.layout_form", { ...ctx2.sourceParams(), font_artifact_id: read("layout-font"), width: integer7("layout-width"), height: integer7("layout-height"), line_height: integer7("layout-line-height") }, { render: false });
+      const result = await ctx2.run("resources.layout_form", { ...ctx2.sourceParams(), font_artifact_id: read("layout-font"), width: integer8("layout-width"), height: integer8("layout-height"), line_height: integer8("layout-line-height") }, { render: false });
       ctx2.setDraft("layout-config", JSON.stringify({ font_artifact_id: result.font_artifact_id, font_schema: result.font_schema, policy: result.policy, request: result.request }, null, 2));
       await ctx2.render();
     } });
@@ -5247,12 +5409,12 @@ ${font ? `<section class="card"><h3>Font metrics · ${esc(font.id)}</h3><div cla
   });
 
   // romancer/ui/structural_lab.js
-  var hex2 = (v) => "0x" + v.toString(16);
+  var hex3 = (v) => "0x" + v.toString(16);
   var bound = (state2, r) => {
     var _a, _b;
     return (r == null ? void 0 : r.source_sha256) === ((_a = state2.artifact) == null ? void 0 : _a.sha256) && r.artifact_id === ((_b = state2.artifact) == null ? void 0 : _b.artifact_id);
   };
-  function integer8(id, min, max) {
+  function integer9(id, min, max) {
     const text = read(id), value = Number(text);
     if (!text.trim() || !Number.isSafeInteger(value) || value < min || value > max) throw Error("Choose a whole number from " + min + " to " + max + ".");
     return value;
@@ -5273,7 +5435,7 @@ ${font ? `<section class="card"><h3>Font metrics · ${esc(font.id)}</h3><div cla
     ctx2.use({
       "lab-survey": async () => {
         if (!current2()) throw Error("The selected source changed.");
-        const window2 = { offset: integer8("lab-offset", 0, 64 * 1024 ** 2), length: integer8("lab-length", 1, 65536) }, generation = ++entry.generation;
+        const window2 = { offset: integer9("lab-offset", 0, 64 * 1024 ** 2), length: integer9("lab-length", 1, 65536) }, generation = ++entry.generation;
         const r = await ctx2.run("structures.survey", { ...params, ...window2 }, { render: false, refresh: false });
         if (!current2() || entry.generation !== generation) return;
         if ((r == null ? void 0 : r.ok) === false || !bound(state2, r)) throw Error(r.error || "Experiment belongs to another source.");
@@ -5292,130 +5454,7 @@ ${font ? `<section class="card"><h3>Font metrics · ${esc(font.id)}</h3><div cla
         await ctx2.navigate("tables");
       }
     });
-    return `<section class="card structural-lab"><h2>Explore ROM structure</h2><p>Test repeated numeric layouts, inspect sample records, and open a neutral editor. These are hypotheses; game meaning and pointer use need behavioral evidence.</p><div class="field-row">${field("lab-offset", "Window file offset", ctx2.draft("lab-offset", "0"))}${field("lab-length", "Window bytes (up to 65536)", ctx2.draft("lab-length", "4096"))}</div>${button("Test this range", "lab-survey", { primary: true })}${result ? `<p>${result.coverage.positions_tested} layouts tested · start positions sampled every ${result.coverage.position_stride} bytes · ${result.total_candidates} surviving hypotheses${result.truncated ? " · result limit reached" : ""}</p><p class="notice">${esc(result.next_experiment)}</p>${select("lab-interpretation", "Open editor as", [["numeric", "Neutral numeric values"], ["linear-pointer", "An explicit linear-pointer hypothesis"]], ctx2.draft("lab-interpretation", "numeric"))}${result.candidates.length ? `<div class="table-wrap"><table><thead><tr><th>First record</th><th>Layout</th><th>Sample values and possible targets</th><th></th></tr></thead><tbody>${result.candidates.slice(0, 12).map((c) => `<tr><td><code>${hex2(c.offset)}</code></td><td>${c.count} records · ${c.stride} bytes/record<br>${c.width * 8} bit · ${esc(c.endian)}<br>Target hypothesis: stored − ${hex2(c.base)}</td><td>${c.samples.slice(0, 3).map((s) => `<div><code>${hex2(s.stored_value)} → ${hex2(s.target_offset)}</code>${s.target_preview ? " · " + esc(s.target_preview) : ""}</div>`).join("")}</td><td>${button("Open table editor", "lab-open", { id: c.candidate_id })}</td></tr>`).join("")}</tbody></table></div><p class="subtle">Showing ${Math.min(12, result.candidates.length)} of ${result.candidates.length} retained hypotheses. Use a smaller range to separate layouts. Opening an editor does not modify ROM bytes.</p>` : "<p>No repeated layout survived these tests. Try another range or use native access evidence to locate data.</p>"}` : ""}</section>`;
-  }
-
-  // romancer/ui/execution_trace.js
-  var hex3 = (v) => Number.isSafeInteger(v) ? "0x" + v.toString(16) : "Unknown";
-  var identity = (state2, r) => {
-    var _a, _b;
-    return (r == null ? void 0 : r.source_sha256) === ((_a = state2.artifact) == null ? void 0 : _a.sha256) && r.artifact_id === ((_b = state2.artifact) == null ? void 0 : _b.artifact_id);
-  };
-  function integer9(id, min, max) {
-    const text = read(id), v = Number(text);
-    if (!text.trim() || !Number.isSafeInteger(v) || v < min || v > max) throw Error("Enter a whole number from " + min + " to " + max + ".");
-    return v;
-  }
-  async function executionTrace(ctx2) {
-    var _a, _b, _c, _d, _e, _f;
-    const { state: state2 } = ctx2, scope = selectionKey(state2), params = { ...ctx2.sourceParams() };
-    let entry = state2.nativeTrace;
-    if ((entry == null ? void 0 : entry.scope) !== scope) state2.nativeTrace = entry = { scope, generation: 0, result: null, steps: [{}] };
-    const current2 = () => selectionKey(state2) === scope && state2.nativeTrace === entry;
-    const proposal = ((_a = state2.nativeProbe) == null ? void 0 : _a.scope) === scope && identity(state2, state2.nativeProbe.result) ? state2.nativeProbe.result : null;
-    if (!entry.checked) {
-      entry.checked = true;
-      try {
-        const r = await ctx2.api.call("debugger.capabilities", params);
-        if (current2()) {
-          if ((r == null ? void 0 : r.ok) === false || !identity(state2, r)) throw Error(r.error || "Backend identity differs.");
-          entry.capabilities = r;
-        }
-      } catch (error) {
-        if (current2()) entry.error = error.message;
-      }
-    }
-    const remembered = ctx2.draft("native-trace-id", "");
-    if (!entry.loaded && remembered) {
-      entry.loaded = true;
-      const generation = ++entry.generation;
-      try {
-        const r = await ctx2.api.call("debugger.get", { ...params, evidence_id: remembered, offset: 0, limit: 100 });
-        if (current2() && entry.generation === generation) {
-          if ((r == null ? void 0 : r.ok) === false || !identity(state2, r)) throw Error(r.error || "Capture belongs to another source.");
-          entry.result = r;
-        }
-      } catch (error) {
-        if (current2() && entry.generation === generation) entry.error = error.message;
-      }
-    }
-    const result = identity(state2, entry.result) ? entry.result : null, available = ((_b = entry.capabilities) == null ? void 0 : _b.available) === true;
-    const reason = ((_c = entry.capabilities) == null ? void 0 : _c.reason) || entry.error || "The native debugger is unavailable for this source or host.";
-    const steps2 = () => entry.steps.map((_, i) => ({ frames: integer9("trace-frames-" + i, 1, 3600), buttons: read("trace-buttons-" + i).split(/[\s,]+/).filter(Boolean), port: 0 }));
-    const accept = async (operation, parameters) => {
-      if (!current2()) throw Error("The selected source changed. Open its native capture again.");
-      const generation = ++entry.generation;
-      entry.error = null;
-      const r = await ctx2.run(operation, { ...params, ...parameters }, { render: false, refresh: false });
-      if (!current2() || entry.generation !== generation) return;
-      if ((r == null ? void 0 : r.ok) === false || !identity(state2, r)) throw Error(r.error || "Native capture belongs to another source.");
-      entry.result = r;
-      entry.loaded = true;
-      ctx2.setDraft("native-trace-id", r.evidence_id);
-      await ctx2.render();
-    };
-    ctx2.use({
-      "trace-capture": () => {
-        if (!current2()) throw Error("The selected source changed.");
-        if (!available) throw Error(reason);
-        const replay = { steps: steps2(), start_frame: integer9("trace-start", 0, 3599), event_limit: integer9("trace-limit", 1, 2e3), instruction_limit: 2e7, timeout: 30 };
-        if (proposal) return accept("debugger.investigate", { investigation_id: proposal.investigation_id, candidate_id: proposal.candidate.candidate_id, replay });
-        const start = integer9("trace-address", 0, 268435455), length = integer9("trace-length", 1, 4096);
-        return accept("debugger.capture", { config: { ...replay, probes: [{ kind: read("trace-kind"), start, end: start + length - 1 }] } });
-      },
-      "trace-add-step": async () => {
-        if (!current2()) throw Error("The source changed.");
-        if (entry.steps.length >= 64) throw Error("Use at most 64 input steps.");
-        entry.steps = steps2();
-        entry.steps.push({});
-        await ctx2.render();
-      },
-      "trace-remove-step": async () => {
-        if (!current2()) throw Error("The source changed.");
-        if (entry.steps.length > 1) {
-          entry.steps = steps2();
-          entry.steps.pop();
-          await ctx2.render();
-        }
-      },
-      "trace-manual": () => {
-        if (!current2()) throw Error("The source changed.");
-        state2.nativeProbe = null;
-        return ctx2.render();
-      },
-      "trace-recheck": () => {
-        if (!current2()) throw Error("The source changed.");
-        entry.checked = false;
-        return ctx2.render();
-      },
-      "trace-page": (node) => {
-        if (!current2() || !result) throw Error("Open a capture first.");
-        return accept("debugger.get", { evidence_id: result.evidence_id, offset: Math.max(0, result.offset + Number(node.dataset.id) * 100), limit: 100 });
-      },
-      "trace-open": (node) => {
-        if (!current2() || !result) throw Error("Open a capture for the selected source first.");
-        const offset = Number(node.dataset.id);
-        if (!Number.isSafeInteger(offset) || offset < 0 || offset >= state2.artifact.size || !result.events.some((e) => {
-          var _a2, _b2;
-          return e.file_offset === offset || ((_a2 = e.execution_context) == null ? void 0 : _a2.file_offset) === offset || ((_b2 = e.execution_context) == null ? void 0 : _b2.source_candidate_offset) === offset;
-        })) throw Error("Choose a captured source location.");
-        state2.resourceJump = offset;
-        return ctx2.navigate("resources");
-      }
-    });
-    const open = (offset) => Number.isSafeInteger(offset) ? button(hex3(offset), "trace-open", { id: String(offset) }) : "Unresolved";
-    const watched = proposal ? `<div class="notice"><strong>Investigating RAM ${hex3(proposal.candidate.offset)} · ${proposal.candidate.width} bytes</strong><p>Physical watch derived from the observed core buffer, including banked RAM.</p>${button("Use a manual address instead", "trace-manual")}</div>` : `<details><summary>Manual CPU address watch</summary><div class="field-row">${select("trace-kind", "Access type", [["write", "Writes"], ["read", "Reads"], ["exec", "Execution"]], ctx2.draft("trace-kind", "write"))}${field("trace-address", "CPU start address", ctx2.draft("trace-address", "0x100"))}${field("trace-length", "Address bytes", ctx2.draft("trace-length", "1"))}</div></details>`;
-    const route = `<h3>Replay input</h3><div class="table-wrap"><table><thead><tr><th>Step</th><th>Frames</th><th>Buttons held</th></tr></thead><tbody>${entry.steps.map((step, i) => {
-      var _a2;
-      return `<tr><td>${i + 1}</td><td>${field("trace-frames-" + i, "Frames", ctx2.draft("trace-frames-" + i, String(step.frames ?? 120)))}</td><td>${field("trace-buttons-" + i, "Buttons (blank for none)", ctx2.draft("trace-buttons-" + i, ((_a2 = step.buttons) == null ? void 0 : _a2.join(" ")) || ""), { placeholder: "For example start or a right" })}</td></tr>`;
-    }).join("")}</tbody></table></div><div class="actions">${button("Add input step", "trace-add-step", { disabled: entry.steps.length >= 64 })}${button("Remove last step", "trace-remove-step", { disabled: entry.steps.length <= 1 })}</div><div class="field-row">${field("trace-start", "Start recording after frame", ctx2.draft("trace-start", "0"))}${field("trace-limit", "Maximum sampled events", ctx2.draft("trace-limit", "200"))}</div>`;
-    const evidence2 = !result ? "" : `<h3>Captured evidence · ${esc(result.total_events)} events</h3><p>${esc(((_d = result.backend) == null ? void 0 : _d.backend) || "Native debugger")} ${esc(((_e = result.backend) == null ? void 0 : _e.version) || "")} · ${result.runtime_trusted ? "Authenticated capture" : "Historical capture"}</p>${result.status === "BUDGET_EXCEEDED" || result.omitted_events ? `<p class="notice warm">Partial capture: an event or instruction limit was reached. ${esc(result.omitted_events ?? 0)} events were omitted. Narrow the watch or recording window.</p>` : ""}<p>${result.route_complete ? "Replay reached its requested end." : "Replay did not reach its requested end."}</p>${result.events.length ? `<div class="table-wrap"><table><thead><tr><th>Event</th><th>CPU address</th><th>Value</th><th>Execution context</th><th>Context in source</th><th>Access in source</th></tr></thead><tbody>${result.events.map((e) => {
-      var _a2, _b2, _c2;
-      return `<tr><td>${esc(e.id)} · ${esc(e.kind)}</td><td><code>${hex3(e.address)}</code></td><td><code>${hex3(e.value)}</code></td><td><code>${hex3((_a2 = e.execution_context) == null ? void 0 : _a2.pc)}</code>${e.registers ? `<details><summary>Registers</summary><pre>${esc(Object.entries(e.registers).map(([k, v]) => k + " = " + hex3(v)).join("\n"))}</pre></details>` : ""}</td><td>${Number.isSafeInteger((_b2 = e.execution_context) == null ? void 0 : _b2.source_candidate_offset) ? button("Possible " + hex3(e.execution_context.source_candidate_offset), "trace-open", { id: String(e.execution_context.source_candidate_offset) }) + "<small>Unique byte-pattern candidate; mapper unresolved.</small>" : open((_c2 = e.execution_context) == null ? void 0 : _c2.file_offset)}</td><td>${open(e.file_offset)}</td></tr>`;
-    }).join("")}</tbody></table></div>` : "<p>No matching access was sampled. Check the route, start frame and watch range. An empty capture does not prove that the location is unused.</p>"}<div class="actions">${button("Previous events", "trace-page", { id: "-1", disabled: result.offset === 0 })}<span>${result.total_events ? result.offset + 1 : 0}–${Math.min(result.offset + result.events.length, result.total_events)} of ${result.total_events}</span>${button("Next events", "trace-page", { id: "1", disabled: result.offset + 100 >= Math.max(result.total_events, result.total_instruction_samples || 0) })}</div>`;
-    const instructions = !((_f = result == null ? void 0 : result.instruction_samples) == null ? void 0 : _f.length) ? "" : `<details><summary>Native instruction samples · ${esc(result.total_instruction_samples)}</summary><p>Ordered within this instruction sample only. The memory-access sequence has separate ordering.</p><div class="table-wrap"><table><thead><tr><th>Sample</th><th>CPU PC</th><th>Disassembly</th></tr></thead><tbody>${result.instruction_samples.map((row) => `<tr><td>${esc(row.id)}</td><td><code>${hex3(row.pc)}</code></td><td><code>${esc(row.assembly)}</code></td></tr>`).join("")}</tbody></table></div></details>`;
-    const budget = state2.artifact.system_id === "genesis" ? "At most 3,600 frames and 30 seconds. Native instruction sampling stops after at most 2,000 records; it does not count every instruction executed during the rest of the replay." : "At most 3,600 frames, 20 million instruction callbacks and 30 seconds.";
-    return `<section class="card native-execution-trace" id="native-accesses"><div class="card-heading"><h2>Trace actual accesses</h2>${button("Check debugger", "trace-recheck")}</div><p>Replay from power on with normal controller input. Record accesses and their execution context, then inspect mapped source bytes. This is a separate session; it does not resume Playtest.</p>${!available ? `<p class="notice warm">${esc(reason)}</p>` : ""}${entry.error ? `<p class="notice warm">${esc(entry.error)}</p>` : ""}${watched}${route}${button(proposal ? "Replay & investigate this value" : "Replay & capture accesses", "trace-capture", { primary: true, disabled: !available, reason })}<p class="subtle">${budget} Context is a lead; DMA ownership and the meaning of a value remain unproven.</p>${evidence2}${instructions}</section>`;
+    return `<section class="card structural-lab"><h2>Explore ROM structure</h2><p>Test repeated numeric layouts, inspect sample records, and open a neutral editor. These are hypotheses; game meaning and pointer use need behavioral evidence.</p><div class="field-row">${field("lab-offset", "Window file offset", ctx2.draft("lab-offset", "0"))}${field("lab-length", "Window bytes (up to 65536)", ctx2.draft("lab-length", "4096"))}</div>${button("Test this range", "lab-survey", { primary: true })}${result ? `<p>${result.coverage.positions_tested} layouts tested · start positions sampled every ${result.coverage.position_stride} bytes · ${result.total_candidates} surviving hypotheses${result.truncated ? " · result limit reached" : ""}</p><p class="notice">${esc(result.next_experiment)}</p>${select("lab-interpretation", "Open editor as", [["numeric", "Neutral numeric values"], ["linear-pointer", "An explicit linear-pointer hypothesis"]], ctx2.draft("lab-interpretation", "numeric"))}${result.candidates.length ? `<div class="table-wrap"><table><thead><tr><th>First record</th><th>Layout</th><th>Sample values and possible targets</th><th></th></tr></thead><tbody>${result.candidates.slice(0, 12).map((c) => `<tr><td><code>${hex3(c.offset)}</code></td><td>${c.count} records · ${c.stride} bytes/record<br>${c.width * 8} bit · ${esc(c.endian)}<br>Target hypothesis: stored − ${hex3(c.base)}</td><td>${c.samples.slice(0, 3).map((s) => `<div><code>${hex3(s.stored_value)} → ${hex3(s.target_offset)}</code>${s.target_preview ? " · " + esc(s.target_preview) : ""}</div>`).join("")}</td><td>${button("Open table editor", "lab-open", { id: c.candidate_id })}</td></tr>`).join("")}</tbody></table></div><p class="subtle">Showing ${Math.min(12, result.candidates.length)} of ${result.candidates.length} retained hypotheses. Use a smaller range to separate layouts. Opening an editor does not modify ROM bytes.</p>` : "<p>No repeated layout survived these tests. Try another range or use native access evidence to locate data.</p>"}` : ""}</section>`;
   }
 
   // romancer/ui/value_finder.js

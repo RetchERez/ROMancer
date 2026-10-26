@@ -49,6 +49,8 @@ export async function executionTrace(ctx){
   'trace-open':node=>{
    if(!current()||!result)throw Error('Open a capture for the selected source first.');const offset=Number(node.dataset.id);
    if(!Number.isSafeInteger(offset)||offset<0||offset>=state.artifact.size||!result.events.some(e=>e.file_offset===offset||e.execution_context?.file_offset===offset||e.execution_context?.source_candidate_offset===offset))throw Error('Choose a captured source location.');
+   const event=result.events.find(e=>e.file_offset===offset||e.execution_context?.file_offset===offset||e.execution_context?.source_candidate_offset===offset);
+   state.nativeSourceContext={scope,evidence_id:result.evidence_id,offset:result.offset,event_id:event.id,source_offset:offset};
    state.resourceJump=offset;return ctx.navigate('resources');
   }
  });
@@ -60,4 +62,22 @@ export async function executionTrace(ctx){
  const instructions=!result?.instruction_samples?.length?'':`<details><summary>Native instruction samples · ${esc(result.total_instruction_samples)}</summary><p>Ordered within this instruction sample only. The memory-access sequence has separate ordering.</p><div class="table-wrap"><table><thead><tr><th>Sample</th><th>CPU PC</th><th>Disassembly</th></tr></thead><tbody>${result.instruction_samples.map(row=>`<tr><td>${esc(row.id)}</td><td><code>${hex(row.pc)}</code></td><td><code>${esc(row.assembly)}</code></td></tr>`).join('')}</tbody></table></div></details>`;
  const budget=state.artifact.system_id==='genesis'?'At most 3,600 frames and 30 seconds. Native instruction sampling stops after at most 2,000 records; it does not count every instruction executed during the rest of the replay.':'At most 3,600 frames, 20 million instruction callbacks and 30 seconds.';
  return `<section class="card native-execution-trace" id="native-accesses"><div class="card-heading"><h2>Trace actual accesses</h2>${button('Check debugger','trace-recheck')}</div><p>Replay from power on with normal controller input. Record accesses and their execution context, then inspect mapped source bytes. This is a separate session; it does not resume Playtest.</p>${!available?`<p class="notice warm">${esc(reason)}</p>`:''}${entry.error?`<p class="notice warm">${esc(entry.error)}</p>`:''}${watched}${route}${button(proposal?'Replay & investigate this value':'Replay & capture accesses','trace-capture',{primary:true,disabled:!available,reason})}<p class="subtle">${budget} Context is a lead; DMA ownership and the meaning of a value remain unproven.</p>${evidence}${instructions}</section>`;
+}
+
+export async function observedSourceContext(ctx){
+ const {state}=ctx,scope=selectionKey(state),entry=state.nativeSourceContext;
+ if(!entry||entry.scope!==scope)return '';
+ const current=()=>selectionKey(state)===scope&&state.nativeSourceContext===entry;
+ if(!entry.result){
+  try{const r=await ctx.api.call('debugger.get',{...ctx.sourceParams(),evidence_id:entry.evidence_id,offset:entry.offset,limit:100});
+   if(!current())return '';
+   if(r?.ok===false||!identity(state,r))throw Error(r.error||'Capture belongs to another source.');entry.result=r;
+  }catch(error){if(!current())return '';return `<p class="notice warm">Access evidence could not be reopened: ${esc(error.message)}</p>`;}
+ }
+ const r=entry.result,event=r.events.find(e=>e.id===entry.event_id),context=event?.execution_context;
+ if(!event||![event.file_offset,context?.file_offset,context?.source_candidate_offset].includes(entry.source_offset))return '';
+ ctx.use({'source-capture-back':()=>{if(!current())throw Error('The selected source changed.');return ctx.navigate('debug');},
+  'source-capture-dismiss':()=>{if(!current())return;state.nativeSourceContext=null;return ctx.render();}});
+ const candidate=context?.source_candidate_offset===entry.source_offset&&context?.file_offset!==entry.source_offset;
+ return `<section class="card observed-source-context"><div class="card-heading"><h3>Why these bytes are open</h3>${button('Dismiss','source-capture-dismiss')}</div><p>${r.runtime_trusted?'Authenticated native capture':'Historical capture'} · ${esc(r.backend?.backend||'Debugger')} ${esc(r.backend?.version||'')} · event ${event.id}</p><p>Observed <strong>${esc(event.kind)}</strong> at CPU address <code>${hex(event.address)}</code>, value <code>${hex(event.value)}</code>. Execution context: <code>${hex(context?.pc)}</code>.</p><p>${candidate?'This source location is a unique byte-pattern candidate. Active mapper state was not established.':'This source location was mapped in the captured native event.'} Game meaning and causal ownership remain separate questions.</p>${button('Back to captured evidence','source-capture-back')}</section>`;
 }

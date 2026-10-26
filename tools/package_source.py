@@ -155,6 +155,7 @@ APPROVED_FILES = APPROVED_FILES | frozenset({
     'romancer/debugger_tools.py','tests/test_debugger_tools.py',
     'romancer/genesis_debugger.py','romancer/genesis_capture.lua','tests/test_genesis_debugger.py',
     'romancer/structural_lab.py','romancer/structure_tools.py','tests/test_structural_lab.py','tests/test_structure_tools.py',
+    'romancer/compression_oracle.py',
     'romancer/core_memory_layout.py','tests/test_core_memory_layout.py',
     'tests/test_native_debugger.py',
     'romancer/ui/investigation_series.js','tests/ui_investigation_series.mjs',

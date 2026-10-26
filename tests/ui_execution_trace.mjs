@@ -2,7 +2,7 @@ import assert from 'node:assert/strict';
 import fs from 'node:fs';
 const path=new URL('../romancer/ui/execution_trace.js',import.meta.url);
 assert.ok(fs.existsSync(path),'Native access capture needs a guided UI.');
-const {executionTrace}=await import(path);
+const {executionTrace,observedSourceContext}=await import(path);
 const {selectionKey}=await import('../romancer/ui/tool_inputs.js');
 const {releaseProjectResources}=await import('../romancer/ui/project_flow.js');
 const report={ok:true,source_sha256:'sha',artifact_id:'a',evidence_id:'e',status:'BUDGET_EXCEEDED',
@@ -31,6 +31,9 @@ globalThis.document={getElementById:id=>({value:({'trace-frames-0':'8','trace-bu
  const shown=await executionTrace(ctx);assert.match(shown,/52/);assert.match(shown,/partial|limit/i);assert.match(shown,/0x8000/);
  assert.match(shown,/Native instruction samples/);assert.match(shown,/move #\$2700, SR/);
  await actions['trace-open']({dataset:{id:'16'}});assert.equal(state.resourceJump,16);
+ assert.equal(state.nativeSourceContext.evidence_id,'e');
+ assert.match(await observedSourceContext(ctx),/Why these bytes are open/);
+ assert.match(await observedSourceContext(ctx),/0x8000/);
  state.artifact={...state.artifact,artifact_id:'other'};
  await assert.rejects(async()=>actions['trace-capture'](),/source|selection/i);
  releaseProjectResources(state);assert.equal(state.nativeTrace,null);assert.equal(state.nativeProbe,null);

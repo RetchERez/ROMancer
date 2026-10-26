@@ -34,12 +34,23 @@ class CompressionTests(unittest.TestCase):
 
     def test_encoders_cover_literal_groups_runs_and_window_boundaries(self):
         service=self.service()
+        from romancer.compression_oracle import verify_encoded
         values=[bytes(range(256))*3,b'A'*9000,b'ABCD'*2000,bytes((index*37+index//17)&255 for index in range(6000))]
         for codec in ('gba-lz10','gba-rle'):
             for raw in values:
                 encoded=service.encode_stream(raw,codec);self.assertEqual(service.decode_stream(encoded,codec)['data'],raw)
+                self.assertTrue(verify_encoded(encoded,codec,raw)['verified'])
                 self.assertEqual(encoded,service.encode_stream(raw,codec))
         self.assertLess(len(service.encode_stream(b'ABCD'*2000,'gba-lz10')),1100)
+
+    def test_separate_oracle_rejects_wrong_payload_truncation_overrun_trailing_and_cancellation(self):
+        from romancer.compression_oracle import verify_encoded
+        for encoded,codec,expected in [(LZ,'gba-lz10',b'ABCABCABC'),(RLE,'gba-rle',b'AAAAABCD')]:
+            self.assertTrue(verify_encoded(encoded,codec,expected)['verified'])
+            for bad in (encoded[:-1],encoded+b'junk',encoded[:1]+b'\xff\xff\xff'+encoded[4:]):
+                with self.subTest(bad=bad),self.assertRaises(ValueError):verify_encoded(bad,codec,expected)
+            with self.assertRaises(ValueError):verify_encoded(encoded,codec,b'X'*len(expected))
+            with self.assertRaises(KeyboardInterrupt):verify_encoded(encoded,codec,expected,cancelled=lambda:True)
 
     def test_discovery_validates_streams_without_granting_resource_authority(self):
         service=self.service();rows=service.compression_candidates(b'\0'*8+LZ+b'\xff'*10,0)
@@ -69,6 +80,13 @@ class CompressionTests(unittest.TestCase):
                     return b'AAAAAYCD' if selected==Path(edited['path']) else real_read(selected)
                 with patch.object(Path,'read_bytes',changed_read),self.assertRaisesRegex(ValueError,'identity'):
                     service.plan_reinsert(Path(project['path']),parent['artifact_id'],child['artifact_id'],edited['artifact_id'],0x500,32,'gba-rle')
+                real_decode=service.decode_stream
+                wrong=service.encode_stream(b'AAAAAYCD','gba-rle')
+                def misleading_decode(data,codec,*args,**kwargs):
+                    return {'data':b'AAAAAZCD','consumed':len(wrong)} if bytes(data)==wrong else real_decode(data,codec,*args,**kwargs)
+                with patch.object(service,'encode_stream',return_value=wrong),patch.object(service,'decode_stream',side_effect=misleading_decode):
+                    rejected=api.dispatch('compression.plan_reinsert',arguments)
+                self.assertFalse(rejected['ok'],'A second parser must reject incorrect encoded bytes even when the primary decoder agrees.')
                 planned=api.dispatch('compression.plan_reinsert',arguments);self.assertTrue(planned['ok'],planned);self.assertTrue(planned['independent_decode_verified'])
                 built=api.dispatch('build.apply',{'project_id':project['project_id'],'plan_id':planned['plan_id']});self.assertTrue(built['ok'],built)
                 expected=bytearray(raw);expected[0x507]=ord('Z');self.assertEqual(Path(built['path']).read_bytes(),expected)

@@ -154,7 +154,9 @@ def plan_reinsert(project,parent_id,decoded_id,edited_id,offset,allocation,codec
     if len(replacement)!=edited['size'] or hashlib.sha256(replacement).hexdigest()!=edited['sha256']:raise ValueError('captured edited bytes differ from the expected resource identity')
     packed=encode_stream(replacement,codec)
     if len(packed)>allocation:raise ValueError('recompressed data does not fit the confirmed allocation; reduce the edit or use a separately supported relocation')
-    if decode_stream(packed,codec)['data']!=replacement:raise ValueError('independent recompression decode differs from edited resource')
+    if decode_stream(packed,codec)['data']!=replacement:raise ValueError('recompression round-trip differs from edited resource')
+    from .compression_oracle import verify_encoded
+    verification=verify_encoded(packed,codec,replacement,cancelled=cancelled)
     with Path(parent['path']).open('rb') as stream:stream.seek(offset);before=stream.read(len(packed))
     edits=[]
     for position in range(0,len(packed),4096):
@@ -166,4 +168,5 @@ def plan_reinsert(project,parent_id,decoded_id,edited_id,offset,allocation,codec
         edits=integrity_edits(parent['path'],parent['sha256'],parent['system_id'],edits)
     projects._measure(parent['path'],parent,cancelled=cancelled);projects._measure(edited['path'],edited,cancelled=cancelled)
     result=projects.plan_byte_edits(project,parent_id,edits)
-    return {**result,'codec':codec,'packed_size':len(packed),'decoded_sha256':edited['sha256'],'independent_decode_verified':True,'allocation':allocation}
+    return {**result,'codec':codec,'packed_size':len(packed),'decoded_sha256':edited['sha256'],
+        'independent_decode_verified':verification['verified'],'decode_verification':verification,'allocation':allocation}

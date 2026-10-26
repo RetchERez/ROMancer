@@ -2,7 +2,7 @@ export function selectionTicket(state){state.selectionRevision=(state.selectionR
 export function selectionCurrent(state,ticket){return state.selectionRevision===ticket;}
 export function releaseProjectResources(state){
  state.gameVisualModel=null;state.animationClock?.stop();state.animationClock=null;state.animationPlaying=false;state.animationIndex=0;state.valueSearch=null;state.valueVideo=null;state.soundPlayer?.close();state.soundPlayer=null;state.soundPreview=null;
- for(const key of ['structuralLab','structuralPrefill','tableProposal','nativeTrace','nativeProbe','investigationSeries','gameMapsView','gameMapEditor','levelEditor','levelClipboard','levelRect','paint','pixelHistories','pixelHistoryScope','spriteHistory','hexDraft','hexReview','hexSearch','hexNumbers','hexExplanation','hexBookmarks','hexComparison','historyComparison','translationSheet','translationReview'])state[key]=null;
+ for(const key of ['nativeSourceContext','structuralLab','structuralPrefill','tableProposal','nativeTrace','nativeProbe','investigationSeries','gameMapsView','gameMapEditor','levelEditor','levelClipboard','levelRect','paint','pixelHistories','pixelHistoryScope','spriteHistory','hexDraft','hexReview','hexSearch','hexNumbers','hexExplanation','hexBookmarks','hexComparison','historyComparison','translationSheet','translationReview'])state[key]=null;
  state.drafts={};state.romScans={};state.graphicsInvestigations={};state.graphicsPartHeight=null;state.graphicsRegionOpen=false;state.results={};
 }
 export function clearProjectState(state){
