@@ -91,6 +91,15 @@ def cd_bytes(*,raw_sector=False):
 
 
 class RecognitionTests(unittest.TestCase):
+    def test_snes_non_power_of_two_size_uses_rounded_header_declaration(self):
+        raw=bytearray(snes_bytes())+bytearray(3*1024**2-32768)
+        raw[0x7fd7]=12  # 3 MiB payload conventionally declares 4 MiB.
+        result=self.investigate(raw)
+        self.assertEqual(result['status'],'IDENTIFIED',result)
+        self.assertEqual(result['candidates'][0]['metadata']['declared_rom_bytes'],4*1024**2)
+        raw[0x7fd7]=11
+        self.assertEqual(self.investigate(raw)['status'],'BLOCKED')
+
     def investigate(self,raw,suffix='.anything'):
         from romancer.system_identify import identify_system
         with tempfile.TemporaryDirectory() as temp:

@@ -61,11 +61,26 @@ def check_rom(path,expected_sha256,expected_crc32='',crc_scope='file',*,cancelle
     elif system=='snes':
         prefix=selected['metadata'].get('copier_header_bytes',0);body=len(raw)-prefix
         if layout:payload=[{'offset':prefix,'length':body}]
-        if selected['format'] not in ('lorom','hirom') or not body or body&(body-1):
-            add('SNES ROM checksum','NOT_CHECKED','Whole-image checks currently require a power-of-two LoROM or HiROM. Mirrored layouts are not checked.')
+        h=selected['header_offset']
+        if not layout or selected['format'] not in ('lorom','hirom') or not 32768<=body<=4*1024**2 or body%32768 or raw[h+22] not in (0,1,2):
+            add('SNES ROM checksum','NOT_CHECKED','Standard checksum checks cover ordinary LoROM/HiROM up to 4 MiB. Enhancement chips, extended maps and unresolved layouts require separate evidence.')
         else:
-            h=selected['header_offset'];stored=int.from_bytes(raw[h+30:h+32],'little');expected=sum(raw[prefix:])&65535
-            add('SNES ROM checksum','PASS' if expected==stored else 'FAIL','Whole cartridge data; excludes an identified 512-byte copier header.',f'{stored:04X}',f'{expected:04X}')
+            from .cartridge_integrity import snes_mirrored_checksum
+            stored=int.from_bytes(raw[h+30:h+32],'little');expected=snes_mirrored_checksum(bytes(raw[prefix:]))
+            add('SNES ROM checksum','PASS' if expected==stored else 'FAIL','Standard recursive tail mirroring; excludes an identified 512-byte copier header. This is not a game-revision match.',f'{stored:04X}',f'{expected:04X}')
+    if layout and len(valid)==1:
+        from .cartridge_startup import inspect_startup
+        from .cartridge_integrity import check_boot_logo,check_gba_fixed_header
+        if cancelled():raise KeyboardInterrupt('ROM verification cancelled')
+        if system in ('gb','gbc','gba'):
+            checks.append(check_boot_logo(raw,system))
+            if system=='gba':checks.append(check_gba_fixed_header(raw))
+        checks.extend(inspect_startup(raw,selected))
+        for check in checks:
+            if 'locations' not in check and type(check.get('offset')) is int:
+                at=check['offset'];length=check.get('length',1)
+                if type(length) is int and 0<=at<=len(raw)-length:
+                    check['locations']=[{'offset':at,'length':length,'label':'View header bytes'}]
     if crc_scope=='payload' and not payload:raise ValueError('Payload CRC32 requires a unique supported cartridge layout. Use whole file instead.')
     ranges=[{'offset':0,'length':len(raw)}] if crc_scope=='file' else payload
     crc=0
@@ -74,9 +89,11 @@ def check_rom(path,expected_sha256,expected_crc32='',crc_scope='file',*,cancelle
     comparison={'status':'NOT_CHECKED' if not reference else 'PASS' if measured==reference else 'FAIL',
                 'expected':reference or None,'measured':measured,'scope':crc_scope,'ranges':ranges}
     issues=any(c['status']=='FAIL' for c in checks) or comparison['status']=='FAIL'
-    return {'ok':True,'status':'ISSUES_FOUND' if issues else 'CHECKED','source':identity,'system_id':system,
+    warnings=any(c['status']=='WARN' for c in checks)
+    return {'ok':True,'status':'ISSUES_FOUND' if issues else 'WARNINGS_FOUND' if warnings else 'CHECKED','source':identity,'system_id':system,
             'system_status':assessment['status'],'crc32':full_crc,'crc_comparison':comparison,'payload_ranges':payload,
             'checks':checks,'warnings':assessment['warnings'],
             'limits':['No trusted game database is bundled. A matching supplied CRC32 is not an authenticity guarantee.',
-                      'Logo data, mapper compatibility and boot behavior are not validated by these checks.'],
+                      'Header and startup checks cover their explicitly supported encodings and mappings only.',
+                      'A matching header logo does not identify a game revision or certify native boot.'],
             'runtime_verified':False,'write_authorized':False}

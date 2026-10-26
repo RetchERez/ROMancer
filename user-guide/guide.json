@@ -513,6 +513,57 @@
       ]
     },
     {
+      "id": "compare-mods",
+      "title": "Load a mod and compare the changed bytes",
+      "part": "Basic",
+      "kicker": "ORIGINAL / MODIFIED FILES",
+      "intro": "Compare two files in the same project. A patch can create a separate modified build, while a supplied modded ROM can be imported as another source.",
+      "steps": [
+        "Import your original ROM into a project. For a modded ROM file, use <b>Import source</b> in that same project. For BPS/IPS, select the original and open <b>Export > Apply a downloaded patch</b>. IPS requires the author’s original CRC32 or SHA-256 reference.",
+        "Choose <b>Preview patch</b>, inspect the changed-byte count and source identity, then <b>Create patched build</b>. The original remains unchanged. A successful BPS reconstruction does not establish each changed byte’s gameplay meaning.",
+        "Open <b>Overview > Build history > Compare files</b>. Choose the original/earlier file and the modified/later file, then click <b>Compare files</b>. Read the full changed-byte count and select a listed changed range.",
+        "In Resources, compare <b>Earlier bytes</b> and <b>Selected bytes</b>. Highlights mark differences. A dash means that file has no byte at that offset. Use the comparison page controls for added/removed regions, or <b>Follow hex editor</b> to use its current position."
+      ],
+      "result": "Both columns describe the exact selected file pair at the displayed offset. The example applies a Castlevania BPS patch and compares its two changed starting-life constants.",
+      "note": "A shifted or recompressed resource can change many bytes without creating many separate gameplay changes. The range list can be truncated; its changed-byte total still covers the complete comparison. File-relative differences do not prove that offsets mean the same thing after relocation.",
+      "related": [
+        "patches",
+        "drafts",
+        "investigation",
+        "checks"
+      ],
+      "terms": [
+        "term-build",
+        "term-offset",
+        "term-bps",
+        "term-ips"
+      ],
+      "image": "26-mod-byte-comparison",
+      "caption": "Actual loaded Castlevania patch: original and modified byte columns, with a starting-life constant changing from 04 to 06.",
+      "image_layout": "following-page",
+      "visual_page": {
+        "title": "Load a mod and compare the changed bytes / actual interface",
+        "kicker": "Basic / actual application capture",
+        "intro": "A loaded Castlevania patch compared with its exact original.",
+        "panels": [
+          {
+            "image": "26-mod-byte-comparison",
+            "title": "Load a mod and compare the changed bytes",
+            "x": 48,
+            "top": 846,
+            "width": 1170,
+            "crop": [
+              180,
+              60,
+              1390,
+              860
+            ],
+            "caption": "Unaltered full-resolution capture is linked in the offline HTML edition."
+          }
+        ]
+      }
+    },
+    {
       "id": "hex-editor",
       "title": "Inspect bytes with useful context",
       "kicker": "RESOURCES / HEX EDITOR",
@@ -1543,6 +1594,57 @@
           }
         ]
       }
+    },
+    {
+      "id": "startup-verification",
+      "title": "Read automatic cartridge verification",
+      "part": "Advanced",
+      "kicker": "DEEP SCAN / STATIC CHECKS",
+      "intro": "Deep scan now displays individual cartridge-health results, including supported startup addresses. These checks describe the stored image without executing its program.",
+      "steps": [
+        "Let the automatic scan finish. Expand <b>Cartridge verification</b> in ROM investigation. Read <b>Consistent</b>, <b>Needs attention</b>, <b>Mismatch</b> and <b>Not checked</b> separately. A warning is not a proof of corruption.",
+        "Inspect supported reset vectors or entry branches. CPU addresses and file locations remain different. Click a vector/header or target-byte button to examine its actual storage. An unresolved bank state does not receive a guessed target.",
+        "For GB/GBC/GBA, read the documented header checks. Logo comparison uses fingerprints rather than distributed logo assets; GBA normalization changes only documented variable bits. Custom headers can intentionally differ.",
+        "For ordinary LoROM/HiROM up to 4 MiB, checksum verification handles standard tail mirroring and an identified copier header. The size declaration uses the rounded-up payload size. Enhancement chips, extended maps and unresolved layouts remain outside this checksum rule."
+      ],
+      "result": "A valid non-power-of-two standard SNES image can be checked correctly, and all six systems get startup checks within their supported mappings and encodings.",
+      "note": "NES has no standard whole-cartridge checksum. A standard header logo and an in-bounds branch do not prove game identity, valid target instructions, authentic firmware, or successful gameplay. Instruction breakpoints and full code tracing require a debugger that exposes those events.",
+      "related": [
+        "checks",
+        "hardware-addresses",
+        "debug",
+        "game-knowledge"
+      ],
+      "terms": [
+        "term-reset-vector",
+        "term-mirrored-checksum",
+        "term-mapping",
+        "term-evidence"
+      ],
+      "image": "25-cartridge-verification",
+      "caption": "Actual Castlevania scan: cartridge layout plus three static startup-vector checks, with the absent standard NES checksum reported separately.",
+      "image_layout": "following-page",
+      "visual_page": {
+        "title": "Read automatic cartridge verification / actual interface",
+        "kicker": "Advanced / actual application capture",
+        "intro": "Stored startup vectors are inspected separately from gameplay execution.",
+        "panels": [
+          {
+            "image": "25-cartridge-verification",
+            "title": "Read automatic cartridge verification",
+            "x": 48,
+            "top": 846,
+            "width": 1170,
+            "crop": [
+              180,
+              60,
+              1390,
+              860
+            ],
+            "caption": "Unaltered full-resolution capture is linked in the offline HTML edition."
+          }
+        ]
+      }
     }
   ],
   "glossary": [
@@ -1737,6 +1839,11 @@
       "definition": "A block made from several tiles. Many room cells can reference one block, so changing its parts can affect many uses."
     },
     {
+      "id": "term-mirrored-checksum",
+      "term": "Mirrored checksum",
+      "definition": "A checksum calculated with a documented repetition of the tail of a non-power-of-two image. The checksum convention does not by itself establish cartridge mapping or game compatibility."
+    },
+    {
       "id": "term-metadata",
       "term": "Object metadata",
       "definition": "Optional per-slot index, name, role and declared reference annotations. Metadata does not replace the checked record layout or establish actor/event behavior."
@@ -1785,6 +1892,11 @@
       "id": "term-regression",
       "term": "Regression",
       "definition": "An unintended change detected by a defined test. A successful route covers its assertions, not the entire game."
+    },
+    {
+      "id": "term-reset-vector",
+      "term": "Reset vector",
+      "definition": "A stored address used to enter startup code after reset. Its address domain and cartridge mapping determine which file bytes it can reference; checking the vector does not execute that code."
     },
     {
       "id": "term-revision",
@@ -2000,6 +2112,12 @@
       ]
     },
     {
+      "term": "Changed, added and removed bytes",
+      "topics": [
+        "compare-mods"
+      ]
+    },
+    {
       "term": "Checksums",
       "topics": [
         "checks"
@@ -2029,6 +2147,12 @@
       "topics": [
         "code-references",
         "debug"
+      ]
+    },
+    {
+      "term": "Compare original and modded ROMs",
+      "topics": [
+        "compare-mods"
       ]
     },
     {
@@ -2214,6 +2338,12 @@
       ]
     },
     {
+      "term": "Header-logo fingerprints",
+      "topics": [
+        "startup-verification"
+      ]
+    },
+    {
       "term": "Hex search and bookmarks",
       "topics": [
         "hex-editor"
@@ -2337,6 +2467,12 @@
       "term": "Named object inspector",
       "topics": [
         "connections"
+      ]
+    },
+    {
+      "term": "Non-power-of-two SNES checksums",
+      "topics": [
+        "startup-verification"
       ]
     },
     {
@@ -2552,6 +2688,12 @@
       "term": "Sprite assembly",
       "topics": [
         "sprites"
+      ]
+    },
+    {
+      "term": "Startup vectors and branches",
+      "topics": [
+        "startup-verification"
       ]
     },
     {

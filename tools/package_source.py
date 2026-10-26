@@ -150,6 +150,8 @@ APPROVED_FILES = frozenset(ROOT_FILES | {
 
 
 APPROVED_FILES = APPROVED_FILES | frozenset({
+    'romancer/cartridge_startup.py','romancer/cartridge_integrity.py','romancer/ui/cartridge_verification.js',
+    'tests/test_cartridge_startup.py','tests/test_cartridge_integrity.py','tests/ui_cartridge_verification.mjs','tests/ui_hex_comparison.mjs',
     'romancer/hardware_reference.py','romancer/ui/hardware_reference.js',
     'tests/test_hardware_reference.py','tests/ui_hardware_reference.mjs',
     'romancer/cheat_decode.py','romancer/cheat_catalog.py','romancer/engine_recognition.py',
@@ -174,7 +176,7 @@ APPROVED_FILES = APPROVED_FILES | frozenset({
         '09-playtest-states','10-verified-patch','11-hex-inspection','12-tutorials',
         '13-settings','14-light-theme','15-dark-theme','16-connected-rooms',
         '17-object-inspector','18-byte-explanation','19-chrono-armor','20-ffl2-map-browser','21-game-knowledge',
-        '22-engine-recognition','23-address-domains','24-code-references')),
+        '22-engine-recognition','23-address-domains','24-code-references','25-cartridge-verification','26-mod-byte-comparison')),
 })
 
 

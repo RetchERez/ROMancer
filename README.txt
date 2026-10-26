@@ -76,6 +76,16 @@ and workspace restore metadata persist independently of the browser port.
 
 KNOWLEDGE AND INVESTIGATION
 
+Automatic cartridge verification includes conservative startup-vector/entry
+checks, documented boot-header fingerprints and standard mirrored SNES checksums
+for ordinary LoROM/HiROM up to 4 MiB. Warnings and unsupported checks stay distinct
+from passed checks. It does not execute startup instructions or certify gameplay.
+
+Overview -> Build history -> Compare files compares original and modified ROMs.
+Select a changed range to view both byte columns in Resources. Highlights mark
+changes; a dash marks added/removed storage. Independent page controls cover
+unequal file lengths, and Follow hex editor restores the editor position.
+
 Automatic scans include system hardware/address context and a bounded GBA
 M4A-compatible structure recognizer. Recognition validates a supported code/data
 relationship; it does not certify engine version, full music playback or editing.

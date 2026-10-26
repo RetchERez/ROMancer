@@ -1,0 +1,10 @@
+import assert from 'node:assert/strict';
+import {verificationResults,registerVerificationNavigation} from '../romancer/ui/cartridge_verification.js';
+const health={source:{sha256:'sha'},checks:[{name:'Reset vector',status:'PASS',detail:'Static mapping only.',locations:[{offset:16,length:2,label:'Vector bytes'}]},{name:'Boot header',status:'WARN',detail:'Custom <header>'},{name:'Runtime boot',status:'NOT_CHECKED',detail:'No execution.'}]};
+const html=verificationResults(health);assert.match(html,/Needs attention/);assert.match(html,/Not checked/);assert.match(html,/Custom &lt;header&gt;/);assert.match(html,/rom-verification-view/);
+let actions={},navigated=false;const state={project:{project_id:'p'},artifact:{artifact_id:'a',sha256:'sha',size:64},romScans:{'p:a:sha':{result:{health}}}};
+registerVerificationNavigation({state,use:a=>Object.assign(actions,a),navigate:async()=>navigated=true});
+await actions['rom-verification-view']({dataset:{id:'16'}});assert.equal(state.resourceJump,16);assert.equal(navigated,true);
+state.artifact={artifact_id:'b',sha256:'sha',size:64};await assert.rejects(actions['rom-verification-view']({dataset:{id:'16'}}),/selected|scan|changed/i);
+assert.equal(verificationResults(null),'');
+console.log('Automatic cartridge verification shows warning/unknown states distinctly and binds byte links to the selected source.');

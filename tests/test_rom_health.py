@@ -74,11 +74,19 @@ class RomHealthTests(unittest.TestCase):
         raw=bytearray(32768);h=0x7fc0;raw[h:h+21]=b'ORIGINAL TEST'.ljust(21,b' ')
         raw[h+21]=0x20;raw[h+23]=5;raw[h+28:h+32]=b'\xff\xff\x00\x00'
         checksum=sum(raw)&65535;raw[h+28:h+32]=(checksum^65535).to_bytes(2,'little')+checksum.to_bytes(2,'little')
-        report=self.run_health(bytes(512)+raw);self.assertEqual(report['checks'][-1]['status'],'PASS')
+        report=self.run_health(bytes(512)+raw);self.assertEqual(next(c for c in report['checks'] if c['name']=='SNES ROM checksum')['status'],'PASS')
         self.assertEqual(report['payload_ranges'],[{'offset':512,'length':32768}])
-        # 96KiB is a recognizable layout, but the power-of-two checksum validator must abstain.
-        odd=self.run_health(raw+bytes(65536))
-        self.assertEqual(odd['checks'][-1]['status'],'NOT_CHECKED')
+        # Standard 96 KiB payload declares its next power of two (128 KiB).
+        odd=raw+bytes(65536);odd[h+23]=7;odd[-1]=3
+        odd[h+28:h+32]=b'\xff\xff\x00\x00'
+        expected=(sum(odd[:65536])+2*sum(odd[65536:]))&65535
+        odd[h+28:h+32]=(expected^65535).to_bytes(2,'little')+expected.to_bytes(2,'little')
+        report=self.run_health(odd)
+        self.assertEqual(next(c for c in report['checks'] if c['name']=='SNES ROM checksum')['status'],'PASS')
+        odd[-1]^=1
+        self.assertEqual(next(c for c in self.run_health(odd)['checks'] if c['name']=='SNES ROM checksum')['status'],'FAIL')
+        odd[h+22]=0x13
+        self.assertEqual(next(c for c in self.run_health(odd)['checks'] if c['name']=='SNES ROM checksum')['status'],'NOT_CHECKED')
 
     def test_changed_source_identity_cannot_report_success(self):
         from romancer.rom_health import check_rom

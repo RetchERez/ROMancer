@@ -610,6 +610,31 @@
     return result;
   }
 
+  // romancer/ui/cartridge_verification.js
+  var checkLabel = (status) => ({ PASS: "Consistent", FAIL: "Mismatch", WARN: "Needs attention", NOT_CHECKED: "Not checked" })[status] || "Not checked";
+  var checkTone = (status) => ({ PASS: "good", FAIL: "danger", WARN: "warm" })[status] || "neutral";
+  function registerVerificationNavigation(ctx2) {
+    const scope = selectionKey(ctx2.state);
+    ctx2.use({ "rom-verification-view": async (node) => {
+      var _a, _b, _c, _d, _e, _f;
+      const { state: state2 } = ctx2, health = (_c = (_b = (_a = state2.romScans) == null ? void 0 : _a[scope]) == null ? void 0 : _b.result) == null ? void 0 : _c.health, offset = Number(node.dataset.id);
+      if (scope !== selectionKey(state2) || ((_d = health == null ? void 0 : health.source) == null ? void 0 : _d.sha256) !== ((_e = state2.artifact) == null ? void 0 : _e.sha256) || !Number.isSafeInteger(offset) || offset < 0 || offset >= state2.artifact.size || !((_f = health.checks) == null ? void 0 : _f.some((check) => {
+        var _a2;
+        return (_a2 = check.locations) == null ? void 0 : _a2.some((location2) => location2.offset === offset);
+      }))) throw Error("Scan the selected source again before opening verification bytes.");
+      state2.resourceJump = offset;
+      await ctx2.navigate("resources");
+    } });
+  }
+  function verificationResults(health) {
+    var _a;
+    if (!((_a = health == null ? void 0 : health.checks) == null ? void 0 : _a.length)) return "";
+    const counts = {};
+    for (const check of health.checks) counts[check.status] = (counts[check.status] || 0) + 1;
+    const summary = Object.entries(counts).map(([status, n]) => n + " " + checkLabel(status).toLowerCase()).join(" · ");
+    return `<details class="cartridge-verification" ${counts.FAIL || counts.WARN ? "open" : ""}><summary>Cartridge verification · ${esc(summary)}</summary><div class="table-wrap"><table><thead><tr><th>Check</th><th>Result</th><th>Details</th></tr></thead><tbody>${health.checks.map((check) => `<tr><td>${esc(check.name)}${Number.isSafeInteger(check.cpu_address) ? `<br><code>CPU 0x${check.cpu_address.toString(16).toUpperCase()}</code>` : ""}</td><td>${badge(checkLabel(check.status), checkTone(check.status))}</td><td>${esc(check.detail)}${(check.locations || []).map((location2) => button(location2.label || "View bytes", "rom-verification-view", { id: String(location2.offset) })).join("")}</td></tr>`).join("")}</tbody></table></div><p>These are static cartridge checks. Revision matching and successful gameplay require separate evidence.</p></details>`;
+  }
+
   // romancer/ui/cheat_clues.js
   var hex = (value) => "0x" + Number(value).toString(16).toUpperCase();
   function documentFor(state2) {
@@ -765,6 +790,7 @@
     if (!ctx2.state.artifact) return "";
     registerCheatNavigation(ctx2);
     registerEngineNavigation(ctx2);
+    registerVerificationNavigation(ctx2);
     const scope = selectionKey(ctx2.state), current2 = () => selectionKey(ctx2.state) === scope;
     ctx2.use({
       "graphics-index-play": () => ctx2.navigate("playtest"),
@@ -817,7 +843,7 @@
     var _a, _b, _c, _d;
     const result = entry == null ? void 0 : entry.result, model = result == null ? void 0 : result.identification, known = model == null ? void 0 : model.profile, refs = (_a = result == null ? void 0 : result.catalog) == null ? void 0 : _a.file, matched = (refs == null ? void 0 : refs.status) === "MATCHED" ? (_b = refs.matches[0]) == null ? void 0 : _b.name : null;
     const query = ((_c = ctx2.state.romScanQuery) == null ? void 0 : _c.toLowerCase()) || "", candidates = ((result == null ? void 0 : result.candidates) || []).filter((c) => !query || [c.kind, c.preview, c.format, c.offset.toString(16)].join(" ").toLowerCase().includes(query));
-    return `<section class="card" id="rom-scan-panel"><div class="card-heading"><h3>ROM investigation</h3>${(entry == null ? void 0 : entry.status) === "SCANNING" ? badge("Scanning", "warm") + button("Cancel scan", "rom-scan-cancel", { disabled: !entry.job_id }) : button("Rescan ROM", "rom-rescan", { icon: "search" })}</div>${(entry == null ? void 0 : entry.status) === "ERROR" ? `<p class="notice warm">${esc(entry.error)}</p>` : !result ? '<p class="subtle">' + (getSettings().autoDeepScan ? "Automatic offline identification and resource scan. You can keep working." : "Automatic deep scan is off in Settings. Choose Rescan ROM to investigate this file.") + "</p>" : `<p><strong>${known ? esc(known.name) + (model.status === "MATCHED" ? " · exact revision" : " · based on matched source") : matched ? esc(matched) + " · local catalog match" : esc(((_d = result.system_id) == null ? void 0 : _d.toUpperCase()) || "Unresolved system") + " · game revision unknown"}</strong></p><p class="subtle">${result.health ? "CRC32 " + esc(result.health.crc32) + " · " : ""}${size(result.coverage.file_bytes_read)} of ${size(result.coverage.file_size)} read. ${result.coverage.whole_file_read ? "Whole file covered." : "Partial coverage."} Candidate meanings need confirmation.</p>${graphicsIndex(ctx2, result.graphics_index)}${soundIndex(result.sound_system, result.engine_recognition)}${engineFindings(result.engine_recognition)}${cheatClues(result.cheat_references)}${structureIndex(result.structures)}<details><summary>Discoveries · ${Object.entries(result.counts).map(([kind, count]) => esc(kind) + " " + count + (result.coverage.segments.some((s) => {
+    return `<section class="card" id="rom-scan-panel"><div class="card-heading"><h3>ROM investigation</h3>${(entry == null ? void 0 : entry.status) === "SCANNING" ? badge("Scanning", "warm") + button("Cancel scan", "rom-scan-cancel", { disabled: !entry.job_id }) : button("Rescan ROM", "rom-rescan", { icon: "search" })}</div>${(entry == null ? void 0 : entry.status) === "ERROR" ? `<p class="notice warm">${esc(entry.error)}</p>` : !result ? '<p class="subtle">' + (getSettings().autoDeepScan ? "Automatic offline identification and resource scan. You can keep working." : "Automatic deep scan is off in Settings. Choose Rescan ROM to investigate this file.") + "</p>" : `<p><strong>${known ? esc(known.name) + (model.status === "MATCHED" ? " · exact revision" : " · based on matched source") : matched ? esc(matched) + " · local catalog match" : esc(((_d = result.system_id) == null ? void 0 : _d.toUpperCase()) || "Unresolved system") + " · game revision unknown"}</strong></p><p class="subtle">${result.health ? "CRC32 " + esc(result.health.crc32) + " · " : ""}${size(result.coverage.file_bytes_read)} of ${size(result.coverage.file_size)} read. ${result.coverage.whole_file_read ? "Whole file covered." : "Partial coverage."} Candidate meanings need confirmation.</p>${verificationResults(result.health)}${graphicsIndex(ctx2, result.graphics_index)}${soundIndex(result.sound_system, result.engine_recognition)}${engineFindings(result.engine_recognition)}${cheatClues(result.cheat_references)}${structureIndex(result.structures)}<details><summary>Discoveries · ${Object.entries(result.counts).map(([kind, count]) => esc(kind) + " " + count + (result.coverage.segments.some((s) => {
       var _a2;
       return (_a2 = s[kind]) == null ? void 0 : _a2.results_truncated;
     }) ? "+" : "")).join(" · ")}</summary><p>Showing up to ${result.coverage.result_limit_per_kind} results per kind. Graphics are sampled; compressed streams have work limits. Exact mapped game edits are in Overview.</p><div class="toolbar">${field("rom-scan-query", "Filter discoveries", ctx2.state.romScanQuery || "", { placeholder: "text, codec, offset or preview" })}${button("Filter", "rom-scan-filter")}</div>${candidates.length ? `<div class="table-wrap"><table><thead><tr><th>Location</th><th>Candidate</th><th>Preview</th><th></th></tr></thead><tbody>${candidates.slice(0, 20).map((c) => `<tr><td><code>0x${c.offset.toString(16).toUpperCase()}</code></td><td>${esc(c.kind)}<br><small>${esc(c.confidence)}</small></td><td>${esc(c.preview)}</td><td>${button("View bytes", "rom-scan-inspect", { id: String(c.offset) })}</td></tr>`).join("")}</tbody></table></div><p class="subtle">${Math.min(20, candidates.length)} of ${candidates.length} stored discoveries. Filter to narrow results.</p>` : "<p>No matching candidates. Custom encodings and layouts need a definition.</p>"}<details><summary>Coverage and limits</summary>${result.limits.map((note) => `<p>${esc(note)}</p>`).join("")}<p>${result.coverage.segments.filter((s) => {
@@ -2316,7 +2342,7 @@
         var _a2;
         const r = state2.historyComparison;
         if ((r == null ? void 0 : r.project_id) !== ((_a2 = state2.project) == null ? void 0 : _a2.project_id)) throw Error("Compare the files again.");
-        state2.hexComparison = { project_id: project, left_id: r.left_id, right_id: r.right_id, left_sha256: r.left_sha256, right_sha256: r.right_sha256 };
+        state2.hexComparison = { project_id: project, left_id: r.left_id, right_id: r.right_id, left_sha256: r.left_sha256, right_sha256: r.right_sha256, offset: Number(node.dataset.id) };
         await ctx2.setArtifact(r.right_id);
         state2.resourceJump = Number(node.dataset.id);
         await ctx2.navigate("resources");
@@ -2551,13 +2577,34 @@
  <details><summary>Number inspector & bookmarks</summary><p>Selected offset: <code id="hex-selected">0x${draft.selected.toString(16)}</code></p>${button("Explain selected bytes", "hex-explain")}${button("Inspect selected number", "hex-numbers")}<div id="hex-explanation">${((_h = state2.hexExplanation) == null ? void 0 : _h.scope) === ticket && state2.hexExplanation.result.offset === draft.selected ? `<p>${esc(state2.hexExplanation.result.note)}</p>${state2.hexExplanation.result.interpretations.map((row) => `<dl><dt>${esc(row.name)} · declared</dt><dd>File offset 0x${row.offset.toString(16)} · ${row.length} bytes${row.type ? " · " + esc(row.type) + " " + esc(row.endian) + " · value " + esc(row.value) + " · numeric range " + row.minimum + "–" + row.maximum : ""}${row.description ? "<br>" + esc(row.description) : ""}</dd></dl>`).join("")}` : ""}</div><div id="hex-number-result">${numbers ? `<dl>${Object.entries(numbers.values).map(([k, v]) => `<dt>${esc(k)}</dt><dd>${esc(v)}</dd>`).join("")}</dl>` : ""}</div>${field("hex-bookmark-name", "Bookmark name", ctx2.draft("hex-bookmark-name", ""))}<div class="actions">${button("Bookmark selected byte", "hex-bookmark")}${button("Load bookmarks", "hex-bookmarks")}</div>${((marks == null ? void 0 : marks.bookmarks) || []).map((r) => `<div class="actions">${button(`${r.name} · 0x${r.offset.toString(16)}`, "hex-jump", { id: String(r.offset) })}${button("Remove", "hex-unbookmark", { id: String(r.offset) })}</div>`).join("")}</details></section>`;
   }
   async function hexComparison(ctx2, data) {
-    const saved = ctx2.state.hexComparison, a = ctx2.state.artifact, p = ctx2.state.project;
+    const saved = ctx2.state.hexComparison, a = ctx2.state.artifact, p = ctx2.state.project, scope = selectionKey(ctx2.state);
     if (!saved || saved.project_id !== p.project_id || saved.right_id !== a.artifact_id || saved.right_sha256 !== a.sha256) return "";
     const left = p.sources.concat(p.builds).find((r) => r.artifact_id === saved.left_id);
     if (!left || left.sha256 !== saved.left_sha256) return "";
-    const original = await ctx2.api.call("resource.inspect", { project_id: p.project_id, artifact_id: left.artifact_id, offset: Math.min(data.offset, left.size), length: Math.max(1, data.length) });
-    const x = original.hex.match(/../g) || [], y = data.hex.match(/../g) || [];
-    return `<details class="card" open><summary>Compare at 0x${data.offset.toString(16)}</summary><p>${esc(left.name)} → ${esc(a.name)}</p><div class="hex-scroll"><table><thead><tr><th>Offset</th><th>Earlier bytes</th><th>Selected bytes</th></tr></thead><tbody>${Array.from({ length: Math.ceil(Math.max(x.length, y.length) / 16) }, (_, i) => `<tr><td><code>${(data.offset + i * 16).toString(16)}</code></td>${[x, y].map((v, k) => `<td><code>${v.slice(i * 16, i * 16 + 16).map((b, j) => b !== [y, x][k][i * 16 + j] ? `<mark>${b}</mark>` : b).join(" ")}</code></td>`).join("")}</tr>`).join("")}</tbody></table></div></details>`;
+    const maximum = Math.max(left.size, a.size), offset = saved.offset ?? data.offset;
+    if (!Number.isSafeInteger(offset) || offset < 0 || offset > maximum) return "";
+    const length = Math.max(1, Math.min(256, maximum - offset));
+    const readSide = (row) => ctx2.api.call("resource.inspect", { project_id: p.project_id, artifact_id: row.artifact_id, offset: Math.min(offset, row.size), length });
+    const [original, selected2] = await Promise.all([readSide(left), readSide(a)]);
+    if (selectionKey(ctx2.state) !== scope || ctx2.state.hexComparison !== saved) return "";
+    if (original.artifact_id !== left.artifact_id || original.sha256 !== left.sha256 || selected2.artifact_id !== a.artifact_id || selected2.sha256 !== a.sha256) throw Error("The compared source changed. Compare these files again.");
+    ctx2.use({ "hex-diff-page": async (node) => {
+      if (selectionKey(ctx2.state) !== scope || ctx2.state.hexComparison !== saved) throw Error("The selected comparison changed. Compare these files again.");
+      const delta = Number(node.dataset.id);
+      if (![-256, 256].includes(delta)) throw Error("Invalid comparison page.");
+      saved.offset = Math.max(0, Math.min(Math.max(0, maximum - 1), offset + delta));
+      await ctx2.render();
+    }, "hex-diff-follow": async () => {
+      if (selectionKey(ctx2.state) !== scope || ctx2.state.hexComparison !== saved) throw Error("The selected comparison changed.");
+      delete saved.offset;
+      await ctx2.render();
+    } });
+    const x = original.hex.match(/../g) || [], y = selected2.hex.match(/../g) || [], span = Math.max(x.length, y.length);
+    const cells = (values, other, index) => Array.from({ length: Math.min(16, span - index) }, (_, j) => {
+      const value = values[index + j];
+      return value === void 0 ? '<span aria-label="No byte in file">—</span>' : value !== other[index + j] ? `<mark>${value}</mark>` : value;
+    }).join(" ");
+    return `<details class="card hex-comparison" open><summary>Compare at 0x${offset.toString(16)}</summary><p>${esc(left.name)} → ${esc(a.name)}</p><p>Changed bytes are highlighted. — means this file has no byte at that offset.</p><div class="actions">${button("Previous comparison page", "hex-diff-page", { id: "-256", disabled: offset === 0 })}${button("Next comparison page", "hex-diff-page", { id: "256", disabled: offset + span >= maximum })}${button("Follow hex editor", "hex-diff-follow")}</div><div class="hex-scroll"><table><thead><tr><th>Offset</th><th>Earlier bytes</th><th>Selected bytes</th></tr></thead><tbody>${Array.from({ length: Math.ceil(span / 16) }, (_, i) => `<tr><td><code>${(offset + i * 16).toString(16)}</code></td><td><code>${cells(x, y, i * 16)}</code></td><td><code>${cells(y, x, i * 16)}</code></td></tr>`).join("")}</tbody></table></div></details>`;
   }
   function mountHexEditor(ctx2) {
     const root = document.getElementById("hex-editor");
@@ -2750,10 +2797,10 @@
 
   // romancer/ui/rom_health.js
   function romHealthPanel(ctx2) {
-    var _a;
-    const { state: state2 } = ctx2, result = state2.results["rom.check"], r = (result == null ? void 0 : result.artifact_id) === ((_a = state2.artifact) == null ? void 0 : _a.artifact_id) ? result : null, c = r == null ? void 0 : r.crc_comparison;
-    const tone = (status) => status === "PASS" ? "good" : status === "FAIL" ? "danger" : "neutral";
-    return `<section class="card rom-health"><div class="card-heading"><h2>ROM health</h2>${r ? badge(r.status === "ISSUES_FOUND" ? "Issues found" : "Checks finished", r.status === "ISSUES_FOUND" ? "danger" : "neutral") : ""}</div><div class="toolbar">${field("rom-expected-crc", "Expected CRC32 (optional)", ctx2.draft("rom-expected-crc", ""), { placeholder: "Eight hex digits", hint: "Use the reference supplied with your patch or dump." })}${select("rom-crc-scope", "CRC32 comparison covers", [["file", "Whole file"], ["payload", "Cartridge payload"]], ctx2.draft("rom-crc-scope", "file"))}${button("Check ROM", "rom-check", { primary: true, icon: "shield" })}</div>${r ? `<div class="identity"><strong>File CRC32</strong><code>${esc(r.crc32)}</code><span>${esc((c == null ? void 0 : c.scope) === "payload" ? "Reference compares cartridge payload" : "Reference compares whole file")}</span></div><div class="notice ${(c == null ? void 0 : c.status) === "FAIL" ? "danger" : ""}"><strong>${(c == null ? void 0 : c.status) === "FAIL" ? "CRC32 mismatch" : (c == null ? void 0 : c.status) === "PASS" ? "Reference CRC32 matches" : "No reference supplied"}</strong>${(c == null ? void 0 : c.expected) ? ` · Expected <code>${esc(c.expected)}</code> · Measured <code>${esc(c.measured)}</code>` : " · The file fingerprint was measured; no dump match was checked."}</div><div class="table-wrap"><table><thead><tr><th>Check</th><th>Result</th><th>Details</th></tr></thead><tbody>${(r.checks || []).map((check) => `<tr><td>${esc(check.name)}</td><td>${badge(check.status === "NOT_CHECKED" ? "Not checked" : check.status === "FAIL" ? "Mismatch" : "Consistent", tone(check.status))}</td><td>${esc(check.detail)}${check.stored !== void 0 ? ` Stored <code>${esc(check.stored)}</code>; computed <code>${esc(check.computed)}</code>.` : ""}</td></tr>`).join("")}</tbody></table></div><p class="subtle">These checks do not establish authenticity or successful gameplay.</p><details><summary>Full health report</summary><pre>${esc(JSON.stringify(r, null, 2))}</pre></details>` : '<p class="subtle">Checks cartridge layout and supported internal checksums. A reference is needed to detect a CRC32 mismatch.</p>'}</section>`;
+    var _a, _b, _c;
+    const { state: state2 } = ctx2, result = state2.results["rom.check"], r = (result == null ? void 0 : result.artifact_id) === ((_a = state2.artifact) == null ? void 0 : _a.artifact_id) && ((_b = result == null ? void 0 : result.source) == null ? void 0 : _b.sha256) === ((_c = state2.artifact) == null ? void 0 : _c.sha256) ? result : null, c = r == null ? void 0 : r.crc_comparison;
+    const tone = checkTone;
+    return `<section class="card rom-health"><div class="card-heading"><h2>ROM health</h2>${r ? badge(r.status === "ISSUES_FOUND" ? "Issues found" : r.status === "WARNINGS_FOUND" ? "Needs attention" : "Checks finished", r.status === "ISSUES_FOUND" ? "danger" : r.status === "WARNINGS_FOUND" ? "warm" : "neutral") : ""}</div><div class="toolbar">${field("rom-expected-crc", "Expected CRC32 (optional)", ctx2.draft("rom-expected-crc", ""), { placeholder: "Eight hex digits", hint: "Use the reference supplied with your patch or dump." })}${select("rom-crc-scope", "CRC32 comparison covers", [["file", "Whole file"], ["payload", "Cartridge payload"]], ctx2.draft("rom-crc-scope", "file"))}${button("Check ROM", "rom-check", { primary: true, icon: "shield" })}</div>${r ? `<div class="identity"><strong>File CRC32</strong><code>${esc(r.crc32)}</code><span>${esc((c == null ? void 0 : c.scope) === "payload" ? "Reference compares cartridge payload" : "Reference compares whole file")}</span></div><div class="notice ${(c == null ? void 0 : c.status) === "FAIL" ? "danger" : ""}"><strong>${(c == null ? void 0 : c.status) === "FAIL" ? "CRC32 mismatch" : (c == null ? void 0 : c.status) === "PASS" ? "Reference CRC32 matches" : "No reference supplied"}</strong>${(c == null ? void 0 : c.expected) ? ` · Expected <code>${esc(c.expected)}</code> · Measured <code>${esc(c.measured)}</code>` : " · The file fingerprint was measured; no dump match was checked."}</div><div class="table-wrap"><table><thead><tr><th>Check</th><th>Result</th><th>Details</th></tr></thead><tbody>${(r.checks || []).map((check) => `<tr><td>${esc(check.name)}</td><td>${badge(checkLabel(check.status), tone(check.status))}</td><td>${esc(check.detail)}${check.stored !== void 0 ? ` Stored <code>${esc(check.stored)}</code>${check.computed !== void 0 ? `; computed <code>${esc(check.computed)}</code>` : check.expected !== void 0 ? `; expected <code>${esc(check.expected)}</code>` : ""}.` : ""}</td></tr>`).join("")}</tbody></table></div><p class="subtle">These checks do not establish authenticity or successful gameplay.</p><details><summary>Full health report</summary><pre>${esc(JSON.stringify(r, null, 2))}</pre></details>` : '<p class="subtle">Checks cartridge layout and supported internal checksums. A reference is needed to detect a CRC32 mismatch.</p>'}</section>`;
   }
 
   // romancer/ui/discovery_controls.js

@@ -54,12 +54,24 @@ export function hexEditor(ctx,data){
  <details><summary>Number inspector & bookmarks</summary><p>Selected offset: <code id="hex-selected">0x${draft.selected.toString(16)}</code></p>${button('Explain selected bytes','hex-explain')}${button('Inspect selected number','hex-numbers')}<div id="hex-explanation">${state.hexExplanation?.scope===ticket&&state.hexExplanation.result.offset===draft.selected?`<p>${esc(state.hexExplanation.result.note)}</p>${state.hexExplanation.result.interpretations.map(row=>`<dl><dt>${esc(row.name)} · declared</dt><dd>File offset 0x${row.offset.toString(16)} · ${row.length} bytes${row.type?' · '+esc(row.type)+' '+esc(row.endian)+' · value '+esc(row.value)+' · numeric range '+row.minimum+'–'+row.maximum:''}${row.description?'<br>'+esc(row.description):''}</dd></dl>`).join('')}`:''}</div><div id="hex-number-result">${numbers?`<dl>${Object.entries(numbers.values).map(([k,v])=>`<dt>${esc(k)}</dt><dd>${esc(v)}</dd>`).join('')}</dl>`:''}</div>${field('hex-bookmark-name','Bookmark name',ctx.draft('hex-bookmark-name',''))}<div class="actions">${button('Bookmark selected byte','hex-bookmark')}${button('Load bookmarks','hex-bookmarks')}</div>${(marks?.bookmarks||[]).map(r=>`<div class="actions">${button(`${r.name} · 0x${r.offset.toString(16)}`,'hex-jump',{id:String(r.offset)})}${button('Remove','hex-unbookmark',{id:String(r.offset)})}</div>`).join('')}</details></section>`;
 }
 export async function hexComparison(ctx,data){
- const saved=ctx.state.hexComparison,a=ctx.state.artifact,p=ctx.state.project;
+ const saved=ctx.state.hexComparison,a=ctx.state.artifact,p=ctx.state.project,scope=selectionKey(ctx.state);
  if(!saved||saved.project_id!==p.project_id||saved.right_id!==a.artifact_id||saved.right_sha256!==a.sha256)return '';
  const left=p.sources.concat(p.builds).find(r=>r.artifact_id===saved.left_id);if(!left||left.sha256!==saved.left_sha256)return '';
- const original=await ctx.api.call('resource.inspect',{project_id:p.project_id,artifact_id:left.artifact_id,offset:Math.min(data.offset,left.size),length:Math.max(1,data.length)});
- const x=original.hex.match(/../g)||[],y=data.hex.match(/../g)||[];
- return `<details class="card" open><summary>Compare at 0x${data.offset.toString(16)}</summary><p>${esc(left.name)} → ${esc(a.name)}</p><div class="hex-scroll"><table><thead><tr><th>Offset</th><th>Earlier bytes</th><th>Selected bytes</th></tr></thead><tbody>${Array.from({length:Math.ceil(Math.max(x.length,y.length)/16)},(_,i)=>`<tr><td><code>${(data.offset+i*16).toString(16)}</code></td>${[x,y].map((v,k)=>`<td><code>${v.slice(i*16,i*16+16).map((b,j)=>b!==[y,x][k][i*16+j]?`<mark>${b}</mark>`:b).join(' ')}</code></td>`).join('')}</tr>`).join('')}</tbody></table></div></details>`;
+ const maximum=Math.max(left.size,a.size),offset=saved.offset??data.offset;
+ if(!Number.isSafeInteger(offset)||offset<0||offset>maximum)return '';
+ const length=Math.max(1,Math.min(256,maximum-offset));
+ const readSide=row=>ctx.api.call('resource.inspect',{project_id:p.project_id,artifact_id:row.artifact_id,offset:Math.min(offset,row.size),length});
+ const [original,selected]=await Promise.all([readSide(left),readSide(a)]);
+ if(selectionKey(ctx.state)!==scope||ctx.state.hexComparison!==saved)return '';
+ if(original.artifact_id!==left.artifact_id||original.sha256!==left.sha256||selected.artifact_id!==a.artifact_id||selected.sha256!==a.sha256)throw Error('The compared source changed. Compare these files again.');
+ ctx.use({'hex-diff-page':async node=>{
+  if(selectionKey(ctx.state)!==scope||ctx.state.hexComparison!==saved)throw Error('The selected comparison changed. Compare these files again.');
+  const delta=Number(node.dataset.id);if(![-256,256].includes(delta))throw Error('Invalid comparison page.');
+  saved.offset=Math.max(0,Math.min(Math.max(0,maximum-1),offset+delta));await ctx.render();
+ },'hex-diff-follow':async()=>{if(selectionKey(ctx.state)!==scope||ctx.state.hexComparison!==saved)throw Error('The selected comparison changed.');delete saved.offset;await ctx.render();}});
+ const x=original.hex.match(/../g)||[],y=selected.hex.match(/../g)||[],span=Math.max(x.length,y.length);
+ const cells=(values,other,index)=>Array.from({length:Math.min(16,span-index)},(_,j)=>{const value=values[index+j];return value===undefined?'<span aria-label="No byte in file">—</span>':value!==other[index+j]?`<mark>${value}</mark>`:value;}).join(' ');
+ return `<details class="card hex-comparison" open><summary>Compare at 0x${offset.toString(16)}</summary><p>${esc(left.name)} → ${esc(a.name)}</p><p>Changed bytes are highlighted. — means this file has no byte at that offset.</p><div class="actions">${button('Previous comparison page','hex-diff-page',{id:'-256',disabled:offset===0})}${button('Next comparison page','hex-diff-page',{id:'256',disabled:offset+span>=maximum})}${button('Follow hex editor','hex-diff-follow')}</div><div class="hex-scroll"><table><thead><tr><th>Offset</th><th>Earlier bytes</th><th>Selected bytes</th></tr></thead><tbody>${Array.from({length:Math.ceil(span/16)},(_,i)=>`<tr><td><code>${(offset+i*16).toString(16)}</code></td><td><code>${cells(x,y,i*16)}</code></td><td><code>${cells(y,x,i*16)}</code></td></tr>`).join('')}</tbody></table></div></details>`;
 }
 export function mountHexEditor(ctx){
  const root=document.getElementById('hex-editor');if(!root)return;const draft=ctx.state.hexDraft;
