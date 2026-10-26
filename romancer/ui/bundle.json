@@ -4,7 +4,7 @@
   "sources": {
     "romancer/ui/animation_studio.js": "e476a432518c32367106f6ff35885f519b4e632fa12af31187231fd377e313a5",
     "romancer/ui/api.js": "fecedda3d58703597f5d5f3d958d86c6474e52d1942b5b3d0c430f075afc0487",
-    "romancer/ui/app.js": "87deea4e9456dd9078fb03ca4ec2ee64d226dd4cc86cb4170df2406f5b00e986",
+    "romancer/ui/app.js": "047b15d250d486d889660f45a2ea4dae658f7262f267bdd1b082f59d42e97adc",
     "romancer/ui/app_settings.js": "3d5a4acd1b898120e707bbb78751cf1a63c7da89e83d230b053c7e4f0aed369e",
     "romancer/ui/asset_controls.js": "1df6ee0f5b41edc370c95ac1af9b52aab1e61036fb819da2e6dec491dc98aa1b",
     "romancer/ui/audio_live.js": "acc32da345590382153d3e21eb8194695ad1012726d8cf5ed00594f31fdd92af",
@@ -25,6 +25,7 @@
     "romancer/ui/hex_editor.js": "6742dd9608391d5ce5d938f9c1e99cb85a3e1983132828c634f477a5fc489be5",
     "romancer/ui/icons.js": "54b4e56205917bdaddfae74d2335106ae5e83541c68e0d0efea047f1097e9b40",
     "romancer/ui/interface_scale.js": "943998f0b2e83bcd42fd26ba1c45637bf395eb69fbde61afc5e090886130e81f",
+    "romancer/ui/investigation_series.js": "deeb154d03cf7d3387e3eac1a5e623d066083e9cf19e95730dbfec38b9e91da3",
     "romancer/ui/level_canvas.js": "056852b507f07b6b450a206f42a27889d84d0408c2806246eb95e619a47d7434",
     "romancer/ui/memory_watches.js": "5a9a271484eacc58d8c350d2e6acf93a03a0a977b887a3a8b12cd160a672fe51",
     "romancer/ui/menu_preview.js": "df2ce74e3d6ace99a7a9e3f64b0c8202578b0bd3b4e227b4d4acaa5fa7c9695c",
@@ -35,7 +36,7 @@
     "romancer/ui/playback_controls.js": "51a0c8e910d8bd0ecf856a3644fe4c8e4ceee7c0177cc9e3dac8c44b34e63448",
     "romancer/ui/preferences.js": "2d126b0107c726a9cb915c44d821dfe47ad96930a20e095f7b4b8a7721b97ad9",
     "romancer/ui/project_checks.js": "522a68761bef6e8789e3330a2c040764e507d564177fb27f5aaa7f8f41b8e894",
-    "romancer/ui/project_flow.js": "e195bbb56cc1d0f5c9321eefb5bf97fc83bc23bd56312b82353a527cac6a81c1",
+    "romancer/ui/project_flow.js": "5414ca805958b816f1126ab47f8364b9786f77b88e264e653d5dcb215602a87a",
     "romancer/ui/project_manager.js": "3a997b08289f4caddc8c880b054b3152eb86fb3dba7d0af626fe12ce6b0ab217",
     "romancer/ui/revision_controls.js": "ef2eaeba192f2cffd8bbef2c5742cadc4d37f0551ff277acd757b619217e0871",
     "romancer/ui/rom_health.js": "f1c022d40363d2deaf6268af498608260f9bb8d4230b497d54732ffd1e50715d",
@@ -58,7 +59,7 @@
     "romancer/ui/verified_games.js": "ff8f9d9e425a9eab7fa8241f3fec60f35302597c80ea87841d6ae7cd26a84e29",
     "romancer/ui/views/assets.js": "7447e3a43e807e745dbe62a1eac09be8e135daaf9e3d802d9b714aa96f9b54ce",
     "romancer/ui/views/automation.js": "4137ea271b3548c2f882e9a80c192eecaa0d4b5035e9786ee793985af7fed918",
-    "romancer/ui/views/debug.js": "467feec140614dce5612cb0987c6820d34036cd5783bff701f313f2c6452da58",
+    "romancer/ui/views/debug.js": "bcb00890b7a650cccc79859b0a2984116ba04b5f74df5264ecf360383cfdd826",
     "romancer/ui/views/help.js": "f8a213bef5f6d69a173cc18dc8260b717062a9969617a3c01b675881a8c4fefe",
     "romancer/ui/views/levels.js": "8a3a69f7f11c7b86cd97c8237887798956978855d1a6ad2aa9c3f10ab9899af7",
     "romancer/ui/views/overview.js": "bb18ee1e145c70dd4b566f55282fce5f806cac4bf2bb4552163c3a338c592c4a",
@@ -77,5 +78,5 @@
     "romancer/ui/workspace_resume.js": "a2b946a51d67fb470e6821205faac6d2521a0f24a0ad4611dd7134a0ba879ee7",
     "romancer/ui/workspace_status.js": "36ab851ac108b56ae4bdc1274eb52b62139397c83c90c18ca5efc9767dc5172c"
   },
-  "sha256": "31c8942a8530b83117cc583559a5cc0319050f286f70b957926307ff99caeb84"
+  "sha256": "40bf196acdf0b9c0ccd1b4f3c33b0c35ba6d2b9b3aa1cd6841b29ccefab507cd"
 }
