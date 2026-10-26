@@ -24,7 +24,7 @@ CSS += '''
 #guide-search{margin:26px 0;padding:24px;background:#e1e5e9;border:1px solid #b5c0c9;border-radius:8px}#guide-search h2{font-size:26px}#guide-search label{display:block;font-weight:650}.guide-search-controls{display:flex;flex-wrap:wrap;gap:10px;margin:8px 0 14px}.guide-search-controls input{flex:1;min-width:180px;background:white;color:#19252d;border:1px solid #788d94;border-radius:6px;padding:12px;font:inherit}.guide-search-controls button{background:#143038;color:white;border:1px solid #143038;border-radius:6px;padding:10px 18px;font:inherit;cursor:pointer}#guide-search :focus-visible{outline:3px solid #9b5e00;outline-offset:3px}#guide-results{margin:0}#guide-results li{margin:16px 0}#guide-results a{font-weight:700}#guide-results p{margin:4px 0;font-size:16px}#guide-search-status{margin:12px 0}
 '''
 
-CSS += '.walkthrough-video{max-width:1200px}.walkthrough-video video{display:block;width:100%;aspect-ratio:8/5;background:#10191f;border:1px solid #788d94;border-radius:8px}@media print{.walkthrough-video video{display:none}}'
+CSS += '.walkthrough-video{max-width:1200px}.walkthrough-video video{display:block;width:100%;aspect-ratio:10/7;background:#10191f;border:1px solid #788d94;border-radius:8px}@media print{.walkthrough-video video{display:none}}'
 
 def load_content(folder):
     data = json.loads((folder / 'guide.json').read_text(encoding='utf-8'))
