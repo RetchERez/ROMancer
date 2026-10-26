@@ -26,8 +26,11 @@ source and component notices alongside the engine binaries.
 The source-only archive contains ROMancer code and engine metadata/build recipes;
 it does not embed upstream emulator implementations. The separate engine pack includes
 its complete Windows libretro build inputs, documented CRT compatibility patch and
-compiler runtime notices. Games, user saves, commercial artwork and separately
-supplied firmware dumps are not bundled. Custom engines retain their own terms.
+compiler runtime notices. Commercial ROM files, user saves and separately supplied
+firmware dumps are not bundled. The user guide contains instructional game
+screenshots. Game titles and imagery belong to their respective rights holders
+and are not covered by the MIT license for ROMancer code. Custom engines retain
+their own terms.
 The harbor demonstration, vector marks and fixture content are original to this
 ROMancer continuation. Browser fonts use the operating system's font stack.
 

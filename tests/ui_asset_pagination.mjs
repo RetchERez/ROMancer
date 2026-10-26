@@ -1,0 +1,11 @@
+import assert from 'node:assert/strict';
+import {render} from '../romancer/ui/views/assets.js';
+const bitmap=(id,count)=>({id,count,width:1,height:1,codec:'mono-row-msb-v1',cells:Array.from({length:count},(_,index)=>({index,pixels:[0]}))}),doc={ok:true,write_supported:true,document_id:'d',source_sha256:'sha',bitmaps:[bitmap('large',70),bitmap('small',1)],palettes:[],tilemaps:[],fonts:[]};
+const state={project:{project_id:'p',descriptors:{}},artifact:{artifact_id:'a',sha256:'sha',name:'ROM',system_id:'gb',descriptors:{}},results:{'assets.inspect':doc},assetBitmapId:'large',assetPage:1},drafts=new Map(),handlers={};let html;
+globalThis.document={getElementById:id=>id==='asset-changes'?{value:'[]'}:null};
+const ctx={state,draft:(key,fallback)=>drafts.get(key)??fallback,setDraft:(key,value)=>drafts.set(key,value),use:next=>Object.assign(handlers,next),render:async()=>{html=await render(ctx);}};
+await ctx.render();assert.match(html,/data-cell="64"/);
+await handlers['asset-group']({dataset:{id:'small'}});assert.equal(state.assetPage,0,'changing bitmap group opens its first visible page');assert.match(html,/data-cell="0"/);
+state.assetPage=999;await ctx.render();assert.equal(state.assetPage,0,'restored page outside the selected bitmap clamps to its real last page');assert.match(html,/data-cell="0"/);
+state.assetBitmapId='large';state.assetPage=999;await ctx.render();assert.equal(state.assetPage,1);assert.match(html,/data-cell="69"/);
+console.log('Bitmap group changes reset pagination and restored pages clamp to the actual collection.');

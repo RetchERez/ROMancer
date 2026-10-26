@@ -16,6 +16,7 @@ export async function render(ctx){const {state}=ctx,missing=requireProject(ctx);
  const key=document?.document_id;if(state.paint?.document_id!==key)state.paint=null;
  if(document?.ok&&!state.paint){try{const saved=JSON.parse(ctx.draft('paint-buffer','null')),savedBitmap=document.bitmaps.find(b=>b.id===saved?.bitmap_id);if(saved?.document_id===key&&savedBitmap?.cells[saved.cell_index]&&Array.isArray(saved.pixels)&&saved.pixels.length===savedBitmap.width*savedBitmap.height){state.paint=saved;state.assetBitmapId=saved.bitmap_id;}}catch{}}
  const bitmap=document?.bitmaps?.find(b=>b.id===state.assetBitmapId)||document?.bitmaps?.[0],palette=document?.palettes?.find(p=>p.id===bitmap?.palette_id);
+ state.assetPage=Math.min(Math.max(0,Number.isSafeInteger(state.assetPage)?state.assetPage:0),Math.max(0,Math.ceil((bitmap?.count||0)/64)-1));
  const selected=state.paint?.cell_index??0;
  const request=()=>{if(!document?.ok)throw new Error('Inspect a valid asset descriptor first.');const changes=mergeCellChanges(json('asset-changes'),state.paint?[{kind:'cell',bitmap_id:bitmap.id,cell_index:selected,before_pixels:bitmap.cells[selected].pixels,after_pixels:state.paint.pixels}]:[]);return {schema_version:1,document_id:document.document_id,changes,acknowledged_consumers:state.assetAcknowledgements||[]};};
  ctx.use({

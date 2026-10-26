@@ -1,0 +1,14 @@
+import assert from 'node:assert/strict';
+import {DEFAULT_SETTINGS,hydrateSettings} from '../romancer/ui/app_settings.js';
+import {ensureRomScan,scanControls} from '../romancer/ui/rom_scan.js';
+import {ensureGraphicsObservation} from '../romancer/ui/graphics_investigation.js';
+globalThis.document={getElementById:()=>null};
+hydrateSettings({revision:0,values:{...DEFAULT_SETTINGS,autoDeepScan:false,autoGraphics:false}});
+const calls=[],ctx={state:{project:{project_id:'p'},artifact:{artifact_id:'a',sha256:'a'.repeat(64),size:1024},page:'playtest',runtime:{game_sha256:'a'.repeat(64),session_dir:'worker'},frame:{sha256:'frame'}},sourceParams:()=>({project_id:'p',artifact_id:'a'}),use(){},api:{call:async(op,p)=>{calls.push(op);if(op==='rom.scan.start')return {status:'READY',result:{}};if(op==='jobs.submit')return {job_id:'job'};if(op==='jobs.get')return {status:'COMPLETED',result:{ok:true,matches:[]}};}}};
+await ensureRomScan(ctx);await ensureGraphicsObservation(ctx);assert.deepEqual(calls,[],'Disabled automatic scans must not submit jobs.');
+assert.match(scanControls(ctx),/off/i);
+await ensureRomScan(ctx,true);assert.deepEqual(calls,['rom.scan.start'],'Manual ROM scan stays available.');
+await ensureGraphicsObservation(ctx,{force:true});assert(calls.includes('jobs.submit'),'Manual gameplay investigation stays available.');
+hydrateSettings({revision:1,values:{...DEFAULT_SETTINGS}});ctx.state.romScans={};calls.length=0;
+await ensureRomScan(ctx);assert.deepEqual(calls,['rom.scan.start'],'Default auto deep scan remains on.');
+console.log('Automatic scan preferences stop background work without disabling explicit investigation.');

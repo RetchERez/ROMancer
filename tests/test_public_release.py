@@ -93,6 +93,13 @@ class PublicReleaseTests(unittest.TestCase):
             git('init');git('add','--all')
             staged=set(git('ls-files','-z').decode().strip('\0').split('\0'))
             self.assertEqual(staged,APPROVED_FILES)
+            # Generated bundle metadata hashes literal source bytes. Git's LF
+            # normalization must not silently change those inputs on upload.
+            for name in sorted(staged):
+                if name.endswith(('.py','.js','.mjs','.json','.css','.html','.txt','.yml')):
+                    raw=(export/name).read_bytes()
+                    expected=hashlib.sha1(b'blob '+str(len(raw)).encode()+b'\0'+raw).hexdigest()
+                    self.assertEqual(git('rev-parse',':'+name).decode().strip(),expected,name)
 
     def test_source_audit_requires_the_complete_runnable_buildable_inventory(self):
         from tools.package_source import package

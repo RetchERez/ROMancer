@@ -1,0 +1,15 @@
+import assert from 'node:assert/strict';
+import {roomPixels,roomPoint,roomValue,roomPreview} from '../romancer/ui/room_editor.js';
+const visual={origin:[10,28],size:[2,2],tile_size:2,palette:[[255,255,255],[0,0,0]],tiles:[Array(4).fill(0),Array(4).fill(1)],base_cells:[0,0,0,0],current:[10,28],original:[10,28],stool_down:[10,29],object:{name:'Stool',tile_id:1,allowed:[[10,28],[10,29]]}};
+assert.equal(roomValue(visual,[10,29]),'stool_down');
+assert.throws(()=>roomValue(visual,[11,28]),/verified floor/);
+assert.deepEqual(roomPoint(visual,{left:100,top:40,width:80,height:80},{x:120,y:100}),[10,29]);
+assert.equal(roomPoint(visual,{left:100,top:40,width:80,height:80},{x:99,y:100}),null);
+const before=roomPixels(visual,[10,28]),after=roomPixels(visual,[10,29]);
+assert.deepEqual([...before.slice(0,4)],[0,0,0,255]);assert.deepEqual([...after.slice(0,4)],[255,255,255,255]);
+assert.deepEqual([...after.slice(4*4*2,4*4*2+4)],[0,0,0,255]);
+assert.match(roomPreview(visual,'stool_down'),/room-original/);assert.match(roomPreview(visual,'stool_down'),/room-edit/);
+assert.match(roomPreview(visual,'stool_down'),/Drag the stool/);
+assert.match(roomPreview(visual,'stool_down'),/Layers/);assert.match(roomPreview(visual,'stool_down'),/room-show-object/);
+assert.match(roomPreview({...visual,collision_values:[1,1,1,1]},'stool_down'),/Collision values/);
+console.log('Real room tiles render before/after movement; picking respects zoom and only verified floor destinations are accepted.');

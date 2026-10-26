@@ -57,6 +57,23 @@ libretro library. Linux uses a Linux x86_64 .so, rather than a Windows DLL.
 New or unusual cartridges may need configuration or external system files;
 passing the included checks does not certify every game.
 
+USER GUIDE
+
+Help -> User guide opens the included offline manual. It contains Basic and Advanced
+workflows, actual editing screenshots, a linked glossary and an alphabetical index.
+The source and Windows packages also include user-guide/index.html and guide.pdf
+(inside app/user-guide in the Windows package). Keep the screenshots folder with it.
+
+The default 100% app size now matches the earlier 75% layout. Browser zoom can stay
+at 100%; Settings -> Preferences offers larger interface sizes.
+ROMancer is the default theme; Dark and Light are also available.
+OK saves and closes Settings. Apply saves while staying there. Cancel discards
+unapplied preference changes. Restore defaults fills the standard values; use
+Apply or OK to save them. Auto deep scan on ROM load is enabled by default.
+Automatic gameplay graphics analysis, workspace restore, volume, mute, preview
+looping, reduced motion and advanced-tool visibility are configurable. Settings
+and workspace restore metadata persist independently of the browser port.
+
 EVERYDAY CONTROLS
 
 Ctrl+S saves editing drafts; Create build produces the playable ROM.
@@ -238,7 +255,9 @@ LICENSES
 Project code and original fixtures are MIT licensed; see LICENSE.
 THIRD_PARTY_NOTICES.txt describes dependency notices. Bundled Python and Pillow
 retain their full upstream license files. Separately supplied emulator cores
-retain their own licenses. No commercial game data is distributed.
+retain their own licenses. No commercial ROM files, firmware dumps or user save data are distributed.
+The user guide includes instructional screenshots from the supplied games; game
+imagery remains the property of its respective rights holders.
 
 AI AND LLM CLIENTS
 

@@ -179,3 +179,13 @@ main,.scaled-compact main,.scaled-narrow main{padding:20px clamp(18px,1.5vw,28px
 .unavailable-control:hover .unavailable-reason:not([hidden]), .unavailable-control:focus-within .unavailable-reason:not([hidden]) { display:block; }
 
 .field-title{display:flex;align-items:center;gap:8px}.field-help{position:relative;display:inline-flex;align-items:center;justify-content:center;flex-shrink:0;width:24px;height:24px;border:1px solid var(--line);border-radius:50%;font-size:16px;color:var(--muted);cursor:help}.field-help-tip{display:none;position:absolute;right:0;top:calc(100% + 6px);z-index:40;width:min(290px,75vw);padding:12px;background:var(--panel2);border:1px solid var(--line);border-radius:8px;color:var(--text);font-size:16px;font-weight:400;line-height:1.5;box-shadow:0 6px 24px #0006}.field-help:hover>.field-help-tip,.field-help:focus>.field-help-tip{display:block}
+.guide-link{display:inline-flex;align-items:center;min-height:44px;padding:8px 14px;border:1px solid var(--line);border-radius:7px;background:var(--panel2)}
+.room-object-preview canvas{display:block;width:100%;max-width:448px;height:auto;image-rendering:pixelated;background:#111;border:1px solid var(--line)}
+.room-object-preview label{display:flex;align-items:center;gap:10px;min-height:40px}.room-object-preview input{width:20px;height:20px}
+.room-layers{display:flex;flex-wrap:wrap;gap:8px 20px;border:1px solid var(--line);border-radius:7px;padding:8px 12px;margin:12px 0}.room-layers legend{padding:0 6px;color:var(--muted)}
+.reduce-motion *,.reduce-motion *:before,.reduce-motion *:after{animation:none!important;transition:none!important;scroll-behavior:auto!important}
+.game-definition:has(.room-object-preview) .game-definition-grid{grid-template-columns:minmax(0,2fr) minmax(260px,1fr)}
+.level-brush-panel{margin:12px 0}.level-brush-palette{display:grid;grid-template-columns:repeat(auto-fill,minmax(52px,1fr));gap:6px;max-height:240px;overflow:auto}
+.level-brush-palette button{display:flex;flex-direction:column;align-items:center;gap:3px;padding:6px}.level-brush-palette canvas{width:32px;height:32px;image-rendering:pixelated}
+.level-brush-palette button[aria-pressed=true]{border-color:var(--accent);outline:1px solid var(--accent)}
+@media(max-width:1050px){.game-definition:has(.room-object-preview) .game-definition-grid{grid-template-columns:minmax(0,1fr)}}

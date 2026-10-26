@@ -1,0 +1,1911 @@
+{
+  "schema_version": 1,
+  "product": "ROMancer v1.0",
+  "subtitle": "A practical guide to the current editing tools: small first edits, advanced workflows, actual editing and appearance examples, a glossary and an alphabetical index.",
+  "scope": "Work on a project copy, review exact changes, create a separate build, playtest that build and verify its patch. Examples require the exact matched revisions and declared layouts shown. A measured check covers its recorded scope; it does not certify every game or scene.",
+  "basic_summary": "Start the application, choose saved preferences, identify a source, make a focused edit, preserve progress and export a checked patch. These procedures build the habits used throughout the guide.",
+  "advanced_summary": "Use explicit storage definitions for deeper graphics, text, tables, rooms, audio and automation. Keep supported formats, observed results and unknown game semantics separate.",
+  "attribution": "By RetchEWretched. ROMancer code and original fixtures use the project MIT license. Instructional screenshots show third-party games, including Castlevania, Chrono Trigger, The Immortal, Wario Land 4, Final Fantasy Legend II and Deja Vu I & II; their imagery and trademarks remain those of their respective rights holders and are separate from the code license. No ROM files, game saves, emulator states, firmware dumps or authentication data are included in this guide. The prebuilt PDF and HTML work offline; PDF rebuilding optionally uses ReportLab.",
+  "chapters": [
+    {
+      "id": "install",
+      "title": "Install, open and choose a workspace",
+      "part": "Basic",
+      "kicker": "Start here",
+      "intro": "The full Windows x64 release includes Python, Pillow and credited emulator engines. The source edition uses your own Python installation. Both include this guide.",
+      "steps": [
+        "Run the Windows setup executable. Choose the install location, finish setup, then open ROMancer. The application and its saved workspace are separate.",
+        "For the portable Windows ZIP, extract the entire archive and use <b>Open ROMancer.cmd</b>. Keep app, python, cores and the root launch files together.",
+        "For the source edition, install Python 3.13 or later and the pinned requirements, then use <b>Launch ROMancer.cmd</b> on Windows or the supplied run.sh launcher. Read the root README for the command-line and MCP entry points.",
+        "Open <b>Help</b> for tutorials and this guide. Start a workshop or import a ROM you supply. No AI account, subscription or API key is required."
+      ],
+      "result": "ROMancer opens its local interface and your project list. The full Windows edition selects a matching included engine when you load a supported system.",
+      "note": "Keep the complete folder when moving a portable copy. Moving the program does not by itself move the workspace or its projects.",
+      "details": [
+        {
+          "title": "Update and recovery",
+          "text": "Install a new build revision rather than replacing files inside an old verified version. Rollback changes the active application version while preserving projects; an older application may not understand newer project features."
+        },
+        {
+          "title": "Offline guide",
+          "text": "Open user-guide/index.html directly from the source folder, or app/user-guide/index.html in the Windows payload. The adjacent guide.pdf is the printable edition. Keep the screenshots folder beside the HTML."
+        }
+      ],
+      "related": [
+        "projects",
+        "mcp"
+      ],
+      "terms": [
+        "term-core",
+        "term-original"
+      ]
+    },
+    {
+      "id": "settings",
+      "title": "Set preferences and choose a theme",
+      "part": "Basic",
+      "kicker": "Settings / saved across launches",
+      "intro": "Settings control the working environment: appearance, startup behavior, automatic analysis and audio defaults. Apply the choices you want to keep before closing the application.",
+      "steps": [
+        "Open <b>Settings</b>. Review appearance and startup preferences. <b>100%</b> is the standard interface size; it uses the more compact layout previously shown at 75%. Choose another offered size when useful.",
+        "Choose a theme: <b>ROMancer (default)</b>, <b>Dark</b> for neutral graphite or <b>Light</b> for white surfaces. Adjust <b>Reduce interface motion</b> and <b>Show advanced tools in navigation</b> to suit your work.",
+        "Review <b>Auto deep scan on ROM load</b>, enabled by default, and <b>Inspect gameplay graphics automatically</b>. Set <b>Remember my workspace</b> to reopen the last project, ROM, page and editing position. These preferences choose automatic work, not a new level of game-format verification.",
+        "Set <b>Volume</b> from 0 to 100, <b>Start game audio muted</b> and <b>Loop audio previews</b>. Choose <b>Apply</b> to save and continue, or <b>OK</b> to save and close. <b>Cancel</b> discards unapplied changes. <b>Restore defaults</b> prepares the standard choices; use Apply or OK to keep that reset."
+      ],
+      "result": "Applied preferences persist across launches for this workspace. The chosen theme and size make the controls comfortable to read, and automatic scan/audio behavior follows the saved choices.",
+      "note": "A theme changes appearance, not ROM bytes. Disabling automatic analysis does not invalidate an existing definition; it changes when that analysis runs. Manual investigation and review remain available.",
+      "details": [
+        {
+          "title": "When to change automatic work",
+          "text": "Leave Auto deep scan on ROM load enabled for normal discovery. Turn it off when you want to choose the timing of a manual scan. Automatic analysis of paused gameplay graphics depends on an actual loaded session and exposed data; it does not identify arbitrary resource ownership."
+        },
+        {
+          "title": "Audio and motion",
+          "text": "Volume and start-muted preferences control playback defaults; use the current preview controls when listening. Preview looping repeats the available preview, not the game sequence. Reduced motion makes interface motion less distracting."
+        },
+        {
+          "title": "Apply, Cancel and defaults",
+          "text": "Apply saves the currently selected preferences without closing Settings. Cancel does not roll back an earlier Apply. Restore defaults prepares the standard choices for review; use Apply or OK to keep them."
+        }
+      ],
+      "related": [
+        "settings-appearance",
+        "install",
+        "resources",
+        "sound",
+        "help"
+      ],
+      "terms": [
+        "term-preferences",
+        "term-theme",
+        "term-candidate"
+      ],
+      "image": "13-settings",
+      "image_layout": "following-page",
+      "image_alt": "Actual ROMancer Settings showing Appearance, Automatic tasks, Audio and Workspace tools preferences",
+      "caption": "Actual saved Settings in the ROMancer default theme. Open the image for full resolution.",
+      "extra_images": [
+        {
+          "image": "14-light-theme",
+          "title": "Light theme / readable white surfaces"
+        },
+        {
+          "image": "15-dark-theme",
+          "title": "Dark theme / neutral graphite surfaces"
+        }
+      ]
+    },
+    {
+      "id": "start",
+      "title": "Start with a project",
+      "kicker": "YOUR FIRST FIVE MINUTES",
+      "image": "01-workspace",
+      "steps": [
+        "Click <b>New project</b>. Give this piece of work a useful name, then import your ROM into that project.",
+        "Check the selected source at the top. On Overview, read the revision match and investigation results before choosing an editor.",
+        "Make one small edit, review it, create a separate <a href=\"#term-build\">build</a>, then playtest that build. Export its patch after checking the result."
+      ],
+      "result": "A project holds owned source copies, editing setup, builds and evidence. Start a new project for unrelated work.",
+      "note": "The Windows x64 distribution includes its runtime and emulator engines. Supply your own ROMs. GB and GBC use separate system modes.",
+      "part": "Basic",
+      "intro": "A project keeps one piece of work together: imported sources, definitions, drafts, builds and measured checks. Begin with a small, reversible edit.",
+      "related": [
+        "checks",
+        "drafts",
+        "projects"
+      ],
+      "caption": "Actual ROMancer interface. The HTML edition links to the full-resolution capture.",
+      "terms": [
+        "term-original",
+        "term-draft",
+        "term-build"
+      ]
+    },
+    {
+      "id": "checks",
+      "title": "Identify the ROM and its exact revision",
+      "part": "Basic",
+      "kicker": "Hashes, scope and evidence",
+      "intro": "A system header, an exact hash match and a successful playtest answer different questions. Read each result before selecting a named game edit.",
+      "steps": [
+        "Select the imported source and open <b>Resources</b>. Read <b>ROM health & revision</b> and the investigation summary. A filename is a hint, not a verified identity.",
+        "For a known reference, use <b>Identify ROM revision</b>. Import your offline CSV, TSV, JSON or XML DAT catalog and select whole-file or supported cartridge-payload scope.",
+        "Compare CRC32, SHA-1 or SHA-256 with an expected value for that same scope. Check the region, revision and any copier/header prefix. A mismatch is against the selected reference.",
+        "Use <b>Check project</b> on Overview for missing files, stale definitions, overlaps and declared pointer/allocation problems. Recheck after repairing the reported location."
+      ],
+      "result": "A catalog match identifies exact referenced bytes. Unknown means no matching reference was established. It does not prove corruption. A project check reports its declared structural checks.",
+      "note": "A valid console checksum does not prove every game-specific check passes. Hashes do not prove that an edit is fun, balanced or safe in every scene.",
+      "details": [
+        {
+          "title": "Three separate checks",
+          "text": "<b>Identity:</b> compare measured bytes with an expected revision. <b>Structure:</b> validate supported headers, declared sizes and integrity fields. <b>Behavior:</b> playtest and replay explicit assertions. Keep these conclusions separate."
+        },
+        {
+          "title": "Headers and byte scope",
+          "text": "A SNES copier prefix or an NES trainer/header can change file positions and whole-file hashes. Compare a payload reference only with the matching supported payload scope. Never force a named definition onto a close-looking revision."
+        }
+      ],
+      "related": [
+        "resources",
+        "debug",
+        "regression"
+      ],
+      "terms": [
+        "term-crc",
+        "term-sha",
+        "term-scope"
+      ]
+    },
+    {
+      "id": "drafts",
+      "title": "Save drafts, undo and create a build",
+      "part": "Basic",
+      "kicker": "The editing cycle",
+      "intro": "Editing changes the proposal shown in the editor. A build is a separate playable output created from a reviewed plan.",
+      "steps": [
+        "Watch the <b>Saving</b> or <b>Saved</b> status as you work. Ctrl+S requests draft saving. A saved draft still needs review and a build.",
+        "Use the active editor's Undo and Redo controls. Pixel and room editors group a stroke; text fields retain ordinary text editing undo. The shortcut help explains the current context.",
+        "Choose <b>Review changes</b> or the tool's equivalent. Read expected original bytes, proposed values, shared consumers and any integrity updates. Changing an input invalidates an older review.",
+        "Create the separate build, select it in the top bar and reload it in Playtest. Compare the intended change and one nearby unchanged behavior."
+      ],
+      "result": "The source remains intact, the build has its own identity, and the selected Playtest file is the output you just created.",
+      "note": "If saving fails, keep the window open and copy unsaved text before reloading. Undoing staged work does not erase a previously created build.",
+      "details": [
+        {
+          "title": "Draft versus plan",
+          "text": "Drafts hold editor values and staged changes. A plan binds exact changes and preconditions to a source identity. Re-review when the source, definition or staged values change."
+        },
+        {
+          "title": "Returning to earlier work",
+          "text": "Use Overview > Build history to inspect versions and meaningful names. Select an earlier output when comparing behavior. Make a complete private project backup before moving work or changing a complex definition."
+        }
+      ],
+      "related": [
+        "projects",
+        "play",
+        "patches"
+      ],
+      "terms": [
+        "term-draft",
+        "term-plan",
+        "term-build"
+      ]
+    },
+    {
+      "id": "numbers",
+      "title": "Make a small balance change",
+      "kicker": "SNES / CHRONO TRIGGER",
+      "image": "03-chrono-weapon",
+      "steps": [
+        "On Overview, look for <b>Game edits</b> and <b>Revision matched</b>. These named edits require the exact verified original.",
+        "Change <b>Wood Sword power</b> from 3 to 30. Read the original/edited comparison and click <b>Review changes</b>.",
+        "Expand <b>Byte changes and console checksum</b> if you want the exact edit list. Choose <b>Create build</b>, then test the weapon in game."
+      ],
+      "result": "The preview reports stored power 3 to 30: +27, or +900%.",
+      "note": "Stored power is not the final damage or displayed attack. Game formulas can change that result. A revision match verifies the source, not every possible gameplay effect.",
+      "part": "Basic",
+      "intro": "Use a named, revision-matched edit for a focused first balance change. Compare the stored value with the actual in-game result.",
+      "related": [
+        "tables",
+        "checks",
+        "regression"
+      ],
+      "caption": "Actual ROMancer interface. The HTML edition links to the full-resolution capture.",
+      "terms": [
+        "term-revision",
+        "term-field",
+        "term-evidence"
+      ]
+    },
+    {
+      "id": "text",
+      "title": "Change text without overrunning it",
+      "kicker": "GENESIS / THE IMMORTAL",
+      "image": "05-immortal-text",
+      "steps": [
+        "On the matched source, edit <b>New-game menu text</b>. This example changes \"New game?\" to \"New hack?\".",
+        "Read the text comparison and length limit. Click <b>Review changes</b> and inspect every additional change listed in the plan.",
+        "Create the build and playtest the actual menu. Use <b>Text & layout</b> for declared script records and translation imports."
+      ],
+      "result": "The preview shows both strings; the review also names the guarded game-specific adjustment required by this definition.",
+      "note": "The preview uses the system font. The real game font and window still need playtesting. This named definition preserves its protected terminator; do not copy its offsets to another revision.",
+      "part": "Basic",
+      "intro": "Change a short, documented string while keeping its storage and required controls intact. Test its appearance with the real game font.",
+      "related": [
+        "translation",
+        "text-layout",
+        "drafts"
+      ],
+      "caption": "Actual ROMancer interface. The HTML edition links to the full-resolution capture.",
+      "terms": [
+        "term-encoding",
+        "term-control",
+        "term-allocation"
+      ]
+    },
+    {
+      "id": "gba-colors",
+      "title": "Compare palette colors before building",
+      "kicker": "GBA / WARIO LAND 4",
+      "image": "06-wario-palettes",
+      "steps": [
+        "Open the matched source and change <b>File-select colors</b> to <b>Teal and magenta</b>.",
+        "Compare <b>Original</b> and <b>Edited</b> swatches. Expand the second file-select palette to inspect that set too.",
+        "Review the change, create a build and open the file-select scene in Playtest to check the appearance."
+      ],
+      "result": "The actual editor shows the first 256-color palette, with 78 changed colors for this preset.",
+      "note": "These swatches decode stored RGB555 colors. They are not a screenshot of the game scene. Palette changes can affect every object using those entries.",
+      "part": "Basic",
+      "intro": "Compare decoded original colors and proposed colors before writing a build. This example is tied to an exact file-select palette definition.",
+      "related": [
+        "palettes",
+        "tilemaps",
+        "checks"
+      ],
+      "caption": "Actual ROMancer interface. The HTML edition links to the full-resolution capture.",
+      "terms": [
+        "term-palette",
+        "term-codec"
+      ]
+    },
+    {
+      "id": "room",
+      "title": "Move a documented room object",
+      "kicker": "GAME BOY / FINAL FANTASY LEGEND II",
+      "image": "07-ffl2-room",
+      "steps": [
+        "On the matched source, open <b>Opening-bedroom stool</b> on Overview or open its matched room in <b>Levels</b>. Compare the actual ROM-decoded original and edited terrain.",
+        "In <b>Layers</b>, toggle <b>Terrain</b>, <b>Objects</b>, <b>Collision values</b>, <b>Tile grid</b> and <b>Allowed floor tiles</b>. Keep Objects visible to edit the stool.",
+        "Drag the stool or click a highlighted allowed floor tile. With the room control focused, arrow keys select guarded positions. The stool-position dropdown is an alternative.",
+        "Review the source-bound command, create a separate build and visit the bedroom. Check the stool, surrounding movement and protected doorway in Playtest."
+      ],
+      "result": "Original and edited maps use actual decoded opening-bedroom data. The five supported stool positions are (12, 31), (14, 31), (12, 32), (13, 32) and (14, 32).",
+      "note": "The doorway at (13, 33) and other room commands are protected. Collision values are raw hexadecimal data, not inferred walkability labels. Actors and dialogue are excluded from this terrain preview. Hiding Objects prevents stool edits.",
+      "part": "Basic",
+      "intro": "Change one documented room object on the exact matched revision. Check the surrounding room and movement after building.",
+      "related": [
+        "levels",
+        "checks",
+        "regression"
+      ],
+      "caption": "Actual ROMancer interface. The HTML edition links to the full-resolution capture.",
+      "terms": [
+        "term-metatile",
+        "term-collision",
+        "term-layer"
+      ]
+    },
+    {
+      "id": "gbc-colors",
+      "title": "Edit a Game Boy Color palette",
+      "kicker": "GAME BOY COLOR / DEJA VU CASEBOOKS",
+      "image": "08-dejavu-colors",
+      "steps": [
+        "Select the matched <b>.gbc</b> source. Choose <b>Parchment colors</b> under <b>Opening casebook interface</b>.",
+        "Compare the startup interface swatches. Expand <b>Opening scene interface colors</b> to inspect the second palette.",
+        "Review and build, then playtest with the <b>Game Boy Color</b> system selected. Check the opening casebook and first scene."
+      ],
+      "result": "The editor previews the four-color startup palette and reports three changed colors.",
+      "note": "This definition covers the startup interface and first Case Book 1 scene. Later rooms may use separate palettes. GBC mode matters even though GB and GBC share an engine.",
+      "part": "Basic",
+      "intro": "Use the Color system mode for a GBC source, then test both the startup interface and the first scene covered by this definition.",
+      "related": [
+        "palettes",
+        "play",
+        "resources"
+      ],
+      "caption": "Actual ROMancer interface. The HTML edition links to the full-resolution capture.",
+      "terms": [
+        "term-palette",
+        "term-bank"
+      ]
+    },
+    {
+      "id": "play",
+      "title": "Playtest, pause and save a state",
+      "kicker": "TEST THE SELECTED BUILD",
+      "image": "09-playtest-states",
+      "steps": [
+        "Check that the top selector shows your build, then open <b>Playtest</b> and click <b>Load game</b>.",
+        "Choose <b>Play</b> and focus the game for controller input. Use <b>Pause</b> before inspecting a frame. Controller & frame tools exposes manual stepping and input devices.",
+        "Choose <b>Save state</b>. Select a saved state and click <b>Load state</b> to return to it. Ordinary battery saves are managed separately below."
+      ],
+      "result": "For this capture, the modified Chrono Trigger build was loaded, advanced 600 frames, saved and restored through ROMancer.",
+      "note": "Save states are bound to the exact ROM, engine and runtime setup. Do not assume a state from the original will load on a modified build. Loading refreshes one paused frame.",
+      "part": "Basic",
+      "intro": "Load the exact source or build you intend to test. Playback, controller input, frame stepping and snapshots operate on that loaded session.",
+      "related": [
+        "saves",
+        "regression",
+        "sound"
+      ],
+      "caption": "Actual ROMancer interface. The HTML edition links to the full-resolution capture.",
+      "terms": [
+        "term-core",
+        "term-frame",
+        "term-state"
+      ]
+    },
+    {
+      "id": "saves",
+      "title": "Keep battery saves and states separate",
+      "part": "Basic",
+      "kicker": "Protect progress",
+      "intro": "A battery save is persistent game data such as raw .sav or .srm RAM. A save state captures an emulator session and has much tighter compatibility requirements.",
+      "steps": [
+        "For a snapshot, use <b>Save state</b> beside Play. Select the timestamped state for the same ROM, core and setup, then use <b>Load state</b>. Loading refreshes one paused frame.",
+        "For ordinary progress, load the exact game and open <b>Battery saves</b>. Back up the currently exposed save RAM before importing or restarting.",
+        "Import raw save data only at the exact supported size. Keep a downloaded backup. Use the game's own load/save menu to confirm progress after a restart.",
+        "Use <b>Restart with selected save</b> only after reviewing the chosen file and automatic backup. Keep separate progress for experiments until the edited build is validated."
+      ],
+      "result": "The selected data has the expected size and identity, a backup exists, and the game can load the intended progress through its normal save system.",
+      "note": "A state from an original can be incompatible with a modified build. Wrapped emulator saves are not automatically raw RAM; use the originating emulator's export tools.",
+      "details": [
+        {
+          "title": "Binding matters",
+          "text": "States depend on exact ROM bytes, engine build, options and system-file setup. Do not treat a matching game title as compatibility. Battery files can also depend on the game revision and save layout."
+        },
+        {
+          "title": "Size or initialization mismatch",
+          "text": "Some games expose a different save size after initialization. A refusal preserves the backup; do not pad, truncate or bypass exact-size checks without a separately understood format."
+        }
+      ],
+      "related": [
+        "play",
+        "projects",
+        "troubleshooting"
+      ],
+      "terms": [
+        "term-battery",
+        "term-state"
+      ]
+    },
+    {
+      "id": "patches",
+      "title": "Export a verified patch",
+      "kicker": "SHARE YOUR CHANGES",
+      "image": "10-verified-patch",
+      "steps": [
+        "Open <b>Export</b>. Select the exact <b>Original revision</b> and the intended <b>Target build</b>. Add a useful title and notes.",
+        "Click <b>Create & independently verify patch</b>. ROMancer reconstructs the target with a separate BPS decoder and checks its identity.",
+        "Download the prepared patch. Include the expected original revision and instructions with your release, then test applying that patch to a fresh source copy."
+      ],
+      "result": "The capture follows a successful patch preparation from the modified Chrono Trigger build.",
+      "note": "A patch is not a full ROM. BPS checks compatibility using embedded checksums; IPS needs an external source reference. A verified patch proves reconstruction, not complete gameplay correctness. To apply a downloaded patch, use Export > Apply a downloaded patch on the exact original. BPS carries checksums; IPS requires the author's full-file CRC32 or SHA-256 reference. Preview compatibility before creating its separate build.",
+      "part": "Basic",
+      "intro": "Share the verified difference between an exact original and a completed build. State the required source revision with your instructions.",
+      "related": [
+        "regression",
+        "projects",
+        "checks"
+      ],
+      "caption": "Actual ROMancer interface. The HTML edition links to the full-resolution capture.",
+      "terms": [
+        "term-bps",
+        "term-ips",
+        "term-patch"
+      ]
+    },
+    {
+      "id": "projects",
+      "title": "Back up, restore and recover a project",
+      "part": "Basic",
+      "kicker": "Projects, Trash and private backups",
+      "intro": "A project backup is for your own recovery or migration. A public patch package has a different purpose and contains a different selection of data.",
+      "steps": [
+        "Open <b>Projects</b> to choose the right project before editing. Use a separate project for unrelated games or experiments you want to manage independently.",
+        "In <b>Settings</b>, make a complete private project backup before moving a workspace or making broad changes. Store the archive outside the working project and confirm it was created.",
+        "Restore into the destination workspace, open the recovered project and run <b>Check project</b>. Inspect sources, builds, definitions, drafts and prepared exports.",
+        "To remove an unwanted project from the active list, choose <b>Delete project</b>, then <b>Move to Trash</b>. Recover it through <b>Projects > Trash > Restore</b>."
+      ],
+      "result": "A restored project opens with its owned source and build data. Deleting a project moves its owned files to Trash; the original external ROM stays where it was.",
+      "note": "A private backup can contain your ROMs, saves and personal work. Review what you share. Recovery does not make historical reports into fresh native evidence.",
+      "details": [
+        {
+          "title": "Before cleanup",
+          "text": "Check the project name and current workspace. Keep an independent backup before deleting old application folders or moving manually managed data. A reversible application rollback is not a project backup."
+        },
+        {
+          "title": "After restore",
+          "text": "Run fresh native checks before using restored captures or reports as current proof. If a lock blocks recovery, establish that the previous owner process is no longer running; never break an active writer's lock."
+        }
+      ],
+      "related": [
+        "drafts",
+        "checks",
+        "patches"
+      ],
+      "terms": [
+        "term-artifact",
+        "term-evidence"
+      ]
+    },
+    {
+      "id": "help",
+      "title": "Learn a little at a time",
+      "kicker": "HELP / BASIC AND ADVANCED",
+      "image": "12-tutorials",
+      "steps": [
+        "Open <b>Help > Tutorials</b> whenever you want a guided lesson. The first-launch invitation is optional and includes <b>Never ask again</b>.",
+        "Choose a short <b>Basic</b> or <b>Advanced</b> lesson. Completed lessons receive a green check; skipped lessons do not.",
+        "Use <b>Help > Keyboard shortcuts</b> for the popup. Ctrl+S saves drafts; contextual Undo/Redo acts on the active editor. Text fields retain normal text undo."
+      ],
+      "result": "Tutorials remain available after dismissing the first-launch invitation.",
+      "note": "Saved drafts are not playable builds. Before leaving an edit session, review the Saved or Saving status and whether staged changes still require a build.",
+      "part": "Basic",
+      "intro": "Learn one tool at a time, or jump to an exact term. Tutorials, keyboard shortcuts, this glossary and the index remain available offline.",
+      "related": [
+        "drafts",
+        "troubleshooting",
+        "mcp"
+      ],
+      "caption": "Actual ROMancer interface. The HTML edition links to the full-resolution capture.",
+      "terms": [
+        "term-draft",
+        "term-build"
+      ]
+    },
+    {
+      "id": "hex-editor",
+      "title": "Inspect bytes with useful context",
+      "kicker": "RESOURCES / HEX EDITOR",
+      "image": "11-hex-inspection",
+      "steps": [
+        "Use a <b>Known locations > View 0x...</b> button to jump to a documented offset, or open <b>Resources</b> and enter an offset.",
+        "Search bytes such as AB ?? CD, UTF-8 text or an integer with explicit byte order. Inspect signed/unsigned numbers, read nearby verified notes and bookmark the selected offset before editing.",
+        "Edit a byte using two hex digits. Choose <b>Review byte edits</b>, inspect the plan, then <b>Create separate build</b>."
+      ],
+      "result": "The editor is opened at The Immortal's documented menu bytes rather than an arbitrary location.",
+      "note": "Hexadecimal is a way to write numbers; it does not tell you what a byte means. Unknown data stays unknown until evidence establishes its structure and purpose.",
+      "part": "Advanced",
+      "intro": "Inspect exact stored bytes with a known purpose and an explicit address scope. Use higher-level tools when their definitions describe the change.",
+      "related": [
+        "debug",
+        "checks",
+        "tables"
+      ],
+      "caption": "Actual ROMancer interface. The HTML edition links to the full-resolution capture.",
+      "terms": [
+        "term-hex",
+        "term-offset",
+        "term-byte-order"
+      ]
+    },
+    {
+      "id": "resources",
+      "title": "Discover resources and declare a format",
+      "part": "Advanced",
+      "kicker": "Known, declared and candidate",
+      "intro": "Offline investigation can identify known revisions and suggest possible structures. A candidate is a lead to inspect, not permission to edit arbitrary bytes.",
+      "steps": [
+        "Read the automatic investigation after import. Keep exact known identities separate from candidate text, graphics, pointer or compression matches.",
+        "Use <b>Rescan ROM</b> for changed data or <b>Find resources</b> for a focused byte range. Read any partial-range report and continue the next range when needed.",
+        "Confirm the offset, format, dimensions, allocation and source identity before declaring a resource. Inspect surrounding bytes and independent references for the exact revision.",
+        "Save the checked definition. Reopen it on the same source and compare the preview with a measured game scene before applying edits."
+      ],
+      "result": "The editor decodes the intended resource from bounded, explicitly identified storage. A later build must meet the same source and original-byte preconditions.",
+      "note": "A plausible picture or readable word can occur inside code or unrelated data. Automatic discovery cannot establish arbitrary enemy names, animation scripts or sound-driver commands.",
+      "details": [
+        {
+          "title": "System formats",
+          "text": "NES stored CHR uses planar 2bpp; Game Boy uses paired row bitplanes. SNES templates support paired 4bpp; Genesis supports packed 4bpp and big-endian palette words. GBA templates include low-nibble-first 4bpp and RGB555. Each game can add compression and its own layout."
+        },
+        {
+          "title": "Six supported modes",
+          "text": "NES, SNES, Genesis, GB, GBC and GBA are separate user choices. Bank switching, enhancement hardware and game-specific data need their own supported mapping or verified definition. Unknown bytes remain inspectable, with editing or execution refused when support is not established."
+        },
+        {
+          "title": "Automatic versus manual investigation",
+          "text": "Settings enables Auto deep scan on ROM load by default. You can choose a manual scan instead. Automatic paused-gameplay graphics analysis examines available observed data; its candidates still need format and ownership confirmation."
+        }
+      ],
+      "related": [
+        "compression",
+        "checks",
+        "recipes"
+      ],
+      "terms": [
+        "term-candidate",
+        "term-declared",
+        "term-known"
+      ]
+    },
+    {
+      "id": "sprites",
+      "title": "Paint an assembled sprite",
+      "kicker": "NES / CASTLEVANIA",
+      "image": "02-castlevania-sprite",
+      "steps": [
+        "Open <b>Graphics & fonts</b>. With verified or declared tiles loaded, use <b>Sprite assembly</b> to arrange the parts.",
+        "Choose a brush color index and paint in <b>Editing - paint here</b>. Compare the fixed Original image with the edited preview.",
+        "Use <b>Undo sprite stroke</b> or <b>Redo sprite stroke</b>, then <b>Review asset changes</b> and create a build."
+      ],
+      "result": "The capture shows an actual changed pixel on a 16 x 32 Simon assembly made from eight tiles.",
+      "note": "This example uses a declared tile layout and observed gameplay colors. It does not prove automatic sprite assembly for every game. Preview colors do not change palette bytes.",
+      "part": "Advanced",
+      "intro": "An explicit assembly places known tiles into a useful sprite view. Painting edits the referenced tiles; the arrangement itself does not discover game logic.",
+      "related": [
+        "animation",
+        "palettes",
+        "tilemaps"
+      ],
+      "caption": "Actual ROMancer interface. The HTML edition links to the full-resolution capture.",
+      "terms": [
+        "term-tile",
+        "term-palette"
+      ]
+    },
+    {
+      "id": "palettes",
+      "title": "Edit stored palette entries deliberately",
+      "part": "Advanced",
+      "kicker": "Color indices and shared uses",
+      "intro": "A pixel usually stores a color index. A palette supplies the RGB color for that index. Changing the palette can recolor many uses at once.",
+      "steps": [
+        "Load a declared graphics resource and inspect <b>Palette colors</b>. Select the bank and entry before editing. Confirm the original swatch matches the intended resource.",
+        "Use <b>Choose color</b> for an RGB proposal, or <b>Color storage values</b> for the declared channels. Read the Original/Edited comparison as the change is staged.",
+        "Review the channel limits and shared consumers. RGB555 stores 5-bit channels, so a chosen screen color is quantized to a representable value.",
+        "Review asset changes, create the build and inspect every scene known to share that palette. Verify the color in the actual game, not just the swatch."
+      ],
+      "result": "The proposed color is representable in the declared format; the build changes the intended palette bytes and the scene uses them as expected.",
+      "note": "Preview colors used to arrange a sprite are not necessarily stored palette edits. Transparency, banks and a game's dynamic palette changes can affect the observed result.",
+      "details": [
+        {
+          "title": "Shared entries",
+          "text": "One index can be referenced by multiple tiles, objects or frames. A correct local swatch can cause an unintended global recolor. Inspect declared consumers and compare an unchanged neighboring object."
+        },
+        {
+          "title": "Original versus edited",
+          "text": "The original view remains the reference while the edited view follows staged values. Saving the editor draft does not modify the playable source. Build and reload before judging the in-game effect."
+        }
+      ],
+      "related": [
+        "gba-colors",
+        "gbc-colors",
+        "sprites"
+      ],
+      "terms": [
+        "term-palette",
+        "term-bank"
+      ]
+    },
+    {
+      "id": "animation",
+      "title": "Preview an explicitly assembled animation",
+      "part": "Advanced",
+      "kicker": "Frames and shared tiles",
+      "intro": "Animation frames let you compare declared arrangements over time. They do not automatically identify or rewrite a commercial game's animation script.",
+      "steps": [
+        "Arrange the tiles for one frame in <b>Sprite assembly</b>. Open <b>Animation frames</b>, set <b>Frame duration (ms)</b> and choose <b>Add assembled frame</b>.",
+        "Create the other explicit frame arrangements. Select a frame to inspect it, use <b>Edit selected frame</b> to revise its layout, or <b>Remove selected frame</b> to remove it from this preview.",
+        "Use <b>Play animation</b> and <b>Pause animation</b> to review the proposed sequence. Read the shared-tile count before changing pixels.",
+        "Review the actual asset changes and build them. Playtest the real game animation to establish whether its own script uses the edited tiles in the intended order."
+      ],
+      "result": "The preview cycles through the layouts you supplied and reflects staged tile/palette edits. The unchanged original remains available for comparison.",
+      "note": "Editing a tile reused across frames changes every preview frame that references it. A timing value in this preview is not proof of the game's stored animation timing.",
+      "details": [
+        {
+          "title": "What is saved",
+          "text": "The frame list is an explicit editor layout. Only supported reviewed asset changes become ROM bytes. Keep resource definitions and game-specific script evidence separate."
+        },
+        {
+          "title": "Useful first check",
+          "text": "Make a one-pixel change in one tile, find every frame that shares it, then undo. This reveals the practical reach of a tile before you commit a larger redraw."
+        }
+      ],
+      "related": [
+        "sprites",
+        "palettes",
+        "regression"
+      ],
+      "terms": [
+        "term-tile",
+        "term-frame"
+      ]
+    },
+    {
+      "id": "tilemaps",
+      "title": "Paint a declared tilemap",
+      "part": "Advanced",
+      "kicker": "Tile references, banks and flips",
+      "intro": "A tilemap is a grid of references to tiles. Entries can also contain palette banks or horizontal and vertical flip flags, depending on the declared format.",
+      "steps": [
+        "Inspect a graphics definition that includes the tilemap location, dimensions, entry format and associated tile/palette resources. Confirm the original map preview.",
+        "Select the map brush or entry and stage the intended tile index, palette bank and flip values. Compare the map preview while keeping the original as the reference.",
+        "Use the tilemap editor's supported painting tools and undo controls for bounded strokes. For a specific entry, inspect its stored values before staging a change.",
+        "Review asset changes and shared consumers. Create a build and load the game location that uses the map, including scrolling or transitions that might load other banks."
+      ],
+      "result": "The reviewed map entry references a valid tile and allowed bank/flip values. The rendered game screen shows the intended arrangement.",
+      "note": "A tilemap is a display arrangement. Collision, objects and exits can live in separate records and will not automatically follow a visual change.",
+      "details": [
+        {
+          "title": "PNG import",
+          "text": "For supported graphics imports, choose exact palette mapping or explicitly review nearest-color conversion. Importing artwork does not establish the ROM's resource location or capacity."
+        },
+        {
+          "title": "Reuse matters",
+          "text": "A tile edit changes every map entry that reuses that tile. A map-entry edit changes its reference instead. Pick the operation that matches the intended scope."
+        }
+      ],
+      "related": [
+        "levels",
+        "sprites",
+        "palettes"
+      ],
+      "terms": [
+        "term-tilemap",
+        "term-tile",
+        "term-palette"
+      ]
+    },
+    {
+      "id": "tables",
+      "title": "Edit a declared data table",
+      "kicker": "ADVANCED / DOCUMENTED RECORDS",
+      "image": "04-chrono-table",
+      "steps": [
+        "From the matched Chrono Trigger definition, choose <b>Open Weapon base attack table</b>. It opens under <b>More tools > Data tables</b>.",
+        "For your own table, open <b>Table layout</b>. Declare <b>First record offset</b>, <b>Record count</b> and <b>Bytes per record</b>; add each field's relative offset, numeric type and byte order, then choose <b>Load table definition</b>.",
+        "Edit a row value. The inline Original/Edited comparison updates as you type. Review changes before creating a build.",
+        "For several rows, open <b>Batch change</b>, choose the field and operation, and preview the affected records before review."
+      ],
+      "result": "The screenshot shows record 1, at 0xC0267, with a live 3-to-30 preview. The verified table contains 90 records.",
+      "note": "Only the documented base-attack byte is exposed here; other record bytes are preserved. Row IDs are not guessed weapon names. A table needs a verified or declared layout. A linear pointer uses target file offset = stored value - base. Bounds, overlap and stale-source checks do not establish item names or game-specific balance limits.",
+      "part": "Advanced",
+      "intro": "A declared table turns exact bytes into named numeric fields. Inspect its layout and numeric meaning before using a broad batch operation.",
+      "related": [
+        "numbers",
+        "debug",
+        "recipes"
+      ],
+      "caption": "Actual ROMancer interface. The HTML edition links to the full-resolution capture.",
+      "terms": [
+        "term-record",
+        "term-field",
+        "term-stride"
+      ]
+    },
+    {
+      "id": "translation",
+      "title": "Translate through CSV or TSV",
+      "part": "Advanced",
+      "kicker": "Stable IDs and byte capacity",
+      "intro": "The translation spreadsheet preserves the source text and stable record identity. Edit the translation column while keeping the exported structure intact.",
+      "steps": [
+        "Inspect editable text in <b>Text & layout</b>. Open <b>Translation spreadsheet</b> and download CSV or TSV for the selected source and definition.",
+        "Keep every stable ID, original-text field and control column. Edit only <b>translation</b>. Preserve delimiters, quoted multiline fields and the same file format when saving.",
+        "Import the sheet back into the same source context. Review unmapped characters, protected controls and encoded byte capacity for each changed record.",
+        "Preview the translation plan, create a separate build and test menus, dialogue, line breaks and transitions using the actual font and game logic."
+      ],
+      "result": "Changed rows map back to the exported records. Original controls are protected and every translation fits its declared encoding and allocation.",
+      "note": "Character count and encoded byte count can differ. A spreadsheet that silently reformats IDs or line breaks can invalidate the import. Shorten text or correct an established allocation rather than bypassing limits.",
+      "details": [
+        {
+          "title": "A useful first round-trip",
+          "text": "Export a sheet, change one short line and reimport it before translating hundreds of rows. Keep the original export as a reference and a project backup outside the workspace."
+        },
+        {
+          "title": "Text preview limits",
+          "text": "A system-font comparison helps review wording. It does not establish glyph availability, game-window width or dialogue behavior. Use declared font/layout measurements and native playtesting for those checks."
+        }
+      ],
+      "related": [
+        "text-layout",
+        "text",
+        "projects"
+      ],
+      "terms": [
+        "term-csv",
+        "term-encoding",
+        "term-allocation"
+      ]
+    },
+    {
+      "id": "text-layout",
+      "title": "Declare text, fonts and layout limits",
+      "part": "Advanced",
+      "kicker": "Encoding, pointers and controls",
+      "intro": "Text bytes need an encoding and storage layout. Font and window measurements add useful checks when those formats are explicitly declared.",
+      "steps": [
+        "Declare the text offset, slot capacity, encoding and terminator, or load a verified definition for the exact source. Add pointer information only when its location and mapping are established.",
+        "Inspect records and visible control tokens. Edit wording while preserving required controls and segment boundaries. Read capacity and unmapped-character feedback.",
+        "For declared fonts and menu/dialogue layouts, inspect the actual decoded-font canvas, glyph metrics and available dimensions. Treat a measured overflow as a concrete issue in that declared layout.",
+        "Review the exact plan, including pointer or integrity changes, build and test the actual screen. Inspect the following record or menu item for unintended damage."
+      ],
+      "result": "The edited record fits the supported allocation, preserves protected bytes and displays correctly in the tested game window.",
+      "note": "An offset is not a CPU address. A linear pointer base does not establish a bank-switched mapping. A fixed slot cannot grow just because more words fit in the editor.",
+      "details": [
+        {
+          "title": "Control codes",
+          "text": "Commands can change colors, insert names, wait for input or end a record. Preserve their declared structure even when they look like punctuation or empty bytes."
+        },
+        {
+          "title": "Fonts and graphics",
+          "text": "Glyph painting uses declared graphics storage. Changing a glyph can affect every string that uses it. A layout measurement covers its supplied font and dimensions, not every screen in the game."
+        }
+      ],
+      "related": [
+        "translation",
+        "hex-editor",
+        "resources"
+      ],
+      "terms": [
+        "term-control",
+        "term-glyph",
+        "term-pointer"
+      ]
+    },
+    {
+      "id": "levels",
+      "title": "Edit declared terrain, objects and collision",
+      "part": "Advanced",
+      "kicker": "Levels and bounded game definitions",
+      "intro": "A useful room editor needs verified tile, metatile and grid formats. Object meanings, collision labels and exits need their own game-specific evidence.",
+      "steps": [
+        "Open <b>Levels</b> on a source with a checked definition, or use <b>Open design workshop</b> for original practice content. Inspect <b>Level setup</b> before using a layout form.",
+        "Choose <b>Room</b> and <b>Paint layer</b>: Terrain or declared Collision values. Select a Terrain brushes thumbnail, or use <b>Pick from room</b> to sample a cell. Compare Original room with the editing canvas; paint, fill or select/copy/paste within the declared grid.",
+        "Use <b>Undo stroke</b> and <b>Redo stroke</b>. Choose the Object slots overlay and <b>Move object</b> to drag a numbered declared slot. Inspect <b>Metatiles & shared uses</b> before changing a shared block, and <b>Objects, starts & exits</b> for declared object fields.",
+        "Choose <b>Review level changes</b>, inspect the exact changes, then <b>Create level build</b>. Visit the room and test walking, collision, boundaries and transitions."
+      ],
+      "result": "Changed grid/object fields stay within the declared ranges. The game renders the room, moves through it and follows the intended transitions.",
+      "note": "Terrain appearance does not establish collision semantics. Collision values are raw stored values. Numbered object markers identify declared slots; unknown kind values are not enemy or door names. A named one-room edit is a bounded capability, not universal room discovery.",
+      "details": [
+        {
+          "title": "Shared metatiles",
+          "text": "A block can be used in many cells or rooms. Changing its component tile changes every declared use; changing one terrain cell selects a different block for that cell."
+        },
+        {
+          "title": "Game-specific room edits",
+          "text": "Use a matched definition for the exact supported room. Inspect the original and proposed position, review the bounded command and test surrounding movement. The supported command range does not imply arbitrary map reconstruction."
+        }
+      ],
+      "related": [
+        "room",
+        "tilemaps",
+        "regression"
+      ],
+      "terms": [
+        "term-metatile",
+        "term-collision",
+        "term-layer"
+      ]
+    },
+    {
+      "id": "sound",
+      "title": "Preview sound and respect driver limits",
+      "part": "Advanced",
+      "kicker": "Music & sound",
+      "intro": "Console audio hardware and a game's music driver are different layers. Native audio recording can work even when sequence editing is unavailable.",
+      "steps": [
+        "Open <b>Music & sound</b>. Read the hardware information and <b>Music driver</b> status. Unknown driver means sequence editing is unavailable.",
+        "For actual game output, load the source in Playtest, reach the sound, then use <b>Record native preview</b>. Play, pause, seek or loop the resulting preview and save a WAV when useful.",
+        "For a supported sample, use a verified offset, allocation, codec and preview sample rate. Choose <b>Check declared sample</b>, then preview gain, reverse, silence or supported WAV replacement before staging. Staged edits update Original and Edited PCM waveform previews; use their play controls when ready. Audio does not autoplay.",
+        "Review sound changes, create a sound build and test the real scene. Use note/event or transpose operations only when a supported sequence definition is identified."
+      ],
+      "result": "The decoded preview corresponds to the intended declared sample, and the game plays the built result at the expected rate and without an unintended neighboring change.",
+      "note": "A valid codec does not locate a sample or determine its rate, loop or instrument. Lossy re-encoding can change sound quality. A synthesized sequence preview does not certify the native driver result. Supported sequence editing is available in the workshop definition; that does not establish a commercial game driver.",
+      "details": [
+        {
+          "title": "Two preview paths",
+          "text": "Native recording captures the engine's mixed output for the selected game session. A declared sample preview decodes a bounded stored resource. They answer different questions and can sound different."
+        },
+        {
+          "title": "When music cannot be edited",
+          "text": "Keep unknown driver data unchanged. Use native recording, document the observed scene and find evidence for the exact driver and revision. Do not invent note commands from a console hardware label."
+        }
+      ],
+      "related": [
+        "play",
+        "resources",
+        "regression"
+      ],
+      "terms": [
+        "term-driver",
+        "term-codec"
+      ]
+    },
+    {
+      "id": "compression",
+      "title": "Extract and reinsert supported compression",
+      "part": "Advanced",
+      "kicker": "Allocations and independent decoding",
+      "intro": "A decoded resource is not automatically safe to write back at a new size. Recompression must fit an established parent allocation.",
+      "steps": [
+        "Select a validated supported LZ10 or RLE stream in Resources. Confirm its codec, file offset and allocated capacity using evidence for this revision.",
+        "Extract the decoded resource into the project. Inspect and edit it through the normal supported editors, then create the edited decoded build.",
+        "Select that edited decoded build and review recompression into its original parent. Read the proposed compressed length and confirmed capacity.",
+        "Create the parent build only when the stream fits. Inspect the independently decoded comparison, then playtest the actual game resource."
+      ],
+      "result": "The encoded stream fits without overwriting neighbors, and independent decoding reconstructs every intended decoded byte.",
+      "note": "Unrecognized compression remains read-only. A run of zero bytes after a stream does not by itself establish free space or permission to relocate it.",
+      "details": [
+        {
+          "title": "Parent and child",
+          "text": "Extraction creates a resource with an explicit relationship to its parent bytes. Editing a child does not automatically modify the game. Reinsert the selected child build and test the resulting parent ROM."
+        },
+        {
+          "title": "Capacity failure",
+          "text": "Shorten or simplify the resource, or establish a separately supported allocation/relocation workflow. Do not increase a length field merely to make the review accept a larger stream."
+        }
+      ],
+      "related": [
+        "resources",
+        "checks",
+        "tilemaps"
+      ],
+      "terms": [
+        "term-codec",
+        "term-allocation"
+      ]
+    },
+    {
+      "id": "regression",
+      "title": "Record routes and compare builds",
+      "part": "Advanced",
+      "kicker": "Measured assertions",
+      "intro": "A regression route repeats explicit inputs and checks an expected observation. Define what should remain unchanged and what is intentionally different.",
+      "steps": [
+        "Open <b>Routes</b> and start recording controller inputs. Reach the screen in Playtest, pause and capture a measured frame for the selected build.",
+        "In <b>Screenshot checkpoints</b>, select a stable region up to 256 x 256 pixels. Add the checkpoint to the latest recorded input, then stop and save the recording.",
+        "Replay the recorded checkpoint. For original/build comparison, save a cold-start definition, open <b>Regression</b>, select the original, build and up to eight routes, then run the suite.",
+        "Read baseline, build and assertion results separately. Inspect expected, actual and difference images on a failure. Rerun after fixing a relevant change."
+      ],
+      "result": "The baseline passes its defined assertions before the build is evaluated. Results are bound to the measured source, engine and route setup.",
+      "note": "A passing region or route covers that observation. It does not certify the entire game. Timing, random state, blinking or scrolling can make an unsuitable screenshot reference unstable.",
+      "details": [
+        {
+          "title": "Choose assertions deliberately",
+          "text": "For a palette edit, capture the changed interface and an unchanged scene. For a balance edit, compare the stored value and a repeatable in-game action. A detected intentional difference can be expected."
+        },
+        {
+          "title": "Smoke checks",
+          "text": "Check ROM runs a short 120-frame fresh-worker test and measures output. It can establish startup evidence, but it is not a campaign test, a save-system test or a substitute for explicit expected gameplay."
+        },
+        {
+          "title": "Progression coverage",
+          "text": "Routes also expose Progression coverage. Select authenticated route records and declare required, optional, ending and unknown objectives, then build the coverage graph. Unvisited objectives stay separate; imported PASS labels do not grant coverage. An advanced declared resource model states supplied action costs and assumptions rather than inferring combat rules."
+        }
+      ],
+      "related": [
+        "play",
+        "checks",
+        "debug"
+      ],
+      "terms": [
+        "term-route",
+        "term-assertion",
+        "term-baseline"
+      ]
+    },
+    {
+      "id": "debug",
+      "title": "Inspect memory and translate addresses",
+      "part": "Advanced",
+      "kicker": "Observed values and explicit mappings",
+      "intro": "File offsets, console addresses and emulator memory regions describe different spaces. Declare the mapping before comparing or editing them.",
+      "steps": [
+        "Start with exact source/build bytes and a known offset. Use the number inspector to choose signedness and byte order rather than guessing from a displayed decimal value.",
+        "Use the supported system address mapping. Supply bank information for ambiguous windows and distinguish file positions from CPU or bus addresses.",
+        "Load a matching Playtest session. Under <b>Find a changing value</b>, use <b>Start RAM search</b>, play one action, pause, then <b>Capture & narrow</b> by changed, unchanged, increased, decreased or exact value. Add a watch to a measured result.",
+        "Record what was measured and under which setup. Use an instruction-level feature only with a proven matching debugger adapter; keep imported traces labeled as imported observations."
+      ],
+      "result": "The translated location uses the intended mapping and bank. A watch reports the selected memory value for the actual loaded session.",
+      "note": "A changed value does not identify the instruction that wrote it. A byte pattern match is not proof that the same code or structure exists in a different revision.",
+      "details": [
+        {
+          "title": "Tables and pointers",
+          "text": "For a declared linear table pointer, target file offset = stored value - base. Record stride is the distance between entries; a field offset is relative to each record. Bank switching needs additional mapping evidence."
+        },
+        {
+          "title": "Memory is not a ROM location",
+          "text": "RAM matches do not identify the stored ROM source of a value. Available video-memory previews decode exposed bytes as indexed grayscale tiles; palette, object attributes and ROM ownership remain unknown. Use repeated controlled observations to narrow a candidate."
+        }
+      ],
+      "related": [
+        "hex-editor",
+        "tables",
+        "checks"
+      ],
+      "terms": [
+        "term-mapping",
+        "term-bank",
+        "term-offset"
+      ]
+    },
+    {
+      "id": "recipes",
+      "title": "Reuse checked recipes and definitions",
+      "part": "Advanced",
+      "kicker": "Declarative automation",
+      "intro": "A recipe repeats supported source-bound operations. A definition describes storage. Neither import grants arbitrary shell execution or native evidence trust.",
+      "steps": [
+        "Open <b>More tools > Recipes & definitions</b> and select the exact original source revision.",
+        "After reviewing or building edits, use <b>Save a plan as a recipe</b>, or import an existing recipe JSON file. Keep the recipe with its source identity and intended purpose.",
+        "Preview every operation and affected range on rerun. Resolve wrong hashes, overlaps and unsupported commands before creating a new build.",
+        "Export checked text, graphics or table definitions when useful. Reimport on the same source context and inspect the decoded result before editing."
+      ],
+      "result": "The recipe produces a fresh reviewable plan for the exact source and rejects stale or incompatible assumptions. The new build remains separate.",
+      "note": "A recipe from a trusted person can still target a different revision. Inspect the plan rather than treating the filename or previous success as authority.",
+      "details": [
+        {
+          "title": "Batch table changes",
+          "text": "The table editor previews up to 1,024 source records. Choose set, add, multiply or percent, then inspect the range. Percent changes round halves away from zero; numeric overflow is refused. Game-specific limits still require evidence."
+        },
+        {
+          "title": "Reusable does not mean universal",
+          "text": "Keep a short note explaining the format, region and observed behavior the definition covers. Declared consumer lists, capacity and source preconditions remain part of every review."
+        }
+      ],
+      "related": [
+        "tables",
+        "resources",
+        "mcp"
+      ],
+      "terms": [
+        "term-plan",
+        "term-declared"
+      ]
+    },
+    {
+      "id": "mcp",
+      "title": "Use AI and MCP with explicit permissions",
+      "part": "Advanced",
+      "kicker": "Optional local tool access",
+      "intro": "ROMancer works without AI. Compatible clients can use its local MCP stdio adapter to inspect supported data and, when explicitly enabled, create checked builds.",
+      "steps": [
+        "Open <b>Settings > AI & LLM access</b> to create a client configuration with the correct interpreter and workspace. The root README documents the command-line entry point.",
+        "Start with read-only access. The source entry point is python -B -m romancer.mcp_server --workspace &lt;workspace-folder&gt;. Use the installed interpreter for the bundled edition.",
+        "Enable writes with --allow-writes only for a deliberate editing session. Add --rom-root &lt;folder&gt; for each dedicated folder from which that client may import ROMs.",
+        "Require the same inspect, plan, build, playtest and patch-verification cycle. Review generated plans and sharing content yourself. Keep ROMs, save data and personal paths private."
+      ],
+      "result": "The client uses structured supported operations against the intended workspace. Read-only mode refuses writes, and imported sources stay within explicitly allowed roots.",
+      "note": "MCP is a transport and tool interface, not a built-in model. A client's confident explanation does not turn an unknown layout into verified game semantics.",
+      "details": [
+        {
+          "title": "Useful requests",
+          "text": "Ask the client to identify the selected source, describe a checked definition, propose one bounded edit, show the plan and verify patch reconstruction. Add explicit gameplay assertions when asking it to test behavior."
+        },
+        {
+          "title": "Permission and protocol",
+          "text": "Do not grant a whole drive when a dedicated folder is sufficient. The bridge exposes no shell execution operation. Protocol data uses stdin/stdout; diagnostics must not be mixed into that stream."
+        }
+      ],
+      "related": [
+        "recipes",
+        "checks",
+        "projects"
+      ],
+      "terms": [
+        "term-mcp",
+        "term-plan"
+      ]
+    },
+    {
+      "id": "troubleshooting",
+      "title": "Find the cause before repeating a change",
+      "part": "Advanced",
+      "kicker": "Troubleshooting and support",
+      "intro": "Read the reported source, location and failed precondition. A useful next step reduces uncertainty instead of applying the same edit repeatedly.",
+      "steps": [
+        "If the game did not change, check the selected source/build, Saved status and whether a build was created. Reload the new build in Playtest; an old session can still be running.",
+        "If a definition or patch refuses, compare exact revision, byte scope and original bytes. For text, inspect controls/encoding/capacity. For graphics, inspect codec, bank and shared consumers.",
+        "If playback or sound fails, check the selected system, engine setup, game focus and audio controls. GB and GBC need the right mode. Restore only compatible states and supported raw save data.",
+        "Run project checks and <b>Settings > Diagnostics & support</b>. Review the sanitized preview, then download the report if you want to share it. No report is sent automatically."
+      ],
+      "result": "You have a specific failed condition, a reproducible input and a measured observation. Correct the narrow issue, rerun the relevant check and preserve the earlier backup.",
+      "note": "Do not erase originals, bypass identity checks or reinterpret unknown data just to clear an error. A passing later check should address the actual earlier failure.",
+      "details": [
+        {
+          "title": "Useful support detail",
+          "text": "State the operation, application revision, selected system, expected result and actual result. Review any screenshot or log for personal information before sharing. Sanitized reports exclude ROM/save bytes, credentials, personal paths, project names and raw errors."
+        },
+        {
+          "title": "Recovery order",
+          "text": "Keep unsaved text, back up the project, check the source identity, reproduce one small step, inspect the failure and restore or correct the narrow change. Historical reports are references; run fresh native checks for a current claim."
+        }
+      ],
+      "related": [
+        "projects",
+        "checks",
+        "regression"
+      ],
+      "terms": [
+        "term-evidence",
+        "term-revision"
+      ]
+    }
+  ],
+  "glossary": [
+    {
+      "id": "term-allocation",
+      "term": "Allocation",
+      "definition": "The confirmed storage extent available to a resource. A larger encoded result must not overwrite neighboring data."
+    },
+    {
+      "id": "term-artifact",
+      "term": "Artifact",
+      "definition": "A project-owned source, build or prepared output identified by its own content and role."
+    },
+    {
+      "id": "term-assertion",
+      "term": "Assertion",
+      "definition": "An explicit expected observation used by a route or check. A test cannot infer the correct gameplay outcome for you."
+    },
+    {
+      "id": "term-bank",
+      "term": "Bank",
+      "definition": "A selected storage window in a bank-switched system. Translating a CPU address may require an explicit bank."
+    },
+    {
+      "id": "term-baseline",
+      "term": "Baseline",
+      "definition": "The original or reference run against which a build is compared. It must pass the intended assertions before comparison."
+    },
+    {
+      "id": "term-battery",
+      "term": "Battery save",
+      "definition": "Persistent game progress exposed as save RAM. Raw .sav/.srm data is different from an emulator save state."
+    },
+    {
+      "id": "term-bps",
+      "term": "BPS",
+      "definition": "A patch format with source, target and patch checksums. ROMancer independently reconstructs the target during patch verification."
+    },
+    {
+      "id": "term-build",
+      "term": "Build",
+      "definition": "A separate playable output created by applying a reviewed plan. Saving an editor draft does not create a build."
+    },
+    {
+      "id": "term-byte",
+      "term": "Byte",
+      "definition": "Eight bits of stored data. Two hexadecimal digits represent a byte; its meaning depends on its format and location."
+    },
+    {
+      "id": "term-byte-order",
+      "term": "Byte order",
+      "definition": "The order of bytes in a multi-byte value. Little endian stores the least significant byte first; big endian stores it last."
+    },
+    {
+      "id": "term-candidate",
+      "term": "Candidate",
+      "definition": "A possible resource or structural match that requires confirmation. Plausible text or pixels are not proof of game semantics."
+    },
+    {
+      "id": "term-checksum",
+      "term": "Console checksum",
+      "definition": "A system-specific integrity field stored in some ROMs. It differs from a measured whole-file CRC32 or SHA-256 identity."
+    },
+    {
+      "id": "term-codec",
+      "term": "Codec",
+      "definition": "The rule for decoding or encoding stored graphics, samples or compressed data. A codec does not locate a resource."
+    },
+    {
+      "id": "term-collision",
+      "term": "Collision",
+      "definition": "Data or game behavior controlling movement and contact. Visual terrain does not by itself establish collision semantics."
+    },
+    {
+      "id": "term-control",
+      "term": "Control code",
+      "definition": "A declared non-text command embedded in a text record, such as a wait, color change or terminator. Protected controls must be preserved."
+    },
+    {
+      "id": "term-core",
+      "term": "Core / engine",
+      "definition": "The local emulator component used by Playtest. Its build, options and system-file setup affect state compatibility."
+    },
+    {
+      "id": "term-crc",
+      "term": "CRC32",
+      "definition": "A measured checksum to compare with a known expected value for the same byte scope. Without a reference, revision status stays unknown."
+    },
+    {
+      "id": "term-csv",
+      "term": "CSV / TSV",
+      "definition": "Delimited text formats used for translation sheets and catalogs. Preserve stable IDs, quoting, columns and the selected delimiter."
+    },
+    {
+      "id": "term-declared",
+      "term": "Declared definition",
+      "definition": "An explicitly supplied description of storage, fields, mappings and limits. It is not automatically independent proof of game meaning."
+    },
+    {
+      "id": "term-draft",
+      "term": "Draft",
+      "definition": "Saved editor inputs and staged work. A draft can be reopened, but it is not a playable modified ROM."
+    },
+    {
+      "id": "term-encoding",
+      "term": "Encoding",
+      "definition": "The mapping between stored values and characters or commands. Encoded byte length can differ from character count."
+    },
+    {
+      "id": "term-evidence",
+      "term": "Evidence",
+      "definition": "A measured observation bound to its content and setup. Its conclusion is limited to the checks actually performed."
+    },
+    {
+      "id": "term-field",
+      "term": "Field",
+      "definition": "A named value at a declared relative position in a record. Its type, byte order and range determine its supported storage."
+    },
+    {
+      "id": "term-frame",
+      "term": "Frame",
+      "definition": "A video update or explicitly assembled animation view. A preview frame and a measured native game frame have different origins."
+    },
+    {
+      "id": "term-glyph",
+      "term": "Glyph",
+      "definition": "A stored shape used to display a character. A shared glyph edit can affect every string that uses it."
+    },
+    {
+      "id": "term-hex",
+      "term": "Hexadecimal",
+      "definition": "Base-16 notation using 0-9 and A-F. The prefix 0x marks a hexadecimal number."
+    },
+    {
+      "id": "term-ips",
+      "term": "IPS",
+      "definition": "A patch format that requires an external exact-source reference. ROMancer asks for the author's full-file CRC32 or SHA-256."
+    },
+    {
+      "id": "term-known",
+      "term": "Known / verified",
+      "definition": "Information supported by the recorded verification for a stated scope. A revision match is not exhaustive gameplay verification."
+    },
+    {
+      "id": "term-mapping",
+      "term": "Mapping",
+      "definition": "A declared relationship between file offsets and system addresses. Bank-switched or special hardware needs additional information."
+    },
+    {
+      "id": "term-mcp",
+      "term": "MCP",
+      "definition": "The optional structured tool interface for compatible AI clients. ROMancer starts read-only unless writes are explicitly enabled."
+    },
+    {
+      "id": "term-metatile",
+      "term": "Metatile",
+      "definition": "A block made from several tiles. Many room cells can reference one block, so changing its parts can affect many uses."
+    },
+    {
+      "id": "term-offset",
+      "term": "Offset",
+      "definition": "A zero-based byte position in a file. It is distinct from an address in a console memory map."
+    },
+    {
+      "id": "term-original",
+      "term": "Original / source",
+      "definition": "The source identity imported into the project. ROMancer works with owned copies and creates separate edited outputs."
+    },
+    {
+      "id": "term-palette",
+      "term": "Palette",
+      "definition": "A set of colors addressed by pixel indices. Banks and shared entries can affect several sprites, backgrounds or scenes."
+    },
+    {
+      "id": "term-patch",
+      "term": "Patch",
+      "definition": "A file describing changes from an original to a target build. Compatibility depends on the exact expected source bytes."
+    },
+    {
+      "id": "term-plan",
+      "term": "Plan",
+      "definition": "A source-bound list of proposed changes with original-byte preconditions and any required integrity updates."
+    },
+    {
+      "id": "term-pointer",
+      "term": "Pointer",
+      "definition": "A stored value interpreted through a declared mapping. A linear pointer base does not establish a bank-switched CPU address."
+    },
+    {
+      "id": "term-record",
+      "term": "Record",
+      "definition": "One entry in a declared table or script. A row ID is not automatically a known in-game item or character name."
+    },
+    {
+      "id": "term-regression",
+      "term": "Regression",
+      "definition": "An unintended change detected by a defined test. A successful route covers its assertions, not the entire game."
+    },
+    {
+      "id": "term-revision",
+      "term": "Revision",
+      "definition": "An exact version or byte identity of a source. A matching title or filename does not establish the revision."
+    },
+    {
+      "id": "term-route",
+      "term": "Route",
+      "definition": "A recorded or declared sequence of inputs and assertions for a particular native setup and starting condition."
+    },
+    {
+      "id": "term-scope",
+      "term": "Scope",
+      "definition": "The exact bytes, scene, route or format a claim covers. Whole-file and cartridge-payload hashes use different scopes."
+    },
+    {
+      "id": "term-sha",
+      "term": "SHA-256",
+      "definition": "An exact content identity used to bind sources, plans, builds and evidence to the bytes they concern."
+    },
+    {
+      "id": "term-driver",
+      "term": "Sound driver",
+      "definition": "Game-specific code that interprets music and sound data. Knowing the console hardware does not identify its command grammar."
+    },
+    {
+      "id": "term-state",
+      "term": "Save state",
+      "definition": "An emulator snapshot tied to exact ROM, engine and setup identities. It is different from persistent battery save data."
+    },
+    {
+      "id": "term-stride",
+      "term": "Stride",
+      "definition": "The number of bytes from one table record to the next. Each field has its own offset within a record."
+    },
+    {
+      "id": "term-tile",
+      "term": "Tile",
+      "definition": "A small stored graphics cell decoded with a specific codec. Several tiles can form a sprite, glyph or background."
+    },
+    {
+      "id": "term-tilemap",
+      "term": "Tilemap",
+      "definition": "A grid of references to tiles, sometimes including palette banks or flip bits. Its storage format must be established."
+    },
+    {
+      "id": "term-preferences",
+      "term": "Preferences",
+      "definition": "Saved application choices for appearance, startup, automatic analysis and audio. Apply or OK persists them; a theme or volume change does not edit ROM data."
+    },
+    {
+      "id": "term-theme",
+      "term": "Theme",
+      "definition": "The application color treatment. ROMancer is the default; Dark uses neutral graphite and Light uses a readable white surface. Themes do not modify the game palette."
+    },
+    {
+      "id": "term-layer",
+      "term": "Layer",
+      "definition": "A selectable view or declared editing plane. Terrain, raw collision values and object slots describe different information; hiding a visual overlay does not establish new game semantics."
+    }
+  ],
+  "index": [
+    {
+      "term": "Address translation",
+      "topics": [
+        "debug",
+        "hex-editor"
+      ]
+    },
+    {
+      "term": "AI clients",
+      "topics": [
+        "mcp"
+      ]
+    },
+    {
+      "term": "Allocations",
+      "topics": [
+        "compression",
+        "text-layout"
+      ]
+    },
+    {
+      "term": "Animation frames",
+      "topics": [
+        "animation"
+      ]
+    },
+    {
+      "term": "Assertions",
+      "topics": [
+        "regression"
+      ]
+    },
+    {
+      "term": "Audio preview",
+      "topics": [
+        "sound",
+        "play"
+      ]
+    },
+    {
+      "term": "Backups and restore",
+      "topics": [
+        "projects",
+        "saves"
+      ]
+    },
+    {
+      "term": "Banks and byte order",
+      "topics": [
+        "debug",
+        "resources"
+      ]
+    },
+    {
+      "term": "Baseline checks",
+      "topics": [
+        "regression"
+      ]
+    },
+    {
+      "term": "Batch table edits",
+      "topics": [
+        "tables",
+        "recipes"
+      ]
+    },
+    {
+      "term": "Battery saves",
+      "topics": [
+        "saves"
+      ]
+    },
+    {
+      "term": "BPS patches",
+      "topics": [
+        "patches"
+      ]
+    },
+    {
+      "term": "Build history",
+      "topics": [
+        "drafts"
+      ]
+    },
+    {
+      "term": "Candidate discoveries",
+      "topics": [
+        "resources"
+      ]
+    },
+    {
+      "term": "Capacity and overflow",
+      "topics": [
+        "translation",
+        "compression"
+      ]
+    },
+    {
+      "term": "Checksums",
+      "topics": [
+        "checks"
+      ]
+    },
+    {
+      "term": "Collision",
+      "topics": [
+        "levels"
+      ]
+    },
+    {
+      "term": "Color picker",
+      "topics": [
+        "palettes"
+      ]
+    },
+    {
+      "term": "Compression",
+      "topics": [
+        "compression"
+      ]
+    },
+    {
+      "term": "Console system modes",
+      "topics": [
+        "resources",
+        "play"
+      ]
+    },
+    {
+      "term": "Control codes",
+      "topics": [
+        "text-layout"
+      ]
+    },
+    {
+      "term": "Controller input",
+      "topics": [
+        "play",
+        "help"
+      ]
+    },
+    {
+      "term": "CRC32",
+      "topics": [
+        "checks"
+      ]
+    },
+    {
+      "term": "CSV and TSV",
+      "topics": [
+        "translation",
+        "checks"
+      ]
+    },
+    {
+      "term": "Data tables",
+      "topics": [
+        "tables"
+      ]
+    },
+    {
+      "term": "Definitions",
+      "topics": [
+        "resources",
+        "recipes"
+      ]
+    },
+    {
+      "term": "Delete and Trash",
+      "topics": [
+        "projects"
+      ]
+    },
+    {
+      "term": "Diagnostics",
+      "topics": [
+        "troubleshooting"
+      ]
+    },
+    {
+      "term": "Draft saving",
+      "topics": [
+        "drafts"
+      ]
+    },
+    {
+      "term": "Encoding",
+      "topics": [
+        "translation",
+        "text-layout"
+      ]
+    },
+    {
+      "term": "Engines",
+      "topics": [
+        "install",
+        "play"
+      ]
+    },
+    {
+      "term": "Evidence and limits",
+      "topics": [
+        "checks",
+        "regression"
+      ]
+    },
+    {
+      "term": "Exports",
+      "topics": [
+        "patches"
+      ]
+    },
+    {
+      "term": "File offsets",
+      "topics": [
+        "hex-editor",
+        "debug"
+      ]
+    },
+    {
+      "term": "Fonts and glyphs",
+      "topics": [
+        "text-layout"
+      ]
+    },
+    {
+      "term": "Game Boy Color mode",
+      "topics": [
+        "gbc-colors",
+        "resources"
+      ]
+    },
+    {
+      "term": "Game-specific edits",
+      "topics": [
+        "numbers",
+        "room"
+      ]
+    },
+    {
+      "term": "Graphics discovery",
+      "topics": [
+        "resources"
+      ]
+    },
+    {
+      "term": "Hex search and bookmarks",
+      "topics": [
+        "hex-editor"
+      ]
+    },
+    {
+      "term": "Import ROM",
+      "topics": [
+        "start"
+      ]
+    },
+    {
+      "term": "Installation and portable ZIP",
+      "topics": [
+        "install"
+      ]
+    },
+    {
+      "term": "IPS patches",
+      "topics": [
+        "patches"
+      ]
+    },
+    {
+      "term": "Keyboard shortcuts",
+      "topics": [
+        "help"
+      ]
+    },
+    {
+      "term": "Known versus unknown",
+      "topics": [
+        "checks",
+        "resources"
+      ]
+    },
+    {
+      "term": "Layouts and pointers",
+      "topics": [
+        "text-layout",
+        "debug"
+      ]
+    },
+    {
+      "term": "Level editing",
+      "topics": [
+        "levels"
+      ]
+    },
+    {
+      "term": "MCP permissions",
+      "topics": [
+        "mcp"
+      ]
+    },
+    {
+      "term": "Memory watches",
+      "topics": [
+        "debug"
+      ]
+    },
+    {
+      "term": "Metatiles",
+      "topics": [
+        "levels"
+      ]
+    },
+    {
+      "term": "Music drivers",
+      "topics": [
+        "sound"
+      ]
+    },
+    {
+      "term": "Named edits",
+      "topics": [
+        "numbers",
+        "text"
+      ]
+    },
+    {
+      "term": "Original and edited previews",
+      "topics": [
+        "sprites",
+        "palettes"
+      ]
+    },
+    {
+      "term": "Palette banks",
+      "topics": [
+        "palettes"
+      ]
+    },
+    {
+      "term": "Patch application",
+      "topics": [
+        "patches"
+      ]
+    },
+    {
+      "term": "Pixel painting",
+      "topics": [
+        "sprites"
+      ]
+    },
+    {
+      "term": "PNG import",
+      "topics": [
+        "tilemaps"
+      ]
+    },
+    {
+      "term": "Private project data",
+      "topics": [
+        "projects",
+        "mcp"
+      ]
+    },
+    {
+      "term": "Project checks",
+      "topics": [
+        "checks"
+      ]
+    },
+    {
+      "term": "Recipes",
+      "topics": [
+        "recipes"
+      ]
+    },
+    {
+      "term": "Regression suites",
+      "topics": [
+        "regression"
+      ]
+    },
+    {
+      "term": "Revision catalogs",
+      "topics": [
+        "checks"
+      ]
+    },
+    {
+      "term": "Rollback and updates",
+      "topics": [
+        "install"
+      ]
+    },
+    {
+      "term": "Room objects",
+      "topics": [
+        "room",
+        "levels"
+      ]
+    },
+    {
+      "term": "Save states",
+      "topics": [
+        "play",
+        "saves"
+      ]
+    },
+    {
+      "term": "Screenshot checkpoints",
+      "topics": [
+        "regression"
+      ]
+    },
+    {
+      "term": "SHA-256",
+      "topics": [
+        "checks"
+      ]
+    },
+    {
+      "term": "Shared tiles",
+      "topics": [
+        "animation",
+        "tilemaps"
+      ]
+    },
+    {
+      "term": "Sound samples and WAV",
+      "topics": [
+        "sound"
+      ]
+    },
+    {
+      "term": "Sprite assembly",
+      "topics": [
+        "sprites"
+      ]
+    },
+    {
+      "term": "Table fields and stride",
+      "topics": [
+        "tables",
+        "debug"
+      ]
+    },
+    {
+      "term": "Terrain and collision",
+      "topics": [
+        "levels"
+      ]
+    },
+    {
+      "term": "Text and translation",
+      "topics": [
+        "text",
+        "translation"
+      ]
+    },
+    {
+      "term": "Tilemaps",
+      "topics": [
+        "tilemaps"
+      ]
+    },
+    {
+      "term": "Troubleshooting",
+      "topics": [
+        "troubleshooting"
+      ]
+    },
+    {
+      "term": "Undo and Redo",
+      "topics": [
+        "drafts",
+        "sprites"
+      ]
+    },
+    {
+      "term": "Decoded room terrain",
+      "topics": [
+        "room",
+        "levels"
+      ]
+    },
+    {
+      "term": "Original and edited waveforms",
+      "topics": [
+        "sound"
+      ]
+    },
+    {
+      "term": "Metatile brush thumbnails",
+      "topics": [
+        "levels"
+      ]
+    },
+    {
+      "term": "Progression coverage",
+      "topics": [
+        "regression"
+      ]
+    },
+    {
+      "term": "RAM value search",
+      "topics": [
+        "debug"
+      ]
+    },
+    {
+      "term": "Advanced tools visibility",
+      "topics": [
+        "settings"
+      ]
+    },
+    {
+      "term": "Apply, OK and Cancel",
+      "topics": [
+        "settings"
+      ]
+    },
+    {
+      "term": "Auto deep scan on ROM load",
+      "topics": [
+        "settings",
+        "resources"
+      ]
+    },
+    {
+      "term": "Automatic graphics analysis",
+      "topics": [
+        "settings",
+        "resources"
+      ]
+    },
+    {
+      "term": "Collision values and layers",
+      "topics": [
+        "room",
+        "levels"
+      ]
+    },
+    {
+      "term": "Dark and Light themes",
+      "topics": [
+        "settings",
+        "settings-appearance"
+      ]
+    },
+    {
+      "term": "Interface size and 100%",
+      "topics": [
+        "settings"
+      ]
+    },
+    {
+      "term": "Layers and grid",
+      "topics": [
+        "room",
+        "levels"
+      ]
+    },
+    {
+      "term": "Preferences",
+      "topics": [
+        "settings",
+        "settings-appearance"
+      ]
+    },
+    {
+      "term": "Preview looping and mute",
+      "topics": [
+        "settings",
+        "sound"
+      ]
+    },
+    {
+      "term": "Reduced motion",
+      "topics": [
+        "settings"
+      ]
+    },
+    {
+      "term": "Remember last workspace",
+      "topics": [
+        "settings"
+      ]
+    },
+    {
+      "term": "Restore defaults",
+      "topics": [
+        "settings"
+      ]
+    },
+    {
+      "term": "Settings",
+      "topics": [
+        "settings"
+      ]
+    },
+    {
+      "term": "Themes",
+      "topics": [
+        "settings",
+        "settings-appearance"
+      ]
+    },
+    {
+      "term": "Volume",
+      "topics": [
+        "settings",
+        "play"
+      ]
+    }
+  ]
+}

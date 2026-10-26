@@ -18,6 +18,9 @@ class VerifiedGameTests(unittest.TestCase):
             profile=copy.deepcopy(next(p for p in PROFILES if p['id']==identifier))
             raw=bytearray(make_boot_fixture(profile['system'])['data']);raw.extend(bytes(profile['size']-len(raw)))
             raw[0x148]=(len(raw)//32768).bit_length()-1
+            if identifier=='ffl2-usa':
+                from tests.test_verified_room import make_room_fixture
+                raw=make_room_fixture(raw)
             for offset,length,_ in profile['offsets']:
                 raw[offset:offset+length]=bytes.fromhex('17ce1d' if identifier=='ffl2-usa' else '0000027e1e007f03')
             raw[0x14d]=(-sum(raw[0x134:0x14d])-25)&255;raw[0x14e:0x150]=bytes(2);raw[0x14e:0x150]=(sum(raw)&65535).to_bytes(2,'big')

@@ -1,6 +1,6 @@
 import {selectionKey} from './tool_inputs.js';
 export function chooseArtifact(project,id){const rows=project.sources.concat(project.builds);return rows.find(r=>r.artifact_id===id)||project.sources[0]||project.builds[0]||null;}
-export function shouldSaveField(node){return !!node.id&&!node.closest('dialog')&&!['global-search','project-select','artifact-select'].includes(node.id)&&!['file','hidden','checkbox','radio'].includes(node.type);}
+export function shouldSaveField(node){return !!node.id&&!node.id.startsWith('settings-')&&!node.closest('dialog')&&!['global-search','project-select','artifact-select'].includes(node.id)&&!['file','hidden','checkbox','radio'].includes(node.type);}
 export const retainedScroll=(previous,next,scroll)=>previous===next?Math.max(0,scroll):0;
 function detailsEntries(root){const counts=new Map();return [...root.querySelectorAll('details')].map(node=>{const summary=node.querySelector(':scope > summary')?.textContent.split(' ·')[0].trim()||'',index=counts.get(summary)||0;counts.set(summary,index+1);return [node.id||summary+':'+index,node];});}
 export const rememberDetails=root=>root?new Map(detailsEntries(root).map(([key,node])=>[key,node.open])):new Map();

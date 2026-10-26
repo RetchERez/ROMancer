@@ -1,4 +1,5 @@
 import {selectionKey} from './tool_inputs.js';
+import {getSettings} from './app_settings.js';
 import {esc,button,field,select,read,size} from './common.js';
 import {stopPlayback} from './playback_controls.js';
 
@@ -14,6 +15,7 @@ export function candidateGroups(result,height){
 }
 
 export async function ensureGraphicsObservation(ctx,{force=false,region=null,offset=0,length=null}={}){
+ if(!force&&!getSettings().autoGraphics)return;
  const {state}=ctx;if(state.page!=='playtest'||state.playing||!state.runtime||!state.frame||!state.artifact?.size)return;
  if(state.runtime.game_sha256&&state.runtime.game_sha256!==state.artifact.sha256)return;
  const scope=selectionKey(state),frame=state.frame,session=state.runtime.session_dir,params={...ctx.sourceParams()},sourceSize=state.artifact.size;region=region?{...region}:null;

@@ -13,7 +13,7 @@ if __package__ in (None, ''):
 
 from romancer.cd_patch import check_output_paths
 
-DIRECTORIES = {'romancer', 'examples', 'profiles', 'tests', 'tools', 'knowledge', '.github'}
+DIRECTORIES = {'romancer', 'examples', 'profiles', 'tests', 'tools', 'knowledge', '.github', 'user-guide'}
 ROOT_FILES = {'README.txt', 'run.sh', 'run.ps1', 'Launch ROMancer.cmd',
               'launch.ps1', 'desktop_window.ps1', 'requirements.txt', 'THIRD_PARTY_NOTICES.txt',
               'LICENSE', 'NSIS-LICENSE.txt', '.gitignore', '.gitattributes', '.editorconfig',
@@ -146,6 +146,21 @@ APPROVED_FILES = frozenset(ROOT_FILES | {
         ''',
     }.items()
     for name in names.split() if directory != 'docs'
+})
+
+
+APPROVED_FILES = APPROVED_FILES | frozenset({
+    'romancer/verified_room.py','romancer/ui/room_editor.js',
+    'tests/test_verified_room.py','tests/test_user_guide.py','tests/ui_interface_scale.mjs',
+    'tests/ui_room_editor.mjs','tests/ui_sound_live_preview.mjs','tests/ui_asset_pagination.mjs',
+    'tests/ui_level_visual_tools.mjs','tests/ui_menu_preview.mjs','romancer/ui/menu_preview.js',
+    'romancer/app_settings.py','romancer/ui/app_settings.js','tests/test_app_settings.py','tests/ui_app_settings.mjs','tests/ui_scan_preferences.mjs',
+    'tools/build_user_guide.py','user-guide/index.html','user-guide/guide.css','user-guide/guide.pdf','user-guide/guide.json',
+    *('user-guide/screenshots/'+name+'.png' for name in (
+        '01-workspace','02-castlevania-sprite','03-chrono-weapon','04-chrono-table',
+        '05-immortal-text','06-wario-palettes','07-ffl2-room','08-dejavu-colors',
+        '09-playtest-states','10-verified-patch','11-hex-inspection','12-tutorials',
+        '13-settings','14-light-theme','15-dark-theme')),
 })
 
 

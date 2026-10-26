@@ -1,7 +1,36 @@
+import {getSettings} from './app_settings.js';
 export class WavPreview{
  constructor(urls={create:blob=>URL.createObjectURL(blob),revoke:url=>URL.revokeObjectURL(url)}){this.urls=urls;this.audio=null;this.url=null;}
- attach(audio,encoded){this.close();if(typeof encoded!=='string'||encoded.length>6*1024*1024)throw Error('Audio preview exceeds its byte budget.');const raw=Uint8Array.from(atob(encoded),c=>c.charCodeAt(0));if(String.fromCharCode(...raw.slice(0,4))!=='RIFF'||String.fromCharCode(...raw.slice(8,12))!=='WAVE')throw Error('Preview is not a WAV file.');this.url=this.urls.create(new Blob([raw],{type:'audio/wav'}));this.audio=audio;audio.src=this.url;}
+ attach(audio,encoded){this.close();if(typeof encoded!=='string'||encoded.length>6*1024*1024)throw Error('Audio preview exceeds its byte budget.');const raw=Uint8Array.from(atob(encoded),c=>c.charCodeAt(0));if(String.fromCharCode(...raw.slice(0,4))!=='RIFF'||String.fromCharCode(...raw.slice(8,12))!=='WAVE')throw Error('Preview is not a WAV file.');this.url=this.urls.create(new Blob([raw],{type:'audio/wav'}));this.audio=audio;audio.src=this.url;const prefs=getSettings();audio.volume=prefs.volume/100;audio.muted=prefs.startMuted;audio.loop=prefs.loopPreview;}
  close(){if(this.audio){try{this.audio.pause();this.audio.removeAttribute('src');this.audio.load();}catch{}this.audio=null;}if(this.url){this.urls.revoke(this.url);this.url=null;}}
+}
+function decodedWav(encoded){
+ if(typeof encoded!=='string'||encoded.length>6*1024*1024)throw Error('Audio preview exceeds its byte budget.');
+ const raw=Uint8Array.from(atob(encoded),c=>c.charCodeAt(0)),view=new DataView(raw.buffer),tag=at=>String.fromCharCode(...raw.slice(at,at+4));
+ if(raw.length<44||tag(0)!=='RIFF'||tag(8)!=='WAVE'||view.getUint32(4,true)+8!==raw.length)throw Error('Decoded preview is not a complete PCM WAV.');
+ let format=null,pcm=null,chunks=0;
+ for(let at=12;at+8<=raw.length;){
+  if(++chunks>1024)throw Error('WAV chunk budget exceeded.');const size=view.getUint32(at+4,true),start=at+8,end=start+size;
+  if(end>raw.length)throw Error('Decoded WAV contains a truncated chunk.');
+  if(tag(at)==='fmt '){if(size<16)throw Error('Decoded WAV format is incomplete.');format={codec:view.getUint16(start,true),channels:view.getUint16(start+2,true),sample_rate:view.getUint32(start+4,true),block:view.getUint16(start+12,true),bits:view.getUint16(start+14,true)};}
+  if(tag(at)==='data'){if(pcm)throw Error('Decoded WAV has duplicate audio data.');pcm=raw.subarray(start,end);}
+  at=end+(size%2);
+ }
+ if(!format||format.codec!==1||format.bits!==16||![1,2].includes(format.channels)||!format.sample_rate||format.sample_rate>384000||format.block!==format.channels*2||!pcm?.length||pcm.length%format.block)throw Error('Preview waveform requires decoded 16-bit mono or stereo PCM.');
+ return {pcm,channels:format.channels,sample_rate:format.sample_rate,frames:pcm.length/format.block};
+}
+function waveform(decoded){
+ const {pcm,channels,sample_rate,frames}=decoded,view=new DataView(pcm.buffer,pcm.byteOffset,pcm.byteLength),step=Math.max(1,Math.ceil(frames/512)),peaks=[];
+ for(let first=0;first<frames;first+=step){let low=32767,high=-32768;for(let i=first*channels;i<Math.min(frames,first+step)*channels;i++){const value=view.getInt16(i*2,true);low=Math.min(low,value);high=Math.max(high,value);}peaks.push([low,high]);}
+ return {peaks,channels,sample_rate,frames};
+}
+export function compareWavPreviews(original,edited){
+ const before=decodedWav(original),after=decodedWav(edited),changed=before.channels!==after.channels||before.sample_rate!==after.sample_rate||before.pcm.length!==after.pcm.length||before.pcm.some((value,i)=>value!==after.pcm[i]);
+ return {original:waveform(before),edited:waveform(after),changed};
+}
+export function drawWaveform(canvas,peaks){
+ if(!canvas)return;const c=canvas.getContext('2d'),middle=canvas.height/2,amplitude=Math.max(0,middle-5);c.fillStyle='#102127';c.fillRect(0,0,canvas.width,canvas.height);c.strokeStyle='#73d7ba';c.beginPath();
+ for(const [i,[low,high]] of peaks.entries()){const x=i/(peaks.length-1||1)*canvas.width;c.moveTo(x,middle-low/32768*amplitude);c.lineTo(x,middle-high/32768*amplitude);}c.stroke();
 }
 export function stageNote(doc,changes,songId,index,field,value){const song=doc.songs.find(s=>s.id===songId),bounds={note:[33,108],duration:[1,6000],volume:[0,127]};if(!song||!Number.isInteger(index)||index<0||index>=song.events.length||!bounds[field]||!Number.isInteger(value)||value<bounds[field][0]||value>bounds[field][1])throw Error('Choose a supported song field and an in-range value.');const result=changes.filter(c=>!(c.kind==='note'&&c.song_id===songId&&c.index===index&&c.field===field));if(value!==song.events[index][field])result.push({kind:'note',song_id:songId,index,field,value});return result;}
 export function restoreSoundChanges(doc,encoded){

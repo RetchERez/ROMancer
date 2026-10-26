@@ -31,6 +31,10 @@ class WorkbenchAPI:
         self.rom_scans={}
         self.project_admin_lock=threading.RLock()
         self.routes={
+            'settings.get':('',self._settings_get),
+            'settings.save':('revision values',self._settings_save),
+            'settings.workspace.get':('',self._settings_workspace_get),
+            'settings.workspace.save':('location',self._settings_workspace_save),
             'system.operations':('',self._operations),
             'games.inspect':('project_id artifact_id',self._game_inspect),
             'games.plan':('project_id artifact_id profile_id values',self._game_plan),
@@ -209,6 +213,22 @@ class WorkbenchAPI:
     def _operations(self,p,c):
         return {'ok':True,'operations':[{'name':name,'required_parameters':entry[0].split()} for name,entry in sorted(self.routes.items())],
                 'scope':'Operation names and required parameter names; value constraints are documented per operation.'}
+
+    def _settings_get(self,p,c):
+        from .app_settings import get_settings
+        return get_settings(self.workspace)
+
+    def _settings_save(self,p,c):
+        from .app_settings import save_settings
+        return save_settings(self.workspace,p['revision'],p['values'])
+
+    def _settings_workspace_get(self,p,c):
+        from .app_settings import get_workspace_location
+        return get_workspace_location(self.workspace)
+
+    def _settings_workspace_save(self,p,c):
+        from .app_settings import save_workspace_location
+        return save_workspace_location(self.workspace,p['location'])
 
     def _game_plan(self,p,c):
         from .verified_games import plan

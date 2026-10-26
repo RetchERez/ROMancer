@@ -14,7 +14,7 @@ const ctx={state,sourceParams:()=>({project_id:'p',artifact_id:'a'}),draft:(_id,
  render:async()=>{html=await soundView.render(ctx);}};
 await ctx.render();await handlers['sound-capture']();assert.match(html,/<h3>Audio preview<\/h3>/);assert.equal(state.soundPreview.scope,'native_sound_preview');
 state.artifact={...state.artifact,artifact_id:'b'};await ctx.render();assert.doesNotMatch(html,/<h3>Audio preview<\/h3>/);
-const soundDoc={...doc,document_id:'sd',source_sha256:'sha',definition:{},samples:[]},drafts=new Map();state.artifact.artifact_id='a';state.results['sound.inspect']=soundDoc;
+const soundDoc={...doc,ok:true,document_id:'sd',source_sha256:'sha',definition:{},samples:[]},drafts=new Map();state.artifact.artifact_id='a';state.results['sound.inspect']=soundDoc;
 ctx.draft=(key,fallback)=>drafts.get(key)??fallback;ctx.setDraft=(key,value)=>drafts.set(key,value);ctx.projectParams=()=>({project_id:'p'});ctx.notify=()=>{};
 const note=value=>({kind:'note',song_id:'s',index:0,field:'note',value});
 drafts.set('sound-changes',JSON.stringify({document_id:'sd',changes:[note(61)]}));await ctx.render();

@@ -1,10 +1,18 @@
 import assert from 'node:assert/strict';
 import {LevelDraft,roomPixels,levelScale} from '../romancer/ui/level_canvas.js';
+import * as levelCanvas from '../romancer/ui/level_canvas.js';
 assert.ok(224*levelScale(256,224,720,900,'fit')<=300);
 assert.equal(levelScale(256,224,1080,1200,'2'),2);
 assert.throws(()=>levelScale(256,224,720,900,'99'));
 const doc={document_id:'doc',tiles:[Array(64).fill(0),Array(64).fill(1)],palette:[[0,0,0],[200,100,50]],block_width:1,block_height:1,metatiles:[[0],[1]],rooms:[{id:'a',width:3,height:2,terrain:[0,0,1,0,1,1],collision:[0,1,0,0,0,0],objects:[{kind:1,x:0,y:0}]}]};
 const model=new LevelDraft(doc);model.begin();model.paint('a','terrain',0,1);model.paint('a','terrain',1,1);model.commit();
+assert.equal(typeof levelCanvas.blockPixels,'function','visual brushes render real metatile pixels');
+assert.deepEqual(Array.from(levelCanvas.blockPixels(doc,model,1).slice(0,4)),[200,100,50,255]);
+assert.equal(levelCanvas.pickLevelBrush(model,'a','terrain',0),1,'eyedropper samples the edited room');
+const dragged=new LevelDraft(doc);dragged.begin();levelCanvas.moveLevelObject(dragged,'a',0,2,1);dragged.commit();
+assert.deepEqual(dragged.objects('a')[0],{kind:1,x:2,y:1});assert.equal(dragged.past.length,1,'two coordinates form one undo step');
+dragged.undo();assert.deepEqual(dragged.objects('a')[0],doc.rooms[0].objects[0]);dragged.redo();
+assert.throws(()=>levelCanvas.moveLevelObject(dragged,'a',0,3,1),/bounds/);assert.deepEqual(dragged.objects('a')[0],{kind:1,x:2,y:1});
 assert.deepEqual(model.cells('a','terrain'),[1,1,1,0,1,1]);model.undo();assert.deepEqual(model.cells('a','terrain'),doc.rooms[0].terrain);model.redo();assert.equal(model.cells('a','terrain')[0],1);
 model.begin();model.fill('a','terrain',3,1);model.commit();assert.deepEqual(model.cells('a','terrain'),Array(6).fill(1));
 const clip=model.copy('a','collision',{x:0,y:0,width:2,height:1});model.begin();model.paste('a','collision',3,clip);model.commit();assert.deepEqual(model.cells('a','collision'),[0,1,0,0,1,0]);

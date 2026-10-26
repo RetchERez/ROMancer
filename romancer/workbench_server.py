@@ -20,6 +20,7 @@ from .workbench_projects import write_json
 MAX_BODY=1024**2
 MAX_UPLOAD=64*1024**2
 UI_ROOT=Path(__file__).parent/'ui'
+GUIDE_ROOT=Path(__file__).resolve().parent.parent/'user-guide'
 
 
 class Handler(BaseHTTPRequestHandler):
@@ -70,12 +71,17 @@ class Handler(BaseHTTPRequestHandler):
         if path.startswith('/api/'):
             if not self._authorize():return
             self._json(405,{'ok':False,'error':'Use POST for workbench operations'});return
-        name='index.html' if path=='/' else path.lstrip('/')
+        guide=path.startswith('/user-guide/')
+        root=GUIDE_ROOT if guide else UI_ROOT
+        name=path[len('/user-guide/'):] if guide else ('index.html' if path=='/' else path.lstrip('/'))
         if (not name or '\\' in name or '%' in name or any(p in ('','.','..') for p in name.split('/'))
-                or Path(name).suffix not in ('.html','.css','.js','.svg')):
+                or Path(name).suffix not in (('.html','.css','.pdf','.png') if guide else ('.html','.css','.js','.svg'))):
             self._json(404,{'ok':False,'error':'Page not found'});return
-        file=UI_ROOT/name
-        if not file.is_file() or file.is_symlink():self._json(404,{'ok':False,'error':'Page not found'});return
+        file=root/name
+        if (root.is_symlink() or root.is_junction() or not file.is_file() or file.is_symlink() or file.is_junction()
+                or not file.resolve().is_relative_to(root.resolve())
+                or any(p.is_symlink() or p.is_junction() for p in file.parents if p!=root and root in p.parents)):
+            self._json(404,{'ok':False,'error':'Page not found'});return
         raw=file.read_bytes();kind=mimetypes.guess_type(file.name)[0] or 'application/octet-stream'
         self._headers(200,kind+('; charset=utf-8' if kind.startswith('text/') or kind in ('application/javascript',) else ''),len(raw));self.end_headers()
         try:self.wfile.write(raw)

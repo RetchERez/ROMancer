@@ -1,0 +1,13 @@
+import assert from 'node:assert/strict';
+import {applyInterfaceScale} from '../romancer/ui/interface_scale.js';
+const classes=new Map(),variables=new Map();
+const root={style:{setProperty:(k,v)=>variables.set(k,v)},classList:{toggle:(k,v)=>classes.set(k,v)}};
+globalThis.document={documentElement:root};globalThis.window={innerWidth:1600,innerHeight:1000};
+assert.equal(applyInterfaceScale(100),100);
+assert.equal(root.style.zoom,'0.75','100% uses the requested former75% layout');
+assert.equal(variables.get('--workspace-height'),String(1000/.75)+'px');
+assert.equal(classes.get('scaled-compact'),false);
+assert.equal(applyInterfaceScale(200),200);assert.equal(root.style.zoom,'1.5');
+assert.equal(classes.get('scaled-compact'),true);
+assert.equal(applyInterfaceScale('invalid'),100);assert.equal(root.style.zoom,'0.75');
+console.log('Default100% uses the former75% density; magnification, viewport height and responsive thresholds agree.');

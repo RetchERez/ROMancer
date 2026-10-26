@@ -13,7 +13,7 @@ PROFILES=(
     {'id':'ffl2-usa','name':'Final Fantasy Legend II','system':'gb','size':262144,
      'sha256':'2d89231f9e264a024d634bcf7d00de5a66d8a45f6f4ca33e1fc1602a35b9840b',
      'reference':'https://github.com/daid/FFL2-Disassembly/tree/a5c17a90d87d102a9a45d287042c9a36ffd06f97',
-     'scope':'Opening-bedroom stool position only. Both stool and underlying floor have the same collision value; test each new build.',
+     'scope':'ROM-decoded opening bedroom and stool placement. Five floor positions preserve collision; exits and other room commands are protected. Test each new build.',
      'offsets':[(0x20375,3,'Bedroom stool map command')]},
     {'id':'dejavu-casebooks-usa','name':'Deja Vu I & II - The Casebooks of Ace Harding','system':'gbc','size':1048576,
      'sha256':'b3ca745829e018513eae8d760484140a031c0f031e1881fca3374a9194e3ecac',
@@ -104,9 +104,9 @@ def _rotate(raw):
 def _model(profile,root,path):
     identifier=profile['id']
     if identifier=='ffl2-usa':
-        stored=_read(path,0x20375,3)
-        if stored not in (bytes.fromhex('17ce1d'),bytes.fromhex('180e1d')):raise ValueError('bedroom map command guard differs; inspect this build')
-        return [{'id':'room_layout','label':'Opening-bedroom stool','type':'choice','value':'original' if stored==bytes.fromhex('17ce1d') else 'stool_down','options':[['original','Original position'],['stool_down','Move one tile down']]}]
+        from .verified_room import room_visual
+        visual=room_visual(path,root['path'])
+        return [{'id':'room_layout','label':'Opening-bedroom stool','type':'choice','value':visual['value'],'options':visual['options']}]
     if identifier=='dejavu-casebooks-usa':
         rows=[_read(path,o,n) for o,n,_ in profile['offsets']]
         original=bytes.fromhex('0000027e1e007f03');parchment=bytes.fromhex('0000285695155d5f')
@@ -137,7 +137,8 @@ def _model(profile,root,path):
 
 def palette_visuals(profile,root,path):
     if profile['id']=='ffl2-usa':
-        return {'kind':'map-point','current':[14,31 if _read(path,0x20375,3)==bytes.fromhex('17ce1d') else 32],'original':[14,31],'stool_down':[14,32],'origin':[10,28],'size':[7,8]}
+        from .verified_room import room_visual
+        return room_visual(path,root['path'])
     if profile['id'] not in ('wario-land4-ue','dejavu-casebooks-usa'):return None
     def colors(raw):
         return [[round(((int.from_bytes(raw[i:i+2],'little')>>shift)&31)*255/31) for shift in (0,5,10)] for i in range(0,len(raw),2)]
@@ -191,8 +192,8 @@ def plan(api,parameters,*,cancelled=lambda:False):
     identifier=profile['id'];field=model[0];value=values[field['id']]
     if field['type']=='integer':number(value,field['min'],field['max'])
     if identifier=='ffl2-usa':
-        if type(value) is not str or value not in ('original','stool_down'):raise ValueError('choose a verified bedroom stool position')
-        edit(0x20375,bytes.fromhex('17ce1d' if value=='original' else '180e1d'));name='Bedroom stool - '+value
+        from .verified_room import encode_move
+        edit(0x20375,encode_move(path,root['path'],value));name='Bedroom stool - '+value
     elif identifier=='dejavu-casebooks-usa':
         if type(value) is not str or value not in ('original','parchment'):raise ValueError('choose a verified opening interface palette')
         for offset,_,_ in profile['offsets']:edit(offset,bytes.fromhex('0000027e1e007f03' if value=='original' else '0000285695155d5f'))
