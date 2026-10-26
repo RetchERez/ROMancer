@@ -146,10 +146,10 @@
       "id": "start",
       "title": "Start with a project",
       "kicker": "YOUR FIRST FIVE MINUTES",
-      "image": "01-workspace",
+      "image": "37-task-workspace",
       "steps": [
         "Click <b>New project</b>. Give this piece of work a useful name, then import your ROM into that project.",
-        "Check the selected source at the top. On Overview, read the revision match and investigation results before choosing an editor.",
+        "Check the selected source at the top. On Overview, use <b>Choose a task</b> to open an editor or Investigation. Expand <b>What is known about this source</b> to check the available evidence.",
         "Make one small edit, review it, create a separate <a href=\"#term-build\">build</a>, then playtest that build. Export its patch after checking the result."
       ],
       "result": "A project holds owned source copies, editing setup, builds and evidence. Start a new project for unrelated work.",
@@ -173,11 +173,11 @@
       "details": [
         {
           "title": "Choose the tool for your task",
-          "text": "Text & layout handles declared text and encoding. Graphics & fonts handles tiles, assembled sprites and stored palettes. Levels needs a declared room format. Data tables edits declared numeric records. Use Investigation when you do not yet know where a changing value lives."
+          "text": "Choose a task opens graphics, text, numbers, levels, sound, investigation, playtesting or patch tools. Numbers &amp; stats opens Data tables. Editors need an understood or declared layout; use Investigation when byte locations or meanings are unknown."
         },
         {
           "title": "Find help without reading every page",
-          "text": "Follow the first-edit exercise, then use related-topic links. The glossary explains unfamiliar words; the alphabetical index locates tasks and error cases. Ctrl+F searches the offline HTML or PDF. A system match does not promise a decoded game-specific level or music format."
+          "text": "Use Find help in the offline HTML guide to search tasks, tool names, glossary definitions and index aliases. Results link directly to a topic. The PDF retains its linked contents, glossary, index and ordinary Find command. A system match does not promise a decoded game-specific level or music format."
         }
       ],
       "image_layout": "following-page",
@@ -187,7 +187,7 @@
         "intro": "Start with a workshop or your own imported source, then use the editor that matches the task.",
         "panels": [
           {
-            "image": "01-workspace",
+            "image": "37-task-workspace",
             "title": "Project overview",
             "x": 48,
             "top": 846,
@@ -204,6 +204,60 @@
       }
     },
     {
+      "id": "find-help",
+      "title": "Find a tool or an answer",
+      "part": "Basic",
+      "kicker": "Task shortcuts / offline search",
+      "intro": "Use the task you want to perform as a starting point. Keep this guide open beside the editor when a term is unfamiliar.",
+      "steps": [
+        "On <b>Overview</b>, open <b>Choose a task</b>. Graphics &amp; fonts covers sprites and palettes; Numbers &amp; stats opens Data tables. Investigation helps locate unknown values.",
+        "Open <b>Help &gt; User guide</b>. Choose <b>Search guide</b>, enter a short term such as palette or save states, then open a matching topic.",
+        "Add another word to narrow results. Search matches all entered words and includes glossary definitions and index aliases. Clear empties the results.",
+        "Follow a topic’s related links or glossary terms. For an exact phrase, use the browser or PDF reader Find command."
+      ],
+      "result": "The tool opens from its task card. Search links take you to the relevant instructions without hiding other chapters.",
+      "note": "Topic search runs locally in the HTML guide, with no network or account. Without JavaScript, use the contents, glossary, index or ordinary Find. Search does not inspect your ROM.",
+      "details": [
+        {
+          "title": "If an editor asks for a definition",
+          "text": "A console header identifies hardware, not arbitrary game data. Use a verified definition, declare a format you understand, or investigate bytes and runtime observations. Candidate matches are evidence to review, not confirmed game semantics."
+        }
+      ],
+      "related": [
+        "start",
+        "first-edit",
+        "checks"
+      ],
+      "terms": [
+        "term-build",
+        "term-palette"
+      ],
+      "image": "41-guide-search",
+      "image_layout": "following-page",
+      "caption": "Actual offline guide search for palette. Each result links to a chapter or glossary definition.",
+      "visual_page": {
+        "title": "Search help without leaving the local guide",
+        "kicker": "Basic / offline HTML edition",
+        "intro": "Search by task, tool or term; open a result for the full instructions.",
+        "panels": [
+          {
+            "image": "41-guide-search",
+            "title": "Topic links and short excerpts",
+            "x": 48,
+            "top": 846,
+            "width": 1000,
+            "crop": [
+              300,
+              0,
+              1260,
+              880
+            ],
+            "caption": "The complete unaltered screenshot is linked in the HTML edition."
+          }
+        ]
+      }
+    },
+    {
       "id": "first-edit",
       "title": "Your first complete edit: the original NES workshop",
       "part": "Basic",
@@ -211,10 +265,10 @@
       "intro": "Use the included original drawing program to learn the full workflow without finding offsets or supplying a commercial game.",
       "steps": [
         "If the optional tutorial prompt appears, choose <b>Not now</b> for this exercise. Save existing work; choose the blank <b>Choose a project</b> entry if needed. On the empty Overview, click <b>NES workshop</b>.",
-        "Open <b>Graphics & fonts</b>. Keep First tile 0, Tiles across 1 and Tiles down 1; click <b>Assemble tiles</b>. Set Brush color index to 1.",
-        "Focus the <b>Editing</b> canvas. Press Right Arrow once, then Space. Expect <b>1 pixels differ</b>; the Original picture stays unchanged. Undo sprite stroke reverses the experiment.",
-        "Click <b>Review asset changes</b>, read the plan, then <b>Create asset build</b>. Choose the new build in the top source/build selector.",
-        "Open <b>Playtest</b>, choose <b>Load game</b>, then Play. Pause to inspect the result. The full Windows edition supplies the engine; the source edition may require core setup.",
+        "Open <b>Graphics &amp; fonts</b>. Keep First tile 0, Tiles across 1 and Tiles down 1; click <b>Assemble tiles</b>. Leave Preview size on Fit and set Brush color index to 1.",
+        "Focus the <b>Editing</b> canvas. Press Right Arrow once, then Space. Expect <b>1 pixel differs</b>; the Original picture stays unchanged. Undo sprite stroke reverses the experiment.",
+        "Click <b>Review asset changes</b>, read the plan, then <b>Create asset build</b>. Click <b>Playtest build</b> in the bottom bar to select that output and open Playtest.",
+        "Choose <b>Load game</b>, then Play. Pause to inspect the result. The full Windows edition supplies the engine; the source edition may require core setup.",
         "Open <b>Export</b>. Choose the original revision and your asset build, then <b>Create &amp; independently verify patch</b>. Download the prepared BPS. Continue with Apply a downloaded patch to check a fresh reconstruction."
       ],
       "result": "The tested exercise changed exactly file offset 16400 (0x4010), from 81 to C1. Native original/build frames differed, a save/load roundtrip restored the view, and reapplying the exported patch recreated the same build hash.",
@@ -233,16 +287,16 @@
         "term-plan",
         "term-shared-resource"
       ],
-      "image": "35-first-workshop-edit",
+      "image": "38-sprite-preview",
       "image_layout": "following-page",
       "caption": "The actual one-pixel practice edit, with a reviewed asset build ready to create.",
       "visual_page": {
         "title": "One changed pixel / reviewed build",
-        "kicker": "Actual packaged application / original practice program",
+        "kicker": "Actual application / original practice program",
         "intro": "Original and editing previews remain separate; Create asset build uses the reviewed proposal.",
         "panels": [
           {
-            "image": "35-first-workshop-edit",
+            "image": "38-sprite-preview",
             "title": "One changed pixel / reviewed build",
             "x": 48,
             "top": 846,
@@ -330,7 +384,7 @@
         "Watch the <b>Saving</b> or <b>Saved</b> status as you work. Ctrl+S requests draft saving. A saved draft still needs review and a build.",
         "Use the active editor's Undo and Redo controls. Pixel and room editors group a stroke; text fields retain ordinary text editing undo. The shortcut help explains the current context.",
         "Choose <b>Review changes</b> or the tool's equivalent. Read expected original bytes, proposed values, shared consumers and any integrity updates. Changing an input invalidates an older review.",
-        "Create the separate build, select it in the top bar and reload it in Playtest. Compare the intended change and one nearby unchanged behavior."
+        "Create the separate build, then click <b>Playtest build</b> in the bottom bar. It selects that output and opens Playtest; choose Load game. Older outputs remain in the top selector and Build history."
       ],
       "result": "The source remains intact, the build has its own identity, and the selected Playtest file is the output you just created.",
       "note": "If saving fails, keep the window open and copy unsaved text before reloading. Undoing staged work does not erase a previously created build.",
@@ -341,7 +395,7 @@
         },
         {
           "title": "Returning to earlier work",
-          "text": "Use Overview > Build history to inspect versions and meaningful names. Select an earlier output when comparing behavior. Make a complete private project backup before moving work or changing a complex definition."
+          "text": "Playtest build appears for an output created in this session from the selected input. Newer staged edits still need another build. Overview &gt; Build history keeps all recorded versions. Give outputs meaningful names and keep private project backups."
         }
       ],
       "related": [
@@ -355,41 +409,41 @@
         "term-plan",
         "term-build"
       ],
-      "image": "19-chrono-armor",
+      "image": "39-build-handoff",
       "image_layout": "following-page",
-      "image_alt": "Read the staged-edit status",
-      "caption": "Saved means the editing draft is saved. Staged changes still require review and a separate build. An existing build remains available even after an editor undo.",
+      "image_alt": "Playtest build in the bottom bar after an asset build",
+      "caption": "Playtest build selects the newly recorded output; it does not load newer staged edits.",
       "visual_page": {
-        "title": "Read the staged-edit status",
+        "title": "From a reviewed build to Playtest",
         "kicker": "Basic / actual application capture",
-        "intro": "Actual Chrono Trigger table editing. Review the selected source, changed values, byte preview and the status along the bottom.",
+        "intro": "Playtest build selects the recorded output and opens Playtest. Choose Load game to run it.",
         "panels": [
           {
-            "image": "19-chrono-armor",
-            "title": "Read the staged-edit status",
+            "image": "39-build-handoff",
+            "title": "The recorded build stays separate from the original",
             "x": 48,
             "top": 846,
-            "width": 1200,
+            "width": 1100,
             "crop": [
               180,
-              100,
+              120,
               1390,
-              620
+              700
             ]
           },
           {
-            "image": "19-chrono-armor",
-            "title": "Saved draft / staged changes still need a build",
+            "image": "39-build-handoff",
+            "title": "Choose Playtest build in the bottom bar",
             "x": 48,
             "top": 225,
-            "width": 1200,
+            "width": 1100,
             "crop": [
-              180,
+              1000,
               950,
-              1390,
+              600,
               50
             ],
-            "caption": "Saved means the editing draft is saved. Staged changes still require review and a separate build. An existing build remains available even after an editor undo."
+            "caption": "This selects the newly created output and opens Playtest. Choose Load game to start it."
           }
         ]
       }
@@ -1015,7 +1069,7 @@
       "image": "02-castlevania-sprite",
       "steps": [
         "Open <b>Graphics & fonts</b>. With verified or declared tiles loaded, use <b>Sprite assembly</b> to arrange the parts.",
-        "Choose a brush color index and paint in <b>Editing - paint here</b>. Compare the fixed Original image with the edited preview.",
+        "Choose a brush color index. Set <b>Preview size</b> to Fit or 8x, 16x or 32x, then paint in <b>Editing - paint here</b>. Compare Original with Editing. Zoom changes the view; saved PNG dimensions and ROM tiles stay unchanged.",
         "Use <b>Undo sprite stroke</b> or <b>Redo sprite stroke</b>, then <b>Review asset changes</b> and create a build."
       ],
       "result": "The capture shows an actual changed pixel on a 16 x 32 Simon assembly made from eight tiles.",
@@ -3858,6 +3912,33 @@
       "topics": [
         "ai-worked-edit",
         "term-expected-bytes"
+      ]
+    },
+    {
+      "term": "Guide search",
+      "topics": [
+        "find-help"
+      ]
+    },
+    {
+      "term": "Choose a task",
+      "topics": [
+        "start",
+        "find-help"
+      ]
+    },
+    {
+      "term": "Playtest build",
+      "topics": [
+        "drafts",
+        "first-edit"
+      ]
+    },
+    {
+      "term": "Preview size",
+      "topics": [
+        "sprites",
+        "first-edit"
       ]
     }
   ]

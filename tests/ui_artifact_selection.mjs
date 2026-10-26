@@ -1,0 +1,11 @@
+import assert from 'node:assert/strict';
+import {setArtifactSelection} from '../romancer/ui/artifact_selection.js';
+const a={artifact_id:'a',sha256:'a'},b={artifact_id:'b',sha256:'b'},d={artifact_id:'d',sha256:'d'};
+const state={project:{project_id:'p',sources:[a],builds:[b,d]},artifact:a};let release,calls=0,renders=0,clears=0;
+const hooks={rememberLocation(){},stopPlayback(){},flushDrafts:()=>++calls===1?new Promise(resolve=>release=resolve):Promise.resolve(),clearDraftCache:()=>clears++,writePreference(){},resumeLocation(){}};
+const ctx={state,api:{call:async()=>{}},render:async()=>renders++};
+const old=setArtifactSelection(ctx,'b',hooks);await setArtifactSelection(ctx,'d',hooks);release();assert.equal(await old,false);assert.equal(state.artifact,d);assert.equal(renders,1);assert.equal(clears,1);
+calls=0;const oldProject=setArtifactSelection(ctx,'b',hooks);state.project={project_id:'other',sources:[a],builds:[]};state.artifact=a;release();assert.equal(await oldProject,false);assert.equal(state.artifact,a);
+state.project={project_id:'p',sources:[a],builds:[b,d]};state.runtime={};let finishClose;hooks.flushDrafts=async()=>{};ctx.api.call=()=>new Promise(resolve=>finishClose=resolve);
+const closing=setArtifactSelection(ctx,'b',hooks);await Promise.resolve();await Promise.resolve();state.runtime=null;await setArtifactSelection(ctx,'d',hooks);finishClose();assert.equal(await closing,false);assert.equal(state.artifact,d);
+console.log('A newer artifact or project selection wins over delayed draft saves and runtime closure.');

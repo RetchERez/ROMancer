@@ -75,7 +75,8 @@ class Handler(BaseHTTPRequestHandler):
         root=GUIDE_ROOT if guide else UI_ROOT
         name=path[len('/user-guide/'):] if guide else ('index.html' if path=='/' else path.lstrip('/'))
         if (not name or '\\' in name or '%' in name or any(p in ('','.','..') for p in name.split('/'))
-                or Path(name).suffix not in (('.html','.css','.pdf','.png') if guide else ('.html','.css','.js','.svg'))):
+                or Path(name).suffix not in (('.html','.css','.pdf','.png','.js') if guide else ('.html','.css','.js','.svg'))
+                or (guide and Path(name).suffix=='.js' and name!='guide.js')):
             self._json(404,{'ok':False,'error':'Page not found'});return
         file=root/name
         if (root.is_symlink() or root.is_junction() or not file.is_file() or file.is_symlink() or file.is_junction()

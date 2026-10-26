@@ -401,6 +401,224 @@
     return `<div class="workspace-state" aria-label="File and edit status">${includeFile ? badge(file.label, file.tone) : ""}${hasStagedChanges(state2) ? badge("Staged changes · build required", "warm") : ""}<span id="draft-save-status" role="status" aria-live="polite" class="save-state ${save.tone}">${esc(save.label)}</span>${snapshot.failed ? '<button type="button" data-action="draft-retry">Retry save</button>' : ""}</div>`;
   }
 
+  // romancer/ui/build_handoff.js
+  function createdBuild(state2) {
+    if (!state2.project || !state2.artifact) return null;
+    const results = ["structured.apply", "build.apply", "patches.apply"].map((key3) => {
+      var _a;
+      return (_a = state2.results) == null ? void 0 : _a[key3];
+    });
+    return [...state2.project.builds].reverse().find((row) => row.source_id === state2.artifact.artifact_id && results.some((result) => (result == null ? void 0 : result.artifact_id) === row.artifact_id && result.sha256 === row.sha256)) || null;
+  }
+  async function playtestCreatedBuild(ctx2, id) {
+    var _a, _b, _c;
+    const build = createdBuild(ctx2.state), project = (_a = ctx2.state.project) == null ? void 0 : _a.project_id;
+    if (!build || build.artifact_id !== id) throw Error("The selected build changed. Choose it again from Build history.");
+    const target = build.sha256;
+    const selected2 = await ctx2.setArtifact(id);
+    if (selected2 === false) throw Error("The selection changed. Choose your build before playtesting.");
+    if (((_b = ctx2.state.project) == null ? void 0 : _b.project_id) !== project || ((_c = ctx2.state.artifact) == null ? void 0 : _c.artifact_id) !== id || ctx2.state.artifact.sha256 !== target) throw Error("The selection changed. Choose your build before playtesting.");
+    const scope = selectionKey(ctx2.state);
+    await ctx2.navigate("playtest");
+    if (selectionKey(ctx2.state) !== scope) throw Error("The selection changed while opening Playtest.");
+  }
+
+  // romancer/ui/project_flow.js
+  function selectionTicket(state2) {
+    state2.selectionRevision = (state2.selectionRevision || 0) + 1;
+    return state2.selectionRevision;
+  }
+  function selectionCurrent(state2, ticket) {
+    return state2.selectionRevision === ticket;
+  }
+  function releaseProjectResources(state2) {
+    var _a, _b;
+    state2.gameVisualModel = null;
+    (_a = state2.animationClock) == null ? void 0 : _a.stop();
+    state2.animationClock = null;
+    state2.animationPlaying = false;
+    state2.animationIndex = 0;
+    state2.valueSearch = null;
+    state2.valueVideo = null;
+    (_b = state2.soundPlayer) == null ? void 0 : _b.close();
+    state2.soundPlayer = null;
+    state2.soundPreview = null;
+    for (const key3 of ["tablePreview", "dataRelocation", "nativeSourceContext", "structuralLab", "structuralPrefill", "tableProposal", "nativeTrace", "nativeProbe", "investigationSeries", "gameMapsView", "gameMapEditor", "levelEditor", "levelClipboard", "levelRect", "paint", "pixelHistories", "pixelHistoryScope", "spriteHistory", "hexDraft", "hexReview", "hexSearch", "hexNumbers", "hexExplanation", "hexBookmarks", "hexComparison", "historyComparison", "translationSheet", "translationReview"]) state2[key3] = null;
+    state2.drafts = {};
+    state2.romScans = {};
+    state2.graphicsInvestigations = {};
+    state2.graphicsPartHeight = null;
+    state2.graphicsRegionOpen = false;
+    state2.results = {};
+  }
+  function clearProjectState(state2) {
+    selectionTicket(state2);
+    releaseProjectResources(state2);
+    for (const key3 of ["project", "artifact", "runtime", "frame", "snapshot", "pending", "paint", "profileFamily", "profileLoadedFamily", "candidateReview", "resourcePrefill", "openDeclaration"]) state2[key3] = null;
+    state2.results = {};
+    state2.playing = false;
+    state2.heldButtons = [];
+    state2.page = "overview";
+    state2.scriptPage = 0;
+    state2.assetPage = 0;
+    state2.catalogPage = 0;
+    state2.catalogQuery = "";
+  }
+  function droppedSource(files) {
+    if (!files || files.length !== 1) throw new Error("Drop one file at a time.");
+    const file = files[0];
+    if (!Number.isSafeInteger(file.size) || file.size < 1) throw new Error("The selected file is empty. Choose a ROM file.");
+    if (file.size > 64 * 1024 * 1024) throw new Error("Files larger than64 MiB need Advanced path import.");
+    return file;
+  }
+  function helpForError(message) {
+    const text = String(message).toLowerCase();
+    if (/old.byte|precondition/.test(text)) return { topic: "discovery", label: "Check source bytes" };
+    if (/core|bios|playtest|native|architecture/.test(text)) return { topic: "playtest", label: "Playtest setup help" };
+    if (/stale|revision|changed|lock|draft|backup|restore/.test(text)) return { topic: "recovery", label: "Recovery help" };
+    if (/text|slot|encoding|terminator|control|overflow/.test(text)) return { topic: "text", label: "Text editing help" };
+    if (/table|record|numeric|stride|integer/.test(text)) return { topic: "tables", label: "Data table help" };
+    if (/palette|pixel|tile|graphic|glyph/.test(text)) return { topic: "graphics", label: "Graphics help" };
+    if (/compression|lz10|rle|allocation/.test(text)) return { topic: "compression", label: "Compression help" };
+    if (/patch|bps|export/.test(text)) return { topic: "export", label: "Patch export help" };
+    return { topic: "start", label: "Open help" };
+  }
+  var DraftQueue = class {
+    constructor(onChange = () => {
+    }) {
+      this.pending = /* @__PURE__ */ new Map();
+      this.failed = /* @__PURE__ */ new Map();
+      this.operations = /* @__PURE__ */ new Map();
+      this.onChange = onChange;
+    }
+    snapshot() {
+      return { pending: this.pending.size, failed: this.failed.size, state: this.failed.size ? "failed" : this.pending.size ? "saving" : "saved", unsafe: !!(this.pending.size || this.failed.size) };
+    }
+    changed() {
+      try {
+        this.onChange(this.snapshot());
+      } catch {
+      }
+    }
+    enqueue(key3, operation, onError) {
+      this.operations.set(key3, { operation, onError });
+      const prior = this.pending.get(key3) || Promise.resolve();
+      const next = prior.then(operation).then(() => this.failed.delete(key3)).catch((error) => {
+        this.failed.set(key3, error);
+        try {
+          onError(error);
+        } catch {
+        }
+      });
+      this.pending.set(key3, next);
+      this.changed();
+      void next.finally(() => {
+        if (this.pending.get(key3) === next) {
+          this.pending.delete(key3);
+          if (!this.failed.has(key3)) this.operations.delete(key3);
+        }
+        this.changed();
+      });
+    }
+    async retry() {
+      for (const key3 of this.failed.keys()) if (!this.pending.has(key3)) {
+        const task = this.operations.get(key3);
+        if (task) this.enqueue(key3, task.operation, task.onError);
+      }
+      await this.flush();
+    }
+    async flush() {
+      while (this.pending.size) await Promise.all([...this.pending.values()]);
+      if (this.failed.size) throw Error("Draft not saved. Your unsaved edits are still here. Retry saving before changing source or project.");
+    }
+    clear() {
+      if (this.pending.size || this.failed.size) throw Error("Unsaved edits must be saved before clearing drafts.");
+      this.failed.clear();
+      this.operations.clear();
+      this.changed();
+    }
+  };
+
+  // romancer/ui/workbench_usability.js
+  function chooseArtifact(project, id) {
+    const rows = project.sources.concat(project.builds);
+    return rows.find((r) => r.artifact_id === id) || project.sources[0] || project.builds[0] || null;
+  }
+  function shouldSaveField(node) {
+    return !!node.id && !node.id.startsWith("settings-") && !node.closest("dialog") && !["global-search", "project-select", "artifact-select"].includes(node.id) && !["file", "hidden", "checkbox", "radio"].includes(node.type);
+  }
+  var retainedScroll = (previous, next, scroll) => previous === next ? Math.max(0, scroll) : 0;
+  function detailsEntries(root) {
+    const counts = /* @__PURE__ */ new Map();
+    return [...root.querySelectorAll("details")].map((node) => {
+      var _a;
+      const summary = ((_a = node.querySelector(":scope > summary")) == null ? void 0 : _a.textContent.split(" ·")[0].trim()) || "", index = counts.get(summary) || 0;
+      counts.set(summary, index + 1);
+      return [node.id || summary + ":" + index, node];
+    });
+  }
+  var rememberDetails = (root) => root ? new Map(detailsEntries(root).map(([key3, node]) => [key3, node.open])) : /* @__PURE__ */ new Map();
+  function restoreDetails(root, saved) {
+    for (const [key3, node] of detailsEntries(root)) if (saved.has(key3)) node.open = saved.get(key3);
+  }
+  async function runScoped(ctx2, operation, parameters, options = {}, updateJob2 = () => {
+  }) {
+    const { state: state2 } = ctx2, scope = selectionKey(state2), current2 = () => scope === selectionKey(state2);
+    const changed2 = () => Error("Action finished for the previous selection. Open that project or file to review its result.");
+    let result;
+    try {
+      result = await ctx2.api.job(operation, parameters, updateJob2);
+    } catch (error) {
+      if (!current2()) throw changed2();
+      if (error.result) state2.results[operation] = error.result;
+      if (options.render !== false) await ctx2.render();
+      throw error;
+    }
+    if (!current2()) throw changed2();
+    if (options.refresh !== false) await ctx2.refreshProject();
+    if (!current2()) throw changed2();
+    state2.results[operation] = result;
+    if (options.render !== false) await ctx2.render();
+    return result;
+  }
+
+  // romancer/ui/artifact_selection.js
+  async function setArtifactSelection(ctx2, id, hooks) {
+    var _a, _b;
+    const { state: state2 } = ctx2, project = (_a = state2.project) == null ? void 0 : _a.project_id, ticket = selectionTicket(state2);
+    const current2 = () => {
+      var _a2;
+      return selectionCurrent(state2, ticket) && ((_a2 = state2.project) == null ? void 0 : _a2.project_id) === project;
+    };
+    hooks.rememberLocation();
+    hooks.stopPlayback(state2);
+    state2.animationPlaying = false;
+    await hooks.flushDrafts();
+    if (!current2()) return false;
+    if (state2.runtime) {
+      await ctx2.api.call("runtime.close", { project_id: project });
+      if (!current2()) return false;
+      state2.runtime = null;
+      state2.frame = null;
+      state2.snapshot = null;
+    }
+    await hooks.flushDrafts();
+    if (!current2()) return false;
+    hooks.clearDraftCache();
+    state2.artifact = chooseArtifact(state2.project, id);
+    hooks.writePreference("romancer-artifact:" + project, ((_b = state2.artifact) == null ? void 0 : _b.artifact_id) || "");
+    state2.profileFamily = null;
+    state2.profileLoadedFamily = null;
+    state2.scriptPage = 0;
+    state2.assetPage = 0;
+    state2.catalogPage = 0;
+    state2.catalogQuery = "";
+    state2.pending = null;
+    hooks.resumeLocation();
+    await ctx2.render();
+    return current2();
+  }
+
   // romancer/ui/shortcuts.js
   var SHORTCUTS = [["Ctrl+S", "Save drafts now"], ["Ctrl+Z", "Undo the active editor"], ["Ctrl+Y / Ctrl+Shift+Z", "Redo the active editor"], ["Ctrl+K", "Search the workspace"], ["?", "Show keyboard shortcuts"]];
   function shortcutFor(event, { modalOpen = false, gameFocused = false } = {}) {
@@ -565,49 +783,6 @@
       else context.moveTo(x, y);
     }
     context.stroke();
-  }
-
-  // romancer/ui/workbench_usability.js
-  function chooseArtifact(project, id) {
-    const rows = project.sources.concat(project.builds);
-    return rows.find((r) => r.artifact_id === id) || project.sources[0] || project.builds[0] || null;
-  }
-  function shouldSaveField(node) {
-    return !!node.id && !node.id.startsWith("settings-") && !node.closest("dialog") && !["global-search", "project-select", "artifact-select"].includes(node.id) && !["file", "hidden", "checkbox", "radio"].includes(node.type);
-  }
-  var retainedScroll = (previous, next, scroll) => previous === next ? Math.max(0, scroll) : 0;
-  function detailsEntries(root) {
-    const counts = /* @__PURE__ */ new Map();
-    return [...root.querySelectorAll("details")].map((node) => {
-      var _a;
-      const summary = ((_a = node.querySelector(":scope > summary")) == null ? void 0 : _a.textContent.split(" ·")[0].trim()) || "", index = counts.get(summary) || 0;
-      counts.set(summary, index + 1);
-      return [node.id || summary + ":" + index, node];
-    });
-  }
-  var rememberDetails = (root) => root ? new Map(detailsEntries(root).map(([key3, node]) => [key3, node.open])) : /* @__PURE__ */ new Map();
-  function restoreDetails(root, saved) {
-    for (const [key3, node] of detailsEntries(root)) if (saved.has(key3)) node.open = saved.get(key3);
-  }
-  async function runScoped(ctx2, operation, parameters, options = {}, updateJob2 = () => {
-  }) {
-    const { state: state2 } = ctx2, scope = selectionKey(state2), current2 = () => scope === selectionKey(state2);
-    const changed2 = () => Error("Action finished for the previous selection. Open that project or file to review its result.");
-    let result;
-    try {
-      result = await ctx2.api.job(operation, parameters, updateJob2);
-    } catch (error) {
-      if (!current2()) throw changed2();
-      if (error.result) state2.results[operation] = error.result;
-      if (options.render !== false) await ctx2.render();
-      throw error;
-    }
-    if (!current2()) throw changed2();
-    if (options.refresh !== false) await ctx2.refreshProject();
-    if (!current2()) throw changed2();
-    state2.results[operation] = result;
-    if (options.render !== false) await ctx2.render();
-    return result;
   }
 
   // romancer/ui/cartridge_verification.js
@@ -1136,122 +1311,6 @@
       }
     };
   }
-
-  // romancer/ui/project_flow.js
-  function selectionTicket(state2) {
-    state2.selectionRevision = (state2.selectionRevision || 0) + 1;
-    return state2.selectionRevision;
-  }
-  function selectionCurrent(state2, ticket) {
-    return state2.selectionRevision === ticket;
-  }
-  function releaseProjectResources(state2) {
-    var _a, _b;
-    state2.gameVisualModel = null;
-    (_a = state2.animationClock) == null ? void 0 : _a.stop();
-    state2.animationClock = null;
-    state2.animationPlaying = false;
-    state2.animationIndex = 0;
-    state2.valueSearch = null;
-    state2.valueVideo = null;
-    (_b = state2.soundPlayer) == null ? void 0 : _b.close();
-    state2.soundPlayer = null;
-    state2.soundPreview = null;
-    for (const key3 of ["tablePreview", "dataRelocation", "nativeSourceContext", "structuralLab", "structuralPrefill", "tableProposal", "nativeTrace", "nativeProbe", "investigationSeries", "gameMapsView", "gameMapEditor", "levelEditor", "levelClipboard", "levelRect", "paint", "pixelHistories", "pixelHistoryScope", "spriteHistory", "hexDraft", "hexReview", "hexSearch", "hexNumbers", "hexExplanation", "hexBookmarks", "hexComparison", "historyComparison", "translationSheet", "translationReview"]) state2[key3] = null;
-    state2.drafts = {};
-    state2.romScans = {};
-    state2.graphicsInvestigations = {};
-    state2.graphicsPartHeight = null;
-    state2.graphicsRegionOpen = false;
-    state2.results = {};
-  }
-  function clearProjectState(state2) {
-    selectionTicket(state2);
-    releaseProjectResources(state2);
-    for (const key3 of ["project", "artifact", "runtime", "frame", "snapshot", "pending", "paint", "profileFamily", "profileLoadedFamily", "candidateReview", "resourcePrefill", "openDeclaration"]) state2[key3] = null;
-    state2.results = {};
-    state2.playing = false;
-    state2.heldButtons = [];
-    state2.page = "overview";
-    state2.scriptPage = 0;
-    state2.assetPage = 0;
-    state2.catalogPage = 0;
-    state2.catalogQuery = "";
-  }
-  function droppedSource(files) {
-    if (!files || files.length !== 1) throw new Error("Drop one file at a time.");
-    const file = files[0];
-    if (!Number.isSafeInteger(file.size) || file.size < 1) throw new Error("The selected file is empty. Choose a ROM file.");
-    if (file.size > 64 * 1024 * 1024) throw new Error("Files larger than64 MiB need Advanced path import.");
-    return file;
-  }
-  function helpForError(message) {
-    const text = String(message).toLowerCase();
-    if (/old.byte|precondition/.test(text)) return { topic: "discovery", label: "Check source bytes" };
-    if (/core|bios|playtest|native|architecture/.test(text)) return { topic: "playtest", label: "Playtest setup help" };
-    if (/stale|revision|changed|lock|draft|backup|restore/.test(text)) return { topic: "recovery", label: "Recovery help" };
-    if (/text|slot|encoding|terminator|control|overflow/.test(text)) return { topic: "text", label: "Text editing help" };
-    if (/table|record|numeric|stride|integer/.test(text)) return { topic: "tables", label: "Data table help" };
-    if (/palette|pixel|tile|graphic|glyph/.test(text)) return { topic: "graphics", label: "Graphics help" };
-    if (/compression|lz10|rle|allocation/.test(text)) return { topic: "compression", label: "Compression help" };
-    if (/patch|bps|export/.test(text)) return { topic: "export", label: "Patch export help" };
-    return { topic: "start", label: "Open help" };
-  }
-  var DraftQueue = class {
-    constructor(onChange = () => {
-    }) {
-      this.pending = /* @__PURE__ */ new Map();
-      this.failed = /* @__PURE__ */ new Map();
-      this.operations = /* @__PURE__ */ new Map();
-      this.onChange = onChange;
-    }
-    snapshot() {
-      return { pending: this.pending.size, failed: this.failed.size, state: this.failed.size ? "failed" : this.pending.size ? "saving" : "saved", unsafe: !!(this.pending.size || this.failed.size) };
-    }
-    changed() {
-      try {
-        this.onChange(this.snapshot());
-      } catch {
-      }
-    }
-    enqueue(key3, operation, onError) {
-      this.operations.set(key3, { operation, onError });
-      const prior = this.pending.get(key3) || Promise.resolve();
-      const next = prior.then(operation).then(() => this.failed.delete(key3)).catch((error) => {
-        this.failed.set(key3, error);
-        try {
-          onError(error);
-        } catch {
-        }
-      });
-      this.pending.set(key3, next);
-      this.changed();
-      void next.finally(() => {
-        if (this.pending.get(key3) === next) {
-          this.pending.delete(key3);
-          if (!this.failed.has(key3)) this.operations.delete(key3);
-        }
-        this.changed();
-      });
-    }
-    async retry() {
-      for (const key3 of this.failed.keys()) if (!this.pending.has(key3)) {
-        const task = this.operations.get(key3);
-        if (task) this.enqueue(key3, task.operation, task.onError);
-      }
-      await this.flush();
-    }
-    async flush() {
-      while (this.pending.size) await Promise.all([...this.pending.values()]);
-      if (this.failed.size) throw Error("Draft not saved. Your unsaved edits are still here. Retry saving before changing source or project.");
-    }
-    clear() {
-      if (this.pending.size || this.failed.size) throw Error("Unsaved edits must be saved before clearing drafts.");
-      this.failed.clear();
-      this.operations.clear();
-      this.changed();
-    }
-  };
 
   // romancer/ui/tutorial.js
   function renderHub(data) {
@@ -1930,6 +1989,21 @@
     render: () => render5
   });
 
+  // romancer/ui/overview_tasks.js
+  var OVERVIEW_TASKS = [
+    ["assets", "Graphics & fonts", "Tiles, sprites and palettes"],
+    ["scripts", "Text & layout", "Text, fonts and dialogue"],
+    ["tables", "Numbers & stats", "Editable tables and values"],
+    ["levels", "Levels", "Rooms, objects and terrain"],
+    ["sound", "Music & sound", "Samples and known sequences"],
+    ["debug", "Investigation", "Find values and source bytes"],
+    ["playtest", "Playtest", "Play, step and save states"],
+    ["release", "Export & patches", "Apply or export patches"]
+  ];
+  function overviewTasks() {
+    return `<section class="card"><div class="card-heading"><h3>Choose a task</h3></div><div class="overview-tasks">${OVERVIEW_TASKS.map(([id, label, note]) => `<div>${button(label, "navigate", { id, icon: id })}<p class="subtle">${esc(note)}</p></div>`).join("")}</div></section>`;
+  }
+
   // romancer/ui/source_support.js
   var systems = /* @__PURE__ */ new Set(["nes", "snes", "genesis", "gb", "gbc", "gba"]);
   var names = { nes: "NES", snes: "SNES", genesis: "Genesis", gb: "Game Boy", gbc: "Game Boy Color", gba: "GBA" };
@@ -2406,7 +2480,7 @@
     const reports = (await ctx2.api.call("reports.list", { project_id: p.project_id })).reports;
     const exports = (await ctx2.api.call("exports.list", { project_id: p.project_id })).exports;
     const gameEditing = await gameEdits(ctx2);
-    return `${heading("Workspace overview", "Overview", p.demo ? "An original, redistributable fixture. Explore the real editing and release workflows." : "Your sources, builds, and recorded evidence in one place.", button("Import source", "import", { icon: "plus" }))}${sourceSupport(ctx2)}${gameEditing}${scanControls(ctx2)}<section class="card task-checklist"><h3>Next steps</h3>${p.demo ? badge("Practice ROM") : ""}<div class="actions">${progress.steps.map((step) => button((step.complete ? "✓ " : "") + step.title, "navigate", { id: step.page })).join("")}</div></section><div class="stats">${stat("Sources", p.sources.length, "Owned copies; originals preserved", "resources")}${stat("Builds", p.builds.length, "Content identities stored in history", "check")}${stat("Test records", reports.length, "Measured scope shown per report", "shield")}${stat("Exports", exports.length, "Selected documentation and patches", "release")}</div><section class="card"><div class="card-heading"><h3>Files</h3><span class="subtle">${p.sources.length + p.builds.length} ${p.sources.length + p.builds.length === 1 ? "item" : "items"}</span></div>${[...p.sources, ...p.builds].slice(-6).map(resource).join("") || empty("Import your first source", "Add a game file or a resource extracted from your own project.", button("Import source", "import", { primary: true }))}</section>${buildHistory(ctx2, timeline)}${projectChecks(ctx2)}`;
+    return `${heading("Workspace overview", "Overview", p.demo ? "An original, redistributable fixture. Explore the real editing and release workflows." : "Your sources, builds, and recorded evidence in one place.", button("Import source", "import", { icon: "plus" }))}${sourceSupport(ctx2)}${overviewTasks()}${gameEditing}${scanControls(ctx2)}<details class="card task-checklist"><summary>Project checklist</summary>${p.demo ? badge("Practice ROM") : ""}<div class="actions">${progress.steps.map((step) => button((step.complete ? "✓ " : "") + step.title, "navigate", { id: step.page })).join("")}</div></details><div class="stats">${stat("Sources", p.sources.length, "Owned copies; originals preserved", "resources")}${stat("Builds", p.builds.length, "Content identities stored in history", "check")}${stat("Test records", reports.length, "Measured scope shown per report", "shield")}${stat("Exports", exports.length, "Selected documentation and patches", "release")}</div><section class="card"><div class="card-heading"><h3>Files</h3><span class="subtle">${p.sources.length + p.builds.length} ${p.sources.length + p.builds.length === 1 ? "item" : "items"}</span></div>${[...p.sources, ...p.builds].slice(-6).map(resource).join("") || empty("Import your first source", "Add a game file or a resource extracted from your own project.", button("Import source", "import", { primary: true }))}</section>${buildHistory(ctx2, timeline)}${projectChecks(ctx2)}`;
   }
   function stat(title, value, note, ico) {
     return `<div class="stat"><div class="stat-top"><span>${title}</span>${icon(ico)}</div><strong>${value}</strong></div>`;
@@ -4513,6 +4587,10 @@ ${font ? `<section class="card"><h3>Font metrics · ${esc(font.id)}</h3><div cla
   }
 
   // romancer/ui/sprite_assembly.js
+  function spritePreviewSize(width, height, zoom = "fit", available = 384) {
+    const scale = ["8", "16", "32"].includes(String(zoom)) ? Number(zoom) : Math.max(1, Math.min(32, Math.floor(Math.min(Math.max(1, available) / width, 384 / height))));
+    return { width: width * scale, height: height * scale, scale };
+  }
   function makeAssembly(bitmap, { first = 0, columns: columns2, rows, order = "rows", indices = null, flips = null, colors = null, provenance = "declared_layout" }) {
     if (![first, columns2, rows].every(Number.isSafeInteger) || first < 0 || columns2 < 1 || rows < 1 || columns2 > 8 || rows > 8 || !["rows", "columns"].includes(order)) throw Error("Choose a grid of up to 8 × 8 declared tiles.");
     const custom = indices !== null;
@@ -4630,9 +4708,10 @@ ${font ? `<section class="card"><h3>Font metrics · ${esc(font.id)}</h3><div cla
         link.click();
       }
     });
-    return `<section class="card sprite-assembly"><div class="card-heading"><h3>Sprite assembly</h3>${layout ? button("Save preview PNG", "sprite-export") : ""}</div><p class="subtle">Arrange declared tiles, then paint the whole image. Shared tiles update everywhere in this editing layout.</p><div class="field-row">${field("sprite-first", "First tile", ctx2.draft("sprite-first", (layout == null ? void 0 : layout.first) ?? 0), { type: "number", min: 0 })}${field("sprite-columns", "Tiles across", ctx2.draft("sprite-columns", (layout == null ? void 0 : layout.columns) ?? Math.min(2, bitmap.count)), { type: "number", min: 1, max: 8 })}${field("sprite-rows", "Tiles down", ctx2.draft("sprite-rows", (layout == null ? void 0 : layout.rows) ?? Math.min(2, Math.floor(bitmap.count / 2) || 1)), { type: "number", min: 1, max: 8 })}${select("sprite-order", "Tile order", [["rows", "Across, then down"], ["columns", "Down, then across"]], ctx2.draft("sprite-order", (layout == null ? void 0 : layout.order) || "rows"))}</div><details><summary>Custom tile placement</summary>${field("sprite-map", "Tile map", ctx2.draft("sprite-map", (layout == null ? void 0 : layout.indices) ? layout.indices.map((v, i) => v === null ? "." : String(v) + (layout.flips[i] & 1 ? "h" : "") + (layout.flips[i] & 2 ? "v" : "")).join(", ") : ""))}<p>One tile per grid position; use h/v for flips and . for an unmapped part.</p></details>${button("Assemble tiles", "sprite-assemble", { primary: !layout })}${image ? `${layout.provenance === "pixel_candidate" ? '<p class="notice warm">Gameplay pixel candidates. Source use still needs native verification.</p>' : ""}${layout.colors ? '<p class="subtle">Gameplay colors are a preview; palette bytes are unchanged.</p>' : ""}<div class="toolbar">${field("sprite-color", "Brush color index", ctx2.draft("sprite-color", "1"), { type: "number", min: 0 })}</div><div class="preview-pair sprite-comparison"><div><span>Original</span><div class="sprite-preview"><canvas id="sprite-original" aria-label="Original assembled sprite"></canvas></div></div><div><span>Editing · paint here</span><div class="sprite-preview"><canvas id="sprite-canvas" width="${image.width}" height="${image.height}" tabindex="0" role="application" aria-label="Assembled sprite editor: arrows move, Space paints"></canvas></div></div></div><p id="sprite-difference-count" class="preview-caption" role="status" aria-live="polite"></p><div class="actions">${button("Undo sprite stroke", "sprite-undo", { disabled: !undo.canUndo })}${button("Redo sprite stroke", "sprite-redo", { disabled: !undo.canRedo })}<span class="subtle">${image.width} × ${image.height} pixels · ${layout.tiles.length} tiles</span></div><p class="subtle">Drag across tile boundaries; review all changed tiles together with Review asset changes.</p><details><summary>Tile placement</summary><p>${layout.tiles.map((index, i) => esc(`(${i % layout.columns}, ${Math.floor(i / layout.columns)}) → tile ${index}`)).join(" · ")}</p><p>This source-bound layout is explicit. OAM, animation frames and game-specific metasprite tables still need their own declared mapping.</p></details>` : ""}</section>`;
+    return `<section class="card sprite-assembly"><div class="card-heading"><h3>Sprite assembly</h3>${layout ? button("Save preview PNG", "sprite-export") : ""}</div><p class="subtle">Arrange declared tiles, then paint the whole image. Shared tiles update everywhere in this editing layout.</p><div class="field-row">${field("sprite-first", "First tile", ctx2.draft("sprite-first", (layout == null ? void 0 : layout.first) ?? 0), { type: "number", min: 0 })}${field("sprite-columns", "Tiles across", ctx2.draft("sprite-columns", (layout == null ? void 0 : layout.columns) ?? Math.min(2, bitmap.count)), { type: "number", min: 1, max: 8 })}${field("sprite-rows", "Tiles down", ctx2.draft("sprite-rows", (layout == null ? void 0 : layout.rows) ?? Math.min(2, Math.floor(bitmap.count / 2) || 1)), { type: "number", min: 1, max: 8 })}${select("sprite-order", "Tile order", [["rows", "Across, then down"], ["columns", "Down, then across"]], ctx2.draft("sprite-order", (layout == null ? void 0 : layout.order) || "rows"))}</div><details><summary>Custom tile placement</summary>${field("sprite-map", "Tile map", ctx2.draft("sprite-map", (layout == null ? void 0 : layout.indices) ? layout.indices.map((v, i) => v === null ? "." : String(v) + (layout.flips[i] & 1 ? "h" : "") + (layout.flips[i] & 2 ? "v" : "")).join(", ") : ""))}<p>One tile per grid position; use h/v for flips and . for an unmapped part.</p></details>${button("Assemble tiles", "sprite-assemble", { primary: !layout })}${image ? `${layout.provenance === "pixel_candidate" ? '<p class="notice warm">Gameplay pixel candidates. Source use still needs native verification.</p>' : ""}${layout.colors ? '<p class="subtle">Gameplay colors are a preview; palette bytes are unchanged.</p>' : ""}<div class="toolbar">${field("sprite-color", "Brush color index", ctx2.draft("sprite-color", "1"), { type: "number", min: 0 })}${select("sprite-zoom", "Preview size", [["fit", "Fit"], ["8", "8×"], ["16", "16×"], ["32", "32×"]], ctx2.draft("sprite-zoom", "fit"))}<span id="sprite-zoom-label" class="subtle" role="status"></span></div><div class="preview-pair sprite-comparison"><div><span>Original</span><div class="sprite-preview"><canvas id="sprite-original" aria-label="Original assembled sprite"></canvas></div></div><div><span>Editing · paint here</span><div class="sprite-preview"><canvas id="sprite-canvas" width="${image.width}" height="${image.height}" tabindex="0" role="application" aria-label="Assembled sprite editor: arrows move, Space paints"></canvas></div></div></div><p id="sprite-difference-count" class="preview-caption" role="status" aria-live="polite"></p><div class="actions">${button("Undo sprite stroke", "sprite-undo", { disabled: !undo.canUndo })}${button("Redo sprite stroke", "sprite-redo", { disabled: !undo.canRedo })}<span class="subtle">${image.width} × ${image.height} pixels · ${layout.tiles.length} tiles</span></div><p class="subtle">Drag across tile boundaries; review all changed tiles together with Review asset changes.</p><details><summary>Tile placement</summary><p>${layout.tiles.map((index, i) => esc(`(${i % layout.columns}, ${Math.floor(i / layout.columns)}) → tile ${index}`)).join(" · ")}</p><p>This source-bound layout is explicit. OAM, animation frames and game-specific metasprite tables still need their own declared mapping.</p></details>` : ""}</section>`;
   }
   function mountSprite(ctx2, doc, bitmap, palette2) {
+    var _a, _b;
     const canvas = document.getElementById("sprite-canvas"), layout = layoutFor(ctx2, doc, bitmap);
     if (!canvas || !layout) return;
     const scope = selectionKey(ctx2.state), current2 = () => selectionKey(ctx2.state) === scope;
@@ -4643,8 +4722,8 @@ ${font ? `<section class="card"><h3>Font metrics · ${esc(font.id)}</h3><div cla
     const rgba = (values, colors) => {
       const data = new Uint8ClampedArray(values.length * 4);
       values.forEach((value, i) => {
-        var _a, _b, _c;
-        const part = Math.floor(Math.floor(i / image.width) / bitmap.height) * layout.columns + Math.floor(i % image.width / bitmap.width), observed = (_b = (_a = layout.colors) == null ? void 0 : _a[part]) == null ? void 0 : _b[value], color = (_c = colors == null ? void 0 : colors.entries.find((e) => e.index === value && e.bank === 0)) == null ? void 0 : _c.rgb, shade = Math.round(18 + value / Math.max(1, count - 1) * 216);
+        var _a2, _b2, _c;
+        const part = Math.floor(Math.floor(i / image.width) / bitmap.height) * layout.columns + Math.floor(i % image.width / bitmap.width), observed = (_b2 = (_a2 = layout.colors) == null ? void 0 : _a2[part]) == null ? void 0 : _b2[value], color = (_c = colors == null ? void 0 : colors.entries.find((e) => e.index === value && e.bank === 0)) == null ? void 0 : _c.rgb, shade = Math.round(18 + value / Math.max(1, count - 1) * 216);
         data.set([(color == null ? void 0 : color.r) ?? (observed == null ? void 0 : observed[0]) ?? shade, (color == null ? void 0 : color.g) ?? (observed == null ? void 0 : observed[1]) ?? shade, (color == null ? void 0 : color.b) ?? (observed == null ? void 0 : observed[2]) ?? shade, 255], i * 4);
       });
       return data;
@@ -4653,7 +4732,6 @@ ${font ? `<section class="card"><h3>Font metrics · ${esc(font.id)}</h3><div cla
     if (beforeCanvas) {
       beforeCanvas.width = image.width;
       beforeCanvas.height = image.height;
-      beforeCanvas.style.width = Math.min(320, image.width * 8) + "px";
       const c = beforeCanvas.getContext("2d"), frame = c.createImageData(image.width, image.height);
       frame.data.set(originalPixels);
       c.putImageData(frame, 0, 0);
@@ -4665,7 +4743,7 @@ ${font ? `<section class="card"><h3>Font metrics · ${esc(font.id)}</h3><div cla
       let changed2 = 0;
       for (let i = 0; i < frame.data.length; i += 4) if ([0, 1, 2].some((c) => frame.data[i + c] !== originalPixels[i + c])) changed2++;
       const n = document.getElementById("sprite-difference-count");
-      if (n) n.textContent = changed2 ? "Preview updated · " + changed2 + " pixels differ · not built" : "Unchanged sprite preview";
+      if (n) n.textContent = changed2 ? "Preview updated · " + changed2 + (changed2 === 1 ? " pixel differs" : " pixels differ") + " · not built" : "Unchanged sprite preview";
     };
     const paint = (x, y) => {
       const color = Number(read("sprite-color"));
@@ -4684,9 +4762,31 @@ ${font ? `<section class="card"><h3>Font metrics · ${esc(font.id)}</h3><div cla
       pixels = [...imageFor(ctx2, doc, bitmap, layout).pixels];
       undo.begin(pixels);
     };
+    const resize = () => {
+      if (!current2()) return;
+      const panes = [beforeCanvas, canvas].filter(Boolean).map((node) => node.parentElement), width = Math.min(...panes.map((node) => Math.max(1, ((node == null ? void 0 : node.clientWidth) || 416) - 32)));
+      const size2 = spritePreviewSize(image.width, image.height, ctx2.draft("sprite-zoom", "fit"), width);
+      for (const node of [beforeCanvas, canvas].filter(Boolean)) {
+        node.style.width = size2.width + "px";
+        node.style.height = size2.height + "px";
+      }
+      const label = document.getElementById("sprite-zoom-label");
+      if (label) label.textContent = size2.scale + "× preview";
+    };
+    (_a = document.getElementById("sprite-zoom")) == null ? void 0 : _a.addEventListener("change", (event) => {
+      if (!current2()) return;
+      ctx2.setDraft("sprite-zoom", event.target.value);
+      resize();
+    });
     canvas.style.touchAction = "none";
-    canvas.style.width = Math.min(320, image.width * 8) + "px";
+    resize();
     draw2();
+    if (typeof ResizeObserver !== "undefined") {
+      const observer = new ResizeObserver(resize);
+      observer.observe(canvas.parentElement);
+      (_b = ctx2.state.spritePreviewObserver) == null ? void 0 : _b.disconnect();
+      ctx2.state.spritePreviewObserver = observer;
+    }
     canvas.addEventListener("sprite-refresh", () => {
       if (current2() && pointer === null) {
         pixels = [...imageFor(ctx2, doc, bitmap, layout).pixels];
@@ -7900,6 +8000,7 @@ ${font ? `<section class="card"><h3>Font metrics · ${esc(font.id)}</h3><div cla
   var startupReady = false;
   applyInterfaceScale(readPreference("romancer-scale") || 100);
   window.addEventListener("resize", () => applyInterfaceScale(getSettings().scale));
+  var navigationRevision = 0;
   var views = { tutorials: tutorials_exports, overview: overview_exports, resources: resources_exports, scripts: scripts_exports, assets: assets_exports, levels: levels_exports, sound: sound_exports, tables: tables_exports, automation: automation_exports, playtest: playtest_exports, debug: debug_exports, routes: routes_exports, regression: regression_exports, release: release_exports, help: help_exports, settings: settings_exports };
   var names3 = { tutorials: "Tutorials", automation: "Recipes & definitions", overview: "Overview", resources: "Resources", scripts: "Text & layout", assets: "Graphics & fonts", levels: "Levels", sound: "Music & sound", tables: "Data tables", playtest: "Playtest", debug: "Investigation", routes: "Routes", regression: "Regression", release: "Export", settings: "Settings", help: "Help" };
   var state = { page: "overview", projects: [], project: null, artifact: null, capabilities: null, drafts: {}, results: {}, pending: null, job: null, runtime: null, frame: null, snapshot: null };
@@ -8052,33 +8153,7 @@ ${font ? `<section class="card"><h3>Font metrics · ${esc(font.id)}</h3><div cla
     run,
     projectParams: () => ({ project_id: state.project.project_id }),
     sourceParams: () => ({ project_id: state.project.project_id, artifact_id: state.artifact.artifact_id }),
-    setArtifact: async (id) => {
-      var _a, _b;
-      rememberLocation();
-      if (((_a = state.artifact) == null ? void 0 : _a.artifact_id) !== id) selectionTicket(state);
-      stopPlayback(state);
-      state.animationPlaying = false;
-      await flushDrafts();
-      if (state.runtime) {
-        await api.call("runtime.close", { project_id: state.project.project_id });
-        state.runtime = null;
-        state.frame = null;
-        state.snapshot = null;
-      }
-      await flushDrafts();
-      clearDraftCache();
-      state.artifact = chooseArtifact(state.project, id);
-      writePreference("romancer-artifact:" + state.project.project_id, ((_b = state.artifact) == null ? void 0 : _b.artifact_id) || "");
-      state.profileFamily = null;
-      state.profileLoadedFamily = null;
-      state.scriptPage = 0;
-      state.assetPage = 0;
-      state.catalogPage = 0;
-      state.catalogQuery = "";
-      state.pending = null;
-      resumeLocation();
-      await render17();
-    }
+    setArtifact: (id) => setArtifactSelection(ctx, id, { rememberLocation, stopPlayback, flushDrafts, clearDraftCache, writePreference, resumeLocation })
   };
   var tutorial = createTutorial({ ...ctx, openProject, closeProject });
   function draftFieldKey(id) {
@@ -8131,8 +8206,8 @@ ${font ? `<section class="card"><h3>Font metrics · ${esc(font.id)}</h3><div cla
   }
   function jobTray() {
     var _a;
-    const job = state.job, active = job && !["COMPLETED", "FAILED", "CANCELLED", "INTERRUPTED"].includes(job.status);
-    return `<div class="job-tray ${active ? "working" : ""}"><div><span class="pulse"></span><strong>${active ? "Working" : (job == null ? void 0 : job.status) === "FAILED" ? "Action failed" : (job == null ? void 0 : job.status) === "CANCELLED" ? "Cancelled" : "Ready"}</strong><span> ${active ? " — " + esc(job.message) : ""}</span></div><div id="workspace-state-host">${workspaceStatus(state, draftWrites.snapshot(), false)}</div>${active ? button("Cancel job", "cancel-job") : `<div class="actions">${((_a = state.tutorial) == null ? void 0 : _a.minimized) ? button("Resume lesson", "tutorial-toggle") : ""}${button("Undo", "draft-undo", { disabled: !historyAvailable(-1), reason: "No earlier edit in the active editor." })}${button("Redo", "draft-redo", { disabled: !historyAvailable(1), reason: "No edit to redo in the active editor." })}</div>`}</div>`;
+    const built = createdBuild(state), job = state.job, active = job && !["COMPLETED", "FAILED", "CANCELLED", "INTERRUPTED"].includes(job.status);
+    return `<div class="job-tray ${active ? "working" : ""}"><div><span class="pulse"></span><strong>${active ? "Working" : (job == null ? void 0 : job.status) === "FAILED" ? "Action failed" : (job == null ? void 0 : job.status) === "CANCELLED" ? "Cancelled" : "Ready"}</strong><span> ${active ? " — " + esc(job.message) : ""}</span></div><div id="workspace-state-host">${workspaceStatus(state, draftWrites.snapshot(), false)}</div>${active ? button("Cancel job", "cancel-job") : `<div class="actions">${built ? button("Playtest build", "playtest-created-build", { id: built.artifact_id, icon: "playtest", primary: true }) : ""}${((_a = state.tutorial) == null ? void 0 : _a.minimized) ? button("Resume lesson", "tutorial-toggle") : ""}${button("Undo", "draft-undo", { disabled: !historyAvailable(-1), reason: "No earlier edit in the active editor." })}${button("Redo", "draft-redo", { disabled: !historyAvailable(1), reason: "No edit to redo in the active editor." })}</div>`}</div>`;
   }
   function updateJob(job) {
     state.job = job;
@@ -8190,16 +8265,17 @@ ${font ? `<section class="card"><h3>Font metrics · ${esc(font.id)}</h3><div cla
     await render17();
   }
   async function navigate(page) {
-    var _a;
+    var _a, _b, _c, _d, _e;
+    const revision = ++navigationRevision, project = (_a = state.project) == null ? void 0 : _a.project_id, artifact = (_b = state.artifact) == null ? void 0 : _b.artifact_id, selection2 = state.selectionRevision;
     rememberLocation();
     stopPlayback(state);
     state.animationPlaying = false;
     await flushDrafts();
-    if (!views[page]) return;
+    if (revision !== navigationRevision || ((_c = state.project) == null ? void 0 : _c.project_id) !== project || ((_d = state.artifact) == null ? void 0 : _d.artifact_id) !== artifact || state.selectionRevision !== selection2 || !views[page]) return false;
     if (page === "settings" && state.page !== "settings") state.settingsReturnPage = state.page;
     state.page = page;
     await render17();
-    (_a = document.getElementById("main")) == null ? void 0 : _a.focus({ preventScroll: true });
+    (_e = document.getElementById("main")) == null ? void 0 : _e.focus({ preventScroll: true });
   }
   async function importDialog() {
     const dropped = state.droppedImportFile;
@@ -8212,6 +8288,7 @@ ${font ? `<section class="card"><h3>Font metrics · ${esc(font.id)}</h3><div cla
   }
   function baseActions() {
     return {
+      "playtest-created-build": (node) => playtestCreatedBuild(ctx, node.dataset.id),
       "error-dismiss": () => {
         state.lastError = null;
         document.getElementById("error-panel").innerHTML = "";
@@ -8300,19 +8377,21 @@ ${font ? `<section class="card"><h3>Font metrics · ${esc(font.id)}</h3><div cla
     };
   }
   async function render17() {
-    var _a, _b, _c, _d, _e, _f, _g, _h, _i, _j, _k, _l;
+    var _a, _b, _c, _d, _e, _f, _g, _h, _i, _j, _k, _l, _m;
     if (((_a = document.getElementById("app")) == null ? void 0 : _a.dataset.startupRecovered) === "true") return;
     rememberLocation();
+    (_b = state.spritePreviewObserver) == null ? void 0 : _b.disconnect();
+    state.spritePreviewObserver = null;
     disposeAudio();
-    (_b = state.soundPlayer) == null ? void 0 : _b.close();
+    (_c = state.soundPlayer) == null ? void 0 : _c.close();
     state.soundPlayer = null;
-    (_c = state.animationClock) == null ? void 0 : _c.stop();
+    (_d = state.animationClock) == null ? void 0 : _d.stop();
     state.animationClock = null;
-    const revision = ++renderRevision, previousScroll = ((_d = document.getElementById("main")) == null ? void 0 : _d.scrollTop) || 0, renderScope = [(_e = state.project) == null ? void 0 : _e.project_id, (_f = state.artifact) == null ? void 0 : _f.artifact_id, state.page].join(":"), details = rememberDetails(document.getElementById("main"));
+    const revision = ++renderRevision, previousScroll = ((_e = document.getElementById("main")) == null ? void 0 : _e.scrollTop) || 0, renderScope = [(_f = state.project) == null ? void 0 : _f.project_id, (_g = state.artifact) == null ? void 0 : _g.artifact_id, state.page].join(":"), details = rememberDetails(document.getElementById("main"));
     actions = baseActions();
     tutorial.bind();
     const project = state.project, artifacts = project ? [...project.sources, ...project.builds] : [];
-    document.getElementById("app").innerHTML = `<div class="shell"><aside class="sidebar"><a class="brand" href="#" data-action="navigate" data-id="overview"><img src="/mark.svg" alt=""><div><strong>ROMancer</strong><small>By RetchEWretched</small></div></a><div class="nav-label">Workspace</div><nav aria-label="Workbench">${["overview", "resources", "debug", "scripts", "assets", "levels", "sound", "playtest", "release"].map((k) => `<button class="nav-item ${state.page === k ? "active" : ""}" data-action="navigate" data-id="${k}" title="${names3[k]}" ${state.page === k ? 'aria-current="page"' : ""}>${icon(k)}<span>${names3[k]}</span></button>`).join("")}<details class="more-tools" ${getSettings().advancedTools || ["tables", "automation", "routes", "regression"].includes(state.page) ? "open" : ""}><summary title="More tools">More tools</summary>${["tables", "automation", "routes", "regression"].map((k) => `<button class="nav-item ${state.page === k ? "active" : ""}" data-action="navigate" data-id="${k}" title="${names3[k]}">${icon(k)}<span>${names3[k]}</span></button>`).join("")}</details></nav><div class="sidebar-bottom"><button class="nav-item" data-action="navigate" data-id="help" title="Help">${icon("shield")}<span>Help</span></button><button class="nav-item" data-action="projects-manage" title="Projects">${icon("folder")}<span>Projects</span></button><button class="nav-item ${state.page === "settings" ? "active" : ""}" data-action="navigate" data-id="settings" title="Settings">${icon("settings")}<span>Settings</span></button><button class="nav-item" data-action="about" title="About ROMancer">${icon("shield")}<span>About</span></button><div class="local-label"><span class="dot"></span>Runs on your computer</div></div></aside><header class="topbar"><div class="project-control">${icon("folder")}<div><small>ACTIVE PROJECT</small><br><select id="project-select" aria-label="Active project"><option value="">Choose a project</option>${state.projects.map((p) => `<option value="${p.project_id}" ${(project == null ? void 0 : project.project_id) === p.project_id ? "selected" : ""}>${esc(p.name)}</option>`).join("")}</select></div>${button("New project", "new-project", { icon: "plus", class: "compact" })}</div>${artifacts.length ? `<div class="project-control source-selector"><div><small>${((_g = state.artifact) == null ? void 0 : _g.kind) === "source" ? "ORIGINAL ROM" : "BUILD"}</small><br><select id="artifact-select" aria-label="Selected source or build">${[["Original ROMs", project.sources], ["Builds", project.builds]].filter(([, rows]) => rows.length).map(([label, rows]) => `<optgroup label="${label}">${rows.map((a) => {
+    document.getElementById("app").innerHTML = `<div class="shell"><aside class="sidebar"><a class="brand" href="#" data-action="navigate" data-id="overview"><img src="/mark.svg" alt=""><div><strong>ROMancer</strong><small>By RetchEWretched</small></div></a><div class="nav-label">Workspace</div><nav aria-label="Workbench">${["overview", "resources", "debug", "scripts", "assets", "levels", "sound", "playtest", "release"].map((k) => `<button class="nav-item ${state.page === k ? "active" : ""}" data-action="navigate" data-id="${k}" title="${names3[k]}" ${state.page === k ? 'aria-current="page"' : ""}>${icon(k)}<span>${names3[k]}</span></button>`).join("")}<details class="more-tools" ${getSettings().advancedTools || ["tables", "automation", "routes", "regression"].includes(state.page) ? "open" : ""}><summary title="More tools">More tools</summary>${["tables", "automation", "routes", "regression"].map((k) => `<button class="nav-item ${state.page === k ? "active" : ""}" data-action="navigate" data-id="${k}" title="${names3[k]}">${icon(k)}<span>${names3[k]}</span></button>`).join("")}</details></nav><div class="sidebar-bottom"><button class="nav-item" data-action="navigate" data-id="help" title="Help">${icon("shield")}<span>Help</span></button><button class="nav-item" data-action="projects-manage" title="Projects">${icon("folder")}<span>Projects</span></button><button class="nav-item ${state.page === "settings" ? "active" : ""}" data-action="navigate" data-id="settings" title="Settings">${icon("settings")}<span>Settings</span></button><button class="nav-item" data-action="about" title="About ROMancer">${icon("shield")}<span>About</span></button><div class="local-label"><span class="dot"></span>Runs on your computer</div></div></aside><header class="topbar"><div class="project-control">${icon("folder")}<div><small>ACTIVE PROJECT</small><br><select id="project-select" aria-label="Active project"><option value="">Choose a project</option>${state.projects.map((p) => `<option value="${p.project_id}" ${(project == null ? void 0 : project.project_id) === p.project_id ? "selected" : ""}>${esc(p.name)}</option>`).join("")}</select></div>${button("New project", "new-project", { icon: "plus", class: "compact" })}</div>${artifacts.length ? `<div class="project-control source-selector"><div><small>${((_h = state.artifact) == null ? void 0 : _h.kind) === "source" ? "ORIGINAL ROM" : "BUILD"}</small><br><select id="artifact-select" aria-label="Selected source or build">${[["Original ROMs", project.sources], ["Builds", project.builds]].filter(([, rows]) => rows.length).map(([label, rows]) => `<optgroup label="${label}">${rows.map((a) => {
       var _a2;
       return `<option value="${a.artifact_id}" ${((_a2 = state.artifact) == null ? void 0 : _a2.artifact_id) === a.artifact_id ? "selected" : ""}>${esc(a.name)}</option>`;
     }).join("")}</optgroup>`).join("")}</select></div></div>` : ""}<label class="search">${icon("search")}<input id="global-search" placeholder="Search workspace" aria-label="Search workspace"><kbd>Ctrl K</kbd><button type="button" data-action="workspace-search" aria-label="Run workspace search" class="search-go">Go</button></label></header><main id="main" tabindex="-1"><div class="loading">Opening ${names3[state.page]}…</div></main>${jobTray()}${tutorial.panel()}</div>`;
@@ -8343,17 +8422,17 @@ ${font ? `<section class="card"><h3>Font metrics · ${esc(font.id)}</h3><div cla
       html = `${heading("Workspace", names3[state.page], "")}<div class="card"><p class="error">${esc(error.message)}</p>${button("Return to overview", "navigate", { id: "overview" })}</div>`;
     }
     if (revision !== renderRevision) return;
-    if (((_h = document.getElementById("app")) == null ? void 0 : _h.dataset.startupRecovered) === "true") return;
+    if (((_i = document.getElementById("app")) == null ? void 0 : _i.dataset.startupRecovered) === "true") return;
     document.getElementById("main").innerHTML = `<div id="error-panel">${errorNotice()}</div>` + html;
     if (lastRenderedScope === renderScope) restoreDetails(document.getElementById("main"), details);
-    await ((_i = view.mount) == null ? void 0 : _i.call(view, ctx));
+    await ((_j = view.mount) == null ? void 0 : _j.call(view, ctx));
     tutorial.mount();
     updateWorkspaceStatus();
     document.getElementById("main").scrollTop = retainedScroll(lastRenderedScope, renderScope, previousScroll);
     lastRenderedScope = renderScope;
     const main = document.getElementById("main");
     main.dataset.locationScope = renderScope;
-    const identity2 = [(_j = state.project) == null ? void 0 : _j.project_id, (_k = state.artifact) == null ? void 0 : _k.artifact_id, (_l = state.artifact) == null ? void 0 : _l.sha256].join(":");
+    const identity2 = [(_k = state.project) == null ? void 0 : _k.project_id, (_l = state.artifact) == null ? void 0 : _l.artifact_id, (_m = state.artifact) == null ? void 0 : _m.sha256].join(":");
     if (state.resumeIdentity === identity2 && state.resumeScroll !== void 0) {
       main.scrollTop = state.resumeScroll;
       delete state.resumeScroll;
@@ -8380,7 +8459,7 @@ ${font ? `<section class="card"><h3>Font metrics · ${esc(font.id)}</h3><div cla
   });
   document.addEventListener("input", (event) => {
     if (shouldSaveField(event.target)) {
-      state.pending = null;
+      if (event.target.id !== "sprite-zoom") state.pending = null;
       saveDraft(event.target.id, event.target.value);
     }
   });
@@ -8471,13 +8550,15 @@ ${font ? `<section class="card"><h3>Font metrics · ${esc(font.id)}</h3><div cla
     }
   });
   window.addEventListener("pagehide", () => {
-    var _a, _b;
+    var _a, _b, _c;
     clearTimeout(locationTimer);
     rememberLocation();
+    (_a = state.spritePreviewObserver) == null ? void 0 : _a.disconnect();
+    state.spritePreviewObserver = null;
     stopPlayback(state);
     disposeAudio();
-    (_a = state.soundPlayer) == null ? void 0 : _a.close();
-    (_b = state.animationClock) == null ? void 0 : _b.stop();
+    (_b = state.soundPlayer) == null ? void 0 : _b.close();
+    (_c = state.animationClock) == null ? void 0 : _c.stop();
   });
   document.getElementById("modal").addEventListener("cancel", (event) => {
     if (document.getElementById("tutorial-never")) {

@@ -4,10 +4,12 @@
   "sources": {
     "romancer/ui/animation_studio.js": "e476a432518c32367106f6ff35885f519b4e632fa12af31187231fd377e313a5",
     "romancer/ui/api.js": "f70ef8ff761597611651f49266ccf785d799923ec4a11e28a3ca1b6b39d40688",
-    "romancer/ui/app.js": "047b15d250d486d889660f45a2ea4dae658f7262f267bdd1b082f59d42e97adc",
+    "romancer/ui/app.js": "791daeb95f8b6740d12f049b0d54fc8f978fe65ab95cf796915f08acba1fc376",
     "romancer/ui/app_settings.js": "3d5a4acd1b898120e707bbb78751cf1a63c7da89e83d230b053c7e4f0aed369e",
+    "romancer/ui/artifact_selection.js": "93d7dc00ed13d7f40eba4ef77f63aab4def3276a0336151d4662d5aca255f168",
     "romancer/ui/asset_controls.js": "1df6ee0f5b41edc370c95ac1af9b52aab1e61036fb819da2e6dec491dc98aa1b",
     "romancer/ui/audio_live.js": "acc32da345590382153d3e21eb8194695ad1012726d8cf5ed00594f31fdd92af",
+    "romancer/ui/build_handoff.js": "a073386d63ded27059d0f09fdb8b91494e43f2302caa1ed94f551f7b10b2d48c",
     "romancer/ui/build_history.js": "b76ff0c10ddb985505100f4e66ea5e54fa6e46c2cb1ae4f6ca2a2bfc9844992d",
     "romancer/ui/cartridge_verification.js": "1ed8c68b3615d8d74c5e4bfa0ec7b8b2bb2666f156b441a7d69964ac96ce093e",
     "romancer/ui/cheat_clues.js": "74d3b4dc912bba39f3d7bc7ae54ccb19b3ef087f3153781ee10bc41d998d8dab",
@@ -31,6 +33,7 @@
     "romancer/ui/level_canvas.js": "056852b507f07b6b450a206f42a27889d84d0408c2806246eb95e619a47d7434",
     "romancer/ui/memory_watches.js": "5a9a271484eacc58d8c350d2e6acf93a03a0a977b887a3a8b12cd160a672fe51",
     "romancer/ui/menu_preview.js": "df2ce74e3d6ace99a7a9e3f64b0c8202578b0bd3b4e227b4d4acaa5fa7c9695c",
+    "romancer/ui/overview_tasks.js": "5f4d4fc9190eb067cc38287fc36ea2e1662ec9bed0a43c8e4ba8e40da737aecb",
     "romancer/ui/palette_editor.js": "a5cb2900c647def8fc1cb15d41ad7c4f3ce79d01390b15718e42d3f109ed98ae",
     "romancer/ui/patch_controls.js": "85e25281a340a7331a826eeed55f761fb6f666c181ea6934ae30ed6bc529dad9",
     "romancer/ui/pixel_history.js": "838c1855a12394b993e003e0e1c6e63eca1aec82bdef403726baafcf839c6dc1",
@@ -51,7 +54,7 @@
     "romancer/ui/shortcuts.js": "8f95a5eb596dffdda3b329b371d2c204c66769e2ad550828f1684fd2d063b764",
     "romancer/ui/sound_preview.js": "615925c12c69b0e4170967536abb842adc78f580a1cbf8025c77a6815abfe252",
     "romancer/ui/source_support.js": "616f285cc217f5b43d07e3ebc1afc870a5ca638cfbb651eab4e49f1e2b39c475",
-    "romancer/ui/sprite_assembly.js": "98fc8d2561a9e7594d70c528a8c19a0b369d326372376c94ec07db34c08d59e0",
+    "romancer/ui/sprite_assembly.js": "3a193db1afa1cf5406a0e729cc8c26c2f7f6f8f936fd1ed9abef8dfb312b05da",
     "romancer/ui/structural_lab.js": "1e228a48e485b55f972b913c6796115532c3b68bed34473091fc7c07b2806951",
     "romancer/ui/tilemap_editor.js": "1a82ccf1cc88bcfa4ee6ce89ca13d7343753ead6d5cfe5c5ebc8fdf106db1b3e",
     "romancer/ui/tool_help.js": "02205ba7b270e6ef25c965771cef38afad0977318dc1e80e820107b8cc86970a",
@@ -65,7 +68,7 @@
     "romancer/ui/views/debug.js": "2c4271e8f0239552cbea966d6c6d089c4e9735414676d3d36d4e6ca0733d1036",
     "romancer/ui/views/help.js": "f8a213bef5f6d69a173cc18dc8260b717062a9969617a3c01b675881a8c4fefe",
     "romancer/ui/views/levels.js": "8a3a69f7f11c7b86cd97c8237887798956978855d1a6ad2aa9c3f10ab9899af7",
-    "romancer/ui/views/overview.js": "bb18ee1e145c70dd4b566f55282fce5f806cac4bf2bb4552163c3a338c592c4a",
+    "romancer/ui/views/overview.js": "b65005c605c35e8667801c134e7ccca744252372f937f9abeee94eacc7d04a70",
     "romancer/ui/views/playtest.js": "994a269703e1deb8aa34f83fc28df9b485afbe65345306e019843852b6314444",
     "romancer/ui/views/regression.js": "7a12aabc0106f732f660358e6811d913c5cf35844edac22ab23c9f02867e3ff2",
     "romancer/ui/views/release.js": "de29655328d3e5c38a15c30420518fb7c88f6eae46ed694ec23d73bc8b11e12c",
@@ -81,5 +84,5 @@
     "romancer/ui/workspace_resume.js": "a2b946a51d67fb470e6821205faac6d2521a0f24a0ad4611dd7134a0ba879ee7",
     "romancer/ui/workspace_status.js": "36ab851ac108b56ae4bdc1274eb52b62139397c83c90c18ca5efc9767dc5172c"
   },
-  "sha256": "5c63555866d31f5ff3540366ce29026ada77dd43b549a82777fab68225a3f0e6"
+  "sha256": "82c7ef30326c5cba10d26a7bcda3d9ca357a8191b6fc7ac94fcf06bc16b82fcf"
 }

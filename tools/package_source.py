@@ -150,6 +150,7 @@ APPROVED_FILES = frozenset(ROOT_FILES | {
 
 
 APPROVED_FILES = APPROVED_FILES | frozenset({
+    'romancer/ui/artifact_selection.js','tests/ui_artifact_selection.mjs','romancer/ui/build_handoff.js','romancer/ui/overview_tasks.js','tests/ui_build_handoff.mjs','tests/ui_overview_tasks.mjs','tests/ui_sprite_zoom.mjs','tests/ui_guide_search.mjs','user-guide/guide.js',
     'romancer/observation_series.py','romancer/investigation_tools.py',
     'romancer/native_debugger.py','romancer/debugger_protocol.py','romancer/debugger_capture.lua',
     'romancer/debugger_tools.py','tests/test_debugger_tools.py',
@@ -191,7 +192,7 @@ APPROVED_FILES = APPROVED_FILES | frozenset({
         '09-playtest-states','10-verified-patch','11-hex-inspection','12-tutorials',
         '13-settings','14-light-theme','15-dark-theme','16-connected-rooms',
         '17-object-inspector','18-byte-explanation','19-chrono-armor','20-ffl2-map-browser','21-game-knowledge',
-        '22-engine-recognition','23-address-domains','24-code-references','25-cartridge-verification','26-mod-byte-comparison','27-crc-mismatch','28-text-overflow','29-audio-preview','30-project-recovery','26-universal-value-series','27-native-access-capture','28-native-source-context','29-structural-experiments','30-generated-table-editor','31-debugger-preparation','32-data-relocation','33-moved-table','34-menu-contrast','35-first-workshop-edit','36-patch-compatibility-preview')),
+        '22-engine-recognition','23-address-domains','24-code-references','25-cartridge-verification','26-mod-byte-comparison','27-crc-mismatch','28-text-overflow','29-audio-preview','30-project-recovery','26-universal-value-series','27-native-access-capture','28-native-source-context','29-structural-experiments','30-generated-table-editor','31-debugger-preparation','32-data-relocation','33-moved-table','34-menu-contrast','35-first-workshop-edit','36-patch-compatibility-preview','37-task-workspace','38-sprite-preview','39-build-handoff','40-light-workspace','41-guide-search')),
 })
 
 

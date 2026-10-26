@@ -60,13 +60,17 @@ passing the included checks does not certify every game.
 USER GUIDE
 
 Help -> User guide opens the included offline manual. It contains Basic and Advanced
-workflows, actual editing screenshots, a linked glossary and an alphabetical index.
+workflows, actual editing screenshots, offline topic search, a linked glossary and an
+alphabetical index. Search the HTML guide by tool, task or unfamiliar term.
 The source and Windows packages also include user-guide/index.html and guide.pdf
 (inside app/user-guide in the Windows package). Keep the screenshots folder with it.
 
 New users can follow the complete original NES-workshop exercise: edit one pixel,
 create a build, test it, and reconstruct it from a patch. No commercial ROM is
-needed for practice. The guide also includes a checked MCP editing example and
+needed for practice. Overview offers task shortcuts. Sprite previews offer Fit and
+8x/16x/32x viewing sizes; these do not resize the stored graphics. After creating
+a build, Playtest build selects that recorded output and opens Playtest.
+The guide also includes a checked MCP editing example and
 a checklist for testing and sharing a hack.
 
 The default 100% app size now matches the earlier 75% layout. Browser zoom can stay

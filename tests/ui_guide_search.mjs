@@ -1,0 +1,11 @@
+import assert from 'node:assert/strict';
+import {readFile} from 'node:fs/promises';
+import vm from 'node:vm';
+const sandbox={};vm.createContext(sandbox);vm.runInContext(await readFile(new URL('../user-guide/guide.js',import.meta.url),'utf8'),sandbox);
+const docs=[{id:'palette',title:'Adjust colors',text:'Edit palettes and preview colors',aliases:'palette color'}, {id:'states',title:'Save states',text:'Save and load emulator states',aliases:'save game'}, {id:'gloss',title:'Palette',text:'A collection of colors',aliases:''}];
+const find=q=>sandbox.romancerGuideMatches(docs,q,12);
+assert.equal(find('palette')[0].id,'gloss','title matches rank first');
+assert.equal(find('load states')[0].id,'states');assert.equal(find('states colors').length,0);
+assert.equal(find('  SAVE  ')[0].id,'states');assert.equal(find('').length,0);assert.equal(find('<img src=x>').length,0);
+assert.equal(sandbox.romancerGuideMatches(docs,'colors',1).length,1);
+console.log('Offline help search matches all tokens, aliases and titles without evaluating input.');
