@@ -1385,13 +1385,181 @@
         "term-evidence",
         "term-revision"
       ]
+    },
+    {
+      "id": "code-references",
+      "title": "Use documented codes to find investigation leads",
+      "part": "Advanced",
+      "kicker": "LOCAL REFERENCES / READ-ONLY ANALYSIS",
+      "intro": "A documented code can narrow a search. Its published effect label is a claim to test, and its CPU address still needs a valid mapping to the selected ROM.",
+      "steps": [
+        "In <b>Resources</b>, expand <b>ROM health & revision</b>, then <b>Code reference catalog</b>. Choose a local UTF-8 TXT, JSON, JSONL, CSV or TSV catalog and click <b>Import code references</b>. This replaces the project’s reference catalog; it does not edit the ROM.",
+        "Choose <b>Inspect matching references</b>. Search an effect label or code and use Previous/Next for additional pages. Required + combinations and / revision alternatives remain distinct.",
+        "Read the revision status. MATCHED compares supplied hashes with the root source; MISMATCH has no mapped locations. UNSPECIFIED usually means title-only selection. Even a hash match does not verify the effect label.",
+        "Use <b>Inspect</b> beside a decoded location to open its bytes. Compare bytes can eliminate incompatible candidates, but a switchable-bank candidate does not establish the active bank. Do not turn an incomplete or truncated combination into a patch."
+      ],
+      "result": "You can follow a source-attributed clue to actual bounded ROM bytes without silently activating a cheat or trusting another game’s offsets.",
+      "note": "Game Genie decoding covers NES, SNES, Genesis, GB and GBC only. GBA codes use other formats and are not decoded here. Hardware overlays, unknown mappers and unsupported codes remain unresolved. Keep the original local catalog for full provenance when a result is shortened.",
+      "related": [
+        "checks",
+        "debug",
+        "game-knowledge",
+        "mcp"
+      ],
+      "terms": [
+        "term-code-reference",
+        "term-compare-byte",
+        "term-bank",
+        "term-evidence"
+      ],
+      "image": "24-code-references",
+      "caption": "Actual Castlevania reference inspection: one code has no compatible compare byte, while another links to a matching stored byte. Effect labels remain unverified.",
+      "image_layout": "following-page",
+      "visual_page": {
+        "title": "Use documented codes to find investigation leads / actual interface",
+        "kicker": "Advanced / actual application capture",
+        "intro": "Castlevania: an incompatible code is rejected; a matching compare byte links to the actual ROM location.",
+        "panels": [
+          {
+            "image": "24-code-references",
+            "title": "Use documented codes to find investigation leads",
+            "x": 48,
+            "top": 846,
+            "width": 1170,
+            "crop": [
+              180,
+              60,
+              1390,
+              860
+            ],
+            "caption": "Unaltered full-resolution capture is linked in the offline HTML edition."
+          }
+        ]
+      },
+      "details": [
+        {
+          "title": "Mixed extracts and duplicate references",
+          "text": "A composite text file may include both publication and community sections. Explicit Game Genie and Action Replay labels stay separate. Unsupported Action Replay records remain reference data without decoded ROM locations. Duplicate publication/community entries retain their own provenance; the record count is not a count of unique, tested effects."
+        }
+      ]
+    },
+    {
+      "id": "engine-recognition",
+      "title": "Inspect a shared engine without known game offsets",
+      "part": "Advanced",
+      "kicker": "AUTOMATIC SCAN / STRUCTURAL EVIDENCE",
+      "intro": "The GBA recognizer follows a supported THUMB instruction pattern and validates linked player, song-header and track-pointer structures. It does not look up a Wario Land 4 address.",
+      "steps": [
+        "Let deep scan finish, or choose <b>Rescan ROM</b>. Expand <b>Recognized data structures</b> in the ROM investigation panel when a finding is available.",
+        "Read the engine family, linked-record count and source reference. <b>View Song table</b> and the other location buttons open the actual file bytes used by this finding.",
+        "Separate a recognized structure from editing support. This recognizer checks one straight-line M4A-compatible loader and a bounded table ending at its first referenced header. Other drivers, compiler variants or table placements can be missed.",
+        "An ambiguous result selects no table. A work-budget result reports no complete finding. A no-match result does not prove that the engine is absent. Use a checked sample/sequence definition before editing music."
+      ],
+      "result": "A supported shared format supplies useful locations even when a game-specific offset is unavailable.",
+      "note": "Engine version, full sequence control flow, playback correctness, instruments and safe relocation are not certified. The current detector validates track bounds and a supported initial command, rather than interpreting every song. It does not create an editable commercial-game music definition.",
+      "related": [
+        "sound",
+        "resources",
+        "game-knowledge",
+        "mcp"
+      ],
+      "terms": [
+        "term-driver",
+        "term-evidence",
+        "term-pointer"
+      ],
+      "image": "22-engine-recognition",
+      "caption": "Actual Wario Land 4 deep-scan result: independently located song and player tables, with 819 entries and structural evidence.",
+      "image_layout": "following-page",
+      "visual_page": {
+        "title": "Inspect a shared engine without known game offsets / actual interface",
+        "kicker": "Advanced / actual application capture",
+        "intro": "Actual Wario Land 4 deep-scan result: independently located song and player tables, with 819 entries and structural evidence.",
+        "panels": [
+          {
+            "image": "22-engine-recognition",
+            "title": "Inspect a shared engine without known game offsets",
+            "x": 48,
+            "top": 846,
+            "width": 1170,
+            "crop": [
+              180,
+              60,
+              1390,
+              860
+            ],
+            "caption": "Unaltered full-resolution capture is linked in the offline HTML edition."
+          }
+        ]
+      }
+    },
+    {
+      "id": "hardware-addresses",
+      "title": "Understand an address before investigating it",
+      "part": "Advanced",
+      "kicker": "HARDWARE HELP / SEPARATE ADDRESS DOMAINS",
+      "intro": "A CPU address, file offset and video-memory offset can have the same number and refer to different things. Hardware help explains the region without pretending to know a game variable.",
+      "steps": [
+        "Open <b>More tools > Troubleshooting</b> and expand <b>Hardware & address help</b>. A completed ROM scan supplies the CPU, byte-order convention, graphics layout and mapping notes for the selected system.",
+        "Choose the address domain, enter a decimal or 0x hexadecimal value, and click <b>Explain address</b>. NES PPU, physical VRAM and SNES audio CPU domains are separate choices only where supported.",
+        "Read the region and its conditions. A GB cartridge window may contain RTC registers; a SNES audio port is not audio RAM; Genesis sound RAM requires bus arbitration. Register descriptions never read or write the hardware.",
+        "For a persistent ROM edit, use Address explorer with a checked mapping, including the physical bank and header offset. A core’s exposed-memory offset also needs an established mapping before treating it as a CPU address."
+      ],
+      "result": "You can tell a plausible ROM location from RAM, graphics storage, a device port or an unresolved board-dependent range.",
+      "note": "To investigate a changing stat, reproduce one controlled change, narrow its RAM candidates, and establish the writer and immutable source in a debugger that exposes those events. ROMancer’s snapshots do not provide instruction breakpoints or prove causation. Unexecuted bytes and repeated FF/00 runs do not establish free space.",
+      "related": [
+        "debug",
+        "investigation",
+        "resources",
+        "checks"
+      ],
+      "terms": [
+        "term-address-domain",
+        "term-mapping",
+        "term-offset",
+        "term-evidence"
+      ],
+      "image": "23-address-domains",
+      "caption": "Actual GBA hardware help: CPU 0x06000000 is video memory, alongside the separate live-value investigation tools.",
+      "image_layout": "following-page",
+      "visual_page": {
+        "title": "Understand an address before investigating it / actual interface",
+        "kicker": "Advanced / actual application capture",
+        "intro": "Actual GBA hardware help: CPU 0x06000000 is video memory, alongside the separate live-value investigation tools.",
+        "panels": [
+          {
+            "image": "23-address-domains",
+            "title": "Understand an address before investigating it",
+            "x": 48,
+            "top": 846,
+            "width": 1170,
+            "crop": [
+              180,
+              60,
+              1390,
+              860
+            ],
+            "caption": "Unaltered full-resolution capture is linked in the offline HTML edition."
+          }
+        ]
+      }
     }
   ],
   "glossary": [
     {
+      "id": "term-address-domain",
+      "term": "Address domain",
+      "definition": "The coordinate system of an address, such as CPU bus, ROM file bytes, PPU memory or physical VRAM. Conversion needs an established mapping and sometimes runtime bank state."
+    },
+    {
       "id": "term-allocation",
       "term": "Allocation",
       "definition": "The confirmed storage extent available to a resource. A larger encoded result must not overwrite neighboring data."
+    },
+    {
+      "id": "term-arrival",
+      "term": "Arrival record",
+      "definition": "A game-specific destination record, often containing a room reference, coordinates and packed flags. It is distinct from the trigger that selects it."
     },
     {
       "id": "term-artifact",
@@ -1444,9 +1612,9 @@
       "definition": "A possible resource or structural match that requires confirmation. Plausible text or pixels are not proof of game semantics."
     },
     {
-      "id": "term-checksum",
-      "term": "Console checksum",
-      "definition": "A system-specific integrity field stored in some ROMs. It differs from a measured whole-file CRC32 or SHA-256 identity."
+      "id": "term-code-reference",
+      "term": "Code reference",
+      "definition": "An imported code and published effect label used as an investigation lead. Decoding an address and value does not independently verify the label or activate a cheat."
     },
     {
       "id": "term-codec",
@@ -1457,6 +1625,16 @@
       "id": "term-collision",
       "term": "Collision",
       "definition": "Data or game behavior controlling movement and contact. Visual terrain does not by itself establish collision semantics."
+    },
+    {
+      "id": "term-compare-byte",
+      "term": "Compare byte",
+      "definition": "An original byte encoded by some replacement codes. It can reject incompatible candidate locations but cannot by itself establish the active bank or prove the effect."
+    },
+    {
+      "id": "term-checksum",
+      "term": "Console checksum",
+      "definition": "A system-specific integrity field stored in some ROMs. It differs from a measured whole-file CRC32 or SHA-256 identity."
     },
     {
       "id": "term-control",
@@ -1479,9 +1657,19 @@
       "definition": "Delimited text formats used for translation sheets and catalogs. Preserve stable IDs, quoting, columns and the selected delimiter."
     },
     {
+      "id": "term-connection",
+      "term": "Declared connection",
+      "definition": "An explicit mapping from one stored exit-field value to a declared room ID. It supports editor navigation; it does not prove a game executes a door transition."
+    },
+    {
       "id": "term-declared",
       "term": "Declared definition",
       "definition": "An explicitly supplied description of storage, fields, mappings and limits. It is not automatically independent proof of game meaning. Names and editor relationships remain declarations until their runtime consumers are established."
+    },
+    {
+      "id": "term-ownership",
+      "term": "Destination ownership",
+      "definition": "Evidence that a destination allocation belongs to the resource being moved and can be written without overwriting other data. A repeated fill pattern is not that evidence."
     },
     {
       "id": "term-draft",
@@ -1529,6 +1717,11 @@
       "definition": "Information supported by the recorded verification for a stated scope. A revision match is not exhaustive gameplay verification."
     },
     {
+      "id": "term-layer",
+      "term": "Layer",
+      "definition": "A selectable view or declared editing plane. Terrain, raw collision values and object slots describe different information; hiding a visual overlay does not establish new game semantics."
+    },
+    {
       "id": "term-mapping",
       "term": "Mapping",
       "definition": "A declared relationship between file offsets and system addresses. Bank-switched or special hardware needs additional information."
@@ -1542,6 +1735,11 @@
       "id": "term-metatile",
       "term": "Metatile",
       "definition": "A block made from several tiles. Many room cells can reference one block, so changing its parts can affect many uses."
+    },
+    {
+      "id": "term-metadata",
+      "term": "Object metadata",
+      "definition": "Optional per-slot index, name, role and declared reference annotations. Metadata does not replace the checked record layout or establish actor/event behavior."
     },
     {
       "id": "term-offset",
@@ -1574,6 +1772,11 @@
       "definition": "A stored value interpreted through a declared mapping. A linear pointer base does not establish a bank-switched CPU address. Relocation also needs the complete set of affected pointer obligations and representable destination values."
     },
     {
+      "id": "term-preferences",
+      "term": "Preferences",
+      "definition": "Saved application choices for appearance, startup, automatic analysis and audio. Apply or OK persists them; a theme or volume change does not edit ROM data."
+    },
+    {
       "id": "term-record",
       "term": "Record",
       "definition": "One entry in a declared table or script. A row ID is not automatically a known in-game item or character name."
@@ -1594,6 +1797,11 @@
       "definition": "A recorded or declared sequence of inputs and assertions for a particular native setup and starting condition."
     },
     {
+      "id": "term-state",
+      "term": "Save state",
+      "definition": "An emulator snapshot tied to exact ROM, engine and setup identities. It is different from persistent battery save data."
+    },
+    {
       "id": "term-scope",
       "term": "Scope",
       "definition": "The exact bytes, scene, route or format a claim covers. Whole-file and cartridge-payload hashes use different scopes."
@@ -1604,19 +1812,24 @@
       "definition": "An exact content identity used to bind sources, plans, builds and evidence to the bytes they concern."
     },
     {
+      "id": "term-shared-resource",
+      "term": "Shared resource",
+      "definition": "One stored byte range referenced by several rooms, objects, difficulties or scenes. An edit can affect every use."
+    },
+    {
       "id": "term-driver",
       "term": "Sound driver",
       "definition": "Game-specific code that interprets music and sound data. Knowing the console hardware does not identify its command grammar."
     },
     {
-      "id": "term-state",
-      "term": "Save state",
-      "definition": "An emulator snapshot tied to exact ROM, engine and setup identities. It is different from persistent battery save data."
-    },
-    {
       "id": "term-stride",
       "term": "Stride",
       "definition": "The number of bytes from one table record to the next. Each field has its own offset within a record."
+    },
+    {
+      "id": "term-theme",
+      "term": "Theme",
+      "definition": "The application color treatment. ROMancer is the default; Dark uses neutral graphite and Light uses a readable white surface. Themes do not modify the game palette."
     },
     {
       "id": "term-tile",
@@ -1627,54 +1840,33 @@
       "id": "term-tilemap",
       "term": "Tilemap",
       "definition": "A grid of references to tiles, sometimes including palette banks or flip bits. Its storage format must be established."
-    },
-    {
-      "id": "term-preferences",
-      "term": "Preferences",
-      "definition": "Saved application choices for appearance, startup, automatic analysis and audio. Apply or OK persists them; a theme or volume change does not edit ROM data."
-    },
-    {
-      "id": "term-theme",
-      "term": "Theme",
-      "definition": "The application color treatment. ROMancer is the default; Dark uses neutral graphite and Light uses a readable white surface. Themes do not modify the game palette."
-    },
-    {
-      "id": "term-layer",
-      "term": "Layer",
-      "definition": "A selectable view or declared editing plane. Terrain, raw collision values and object slots describe different information; hiding a visual overlay does not establish new game semantics."
-    },
-    {
-      "id": "term-connection",
-      "term": "Declared connection",
-      "definition": "An explicit mapping from one stored exit-field value to a declared room ID. It supports editor navigation; it does not prove a game executes a door transition."
-    },
-    {
-      "id": "term-metadata",
-      "term": "Object metadata",
-      "definition": "Optional per-slot index, name, role and declared reference annotations. Metadata does not replace the checked record layout or establish actor/event behavior."
-    },
-    {
-      "id": "term-ownership",
-      "term": "Destination ownership",
-      "definition": "Evidence that a destination allocation belongs to the resource being moved and can be written without overwriting other data. A repeated fill pattern is not that evidence."
-    },
-    {
-      "id": "term-shared-resource",
-      "term": "Shared resource",
-      "definition": "One stored byte range referenced by several rooms, objects, difficulties or scenes. An edit can affect every use."
-    },
-    {
-      "id": "term-arrival",
-      "term": "Arrival record",
-      "definition": "A game-specific destination record, often containing a room reference, coordinates and packed flags. It is distinct from the trigger that selects it."
     }
   ],
   "index": [
+    {
+      "term": "Address domains",
+      "topics": [
+        "hardware-addresses",
+        "debug"
+      ]
+    },
     {
       "term": "Address translation",
       "topics": [
         "debug",
         "hex-editor"
+      ]
+    },
+    {
+      "term": "Advanced synthetic layout practice",
+      "topics": [
+        "connections"
+      ]
+    },
+    {
+      "term": "Advanced tools visibility",
+      "topics": [
+        "settings"
       ]
     },
     {
@@ -1697,9 +1889,28 @@
       ]
     },
     {
+      "term": "Apply, OK and Cancel",
+      "topics": [
+        "settings"
+      ]
+    },
+    {
+      "term": "Arrival records",
+      "topics": [
+        "game-maps"
+      ]
+    },
+    {
       "term": "Assertions",
       "topics": [
         "regression"
+      ]
+    },
+    {
+      "term": "Audio CPU address space",
+      "topics": [
+        "hardware-addresses",
+        "sound"
       ]
     },
     {
@@ -1707,6 +1918,20 @@
       "topics": [
         "sound",
         "play"
+      ]
+    },
+    {
+      "term": "Auto deep scan on ROM load",
+      "topics": [
+        "settings",
+        "resources"
+      ]
+    },
+    {
+      "term": "Automatic graphics analysis",
+      "topics": [
+        "settings",
+        "resources"
       ]
     },
     {
@@ -1755,6 +1980,13 @@
       ]
     },
     {
+      "term": "Byte explanations",
+      "topics": [
+        "investigation",
+        "hex-editor"
+      ]
+    },
+    {
       "term": "Candidate discoveries",
       "topics": [
         "resources"
@@ -1780,15 +2012,35 @@
       ]
     },
     {
+      "term": "Collision values and layers",
+      "topics": [
+        "room",
+        "levels"
+      ]
+    },
+    {
       "term": "Color picker",
       "topics": [
         "palettes"
       ]
     },
     {
+      "term": "Compare bytes",
+      "topics": [
+        "code-references",
+        "debug"
+      ]
+    },
+    {
       "term": "Compression",
       "topics": [
         "compression"
+      ]
+    },
+    {
+      "term": "Connected rooms",
+      "topics": [
+        "connections"
       ]
     },
     {
@@ -1825,9 +2077,30 @@
       ]
     },
     {
+      "term": "Dark and Light themes",
+      "topics": [
+        "settings",
+        "settings-appearance"
+      ]
+    },
+    {
       "term": "Data tables",
       "topics": [
         "tables"
+      ]
+    },
+    {
+      "term": "Declared connections",
+      "topics": [
+        "connections",
+        "investigation"
+      ]
+    },
+    {
+      "term": "Decoded room terrain",
+      "topics": [
+        "room",
+        "levels"
       ]
     },
     {
@@ -1842,6 +2115,18 @@
       "term": "Delete and Trash",
       "topics": [
         "projects"
+      ]
+    },
+    {
+      "term": "Destination ownership",
+      "topics": [
+        "compression"
+      ]
+    },
+    {
+      "term": "Destination room picker",
+      "topics": [
+        "connections"
       ]
     },
     {
@@ -1884,6 +2169,12 @@
       ]
     },
     {
+      "term": "FFL2 real map catalog",
+      "topics": [
+        "game-maps"
+      ]
+    },
+    {
       "term": "File offsets",
       "topics": [
         "hex-editor",
@@ -1901,6 +2192,12 @@
       "topics": [
         "gbc-colors",
         "resources"
+      ]
+    },
+    {
+      "term": "Game Genie references",
+      "topics": [
+        "code-references"
       ]
     },
     {
@@ -1923,6 +2220,13 @@
       ]
     },
     {
+      "term": "Hillside and Courtyard Advanced practice",
+      "topics": [
+        "connections",
+        "levels"
+      ]
+    },
+    {
       "term": "Import ROM",
       "topics": [
         "start"
@@ -1932,6 +2236,12 @@
       "term": "Installation and portable ZIP",
       "topics": [
         "install"
+      ]
+    },
+    {
+      "term": "Interface size and 100%",
+      "topics": [
+        "settings"
       ]
     },
     {
@@ -1954,6 +2264,13 @@
       ]
     },
     {
+      "term": "Layers and grid",
+      "topics": [
+        "room",
+        "levels"
+      ]
+    },
+    {
       "term": "Layouts and pointers",
       "topics": [
         "text-layout",
@@ -1967,6 +2284,12 @@
       ]
     },
     {
+      "term": "Levels and sound definition exchange",
+      "topics": [
+        "recipes"
+      ]
+    },
+    {
       "term": "MCP permissions",
       "topics": [
         "mcp",
@@ -1977,6 +2300,12 @@
       "term": "Memory watches",
       "topics": [
         "debug"
+      ]
+    },
+    {
+      "term": "Metatile brush thumbnails",
+      "topics": [
+        "levels"
       ]
     },
     {
@@ -1999,10 +2328,34 @@
       ]
     },
     {
+      "term": "Named equipment and enemies",
+      "topics": [
+        "tables"
+      ]
+    },
+    {
+      "term": "Named object inspector",
+      "topics": [
+        "connections"
+      ]
+    },
+    {
+      "term": "Object metadata and roles",
+      "topics": [
+        "connections"
+      ]
+    },
+    {
       "term": "Original and edited previews",
       "topics": [
         "sprites",
         "palettes"
+      ]
+    },
+    {
+      "term": "Original and edited waveforms",
+      "topics": [
+        "sound"
       ]
     },
     {
@@ -2030,10 +2383,30 @@
       ]
     },
     {
+      "term": "Preferences",
+      "topics": [
+        "settings",
+        "settings-appearance"
+      ]
+    },
+    {
+      "term": "Preview looping and mute",
+      "topics": [
+        "settings",
+        "sound"
+      ]
+    },
+    {
       "term": "Private project data",
       "topics": [
         "projects",
         "mcp"
+      ]
+    },
+    {
+      "term": "Progression coverage",
+      "topics": [
+        "regression"
       ]
     },
     {
@@ -2043,15 +2416,58 @@
       ]
     },
     {
+      "term": "Public format references",
+      "topics": [
+        "game-knowledge"
+      ]
+    },
+    {
+      "term": "RAM to ROM investigation",
+      "topics": [
+        "hardware-addresses",
+        "investigation"
+      ]
+    },
+    {
+      "term": "RAM value search",
+      "topics": [
+        "debug"
+      ]
+    },
+    {
       "term": "Recipes",
       "topics": [
         "recipes"
       ]
     },
     {
+      "term": "Reduced motion",
+      "topics": [
+        "settings"
+      ]
+    },
+    {
       "term": "Regression suites",
       "topics": [
         "regression"
+      ]
+    },
+    {
+      "term": "Relocation prerequisites",
+      "topics": [
+        "compression"
+      ]
+    },
+    {
+      "term": "Remember last workspace",
+      "topics": [
+        "settings"
+      ]
+    },
+    {
+      "term": "Restore defaults",
+      "topics": [
+        "settings"
       ]
     },
     {
@@ -2087,9 +2503,29 @@
       ]
     },
     {
+      "term": "Settings",
+      "topics": [
+        "settings"
+      ]
+    },
+    {
       "term": "SHA-256",
       "topics": [
         "checks"
+      ]
+    },
+    {
+      "term": "Shared engine recognition",
+      "topics": [
+        "engine-recognition",
+        "sound"
+      ]
+    },
+    {
+      "term": "Shared resources",
+      "topics": [
+        "game-maps",
+        "palettes"
       ]
     },
     {
@@ -2103,6 +2539,13 @@
       "term": "Sound samples and WAV",
       "topics": [
         "sound"
+      ]
+    },
+    {
+      "term": "Source-bound navigation",
+      "topics": [
+        "investigation",
+        "debug"
       ]
     },
     {
@@ -2132,6 +2575,13 @@
       ]
     },
     {
+      "term": "Themes",
+      "topics": [
+        "settings",
+        "settings-appearance"
+      ]
+    },
+    {
       "term": "Tilemaps",
       "topics": [
         "tilemaps"
@@ -2151,246 +2601,10 @@
       ]
     },
     {
-      "term": "Decoded room terrain",
-      "topics": [
-        "room",
-        "levels"
-      ]
-    },
-    {
-      "term": "Original and edited waveforms",
-      "topics": [
-        "sound"
-      ]
-    },
-    {
-      "term": "Metatile brush thumbnails",
-      "topics": [
-        "levels"
-      ]
-    },
-    {
-      "term": "Progression coverage",
-      "topics": [
-        "regression"
-      ]
-    },
-    {
-      "term": "RAM value search",
-      "topics": [
-        "debug"
-      ]
-    },
-    {
-      "term": "Advanced tools visibility",
-      "topics": [
-        "settings"
-      ]
-    },
-    {
-      "term": "Apply, OK and Cancel",
-      "topics": [
-        "settings"
-      ]
-    },
-    {
-      "term": "Auto deep scan on ROM load",
-      "topics": [
-        "settings",
-        "resources"
-      ]
-    },
-    {
-      "term": "Automatic graphics analysis",
-      "topics": [
-        "settings",
-        "resources"
-      ]
-    },
-    {
-      "term": "Collision values and layers",
-      "topics": [
-        "room",
-        "levels"
-      ]
-    },
-    {
-      "term": "Dark and Light themes",
-      "topics": [
-        "settings",
-        "settings-appearance"
-      ]
-    },
-    {
-      "term": "Interface size and 100%",
-      "topics": [
-        "settings"
-      ]
-    },
-    {
-      "term": "Layers and grid",
-      "topics": [
-        "room",
-        "levels"
-      ]
-    },
-    {
-      "term": "Preferences",
-      "topics": [
-        "settings",
-        "settings-appearance"
-      ]
-    },
-    {
-      "term": "Preview looping and mute",
-      "topics": [
-        "settings",
-        "sound"
-      ]
-    },
-    {
-      "term": "Reduced motion",
-      "topics": [
-        "settings"
-      ]
-    },
-    {
-      "term": "Remember last workspace",
-      "topics": [
-        "settings"
-      ]
-    },
-    {
-      "term": "Restore defaults",
-      "topics": [
-        "settings"
-      ]
-    },
-    {
-      "term": "Settings",
-      "topics": [
-        "settings"
-      ]
-    },
-    {
-      "term": "Themes",
-      "topics": [
-        "settings",
-        "settings-appearance"
-      ]
-    },
-    {
       "term": "Volume",
       "topics": [
         "settings",
         "play"
-      ]
-    },
-    {
-      "term": "Byte explanations",
-      "topics": [
-        "investigation",
-        "hex-editor"
-      ]
-    },
-    {
-      "term": "Connected rooms",
-      "topics": [
-        "connections"
-      ]
-    },
-    {
-      "term": "Declared connections",
-      "topics": [
-        "connections",
-        "investigation"
-      ]
-    },
-    {
-      "term": "Destination ownership",
-      "topics": [
-        "compression"
-      ]
-    },
-    {
-      "term": "Destination room picker",
-      "topics": [
-        "connections"
-      ]
-    },
-    {
-      "term": "Hillside and Courtyard Advanced practice",
-      "topics": [
-        "connections",
-        "levels"
-      ]
-    },
-    {
-      "term": "Levels and sound definition exchange",
-      "topics": [
-        "recipes"
-      ]
-    },
-    {
-      "term": "Named object inspector",
-      "topics": [
-        "connections"
-      ]
-    },
-    {
-      "term": "Object metadata and roles",
-      "topics": [
-        "connections"
-      ]
-    },
-    {
-      "term": "Relocation prerequisites",
-      "topics": [
-        "compression"
-      ]
-    },
-    {
-      "term": "Advanced synthetic layout practice",
-      "topics": [
-        "connections"
-      ]
-    },
-    {
-      "term": "Source-bound navigation",
-      "topics": [
-        "investigation",
-        "debug"
-      ]
-    },
-    {
-      "term": "Public format references",
-      "topics": [
-        "game-knowledge"
-      ]
-    },
-    {
-      "term": "Named equipment and enemies",
-      "topics": [
-        "tables"
-      ]
-    },
-    {
-      "term": "FFL2 real map catalog",
-      "topics": [
-        "game-maps"
-      ]
-    },
-    {
-      "term": "Arrival records",
-      "topics": [
-        "game-maps"
-      ]
-    },
-    {
-      "term": "Shared resources",
-      "topics": [
-        "game-maps",
-        "palettes"
       ]
     }
   ]

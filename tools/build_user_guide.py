@@ -62,10 +62,15 @@ def chunks(rows, count):
     return [rows[start:start + count] for start in range(0, len(rows), count)]
 
 
+def contents_groups(data):
+    return [(part,index,group) for part in ('Basic','Advanced')
+            for index,group in enumerate(chunks([row for row in data['chapters'] if row['part']==part],21))]
+
+
 def pagination(data):
-    # Cover, two contents pages, procedures and optional visual continuations.
+    # Cover, bounded contents pages, procedures and visual continuations.
     pages = {}
-    next_page = 4
+    next_page = 2+len(contents_groups(data))
     for chapter in data['chapters']:
         pages[chapter['id']] = next_page
         next_page += 1
@@ -200,9 +205,9 @@ def build_pdf(data, folder, pages, glossary_groups, index_groups):
     para(html.escape(data['attribution']), 52, 220, 1250, 14, muted)
     end('cover')
 
-    for part in ('Basic', 'Advanced'):
-        y = frame(part + ' contents', 'Contents / clickable topics and page numbers', 'contents' if part == 'Basic' else 'contents-advanced')
-        rows = [row for row in data['chapters'] if row['part'] == part]
+    for part,group_index,rows in contents_groups(data):
+        anchor='contents' if part=='Basic' and group_index==0 else 'contents-'+part.lower()+('-'+str(group_index+1) if group_index else '')
+        y = frame(part + ' contents'+(' / continued' if group_index else ''), 'Contents / clickable topics and page numbers', anchor)
         y = para(html.escape(data[part.lower() + '_summary']), 48, y, 1200, 19) - 28
         row_gap=min(35,(y-185)/max(1,len(rows)))
         if row_gap<29:raise ValueError('Contents requires another page; do not overlap reference links')

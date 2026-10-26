@@ -18,7 +18,7 @@ from .audio_systems import audio_system_info
 MAX_SCAN=64*1024**2
 WINDOW=1024**2
 PER_KIND=100
-VERSION=6
+VERSION=9
 
 
 def cache_path(project,row):
@@ -31,7 +31,12 @@ def fingerprint(project):
         if catalog.stat().st_size>32*1024**2:raise ValueError('revision catalog exceeds scan budget')
         reference=hashlib.sha256(catalog.read_bytes()).hexdigest()
     else:reference=None
-    return hashlib.sha256(json.dumps({'version':VERSION,'catalog':reference,'definitions':PROFILES,'notes':BYTE_NOTES},sort_keys=True).encode()).hexdigest()
+    cheat_path=checked_path(Path(project)/'catalog/cheats.json')
+    if cheat_path.exists():
+        if cheat_path.stat().st_size>16*1024**2:raise ValueError('code reference catalog exceeds scan budget')
+        cheat_reference=hashlib.sha256(cheat_path.read_bytes()).hexdigest()
+    else:cheat_reference=None
+    return hashlib.sha256(json.dumps({'version':VERSION,'catalog':reference,'cheats':cheat_reference,'definitions':PROFILES,'notes':BYTE_NOTES},sort_keys=True).encode()).hexdigest()
 
 
 def cached(project,row,*,cancelled=lambda:False):
@@ -86,12 +91,20 @@ def run(project,row,*,cancelled=lambda:False,publish=None):
                                 'compression':result['compression_scan']}
             segments.append(coverage)
     graphics_index=index_graphics(path,system,size,cancelled=cancelled) if supported else {'status':'CODEC_UNRESOLVED','banks':[]}
+    from .hardware_reference import reference_for
+    hardware=reference_for(system) if supported else None
+    from .cheat_catalog import inspect_catalog
+    cheat_references=inspect_catalog(project,row,path,page=0,limit=10,cancelled=cancelled)
+    if system=='gba':
+        from .engine_recognition import recognize_engines
+        engines=recognize_engines(path,row['sha256'],system,cancelled=cancelled)
+    else:engines={'ok':True,'status':'NOT_IMPLEMENTED','source_sha256':row['sha256'],'findings':[],'write_authorized':False}
     projects._measure(path,row,cancelled=cancelled)
     if cancelled():raise KeyboardInterrupt
     if fingerprint(project)!=stamp:raise ValueError('catalog changed during scan; rescan the ROM')
     result={'ok':True,'status':'SCANNED' if supported else 'SYSTEM_UNRESOLVED','scan_version':VERSION,'fingerprint':stamp,
-            'artifact_id':row['artifact_id'],'source_sha256':row['sha256'],'system_id':system,'identification':model,'catalog':catalog,
-            'health':health,'graphics_index':graphics_index,'sound_system':audio_system_info(system,row['sha256']) if supported else None,'structures':{'candidates':structures,'coverage':structure_coverage,'dereference_observed':False},'counts':counts,'candidates':sorted(rows,key=lambda r:(r['offset'],r['kind'])),
+            'artifact_id':row['artifact_id'],'source_sha256':row['sha256'],'system_id':system,'identification':model,'catalog':catalog,'hardware_reference':hardware,
+            'health':health,'graphics_index':graphics_index,'cheat_references':cheat_references,'engine_recognition':engines,'sound_system':audio_system_info(system,row['sha256']) if supported else None,'structures':{'candidates':structures,'coverage':structure_coverage,'dereference_observed':False},'counts':counts,'candidates':sorted(rows,key=lambda r:(r['offset'],r['kind'])),
             'coverage':{'file_bytes_read':size if supported else 0,'file_size':row['size'],'whole_file_read':supported and size==row['size'],
                         'segments':segments,'result_limit_per_kind':PER_KIND,'exhaustive_semantic_analysis':False},
             'write_authorized':False,'runtime_verified':False,

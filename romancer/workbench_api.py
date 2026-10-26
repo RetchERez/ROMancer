@@ -40,6 +40,10 @@ class WorkbenchAPI:
             'games.maps.catalog':('project_id artifact_id offset limit query',lambda p,c:self._game_maps(p,c,'catalog')),
             'games.maps.inspect':('project_id artifact_id header state',lambda p,c:self._game_maps(p,c,'inspect')),
             'games.maps.plan':('project_id artifact_id header changes',lambda p,c:self._game_maps(p,c,'plan')),
+            'cheats.import':('project_id input_id',self._cheat_import),
+            'cheats.catalog':('project_id',self._cheat_catalog),
+            'cheats.inspect':('project_id artifact_id query page limit',self._cheat_inspect),
+            'engines.inspect':('project_id artifact_id',self._engine_inspect),
             'games.plan':('project_id artifact_id profile_id values',self._game_plan),
             'graphics.observe':('project_id artifact_id frame_sha256 region offset length',self._graphics_observe),
             'graphics.declare':('project_id artifact_id evidence_id matches',self._graphics_declare),
@@ -68,6 +72,8 @@ class WorkbenchAPI:
             'project.readiness':('project_id',self._readiness),
             'system.capabilities':('',self._capabilities),'system.pick_file':('',self._pick_file),
             'systems.list':('',self._systems_list),'systems.identify':('project_id artifact_id',self._system_identify),
+            'systems.reference':('system_id',self._hardware_reference),
+            'systems.classify_address':('system_id address domain',self._classify_address),
             'systems.nes_chr':('project_id artifact_id first_tile count',self._nes_chr),
             'project.demo_nes':('',self._demo_nes),
             'project.demo_system':('system_id',self._demo_system),
@@ -216,6 +222,33 @@ class WorkbenchAPI:
     def _game_maps(self,p,c,operation):
         from .verified_games import maps
         return maps(self,p,operation,cancelled=c)
+
+    def _cheat_import(self,p,c):
+        from .cheat_catalog import import_catalog
+        count=import_catalog(self.project(p),p['input_id'],cancelled=c)
+        return {'ok':True,'status':'IMPORTED','project_id':p['project_id'],'count':count}
+
+    def _hardware_reference(self,p,c):
+        from .hardware_reference import reference_for
+        return reference_for(p['system_id'])
+
+    def _classify_address(self,p,c):
+        from .hardware_reference import classify_address
+        return classify_address(p['system_id'],p['address'],p['domain'])
+
+    def _cheat_catalog(self,p,c):
+        from .cheat_catalog import catalog_info
+        return catalog_info(self.project(p))
+
+    def _cheat_inspect(self,p,c):
+        from .cheat_catalog import inspect_catalog
+        project,row,path=self.source(p)
+        return inspect_catalog(project,row,path,query=p['query'],page=p['page'],limit=p['limit'],cancelled=c)
+
+    def _engine_inspect(self,p,c):
+        from .engine_recognition import recognize_engines
+        project,row,path=self.source(p)
+        return recognize_engines(path,row['sha256'],row.get('system_id'),cancelled=c)
 
     def _operations(self,p,c):
         return {'ok':True,'operations':[{'name':name,'required_parameters':entry[0].split()} for name,entry in sorted(self.routes.items())],

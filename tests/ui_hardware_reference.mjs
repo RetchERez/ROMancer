@@ -1,0 +1,13 @@
+import assert from 'node:assert/strict';
+import {hardwareReference} from '../romancer/ui/hardware_reference.js';
+let actions={},navigated=false,rendered=false,calls=[];
+const doc={name:'NES',cpu:'6502 <CPU>',endian:'little',domains:{cpu:65535,ppu:16383},graphics:'Separated planes',mapping:'16-byte header',references:['javascript:alert(1)','https://www.nesdev.org/wiki/CPU_memory_map']};
+const state={project:{project_id:'p'},artifact:{artifact_id:'a',sha256:'sha',system_id:'nes'},romScans:{'p:a:sha':{result:{hardware_reference:doc}}}};
+const ctx={state,use:a=>Object.assign(actions,a),draft:(_,v)=>v,render:async()=>rendered=true,api:{call:async(op,args)=>{calls.push([op,args]);return {ok:true,label:'PPU port',note:'A hardware register',kind:'io',domain:'cpu',address:8199,file_offset:null,write_authorized:false};}}};
+const html=hardwareReference(ctx);assert.match(html,/6502 &lt;CPU&gt;/);assert.match(html,/16-byte header/);assert.doesNotMatch(html,/href="javascript:/);
+globalThis.document={getElementById:id=>({value:id==='hardware-domain'?'cpu':'0x2007'})};
+await actions['hardware-explain']();assert.equal(calls[0][0],'systems.classify_address');assert.equal(calls[0][1].address,8199);assert.equal(rendered,true);
+assert.match(hardwareReference(ctx),/PPU port/);assert.doesNotMatch(hardwareReference(ctx),/Apply patch|Create build/);
+state.artifact={artifact_id:'other',sha256:'new',system_id:'gb'};
+await assert.rejects(actions['hardware-explain'](),/changed|selected/i);
+console.log('Hardware context keeps address domains distinct and never turns a hardware range into an edit.');

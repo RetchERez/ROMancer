@@ -150,6 +150,12 @@ APPROVED_FILES = frozenset(ROOT_FILES | {
 
 
 APPROVED_FILES = APPROVED_FILES | frozenset({
+    'romancer/hardware_reference.py','romancer/ui/hardware_reference.js',
+    'tests/test_hardware_reference.py','tests/ui_hardware_reference.mjs',
+    'romancer/cheat_decode.py','romancer/cheat_catalog.py','romancer/engine_recognition.py',
+    'romancer/ui/cheat_clues.js','romancer/ui/engine_findings.js',
+    'tests/test_cheat_decode.py','tests/test_cheat_catalog.py','tests/test_engine_recognition.py',
+    'tests/test_cheat_scan_api.py','tests/ui_cheat_clues.mjs','tests/ui_engine_findings.mjs',
     'romancer/chrono_tables.py','romancer/ffl2_maps.py','romancer/game_knowledge.py',
     'romancer/ui/game_maps.js','tests/test_chrono_tables.py','tests/ui_chrono_tables.mjs',
     'tests/test_ffl2_maps.py','tests/test_known_maps_api.py','tests/test_game_knowledge.py','tests/ui_game_maps.mjs',
@@ -167,7 +173,8 @@ APPROVED_FILES = APPROVED_FILES | frozenset({
         '05-immortal-text','06-wario-palettes','07-ffl2-room','08-dejavu-colors',
         '09-playtest-states','10-verified-patch','11-hex-inspection','12-tutorials',
         '13-settings','14-light-theme','15-dark-theme','16-connected-rooms',
-        '17-object-inspector','18-byte-explanation','19-chrono-armor','20-ffl2-map-browser','21-game-knowledge')),
+        '17-object-inspector','18-byte-explanation','19-chrono-armor','20-ffl2-map-browser','21-game-knowledge',
+        '22-engine-recognition','23-address-domains','24-code-references')),
 })
 
 

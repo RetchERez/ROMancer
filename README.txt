@@ -74,6 +74,26 @@ Automatic gameplay graphics analysis, workspace restore, volume, mute, preview
 looping, reduced motion and advanced-tool visibility are configurable. Settings
 and workspace restore metadata persist independently of the browser port.
 
+KNOWLEDGE AND INVESTIGATION
+
+Automatic scans include system hardware/address context and a bounded GBA
+M4A-compatible structure recognizer. Recognition validates a supported code/data
+relationship; it does not certify engine version, full music playback or editing.
+
+Resources -> ROM health & revision -> Code reference catalog imports local
+documented codes as read-only leads. NES/SNES/Genesis/GB/GBC Game Genie formats
+are decoded separately from cartridge mapping. Revision mismatches, uncertain
+banks, unsupported codes and shortened results remain explicit. Catalogs are
+project-owned; no publisher compilation is bundled as MIT application data.
+Mixed publication/community TXT extracts keep explicit code formats and source
+paths. Action Replay and other unsupported formats are retained without ROM
+locations. Duplicate references do not imply additional unique tested effects.
+
+Troubleshooting -> Hardware & address help distinguishes CPU, video and audio
+address domains. These descriptions never activate cheats, access devices or
+automatically turn a RAM value into a ROM edit. The offline guide explains
+these tools and the separate evidence needed before making a build.
+
 EVERYDAY CONTROLS
 
 Ctrl+S saves editing drafts; Create build produces the playable ROM.
