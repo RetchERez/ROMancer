@@ -21,7 +21,7 @@ MAX_MESSAGE=1024*1024
 MAX_RESULT=256*1024
 READ_OPERATIONS=frozenset('''system.capabilities system.operations projects.list project.open
 games.inspect games.maps.catalog games.maps.inspect cheats.catalog cheats.inspect engines.inspect systems.reference systems.classify_address rom.check catalog.list resource.inspect resources.explain resources.relationships
-hex.search hex.numbers hex.bookmarks builds.timeline builds.compare project.validate investigations.get investigations.probe debugger.capabilities debugger.get
+hex.search hex.numbers hex.bookmarks builds.timeline builds.compare project.validate investigations.get investigations.probe debugger.capabilities debugger.get structures.survey structures.definition
 assets.inspect script.inspect tables.inspect tables.batch levels.inspect sound.inspect revision.lookup
 profiles.get profiles.validate runtime.checkpoints reports.list exports.list jobs.get
 systems.address resources.address_uses watches.compare debug.inspect compression.inspect'''.split())
@@ -65,6 +65,8 @@ DESCRIPTIONS={
  'debugger.capabilities':'Inspect actual system/host/pinned-backend availability for bounded native instruction and memory-access investigations. A documented capability does not mean an installed backend.',
  'debugger.capture':'Run a bounded cold-start input route with the pinned headless debugger, recording real access callbacks, instruction context and observed mappings. No arbitrary script/executable/path is accepted. Access width, DMA actor and causation remain explicit unknowns.',
  'debugger.get':'Read a page of application-authenticated native trace events and source-bound execution contexts. Historical captures are labeled; imported JSON never becomes fresh native evidence.',
+ 'structures.survey':'Test bounded repeated numeric record layouts without game profiles. Reports exact tested widths, byte orders, sampling, target bounds and in-window previews. These are structural hypotheses, not named properties or observed dereferences.',
+ 'structures.definition':'Reproduce a structural hypothesis from current source bytes and generate a validated neutral table editor definition. Numeric interpretation is separate from an explicitly selected linear-pointer hypothesis. Does not save a definition or modify ROM bytes.',
  'watches.save':'Save at most 32 named byte ranges on the selected source; does not write native memory.',
  'watches.compare':'Compare two identity-bound memory observations of at most 256 bytes. No instruction or write event is inferred.',
  'video.inspect':'Observe at most 4096 bytes of exposed video memory and decode a tested tile format. Palette and ROM ownership remain unknown.',
@@ -96,6 +98,9 @@ def _investigation_properties(operation):
     def obj(properties):return {'type':'object','properties':properties,'required':list(properties),'additionalProperties':False}
     def array(items,maximum,minimum=0):return {'type':'array','items':items,'minItems':minimum,'maxItems':maximum}
     source={'project_id':string(),'artifact_id':string()}
+    if operation in ('structures.survey','structures.definition'):
+        window={**source,'offset':integer(0,64*1024**2),'length':integer(1,65536)}
+        return window if operation=='structures.survey' else {**window,'candidate_id':string(64),'interpretation':enum(['numeric','linear-pointer'])}
     if operation=='investigations.start':return {**source,'title':string(120),'region':integer(0,3),
         'offset':integer(0,256*1024**2),'length':integer(1,4096),'value':nullable(integer(-2**31,2**32-1))}
     if operation=='investigations.capture':return {**source,'investigation_id':string(64),'label':string(120),

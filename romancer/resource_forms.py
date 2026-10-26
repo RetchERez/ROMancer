@@ -32,7 +32,7 @@ def script_schema(path,sha,config):
     if set(config)-allowed:raise ValueError('unknown text declaration field')
     offset=number(config['offset'],0,source['size']);capacity=number(config['capacity'],1,65536);count=number(config['count'],1,256)
     stride=number(config.get('stride',capacity),capacity,source['size']);pointer_offset=None if config.get('pointer_offset') is None else number(config['pointer_offset'],0,source['size']);width=number(config.get('pointer_width',2),2,4)
-    base=number(config.get('pointer_base',0),0,source['size']);endian=config.get('pointer_endian','little')
+    base=number(config.get('pointer_base',0),-0xffffffff,0xffffffff);endian=config.get('pointer_endian','little')
     if endian not in ('little','big'):raise ValueError('choose pointer byte order')
     if config.get('encoding','ascii')=='ascii':glyphs=[{'byte':i,'text':chr(i)} for i in range(32,127)]
     elif config['encoding']=='table':

@@ -18,7 +18,7 @@ from .audio_systems import audio_system_info
 MAX_SCAN=64*1024**2
 WINDOW=1024**2
 PER_KIND=100
-VERSION=11
+VERSION=12
 
 
 def cache_path(project,row):
@@ -75,6 +75,7 @@ def run(project,row,*,cancelled=lambda:False,publish=None):
     else:catalog={'file':{'status':'NO_CATALOG'},'payload':{'status':'NO_CATALOG'}}
     system=row.get('system_id');rows=[];counts={kind:0 for kind in ('text','graphics','compression')};segments=[]
     size=min(row['size'],MAX_SCAN);supported=system in ('nes','snes','genesis','gb','gbc','gba');structures=[];structure_coverage=[]
+    lab_candidates=[];lab_coverage=[];lab_total=0
     if supported:
         for start in range(0,size,WINDOW):
             if cancelled():raise KeyboardInterrupt
@@ -83,6 +84,9 @@ def run(project,row,*,cancelled=lambda:False,publish=None):
             with path.open('rb') as stream:stream.seek(start);window=stream.read(coverage['length'])
             structural=scan_structures(window,system,start,row['size'],cancelled=cancelled)
             structures.extend(structural['candidates'][:max(0,64-len(structures))]);structure_coverage.append(structural['coverage'])
+            from .structural_lab import survey
+            lab=survey(window[:4096],row['sha256'],system,start,row['size'],max_positions=512,max_results=8,cancelled=cancelled)
+            lab_candidates.extend(lab['candidates'][:max(0,32-len(lab_candidates))]);lab_coverage.append(lab['coverage']);lab_total+=lab['total_candidates']
             for kind in counts:
                 result=discover(path,row['sha256'],system,start,coverage['length'],[kind],cancelled=cancelled)
                 candidates=result['candidates'];counts[kind]+=len(candidates)
@@ -116,6 +120,10 @@ def run(project,row,*,cancelled=lambda:False,publish=None):
                       'Compression checks cover aligned supported LZ10/RLE signatures with per-window work budgets; see coverage.',
                       'Window boundaries may split resources. Use a focused range scan to investigate them.',
                       'Unknown stats, scripts and banked pointers need evidence or explicit mappings.']}
+    result['structural_lab']={'source_sha256':row['sha256'],'candidates':lab_candidates,'coverage':lab_coverage,
+        'total_candidates':lab_total,'truncated':lab_total>len(lab_candidates),'dereference_observed':False,
+        'game_profile_required':False,'write_authorized':False,
+        'scope':'Sampled first 4096 bytes of each 1 MiB segment. Use focused structural experiments to test other ranges and byte alignments.'}
     if publish:publish(result)
     else:
         projects.read_project(project)

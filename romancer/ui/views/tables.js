@@ -1,4 +1,5 @@
 import {numberComparison,mountNumberPreviews,numericBounds} from '../edit_preview.js';
+import {selectionKey} from '../tool_inputs.js';
 import {esc,button,field,select,read,heading,requireProject,empty,report} from '../common.js';
 const numericTypes=['u8','s8','u16','s16','u24','s24','u32','s32'];
 const starter=[{name:'Value',offset:0,type:'u8',endian:'little',pointer_base:null}];
@@ -10,6 +11,16 @@ function recordName(row){return row?.label!==undefined?row.label+' · ID 0x'+row
 export async function render(ctx){
  const {state}=ctx,missing=requireProject(ctx);if(missing)return missing;
  const artifact=state.artifact;if(!artifact)return empty('Import a ROM first','A table needs an exact source revision.',button('Import ROM','import',{primary:true}));
+ const proposal=state.tableProposal?.scope===selectionKey(state)&&state.tableProposal.result.source_sha256===artifact.sha256?state.tableProposal.result:null;
+ if(proposal){
+  const staged=stored(ctx,'table-changes',null);
+  if(staged?.changes?.length){
+   ctx.use({'table-cancel-proposal':()=>{state.tableProposal=null;return ctx.render();}});
+   return empty('Finish the current table edits first','The generated layout is ready. Keep your current staged table edits until you create a build or discard them.',button('Return to the current table','table-cancel-proposal'));
+  }
+  state.tableProposal=null;state.results['tables.inspect']=proposal.inspection;state.pending=null;
+  const d=proposal.definition;for(const [key,value] of Object.entries({'table-name':d.name,'table-offset':d.offset,'table-count':d.count,'table-stride':d.stride,'table-fields':JSON.stringify(d.fields)}))ctx.setDraft(key,typeof value==='string'?value:String(value));
+ }
  const saved=artifact.descriptors?.tables?.source_sha256===artifact.sha256?artifact.descriptors.tables.definition:null;
  let model=state.results['tables.inspect'];if(model?.source_sha256!==artifact.sha256)model=null;
  if(!model&&saved){model=await ctx.api.call('tables.inspect',{...ctx.sourceParams(),definition:saved,page:0,limit:50});state.results['tables.inspect']=model;}

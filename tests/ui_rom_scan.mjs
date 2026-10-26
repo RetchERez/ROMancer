@@ -24,3 +24,7 @@ result.graphics_index={status:'STORAGE_CANDIDATES',codec:'tile8-planar2-msb-v1',
 assert.match(scanControls(ctx),/Graphics organization/);
 assert.match(scanControls(ctx),/Waiting for gameplay/);
 assert.match(scanControls(ctx),/byte-identical/i);
+result.structural_lab={candidates:[{offset:32,count:5,stride:8,width:4}],total_candidates:1,
+ coverage:[{offset:0,length:4096}],scope:'Sampled first 4096 bytes of each segment.'};
+assert.match(scanControls(ctx),/Repeated layout hypotheses/);
+assert.match(scanControls(ctx),/Investigate layout/);

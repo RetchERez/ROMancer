@@ -9,3 +9,8 @@ state.results['tables.inspect'].definition.fields[0].type='u8';ctx.draft=(id,fal
 assert.match(await render(ctx),/Outside the declared numeric range/);
 state.artifact.sha256='3'.repeat(64);assert.ok((await render(ctx)).includes('Define a table'));
 console.log('Empty table, populated table, escaped labels and stale source UI passed.');
+const {selectionKey}=await import('../romancer/ui/tool_inputs.js');
+const proposal={scope:selectionKey(state),result:{source_sha256:state.artifact.sha256,definition:{},inspection:{}}};
+state.tableProposal=proposal;ctx.draft=(id,fallback)=>id==='table-changes'?JSON.stringify({changes:[{row:0,after:4}]}):fallback;
+assert.match(await render(ctx),/Finish the current table edits first/);
+assert.equal(state.tableProposal,proposal,'Opening a generated layout must preserve existing staged edits.');

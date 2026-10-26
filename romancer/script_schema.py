@@ -296,7 +296,9 @@ def _validate_fixed(format_spec, rules, size, reasons):
         width = _integer(pointer['width'], 'pointer width', 2, 4)
         if rule['length'] != width or pointer['endian'] not in ('little', 'big'):
             raise ValueError('pointer width/field length or endian mismatch')
-        base = _integer(pointer['base'], 'pointer base')
+        # Text schema convention: file offset = stored pointer + base.
+        # CPU ROM windows therefore require a negative additive base.
+        base = _integer(pointer['base'], 'pointer base', -0xffffffff, 0xffffffff)
         offset = records[target]['offset']
         stored = offset - base
         if not 0 <= offset < size or not 0 <= stored < 2 ** (8 * width):

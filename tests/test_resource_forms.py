@@ -5,6 +5,19 @@ import unittest
 
 
 class ResourceFormsTests(unittest.TestCase):
+    def test_guided_pointer_base_accepts_real_32_bit_rom_addresses(self):
+        from romancer.resource_forms import script_schema
+        from romancer.script import inspect_script
+        with tempfile.TemporaryDirectory() as temp:
+            source=Path(temp)/'original';source.write_bytes((0x08000008).to_bytes(4,'little')+b'SAFEAB\0'+b'\xff'*5)
+            sha=hashlib.sha256(source.read_bytes()).hexdigest()
+            config={'system_id':'gba','offset':8,'capacity':8,'count':1,'stride':8,
+                'pointer_offset':0,'pointer_width':4,'pointer_endian':'little','pointer_base':-0x08000000}
+            schema=script_schema(source,sha,config);doc=inspect_script(source,schema)
+            self.assertTrue(doc['write_supported'],doc)
+            self.assertEqual(schema['format']['pointers'][0]['base'],-0x08000000)
+            with self.assertRaises(ValueError):script_schema(source,sha,{**config,'pointer_base':0x100000000})
+
     def test_api_structured_cartridge_build_reviews_and_repairs_checksum(self):
         from romancer.workbench_api import WorkbenchAPI
         from romancer.system_demo import make_system_fixtures
