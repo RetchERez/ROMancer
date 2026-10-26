@@ -1,0 +1,69 @@
+"""Persistent investigations captured by the owned native runtime, never imports."""
+from .asset_schema import label,number
+from .observation_series import analyze_series,validate_observations
+from .workbench_evidence import load_evidence,store_evidence
+from .release_scope import require_supported
+
+
+class InvestigationTools:
+    def __init__(self,api):self.api=api
+
+    def routes(self):
+        return {'investigations.start':('project_id artifact_id title region offset length value',self.start),
+            'investigations.capture':('project_id artifact_id investigation_id label value relation delta',self.capture),
+            'investigations.get':('project_id artifact_id investigation_id',self.get)}
+
+    def _load(self,p):
+        project,row,_=self.api.source(p);require_supported(row)
+        record=load_evidence(project,p['investigation_id'],'runtime');report=record['report']
+        if (report.get('kind')!='investigation-series-v1' or report.get('source_sha256')!=row['sha256']
+                or report.get('artifact_id')!=row['artifact_id']):
+            raise ValueError('investigation belongs to another selected source')
+        validate_observations(report['observations'],1);label(report['title'],120)
+        return project,row,record
+
+    def _public(self,record,cancelled):
+        report=record['report'];observations=report['observations']
+        validate_observations(observations,1)
+        analysis=analyze_series(observations,cancelled=cancelled) if len(observations)>1 else {
+            'status':'NEEDS_MORE','candidates':[],'total':0,'truncated':False,'observation_count':1,
+            'unchanged_controls':0,'next_experiment':'Play until the target changes, pause, and capture another observation.'}
+        return {'ok':True,**analysis,'source_sha256':report['source_sha256'],'artifact_id':report['artifact_id'],
+            'investigation_id':record['evidence_id'],'title':report['title'],
+            'runtime_trusted':record.get('runtime_trusted',True),
+            'history':[{'label':o['label'],'value':o['value'],'relation':o['relation'],'delta':o['delta'],
+                'sequence':o['snapshot']['sequence'],'frame_index':o['snapshot'].get('frame_index'),
+                'data_sha256':o['snapshot']['data_sha256']} for o in observations],
+            'rom_location_known':False,'causation_proven':False,'write_authorized':False,'memory_written':False}
+
+    def start(self,p,c):
+        project,row,_=self.api.source(p);require_supported(row);label(p['title'],120)
+        number(p['region'],0,3);number(p['offset'],0,256*1024**2);number(p['length'],1,4096)
+        if p['value'] is not None:number(p['value'],-2**31,2**32-1)
+        with self.api.runtime.lock:
+            packet=self.api.studio.observe(p,c,p['region'],p['offset'],p['length'])
+            observations=[{'snapshot':packet,'label':'Before','value':p['value'],'relation':'initial','delta':None}]
+            validate_observations(observations,1)
+            if c():raise KeyboardInterrupt
+            record=store_evidence(project,'runtime',{'kind':'investigation-series-v1','artifact_id':row['artifact_id'],
+                'source_sha256':row['sha256'],'title':p['title'],'observations':observations})
+        return self._public(record,c)
+
+    def capture(self,p,c):
+        project,row,record=self._load(p)
+        if not record['runtime_trusted']:raise ValueError('historical investigations are read-only; start a fresh native investigation')
+        report=record['report'];observations=report['observations']
+        if len(observations)>=32:raise ValueError('investigation reached 32 observations; start a new focused investigation')
+        label(p['label'],120);first=observations[0]['snapshot']
+        with self.api.runtime.lock:
+            packet=self.api.studio.observe(p,c,first['region'],first['offset'],first['length'])
+            observations=observations+[{'snapshot':packet,'label':p['label'],'value':p['value'],
+                'relation':p['relation'],'delta':p['delta']}]
+            validate_observations(observations)
+            analyze_series(observations,cancelled=c)
+            if c():raise KeyboardInterrupt
+            record=store_evidence(project,'runtime',{**report,'parent_evidence_id':record['evidence_id'],'observations':observations})
+        return self._public(record,c)
+
+    def get(self,p,c):
+        _,_,record=self._load(p);return self._public(record,c)

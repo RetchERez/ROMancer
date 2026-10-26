@@ -21,7 +21,7 @@ MAX_MESSAGE=1024*1024
 MAX_RESULT=256*1024
 READ_OPERATIONS=frozenset('''system.capabilities system.operations projects.list project.open
 games.inspect games.maps.catalog games.maps.inspect cheats.catalog cheats.inspect engines.inspect systems.reference systems.classify_address rom.check catalog.list resource.inspect resources.explain resources.relationships
-hex.search hex.numbers hex.bookmarks builds.timeline builds.compare project.validate
+hex.search hex.numbers hex.bookmarks builds.timeline builds.compare project.validate investigations.get
 assets.inspect script.inspect tables.inspect tables.batch levels.inspect sound.inspect revision.lookup
 profiles.get profiles.validate runtime.checkpoints reports.list exports.list jobs.get
 systems.address resources.address_uses watches.compare debug.inspect compression.inspect'''.split())
@@ -32,7 +32,7 @@ rom.scan.run release.prepare release.verify resources.declare_assets resources.d
 runtime.load_profile runtime.advance runtime.step runtime.capture runtime.memory runtime.close
 runtime.checkpoint runtime.restore runtime.save_state runtime.load_state profiles.controller saves.capture saves.export saves.import saves.restore
 recipes.from_plan recipes.preview recipes.import recipes.export jobs.cancel
-values.start values.narrow watches.save video.inspect compression.extract compression.plan_reinsert
+values.start values.narrow investigations.start investigations.capture watches.save video.inspect compression.extract compression.plan_reinsert
 definitions.export definitions.import'''.split())
 DESCRIPTIONS={
  'project.create':'Create a separate ROM project. Never overwrite an original.',
@@ -57,6 +57,9 @@ DESCRIPTIONS={
  'resources.address_uses':'Find bounded declared references to an exact file offset. Undeclared uses remain unknown.',
  'values.start':'Observe at most 4096 exposed memory bytes and start a source/session-bound integer search. Requires the selected source loaded in Playtest; creates bounded temporary search state.',
  'values.narrow':'Capture a newer observation and narrow the selected search. A changed RAM value does not identify a ROM location or writing instruction.',
+ 'investigations.start':'Start a durable investigation from an owned native memory capture. Tests numeric formats without a game profile; persists authenticated observations and never writes game memory.',
+ 'investigations.capture':'Capture another owned observation and analyze numeric widths, byte orders, signed/BCD formats, display offsets and unchanged controls. Returns a new immutable evidence ID; correlation does not establish a writer or ROM location.',
+ 'investigations.get':'Read an authenticated investigation and its automatic numeric hypotheses. Restored history is labeled historical and cannot append fresh native evidence.',
  'watches.save':'Save at most 32 named byte ranges on the selected source; does not write native memory.',
  'watches.compare':'Compare two identity-bound memory observations of at most 256 bytes. No instruction or write event is inferred.',
  'video.inspect':'Observe at most 4096 bytes of exposed video memory and decode a tested tile format. Palette and ROM ownership remain unknown.',
@@ -88,6 +91,12 @@ def _investigation_properties(operation):
     def obj(properties):return {'type':'object','properties':properties,'required':list(properties),'additionalProperties':False}
     def array(items,maximum,minimum=0):return {'type':'array','items':items,'minItems':minimum,'maxItems':maximum}
     source={'project_id':string(),'artifact_id':string()}
+    if operation=='investigations.start':return {**source,'title':string(120),'region':integer(0,3),
+        'offset':integer(0,256*1024**2),'length':integer(1,4096),'value':nullable(integer(-2**31,2**32-1))}
+    if operation=='investigations.capture':return {**source,'investigation_id':string(64),'label':string(120),
+        'value':nullable(integer(-2**31,2**32-1)),'relation':enum(['changed','unchanged','increased','decreased','delta']),
+        'delta':nullable(integer(-2**32,2**32))}
+    if operation=='investigations.get':return {**source,'investigation_id':string(64)}
     if operation=='cheats.inspect':return {**source,'query':string(240),'page':integer(0,20000),'limit':integer(1,20)}
     if operation=='systems.reference':return {'system_id':enum(['nes','snes','genesis','gb','gbc','gba'])}
     if operation=='systems.classify_address':return {'system_id':enum(['nes','snes','genesis','gb','gbc','gba']),'address':integer(0,0xffffffff),'domain':enum(['cpu','ppu','vram','apu'])}

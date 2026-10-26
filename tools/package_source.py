@@ -150,6 +150,8 @@ APPROVED_FILES = frozenset(ROOT_FILES | {
 
 
 APPROVED_FILES = APPROVED_FILES | frozenset({
+    'romancer/observation_series.py','romancer/investigation_tools.py',
+    'tests/test_observation_series.py','tests/test_investigation_tools.py',
     'romancer/cartridge_startup.py','romancer/cartridge_integrity.py','romancer/ui/cartridge_verification.js',
     'tests/test_cartridge_startup.py','tests/test_cartridge_integrity.py','tests/ui_cartridge_verification.mjs','tests/ui_hex_comparison.mjs',
     'romancer/hardware_reference.py','romancer/ui/hardware_reference.js',
