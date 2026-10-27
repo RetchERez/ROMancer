@@ -3,6 +3,13 @@ from pathlib import Path
 from unittest.mock import patch
 
 class BundledDebuggerTests(unittest.TestCase):
+    def test_unprepared_source_checkout_retains_external_backend_fallback(self):
+        from romancer.debugger_provision import preferred_root
+        with tempfile.TemporaryDirectory() as temp:
+            root=Path(temp);bundled=root/'debuggers/mesence-2.2.1'
+            with patch('romancer.native_debugger.backend_root',return_value=bundled):
+                self.assertEqual(preferred_root(root/'workspace','nes'),bundled)
+
     def test_observer_pack_requires_every_pinned_source_and_notice_and_no_extra_file(self):
         from romancer.bundled_debuggers import observer_files
         with tempfile.TemporaryDirectory() as temp:

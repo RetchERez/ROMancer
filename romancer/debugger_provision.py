@@ -79,7 +79,8 @@ def preferred_root(workspace,system):
     from .native_debugger import backend_root
     bundled=backend_root(system)
     if bundled.exists():return bundled
-    return cache_root(workspace,system)
+    cached=cache_root(workspace,system)
+    return cached if cached.exists() else bundled
 
 
 def verify_prepared(root,system):

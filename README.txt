@@ -170,11 +170,11 @@ three connected animation-frame shapes, save/load and exact patch reconstruction
 were checked. Other enemy types, collisions, enemy AI and full-game correctness
 are not certified. Game Gear, headerless SMS inputs and ambiguous Sega layouts
 remain outside this release. The SMS A/B interface maps the included BlastEm
-engine to its two-button pad; advanced raw libretro input uses A and R for buttons 1 and 2.
+engine to its two-button pad: A and B are buttons 1 and 2, and Start sends Pause.
 
 GITHUB RELEASE PREPARATION
 
-Use the tag v1.0.0 for the public ROMancer v1.0 release. The numeric 1.0.31 build
+Use the tag v1.0.0 for the public ROMancer v1.0 release. The numeric 1.0.36 build
 identifier is internal installer/update identity. Lead the release description
 with ROMancer-v1.0-Setup.exe, then the portable Windows ZIP, offline guide and
 walkthrough. Provide the source, engine pack, component notices and SHA256SUMS.
@@ -372,13 +372,14 @@ Investigate accesses derives a physical watch from the pinned engine interface
 and replays a short controller route in a separate native debugger from power on.
 It does not resume Playtest or convert emulator save states.
 
-Advanced native capture uses optional official MesenCE (NES/SNES/GB/GBC/GBA) or
-MAME (Genesis) downloads. Choose Prepare debugger deliberately once; Windows x64
-is required, and the Genesis debugger requires an x86-64-v2 CPU. Exact hashes,
-source links and applicable notices are checked and retained in the local cache.
-These debugger binaries are not distributed in this release. Preparation uploads
-no ROM. Subsequent captures reuse the verified cache offline. Normal editing and
-included-engine playtesting do not require this download.
+Advanced native capture uses reviewed MesenCE (NES/SNES/SMS/GB/GBC/GBA) and
+MAME (Genesis) observers. The full Windows package includes both, their licenses
+and complete matching source. Windows x64 is required; the Genesis observer
+requires an x86-64-v2 CPU. Exact binaries and source inventories are checked.
+Source-only or smaller custom builds can use Prepare debugger to fetch the
+pinned upstream version once. Preparation uploads no ROM. Later captures reuse
+the verified cache offline. A bundled observer takes priority over an old cache;
+changed or incomplete bundled files are rejected rather than silently replaced.
 
 Capture reports distinguish completed routes, capped samples, mapped source
 locations and candidate pattern matches. Genesis instruction and access samples
