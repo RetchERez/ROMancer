@@ -2,8 +2,8 @@
 import copy
 
 REGISTRY_VERSION='1'
-FOCUS_SYSTEM_IDS=('nes','snes','genesis','gb','gbc','gba')
-SYSTEM_IDS=frozenset({'nes','snes','genesis','gb','gbc','gba','segacd'})
+FOCUS_SYSTEM_IDS=('nes','snes','genesis','gb','gbc','gba','sms')
+SYSTEM_IDS=frozenset({'nes','snes','genesis','gb','gbc','gba','sms','segacd'})
 
 
 def _cap(status,reason,implementation):
@@ -18,6 +18,7 @@ def _definitions():
         ('gb','Game Boy',['gb-cartridge'],'DMG header, declared ROM banks and header checksum.'),
         ('gbc','Game Boy Color',['gbc-cartridge'],'CGB-compatible and Color-only header flags, ROM banks and checksums.'),
         ('segacd','Sega CD',['mode1-2048','mode1-2352','cue-unresolved'],'System identifier and supported first-sector layout; CUE dependencies need explicit import.'),
+        ('sms','Master System',['sms-sega'],'Bounded Sega header and additive checksum; game resources require declarations.'),
         ('gba','GBA',['gba-linear'],'Fixed header byte and complement; logo validation and boot are separate checks.'),
     )
     packs=[]
@@ -28,7 +29,7 @@ def _definitions():
             'raw_inspection':_cap('supported','Bounded read-only inspection of registered bytes.','romancer/workbench_projects.py:inspect_resource'),
             'structured_formats':_cap('supported','Exact-revision declared flat resources use explicit codec/slot descriptors.','romancer/assets.py; romancer/script.py'),
             'automatic_resource_discovery':_cap('supported','Bounded text/graphics candidates and validated LZ10/RLE probes; every editable location still needs confirmation.','romancer/resource_discovery.py'),
-            'address_translation':_cap('supported','Declared supported windows only; bank state is not inferred.','romancer/system_addresses.py'),
+            'address_translation':_cap('unsupported' if identifier=='sms' else 'supported','Declared supported windows only; bank state is not inferred.','romancer/system_addresses.py'),
             'integrity_repair':_cap('supported','System edit plans maintain supported cartridge checksums.','romancer/system_integrity.py'),
             'runtime_control':_cap('unavailable','Configure a matching native core and measure its worker handshake.','romancer/workbench_runtime.py'),
             'nes_chr_descriptor':_cap('supported' if identifier=='nes' else 'unsupported',

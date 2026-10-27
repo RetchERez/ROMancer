@@ -8,7 +8,7 @@ import {assetTools,mountTools,activateCell} from '../asset_controls.js';
 import {mergeCellChanges} from '../pixel_tools.js';
 import {graphicsDeclaration} from '../declarations.js';
 import {esc,button,badge,field,area,jsonEditor,read,json,short,heading,report,requireProject,empty} from '../common.js';
-const codecBits={'tile8-packed4-low-v1':4,'mono-row-msb-v1':1,'tile8-paired2-msb-v1':2,'tile8-planar2-msb-v1':2,'tile8-paired4-msb-v1':4,'tile8-packed4-high-v1':4};
+const codecBits={'tile8-packed4-low-v1':4,'mono-row-msb-v1':1,'tile8-paired2-msb-v1':2,'tile8-planar2-msb-v1':2,'tile8-paired4-msb-v1':4,'tile8-rowplanar4-msb-v1':4,'tile8-packed4-high-v1':4};
 export function literalColorCount(bitmap,palette){const bits=codecBits[bitmap.codec];return bits?Math.min(2**bits,palette?.colors_per_bank||2**bits):0;}
 export function literalRGB(bitmap,value){const count=literalColorCount(bitmap);const shade=Math.round(18+value/Math.max(1,count-1)*216);return {r:shade,g:shade,b:shade};}
 export async function render(ctx){const {state}=ctx,missing=requireProject(ctx);if(missing)return missing;if(!state.artifact)return empty('Import an asset resource','A declared uncompressed codec and source revision are required.');

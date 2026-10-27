@@ -1,3 +1,4 @@
+from romancer.boot_fixtures import make_boot_fixture
 import hashlib
 import importlib.util
 import io
@@ -60,7 +61,7 @@ class ResourceExportTests(unittest.TestCase):
         from romancer.workbench_api import WorkbenchAPI
         from romancer.resource_forms import graphics_schema
         with tempfile.TemporaryDirectory() as folder:
-            root=Path(folder);raw=bytes.fromhex('8040')+b'\0'*14;path=root/'tiles.bin';path.write_bytes(raw);api=WorkbenchAPI(root/'workspace')
+            root=Path(folder);raw=bytearray(make_boot_fixture('gba')['data']);raw[:16]=bytes.fromhex('8040')+b'\0'*14;raw=bytes(raw);path=root/'tiles.bin';path.write_bytes(raw);api=WorkbenchAPI(root/'workspace')
             try:
                 project=api.dispatch('project.create',{'name':'PNG export'});source=api.dispatch('source.import',{'project_id':project['project_id'],'path':str(path),'system':None})
                 schema=graphics_schema(path,source['sha256'],{'system_id':'gb','offset':0,'count':1})

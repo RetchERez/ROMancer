@@ -10,6 +10,11 @@ from .asset_schema import fields, number
 
 
 PROFILES=(
+    {'id':'rastan-sms','name':'Rastan','system':'sms','size':262144,
+     'sha256':'7e310ada1a09ace30e9dd8f5738f095c0ec7821edc225221cbba130fb8cbadb3',
+     'reference':'/user-guide/index.html#rastan-blobs',
+     'scope':'First humanoid enemy literal graphics and one observed 16×32 assembly. The three lower-body blob frames were checked in the edited output; other enemies, collision and AI are separate.',
+     'offsets':[(0x10000,1920,'First humanoid enemy graphics')]},
     {'id':'ffl2-usa','name':'Final Fantasy Legend II','system':'gb','size':262144,
      'sha256':'2d89231f9e264a024d634bcf7d00de5a66d8a45f6f4ca33e1fc1602a35b9840b',
      'reference':'https://github.com/daid/FFL2-Disassembly/tree/a5c17a90d87d102a9a45d287042c9a36ffd06f97',
@@ -43,6 +48,11 @@ PROFILES=(
 )
 
 BYTE_NOTES={
+ 'rastan-sms':[
+  {'storage':'60 literal 8×8 row-planar 4bpp tiles, 32 bytes each',
+   'meaning':'The first humanoid enemy graphics occupy this checked range. An observed pose joins tiles 30,32,31,33,52,54,53,55 as two columns and four rows. Palette bytes, collision and AI are not in this definition.',
+   'example':'Open first enemy sprites to edit the assembled pose. Stored color indices are shown in labeled grayscale until a palette is declared.',
+   'evidence':'ROMancer native original/build frame comparison at frame841 changed only enemy pixels in the measured opening scene. The guide retains the source/build hashes and actual editor captures.'}],
  'ffl2-usa':[
   {'storage':'Three-byte packed point command','meaning':'Places tile1D (stool) in map0265. 17 CE encodes (14,31); 18 0E encodes (14,32). Exit, story window and collision values are preserved.',
    'example':'17 CE 1D to 18 0E 1D.','evidence':'Original room header486B, map0265 and tileset0B were observed in native WRAM. Each edited build needs its own playtest.'}],
@@ -104,6 +114,7 @@ def _rotate(raw):
 
 def _model(profile,root,path):
     identifier=profile['id']
+    if identifier=='rastan-sms':return []
     if identifier=='ffl2-usa':
         from .verified_room import room_visual
         visual=room_visual(path,root['path'])
@@ -152,6 +163,10 @@ def palette_visuals(profile,root,path):
 
 
 def resource_definitions(profile):
+    if profile['id']=='rastan-sms':return [{'id':'first-enemy-sprites','name':'first enemy sprites','kind':'assets',
+        'reference':profile['reference'],'scope':profile['scope'],
+        'config':{'system_id':'sms','offset':0x10000,'count':60,'codec':'tile8-rowplanar4-msb-v1','width':8,'height':8},
+        'sprite_layout':{'first':0,'columns':2,'rows':4,'order':'rows','indices':[30,32,31,33,52,54,53,55]}}]
     if profile['id']!='chrono-trigger-usa':return []
     from .chrono_tables import resource_definitions as named_definitions
     resources=named_definitions()
@@ -187,6 +202,9 @@ def configure_resource(api,parameters,*,cancelled=lambda:False):
     if profile is None:raise ValueError('no verified resource definitions for this exact source revision')
     resource=next((r for r in resource_definitions(profile) if r['id']==parameters['resource_id']),None)
     if resource is None:raise ValueError('unknown verified resource definition')
+    if resource.get('kind')=='assets':
+        result=api._declare_resource({'project_id':parameters['project_id'],'artifact_id':row['artifact_id'],'config':resource['config']},cancelled,'assets')
+        return {**result,'resource_kind':'assets','sprite_layout':resource['sprite_layout'],'reference':resource['reference'],'definition_scope':resource['scope']}
     result=api._tables_save({'project_id':parameters['project_id'],'artifact_id':row['artifact_id'],'definition':resource['definition']},cancelled)
     return {**result,'reference':resource['reference'],'definition_scope':resource['scope']}
 
@@ -217,7 +235,9 @@ def inspect(project,row,path,*,cancelled=lambda:False):
 def plan(api,parameters,*,cancelled=lambda:False):
     project,row,path=api.source(parameters);profile,root=_resolve(project,row,cancelled)
     if profile is None or profile['id']!=parameters['profile_id']:raise ValueError('no matching verified game definition for this exact revision')
-    model=_model(profile,root,path);values=parameters['values'];fields(values,' '.join(f['id'] for f in model))
+    model=_model(profile,root,path)
+    if not model:raise ValueError('Use the verified Graphics resource to review and build this edit.')
+    values=parameters['values'];fields(values,' '.join(f['id'] for f in model))
     edits=[];preview=[];additional=[]
     def edit(offset,after):
         before=_read(path,offset,len(after))

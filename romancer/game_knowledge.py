@@ -19,6 +19,14 @@ def _fact(label,status,scope,sources,**details):
 
 
 REFERENCES={
+ 'rastan-sms':{
+  'sources':[{'id':'native-proof','url':'/user-guide/index.html#rastan-blobs','commit':'native-proof','scope':'ROMancer source-bound native observation','kind':'native_observation',
+    'original_frame_sha256':'a1bb75c23d86c6e98f2e5e6c12d5e3d2a940c42168e7f94d53f98632a75e578c',
+    'edited_frame_sha256':'77b64f165f92d9d9fdb469d072c86abde2e81b6cf9b179e48a10004b0ca6870a'}],
+  'facts':[
+   _fact('First humanoid enemy graphics','implemented','60 literal SMS 4bpp tiles at file offset 0x10000. Open the verified resource to edit a checked pose as one assembled sprite. The grayscale preview preserves indices; the stored palette is separate.',['native-proof'],offset=0x10000,length=1920),
+   _fact('Observed sprite assembly','layout_checked','Two columns by four rows, tile indices 30,32,31,33,52,54,53,55. This is one observed pose, not a complete animation or metasprite grammar.',['native-proof']),
+   _fact('Single-blob native check','layout_checked','The corrected build contains one connected blob per lower animation frame. Native frame841 shows the first humanoid enemies changed; collision, AI and other enemy types were not redesigned.',['native-proof'])]},
  'ffl2-usa':{
   'sources':[_source('disassembly','daid/FFL2-Disassembly','a5c17a90d87d102a9a45d287042c9a36ffd06f97')],
   'facts':[

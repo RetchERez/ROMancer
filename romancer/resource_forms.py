@@ -10,7 +10,7 @@ from .workbench_projects import _measure
 from .assets import digest
 
 PROVENANCE={'origin':'profile_assertion','note':'Explicit resource declaration entered in ROMancer.','reference':None}
-TEMPLATES={'gb':'tile8-paired2-msb-v1','gbc':'tile8-paired2-msb-v1','nes':'tile8-planar2-msb-v1','snes':'tile8-paired4-msb-v1','genesis':'tile8-packed4-high-v1','segacd':'tile8-packed4-high-v1','gba':'tile8-packed4-low-v1'}
+TEMPLATES={'sms':'tile8-rowplanar4-msb-v1','gb':'tile8-paired2-msb-v1','gbc':'tile8-paired2-msb-v1','nes':'tile8-planar2-msb-v1','snes':'tile8-paired4-msb-v1','genesis':'tile8-packed4-high-v1','segacd':'tile8-packed4-high-v1','gba':'tile8-packed4-low-v1'}
 
 
 def _source(path,sha):

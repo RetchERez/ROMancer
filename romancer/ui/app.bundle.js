@@ -980,7 +980,7 @@
   }
 
   // romancer/ui/runtime_setup.js
-  var families = [["nes", "NES"], ["snes", "SNES"], ["genesis", "Genesis"], ["gb", "Game Boy"], ["gbc", "Game Boy Color"], ["gba", "GBA"]];
+  var families = [["nes", "NES"], ["snes", "SNES"], ["genesis", "Genesis"], ["gb", "Game Boy"], ["gbc", "Game Boy Color"], ["gba", "GBA"], ["sms", "Master System"]];
   var defaultKeys = { up: "ArrowUp", down: "ArrowDown", left: "ArrowLeft", right: "ArrowRight", a: "z", b: "x", x: "a", y: "s", l: "q", r: "w", start: "Enter", select: "Shift" };
   async function runtimeSetup(ctx2) {
     var _a, _b, _c, _d, _e;
@@ -1387,6 +1387,11 @@
   }
 
   // romancer/ui/playback_controls.js
+  function buttonsForRuntime(state2, buttons) {
+    var _a, _b, _c, _d, _e;
+    const sms = ((_a = state2.artifact) == null ? void 0 : _a.system_id) === "sms" && ((_e = (_d = (_c = (_b = state2.runtime) == null ? void 0 : _b.loaded) == null ? void 0 : _c.loaded) == null ? void 0 : _d.core) == null ? void 0 : _e.library_name) === "BlastEm";
+    return [...new Set(buttons.map((key3) => sms && key3 === "b" ? "r" : key3))];
+  }
   var defaultKeys2 = { up: "ArrowUp", down: "ArrowDown", left: "ArrowLeft", right: "ArrowRight", a: "z", b: "x", start: "Enter", select: "Shift" };
   function padForSelection(pads, selection2 = -1) {
     if (selection2 === -2) return null;
@@ -1445,7 +1450,9 @@
         ctx2.state.heldButtons = (ctx2.state.heldButtons || []).filter((k) => k !== key3);
       }
     }, options);
-    control.addEventListener("blur", release, options);
+    control.addEventListener("blur", () => {
+      ctx2.state.heldButtons = [];
+    }, options);
     window.addEventListener("blur", release, options);
     document.addEventListener("visibilitychange", () => {
       if (document.hidden) release();
@@ -2338,8 +2345,8 @@
   }
 
   // romancer/ui/source_support.js
-  var systems = /* @__PURE__ */ new Set(["nes", "snes", "genesis", "gb", "gbc", "gba"]);
-  var names = { nes: "NES", snes: "SNES", genesis: "Genesis", gb: "Game Boy", gbc: "Game Boy Color", gba: "GBA" };
+  var systems = /* @__PURE__ */ new Set(["nes", "snes", "genesis", "gb", "gbc", "gba", "sms"]);
+  var names = { nes: "NES", snes: "SNES", genesis: "Genesis", gb: "Game Boy", gbc: "Game Boy Color", gba: "GBA", sms: "Master System (basic)" };
   function sourceSupport(ctx2) {
     var _a, _b, _c, _d, _e, _f, _g;
     const a = ctx2.state.artifact;
@@ -2677,8 +2684,28 @@
         const result = await ctx2.run("games.configure", { ...params, resource_id: node.dataset.id }, { refresh: false, render: false });
         if (!current2()) return;
         await ctx2.refreshProject();
-        state2.results["tables.inspect"] = result.inspection;
-        await ctx2.navigate("tables");
+        if (result.resource_kind === "assets") {
+          state2.pending = null;
+          state2.paint = null;
+          state2.candidateReview = null;
+          state2.assetPage = 0;
+          state2.assetBitmapId = result.inspection.bitmaps[0].id;
+          state2.assetAcknowledgements = [];
+          state2.results["assets.inspect"] = result.inspection;
+          await ctx2.navigate("assets");
+          ctx2.setDraft("asset-schema", JSON.stringify(result.schema, null, 2));
+          const layout = result.sprite_layout;
+          if (layout) {
+            ctx2.setDraft("sprite-layout", JSON.stringify({ document_id: result.inspection.document_id, bitmap_id: result.inspection.bitmaps[0].id, ...layout }));
+            ctx2.setDraft("sprite-columns", String(layout.columns));
+            ctx2.setDraft("sprite-rows", String(layout.rows));
+            ctx2.setDraft("sprite-map", layout.indices.join(","));
+            await ctx2.render();
+          }
+        } else {
+          state2.results["tables.inspect"] = result.inspection;
+          await ctx2.navigate("tables");
+        }
       },
       "game-review": async () => {
         if (!current2()) throw Error("The selected file changed.");
@@ -2750,7 +2777,7 @@
     const knowledge = model.knowledge;
     if (!knowledge) return "";
     const statuses = { implemented: "Supported workflow", layout_checked: "Reference checked", research_candidate: "Research lead" };
-    return `<details class="game-knowledge"><summary>What is known about this game</summary><p>${esc(knowledge.note)}</p>${knowledge.facts.map((fact) => `<div class="notice"><strong>${esc(fact.label)}</strong> ${badge(statuses[fact.status] || fact.status, fact.status === "implemented" ? "good" : "neutral")}<p>${esc(fact.scope)}</p><div>${fact.source_ids.map((id) => knowledge.sources.find((source) => source.id === id)).filter(Boolean).map((source) => `<a href="${esc(source.url)}" target="_blank" rel="noreferrer">Source · ${esc(source.commit.slice(0, 8))}</a>`).join(" · ")}</div></div>`).join("")}</details>`;
+    return `<details class="game-knowledge"><summary>What is known about this game</summary><p>${esc(knowledge.note)}</p>${knowledge.facts.map((fact) => `<div class="notice"><strong>${esc(fact.label)}</strong> ${badge(statuses[fact.status] || fact.status, fact.status === "implemented" ? "good" : "neutral")}<p>${esc(fact.scope)}</p><div>${fact.source_ids.map((id) => knowledge.sources.find((source) => source.id === id)).filter(Boolean).map((source) => `<a href="${esc(source.url)}" target="_blank" rel="noreferrer">${source.kind === "native_observation" ? "Native check" : "Source · " + esc(source.commit.slice(0, 8))}</a>`).join(" · ")}</div></div>`).join("")}</details>`;
   }
 
   // romancer/ui/build_history.js
@@ -3551,7 +3578,7 @@
   }
 
   // romancer/ui/discovery_controls.js
-  var systems2 = [["nes", "NES"], ["snes", "SNES"], ["genesis", "GEN"], ["gb", "Game Boy"], ["gbc", "Game Boy Color"], ["gba", "GBA"]];
+  var systems2 = [["nes", "NES"], ["snes", "SNES"], ["genesis", "GEN"], ["gb", "Game Boy"], ["gbc", "Game Boy Color"], ["gba", "GBA"], ["sms", "Master System"]];
   function integer7(id) {
     const text = read(id).trim(), value = Number(text);
     if (!text || !Number.isSafeInteger(value)) throw new Error("Enter a whole number for " + id + ".");
@@ -4038,7 +4065,7 @@
   }
 
   // romancer/ui/declarations.js
-  var systems3 = [["nes", "NES"], ["snes", "SNES"], ["genesis", "Genesis"], ["gb", "Game Boy"], ["gbc", "Game Boy Color"], ["gba", "GBA"]];
+  var systems3 = [["nes", "NES"], ["snes", "SNES"], ["genesis", "Genesis"], ["gb", "Game Boy"], ["gbc", "Game Boy Color"], ["gba", "GBA"], ["sms", "Master System"]];
   var integer9 = (id) => {
     const text = read(id).trim(), value = Number(text);
     if (!text || !Number.isSafeInteger(value)) throw new Error("Enter a whole number for " + id + ".");
@@ -4081,7 +4108,7 @@
       const config = { system_id: read("gfx-system"), offset: integer9("gfx-offset"), count: integer9("gfx-count"), codec: read("gfx-codec"), width: integer9("gfx-width"), height: integer9("gfx-height"), palette_offset: optional("gfx-palette"), palette_banks: integer9("gfx-banks"), palette_format: read("gfx-palette-format"), map_offset: optional("gfx-map"), map_width: integer9("gfx-map-width"), map_height: integer9("gfx-map-height"), font_chars: read("gfx-chars"), advance_offset: optional("gfx-advance"), advance_pixels: integer9("gfx-advance-pixels") };
       return declared(ctx2, "assets", config);
     } });
-    return `<details class="config" ${ctx2.state.openDeclaration === "gfx" ? "open" : ""}><summary>Declare graphics or font</summary>${system(ctx2, "gfx")}${select("gfx-codec", "Storage layout", [["", "System tile template"], ["mono-row-msb-v1", "Mono font rows"], ["tile8-planar2-msb-v1", "NES 2bpp separate planes"], ["tile8-paired2-msb-v1", "Game Boy 2bpp paired planes"], ["tile8-paired4-msb-v1", "4bpp paired planes"], ["tile8-packed4-high-v1", "4bpp high nibble first"], ["tile8-packed4-low-v1", "4bpp low nibble first"]], ctx2.draft("gfx-codec", ""))}<div class="field-row">${number(ctx2, "gfx-offset", "Bitmap offset", "0")}${number(ctx2, "gfx-count", "Tile or glyph count", "1")}${number(ctx2, "gfx-width", "Cell width", "8")}${number(ctx2, "gfx-height", "Cell height", "8")}${number(ctx2, "gfx-palette", "Palette offset (optional)", "")}${number(ctx2, "gfx-banks", "Palette banks", "1")}${select("gfx-palette-format", "Palette layout", [["rgb555-le", "RGB555 little endian"], ["rgb555-be", "RGB555 big endian"], ["genesis", "Genesis RGB333"]], ctx2.draft("gfx-palette-format", ctx2.state.artifact.system_id === "genesis" ? "genesis" : "rgb555-le"))}${number(ctx2, "gfx-map", "Tilemap offset (optional)", "")}${number(ctx2, "gfx-map-width", "Map columns", "1")}${number(ctx2, "gfx-map-height", "Map rows", "1")}</div>${field("gfx-chars", "Font characters in cell order (optional)", ctx2.draft("gfx-chars", ""))}<div class="field-row">${number(ctx2, "gfx-advance", "Stored advance table offset (optional)", "")}${number(ctx2, "gfx-advance-pixels", "Fixed advance in pixels", "8")}</div>${button("Load graphics declaration", "declare-graphics")}</details>`;
+    return `<details class="config" ${ctx2.state.openDeclaration === "gfx" ? "open" : ""}><summary>Declare graphics or font</summary>${system(ctx2, "gfx")}${select("gfx-codec", "Storage layout", [["", "System tile template"], ["mono-row-msb-v1", "Mono font rows"], ["tile8-planar2-msb-v1", "NES 2bpp separate planes"], ["tile8-paired2-msb-v1", "Game Boy 2bpp paired planes"], ["tile8-rowplanar4-msb-v1", "SMS 4bpp row planes"], ["tile8-paired4-msb-v1", "4bpp paired planes"], ["tile8-packed4-high-v1", "4bpp high nibble first"], ["tile8-packed4-low-v1", "4bpp low nibble first"]], ctx2.draft("gfx-codec", ""))}<div class="field-row">${number(ctx2, "gfx-offset", "Bitmap offset", "0")}${number(ctx2, "gfx-count", "Tile or glyph count", "1")}${number(ctx2, "gfx-width", "Cell width", "8")}${number(ctx2, "gfx-height", "Cell height", "8")}${number(ctx2, "gfx-palette", "Palette offset (optional)", "")}${number(ctx2, "gfx-banks", "Palette banks", "1")}${select("gfx-palette-format", "Palette layout", [["rgb555-le", "RGB555 little endian"], ["rgb555-be", "RGB555 big endian"], ["genesis", "Genesis RGB333"]], ctx2.draft("gfx-palette-format", ctx2.state.artifact.system_id === "genesis" ? "genesis" : "rgb555-le"))}${number(ctx2, "gfx-map", "Tilemap offset (optional)", "")}${number(ctx2, "gfx-map-width", "Map columns", "1")}${number(ctx2, "gfx-map-height", "Map rows", "1")}</div>${field("gfx-chars", "Font characters in cell order (optional)", ctx2.draft("gfx-chars", ""))}<div class="field-row">${number(ctx2, "gfx-advance", "Stored advance table offset (optional)", "")}${number(ctx2, "gfx-advance-pixels", "Fixed advance in pixels", "8")}</div>${button("Load graphics declaration", "declare-graphics")}</details>`;
   }
   function layoutDeclaration(ctx2) {
     var _a;
@@ -4325,7 +4352,7 @@
   }
 
   // romancer/ui/brush_colors.js
-  var bits = { "mono-row-msb-v1": 1, "tile8-paired2-msb-v1": 2, "tile8-planar2-msb-v1": 2, "tile8-paired4-msb-v1": 4, "tile8-packed4-high-v1": 4, "tile8-packed4-low-v1": 4 };
+  var bits = { "mono-row-msb-v1": 1, "tile8-paired2-msb-v1": 2, "tile8-planar2-msb-v1": 2, "tile8-rowplanar4-msb-v1": 4, "tile8-paired4-msb-v1": 4, "tile8-packed4-high-v1": 4, "tile8-packed4-low-v1": 4 };
   var valid = (rgb) => Array.isArray(rgb) && rgb.length === 3 && rgb.every((v) => Number.isInteger(v) && v >= 0 && v <= 255);
   function brushColors(bitmap, palette2, layout) {
     const count = bits[bitmap == null ? void 0 : bitmap.codec] ? Math.min(2 ** bits[bitmap.codec], (palette2 == null ? void 0 : palette2.colors_per_bank) || 256) : 0;
@@ -4440,7 +4467,7 @@
     const paint = (event) => {
       const rect = canvas.getBoundingClientRect(), x = Math.floor((event.clientX - rect.left) / rect.width * bitmap.width), y = Math.floor((event.clientY - rect.top) / rect.height * bitmap.height);
       if (x < 0 || y < 0 || x >= bitmap.width || y >= bitmap.height) return;
-      const color = Number(document.getElementById("paint-color").value), bits2 = { "mono-row-msb-v1": 1, "tile8-paired2-msb-v1": 2, "tile8-planar2-msb-v1": 2, "tile8-paired4-msb-v1": 4, "tile8-packed4-high-v1": 4, "tile8-packed4-low-v1": 4 }[bitmap.codec];
+      const color = Number(document.getElementById("paint-color").value), bits2 = { "mono-row-msb-v1": 1, "tile8-paired2-msb-v1": 2, "tile8-planar2-msb-v1": 2, "tile8-rowplanar4-msb-v1": 4, "tile8-paired4-msb-v1": 4, "tile8-packed4-high-v1": 4, "tile8-packed4-low-v1": 4 }[bitmap.codec];
       if (!Number.isInteger(color) || color < 0 || color >= 2 ** bits2) throw Error("Choose a valid color index.");
       const pixels = [...pixelBuffer(ctx2, doc, bitmap, index())];
       pixels[y * bitmap.width + x] = color;
@@ -4763,7 +4790,7 @@
     var _a, _b, _c, _d, _e, _f;
     if (!(doc == null ? void 0 : doc.ok) || !bitmap) return "";
     const { state: state2 } = ctx2, map = doc.tilemaps.find((row) => row.id === state2.assetMapId) || doc.tilemaps[0], font = doc.fonts.find((row) => row.id === state2.assetFontId) || doc.fonts[0];
-    const count = Math.min(2 ** { "mono-row-msb-v1": 1, "tile8-paired2-msb-v1": 2, "tile8-planar2-msb-v1": 2, "tile8-paired4-msb-v1": 4, "tile8-packed4-high-v1": 4, "tile8-packed4-low-v1": 4 }[bitmap.codec], (palette2 == null ? void 0 : palette2.colors_per_bank) || 256);
+    const count = Math.min(2 ** { "mono-row-msb-v1": 1, "tile8-paired2-msb-v1": 2, "tile8-planar2-msb-v1": 2, "tile8-rowplanar4-msb-v1": 4, "tile8-paired4-msb-v1": 4, "tile8-packed4-high-v1": 4, "tile8-packed4-low-v1": 4 }[bitmap.codec], (palette2 == null ? void 0 : palette2.colors_per_bank) || 256);
     const pixels = () => {
       var _a2;
       return pixelBuffer(ctx2, doc, bitmap, ((_a2 = state2.paint) == null ? void 0 : _a2.cell_index) ?? 0);
@@ -4919,7 +4946,7 @@ ${font ? `<section class="card"><h3>Font metrics · ${esc(font.id)}</h3><div cla
         if (event.key === "ArrowDown") cursor.y = Math.min(bitmap.height - 1, cursor.y + 1);
         state2.pixelCursor = cursor;
         if ([" ", "Enter"].includes(event.key)) {
-          const color = Number(read("paint-color")), bits2 = { "mono-row-msb-v1": 1, "tile8-paired2-msb-v1": 2, "tile8-planar2-msb-v1": 2, "tile8-paired4-msb-v1": 4, "tile8-packed4-high-v1": 4, "tile8-packed4-low-v1": 4 }[bitmap.codec];
+          const color = Number(read("paint-color")), bits2 = { "mono-row-msb-v1": 1, "tile8-paired2-msb-v1": 2, "tile8-planar2-msb-v1": 2, "tile8-rowplanar4-msb-v1": 4, "tile8-paired4-msb-v1": 4, "tile8-packed4-high-v1": 4, "tile8-packed4-low-v1": 4 }[bitmap.codec];
           if (!Number.isInteger(color) || color < 0 || color >= 2 ** bits2) {
             ctx2.notify("Choose a valid palette index.", true);
             return;
@@ -5092,7 +5119,7 @@ ${font ? `<section class="card"><h3>Font metrics · ${esc(font.id)}</h3><div cla
     const scope = selectionKey(ctx2.state), current2 = () => selectionKey(ctx2.state) === scope;
     const image = imageFor(ctx2, doc, bitmap, layout), undo = history2(ctx2, doc, bitmap, layout, image);
     let pixels = [...image.pixels], pointer = null, cursor = { x: 0, y: 0 };
-    const bits2 = { "mono-row-msb-v1": 1, "tile8-paired2-msb-v1": 2, "tile8-planar2-msb-v1": 2, "tile8-paired4-msb-v1": 4, "tile8-packed4-high-v1": 4, "tile8-packed4-low-v1": 4 }[bitmap.codec], count = Math.min(2 ** bits2, (palette2 == null ? void 0 : palette2.colors_per_bank) || 256);
+    const bits2 = { "mono-row-msb-v1": 1, "tile8-paired2-msb-v1": 2, "tile8-planar2-msb-v1": 2, "tile8-rowplanar4-msb-v1": 4, "tile8-paired4-msb-v1": 4, "tile8-packed4-high-v1": 4, "tile8-packed4-low-v1": 4 }[bitmap.codec], count = Math.min(2 ** bits2, (palette2 == null ? void 0 : palette2.colors_per_bank) || 256);
     const beforeCanvas = document.getElementById("sprite-original"), original = assemblePixels(bitmap, layout, (index) => bitmap.cells[index].pixels);
     const rgba = (values, colors) => {
       const data = new Uint8ClampedArray(values.length * 4);
@@ -5331,7 +5358,7 @@ ${font ? `<section class="card"><h3>Font metrics · ${esc(font.id)}</h3><div cla
         return;
       }
       if (!frames[index]) return;
-      const colors = editorPalette(ctx2, palette2), bits2 = { "mono-row-msb-v1": 1, "tile8-paired2-msb-v1": 2, "tile8-planar2-msb-v1": 2, "tile8-paired4-msb-v1": 4, "tile8-packed4-high-v1": 4, "tile8-packed4-low-v1": 4 }[bitmap.codec], count = Math.min(2 ** bits2, (palette2 == null ? void 0 : palette2.colors_per_bank) || 256);
+      const colors = editorPalette(ctx2, palette2), bits2 = { "mono-row-msb-v1": 1, "tile8-paired2-msb-v1": 2, "tile8-planar2-msb-v1": 2, "tile8-rowplanar4-msb-v1": 4, "tile8-paired4-msb-v1": 4, "tile8-packed4-high-v1": 4, "tile8-packed4-low-v1": 4 }[bitmap.codec], count = Math.min(2 ** bits2, (palette2 == null ? void 0 : palette2.colors_per_bank) || 256);
       const image = assemblePixels(bitmap, frames[index], (tile) => pixelBuffer(ctx2, doc, bitmap, tile));
       canvas.width = image.width;
       canvas.height = image.height;
@@ -5356,7 +5383,7 @@ ${font ? `<section class="card"><h3>Font metrics · ${esc(font.id)}</h3><div cla
   }
 
   // romancer/ui/views/assets.js
-  var codecBits = { "tile8-packed4-low-v1": 4, "mono-row-msb-v1": 1, "tile8-paired2-msb-v1": 2, "tile8-planar2-msb-v1": 2, "tile8-paired4-msb-v1": 4, "tile8-packed4-high-v1": 4 };
+  var codecBits = { "tile8-packed4-low-v1": 4, "mono-row-msb-v1": 1, "tile8-paired2-msb-v1": 2, "tile8-planar2-msb-v1": 2, "tile8-paired4-msb-v1": 4, "tile8-rowplanar4-msb-v1": 4, "tile8-packed4-high-v1": 4 };
   function literalColorCount(bitmap, palette2) {
     const bits2 = codecBits[bitmap.codec];
     return bits2 ? Math.min(2 ** bits2, (palette2 == null ? void 0 : palette2.colors_per_bank) || 2 ** bits2) : 0;
@@ -5848,7 +5875,7 @@ ${font ? `<section class="card"><h3>Font metrics · ${esc(font.id)}</h3><div cla
       return result;
     };
     const advance = async (buttons, frames) => {
-      await ctx2.run("runtime.advance", { ...ctx2.projectParams(), frames, buttons, port: 0 }, { refresh: false, render: false });
+      await ctx2.run("runtime.advance", { ...ctx2.projectParams(), frames, buttons: buttonsForRuntime(state2, buttons), port: 0 }, { refresh: false, render: false });
       await capture();
     };
     ctx2.use({
@@ -5880,9 +5907,14 @@ ${font ? `<section class="card"><h3>Font metrics · ${esc(font.id)}</h3><div cla
         state2.playtestExpanded = !state2.playtestExpanded;
         return ctx2.render();
       },
-      "runtime-pause": () => {
+      "runtime-pause": async () => {
+        var _a2, _b2, _c2, _d2, _e2;
+        const project = (_a2 = state2.project) == null ? void 0 : _a2.project_id, session = (_b2 = state2.runtime) == null ? void 0 : _b2.session_dir;
         stopPlayback(state2);
-        return ctx2.render();
+        await ((_c2 = state2.liveStepPending) == null ? void 0 : _c2.catch(() => {
+        }));
+        if (((_d2 = state2.project) == null ? void 0 : _d2.project_id) !== project || ((_e2 = state2.runtime) == null ? void 0 : _e2.session_dir) !== session) return;
+        await capture();
       },
       "runtime-sound-check": async () => {
         stopPlayback(state2);
@@ -5934,7 +5966,14 @@ ${font ? `<section class="card"><h3>Font metrics · ${esc(font.id)}</h3><div cla
           while (state2.playing && (state2.playbackTicket || 0) === ticket && ((_h2 = state2.project) == null ? void 0 : _h2.project_id) === project_id && ((_i2 = state2.runtime) == null ? void 0 : _i2.session_dir) === session) {
             const started = performance.now(), pad = ((_j2 = document.activeElement) == null ? void 0 : _j2.id) === "runtime-controller" ? padForSelection(((_k2 = navigator.getGamepads) == null ? void 0 : _k2.call(navigator)) || [], state2.physicalPadIndex ?? -1) : null;
             const buttons = [.../* @__PURE__ */ new Set([...state2.heldButtons || [], ...controllerButtons(pad)])];
-            const packet = await ctx2.api.call("runtime.step", { project_id, frames: 3, buttons, port: 0 });
+            const pending = ctx2.api.call("runtime.step", { project_id, frames: 3, buttons: buttonsForRuntime(state2, buttons), port: 0 });
+            state2.liveStepPending = pending;
+            let packet;
+            try {
+              packet = await pending;
+            } finally {
+              if (state2.liveStepPending === pending) state2.liveStepPending = null;
+            }
             if (!state2.playing || (state2.playbackTicket || 0) !== ticket) break;
             state2.frame = packet.frame;
             drawFrame(state2.frame);
@@ -6440,7 +6479,7 @@ ${font ? `<section class="card"><h3>Font metrics · ${esc(font.id)}</h3><div cla
   });
 
   // romancer/ui/route_controls.js
-  var familyOptions = [["nes", "NES"], ["snes", "SNES"], ["genesis", "Genesis"], ["gb", "Game Boy"], ["gbc", "Game Boy Color"], ["gba", "GBA"]];
+  var familyOptions = [["nes", "NES"], ["snes", "SNES"], ["genesis", "Genesis"], ["gb", "Game Boy"], ["gbc", "Game Boy Color"], ["gba", "GBA"], ["sms", "Master System"]];
   function selection() {
     return { kind: "artifact", id: read("route-content") };
   }
@@ -6593,7 +6632,7 @@ ${font ? `<section class="card"><h3>Font metrics · ${esc(font.id)}</h3><div cla
       }
     });
     const evidenceSelect = (id, label) => `<label class="field"><span>${label}</span><select id="${id}"><option value="">Select a completed route</option>${reports.map((r) => `<option value="${r.evidence_id}">${esc(r.route_id || "Route")} · ${esc(r.status)} · ${r.evidence_id.slice(0, 8)}</option>`).join("")}</select></label>`;
-    return `${heading("Change-focused regression", "Regression", "Compare recorded runs under matching routes and cores, or localize a reproducible failing edit.")}<section class="card"><h3>Run a regression suite</h3><div class="field-row">${select("suite-source", "Original / baseline", artifacts.map((row) => [row.artifact_id, row.name]), ctx2.draft("suite-source", (_a = state2.project.sources[0]) == null ? void 0 : _a.artifact_id))}${select("suite-target", "Build to test", state2.project.builds.map((row) => [row.artifact_id, row.name]), ctx2.draft("suite-target", ((_b = state2.artifact) == null ? void 0 : _b.kind) === "build" ? state2.artifact.artifact_id : (_c = state2.project.builds.at(-1)) == null ? void 0 : _c.artifact_id))}${field("suite-timeout", "Seconds per run (1–30)", ctx2.draft("suite-timeout", "15"), { type: "number", min: 1 })}</div><div class="suite-routes">${suiteDefinitions.length ? suiteDefinitions.map((row) => `<label><input type="checkbox" name="suite-route" value="${esc(row.definition_id)}"> ${esc(row.name)} · ${esc(row.system_id)}</label>`).join("") : "<p>Save a cold-start route with frame or memory assertions to create a test.</p>"}</div><div class="actions">${button("Run suite", "suite-run", { primary: true, disabled: !suiteDefinitions.length || !state2.project.builds.length })}${button("Create or record test routes", "navigate", { id: "routes" })}</div><p class="subtle">Choose up to8 tests. Each runs on the original and build in fresh workers. A failing baseline stays inconclusive. Total limit:120 seconds.</p></section>${(suite == null ? void 0 : suite.project_id) === state2.project.project_id ? `<section class="card"><div class="card-heading"><h3>Suite results</h3>${badge(suite.status, suite.status === "PASS" ? "good" : "warm")}</div><p>${esc(((_d = artifacts.find((row) => row.artifact_id === suite.source_id)) == null ? void 0 : _d.name) || suite.source_sha256)} → ${esc(((_e = artifacts.find((row) => row.artifact_id === suite.target_id)) == null ? void 0 : _e.name) || suite.target_sha256)}</p><p>${suite.counts.passed} passed · ${suite.counts.regression} regressions · ${suite.counts.inconclusive} inconclusive</p><div class="table-wrap"><table><thead><tr><th>Test</th><th>Baseline</th><th>Build</th><th>Result</th></tr></thead><tbody>${suite.tests.map((row) => `<tr><td>${esc(row.name)}</td><td>${esc(row.baseline_status || "Not completed")}</td><td>${esc(row.candidate_status || "Not run")}</td><td>${badge(row.status, row.status === "PASS" ? "good" : "warm")}${row.reason ? `<p>${esc(row.reason)}</p>` : ""}</td></tr>`).join("")}</tbody></table></div><p class="subtle">Selected assertions only. Untested gameplay remains unknown.</p></section>` : ""}${await suitePictures(ctx2, suite)}<div class="grid-even"><section class="card"><div class="card-heading"><h3>Compare route runs</h3>${badge("STORED EVIDENCE")}</div>${evidenceSelect("baseline-id", "Baseline run")}${evidenceSelect("candidate-id", "Candidate run")}${button("Compare recorded outcomes", "regression-compare", { primary: true, icon: "regression", disabled: reports.length < 2 })}<div class="notice">Different routes or core revisions produce an inconclusive comparison. The source revision may differ because this is a change comparison.</div></section><section class="card"><h3>Reproduce & bisect</h3>${select("bisect-system", "Saved system setup", [["nes", "NES"], ["snes", "SNES"], ["genesis", "Genesis"], ["gb", "Game Boy"], ["gbc", "Game Boy Color"], ["gba", "GBA"]], ctx2.draft("bisect-system", ((_f = state2.artifact) == null ? void 0 : _f.system_id) || "nes"))}${select("bisect-route", "Assertion route", definitions2.map((d) => [d.definition_id, d.name]), ctx2.draft("bisect-route", (_g = definitions2[0]) == null ? void 0 : _g.definition_id))}<div class="field-row">${field("bisect-offset", "Edit offset", ctx2.draft("bisect-offset", "0"))}${field("bisect-before", "Expected bytes", ctx2.draft("bisect-before", ""))}${field("bisect-after", "Replacement bytes", ctx2.draft("bisect-after", ""))}${field("bisect-evaluations", "Maximum evaluations", ctx2.draft("bisect-evaluations", "16"))}${field("bisect-timeout", "Seconds per run", ctx2.draft("bisect-timeout", "30"))}</div><div class="actions">${button("Add candidate edit", "bisect-add-change")}${button("Clear edits", "bisect-clear")}</div><pre>${esc(ctx2.draft("bisect-changes", "[]"))}</pre>${button("Test & narrow edits", "bisect-saved", { disabled: !state2.artifact || !definitions2.length, primary: true })}<p class="subtle">Evaluate subsets of fixed byte edits by rebuilding and actually running the declared route. The empty baseline must pass and the full set must fail.</p>${jsonEditor("bisect-config", "Advanced bisection configuration", ctx2.draft("bisect-config", JSON.stringify({ core: readPreference("romancer-core") || "", options: {}, route: {}, changes: [], budget: { max_evaluations: 16 }, timeout: 30 }, null, 2)), false)}${button("Run bounded bisection", "regression-bisect", { icon: "regression", disabled: !state2.artifact })}<div class="notice warm">Every evaluation uses an owned worker and creates evidence. Cancellation stops further subsets; completed build outputs remain inspectable.</div></section></div>${report(state2.results["regression.compare"], "Run comparison")}${report(state2.results["regression.bisect_profile"] || state2.results["regression.bisect"], "Reproduced failing subset")}`;
+    return `${heading("Change-focused regression", "Regression", "Compare recorded runs under matching routes and cores, or localize a reproducible failing edit.")}<section class="card"><h3>Run a regression suite</h3><div class="field-row">${select("suite-source", "Original / baseline", artifacts.map((row) => [row.artifact_id, row.name]), ctx2.draft("suite-source", (_a = state2.project.sources[0]) == null ? void 0 : _a.artifact_id))}${select("suite-target", "Build to test", state2.project.builds.map((row) => [row.artifact_id, row.name]), ctx2.draft("suite-target", ((_b = state2.artifact) == null ? void 0 : _b.kind) === "build" ? state2.artifact.artifact_id : (_c = state2.project.builds.at(-1)) == null ? void 0 : _c.artifact_id))}${field("suite-timeout", "Seconds per run (1–30)", ctx2.draft("suite-timeout", "15"), { type: "number", min: 1 })}</div><div class="suite-routes">${suiteDefinitions.length ? suiteDefinitions.map((row) => `<label><input type="checkbox" name="suite-route" value="${esc(row.definition_id)}"> ${esc(row.name)} · ${esc(row.system_id)}</label>`).join("") : "<p>Save a cold-start route with frame or memory assertions to create a test.</p>"}</div><div class="actions">${button("Run suite", "suite-run", { primary: true, disabled: !suiteDefinitions.length || !state2.project.builds.length })}${button("Create or record test routes", "navigate", { id: "routes" })}</div><p class="subtle">Choose up to8 tests. Each runs on the original and build in fresh workers. A failing baseline stays inconclusive. Total limit:120 seconds.</p></section>${(suite == null ? void 0 : suite.project_id) === state2.project.project_id ? `<section class="card"><div class="card-heading"><h3>Suite results</h3>${badge(suite.status, suite.status === "PASS" ? "good" : "warm")}</div><p>${esc(((_d = artifacts.find((row) => row.artifact_id === suite.source_id)) == null ? void 0 : _d.name) || suite.source_sha256)} → ${esc(((_e = artifacts.find((row) => row.artifact_id === suite.target_id)) == null ? void 0 : _e.name) || suite.target_sha256)}</p><p>${suite.counts.passed} passed · ${suite.counts.regression} regressions · ${suite.counts.inconclusive} inconclusive</p><div class="table-wrap"><table><thead><tr><th>Test</th><th>Baseline</th><th>Build</th><th>Result</th></tr></thead><tbody>${suite.tests.map((row) => `<tr><td>${esc(row.name)}</td><td>${esc(row.baseline_status || "Not completed")}</td><td>${esc(row.candidate_status || "Not run")}</td><td>${badge(row.status, row.status === "PASS" ? "good" : "warm")}${row.reason ? `<p>${esc(row.reason)}</p>` : ""}</td></tr>`).join("")}</tbody></table></div><p class="subtle">Selected assertions only. Untested gameplay remains unknown.</p></section>` : ""}${await suitePictures(ctx2, suite)}<div class="grid-even"><section class="card"><div class="card-heading"><h3>Compare route runs</h3>${badge("STORED EVIDENCE")}</div>${evidenceSelect("baseline-id", "Baseline run")}${evidenceSelect("candidate-id", "Candidate run")}${button("Compare recorded outcomes", "regression-compare", { primary: true, icon: "regression", disabled: reports.length < 2 })}<div class="notice">Different routes or core revisions produce an inconclusive comparison. The source revision may differ because this is a change comparison.</div></section><section class="card"><h3>Reproduce & bisect</h3>${select("bisect-system", "Saved system setup", [["nes", "NES"], ["snes", "SNES"], ["genesis", "Genesis"], ["gb", "Game Boy"], ["gbc", "Game Boy Color"], ["gba", "GBA"], ["sms", "Master System"]], ctx2.draft("bisect-system", ((_f = state2.artifact) == null ? void 0 : _f.system_id) || "nes"))}${select("bisect-route", "Assertion route", definitions2.map((d) => [d.definition_id, d.name]), ctx2.draft("bisect-route", (_g = definitions2[0]) == null ? void 0 : _g.definition_id))}<div class="field-row">${field("bisect-offset", "Edit offset", ctx2.draft("bisect-offset", "0"))}${field("bisect-before", "Expected bytes", ctx2.draft("bisect-before", ""))}${field("bisect-after", "Replacement bytes", ctx2.draft("bisect-after", ""))}${field("bisect-evaluations", "Maximum evaluations", ctx2.draft("bisect-evaluations", "16"))}${field("bisect-timeout", "Seconds per run", ctx2.draft("bisect-timeout", "30"))}</div><div class="actions">${button("Add candidate edit", "bisect-add-change")}${button("Clear edits", "bisect-clear")}</div><pre>${esc(ctx2.draft("bisect-changes", "[]"))}</pre>${button("Test & narrow edits", "bisect-saved", { disabled: !state2.artifact || !definitions2.length, primary: true })}<p class="subtle">Evaluate subsets of fixed byte edits by rebuilding and actually running the declared route. The empty baseline must pass and the full set must fail.</p>${jsonEditor("bisect-config", "Advanced bisection configuration", ctx2.draft("bisect-config", JSON.stringify({ core: readPreference("romancer-core") || "", options: {}, route: {}, changes: [], budget: { max_evaluations: 16 }, timeout: 30 }, null, 2)), false)}${button("Run bounded bisection", "regression-bisect", { icon: "regression", disabled: !state2.artifact })}<div class="notice warm">Every evaluation uses an owned worker and creates evidence. Cancellation stops further subsets; completed build outputs remain inspectable.</div></section></div>${report(state2.results["regression.compare"], "Run comparison")}${report(state2.results["regression.bisect_profile"] || state2.results["regression.bisect"], "Reproduced failing subset")}`;
   }
 
   // romancer/ui/views/release.js
@@ -6811,6 +6850,10 @@ ${font ? `<section class="card"><h3>Font metrics · ${esc(font.id)}</h3><div cla
       ctx2.notify("Agent configuration copied.");
     }, "settings-setup": async (node) => {
       const family = node.dataset.id;
+      if (!ctx2.state.project && family === "sms") {
+        ctx2.modal("Master System setup", `<p>The full Windows edition includes a Master System engine. Import your own supported cartridge to playtest; a Master System practice workshop is not included.</p>${button("Import ROM", "import", { primary: true })}`);
+        return;
+      }
       if (!ctx2.state.project) {
         const project = await ctx2.api.call("project.demo_system", { system_id: family });
         await ctx2.openProject(project.project_id);
@@ -6830,7 +6873,7 @@ ${font ? `<section class="card"><h3>Font metrics · ${esc(font.id)}</h3><div cla
  <tr><td>Version</td><td>${esc(c.display_version || c.version)}</td></tr><tr><td>Runtime</td><td>Python ${esc(c.python)}</td></tr><tr><td>Platform</td><td>${esc(c.platform)}</td></tr>
  <tr><td>Image support</td><td>${badge(c.pillow ? "Pillow available" : "Pillow missing", c.pillow ? "good" : "warm")}</td></tr><tr><td>Project storage</td><td>Owned source copies and separate builds</td></tr>
  <tr><td>Server</td><td>Authenticated loopback session</td></tr></tbody></table></div><div class="notice">${esc(c.runtime_note)}</div></section>
- <section class="card"><h3>Systems</h3><p>NES · SNES · GEN · Game Boy · Game Boy Color · GBA</p><p class="subtle">Declare text and graphics for your source. Select a saved core setup to playtest.</p>${button("About & credit", "about", { icon: "shield" })}</section></div>
+ <section class="card"><h3>Systems</h3><p>NES · SNES · GEN · Game Boy · Game Boy Color · GBA · Master System (basic)</p><p class="subtle">Declare text and graphics for your source. Select a saved core setup to playtest.</p>${button("About & credit", "about", { icon: "shield" })}</section></div>
  <section class="card"><h3>System support matrix</h3><div class="table-wrap"><table><thead><tr><th>Family</th>${columns.map(([, label]) => `<th>${label}</th>`).join("")}</tr></thead><tbody>
  ${packs.map((pack) => `<tr><td><strong>${esc(pack.label)}${pack.release_focus ? "" : " (advanced)"}</strong><br><small>${esc(pack.formats.join(", "))}</small></td>${columns.map(([key3]) => {
       const capability = key3 === "runtime_control" ? setups[pack.id] : pack.capabilities[key3];
@@ -6914,7 +6957,7 @@ ${font ? `<section class="card"><h3>Font metrics · ${esc(font.id)}</h3><div cla
     const connections = roomConnections(doc, model), names4 = new Map(doc.rooms.map((room) => [room.id, room.name]));
     return `<section class="level-room-navigation"><h3>Choose a room</h3><p class="subtle">Select an object to move it, or choose a terrain brush to paint.</p><div class="level-room-list">${doc.rooms.map((room) => {
       const count = connections.filter((connection) => connection.room_id === room.id).length;
-      return `<button type="button" class="level-room-card" data-action="levels-open-room" data-id="${esc(room.id)}" aria-pressed="${room.id === id}" aria-label="Open room ${esc(room.name)}"><canvas data-level-room-preview="${esc(room.id)}" aria-hidden="true"></canvas><strong>${esc(room.name)}</strong><span>${count} room ${count === 1 ? "link" : "links"}</span></button>`;
+      return `<button type="button" class="level-room-card" data-action="levels-open-room" data-id="${esc(room.id)}" aria-pressed="${room.id === id}"><canvas data-level-room-preview="${esc(room.id)}" aria-hidden="true"></canvas><strong>${esc(room.name)}</strong><span>${count} room ${count === 1 ? "link" : "links"}</span></button>`;
     }).join("")}</div><div class="level-connection-list">${connections.map((connection) => `<div class="level-connection"><span>${esc(names4.get(connection.room_id))}</span>${button(connection.name, "levels-select-object", { id: String(connection.index), name: connection.room_id })}<span aria-hidden="true">→</span>${button(names4.get(connection.target_room_id), "levels-open-room", { id: connection.target_room_id })}</div>`).join("")}</div></section>`;
   }
   function objectChoices(doc, model, id, allRecords = false) {
@@ -8668,7 +8711,7 @@ ${font ? `<section class="card"><h3>Font metrics · ${esc(font.id)}</h3><div cla
   }
   async function importDialog() {
     const dropped = state.droppedImportFile;
-    modal(state.project ? "Import ROM" : "New ROM project", `${!state.project ? field("new-project-name", "Project name", dropped ? dropped.name.replace(/\.[^.]+$/, "") : "My ROM project") : ""}<p>Your original file stays unchanged.</p>${dropped ? `<p class="notice">Selected: <strong>${esc(dropped.name)}</strong></p>` : ""}<label class="field"><span>Choose a ROM file</span><input type="file" id="import-file" accept=".nes,.sfc,.smc,.md,.gen,.bin,.gb,.gbc,.gba,.rom"></label><details class="config"><summary>Advanced path import</summary>${field("import-path", "Absolute file path", "", { placeholder: "C:\\Games\\My game.sfc" })}${button("Browse this computer", "choose-input", { icon: "folder" })}<p>Use a path for files larger than64MiB.</p></details><div class="actions">${button("Import ROM", "import-confirm", { primary: true, icon: "plus" })}${button("Import help", "help-topic", { id: "import" }) + button("Start a new project", "new-project")}</div>`);
+    modal(state.project ? "Import ROM" : "New ROM project", `${!state.project ? field("new-project-name", "Project name", dropped ? dropped.name.replace(/\.[^.]+$/, "") : "My ROM project") : ""}<p>Your original file stays unchanged.</p>${dropped ? `<p class="notice">Selected: <strong>${esc(dropped.name)}</strong></p>` : ""}<label class="field"><span>Choose a ROM file</span><input type="file" id="import-file" accept=".nes,.sfc,.smc,.md,.gen,.bin,.gb,.gbc,.gba,.sms,.rom"></label><details class="config"><summary>Advanced path import</summary>${field("import-path", "Absolute file path", "", { placeholder: "C:\\Games\\My game.sfc" })}${button("Browse this computer", "choose-input", { icon: "folder" })}<p>Use a path for files larger than64MiB.</p></details><div class="actions">${button("Import ROM", "import-confirm", { primary: true, icon: "plus" })}${button("Import help", "help-topic", { id: "import" }) + button("Start a new project", "new-project")}</div>`);
   }
   function showSearch() {
     const query = document.getElementById("global-search").value, matches = workspaceMatches(query, names3, state.project);
@@ -8799,7 +8842,7 @@ ${font ? `<section class="card"><h3>Font metrics · ${esc(font.id)}</h3><div cla
     document.getElementById("app").innerHTML = `<div class="shell"><aside class="sidebar"><a class="brand" href="#" data-action="navigate" data-id="overview"><img src="/mark.svg" alt=""><div><strong>ROMancer</strong><small>By RetchEWretched</small></div></a><div class="nav-label">Workspace</div><nav aria-label="Workbench">${["overview", "resources", "debug", "scripts", "assets", "levels", "sound", "playtest", "release"].map((k) => `<button class="nav-item ${state.page === k ? "active" : ""}" data-action="navigate" data-id="${k}" title="${names3[k]}" ${state.page === k ? 'aria-current="page"' : ""}>${icon(k)}<span>${names3[k]}</span></button>`).join("")}<details class="more-tools" ${getSettings().advancedTools || ["tables", "automation", "routes", "regression"].includes(state.page) ? "open" : ""}><summary title="More tools">More tools</summary>${["tables", "automation", "routes", "regression"].map((k) => `<button class="nav-item ${state.page === k ? "active" : ""}" data-action="navigate" data-id="${k}" title="${names3[k]}">${icon(k)}<span>${names3[k]}</span></button>`).join("")}</details></nav><div class="sidebar-bottom"><button class="nav-item" data-action="navigate" data-id="help" title="Help">${icon("shield")}<span>Help</span></button><button class="nav-item" data-action="projects-manage" title="Projects">${icon("folder")}<span>Projects</span></button><button class="nav-item ${state.page === "settings" ? "active" : ""}" data-action="navigate" data-id="settings" title="Settings">${icon("settings")}<span>Settings</span></button><button class="nav-item" data-action="about" title="About ROMancer">${icon("shield")}<span>About</span></button><div class="local-label"><span class="dot"></span>Runs on your computer</div></div></aside><header class="topbar"><div class="project-control">${icon("folder")}<div><small>ACTIVE PROJECT</small><br><select id="project-select" aria-label="Active project"><option value="">Choose a project</option>${state.projects.map((p) => `<option value="${p.project_id}" ${(project == null ? void 0 : project.project_id) === p.project_id ? "selected" : ""}>${esc(p.name)}</option>`).join("")}</select></div>${button("New project", "new-project", { icon: "plus", class: "compact" })}</div>${artifacts.length ? `<div class="project-control source-selector"><div><small>${((_i = state.artifact) == null ? void 0 : _i.kind) === "source" ? "ORIGINAL ROM" : "BUILD"}</small><br><select id="artifact-select" aria-label="Selected source or build">${[["Original ROMs", project.sources], ["Builds", project.builds]].filter(([, rows]) => rows.length).map(([label, rows]) => `<optgroup label="${label}">${rows.map((a) => {
       var _a2;
       return `<option value="${a.artifact_id}" ${((_a2 = state.artifact) == null ? void 0 : _a2.artifact_id) === a.artifact_id ? "selected" : ""}>${esc(a.name)}</option>`;
-    }).join("")}</optgroup>`).join("")}</select></div></div>` : ""}<label class="search">${icon("search")}<input id="global-search" placeholder="Search workspace" aria-label="Search workspace"><kbd>Ctrl K</kbd><button type="button" data-action="workspace-search" aria-label="Run workspace search" class="search-go">Go</button></label></header><main id="main" tabindex="-1"><div class="loading">Opening ${names3[state.page]}…</div></main>${jobTray()}${tutorial.panel()}</div>`;
+    }).join("")}</optgroup>`).join("")}</select></div></div>` : ""}<label class="search">${icon("search")}<input id="global-search" placeholder="Search workspace" aria-label="Search workspace"><kbd>Ctrl K</kbd><button type="button" data-action="workspace-search" aria-label="Go: search workspace" class="search-go">Go</button></label></header><main id="main" tabindex="-1"><div class="loading">Opening ${names3[state.page]}…</div></main>${jobTray()}${tutorial.panel()}</div>`;
     const view = views[state.page];
     let html;
     if (project && state.artifact) {

@@ -9,6 +9,22 @@ from romancer import workbench_projects as projects
 
 
 class VerifiedGameTests(unittest.TestCase):
+    def test_rastan_exact_revision_opens_verified_first_enemy_graphics(self):
+        from romancer.verified_games import PROFILES
+        profile=copy.deepcopy(next(p for p in PROFILES if p['id']=='rastan-sms'))
+        raw=bytearray(262144);raw[0x7ff0:0x7ff8]=b'TMR SEGA';raw[0x7fff]=0x40
+        raw[0x7ffa:0x7ffc]=((sum(raw[:0x7ff0])+sum(raw[0x8000:]))&65535).to_bytes(2,'little')
+        source=self.root/'original.sms';source.write_bytes(raw);row=projects.register_source(Path(self.project['path']),source,None);profile['sha256']=row['sha256'];p={**self.params,'artifact_id':row['artifact_id']}
+        with patch('romancer.verified_games.PROFILES',(profile,)):
+            model=self.api.dispatch('games.inspect',p);self.assertEqual(model['status'],'MATCHED',model);self.assertEqual(model['fields'],[])
+            self.assertEqual(model['resources'][0]['kind'],'assets')
+            opened=self.api.dispatch('games.configure',{**p,'resource_id':'first-enemy-sprites'});self.assertTrue(opened['ok'],opened)
+            self.assertEqual(opened['resource_kind'],'assets');self.assertEqual(opened['inspection']['bitmaps'][0]['count'],60)
+            self.assertEqual(opened['inspection']['bitmaps'][0]['codec'],'tile8-rowplanar4-msb-v1')
+            self.assertEqual(opened['sprite_layout']['indices'],[30,32,31,33,52,54,53,55])
+            refused=self.api.dispatch('games.plan',{**p,'profile_id':profile['id'],'values':{}});self.assertFalse(refused['ok']);self.assertIn('Graphics',refused['error'])
+            self.assertEqual(source.read_bytes(),raw)
+
     def test_handheld_definitions_guard_layout_and_keep_separate_builds(self):
         from romancer.verified_games import PROFILES
         from romancer.boot_fixtures import make_boot_fixture
@@ -184,10 +200,10 @@ class VerifiedGameTests(unittest.TestCase):
 
     def test_public_registry_contains_only_small_sourced_definitions(self):
         from romancer.verified_games import PROFILES
-        self.assertEqual(len(PROFILES),6)
+        self.assertEqual(len(PROFILES),7)
         for p in PROFILES:
             self.assertRegex(p['sha256'],r'^[a-f0-9]{64}$')
-            self.assertTrue(p['reference'].startswith('https://github.com/'))
+            self.assertTrue(p['reference'].startswith('https://github.com/') or p['id']=='rastan-sms' and p['reference']=='/user-guide/index.html#rastan-blobs')
             self.assertNotIn('path',p)
 
     def test_operation_names_and_required_parameters_are_discoverable(self):

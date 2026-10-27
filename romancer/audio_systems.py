@@ -20,6 +20,8 @@ HARDWARE={
 }
 
 
+HARDWARE['sms']={'name':'Master System PSG','nominal_channels':4,'channels':['Tone 1','Tone 2','Tone 3','Noise'],'sample_formats':[],'notes':'PSG hardware identity does not identify a music driver or sample location. No Master System sequence decoder is provided.','references':['https://www.smspower.org/Development/SN76489']}
+
 HARDWARE['gbc']={**HARDWARE['gb'],'name':'Game Boy Color APU'}
 
 

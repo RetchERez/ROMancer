@@ -74,3 +74,6 @@ html[data-theme="light"] .nav-label,html[data-theme="light"] .app-footer{color:v
 .settings-actions{padding-top:18px;border-top:1px solid var(--line)}
 .settings-actions .subtle{margin-left:auto}
 .settings-card input[type="range"]{accent-color:var(--accent);padding:0;min-height:32px}
+
+/* The emulator screen keeps a dark surface in every interface theme. */
+.screen .empty,.screen .empty h3{color:#e7eded}.screen .empty p{color:#adc1ca}

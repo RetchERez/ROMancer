@@ -53,3 +53,12 @@ for(const existing of [false,true])for(const change of ['newer-input','invalid-i
  if(change==='unchanged')assert.equal(calls.find(([op])=>op==='selected')[1],existing?'existing':'new');
 }
 console.log('Slow reviews and build results preserve newer game edits.');
+
+{
+ const actions={},drafts=new Map([['asset-schema','{"id":"old-declaration"}']]),schema={id:'verified-graphics',source:{sha256:'sha'}},inspection={document_id:'new-doc',bitmaps:[{id:'tiles'}]},state={project:{project_id:'p'},artifact:{artifact_id:'a',sha256:'sha'},results:{},paint:{pixels:[1]},candidateReview:{artifact_id:'a'},pending:{plan_id:'old'}};
+ const model={profile:{id:'rastan-sms',scope:'Checked pose',reference:'/user-guide/index.html#rastan-blobs'},fields:[],locations:[],resources:[{id:'first-enemy-sprites',name:'first enemy sprites',scope:'Checked pose',kind:'assets'}]};
+ const ctx={state,sourceParams:()=>({project_id:'p',artifact_id:'a'}),use:h=>Object.assign(actions,h),draft:(k,v)=>drafts.get(k)??v,setDraft:(k,v)=>drafts.set(k,v),api:{call:async()=>model},run:async()=>({resource_kind:'assets',schema,inspection,sprite_layout:{first:0,columns:2,rows:4,order:'rows',indices:[30,32,31,33,52,54,53,55]}}),refreshProject:async()=>{},navigate:async page=>state.page=page,render:async()=>{}};
+ await gameEdits(ctx);await actions['game-resource']({dataset:{id:'first-enemy-sprites'}});
+ assert.deepEqual(JSON.parse(drafts.get('asset-schema')),schema);assert.equal(state.candidateReview,null);assert.equal(state.paint,null);assert.equal(state.pending,null);assert.equal(state.results['assets.inspect'],inspection);assert.equal(state.page,'assets');
+ console.log('Opening verified enemy graphics replaces a stale schema and candidate state before review.');
+}

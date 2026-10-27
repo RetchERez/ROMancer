@@ -1,17 +1,29 @@
 import assert from 'node:assert/strict';
 import {render as playtest} from '../romancer/ui/views/playtest.js';
 import {render as tables} from '../romancer/ui/views/tables.js';
-import {stopPlayback} from '../romancer/ui/playback_controls.js';
+import {stopPlayback,mountController} from '../romancer/ui/playback_controls.js';
 globalThis.localStorage={getItem:()=>null};
 globalThis.document={getElementById:()=>null,activeElement:null};
 let failures=[];
 async function check(name,test){try{await test();console.log(name+' passed.');}catch(error){failures.push(name+': '+error.message);}}
+await check('Moving focus from the game to Pause does not remove the clicked button',async()=>{
+ const events={},windowEvents={},documentEvents={};let renders=0;const control={addEventListener:(k,f)=>events[k]=f};
+ globalThis.document={getElementById:()=>control,addEventListener:(k,f)=>documentEvents[k]=f,activeElement:control};globalThis.window={addEventListener:(k,f)=>windowEvents[k]=f};
+ const state={playing:true,heldButtons:['a']};mountController({state,render:()=>renders++});events.blur({});assert.equal(state.playing,true);assert.deepEqual(state.heldButtons,[]);assert.equal(renders,0);
+ windowEvents.blur();assert.equal(state.playing,false);assert.equal(renders,1);
+ globalThis.document={getElementById:()=>null,activeElement:null};
+});
 await check('Delayed Play cannot restart after navigation or selection changes',async()=>{
  for(const change of [state=>state.page='resources',state=>state.artifact={artifact_id:'other'},state=>state.project={project_id:'other'},state=>{state.project=null;state.runtime=null;}]){
   let resolveStart,steps=0;const handlers={},state={page:'playtest',project:{project_id:'p',containers:[]},artifact:{artifact_id:'a',name:'Original',sha256:'a'.repeat(64)},runtime:{session_dir:'s'},results:{},capabilities:{platform:'Windows'},liveAudio:{ticket:0,start:()=>new Promise(resolve=>resolveStart=resolve),stop(){this.ticket++;},setVolume(){}}};
   const ctx={state,use:actions=>Object.assign(handlers,actions),draft:(_,fallback)=>fallback,render:async()=>{},notify(){},sourceParams:()=>({project_id:state.project.project_id,artifact_id:state.artifact.artifact_id}),projectParams:()=>({project_id:state.project.project_id}),api:{call:async op=>{if(op==='runtime.step'){steps++;throw new Error('late step');}return op==='saves.list'?{saves:[]}:op==='runtime.checkpoints'?{checkpoints:[]}:{profile:null};}}};
   await playtest(ctx);const playing=handlers['runtime-play']();stopPlayback(state);change(state);resolveStart();await playing.catch(()=>{});assert.equal(steps,0);assert.equal(state.playing,false);
  }
+});
+await check('Pause waits for the in-flight native step and captures its final frame',async()=>{
+ let finish;const handlers={},calls=[],state={page:'playtest',project:{project_id:'p',containers:[]},artifact:{artifact_id:'a',sha256:'a'.repeat(64)},runtime:{session_dir:'s'},results:{},capabilities:{platform:'Windows'},playing:true,liveStepPending:new Promise(resolve=>finish=resolve)};
+ const ctx={state,use:h=>Object.assign(handlers,h),draft:(_,v)=>v,render:async()=>{},sourceParams:()=>({project_id:'p',artifact_id:'a'}),projectParams:()=>({project_id:'p'}),api:{call:async op=>op==='saves.list'?{saves:[]}:op==='runtime.checkpoints'?{checkpoints:[]}:{profile:null}},run:async op=>{calls.push(op);return {index:844,sha256:'f'.repeat(64)};}};
+ await playtest(ctx);const pausing=handlers['runtime-pause']();await Promise.resolve();assert.equal(calls.length,0);finish({});await pausing;assert.deepEqual(calls,['runtime.capture']);assert.equal(state.frame.index,844);assert.equal(state.playing,false);
 });
 function tableContext(){const handlers={},drafts=new Map(),nodes=new Map(),calls=[],definition={schema_version:1,name:'Stats',offset:0,count:100,stride:1,fields:[{name:'Value',offset:0,type:'u8',endian:'little',pointer_base:null}]};
  const state={project:{project_id:'p'},artifact:{artifact_id:'a',sha256:'a'.repeat(64),size:100,descriptors:{}},results:{'tables.inspect':{ok:true,source_sha256:'a'.repeat(64),document_id:'doc',definition,total:100,page:0,limit:50,rows:[{index:0,offset:0,cells:[{field:'Value',value:3,target_offset:null}]}]}},pending:null};

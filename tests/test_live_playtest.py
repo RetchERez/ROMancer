@@ -17,14 +17,33 @@ class LiveStepTests(unittest.TestCase):
     def test_step_batches_under_one_lock_and_preserves_capture_identity_path(self):
         pool=RuntimePool();self.addCleanup(pool.close)
         pool.sessions['project']={'runtime':MagicMock(),'load':{},'touched':0}
-        pool.request=Mock(side_effect=[{'ok':True,'frame_index':3},{'sha256':'f'*64},{'captured_frames':2}])
+        pool.request=Mock(side_effect=[{'complete':False,'captured_frames':48000},{'ok':True,'frame_index':3},{'sha256':'f'*64},{'captured_frames':2}])
         pool.sessions['project']['runtime'].load_result={'av':{'timing':{'fps':60,'sample_rate':44100}}}
         result=pool.step('project',3,['a'],0)
-        self.assertEqual([call.args[1] for call in pool.request.call_args_list],['advance','capture','audio'])
-        self.assertEqual(pool.request.call_args_list[0].args[2],{'frames':3,'buttons':['a'],'port':0})
+        self.assertEqual([call.args[1] for call in pool.request.call_args_list],['audio','advance','capture','audio'])
+        self.assertEqual(pool.request.call_args_list[1].args[2],{'frames':3,'buttons':['a'],'port':0})
         self.assertEqual(result['timing']['fps'],60);self.assertEqual(result['advanced']['frame_index'],3)
         for frames in (0,13,True):
             with self.assertRaises(ValueError):pool.step('project',frames,[],0)
+
+    def test_live_step_excludes_accumulated_manual_audio_and_rejects_invalid_input_before_drain(self):
+        pool=RuntimePool();self.addCleanup(pool.close)
+        runtime=MagicMock();runtime.load_result={'av':{'timing':{'fps':60,'sample_rate':44100}}}
+        pool.sessions['project']={'runtime':runtime,'load':{},'touched':0}
+        pending=60000
+        def request(project,operation,parameters,**kwargs):
+            nonlocal pending
+            if operation=='advance':pending+=parameters['frames']*735;return {'frame_index':844}
+            if operation=='capture':return {'sha256':'f'*64}
+            if operation=='audio':
+                count=pending;pending=0
+                return {'complete':count<=48000,'captured_frames':min(count,48000),'dropped_frames':max(0,count-48000)}
+        pool.request=Mock(side_effect=request)
+        result=pool.step('project',3,[],0)
+        self.assertTrue(result['audio']['complete']);self.assertEqual(result['audio']['captured_frames'],2205)
+        pool.request.reset_mock()
+        with self.assertRaises(ValueError):pool.step('project',3,['not-a-button'],0)
+        pool.request.assert_not_called()
 
     def test_no_active_session_refuses(self):
         pool=RuntimePool();self.addCleanup(pool.close)

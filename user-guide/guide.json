@@ -2,10 +2,10 @@
   "schema_version": 1,
   "product": "ROMancer v1.0",
   "subtitle": "A practical guide to the current editing tools: small first edits, advanced workflows, actual editing and appearance examples, a glossary and an alphabetical index.",
-  "scope": "Investigate unfamiliar cartridges without a game definition, review exact edits, create separate builds, playtest and verify patches. Named game workflows require their exact supported revision. Observations, candidate layouts and unknown behavior remain distinct.",
+  "scope": "Investigate unfamiliar cartridges without a game definition, review exact edits, create separate builds, playtest and verify patches. Named game workflows require their exact supported revision. Observations, candidate layouts and unknown behavior remain distinct. Basic Master System support covers validated Sega headers, checksums, literal row-planar graphics, declared edits, patches and measured playtesting. It does not infer every game resource.",
   "basic_summary": "Start the application, choose saved preferences, identify a source, make a focused edit, preserve progress and export a checked patch. These procedures build the habits used throughout the guide.",
   "advanced_summary": "Use explicit definitions for graphics, text, tables, connected-room layouts, audio and bounded automation. Follow declared ranges to exact bytes, and keep editor metadata, native observations and unknown game semantics separate.",
-  "attribution": "By RetchEWretched. ROMancer code and original fixtures use the project MIT license. Instructional screenshots show third-party games, including Castlevania, Chrono Trigger, The Immortal, Wario Land 4, Final Fantasy Legend II and Deja Vu I & II; their imagery and trademarks remain those of their respective rights holders and are separate from the code license. No ROM files, game saves, emulator states, firmware dumps or authentication data are included in this guide. The prebuilt PDF and HTML work offline; PDF rebuilding optionally uses ReportLab.",
+  "attribution": "By RetchEWretched. ROMancer code and original fixtures use the project MIT license. Instructional screenshots show third-party games, including Castlevania, Chrono Trigger, The Immortal, Wario Land 4, Final Fantasy Legend II and Deja Vu I & II and Rastan; their imagery and trademarks remain those of their respective rights holders and are separate from the code license. No ROM files, game saves, emulator states, firmware dumps or authentication data are included in this guide. The prebuilt PDF and HTML work offline; PDF rebuilding optionally uses ReportLab.",
   "chapters": [
     {
       "id": "install",
@@ -16,7 +16,7 @@
       "steps": [
         "Run the Windows setup executable. Choose the install location, finish setup, then open ROMancer. The application and its saved workspace are separate.",
         "For the portable Windows ZIP, extract the entire archive and use <b>Open ROMancer.cmd</b>. Keep app, python, cores and the root launch files together.",
-        "For the source edition, install Python 3.13 or later and the pinned requirements, then use <b>Launch ROMancer.cmd</b> on Windows or the supplied run.sh launcher. Read the root README for the command-line and MCP entry points.",
+        "For the source edition, install Python 3.13 or 3.14 and the pinned requirements, then use <b>Launch ROMancer.cmd</b> on Windows or the supplied run.sh launcher. Read the root README for the command-line and MCP entry points.",
         "Open <b>Help</b> for tutorials and this guide. Start a workshop or import a ROM you supply. No AI account, subscription or API key is required."
       ],
       "result": "ROMancer opens its local interface and your project list. The full Windows edition selects a matching included engine when you load a supported system.",
@@ -29,6 +29,10 @@
         {
           "title": "Offline guide",
           "text": "Open user-guide/index.html directly from the source folder, or app/user-guide/index.html in the Windows payload. The adjacent guide.pdf is the printable edition. Keep the screenshots folder beside the HTML."
+        },
+        {
+          "title": "Choose your route",
+          "text": "Beginner: use an original workshop and follow Your first edit. To try a supplied hack, apply its BPS patch to the exact original revision. Experienced user: declare resource layouts and review byte plans. Expert or AI client: use the same plans through the local API/MCP interface; successful decoding and gameplay evidence are still separate."
         }
       ],
       "related": [
@@ -141,6 +145,42 @@
           }
         ]
       }
+    },
+    {
+      "id": "release-checks",
+      "title": "Understand test results and report a problem",
+      "part": "Basic",
+      "kicker": "Support / checked scope",
+      "intro": "A passing automated check describes the exact scenario it ran. It does not mean every ROM, edit or computer configuration is certified.",
+      "steps": [
+        "Read VERIFICATION STATUS in README.txt for the released build results, skips and unperformed manual checks. A skipped test is not a pass.",
+        "If a file cannot import, read the exact error. An HTML page saved as .7z is not an archive; obtain your real cartridge file and extract a valid archive before importing. Never rename an error page to .sms.",
+        "Open Settings, expand Diagnostics & support, run checks and prepare a support report. Review it before sharing; exclude ROMs, saves, states, private backups, credentials and personal paths.",
+        "For a bug report, record version/build, operating system, scale setting, exact steps, expected result and actual result. Prefer reproducing with an included workshop.",
+        "Use the GitHub bug form once the repository is published. Security problems should use its private vulnerability-reporting channel after that channel is enabled; do not post secrets publicly."
+      ],
+      "result": "A short, reproducible report gives another person enough information to investigate without your commercial game data.",
+      "note": "Automated accessibility/contrast checks and keyboard navigation help find problems. They do not replace a human screen-reader trial, an independent beginner trial or testing Windows-wide display scaling on a clean machine.",
+      "related": [
+        "install",
+        "beginner-trial",
+        "settings",
+        "first-edit"
+      ],
+      "terms": [
+        "term-build",
+        "term-plan"
+      ],
+      "details": [
+        {
+          "title": "Known formats and reviewed engines",
+          "text": "Import accepts recognized supported cartridge layouts. Unknown, ambiguous or unsupported layouts are blocked. The full Windows runtime checks emulator binaries against the included open-source pins before native loading. A known console header does not identify every game resource; unavailable level, sound or compression interpretations cannot be treated as editable definitions."
+        },
+        {
+          "title": "Useful byte explanations",
+          "text": "After opening a known or declared graphics resource, use Resources -> Explain selected bytes. The report identifies the stored tile/cell, row and bitplane or packed-pixel ordering, and declared palette channel values. It does not invent an enemy name or behavior for undeclared bytes."
+        }
+      ]
     },
     {
       "id": "start",
@@ -738,13 +778,13 @@
       "id": "play",
       "title": "Playtest, pause and save a state",
       "kicker": "TEST THE SELECTED BUILD",
-      "image": "09-playtest-states",
+      "image": "55-snes-visible-playtest",
       "steps": [
-        "Check that the top selector shows your build, then open <b>Playtest</b> and click <b>Load game</b>.",
+        "Check that the top selector shows the source or build you intend to test, then open <b>Playtest</b> and click <b>Load game</b>.",
         "Choose <b>Play</b> and focus the game for controller input. Use <b>Pause</b> before inspecting a frame. Controller & frame tools exposes manual stepping and input devices.",
         "Choose <b>Save state</b>. Select a saved state and click <b>Load state</b> to return to it. Ordinary battery saves are managed separately below."
       ],
-      "result": "For this capture, the modified Chrono Trigger build was loaded, advanced 600 frames, saved and restored through ROMancer.",
+      "result": "The original Chrono Trigger cartridge is visibly running at its name-entry screen. Live Play/Pause, input, save/load and repeated native state replay passed on this source. The earlier black transition frame was rejected as visual load proof.",
       "note": "Save states are bound to the exact ROM, engine and runtime setup. Do not assume a state from the original will load on a modified build. Loading refreshes one paused frame.",
       "part": "Basic",
       "intro": "Load the exact source or build you intend to test. Playback, controller input, frame stepping and snapshots operate on that loaded session.",
@@ -753,7 +793,7 @@
         "regression",
         "sound"
       ],
-      "caption": "Actual ROMancer interface. The HTML edition links to the full-resolution capture.",
+      "caption": "Actual ROMancer Playtest with Chrono Trigger USA, frame993. A running worker alone does not prove a visibly loaded scene.",
       "terms": [
         "term-core",
         "term-frame",
@@ -1202,7 +1242,7 @@
         },
         {
           "title": "Six supported modes",
-          "text": "NES, SNES, Genesis, GB, GBC and GBA are separate user choices. Bank switching, enhancement hardware and game-specific data need their own supported mapping or verified definition. Unknown bytes remain inspectable, with editing or execution refused when support is not established. The declared catalog also exposes checked level and sound ranges; it does not discover arbitrary room identities or music-driver commands."
+          "text": "NES, SNES, Genesis, GB, GBC, GBA and Master System are separate user choices. Bank switching, enhancement hardware and game-specific data need their own supported mapping or verified definition. Unrecognized cartridge layouts are rejected on import. Stored resource interpretations still need their supported codec and source-bound definition. The declared catalog also exposes checked level and sound ranges; it does not discover arbitrary room identities or music-driver commands."
         },
         {
           "title": "Automatic versus manual investigation",
@@ -2719,6 +2759,165 @@
           }
         ]
       }
+    },
+    {
+      "id": "rastan-blobs",
+      "title": "Rastan: turn the first enemy into a blob",
+      "part": "Advanced",
+      "kicker": "Real ROMancer editing / Master System",
+      "intro": "This example replaces the first humanoid enemy graphics with one connected blob per enemy. ROMancer made the build through its asset planner and repeated the same edit through the actual Graphics & fonts interface. Other enemy types are unchanged.",
+      "steps": [
+        "To try the result, use Apply downloaded patch with Rastan-Single-Blob-Enemies.bps and the matching original. Review compatibility and create a separate build.",
+        "For the exact supported original, open Game edits -> Open first enemy sprites. ROMancer loads the checked 60-tile range and observed assembly. Other revisions do not receive this definition.",
+        "In Sprite assembly choose 2 tiles across, 4 down and custom map 30,32,31,33,52,54,53,55. This arrangement was checked against captured native graphics.",
+        "Paint one connected body across the tile boundaries. The corrected example has one connected shape in each of its three lower-body animation frames.",
+        "Choose Review graphics changes. The example changes 1294 bytes, including two maintained checksum bytes. Name and create the build.",
+        "Open the build in Playtest. The measured route uses 600 idle frames, one A frame and 240 further frames. Compare the opening enemies, then export a verified patch."
+      ],
+      "result": "The actual interface reproduced target SHA-256 a063d89fe186a41d5755d80a01e254b3b4fe4320f2eb0e823182d06e24008dcb. The matched native checkpoint shows the two humanoid enemies as single blobs; observed changed pixels are confined to the enemy region.",
+      "note": "Graphics only: original collision space and AI remain, including possible invisible collision above the shorter blob. This opening check is not a full playthrough. Grayscale is labeled when no stored palette is declared.",
+      "details": [
+        {
+          "title": "Exact original revision",
+          "text": "262144 bytes; SHA-256 7e310ada1a09ace30e9dd8f5738f095c0ec7821edc225221cbba130fb8cbadb3. The unmarked archive revision was used; the separately marked bad variant was not."
+        },
+        {
+          "title": "How ROMancer made the hack",
+          "text": "assets.inspect decoded the declared row-planar data; assets.plan reviewed pixel changes and cartridge checksum updates; structured.apply created an owned build; release.prepare independently reconstructed the BPS target. Analysis located and checked data; no standalone script patched the ROM outside ROMancer. The matched original now exposes this layout directly through Game edits."
+        },
+        {
+          "title": "Scope of Master System support",
+          "text": "This build supports conservative Sega headers, their additive checksum, literal SMS row-planar4 tiles, declared text/byte editing, BPS workflows and the tested included BlastEm setup. Active mapper state, complete level/music formats and automatic enemy meanings remain unknown. The bundled setup selects a two-button pad; raw libretro input names differ from console button labels."
+        }
+      ],
+      "related": [
+        "sprites",
+        "first-edit",
+        "patches",
+        "play",
+        "drafts"
+      ],
+      "terms": [
+        "term-plan",
+        "term-build",
+        "term-palette"
+      ],
+      "image": "51-rastan-enemy-editor",
+      "image_layout": "following-page",
+      "caption": "Actual ROMancer original/edited assembly and reviewed 1294-byte build. The blob is a single connected shape.",
+      "visual_page": {
+        "title": "One enemy / one connected blob",
+        "kicker": "Advanced / actual application capture",
+        "intro": "The first enemy graphics are staged as one shape across its tiles.",
+        "panels": [
+          {
+            "image": "51-rastan-enemy-editor",
+            "title": "Original sprite and edited blob",
+            "x": 48,
+            "top": 846,
+            "width": 1170,
+            "crop": [
+              180,
+              160,
+              1585,
+              950
+            ],
+            "caption": "A declared layout joins the sprite parts. Review and Create remain separate steps."
+          }
+        ]
+      },
+      "extra_images": [
+        {
+          "image": "54-rastan-original-playtest",
+          "title": "Original enemy graphics in the same measured opening scene"
+        },
+        {
+          "image": "52-rastan-blobs-playtest",
+          "title": "The recorded build running inside ROMancer Playtest"
+        },
+        {
+          "image": "53-rastan-verified-patch",
+          "title": "Patch creation through the actual Export interface"
+        }
+      ]
+    },
+    {
+      "id": "rastan-playtest",
+      "title": "Check the edited enemy in gameplay",
+      "part": "Advanced",
+      "kicker": "Measured proof / before and after",
+      "intro": "Use the same game, core and input route to compare a reskin. The editor preview shows staged pixels; Playtest shows the recorded build running in the included engine.",
+      "steps": [
+        "Select the original ROM, open Playtest and load the game. Reach a useful scene using the controller or a repeatable route.",
+        "Capture the original scene. Save states belong to that exact ROM and core setup; do not load the original state into a different build.",
+        "Close the worker, select the edited build and repeat the same route from a cold start. Capture the scene at the matching frame.",
+        "Check the changed enemy and the surrounding scene. Use Play and Pause to inspect animation, then save a state for the edited build.",
+        "Export a patch after review. Its checked reconstruction proves the exact target bytes; it does not prove every level or gameplay outcome."
+      ],
+      "result": "The paired Rastan captures show the original humanoid enemies and the single-blob reskin at the same opening checkpoint. ROMancer rendered the measured native frames in its own Playtest canvas.",
+      "note": "These are real application captures. A loading message is not gameplay evidence. The first humanoid enemy type was edited; other enemies and collision behavior were not redesigned.",
+      "related": [
+        "rastan-blobs",
+        "play",
+        "patches"
+      ],
+      "terms": [
+        "term-build"
+      ],
+      "image": "52-rastan-blobs-playtest",
+      "image_layout": "following-page",
+      "caption": "The modified build running inside ROMancer.",
+      "visual_page": {
+        "title": "Original and edited enemies in Playtest",
+        "kicker": "Advanced / matching opening scene",
+        "intro": "The same native frame route shows the difference. These crops come from full ROMancer screenshots included in the HTML guide.",
+        "panels": [
+          {
+            "image": "54-rastan-original-playtest",
+            "title": "Original enemies",
+            "x": 48,
+            "top": 846,
+            "width": 630,
+            "crop": [
+              700,
+              312,
+              550,
+              450
+            ],
+            "caption": "Original ROM, native engine output."
+          },
+          {
+            "image": "52-rastan-blobs-playtest",
+            "title": "One connected blob per enemy",
+            "x": 748,
+            "top": 846,
+            "width": 630,
+            "crop": [
+              700,
+              312,
+              550,
+              450
+            ],
+            "caption": "Separate ROMancer build, native engine output."
+          }
+        ],
+        "notes": [
+          {
+            "title": "What this proves",
+            "text": "The first enemy graphics change in the running game. Original source bytes stay unchanged. Save/load and exact patch reconstruction were also checked.",
+            "x": 48,
+            "y": 250,
+            "width": 625
+          },
+          {
+            "title": "What remains untested",
+            "text": "This bounded opening-scene check is not a full-game playthrough. Collision, enemy AI, other enemy types and every later situation are outside this example.",
+            "x": 748,
+            "y": 250,
+            "width": 625
+          }
+        ]
+      }
     }
   ],
   "glossary": [
@@ -2788,6 +2987,11 @@
       "definition": "A possible resource or structural match that requires confirmation. Plausible text or pixels are not proof of game semantics."
     },
     {
+      "id": "term-checkpoint",
+      "term": "Checkpoint",
+      "definition": "A recorded test observation at a defined point in an input route, such as a screenshot region and expected comparison."
+    },
+    {
       "id": "term-code-reference",
       "term": "Code reference",
       "definition": "An imported code and published effect label used as an investigation lead. Decoding an address and value does not independently verify the label or activate a cheat."
@@ -2816,6 +3020,11 @@
       "id": "term-control",
       "term": "Control code",
       "definition": "A declared non-text command embedded in a text record, such as a wait, color change or terminator. Protected controls must be preserved."
+    },
+    {
+      "id": "term-control-observation",
+      "term": "Control observation",
+      "definition": "A recorded sample where the target stays unchanged while unrelated activity continues. It helps reject coincidental numeric matches."
     },
     {
       "id": "term-core",
@@ -2863,6 +3072,11 @@
       "definition": "A measured observation bound to its content and setup. Its conclusion is limited to the checks actually performed."
     },
     {
+      "id": "term-expected-bytes",
+      "term": "Expected bytes",
+      "definition": "The exact stored values an edit plan requires before writing. They guard against applying an edit to changed or unrelated data."
+    },
+    {
       "id": "term-field",
       "term": "Field",
       "definition": "A named value at a declared relative position in a record. Its type, byte order and range determine its supported storage."
@@ -2881,6 +3095,11 @@
       "id": "term-hex",
       "term": "Hexadecimal",
       "definition": "Base-16 notation using 0-9 and A-F. The prefix 0x marks a hexadecimal number."
+    },
+    {
+      "id": "term-hypothesis",
+      "term": "Hypothesis",
+      "definition": "An interpretation that fits the tested observations. It stays a candidate until additional evidence supports its meaning and scope."
     },
     {
       "id": "term-ips",
@@ -2908,6 +3127,11 @@
       "definition": "The optional structured tool interface for compatible AI clients. ROMancer starts read-only unless writes are explicitly enabled."
     },
     {
+      "id": "term-metasprite",
+      "term": "Metasprite",
+      "definition": "A larger sprite assembled from several hardware tiles. A visual layout does not by itself identify a game's metasprite or animation script format."
+    },
+    {
       "id": "term-metatile",
       "term": "Metatile",
       "definition": "A block made from several tiles. Many room cells can reference one block, so changing its parts can affect many uses."
@@ -2916,6 +3140,11 @@
       "id": "term-mirrored-checksum",
       "term": "Mirrored checksum",
       "definition": "A checksum calculated with a documented repetition of the tail of a non-power-of-two image. The checksum convention does not by itself establish cartridge mapping or game compatibility."
+    },
+    {
+      "id": "term-native-capture",
+      "term": "Native capture",
+      "definition": "Application-owned evidence recorded through actual emulator callbacks or native instruction tracing, bound to the source and capture setup. Imported JSON does not become fresh native proof."
     },
     {
       "id": "term-metadata",
@@ -2953,6 +3182,11 @@
       "definition": "A stored value interpreted through a declared mapping. A linear pointer base does not establish a bank-switched CPU address. Relocation also needs the complete set of affected pointer obligations and representable destination values."
     },
     {
+      "id": "term-precondition",
+      "term": "Precondition",
+      "definition": "A requirement checked before an edit, such as exact original bytes or a matching source hash. A mismatch requires reinspection, not bypassing the check."
+    },
+    {
       "id": "term-preferences",
       "term": "Preferences",
       "definition": "Saved application choices for appearance, startup, automatic analysis and audio. Apply or OK persists them; a theme or volume change does not edit ROM data."
@@ -2968,14 +3202,29 @@
       "definition": "An unintended change detected by a defined test. A successful route covers its assertions, not the entire game."
     },
     {
+      "id": "term-relocation",
+      "term": "Relocation",
+      "definition": "Moving data and updating its required references. ROMancer's declared data mover checks supplied linear references and reservations; it does not prove every consumer was found."
+    },
+    {
       "id": "term-reset-vector",
       "term": "Reset vector",
       "definition": "A stored address used to enter startup code after reset. Its address domain and cartridge mapping determine which file bytes it can reference; checking the vector does not execute that code."
     },
     {
+      "id": "term-reskin",
+      "term": "Reskin",
+      "definition": "A visual replacement of an existing graphic. A reskin does not by itself change collision, movement, AI or rules."
+    },
+    {
       "id": "term-revision",
       "term": "Revision",
       "definition": "An exact version or byte identity of a source. A matching title or filename does not establish the revision."
+    },
+    {
+      "id": "term-rollback",
+      "term": "Rollback",
+      "definition": "Returning to an earlier application version or known-good build. This does not replace a complete project backup."
     },
     {
       "id": "term-route",
@@ -3008,6 +3257,11 @@
       "definition": "Game-specific code that interprets music and sound data. Knowing the console hardware does not identify its command grammar."
     },
     {
+      "id": "term-source-context",
+      "term": "Source context",
+      "definition": "The recorded reason for associating an observed native event with file bytes. An observed mapping and a byte-pattern candidate are different evidence."
+    },
+    {
       "id": "term-stride",
       "term": "Stride",
       "definition": "The number of bytes from one table record to the next. Each field has its own offset within a record."
@@ -3028,59 +3282,9 @@
       "definition": "A grid of references to tiles, sometimes including palette banks or flip bits. Its storage format must be established."
     },
     {
-      "id": "term-control-observation",
-      "term": "Control observation",
-      "definition": "A recorded sample where the target stays unchanged while unrelated activity continues. It helps reject coincidental numeric matches."
-    },
-    {
-      "id": "term-hypothesis",
-      "term": "Hypothesis",
-      "definition": "An interpretation that fits the tested observations. It stays a candidate until additional evidence supports its meaning and scope."
-    },
-    {
-      "id": "term-native-capture",
-      "term": "Native capture",
-      "definition": "Application-owned evidence recorded through actual emulator callbacks or native instruction tracing, bound to the source and capture setup. Imported JSON does not become fresh native proof."
-    },
-    {
       "id": "term-workspace",
       "term": "Workspace",
       "definition": "The local folder that owns projects and workspace preferences. It is separate from the installed application version."
-    },
-    {
-      "id": "term-precondition",
-      "term": "Precondition",
-      "definition": "A requirement checked before an edit, such as exact original bytes or a matching source hash. A mismatch requires reinspection, not bypassing the check."
-    },
-    {
-      "id": "term-metasprite",
-      "term": "Metasprite",
-      "definition": "A larger sprite assembled from several hardware tiles. A visual layout does not by itself identify a game's metasprite or animation script format."
-    },
-    {
-      "id": "term-checkpoint",
-      "term": "Checkpoint",
-      "definition": "A recorded test observation at a defined point in an input route, such as a screenshot region and expected comparison."
-    },
-    {
-      "id": "term-relocation",
-      "term": "Relocation",
-      "definition": "Moving data and updating its required references. ROMancer's declared data mover checks supplied linear references and reservations; it does not prove every consumer was found."
-    },
-    {
-      "id": "term-source-context",
-      "term": "Source context",
-      "definition": "The recorded reason for associating an observed native event with file bytes. An observed mapping and a byte-pattern candidate are different evidence."
-    },
-    {
-      "id": "term-rollback",
-      "term": "Rollback",
-      "definition": "Returning to an earlier application version or known-good build. This does not replace a complete project backup."
-    },
-    {
-      "id": "term-expected-bytes",
-      "term": "Expected bytes",
-      "definition": "The exact stored values an edit plan requires before writing. They guard against applying an edit to changed or unrelated data."
     }
   ],
   "index": [
@@ -3117,6 +3321,12 @@
       ]
     },
     {
+      "term": "AI review gate",
+      "topics": [
+        "ai-worked-edit"
+      ]
+    },
+    {
       "term": "Allocations",
       "topics": [
         "compression",
@@ -3133,6 +3343,12 @@
       "term": "Apply, OK and Cancel",
       "topics": [
         "settings"
+      ]
+    },
+    {
+      "term": "Applying downloaded patches",
+      "topics": [
+        "apply-patch"
       ]
     },
     {
@@ -3215,15 +3431,53 @@
       ]
     },
     {
+      "term": "Before sharing a hack",
+      "topics": [
+        "share-checklist"
+      ]
+    },
+    {
+      "term": "Beginner acceptance checklist",
+      "topics": [
+        "beginner-trial"
+      ]
+    },
+    {
+      "term": "Beginner practice ROM",
+      "topics": [
+        "first-edit"
+      ]
+    },
+    {
+      "term": "Blink comparison",
+      "topics": [
+        "everyday-controls"
+      ]
+    },
+    {
       "term": "BPS patches",
       "topics": [
         "patches"
       ]
     },
     {
+      "term": "Brush swatches",
+      "topics": [
+        "everyday-controls",
+        "sprites"
+      ]
+    },
+    {
       "term": "Build history",
       "topics": [
         "drafts"
+      ]
+    },
+    {
+      "term": "Build notes",
+      "topics": [
+        "drafts",
+        "everyday-controls"
       ]
     },
     {
@@ -3253,9 +3507,22 @@
       ]
     },
     {
+      "term": "Changes only",
+      "topics": [
+        "everyday-controls"
+      ]
+    },
+    {
       "term": "Checksums",
       "topics": [
         "checks"
+      ]
+    },
+    {
+      "term": "Choose a task",
+      "topics": [
+        "start",
+        "find-help"
       ]
     },
     {
@@ -3350,9 +3617,21 @@
       ]
     },
     {
+      "term": "Data relocation",
+      "topics": [
+        "data-relocation"
+      ]
+    },
+    {
       "term": "Data tables",
       "topics": [
         "tables"
+      ]
+    },
+    {
+      "term": "Debugger preparation and repair",
+      "topics": [
+        "debugger-setup"
       ]
     },
     {
@@ -3429,6 +3708,19 @@
       ]
     },
     {
+      "term": "Exact-byte AI example",
+      "topics": [
+        "ai-worked-edit"
+      ]
+    },
+    {
+      "term": "Expected byte preconditions",
+      "topics": [
+        "ai-worked-edit",
+        "term-expected-bytes"
+      ]
+    },
+    {
       "term": "Exports",
       "topics": [
         "patches"
@@ -3445,6 +3737,12 @@
       "topics": [
         "hex-editor",
         "investigation"
+      ]
+    },
+    {
+      "term": "First complete edit",
+      "topics": [
+        "first-edit"
       ]
     },
     {
@@ -3474,9 +3772,21 @@
       ]
     },
     {
+      "term": "Generated table editors",
+      "topics": [
+        "structural-experiments"
+      ]
+    },
+    {
       "term": "Graphics discovery",
       "topics": [
         "resources"
+      ]
+    },
+    {
+      "term": "Guide search",
+      "topics": [
+        "find-help"
       ]
     },
     {
@@ -3496,6 +3806,19 @@
       "topics": [
         "connections",
         "levels"
+      ]
+    },
+    {
+      "term": "Historical investigation evidence",
+      "topics": [
+        "universal-values",
+        "native-accesses"
+      ]
+    },
+    {
+      "term": "Human usability trial",
+      "topics": [
+        "beginner-trial"
       ]
     },
     {
@@ -3569,6 +3892,12 @@
       ]
     },
     {
+      "term": "Master System",
+      "topics": [
+        "rastan-blobs"
+      ]
+    },
+    {
       "term": "MCP permissions",
       "topics": [
         "mcp",
@@ -3582,6 +3911,13 @@
       ]
     },
     {
+      "term": "Metasprites",
+      "topics": [
+        "sprites",
+        "term-metasprite"
+      ]
+    },
+    {
       "term": "Metatile brush thumbnails",
       "topics": [
         "levels"
@@ -3591,6 +3927,13 @@
       "term": "Metatiles",
       "topics": [
         "levels"
+      ]
+    },
+    {
+      "term": "Moved table layouts",
+      "topics": [
+        "data-relocation",
+        "structural-experiments"
       ]
     },
     {
@@ -3616,6 +3959,12 @@
       "term": "Named object inspector",
       "topics": [
         "connections"
+      ]
+    },
+    {
+      "term": "Native memory accesses",
+      "topics": [
+        "native-accesses"
       ]
     },
     {
@@ -3656,6 +4005,13 @@
       ]
     },
     {
+      "term": "Patch order and revisions",
+      "topics": [
+        "apply-patch",
+        "support-identity"
+      ]
+    },
+    {
       "term": "Patch source mismatch",
       "topics": [
         "support-identity",
@@ -3666,6 +4022,13 @@
       "term": "Pixel painting",
       "topics": [
         "sprites"
+      ]
+    },
+    {
+      "term": "Playtest build",
+      "topics": [
+        "drafts",
+        "first-edit"
       ]
     },
     {
@@ -3686,6 +4049,13 @@
       "topics": [
         "settings",
         "sound"
+      ]
+    },
+    {
+      "term": "Preview size",
+      "topics": [
+        "sprites",
+        "first-edit"
       ]
     },
     {
@@ -3734,6 +4104,19 @@
       ]
     },
     {
+      "term": "Rastan enemy blobs",
+      "topics": [
+        "rastan-blobs"
+      ]
+    },
+    {
+      "term": "Readable filenames",
+      "topics": [
+        "patches",
+        "everyday-controls"
+      ]
+    },
+    {
       "term": "Recipes",
       "topics": [
         "recipes"
@@ -3752,6 +4135,13 @@
       ]
     },
     {
+      "term": "Relocation limits",
+      "topics": [
+        "data-relocation",
+        "compression"
+      ]
+    },
+    {
       "term": "Relocation prerequisites",
       "topics": [
         "compression"
@@ -3761,6 +4151,19 @@
       "term": "Remember last workspace",
       "topics": [
         "settings"
+      ]
+    },
+    {
+      "term": "Reserved free space",
+      "topics": [
+        "data-relocation"
+      ]
+    },
+    {
+      "term": "Reskin",
+      "topics": [
+        "rastan-blobs",
+        "sprites"
       ]
     },
     {
@@ -3886,6 +4289,12 @@
       ]
     },
     {
+      "term": "Test skips and support reports",
+      "topics": [
+        "release-checks"
+      ]
+    },
+    {
       "term": "Text and translation",
       "topics": [
         "text",
@@ -3919,24 +4328,16 @@
       ]
     },
     {
+      "term": "Unchanged controls",
+      "topics": [
+        "universal-values"
+      ]
+    },
+    {
       "term": "Undo and Redo",
       "topics": [
         "drafts",
         "sprites"
-      ]
-    },
-    {
-      "term": "Volume",
-      "topics": [
-        "settings",
-        "play"
-      ]
-    },
-    {
-      "term": "Wrong colors",
-      "topics": [
-        "support-editing",
-        "palettes-appearance"
       ]
     },
     {
@@ -3947,96 +4348,16 @@
       ]
     },
     {
-      "term": "Unchanged controls",
+      "term": "Volume",
       "topics": [
-        "universal-values"
+        "settings",
+        "play"
       ]
     },
     {
-      "term": "Native memory accesses",
+      "term": "Walkthrough video",
       "topics": [
-        "native-accesses"
-      ]
-    },
-    {
-      "term": "Generated table editors",
-      "topics": [
-        "structural-experiments"
-      ]
-    },
-    {
-      "term": "Debugger preparation and repair",
-      "topics": [
-        "debugger-setup"
-      ]
-    },
-    {
-      "term": "Historical investigation evidence",
-      "topics": [
-        "universal-values",
-        "native-accesses"
-      ]
-    },
-    {
-      "term": "Data relocation",
-      "topics": [
-        "data-relocation"
-      ]
-    },
-    {
-      "term": "Reserved free space",
-      "topics": [
-        "data-relocation"
-      ]
-    },
-    {
-      "term": "Moved table layouts",
-      "topics": [
-        "data-relocation",
-        "structural-experiments"
-      ]
-    },
-    {
-      "term": "First complete edit",
-      "topics": [
-        "first-edit"
-      ]
-    },
-    {
-      "term": "Beginner practice ROM",
-      "topics": [
-        "first-edit"
-      ]
-    },
-    {
-      "term": "Applying downloaded patches",
-      "topics": [
-        "apply-patch"
-      ]
-    },
-    {
-      "term": "Patch order and revisions",
-      "topics": [
-        "apply-patch",
-        "support-identity"
-      ]
-    },
-    {
-      "term": "Before sharing a hack",
-      "topics": [
-        "share-checklist"
-      ]
-    },
-    {
-      "term": "AI review gate",
-      "topics": [
-        "ai-worked-edit"
-      ]
-    },
-    {
-      "term": "Exact-byte AI example",
-      "topics": [
-        "ai-worked-edit"
+        "walkthrough"
       ]
     },
     {
@@ -4046,17 +4367,9 @@
       ]
     },
     {
-      "term": "Metasprites",
+      "term": "Workspace search aliases",
       "topics": [
-        "sprites",
-        "term-metasprite"
-      ]
-    },
-    {
-      "term": "Relocation limits",
-      "topics": [
-        "data-relocation",
-        "compression"
+        "everyday-controls"
       ]
     },
     {
@@ -4067,94 +4380,16 @@
       ]
     },
     {
-      "term": "Expected byte preconditions",
+      "term": "Wrong colors",
       "topics": [
-        "ai-worked-edit",
-        "term-expected-bytes"
+        "support-editing",
+        "palettes-appearance"
       ]
     },
     {
-      "term": "Guide search",
+      "term": "Rastan gameplay comparison",
       "topics": [
-        "find-help"
-      ]
-    },
-    {
-      "term": "Choose a task",
-      "topics": [
-        "start",
-        "find-help"
-      ]
-    },
-    {
-      "term": "Playtest build",
-      "topics": [
-        "drafts",
-        "first-edit"
-      ]
-    },
-    {
-      "term": "Preview size",
-      "topics": [
-        "sprites",
-        "first-edit"
-      ]
-    },
-    {
-      "term": "Walkthrough video",
-      "topics": [
-        "walkthrough"
-      ]
-    },
-    {
-      "term": "Beginner acceptance checklist",
-      "topics": [
-        "beginner-trial"
-      ]
-    },
-    {
-      "term": "Human usability trial",
-      "topics": [
-        "beginner-trial"
-      ]
-    },
-    {
-      "term": "Brush swatches",
-      "topics": [
-        "everyday-controls",
-        "sprites"
-      ]
-    },
-    {
-      "term": "Changes only",
-      "topics": [
-        "everyday-controls"
-      ]
-    },
-    {
-      "term": "Blink comparison",
-      "topics": [
-        "everyday-controls"
-      ]
-    },
-    {
-      "term": "Readable filenames",
-      "topics": [
-        "patches",
-        "everyday-controls"
-      ]
-    },
-    {
-      "term": "Build notes",
-      "topics": [
-        "drafts",
-        "everyday-controls"
-      ]
-    },
-    {
-      "term": "Workspace search aliases",
-      "topics": [
-        "everyday-controls"
+        "rastan-playtest"
       ]
     }
   ]

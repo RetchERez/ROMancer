@@ -1,3 +1,4 @@
+from romancer.boot_fixtures import make_boot_fixture
 import json
 import os
 from pathlib import Path
@@ -12,7 +13,7 @@ class PortableProjectsTests(unittest.TestCase):
     def test_api_drafts_survive_service_restart(self):
         from romancer.workbench_api import WorkbenchAPI
         with tempfile.TemporaryDirectory() as temp:
-            root=Path(temp);source=root/'own.bin';source.write_bytes(b'abcdefgh')
+            root=Path(temp);source=root/'own.bin';source.write_bytes(make_boot_fixture('nes')['data'])
             api=WorkbenchAPI(root/'workspace')
             project=api.dispatch('project.create',{'name':'Persistent'})
             row=api.dispatch('source.import',{'project_id':project['project_id'],'path':str(source),'system':None})
@@ -54,7 +55,7 @@ class PortableProjectsTests(unittest.TestCase):
     def test_draft_reopen_undo_revision_conflict_and_changed_source(self):
         from romancer.draft_store import draft_get,draft_update,draft_move
         with tempfile.TemporaryDirectory() as temp:
-            root=Path(temp);source=root/'own.bin';source.write_bytes(b'abcdefgh')
+            root=Path(temp);source=root/'own.bin';source.write_bytes(make_boot_fixture('nes')['data'])
             project=Path(p.create_project(root/'workspace','Drafts')['path']);row=p.register_source(project,source,None)
             args=(project,row['artifact_id'],'scripts:text')
             first=draft_update(*args,0,'First');second=draft_update(*args,first['revision'],'Second')
@@ -68,7 +69,7 @@ class PortableProjectsTests(unittest.TestCase):
     def test_legacy_migration_keeps_backup_and_rejects_escaping_relative_path(self):
         from romancer.project_portability import migrate_project
         with tempfile.TemporaryDirectory() as temp:
-            root=Path(temp);source=root/'own.bin';source.write_bytes(b'abcdefgh')
+            root=Path(temp);source=root/'own.bin';source.write_bytes(make_boot_fixture('nes')['data'])
             project=Path(p.create_project(root/'workspace','Legacy')['path']);p.register_source(project,source,None)
             legacy=p.read_project(project);legacy.update(format='romancer-workbench-v1',schema_version=1)
             p.write_json(project/'project.json',legacy);before=(project/'project.json').read_bytes()

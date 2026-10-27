@@ -1,6 +1,6 @@
 import {esc,field,select,button,json,read} from './common.js';
 import {getSettings} from './app_settings.js';
-const families=[['nes','NES'],['snes','SNES'],['genesis','Genesis'],['gb','Game Boy'],['gbc','Game Boy Color'],['gba','GBA']];
+const families=[['nes','NES'],['snes','SNES'],['genesis','Genesis'],['gb','Game Boy'],['gbc','Game Boy Color'],['gba','GBA'],['sms','Master System']];
 const defaultKeys={up:'ArrowUp',down:'ArrowDown',left:'ArrowLeft',right:'ArrowRight',a:'z',b:'x',x:'a',y:'s',l:'q',r:'w',start:'Enter',select:'Shift'};
 export async function runtimeSetup(ctx){const {state}=ctx,family=state.profileFamily||state.artifact?.system_id||'nes';
  if(state.profileLoadedFamily!==family){const saved=await ctx.api.call('profiles.get',{system_id:family});state.profile=saved.profile;state.profileEngine=saved.engine||'';state.profileLoadedFamily=family;}

@@ -33,7 +33,8 @@ class ControllerDeviceTests(unittest.TestCase):
             second=save_profile(root,'genesis',str(core),{},None,{},controller_devices={'0':513})['profile']
             self.assertNotEqual(first['identity'],second['identity'])
             self.assertEqual(load_profile(root,'genesis')['profile']['controller_devices'],{'0':513})
-            self.assertEqual(validate_profile(second)['controller_devices'],{'0':513})
+            with patch('romancer.bundled_cores.packaged_release',return_value=False):
+                self.assertEqual(validate_profile(second)['controller_devices'],{'0':513})
             keys=save_profile(root,'genesis',str(core),{'option':'value'},None,{'a':'v'})['profile']
             self.assertEqual(keys.get('controller_devices'),{'0':513},'Editing keys/options must preserve the same engine subtype.')
             reset=save_profile(root,'genesis',str(core),{},None,{},controller_devices={})['profile']

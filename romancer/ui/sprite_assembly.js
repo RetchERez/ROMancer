@@ -73,7 +73,7 @@ export function mountSprite(ctx,doc,bitmap,palette){
  const canvas=document.getElementById('sprite-canvas'),layout=layoutFor(ctx,doc,bitmap);if(!canvas||!layout)return;
  const scope=selectionKey(ctx.state),current=()=>selectionKey(ctx.state)===scope;
  const image=imageFor(ctx,doc,bitmap,layout),undo=history(ctx,doc,bitmap,layout,image);let pixels=[...image.pixels],pointer=null,cursor={x:0,y:0};
- const bits={'mono-row-msb-v1':1,'tile8-paired2-msb-v1':2,'tile8-planar2-msb-v1':2,'tile8-paired4-msb-v1':4,'tile8-packed4-high-v1':4,'tile8-packed4-low-v1':4}[bitmap.codec],count=Math.min(2**bits,palette?.colors_per_bank||256);
+ const bits={'mono-row-msb-v1':1,'tile8-paired2-msb-v1':2,'tile8-planar2-msb-v1':2,'tile8-rowplanar4-msb-v1':4,'tile8-paired4-msb-v1':4,'tile8-packed4-high-v1':4,'tile8-packed4-low-v1':4}[bitmap.codec],count=Math.min(2**bits,palette?.colors_per_bank||256);
  const beforeCanvas=document.getElementById('sprite-original'),original=assemblePixels(bitmap,layout,index=>bitmap.cells[index].pixels);
  const rgba=(values,colors)=>{const data=new Uint8ClampedArray(values.length*4);values.forEach((value,i)=>{const part=Math.floor(Math.floor(i/image.width)/bitmap.height)*layout.columns+Math.floor((i%image.width)/bitmap.width),observed=layout.colors?.[part]?.[value],color=colors?.entries.find(e=>e.index===value&&e.bank===0)?.rgb,shade=Math.round(18+value/Math.max(1,count-1)*216);data.set([color?.r??observed?.[0]??shade,color?.g??observed?.[1]??shade,color?.b??observed?.[2]??shade,255],i*4);});return data;};
  const originalPixels=rgba(original.pixels,palette);

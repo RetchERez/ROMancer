@@ -16,6 +16,24 @@ def pack_root():
     return Path(__file__).resolve().parents[2]/'cores'
 
 
+def packaged_release():
+    app=Path(__file__).resolve().parents[1]
+    return app.name=='app' and (app.parent/'python/python314._pth').is_file()
+
+
+def require_reviewed_release_core(path):
+    """Official Windows playback accepts only the shipped source/license pins.
+
+    Source developers retain access to original synthetic native test fixtures.
+    The distributed runtime never executes an unreviewed replacement library.
+    """
+    if not packaged_release():return None
+    with checked_path(Path(path)).open('rb') as stream:sha=hashlib.file_digest(stream,'sha256').hexdigest()
+    for pin in CORE_PINS.values():
+        if sha==pin['sha256'] and pin.get('license') and pin.get('source_url') and pin.get('source_commit'):return pin
+    raise ValueError('This release runs only reviewed open-source emulator cores. Select an included engine or reinstall the full Windows package; an unknown or changed core is blocked.')
+
+
 def host_supported():
     return os.name=='nt' and platform.machine().lower() in ('amd64','x86_64')
 
@@ -57,7 +75,7 @@ def _verify_cached(root,stamp):
 def bundled_profile(system_id):
     root=pack_root()
     if not host_supported() or not root.exists():return None
-    engine_id='gb' if system_id=='gbc' else system_id
+    engine_id='gb' if system_id=='gbc' else 'genesis' if system_id=='sms' else system_id
     if engine_id not in CORE_PINS:return None
     stamp=_fingerprint(root);_verify_cached(str(root),stamp)
     pin=CORE_PINS[engine_id]
@@ -67,6 +85,7 @@ def bundled_profile(system_id):
     profile={'schema_version':1,'system_id':system_id,'core':str(root/pin['file']),
              'core_identity':binary,'options':dict(pin['options']),'system_dir':None,
              'system_files':[],'input_map':dict(DEFAULT_KEYS)}
+    if system_id=='sms':profile['options'].update({'blastem_system_type':'sms','blastem_io_1':'gamepad2.1','blastem_io_2':'gamepad2.2'})
     if system_id=='gbc':profile['options']['gambatte_gb_hwmode']='GBC'
     profile['identity']=_identity(profile)
     return {'ok':True,'status':'BUNDLED','profile':profile,'engine':pin['name'],'runtime_verified':False}

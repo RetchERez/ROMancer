@@ -14,6 +14,7 @@ class CodecTests(unittest.TestCase):
     def test_literal_vectors_have_independently_known_pixels(self):
         decode, encode = self.functions()
         cases = [
+            ('tile8-rowplanar4-msb-v1', bytes.fromhex('80402010'+'00'*28), [1,2,4,8]+[0]*60),
             ('tile8-planar2-msb-v1', bytes.fromhex('80000000000000000000000000000001'), [1] + [0]*62 + [2]),
             ('tile8-packed4-high-v1', bytes.fromhex('12' + '00'*30 + 'ef'), [1,2] + [0]*60 + [14,15]),
             ('tile8-paired4-msb-v1', bytes.fromhex('8040' + '00'*14 + '2010' + '00'*14), [1,2,4,8] + [0]*60),
@@ -46,7 +47,7 @@ class CodecTests(unittest.TestCase):
 
     def test_every_single_storage_bit_round_trips(self):
         decode, encode = self.functions()
-        for codec, size in [('tile8-planar2-msb-v1',16),('tile8-paired4-msb-v1',32),('tile8-packed4-high-v1',32)]:
+        for codec, size in [('tile8-rowplanar4-msb-v1',32),('tile8-planar2-msb-v1',16),('tile8-paired4-msb-v1',32),('tile8-packed4-high-v1',32)]:
             for bit in range(size*8):
                 raw=bytearray(size);raw[bit//8]=1<<(bit%8)
                 pixels=decode(bytes(raw),codec=codec,width=8,height=8)

@@ -71,9 +71,13 @@ class RuntimePool:
 
     def step(self,project,frames,buttons,port,*,cancelled=None):
         number(frames,1,12)
+        validate_steps([{'frames':frames,'buttons':buttons,'port':port}])
         with self.lock:
             value=self.sessions.get(str(project))
             if value is None:raise ValueError('load a native playtest first')
+            # A live packet contains this step's audio, not a paused/manual backlog.
+            # Keep explicit runtime.audio available for capturing that backlog.
+            self.request(project,'audio',{},cancelled=cancelled)
             advanced=self.request(project,'advance',{'frames':frames,'buttons':buttons,'port':port},cancelled=cancelled)
             frame=self.request(project,'capture',{},cancelled=cancelled)
             audio=self.request(project,'audio',{},cancelled=cancelled)

@@ -12,7 +12,7 @@ class SuiteValidationTests(unittest.TestCase):
     def test_invalid_route_budgets_refuse_before_any_native_run(self):
         from romancer.workbench_api import WorkbenchAPI
         folder=self.enterContext(tempfile.TemporaryDirectory())
-        root=Path(folder);source=root/'original.bin';source.write_bytes(b'original');api=WorkbenchAPI(root/'workspace');self.addCleanup(api.close)
+        root=Path(folder);source=root/'original.bin';source.write_bytes(make_boot_fixture('nes')['data']);api=WorkbenchAPI(root/'workspace');self.addCleanup(api.close)
         project=api.dispatch('project.create',{'name':'Suite'});row=api.dispatch('source.import',{'project_id':project['project_id'],'path':str(source),'system':None});api._run_saved_route=Mock(side_effect=AssertionError('should not run'))
         params={'project_id':project['project_id'],'source_id':row['artifact_id'],'target_id':row['artifact_id'],'definition_ids':[],'timeout':10}
         for ids in ([],['a'*32]*9,['a'*32,'a'*32]):

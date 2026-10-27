@@ -171,6 +171,7 @@ class AudioCaptureTests(unittest.TestCase):
 
 class FrontendAudioTests(unittest.TestCase):
     def setUp(self):
+        self.enterContext(patch('romancer.bundled_cores.packaged_release',return_value=False))
         self.tmp = tempfile.TemporaryDirectory()
         self.addCleanup(self.tmp.cleanup)
         root = Path(self.tmp.name)

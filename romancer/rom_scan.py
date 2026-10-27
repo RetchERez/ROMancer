@@ -18,7 +18,7 @@ from .audio_systems import audio_system_info
 MAX_SCAN=64*1024**2
 WINDOW=1024**2
 PER_KIND=100
-VERSION=12
+VERSION=13
 
 
 def cache_path(project,row):
@@ -74,19 +74,20 @@ def run(project,row,*,cancelled=lambda:False,publish=None):
             except ValueError as error:catalog[scope]={'status':'NOT_CHECKED','reason':str(error)}
     else:catalog={'file':{'status':'NO_CATALOG'},'payload':{'status':'NO_CATALOG'}}
     system=row.get('system_id');rows=[];counts={kind:0 for kind in ('text','graphics','compression')};segments=[]
-    size=min(row['size'],MAX_SCAN);supported=system in ('nes','snes','genesis','gb','gbc','gba');structures=[];structure_coverage=[]
+    size=min(row['size'],MAX_SCAN);supported=system in ('nes','snes','genesis','gb','gbc','gba','sms');structures=[];structure_coverage=[]
     lab_candidates=[];lab_coverage=[];lab_total=0
     if supported:
         for start in range(0,size,WINDOW):
             if cancelled():raise KeyboardInterrupt
             coverage={'offset':start,'length':min(WINDOW,size-start)}
-            from .studio_discovery import scan_structures
-            with path.open('rb') as stream:stream.seek(start);window=stream.read(coverage['length'])
-            structural=scan_structures(window,system,start,row['size'],cancelled=cancelled)
-            structures.extend(structural['candidates'][:max(0,64-len(structures))]);structure_coverage.append(structural['coverage'])
-            from .structural_lab import survey
-            lab=survey(window[:4096],row['sha256'],system,start,row['size'],max_positions=512,max_results=8,cancelled=cancelled)
-            lab_candidates.extend(lab['candidates'][:max(0,32-len(lab_candidates))]);lab_coverage.append(lab['coverage']);lab_total+=lab['total_candidates']
+            if system!='sms':
+                from .studio_discovery import scan_structures
+                with path.open('rb') as stream:stream.seek(start);window=stream.read(coverage['length'])
+                structural=scan_structures(window,system,start,row['size'],cancelled=cancelled)
+                structures.extend(structural['candidates'][:max(0,64-len(structures))]);structure_coverage.append(structural['coverage'])
+                from .structural_lab import survey
+                lab=survey(window[:4096],row['sha256'],system,start,row['size'],max_positions=512,max_results=8,cancelled=cancelled)
+                lab_candidates.extend(lab['candidates'][:max(0,32-len(lab_candidates))]);lab_coverage.append(lab['coverage']);lab_total+=lab['total_candidates']
             for kind in counts:
                 result=discover(path,row['sha256'],system,start,coverage['length'],[kind],cancelled=cancelled)
                 candidates=result['candidates'];counts[kind]+=len(candidates)

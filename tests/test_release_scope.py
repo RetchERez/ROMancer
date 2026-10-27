@@ -4,23 +4,28 @@ from romancer.workbench_api import WorkbenchAPI
 
 
 class ReleaseScopeTests(unittest.TestCase):
-    def test_only_six_systems_are_exposed_and_other_system_operations_are_refused(self):
+    def test_only_seven_systems_are_exposed_and_other_system_operations_are_refused(self):
         with tempfile.TemporaryDirectory() as temp:
             api=WorkbenchAPI(Path(temp)/'workspace')
             try:
                 systems=api.dispatch('systems.list',{})
-                self.assertEqual({s['id'] for s in systems['systems']},{'nes','snes','genesis','gb','gbc','gba'})
+                self.assertEqual({s['id'] for s in systems['systems']},{'nes','snes','genesis','gb','gbc','gba','sms'})
                 self.assertFalse(any(op in ('runtime.load_disc','route.run_disc','release.disc_set') or op.startswith('containers.') for op in api.routes))
                 blocked=api.dispatch('profiles.get',{'system_id':'unsupported-system'})
-                self.assertFalse(blocked['ok']);self.assertIn('six',blocked['error'])
+                self.assertFalse(blocked['ok']);self.assertIn('seven',blocked['error'])
             finally:api.close()
 
-    def test_unknown_bytes_can_be_inspected_but_not_edited_or_run(self):
+    def test_unknown_bytes_are_rejected_on_import_even_with_a_system_hint(self):
         with tempfile.TemporaryDirectory() as temp:
             root=Path(temp);path=root/'data.bin';path.write_bytes(b'unidentified data');api=WorkbenchAPI(root/'workspace')
             try:
                 project=api.dispatch('project.create',{'name':'Inspection'});p={'project_id':project['project_id']}
-                row=api.dispatch('source.import',{**p,'path':str(path),'system':None});s={**p,'artifact_id':row['artifact_id']}
+                for hint in (None,'nes','sms'):
+                    result=api.dispatch('source.import',{**p,'path':str(path),'system':hint})
+                    self.assertFalse(result['ok'],result);self.assertIn('recognized',result['error'])
+                self.assertEqual(api.dispatch('project.open',p)['sources'],[])
+                from romancer.workbench_projects import register_source
+                row=register_source(Path(project['path']),path,None);s={**p,'artifact_id':row['artifact_id']}
                 self.assertTrue(api.dispatch('resource.inspect',{**s,'offset':0,'length':4})['ok'])
                 blocked=api.dispatch('bytes.plan',{**s,'edits':[{'offset':0,'before':'75','after':'76'}]})
                 self.assertFalse(blocked['ok']);self.assertIn('Inspect',blocked['error'])

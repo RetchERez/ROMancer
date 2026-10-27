@@ -1,0 +1,88 @@
+{
+  "name": "Bug report",
+  "description": "Report a reproducible ROMancer problem without sharing ROM files or private data.",
+  "title": "[Bug]: ",
+  "body": [
+    {
+      "type": "markdown",
+      "attributes": {
+        "value": "Do not attach ROMs, game saves, emulator states, private project backups, credentials or personal paths. Review and sanitize support reports. Report suspected security vulnerabilities privately through the repository Security tab once private reporting is enabled."
+      }
+    },
+    {
+      "type": "input",
+      "id": "version",
+      "attributes": {
+        "label": "ROMancer version and build",
+        "description": "Find this in Settings > Application & system setup."
+      },
+      "validations": {
+        "required": true
+      }
+    },
+    {
+      "type": "input",
+      "id": "platform",
+      "attributes": {
+        "label": "Operating system and display scaling",
+        "description": "For example: Windows version, interface size, browser or desktop window."
+      },
+      "validations": {
+        "required": true
+      }
+    },
+    {
+      "type": "textarea",
+      "id": "steps",
+      "attributes": {
+        "label": "Steps to reproduce",
+        "description": "Prefer an included original workshop. Name the tool, selected source/build and exact actions."
+      },
+      "validations": {
+        "required": true
+      }
+    },
+    {
+      "type": "textarea",
+      "id": "expected",
+      "attributes": {
+        "label": "Expected result"
+      },
+      "validations": {
+        "required": true
+      }
+    },
+    {
+      "type": "textarea",
+      "id": "observed",
+      "attributes": {
+        "label": "Actual result and exact error",
+        "description": "Screenshots may help. Remove personal information before posting."
+      },
+      "validations": {
+        "required": true
+      }
+    },
+    {
+      "type": "textarea",
+      "id": "diagnostics",
+      "attributes": {
+        "label": "Reviewed support report or extra context",
+        "description": "Settings > Diagnostics & support can prepare a report. Inspect it before attaching. Do not upload the ROM."
+      }
+    },
+    {
+      "type": "checkboxes",
+      "id": "privacy",
+      "attributes": {
+        "label": "Before submitting",
+        "options": [
+          {
+            "label": "I removed ROM files, saves, states, credentials and personal paths from this report.",
+            "required": true
+          }
+        ]
+      }
+    }
+  ]
+}

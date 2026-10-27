@@ -1,3 +1,4 @@
+from romancer.boot_fixtures import make_boot_fixture
 import hashlib
 import json
 from pathlib import Path
@@ -46,7 +47,7 @@ class InvestigationMCPTests(unittest.TestCase):
         self.assertTrue(result['isError'],result);self.assertEqual(result['structuredContent']['status'],'BLOCKED');self.assertNotIn('offset',result['structuredContent'])
 
     def source(self):
-        self.root.joinpath('roms').mkdir();path=self.root/'roms/owned.bin';path.write_bytes(bytes.fromhex('300400008141')+b'\xff'*26)
+        self.root.joinpath('roms').mkdir();path=self.root/'roms/owned.bin';raw=bytearray(make_boot_fixture('gba')['data']);raw[:32]=bytes.fromhex('300400008141')+b'\xff'*26;path.write_bytes(raw)
         created=self.writer.call('romancer_project_create',{'name':'Investigation'})['structuredContent'];pid=created['project_id']
         imported=self.writer.call('romancer_source_import',{'project_id':pid,'path':str(path),'system':None})['structuredContent']
         return {'project_id':pid,'artifact_id':imported['artifact_id']},imported
@@ -89,9 +90,9 @@ class InvestigationMCPTests(unittest.TestCase):
         self.assertTrue(self.writer.call('romancer_definitions_import',{**params,'document':forged})['isError'])
 
     def test_explicit_trace_inspection_is_available_without_live_native_loading(self):
-        from debug_fixtures import debug_fixture
+        from tests.debug_fixtures import debug_fixture
         from romancer.history import register_build
-        params,_=self.source();fixture=debug_fixture();path=self.root/'roms/trace-fixture.bin';path.write_bytes(fixture['raw'])
+        params,_=self.source();fixture=debug_fixture();path=self.root/'roms/trace-fixture.bin';raw=bytearray(make_boot_fixture('gba')['data']);raw[:len(fixture['raw'])]=fixture['raw'];fixture['raw']=bytes(raw);fixture['trace']['source']={'sha256':hashlib.sha256(raw).hexdigest(),'size':len(raw)};fixture['case']['source']={'role':'resource',**fixture['trace']['source']};fixture['case']['trace_sha256']=hashlib.sha256(json.dumps(fixture['trace'],sort_keys=True,separators=(',',':'),ensure_ascii=True).encode()).hexdigest();path.write_bytes(raw)
         owned=self.writer.call('romancer_source_import',{'project_id':params['project_id'],'path':str(path),'system':None})['structuredContent']
         project=self.writer.api.project(params)
         registered=register_build(project,{'inputs':[{'role':'resource','path':owned['path']}],'output':owned['path'],
@@ -116,7 +117,7 @@ class InvestigationMCPTests(unittest.TestCase):
         self.assertEqual(path.read_bytes(),fixture['raw'])
 
     def test_large_definition_export_keeps_the_existing_ai_response_budget(self):
-        params,_=self.source();path=self.root/'roms/large-text.bin';path.write_bytes((b'A\0'+b'\xff'*65534)*3)
+        params,_=self.source();path=self.root/'roms/large-text.bin';raw=bytearray((b'A\0'+b'\xff'*65534)*3);raw[0xa0:0xc0]=make_boot_fixture('gba')['data'][0xa0:0xc0];path.write_bytes(raw)
         owned=self.writer.call('romancer_source_import',{'project_id':params['project_id'],'path':str(path),'system':None})['structuredContent'];selected={**params,'artifact_id':owned['artifact_id']}
         declared=self.writer.call('romancer_resources_declare_script',{**selected,'config':{'system_id':'gb','offset':0,'capacity':65536,'count':3}});self.assertFalse(declared['isError'],declared)
         result=self.writer.call('romancer_definitions_export',{**selected,'kind':'script'});self.assertFalse(result['isError'],result)

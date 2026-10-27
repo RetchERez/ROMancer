@@ -137,8 +137,8 @@ def _investigation_properties(operation):
             return {**source,'investigation_id':string(64),'candidate_id':string(64),'replay':configuration}
         return {**source,'config':configuration}
     if operation=='cheats.inspect':return {**source,'query':string(240),'page':integer(0,20000),'limit':integer(1,20)}
-    if operation=='systems.reference':return {'system_id':enum(['nes','snes','genesis','gb','gbc','gba'])}
-    if operation=='systems.classify_address':return {'system_id':enum(['nes','snes','genesis','gb','gbc','gba']),'address':integer(0,0xffffffff),'domain':enum(['cpu','ppu','vram','apu'])}
+    if operation=='systems.reference':return {'system_id':enum(['nes','snes','genesis','gb','gbc','gba','sms'])}
+    if operation=='systems.classify_address':return {'system_id':enum(['nes','snes','genesis','gb','gbc','gba','sms']),'address':integer(0,0xffffffff),'domain':enum(['cpu','ppu','vram','apu'])}
     if operation=='games.maps.catalog':return {**source,'offset':integer(0,10000),'limit':integer(1,24),'query':string(128)}
     if operation=='games.maps.inspect':return {**source,'header':integer(0x4800,0x6f7f),
         'state':{'type':['object','null'],'maxProperties':32,'propertyNames':{'pattern':'^(?:[0-9]|[12][0-9]|3[01])$'},'additionalProperties':integer(0,15)}}
@@ -179,7 +179,7 @@ def _investigation_properties(operation):
         snapshot['required']=list(snapshot['properties'])
         return {'before':snapshot,'after':snapshot}
     if operation=='video.inspect':return {**source,'offset':integer(0,256*1024**2),'length':integer(1,4096),'codec':enum([
-        'tile8-planar2-msb-v1','tile8-paired2-msb-v1','tile8-paired4-msb-v1','tile8-packed4-high-v1','tile8-packed4-low-v1'])}
+        'tile8-rowplanar4-msb-v1','tile8-planar2-msb-v1','tile8-paired2-msb-v1','tile8-paired4-msb-v1','tile8-packed4-high-v1','tile8-packed4-low-v1'])}
     if operation in ('compression.inspect','compression.extract','compression.plan_reinsert'):
         identity=source if operation!='compression.plan_reinsert' else {'project_id':string(),'parent_id':string(),'decoded_id':string(),'edited_id':string()}
         return {**identity,'offset':integer(),'allocation':integer(4,48*1024),'codec':codecs}

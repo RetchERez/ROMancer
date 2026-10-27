@@ -8,8 +8,9 @@ cores: content loading, one-frame execution, standard joypad input, software vid
 capture, core options through the legacy variable interface, save states, and exposed
 memory regions.
 
-No emulator core, BIOS, ROM, disc image, save state, or copyrighted game asset is
-bundled with ROMancer.  The caller supplies those paths.
+The full Windows edition includes reviewed open-source cores with their licenses
+and source inventory. Games, external firmware and user save data are supplied
+separately. This module validates native core identity before loading it.
 """
 
 import ctypes
@@ -282,6 +283,8 @@ class LibretroFrontend:
         self.core_path = str(Path(core_path).resolve())
         if not Path(self.core_path).is_file():
             raise FileNotFoundError(self.core_path)
+        from .bundled_cores import require_reviewed_release_core
+        require_reviewed_release_core(self.core_path)
         self.runtime_root = Path(save_dir or Path.cwd() / ".romancer_runtime").resolve()
         self.runtime_root.mkdir(parents=True, exist_ok=True)
         self.system_dir = Path(system_dir or self.runtime_root / "system").resolve()

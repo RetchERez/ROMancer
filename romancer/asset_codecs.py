@@ -1,6 +1,6 @@
-"""Four literal uncompressed pixel codecs, without console or color guesses."""
+"""Literal uncompressed pixel codecs, without console or color guesses."""
 
-CODECS = {'tile8-paired2-msb-v1': 2, 'tile8-packed4-low-v1': 4, 'mono-row-msb-v1': 1, 'tile8-planar2-msb-v1': 2,
+CODECS = {'tile8-rowplanar4-msb-v1': 4, 'tile8-paired2-msb-v1': 2, 'tile8-packed4-low-v1': 4, 'mono-row-msb-v1': 1, 'tile8-planar2-msb-v1': 2,
           'tile8-paired4-msb-v1': 4, 'tile8-packed4-high-v1': 4}
 
 
@@ -29,7 +29,7 @@ def decode_cell(raw: bytes, *, codec: str, width: int, height: int) -> list[int]
     if codec == 'tile8-packed4-low-v1':
         return [(raw[y*4+x//2] >> (0 if x%2 == 0 else 4)) & 15 for y in range(8) for x in range(8)]
     def plane_offset(plane, y):
-        return y + plane*8 if codec == 'tile8-planar2-msb-v1' else (plane//2)*16 + y*2 + plane%2
+        return y*4+plane if codec=='tile8-rowplanar4-msb-v1' else y + plane*8 if codec == 'tile8-planar2-msb-v1' else (plane//2)*16 + y*2 + plane%2
     return [sum(((raw[plane_offset(plane,y)] >> (7-x)) & 1) << plane
                 for plane in range(CODECS[codec])) for y in range(8) for x in range(8)]
 
@@ -51,6 +51,6 @@ def encode_cell(pixels: list[int], *, codec: str, width: int, height: int) -> by
                 out[y*4+x//2] |= value << (0 if x%2 == 0 else 4)
             else:
                 for plane in range(CODECS[codec]):
-                    offset = y+plane*8 if codec == 'tile8-planar2-msb-v1' else (plane//2)*16+y*2+plane%2
+                    offset = y*4+plane if codec=='tile8-rowplanar4-msb-v1' else y+plane*8 if codec == 'tile8-planar2-msb-v1' else (plane//2)*16+y*2+plane%2
                     out[offset] |= ((value >> plane) & 1) << (7-x)
     return bytes(out)

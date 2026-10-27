@@ -8,11 +8,19 @@ from romancer.hardware_reference import reference_for,classify_address
 
 class HardwareReferenceTests(unittest.TestCase):
     def test_supported_systems_have_sources_and_separate_address_domains(self):
-        for system in ('nes','snes','genesis','gb','gbc','gba'):
+        for system in ('nes','snes','genesis','gb','gbc','gba','sms'):
             doc=reference_for(system)
             self.assertTrue(doc['references']);self.assertIn('cpu',doc['domains'])
             self.assertFalse(doc['write_authorized'])
-        with self.assertRaises(ValueError):reference_for('sms')
+        with self.assertRaises(ValueError):reference_for('unsupported')
+
+    def test_sms_documented_windows_are_distinct_from_mapper_and_file_bytes(self):
+        self.assertEqual(reference_for('sms')['domains']['vram'],0x3fff)
+        for address in (0,0x4000,0xbfff):
+            result=classify_address('sms',address);self.assertEqual(result['kind'],'cartridge');self.assertTrue(result['requires_mapping']);self.assertIsNone(result['file_offset'])
+        self.assertEqual(classify_address('sms',0xc000)['kind'],'ram')
+        self.assertEqual(classify_address('sms',0xe000)['kind'],'ram-mirror')
+        self.assertIn('mapper',classify_address('sms',0xffff)['note'])
 
     def test_gb_bank_window_and_cartridge_storage_are_not_file_offsets(self):
         for system in ('gb','gbc'):
@@ -68,11 +76,11 @@ class HardwareReferenceTests(unittest.TestCase):
             api=WorkbenchAPI(Path(tmp));self.addCleanup(api.close)
             doc=api.dispatch('systems.classify_address',{'system_id':'nes','address':0x2007,'domain':'cpu'})
             self.assertTrue(doc['ok']);self.assertEqual(doc['kind'],'io');self.assertIsNone(doc['file_offset'])
-            self.assertFalse(api.dispatch('systems.reference',{'system_id':'sms'})['ok'])
+            self.assertTrue(api.dispatch('systems.reference',{'system_id':'sms'})['ok'])
             self.assertIn('systems.classify_address',READ_OPERATIONS);self.assertIn('systems.reference',READ_OPERATIONS)
             schema=_schema(['system_id','address','domain'],'systems.classify_address')
             self.assertEqual(schema['properties']['address']['type'],'integer')
-            self.assertNotIn('sms',schema['properties']['system_id']['enum'])
+            self.assertIn('sms',schema['properties']['system_id']['enum'])
 
 
 if __name__=='__main__':unittest.main()

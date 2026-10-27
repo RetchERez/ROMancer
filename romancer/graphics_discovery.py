@@ -9,7 +9,7 @@ import math
 from .asset_codecs import decode_cell,cell_size
 
 VERSION=1
-SYSTEM_CODECS={'nes':'tile8-planar2-msb-v1','snes':'tile8-paired4-msb-v1',
+SYSTEM_CODECS={'sms':'tile8-rowplanar4-msb-v1','nes':'tile8-planar2-msb-v1','snes':'tile8-paired4-msb-v1',
                'genesis':'tile8-packed4-high-v1','gb':'tile8-paired2-msb-v1','gbc':'tile8-paired2-msb-v1',
                'gba':'tile8-packed4-low-v1'}
 MAX_SOURCE_BYTES=512*1024

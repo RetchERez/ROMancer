@@ -34,6 +34,7 @@ runtime-profiles.json
 *.gbc
 *.gba
 *.gen
+*.sms
 *.iso
 *.cue
 *.sav

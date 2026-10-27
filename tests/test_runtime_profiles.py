@@ -3,6 +3,7 @@ import os
 from pathlib import Path
 import tempfile
 import unittest
+from unittest.mock import patch
 import shutil
 import subprocess
 import sys
@@ -16,6 +17,10 @@ def fake_core(path):
 
 
 class RuntimeProfileTests(unittest.TestCase):
+    def setUp(self):
+        # These tests validate profile metadata with an original non-executable binary.
+        self.enterContext(patch('romancer.bundled_cores.packaged_release',return_value=False))
+
     def test_saved_profile_reopen_and_changed_bios_core_or_added_file_refuse(self):
         from romancer.runtime_profiles import save_profile,load_profile,validate_profile
         with tempfile.TemporaryDirectory() as temp:

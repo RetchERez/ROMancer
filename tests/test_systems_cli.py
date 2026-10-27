@@ -15,7 +15,7 @@ class SystemCLITests(unittest.TestCase):
 
     def test_registry_identification_and_chr_routes(self):
         process,inventory=self.call('systems-list');self.assertEqual(process.returncode,0,process.stderr)
-        self.assertEqual({s['id'] for s in inventory['systems']},{'nes','snes','genesis','gb','gbc','gba'})
+        self.assertEqual({s['id'] for s in inventory['systems']},{'nes','snes','genesis','gb','gbc','gba','sms'})
         with tempfile.TemporaryDirectory() as temp:
             path=Path(temp)/'original Ω with spaces.bin';raw=nes_bytes();path.write_bytes(raw)
             process,report=self.call('systems-identify',path);self.assertEqual(process.returncode,0,report)

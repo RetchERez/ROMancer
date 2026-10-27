@@ -26,8 +26,7 @@ class FoundationAPITests(unittest.TestCase):
                 project=api.dispatch('project.create',{'name':'System tools Ω'});p={'project_id':project['project_id']}
                 unknown=root/'misleading.nes';unknown.write_bytes(b'UNKNOWN BYTES')
                 row=api.dispatch('source.import',{**p,'path':str(unknown),'system':'NES'})
-                self.assertTrue(row['ok'],row);self.assertIsNone(row['system_id'])
-                self.assertEqual(row['system_assessment']['status'],'UNKNOWN')
+                self.assertFalse(row['ok'],row);self.assertEqual(row['status'],'BLOCKED');self.assertIn('recognized',row['error'])
                 gba=root/'GBA with spaces.bin';gba.write_bytes(gba_bytes())
                 row=api.dispatch('source.import',{**p,'path':str(gba),'system':None})
                 self.assertEqual(row['system_id'],'gba');self.assertEqual(row['system'],'GBA')
@@ -36,7 +35,7 @@ class FoundationAPITests(unittest.TestCase):
                 self.assertFalse(fresh['write_authorized']);self.assertFalse(fresh['runtime_verified'])
                 caps=api.dispatch('system.capabilities',{});self.assertEqual(caps['version'],__import__('romancer').ROMANCER_VERSION)
                 self.assertEqual(caps['target_version'],'1.0');self.assertIn('adapters',caps)
-                inventory=api.dispatch('systems.list',{});self.assertEqual(len(inventory['systems']),6)
+                inventory=api.dispatch('systems.list',{});self.assertEqual(len(inventory['systems']),7)
                 with self.assertRaises(ValueError):api.jobs.submit('systems.list',{})
                 self.assertFalse(api.dispatch('systems.identify',{**params,'path':str(gba)})['ok'])
                 self.assertFalse(api.dispatch('systems.identify',{**p,'artifact_id':'0'*32})['ok'])
@@ -78,7 +77,7 @@ class FoundationAPITests(unittest.TestCase):
                 for token,origin,code in ((None,None,401),(server.session_token,'https://example.invalid',403)):
                     with self.assertRaises(urllib.error.HTTPError) as caught:request(token,origin)
                     self.assertEqual(caught.exception.code,code);caught.exception.close()
-                self.assertEqual(len(request(server.session_token)['systems']),6)
+                self.assertEqual(len(request(server.session_token)['systems']),7)
             finally:server.shutdown();server.server_close();server.api.close();thread.join(3)
 
 

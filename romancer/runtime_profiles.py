@@ -100,6 +100,8 @@ def validate_profile(profile):
     if type(profile['schema_version']) is not int or profile['schema_version']!=1 or profile['system_id'] not in SYSTEM_IDS or profile['identity']!=_identity(profile):raise ValueError('runtime profile identity/schema changed')
     _options(profile['options'],profile['input_map'])
     if _binary(profile['core'])!=profile['core_identity']:raise ValueError('core changed; choose and save its new revision')
+    from .bundled_cores import require_reviewed_release_core
+    require_reviewed_release_core(profile['core'])
     actual=measure_system_files(profile['system_dir'])
     if actual!=profile['system_files']:raise ValueError('system files changed; review and save the new configuration')
     return {'ok':True,'status':'INPUTS_VERIFIED','profile_identity':profile['identity'],'core':profile['core'],'core_options':profile['options'],'expected_core_sha256':profile['core_identity']['sha256'],

@@ -10,13 +10,13 @@ from .workbench_projects import _measure
 
 
 def _validate_result(raw,system_id):
-    from .system_formats import nes,snes,genesis,gb,gba,segacd
+    from .system_formats import nes,snes,genesis,gb,gba,sms,segacd
     class Reader:
         identity={'size':len(raw)}
         def read_at(self,offset,length):
             if offset<0 or length<1 or offset+length>len(raw):raise ValueError('edited header exceeds cartridge')
             return bytes(raw[offset:offset+length])
-    reader=Reader();valid=[c for parser in (nes,snes,genesis,gb,gba,segacd) for c in parser.candidates(reader) if c['layout_valid']]
+    reader=Reader();valid=[c for parser in (nes,snes,genesis,gb,gba,sms,segacd) for c in parser.candidates(reader) if c['layout_valid']]
     if len(valid)!=1 or valid[0]['system_id']!=system_id:raise ValueError('edited cartridge has an invalid or ambiguous system layout')
 
 
@@ -26,6 +26,8 @@ def integrity_edits(path,expected_sha256,system_id,edits):
     if path.stat().st_size>64*1024**2:raise ValueError('cartridge integrity budget is64MiB')
     raw=bytearray(path.read_bytes());_measure(path,{'sha256':expected_sha256,'size':len(raw)})
     protected={'nes':[(0,16)],'gb':[(0x143,0x14d)],'gbc':[(0x143,0x14d)],'genesis':[(0x100,0x110),(0x1a0,0x1a8)],'gba':[(0xb2,0xb3)]}.get(system_id,[])
+    if system_id=='sms':
+        header=next(c for c in assessment['candidates'] if c['layout_valid'])['header_offset'];protected=[(header,header+16)]
     if system_id=='snes':
         header=next(c for c in assessment['candidates'] if c['layout_valid'])['header_offset'];protected=[(header+21,header+28)]
     for edit in edits:
@@ -41,6 +43,10 @@ def integrity_edits(path,expected_sha256,system_id,edits):
         start=candidate['header_offset']+28;length=4
         raw[start:start+4]=b'\xff\xff\x00\x00';checksum=sum(raw[prefix:])&65535
         replacement=(checksum^65535).to_bytes(2,'little')+checksum.to_bytes(2,'little')
+    elif system_id=='sms':
+        from .system_formats.sms import checksum
+        candidate=next(c for c in assessment['candidates'] if c['layout_valid']);header=candidate['header_offset'];start=header+10;length=2
+        replacement=checksum(raw,header,candidate['metadata']['checksum_length']).to_bytes(2,'little')
     elif system_id=='genesis':
         if len(raw)%2:raise ValueError('checksum repair requires an even-sized linear cartridge')
         start=0x18e;length=2;replacement=(sum(int.from_bytes(raw[i:i+2],'big') for i in range(0x200,len(raw),2))&65535).to_bytes(2,'big')

@@ -1,3 +1,4 @@
+from romancer.boot_fixtures import make_boot_fixture
 import hashlib
 import json
 from pathlib import Path
@@ -48,8 +49,8 @@ class RevisionCatalogTests(unittest.TestCase):
     def test_lookup_distinguishes_match_unknown_and_explicit_mismatch(self):
         from romancer.workbench_api import WorkbenchAPI
         with tempfile.TemporaryDirectory() as folder:
-            root=Path(folder);rom=root/'rom';rom.write_bytes(b'abc');catalog=root/'catalog.json'
-            catalog.write_text(json.dumps([{'name':'Original <ABC>','size':3,'sha256':ABC_SHA},{'name':'Other','size':3,'sha256':'0'*64}]))
+            root=Path(folder);rom=root/'rom';raw=make_boot_fixture('nes')['data'];rom.write_bytes(raw);catalog=root/'catalog.json'
+            catalog.write_text(json.dumps([{'name':'Original <ABC>','size':len(raw),'sha256':hashlib.sha256(raw).hexdigest()},{'name':'Other','size':len(raw),'sha256':'0'*64}]))
             api=WorkbenchAPI(root/'workspace')
             try:
                 p=api.dispatch('project.create',{'name':'Catalog'});params={'project_id':p['project_id']}
@@ -60,7 +61,7 @@ class RevisionCatalogTests(unittest.TestCase):
                 self.assertEqual(found['matches'][0]['name'],'Original <ABC>')
                 other=next(r for r in api.dispatch('revision.list',{**params,'query':'Other'})['entries'])
                 wrong=api.dispatch('revision.lookup',{**src,'scope':'file','expected_id':other['id']});self.assertEqual(wrong['status'],'MISMATCHED',wrong)
-                rom.write_bytes(b'def');new=api.dispatch('source.import',{**params,'path':str(rom),'system':None})
+                changed=bytearray(raw);changed[-1]^=1;rom.write_bytes(changed);new=api.dispatch('source.import',{**params,'path':str(rom),'system':None})
                 unknown=api.dispatch('revision.lookup',{**params,'artifact_id':new['artifact_id'],'scope':'file','expected_id':''});self.assertEqual(unknown['status'],'UNKNOWN',unknown)
                 self.assertFalse(unknown['corruption_established'])
             finally:api.close()

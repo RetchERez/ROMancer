@@ -3,6 +3,38 @@ import hashlib
 from .asset_schema import number
 
 
+def _asset_details(raw,schema,sha,offset):
+    if schema.get('source',{}).get('sha256')!=sha:return []
+    from .asset_schema import validate_asset_schema
+    from .asset_codecs import cell_size
+    d=validate_asset_schema(schema)['normalized_schema'];rows=[]
+    if d['source']['size']!=len(raw):raise ValueError('graphics explanation size differs')
+    for b in d['bitmaps']:
+        if not b['offset']<=offset<b['offset']+b['length']:continue
+        stride=cell_size(b['codec'],b['width'],b['height']);cell,within=divmod(offset-b['offset'],stride)
+        item={'name':b['id']+' / tile '+str(cell)+' / byte '+str(within),'kind':'bitmap-byte','offset':offset,'length':1,'raw_hex':raw[offset:offset+1].hex(),
+              'codec':b['codec'],'cell_index':cell,'byte_within_cell':within,'confidence':'DECLARED','description':'Stored graphics in the declared tile collection. Tile placement, palette ownership and game-object behavior are separate.'}
+        codec=b['codec']
+        if codec=='tile8-rowplanar4-msb-v1':item.update(row=within//4,plane=within%4)
+        elif codec=='tile8-planar2-msb-v1':item.update(row=within%8,plane=within//8)
+        elif codec in ('tile8-paired2-msb-v1','tile8-paired4-msb-v1'):item.update(row=(within%16)//2,plane=(within//16)*2+within%2)
+        elif codec in ('tile8-packed4-low-v1','tile8-packed4-high-v1'):
+            item.update(row=within//4,pixel_columns=[within%4*2,within%4*2+1],nibble_order='low first' if codec=='tile8-packed4-low-v1' else 'high first')
+            item['description']+=' Row '+str(item['row'])+', pixel columns '+str(item['pixel_columns'])+'; '+item['nibble_order']+' nibble order.'
+        elif codec=='mono-row-msb-v1':item.update(row=within//((b['width']+7)//8),first_pixel_column=(within%((b['width']+7)//8))*8)
+        if 'plane' in item:item['description']+=' Row '+str(item['row'])+', bitplane '+str(item['plane'])+'; bit 7 stores the leftmost pixel bit.'
+        rows.append(item)
+    for palette in d['palettes']:
+        if not palette['offset']<=offset<palette['offset']+palette['length']:continue
+        entry=(offset-palette['offset'])//palette['entry_bytes'];at=palette['offset']+entry*palette['entry_bytes'];value=int.from_bytes(raw[at:at+palette['entry_bytes']],palette['byte_order'])
+        channels={name:(value&mask)//(mask&-mask) for name,mask in palette['channels'].items()}
+        rows.append({'name':palette['id']+' / bank '+str(entry//palette['colors_per_bank'])+' / color '+str(entry%palette['colors_per_bank']),
+                     'kind':'palette-entry','offset':at,'length':palette['entry_bytes'],'raw_hex':raw[at:at+palette['entry_bytes']].hex(),'value':value,
+                     'endian':palette['byte_order'],'bank':entry//palette['colors_per_bank'],'index':entry%palette['colors_per_bank'],'channels':channels,
+                     'confidence':'DECLARED','description':'Stored channel values '+', '.join(name.upper()+' '+str(value) for name,value in channels.items())+' in the declared bit ranges. These are not necessarily 8-bit display values. The game may select or replace this palette at runtime.'})
+    return rows
+
+
 def _level_details(raw,doc,offset):
     d=doc['definition'];rows=[]
     def value(name,kind,at,width,endian,maximum,**metadata):
@@ -44,6 +76,7 @@ def _level_details(raw,doc,offset):
 def explain_bytes(raw,descriptors,source_sha256,offset):
     if type(raw) is not bytes or len(raw)>64*1024**2 or hashlib.sha256(raw).hexdigest()!=source_sha256:raise ValueError('byte explanation source differs')
     number(offset,0,len(raw)-1);rows=[]
+    if descriptors.get('assets'):rows.extend(_asset_details(raw,descriptors['assets'],source_sha256,offset))
     table=descriptors.get('tables')
     if table and table.get('source_sha256')==source_sha256:
         from .data_tables import validate_definition,TYPES
@@ -85,4 +118,4 @@ def explain_bytes(raw,descriptors,source_sha256,offset):
                                      'description':'Field in the identified '+song['driver']+' sequence; no commercial music-driver layout is inferred.'})
     return {'ok':True,'source_sha256':source_sha256,'offset':offset,'raw_hex':raw[offset:offset+16].hex(),
       'interpretations':rows[:64],'game_semantics_verified':False,'write_authorized':False,
-      'note':'Declared ranges and numeric encodings only. An empty interpretation list means the byte purpose is unknown.'}
+      'note':'Declared layouts, graphics storage and numeric encodings only. An empty interpretation list means the byte purpose is unknown.'}

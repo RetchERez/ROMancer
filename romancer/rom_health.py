@@ -58,6 +58,10 @@ def check_rom(path,expected_sha256,expected_crc32='',crc_scope='file',*,cancelle
         else:
             expected=sum((raw[i]<<8)|raw[i+1] for i in range(0x200,len(raw),2))&65535;stored=int.from_bytes(raw[0x18e:0x190],'big')
             add('Genesis ROM checksum','PASS' if expected==stored else 'FAIL','Big-endian 16-bit words from 0200 through end of file.',f'{stored:04X}',f'{expected:04X}')
+    elif system=='sms' and layout:
+        from .system_formats.sms import checksum
+        header=selected['header_offset'];stored=int.from_bytes(raw[header+10:header+12],'little');expected=checksum(raw,header,selected['metadata']['checksum_length'])
+        add('Master System ROM checksum','PASS' if expected==stored else 'FAIL','Declared Sega checksum extent excluding the sixteen-byte header; mapper and game behavior remain separate.',f'{stored:04X}',f'{expected:04X}')
     elif system=='snes':
         prefix=selected['metadata'].get('copier_header_bytes',0);body=len(raw)-prefix
         if layout:payload=[{'offset':prefix,'length':body}]

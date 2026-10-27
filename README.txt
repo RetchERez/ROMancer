@@ -2,6 +2,8 @@ ROMancer v1.0 final
 By RetchEWretched
 
 Local ROM editing for NES, SNES, Genesis, Game Boy, Game Boy Color and GBA.
+Master System support covers validated Sega headers, checksums, literal graphics,
+declared text/byte edits, patches and playtesting; other layouts remain unknown.
 Everyday use works offline. No AI account, model, API key or subscription is required.
 
 WHAT WORKS / WHAT NEEDS A DEFINITION
@@ -22,10 +24,28 @@ Editors need an understood layout:
 Still unknown until investigated:
 - Deep scans provide checks, documented structures and candidates. They do not
   automatically decode every game's compression, scripts, maps or music.
-- Unknown is not a failed checksum or proof of a bad ROM. Read matched,
+- Unsupported or ambiguous cartridge layouts cannot be imported. A missing game
+  definition is not a failed checksum. Read matched,
   mismatched, unsupported and unknown results separately.
-- Tested system/data formats cover NES, SNES, Genesis, GB, GBC and GBA.
+- Tested system/data formats cover NES, SNES, Genesis, GB, GBC, GBA and
+  basic Master System formats.
   This does not certify every commercial game or every edit within a game.
+
+HACK EXAMPLES
+
+ROMancer-v1.0-Hack-Examples.zip contains the recoverable distinct editing examples
+for the supplied commercial game revisions plus the original-workshop example.
+Apply each BPS to its exact original revision listed in the collection README
+and manifest. Keep originals and create separate builds. Examples/ contains
+current examples; Experiments/ preserves failed or superseded investigations,
+including the rejected split-blob prototype and one historical checksum failure.
+These experiments are not recommendations. No full commercial ROMs are included.
+
+Rastan-Single-Blob-Enemies.bps is the current Rastan graphics example. It was
+created with ROMancer assets.plan and structured.apply, then recreated through
+its actual Graphics & fonts interface. The original and edited gameplay captures
+come from ROMancer Playtest. See the Rastan guide chapter for the exact tested
+revision, tile arrangement, byte summary, limitations and screenshots.
 
 SHORT WALKTHROUGH
 
@@ -45,13 +65,75 @@ START ON WINDOWS
 
 Python and Pillow are included in the Windows x64 package. Edge provides the
 desktop window; Open in browser is available if the window cannot open.
-The launchers are unsigned. The full Windows release includes an engine for
-NES, SNES, Genesis, Game Boy, Game Boy Color and GBA. Games, user saves and separately supplied
+The launchers are unsigned. The full Windows release includes engines for
+NES, SNES, Genesis, Game Boy, Game Boy Color, GBA and supported Master System cartridges. Games, user saves and separately supplied
 firmware dumps are not distributed. Editing and patching also work without emulation.
+
+The full Windows runtime blocks changed or unreviewed core binaries before loading
+native code. Its included open-source engines are FCEUmm (NES), bsnes-mercury
+Balanced (SNES), BlastEm (Genesis/Mega Drive and Master System), Gambatte
+(Game Boy and Game Boy Color) and mGBA (GBA). SHA-256 pins, source revisions and
+component licenses are included. Source development retains synthetic test-core
+support; custom builds require their own source/license and compatibility review.
 
 Installed projects: %LOCALAPPDATA%\ROMancer\workspace
 Upgrades retain projects and prior versions. Rollback restores the previous
 launcher. Uninstall preserves projects and installed versions for recovery.
+
+VERIFICATION STATUS
+
+Build 1.0.31: the source suite ran 1240 tests with 80 platform/optional skips.
+The full Windows bundle is checked separately with its bundled Python.
+All 78 UI regression suites passed. Automated accessibility checks covered
+42 view/theme combinations with zero reported violations, plus bounded
+keyboard and browser-width checks. Skipped tests are not counted as passes.
+The recorded original NES workshop verifies editing, undo/redo, separate build
+creation, native playback, save/load state, checked patch export, reopening and
+draft recovery. Package/hash audits and isolated setup/uninstall checks passed.
+Fresh native checks covered automatic selection, video, input and state replay
+for the six original workshop profiles. The seven supplied commercial games
+were also tested through actual Playtest controls, native-frame display, live
+Play/Pause, input and save/load replay. A flat/black SNES transition capture was
+replaced with the visibly rendered name-entry scene. Final package and remote
+CI records are attached to the private GitHub draft release as verification.json.
+
+These are automated local checks, not a claim that every commercial game or edit
+works. An independent beginner trial, a clean Windows VM and a human
+screen-reader trial remain separate acceptance checks. Remote CI must be reviewed for the exact
+uploaded commit; the local package summary does not assert a remote result. Browser
+layout/DPI emulation is not a Windows-wide display-scaling trial.
+
+A file named .7z is not necessarily an archive. Saved HTML download/error pages
+are rejected with an explanation; choose a real extracted cartridge file.
+The first supplied Rastan.7z was HTML and was rejected. The replacement ZIP
+contained a valid unmarked Rastan ROM and a separately marked bad variant; only
+the unmarked revision was used. The exact Rastan revision now offers Open first enemy sprites with its
+checked 16-by-32 assembly and byte references. The included example is a graphics-only
+reskin of the first humanoid enemy into one connected blob. Opening-scene video,
+three connected animation-frame shapes, save/load and exact patch reconstruction
+were checked. Other enemy types, collisions, enemy AI and full-game correctness
+are not certified. Game Gear, headerless SMS inputs and ambiguous Sega layouts
+remain outside this release. The SMS A/B interface maps the included BlastEm
+engine to its two-button pad; advanced raw libretro input uses A and R for buttons 1 and 2.
+
+GITHUB RELEASE PREPARATION
+
+Use the tag v1.0.0 for the public ROMancer v1.0 release. The numeric 1.0.31 build
+identifier is internal installer/update identity. Lead the release description
+with ROMancer-v1.0-Setup.exe, then the portable Windows ZIP, offline guide and
+walkthrough. Provide the source, engine pack, component notices and SHA256SUMS.
+The Windows packaging workflow downloads ROMancer-v1.0-Engines.zip from the
+repository's v1.0.0 release: attach that supplied engine pack to a draft release
+before running the trusted Windows packaging job. Uploading source files alone
+is not a successful CI run. Publish only after reviewing actual workflow results.
+
+The repository includes a structured bug-report form. Enable private vulnerability
+reporting in GitHub before advertising the Security reporting path. User reports
+must exclude ROMs, saves, states, credentials and personal paths. The included
+patch collection contains ROMancer-created outputs and sanitized indexes;
+failed/superseded experiments are separated and clearly labeled. Patch
+reconstruction is verified for every included variant;
+apply a patch only to the exact original revision named by its SHA-256.
 
 BEGINNER ACCEPTANCE CHECKLIST (YOUR HANDS-ON TRIAL)
 
@@ -277,24 +359,28 @@ WHAT IS SUPPORTED
 - Declared fixed-capacity terrain, metatiles, collision values and object fields.
 - Room thumbnails, explicitly declared connections and named object controls.
 - Checked level and sound definition exchange for the same source revision.
-- Byte explanations for declared room cells, object fields and numeric storage.
+- Byte explanations for declared tile rows/bitplanes, palette components, room
+  cells, object fields and numeric storage.
 - Tested PCM8/16, Game Boy wave, NES DPCM and standalone SNES BRR sample codecs.
 - Sample gain/reverse/silence/WAV replacement and play/pause/seek previews.
 - Documented console sound hardware, evidence-scoped driver identification,
   and native mixed-audio recording through a configured core.
 - Native playtesting, gamepad/keyboard controls, battery-save backups and states.
+  Live playback starts with fresh step audio after manual frame advancement.
 - Source/session/core/state-bound RAM narrowing and available video-memory tiles.
 - Build history, byte comparisons, recorded tests and screenshot checkpoints.
 - ROM health, CRC comparison, supported checksum repair and project validation.
 - Local hash-catalog import, source-bound resource relationships and support reports.
 - Recoverable project deletion, private backup/restore and persisted editor drafts.
 
-Exact-revision examples include Final Fantasy Legend II USA (opening-bedroom
+Exact-revision examples include Rastan SMS first-enemy sprites, Final Fantasy Legend II USA (opening-bedroom
 stool placement and a source-bound real-map browser) and Deja Vu I & II USA (startup and first Case Book 1 interface
 colors), alongside the four earlier game definitions. Only matched originals or
 owned derived builds expose these edits. Different revisions remain unknown.
 
 FACTS, DEFINITIONS AND LIMITS
+
+KNOWN SUPPORT AND UNRESOLVED FORMATS
 
 Known: exact revision identity or documented binary/system format.
 Declared: a source-bound layout supplied by the user and checked by the editor.
@@ -334,8 +420,10 @@ That workshop demonstrates editor navigation and object records;
 its native program renders Hillside and plays music, without executing the extra
 Courtyard or object/connection records. It is not a complete game authoring engine.
 Playtest exposes frames and bounded memory observations, not CPU breakpoints or
-instruction stepping. Relocation and ROM expansion are not enabled: unused-looking
-bytes do not establish destination ownership or every incoming pointer.
+instruction stepping. Advanced declared-data relocation is supported inside
+explicitly reserved cartridge ranges with checked linear references. ROM expansion
+and position-dependent code relocation are not supported. Unused-looking bytes
+do not establish destination ownership or every incoming pointer.
 
 CRC32 is calculated for the selected file or payload scope. A mismatch requires
 an expected reference for that same scope. Without a reference, comparison is
@@ -386,7 +474,9 @@ For the Windows bundle:
 The Windows packager uses pinned Python/Pillow archives and verifies their
 SHA-256 identities. GitHub CI is included for Windows/Linux and Python 3.13/3.14;
 a workflow file is not evidence that a remote Actions run has passed. Consult
-the verification receipts shipped with the release for actual tested scope.
+the VERIFICATION STATUS section below for the public test summary and remaining
+manual checks. Detailed local logs are retained privately; no claim is made that
+a remote Actions run has passed for this package.
 
 AUTOMATION AND CONTRIBUTING
 

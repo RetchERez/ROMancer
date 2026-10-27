@@ -29,7 +29,7 @@ READ_CHUNK_BYTES = 64 * 1024
 APPROVED_FILES = frozenset(ROOT_FILES | {
     f'{directory}/{name}'
     for directory, names in {
-        '.github': 'workflows/ci.yml',
+        '.github': 'workflows/ci.yml ISSUE_TEMPLATE/bug_report.yml',
         'romancer': '''
             mcp_server.py bundled_cores.py core_pins.py controller_devices.py ui/workspace_status.js ui/workspace_resume.js ui/shortcuts.js ui/tool_help.js
             ui/tool_inputs.js ui/patch_controls.js ui/revision_controls.js ui/hex_editor.js ui/build_history.js ui/project_checks.js ui/save_manager.js ui/translation_controls.js ui/visual_controls.js ui/workbench_usability.js
@@ -62,7 +62,7 @@ APPROVED_FILES = frozenset(ROOT_FILES | {
             system_identify.py system_formats/__init__.py system_formats/nes.py
             system_resources.py system_demo.py boot_fixtures.py
             systems_cli.py
-            system_formats/gb.py system_formats/snes.py system_formats/genesis.py system_formats/gba.py system_formats/segacd.py
+            system_formats/gb.py system_formats/snes.py system_formats/genesis.py system_formats/sms.py system_formats/gba.py system_formats/segacd.py
             ui/app.js ui/api.js ui/common.js ui/icons.js ui/views/overview.js
             ui/views/resources.js ui/views/scripts.js ui/views/assets.js
             ui/views/playtest.js ui/views/debug.js ui/views/routes.js
@@ -103,6 +103,7 @@ APPROVED_FILES = frozenset(ROOT_FILES | {
             universal.json visual_novel.json
         ''',
         'tests': '''
+            test_download_input.py test_sms_format.py ui_sms_input.mjs
             test_mcp_server.py test_bundled_cores.py test_controller_devices.py test_setup_installer.py ui_controller_choices.mjs ui_workspace_status.mjs ui_shortcuts.mjs ui_tool_help.mjs ui_workspace_resume.mjs
             test_level_design.py test_studio_tools.py test_value_search.py test_studio_discovery.py test_source_information.py test_release_scope.py ui_level_design.mjs ui_animation_studio.mjs ui_value_finder.mjs ui_edit_previews.mjs ui_game_visuals.mjs ui_visual_live.mjs ui_publish_drafts.mjs ui_audio_preview.mjs
             test_sound_studio.py test_audio_systems.py ui_sound_studio.mjs
@@ -196,7 +197,7 @@ APPROVED_FILES = APPROVED_FILES | frozenset({
         '09-playtest-states','10-verified-patch','11-hex-inspection','12-tutorials',
         '13-settings','14-light-theme','15-dark-theme','16-connected-rooms',
         '17-object-inspector','18-byte-explanation','19-chrono-armor','20-ffl2-map-browser','21-game-knowledge',
-        '22-engine-recognition','23-address-domains','24-code-references','25-cartridge-verification','26-mod-byte-comparison','27-crc-mismatch','28-text-overflow','29-audio-preview','30-project-recovery','26-universal-value-series','27-native-access-capture','28-native-source-context','29-structural-experiments','30-generated-table-editor','31-debugger-preparation','32-data-relocation','33-moved-table','34-menu-contrast','35-first-workshop-edit','36-patch-compatibility-preview','37-task-workspace','38-sprite-preview','39-build-handoff','40-light-workspace','41-guide-search','45-changes-only','46-brush-build-review','47-search-files','48-readable-download','49-palette-difference','50-clean-level-comparison')),
+        '22-engine-recognition','23-address-domains','24-code-references','25-cartridge-verification','26-mod-byte-comparison','27-crc-mismatch','28-text-overflow','29-audio-preview','30-project-recovery','26-universal-value-series','27-native-access-capture','28-native-source-context','29-structural-experiments','30-generated-table-editor','31-debugger-preparation','32-data-relocation','33-moved-table','34-menu-contrast','35-first-workshop-edit','36-patch-compatibility-preview','37-task-workspace','38-sprite-preview','39-build-handoff','40-light-workspace','41-guide-search','45-changes-only','46-brush-build-review','47-search-files','48-readable-download','49-palette-difference','50-clean-level-comparison','51-rastan-enemy-editor','52-rastan-blobs-playtest','53-rastan-verified-patch','54-rastan-original-playtest','55-snes-visible-playtest')),
 })
 
 

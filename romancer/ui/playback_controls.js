@@ -1,3 +1,4 @@
+export function buttonsForRuntime(state,buttons){const sms=state.artifact?.system_id==='sms'&&state.runtime?.loaded?.loaded?.core?.library_name==='BlastEm';return [...new Set(buttons.map(key=>sms&&key==='b'?'r':key))];}
 const defaultKeys={up:'ArrowUp',down:'ArrowDown',left:'ArrowLeft',right:'ArrowRight',a:'z',b:'x',start:'Enter',select:'Shift'};
 export function padForSelection(pads,selection=-1){if(selection===-2)return null;if(selection===-1)return [...pads].find(p=>p?.connected!==false&&p)||null;return [...pads].find(p=>p?.index===selection&&p.connected!==false)||null;}
 export function controllerButtons(pad){if(!pad)return [];const names=['b','a','y','x','l','r',null,null,'select','start',null,null,'up','down','left','right'],result=[];for(let i=0;i<names.length;i++)if(names[i]&&pad.buttons?.[i]?.pressed)result.push(names[i]);if(pad.axes?.[0]<-.35)result.push('left');if(pad.axes?.[0]>.35)result.push('right');if(pad.axes?.[1]<-.35)result.push('up');if(pad.axes?.[1]>.35)result.push('down');return [...new Set(result)];}
@@ -6,5 +7,5 @@ export function mountController(ctx){const control=document.getElementById('runt
  const release=()=>{ctx.state.heldButtons=[];if(ctx.state.playing){stopPlayback(ctx.state);ctx.render();}};
  control.addEventListener('keydown',event=>{if(event.target!==control)return;const map=ctx.state.profile?.input_map||defaultKeys,key=Object.keys(map).find(k=>map[k]===event.key);if(key){event.preventDefault();ctx.state.heldButtons=[...new Set([...(ctx.state.heldButtons||[]),key])];}},options);
  control.addEventListener('keyup',event=>{const map=ctx.state.profile?.input_map||defaultKeys,key=Object.keys(map).find(k=>map[k]===event.key);if(key){event.preventDefault();ctx.state.heldButtons=(ctx.state.heldButtons||[]).filter(k=>k!==key);}},options);
- control.addEventListener('blur',release,options);window.addEventListener('blur',release,options);document.addEventListener('visibilitychange',()=>{if(document.hidden)release();},options);
+ control.addEventListener('blur',()=>{ctx.state.heldButtons=[];},options);window.addEventListener('blur',release,options);document.addEventListener('visibilitychange',()=>{if(document.hidden)release();},options);
 }

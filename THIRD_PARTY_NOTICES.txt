@@ -15,6 +15,9 @@ The BPS format was designed by byuu. Its public-domain specification is referenc
 at https://floating.muncher.se/byuu/bps/bps_spec.html. ROMancer's encoder and decoder
 are implemented locally; no external patching executable is bundled.
 
+Master System playtesting reuses the same separately licensed BlastEm engine;
+its original notices and corresponding source remain included.
+
 The full Windows release includes separately licensed FCEUmm, bsnes-mercury Balanced,
 BlastEm, Gambatte and mGBA engines. Their licenses, original notices, source commits,
 DLL hashes and corresponding-source archive are retained under cores/. The engines

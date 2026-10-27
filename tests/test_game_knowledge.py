@@ -12,8 +12,10 @@ class GameKnowledgeTests(unittest.TestCase):
             self.assertFalse(result['write_authorized'])
             self.assertTrue(result['facts']);self.assertTrue(result['sources'])
             for source in result['sources']:
-                self.assertTrue(source['url'].startswith('https://github.com/'))
-                self.assertEqual(len(source['commit']),40)
+                if source.get('kind')=='native_observation':
+                    self.assertTrue(source['url'].startswith('/user-guide/'));self.assertEqual(len(source['original_frame_sha256']),64);self.assertEqual(len(source['edited_frame_sha256']),64)
+                else:
+                    self.assertTrue(source['url'].startswith('https://github.com/'));self.assertEqual(len(source['commit']),40)
             for fact in result['facts']:
                 self.assertIn(fact['status'],('implemented','layout_checked','research_candidate'))
                 self.assertTrue(fact['scope']);self.assertTrue(fact['source_ids'])

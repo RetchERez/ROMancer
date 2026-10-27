@@ -10,8 +10,13 @@ _NES='https://www.nesdev.org/wiki/CPU_memory_map'
 _SNES='https://snes.nesdev.org/wiki/Memory_map'
 _MD='https://www.plutiedev.com/memory-map'
 _GBA='https://problemkaputt.de/gbatek.htm#gbamemorymap'
+_SMS='https://www.smspower.org/Development/MemoryMap'
 
 _SYSTEMS={
+ 'sms':dict(name='Master System',cpu='Z80',endian='little',domains={'cpu':0xffff,'vram':0x3fff},
+   graphics='Mode 4 uses 8×8 tiles with four bitplane bytes per row, 32 bytes per tile and 16 stored indices. Palette selection and sprite assembly are separate data.',
+   mapping='CPU cartridge windows are not file offsets. The documented Sega mapper has three 16 KiB slots and an unpaged first 1 KiB; the header alone does not prove this mapper or its active bank state.',
+   references=[_SMS,'https://www.smspower.org/Development/Tiles','https://www.smspower.org/Development/ROMHeader','https://www.smspower.org/Development/SN76489']),
  'nes':dict(name='NES',cpu='Ricoh 2A03/2A07 · 6502 family',endian='little',domains={'cpu':0xffff,'ppu':0x3fff},
    graphics='Common 8×8 tiles use 16 bytes: eight low-plane rows, then eight high-plane rows. CHR-RAM graphics may be generated or decompressed during play.',
    mapping='Read the 16-byte header, optional 512-byte trainer, PRG size and mapper. CPU and PPU have separate buses.',
@@ -51,6 +56,10 @@ def reference_for(system_id):
 
 
 def _cpu(system,address):
+    if system=='sms':
+        if address<0xc000:return 'cartridge','Cartridge or attached-device window','Establish the cartridge mapper and active banks before resolving any ROM file offset. Boot/device overlays are separate.',True
+        if address<0xe000:return 'ram','System work RAM','8 KiB work RAM. Runtime values do not identify ROM initialization data or the instruction that changes them.',False
+        return 'ram-mirror','System RAM mirror and device controls','Mirrors 8 KiB work RAM. On the documented Sega mapper, writes at 0xFFFC–0xFFFF also control cartridge mapping; reads return RAM. Do not assume the mapper from a header.',False
     if system in ('gb','gbc'):
         if address<0x8000:return 'rom-window','Cartridge ROM window','Establish mapper mode and physical bank. Boot ROM overlays can affect startup reads.',True
         if address<0xa000:return 'graphics','Video RAM','CGB selects a VRAM bank; access also depends on display timing.',False

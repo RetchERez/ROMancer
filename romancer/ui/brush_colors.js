@@ -1,5 +1,5 @@
 import {esc} from './common.js';
-const bits={'mono-row-msb-v1':1,'tile8-paired2-msb-v1':2,'tile8-planar2-msb-v1':2,'tile8-paired4-msb-v1':4,'tile8-packed4-high-v1':4,'tile8-packed4-low-v1':4};
+const bits={'mono-row-msb-v1':1,'tile8-paired2-msb-v1':2,'tile8-planar2-msb-v1':2,'tile8-rowplanar4-msb-v1':4,'tile8-paired4-msb-v1':4,'tile8-packed4-high-v1':4,'tile8-packed4-low-v1':4};
 const valid=rgb=>Array.isArray(rgb)&&rgb.length===3&&rgb.every(v=>Number.isInteger(v)&&v>=0&&v<=255);
 export function brushColors(bitmap,palette,layout){
  const count=bits[bitmap?.codec]?Math.min(2**bits[bitmap.codec],palette?.colors_per_bank||256):0;
