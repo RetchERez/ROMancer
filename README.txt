@@ -195,7 +195,7 @@ engine to its two-button pad: A and B are buttons 1 and 2, and Start sends Pause
 
 GITHUB RELEASE PREPARATION
 
-Use the tag v1.0.0 for the public ROMancer v1.0 release. The numeric 1.0.38 build
+Use the tag v1.0.0 for the public ROMancer v1.0 release. The numeric 1.0.39 build
 identifier is internal installer/update identity. Lead the release description
 with ROMancer-v1.0-Setup.exe, then the portable Windows ZIP, offline guide and
 walkthrough. Provide the source, engine pack, component notices and SHA256SUMS.
@@ -722,10 +722,23 @@ A binary patch describes differences, not the meaning of every changed byte.
 Reference facts are bound to matched originals; external hacks can relocate data.
 No research caches, commercial ROMs or upstream editor implementation are bundled.
 
-BUILD38 WORKFLOW AND PREVIEW UPDATE
+SAVED BUILDS AND SCENE PREVIEWS
 Per-ROM readiness requires writable definitions, including read-only codec checks.
 Saved-build Playtest/Export controls survive reopening and keep exact ancestry.
 Graphics can replay a checked temporary draft against a saved cold-start trace,
 with original/draft/difference emulator frames. It does not publish a project build.
 The guide explains bounds, stale results and simulated object-composite differences.
 Independent beginner acceptance remains pending; use user-guide/ACCEPTANCE.txt.
+
+UNDERSTANDING THE MAIN WORKFLOW
+Start with Try the editing studio for an included playable practice game.
+More practice ROMs contains simple system test programs.
+Original: your imported ROM; editing keeps it unchanged.
+Draft: editor changes saved for later; these are not a playable ROM yet.
+Build: a separate ROM containing changes you reviewed and created.
+Patch: the changes you share; the recipient supplies the matching original.
+Game save: ordinary progress saved by the game, such as a .sav file.
+Save state: an emulator snapshot for one exact ROM/build and emulator setup.
+Ready to edit means the saved layout is usable; it does not decode every resource.
+Playtest: Load game, then Play; click the game screen for controller input.
+Unload game closes that session. Your project files and saved states remain.

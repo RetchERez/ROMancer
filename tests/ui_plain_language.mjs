@@ -1,0 +1,17 @@
+import assert from 'node:assert/strict';
+import {render as overview} from '../romancer/ui/views/overview.js';
+import {requireProject} from '../romancer/ui/common.js';
+import {readinessCards} from '../romancer/ui/editing_readiness.js';
+import {workspaceStatus} from '../romancer/ui/workspace_status.js';
+import {gameEdits} from '../romancer/ui/verified_games.js';
+const welcome=await overview({state:{project:null,projects:[]},use(){}});
+assert.match(welcome,/More practice ROMs/);assert.match(welcome,/No ROM file needed/);
+assert.match(welcome,/data-action="demo-studio"[^>]*class="primary /,'The useful original practice game is the primary start.');
+assert(welcome.indexOf('data-action="import"')<welcome.indexOf('More practice ROMs'));
+assert(welcome.indexOf('More practice ROMs')<welcome.indexOf('NES workshop'),'System test programs stay in a separate expandable group.');
+const blank=requireProject({state:{}});assert.match(blank,/data-action="demo-studio"/);assert(!blank.includes('fixture'));
+const model={areas:[{kind:'script',title:'Text',status:'needs_investigation',reason:'No checked definition',action:'Find or declare a layout'},{kind:'levels',title:'Levels',status:'unsupported',reason:'<invalid offset at 0x1234>',action:'Repair definition'},{kind:'assets',title:'Graphics',status:'ready',reason:'Saved layout inspected; no palette',action:'Open editor'}]};
+const cards=readinessCards(model);assert.match(cards,/character table/);assert.match(cards,/Check text setup/);assert.match(cards,/Check setup/);assert.match(cards,/<details[\s\S]*&lt;invalid offset at 0x1234&gt;/,'Exact errors remain available and escaped.');assert(!cards.includes('Repair definition'));
+const status=workspaceStatus({project:{project_id:'p'},artifact:{artifact_id:'a'},drafts:{'p:a:assets:asset-changes':'[{"kind":"palette"}]'},results:{}},{failed:false,pending:false},false);assert.match(status,/Edits not built/);assert.match(status,/Draft saved/);
+const fallback=await gameEdits({state:{project:{project_id:'p'},artifact:{artifact_id:'a',sha256:'s'}},sourceParams:()=>({project_id:'p',artifact_id:'a'}),use(){},api:{call:async()=>({profile:null})}});assert.match(fallback,/^<details/);assert(!fallback.includes('No verified game definition'),'Missing special shortcuts must not contradict usable editing setups above.');
+console.log('Two clear starting choices, plain readiness actions, exact expandable details and explicit draft/build status.');

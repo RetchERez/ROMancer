@@ -60,6 +60,10 @@
 
   // romancer/ui/tool_help.js
   var TERMS = [
+    [/build/i, "A separate ROM made from your reviewed edits. Your original stays unchanged."],
+    [/draft/i, "Editor changes saved for later. Create a build before playing the changed ROM."],
+    [/save state|saved state/i, "An emulator snapshot for one exact ROM/build and emulator setup. A battery game save is a different file."],
+    [/core/i, "The emulator engine that runs this console. The full Windows edition includes reviewed engines."],
     [/offset/i, "A byte's position in the selected file, counted from zero. CPU addresses are different."],
     [/stride/i, "Bytes from the start of one record to the start of the next. This can include unused bytes."],
     [/capacity|allocation/i, "Maximum storage reserved for this resource. An edit must fit, including terminators and padding."],
@@ -110,8 +114,8 @@
     if (/page|previous|next/.test(action)) return "No more items in this direction.";
     if (/(?:apply|build)$/.test(action)) return "Review the changes first.";
     if (/package|export/.test(action)) return "Prepare and select an export first.";
-    if (/state|checkpoint/.test(action)) return "Load the matching ROM and core first.";
-    if (/runtime|profile/.test(action)) return "Choose compatible content and a saved core setup.";
+    if (/state|checkpoint/.test(action)) return "Load the matching ROM and emulator first.";
+    if (/runtime|profile/.test(action)) return /profile/.test(action) ? "Choose a system and load its emulator settings." : "Load a game in Playtest first.";
     if (/undo|redo/.test(action)) return "No edit history in this direction.";
     if (/stop/.test(action)) return "Start recording first.";
     return "Complete the required setup for this selection.";
@@ -181,7 +185,7 @@
     return `<header class="page-heading"><div><h1>${esc(title)}</h1></div><div class="actions">${actions3}${title === "Help" ? "" : button("Help", "help-topic", { icon: "shield" })}</div></header>`;
   }
   function requireProject(ctx2) {
-    if (!ctx2.state.project) return empty("Open a project to begin", "Import your own source or explore the original demonstration fixture.", button("Open demonstration", "demo", { primary: true, icon: "arrow" }));
+    if (!ctx2.state.project) return empty("Choose a ROM to begin", "Try the included practice game, or import your own ROM from Overview.", button("Try the editing studio", "demo-studio", { primary: true, icon: "arrow" }));
     return null;
   }
 
@@ -538,7 +542,7 @@
   }
   function workspaceStatus(state2, snapshot2, includeFile = true) {
     const file = artifactStatus(state2.artifact), save = saveStatus(snapshot2);
-    return `<div class="workspace-state" aria-label="File and edit status">${includeFile ? badge(file.label, file.tone) : ""}${hasStagedChanges(state2) ? badge("Staged changes · build required", "warm") : ""}<span id="draft-save-status" role="status" aria-live="polite" class="save-state ${save.tone}">${esc(save.label)}</span>${snapshot2.failed ? '<button type="button" data-action="draft-retry">Retry save</button>' : ""}</div>`;
+    return `<div class="workspace-state" aria-label="File and edit status">${includeFile ? badge(file.label, file.tone) : ""}${hasStagedChanges(state2) ? badge("Edits not built", "warm") : ""}<span id="draft-save-status" role="status" aria-live="polite" class="save-state ${save.tone}">${esc(hasStagedChanges(state2) && !snapshot2.failed && !snapshot2.pending ? "Draft saved" : save.label)}</span>${snapshot2.failed ? '<button type="button" data-action="draft-retry">Retry save</button>' : ""}</div>`;
   }
 
   // romancer/ui/clean_preview.js
@@ -1166,7 +1170,7 @@
         await ctx2.render();
       },
       "profile-save": async () => {
-        if (read("profile-family") !== state2.profileLoadedFamily) throw new Error("Open the selected system setup before saving.");
+        if (read("profile-family") !== state2.profileLoadedFamily) throw new Error("Load settings for the selected system before saving.");
         const input_map = Object.fromEntries(Object.keys(defaultKeys).map((k) => [k, read("key-" + k)]));
         const result = await ctx2.run("profiles.save", { system_id: read("profile-family"), core: read("core-path"), options: json("core-options"), system_dir: read("system-path").trim() || null, input_map }, { refresh: false, render: false });
         state2.profile = result.profile;
@@ -1184,7 +1188,7 @@
         return ctx2.render();
       }
     });
-    return `<p class="notice ${setupError ? "warm" : ""}">${available ? `Ready to load${state2.profileEngine ? " · " + esc(state2.profileEngine) + " included" : ""}` : profile ? esc(setupError) : "Choose a local emulator core to playtest."}</p>${!profile ? `${button("Find local cores", "profile-scan")}<div class="actions">${candidates.map((row) => button("Use " + row.core.split(/[\\/]/).at(-1), "profile-auto", { id: row.candidate_id })).join("")}</div>${state2.results["profiles.scan_local"] && !candidates.length ? "<p>No matching core found. Open Advanced setup to choose one.</p>" : ""}` : ""}<div class="field-row">${select("profile-family", "System", families, family)}${select("runtime-content", "Content", [...state2.artifact ? [[state2.artifact.artifact_id, state2.artifact.name]] : []], ctx2.draft("runtime-content", ((_c = state2.artifact) == null ? void 0 : _c.artifact_id) || "disc:" + ((_e = (_d = state2.project.containers) == null ? void 0 : _d[0]) == null ? void 0 : _e.container_id)))}</div><div class="actions">${button("Open saved setup", "profile-open")}${button("Check setup", "profile-validate")}</div><details class="config"><summary>Advanced options & controller keys</summary>${field("system-path", "System-file folder (optional)", ctx2.draft("system-path", (profile == null ? void 0 : profile.system_dir) || ""))}<div class="field-row">${field("option-key", "Option name", ctx2.draft("option-key", ""))}${field("option-value", "Option value", ctx2.draft("option-value", ""))}</div>${button("Set option", "profile-option")}<div class="field-row">${Object.entries(defaultKeys).map(([key3, value]) => field("key-" + key3, key3.toUpperCase(), ctx2.draft("key-" + key3, (profile == null ? void 0 : profile.input_map[key3]) || value))).join("")}</div></details>${button("Save system setup", "profile-save")}`;
+    return `<p class="notice ${setupError ? "warm" : ""}">${available ? `Emulator ready${state2.profileEngine ? " · " + esc(state2.profileEngine) + " included" : ""}` : profile ? esc(setupError) : "The source edition needs a reviewed emulator core. The full Windows download includes one."}</p>${!profile ? `${button("Find local cores", "profile-scan")}<div class="actions">${candidates.map((row) => button("Use " + row.core.split(/[\\/]/).at(-1), "profile-auto", { id: row.candidate_id })).join("")}</div>${state2.results["profiles.scan_local"] && !candidates.length ? "<p>No matching core found. Open Advanced setup to choose one.</p>" : ""}` : ""}<div class="field-row">${select("profile-family", "System", families, family)}${select("runtime-content", "ROM or build to play", [...state2.artifact ? [[state2.artifact.artifact_id, state2.artifact.name]] : []], ctx2.draft("runtime-content", ((_c = state2.artifact) == null ? void 0 : _c.artifact_id) || "disc:" + ((_e = (_d = state2.project.containers) == null ? void 0 : _d[0]) == null ? void 0 : _e.container_id)))}</div><div class="actions">${button("Load system settings", "profile-open")}${button("Check setup", "profile-validate")}</div><details class="config"><summary>Controller keys & advanced options</summary>${field("system-path", "System-file folder (optional)", ctx2.draft("system-path", (profile == null ? void 0 : profile.system_dir) || ""))}<div class="field-row">${field("option-key", "Option name", ctx2.draft("option-key", ""))}${field("option-value", "Option value", ctx2.draft("option-value", ""))}</div>${button("Set option", "profile-option")}<div class="field-row">${Object.entries(defaultKeys).map(([key3, value]) => field("key-" + key3, key3.toUpperCase(), ctx2.draft("key-" + key3, (profile == null ? void 0 : profile.input_map[key3]) || value))).join("")}</div></details>${button("Save emulator settings", "profile-save")}`;
   }
   function wavFromPCM(encoded, rate) {
     if (!Number.isInteger(rate) || rate < 1 || rate > 192e3) throw new Error("Unsupported sample rate.");
@@ -1811,8 +1815,8 @@
   }
   async function render(ctx2) {
     var _a, _b;
-    const { state: state2 } = ctx2, missing = requireProject(ctx2);
-    if (missing) return missing;
+    const { state: state2 } = ctx2, missing2 = requireProject(ctx2);
+    if (missing2) return missing2;
     if (!state2.artifact) return empty("Import a ROM first", "Recipes and definitions belong to an exact source revision.");
     const saved = (await ctx2.api.call("recipes.list", ctx2.sourceParams())).recipes, plans = [...new Set([...((_a = state2.pending) == null ? void 0 : _a.artifact_id) === state2.artifact.artifact_id ? [state2.pending.plan_id] : [], ...state2.project.builds.filter((b) => b.source_id === state2.artifact.artifact_id).map((b) => b.plan_id)].filter(Boolean))];
     const selected2 = () => {
@@ -2419,8 +2423,8 @@
     var _a, _b, _c, _d, _e, _f, _g, _h, _i, _j, _k, _l, _m;
     const setupReview = useResearchSetup(ctx2, "tables");
     if (setupReview) return setupReview;
-    const { state: state2 } = ctx2, missing = requireProject(ctx2);
-    if (missing) return missing;
+    const { state: state2 } = ctx2, missing2 = requireProject(ctx2);
+    if (missing2) return missing2;
     const artifact = state2.artifact;
     if (!artifact) return empty("Import a ROM first", "A table needs an exact source revision.", button("Import ROM", "import", { primary: true }));
     const proposal = ((_a = state2.tableProposal) == null ? void 0 : _a.scope) === selectionKey(state2) && state2.tableProposal.result.source_sha256 === artifact.sha256 ? state2.tableProposal.result : null;
@@ -2782,13 +2786,17 @@
     ["release", "Export & patches", "Apply or export patches"]
   ];
   function overviewTasks() {
-    return `<section class="card"><div class="card-heading"><h3>Editing tools</h3></div><div class="overview-tasks">${OVERVIEW_TASKS.map(([id, label, note]) => `<div>${button(label, "navigate", { id, icon: id })}<p class="subtle">${esc(note)}</p></div>`).join("")}</div></section>`;
+    return `<section class="card"><div class="card-heading"><h3>What do you want to change?</h3></div><div class="overview-tasks">${OVERVIEW_TASKS.map(([id, label, note]) => `<div>${button(label, "navigate", { id, icon: id })}<p class="subtle">${esc(note)}</p></div>`).join("")}</div></section>`;
   }
 
   // romancer/ui/editing_readiness.js
-  var labels = { ready: "Ready to edit", needs_investigation: "Needs investigation", unsupported: "Unsupported definition" };
+  var labels = { ready: "Ready to edit", needs_investigation: "Needs investigation", unsupported: "Setup needs fixing" };
+  var missing = { assets: ["Play this ROM, pause, then inspect a sprite to find its graphics.", "Find graphics"], script: ["Text needs a character table and text locations before it can be edited.", "Check text setup"], tables: ["Find a changing value, then save its table layout.", "Find values"], levels: ["Level editing needs a saved map layout, tiles and object records.", "Check level setup"], sound: ["Preview supported samples, or capture audio from Playtest. Editing music needs a supported format.", "Open sound tools"] };
   function readinessCards(model) {
-    return '<section class="card editing-readiness"><h3>This ROM: editing readiness</h3><div class="readiness-grid">' + model.areas.map((a) => "<div><strong>" + esc(a.title) + '</strong><p class="readiness-state ' + esc(a.status) + '">' + esc(labels[a.status]) + "</p><p>" + esc(a.reason) + "</p>" + button(a.action, "readiness-open", { id: a.kind }) + "</div>").join("") + '</div><p class="subtle">Ready means the saved layout passed inspection for this revision. Names and game behavior still need evidence.</p></section>';
+    return '<section class="card editing-readiness"><h3>What can I edit in this ROM?</h3><div class="readiness-grid">' + model.areas.map((a) => {
+      const suggestion = missing[a.kind] || ["Find and save an editing setup for this ROM.", "Investigate"], summary = a.status === "ready" ? "A working editing setup is saved for this ROM." : a.status === "unsupported" ? "The saved setup does not work with this ROM. Open it to check the details." : suggestion[0], action = a.status === "ready" ? "Open editor" : a.status === "unsupported" ? "Check setup" : suggestion[1];
+      return "<div><strong>" + esc(a.title) + '</strong><p class="readiness-state ' + esc(a.status) + '">' + esc(labels[a.status]) + "</p><p>" + esc(summary) + "</p>" + button(action, "readiness-open", { id: a.kind }) + '<details class="readiness-details"><summary>Technical details</summary><p>' + esc(a.reason) + "</p></details></div>";
+    }).join("") + '</div><p class="subtle">Ready applies to the saved layout, not every part of the game. Playtest your changes.</p></section>';
   }
   async function editingReadiness(ctx2) {
     const scope = selectionKey(ctx2.state), current2 = () => {
@@ -2805,7 +2813,10 @@
         ctx2.state.researchOpen = { scope, kind: area2.kind };
         return ctx2.navigate(area2.page);
       }
-      return ctx2.navigate(area2.kind === "assets" ? "playtest" : "debug");
+      if (area2.kind === "assets") return ctx2.navigate("playtest");
+      if (area2.kind === "tables") return ctx2.navigate("debug");
+      ctx2.state.researchOpen = { scope, kind: area2.kind };
+      return ctx2.navigate(area2.page);
     } });
     return readinessCards(model);
   }
@@ -3125,7 +3136,7 @@
     }
     if (!current2()) return "";
     state2.gameVisualModel = { scope, model };
-    if (!model.profile) return `<section class="card game-definition"><div class="card-heading"><h3>Investigate this ROM</h3>${button("Open hex editor", "game-investigate")}</div><p class="subtle">No verified game definition for this revision. Search bytes, compare builds, and bookmark locations in Resources.</p></section>`;
+    if (!model.profile) return `<details class="card game-definition"><summary>Find more editing data · Advanced</summary><p>Use the hex editor to search bytes, compare builds and bookmark locations. Your saved editing setups are listed above.</p>${button("Open hex editor", "game-investigate")}</details>`;
     const pending = ((_a = state2.gameEditPlan) == null ? void 0 : _a.scope) === scope && state2.gameEditPlan.result.profile_id === model.profile.id ? state2.gameEditPlan : null;
     function values() {
       return Object.fromEntries(model.fields.map((f) => {
@@ -3301,14 +3312,14 @@
       await ctx2.setArtifact(node.dataset.id);
       await ctx2.navigate("resources");
     } });
-    if (!p) return `<div class="welcome">${heading("", "Overview", "")}<section class="hero"><div class="hero-copy"><h2>Open a project.</h2><p>Edit text and graphics, playtest, and export patches.</p><div class="actions">${button("Import ROM", "import", { primary: true, icon: "plus" })}${button("Try the editing studio", "demo-studio", { icon: "playtest" })}${[["nes", "NES"], ["snes", "SNES"], ["genesis", "GEN"], ["gb", "Game Boy"], ["gbc", "Game Boy Color"], ["gba", "GBA"]].map(([id, label]) => button(label + " workshop", "demo-system", { id, icon: "assets" })).join("")}</div></div><div class="hero-art">${ship}</div></section><div class="welcome-grid"><section class="card"><h3>Continue a project</h3><div class="project-list">${state2.projects.length ? state2.projects.slice(0, 8).map((p2) => `<div class="resource-row"><span class="resource-icon">${icon("folder")}</span><div class="resource-meta"><strong>${esc(p2.name)}</strong><small>${p2.sources.length} source${p2.sources.length === 1 ? "" : "s"} · ${p2.builds.length} build${p2.builds.length === 1 ? "" : "s"}</small></div>${button("Open", "open-project", { id: p2.project_id })}</div>`).join("") : empty("A fresh workspace", "Your projects will appear here after your first import.")}</div></section><section class="card"><h3>Quick start</h3>${steps()}</section></div></div>`;
+    if (!p) return `<div class="welcome">${heading("", "Overview", "")}<section class="hero"><div class="hero-copy"><h2>Make your first edit.</h2><p>Try the included practice game, or import a ROM you own.</p><div class="actions">${button("Try the editing studio", "demo-studio", { primary: true, icon: "playtest" })}${button("Import ROM", "import", { icon: "plus" })}</div><p class="subtle">Practice game: Mossy Hollow (NES). No ROM file needed.</p><details class="practice-systems"><summary>More practice ROMs</summary><p class="subtle">Simple test programs for individual systems. Start with Mossy Hollow for a playable editing example.</p><div class="actions">${[["nes", "NES"], ["snes", "SNES"], ["genesis", "GEN"], ["gb", "Game Boy"], ["gbc", "Game Boy Color"], ["gba", "GBA"]].map(([id, label]) => button(label + " workshop", "demo-system", { id, icon: "assets" })).join("")}</div></details></div><div class="hero-art">${ship}</div></section><div class="welcome-grid"><section class="card"><h3>Continue a project</h3><div class="project-list">${state2.projects.length ? state2.projects.slice(0, 8).map((p2) => `<div class="resource-row"><span class="resource-icon">${icon("folder")}</span><div class="resource-meta"><strong>${esc(p2.name)}</strong><small>${p2.sources.length} source${p2.sources.length === 1 ? "" : "s"} · ${p2.builds.length} build${p2.builds.length === 1 ? "" : "s"}</small></div>${button("Open", "open-project", { id: p2.project_id })}</div>`).join("") : empty("A fresh workspace", "Your projects will appear here after your first import.")}</div></section><section class="card"><h3>Quick start</h3>${steps()}</section></div></div>`;
     const timeline = await ctx2.api.call("builds.timeline", { project_id: p.project_id });
     const progress = await ctx2.api.call("project.readiness", { project_id: p.project_id });
     const reports = (await ctx2.api.call("reports.list", { project_id: p.project_id })).reports;
     const exports = (await ctx2.api.call("exports.list", { project_id: p.project_id })).exports;
     const gameEditing = await gameEdits(ctx2);
     const ready = state2.artifact ? await editingReadiness(ctx2) : "";
-    return `${heading("Workspace overview", "Overview", p.demo ? "An original, redistributable fixture. Explore the real editing and release workflows." : "Your sources, builds, and recorded evidence in one place.", button("Import source", "import", { icon: "plus" }))}${sourceSupport(ctx2)}${ready}${overviewTasks()}${gameEditing}${scanControls(ctx2)}<details class="card task-checklist"><summary>Project checklist</summary>${p.demo ? badge("Practice ROM") : ""}<div class="actions">${progress.steps.map((step) => button((step.complete ? "✓ " : "") + step.title, "navigate", { id: step.page })).join("")}</div></details><div class="stats">${stat("Sources", p.sources.length, "Owned copies; originals preserved", "resources")}${stat("Builds", p.builds.length, "Content identities stored in history", "check")}${stat("Test records", reports.length, "Measured scope shown per report", "shield")}${stat("Exports", exports.length, "Selected documentation and patches", "release")}</div><section class="card"><div class="card-heading"><h3>Files</h3><span class="subtle">${p.sources.length + p.builds.length} ${p.sources.length + p.builds.length === 1 ? "item" : "items"}</span></div>${[...p.sources, ...p.builds].slice(-6).map(resource).join("") || empty("Import your first source", "Add a game file or a resource extracted from your own project.", button("Import source", "import", { primary: true }))}</section>${buildHistory(ctx2, timeline)}${projectChecks(ctx2)}`;
+    return `${heading("Workspace overview", "Overview", p.demo ? "An original, redistributable fixture. Explore the real editing and release workflows." : "Your sources, builds, and recorded evidence in one place.", button("Import ROM", "import", { icon: "plus" }))}<p class="notice edit-basics">Your original stays unchanged. Edits autosave as a <strong>draft</strong>. Create a <strong>build</strong> to play them; export a <strong>patch</strong> to share them.</p>${sourceSupport(ctx2)}${ready}${overviewTasks()}${gameEditing}${scanControls(ctx2)}<details class="card task-checklist"><summary>Project checklist</summary>${p.demo ? badge("Practice ROM") : ""}<div class="actions">${progress.steps.map((step) => button((step.complete ? "✓ " : "") + step.title, "navigate", { id: step.page })).join("")}</div></details><div class="stats">${stat("Sources", p.sources.length, "Owned copies; originals preserved", "resources")}${stat("Builds", p.builds.length, "Content identities stored in history", "check")}${stat("Test records", reports.length, "Measured scope shown per report", "shield")}${stat("Exports", exports.length, "Selected documentation and patches", "release")}</div><section class="card"><div class="card-heading"><h3>Files</h3><span class="subtle">${p.sources.length + p.builds.length} ${p.sources.length + p.builds.length === 1 ? "item" : "items"}</span></div>${[...p.sources, ...p.builds].slice(-6).map(resource).join("") || empty("Import your first source", "Add a game file or a resource extracted from your own project.", button("Import ROM", "import", { primary: true }))}</section>${buildHistory(ctx2, timeline)}${projectChecks(ctx2)}`;
   }
   function stat(title, value, note, ico) {
     return `<div class="stat"><div class="stat-top"><span>${title}</span>${icon(ico)}</div><strong>${value}</strong></div>`;
@@ -4064,8 +4075,8 @@ ${font ? `<section class="card"><h3>Font metrics · ${esc(font.id)}</h3><div cla
   var relation = (r) => ({ uses_verified_part: "Uses verified part", replayed_graphics_accesses: "Native replay accesses", source_verification: "Source verification", verified_visual_source: "Verified visual source", contains_record: "Contains record", uses_tiles: "Uses tiles", uses_palette: "Uses palette", shares_storage: "Shares byte storage", pixel_match: "Pixel match", located_in: "Located in", contains_object: "Contains object", uses_terrain: "Uses terrain", uses_graphics: "Uses graphics", uses_script: "Uses script", uses_sound: "Uses sound", uses_table: "Uses table" })[r] || r.replaceAll("_", " ");
   async function render5(ctx2) {
     var _a, _b, _c, _d;
-    const missing = requireProject(ctx2);
-    if (missing) return missing;
+    const missing2 = requireProject(ctx2);
+    if (missing2) return missing2;
     const { state: state2 } = ctx2, a = state2.artifact;
     if (!a) return empty("Choose a ROM", "Import a ROM or open a workshop to connect its resources.");
     const scope = selectionKey(state2), params = { ...ctx2.sourceParams() }, current2 = () => {
@@ -5087,8 +5098,8 @@ ${font ? `<section class="card"><h3>Font metrics · ${esc(font.id)}</h3><div cla
   // romancer/ui/views/resources.js
   async function render6(ctx2) {
     var _a, _b, _c, _d, _e, _f;
-    const { state: state2 } = ctx2, missing = requireProject(ctx2);
-    if (missing) return missing;
+    const { state: state2 } = ctx2, missing2 = requireProject(ctx2);
+    if (missing2) return missing2;
     const a = state2.artifact, ticket = selectionKey(state2), generation = (state2.resourceRenderGeneration || 0) + 1;
     state2.resourceRenderGeneration = generation;
     const current2 = () => ticket === selectionKey(state2) && generation === state2.resourceRenderGeneration && (!ctx2.isCurrentRender || ctx2.isCurrentRender()), params = a ? { ...ctx2.sourceParams() } : null;
@@ -5601,8 +5612,8 @@ ${font ? `<section class="card"><h3>Font metrics · ${esc(font.id)}</h3><div cla
     var _a, _b, _c, _d, _e, _f, _g, _h, _i;
     const setupReview = useResearchSetup(ctx2, "script");
     if (setupReview) return setupReview;
-    const { state: state2 } = ctx2, missing = requireProject(ctx2);
-    if (missing) return missing;
+    const { state: state2 } = ctx2, missing2 = requireProject(ctx2);
+    if (missing2) return missing2;
     if (!state2.artifact) return empty("Import a resource", "Select a source with a declared fixed-slot script schema.");
     const fallback = ((_a = state2.candidateReview) == null ? void 0 : _a.artifact_id) === state2.artifact.artifact_id ? {} : ((_b = state2.artifact.descriptors) == null ? void 0 : _b.script) || ((_c = state2.project.descriptors) == null ? void 0 : _c.script) || {};
     const schemaText = ctx2.draft("script-schema", JSON.stringify(fallback, null, 2));
@@ -6258,8 +6269,8 @@ ${font ? `<section class="card"><h3>Font metrics · ${esc(font.id)}</h3><div cla
     var _a, _b, _c, _d, _e, _f, _g, _h, _i, _j, _k, _l, _m, _n, _o, _p;
     const setupReview = useResearchSetup(ctx2, "assets");
     if (setupReview) return setupReview;
-    const { state: state2 } = ctx2, missing = requireProject(ctx2);
-    if (missing) return missing;
+    const { state: state2 } = ctx2, missing2 = requireProject(ctx2);
+    if (missing2) return missing2;
     if (!state2.artifact) return empty("Import an asset resource", "A declared uncompressed codec and source revision are required.");
     const connected = state2.connectedAssetSetup;
     if ((connected == null ? void 0 : connected.scope) === selectionKey(state2)) {
@@ -6930,9 +6941,9 @@ ${font ? `<section class="card"><h3>Font metrics · ${esc(font.id)}</h3><div cla
     var _a, _b, _c, _d, _e, _f, _g, _h, _i, _j, _k, _l, _m, _n, _o, _p, _q, _r, _s, _t, _u, _v, _w, _x, _y;
     const { state: state2 } = ctx2;
     state2.liveMuted ??= getSettings().startMuted;
-    const missing = requireProject(ctx2);
-    if (missing) return missing;
-    if (!state2.artifact && !((_a = state2.project.containers) == null ? void 0 : _a.length)) return empty("Import a game to playtest", "Choose a native libretro core that supports your source.");
+    const missing2 = requireProject(ctx2);
+    if (missing2) return missing2;
+    if (!state2.artifact && !((_a = state2.project.containers) == null ? void 0 : _a.length)) return empty("Import a game to playtest", "Open a project and choose the ROM you want to test.");
     const saveListing = state2.artifact ? await ctx2.api.call("saves.list", ctx2.sourceParams()) : { saves: [] };
     const setup2 = await runtimeSetup(ctx2), contentSha = ((_b = state2.runtime) == null ? void 0 : _b.game_sha256) || ((_c = state2.artifact) == null ? void 0 : _c.sha256), coreSha = ((_d = state2.runtime) == null ? void 0 : _d.core_sha256) || ((_f = (_e = state2.profile) == null ? void 0 : _e.core_identity) == null ? void 0 : _f.sha256), setupSha = ((_g = state2.runtime) == null ? void 0 : _g.runtime_identity_sha256) || ((_i = (_h = state2.runtime) == null ? void 0 : _h.loaded) == null ? void 0 : _i.runtime_identity_sha256), checkpoints = (await ctx2.api.call("runtime.checkpoints", ctx2.projectParams())).checkpoints.filter((c) => (!contentSha || c.game_sha256 === contentSha) && (!coreSha || c.core_sha256 === coreSha) && (!setupSha || c.runtime_identity_sha256 === setupSha));
     const capture = async () => {
@@ -7075,7 +7086,7 @@ ${font ? `<section class="card"><h3>Font metrics · ${esc(font.id)}</h3><div cla
         state2.runtime = await ctx2.run(content.startsWith("disc:") ? "runtime.load_disc" : "runtime.load_profile", { ...ctx2.projectParams(), ...content.startsWith("disc:") ? { container_id: content.slice(5) } : { artifact_id: content }, system_id }, { refresh: false, render: false });
         state2.frame = null;
         await ctx2.render();
-        ctx2.notify("Native worker loaded.");
+        ctx2.notify("Game loaded. Press Play.");
       },
       "runtime-close": async () => {
         stopPlayback(state2);
@@ -7136,7 +7147,7 @@ ${font ? `<section class="card"><h3>Font metrics · ${esc(font.id)}</h3><div cla
     const physicalChoices = [[-1, "Automatic gamepad"], [-2, "Keyboard only"], ...pads.map((p) => [p.index, p.id || "Gamepad " + (p.index + 1)])];
     const controllerSetup = `<div class="field-row">${select("physical-pad", "Input device", physicalChoices, state2.physicalPadIndex ?? -1)}${button("Use input device", "controller-physical")}</div>${active ? `<div class="field-row">${select("controller-type", "Emulated controller", controllerChoices, ((_p = loaded == null ? void 0 : loaded.controller_devices) == null ? void 0 : _p["0"]) ?? 1)}${button("Apply type & restart game", "controller-reload")}</div><p class="subtle">Changing the emulated type restarts the selected ROM. Save states require the same controller setup.</p>` : ""}`;
     const stateControls = `<div class="playtest-toolbar"><div class="actions">${state2.playing ? button("Pause", "runtime-pause", { primary: true }) : button("Play", "runtime-play", { disabled: !active, primary: true })}${button("Save state", "runtime-save", { disabled: !active })}</div><div class="actions state-slot">${select("checkpoint-id", "Saved state", checkpoints.map((c) => [c.snapshot_id, c.created_utc ? c.created_utc.replace("T", " ").replace("+00:00", " UTC") : c.snapshot_id.slice(0, 8) + " · " + c.run_mode]), ((_q = state2.snapshot) == null ? void 0 : _q.snapshot_id) || ((_r = checkpoints.at(-1)) == null ? void 0 : _r.snapshot_id))}${button("Load state", "runtime-restore", { disabled: !active || !checkpoints.length })}</div></div>`;
-    return `${heading("", "Playtest", "", active ? button(state2.playtestExpanded ? "Show setup" : "Expand game", "runtime-view") + button("Close worker", "runtime-close", { icon: "close" }) : "")}<div class="identity">${badge(active ? "NATIVE WORKER LOADED" : state2.profileAvailable ? "READY TO LOAD" : "SETUP REQUIRED", active ? "good" : "warm")}<strong>${esc(((_s = state2.artifact) == null ? void 0 : _s.name) || "Selected source")}</strong><code>${short((_t = state2.artifact) == null ? void 0 : _t.sha256)}</code></div><div class="grid-two playtest-layout ${active && state2.playtestExpanded ? "playtest-expanded" : ""}"><section class="card"><div class="card-heading"><h3>Playtest screen</h3><span class="subtle" id="runtime-frame-label">${state2.frame ? `Frame ${state2.frame.index} · ${state2.frame.width} × ${state2.frame.height}` : "No measured frame yet"}</span></div>${stateControls}<div class="actions">${button("Inspect graphics", "graphics-show-region", { disabled: !state2.frame, icon: "assets" })}</div><div class="screen" id="runtime-controller" tabindex="0" aria-label="Game controller keyboard focus">${state2.frame || active ? '<canvas id="runtime-screen" aria-label="Measured emulator capture"></canvas>' : empty(state2.profileAvailable ? "Ready to playtest" : "Connect a compatible core", state2.profileAvailable ? "Load game to begin." : "Choose a core in System setup.")}</div><details class="manual-runtime"><summary>Controller & frame tools</summary>${controllerSetup}<div class="runtime-controls"><div><div class="field-row">${field("runtime-frames", "Frames to advance", ctx2.draft("runtime-frames", "60"), { type: "number", min: 1 })}${field("input-frames", "Frames per input", ctx2.draft("input-frames", "1"), { type: "number", min: 1 })}</div><div class="actions">${button("Advance frames", "runtime-advance", { primary: true, disabled: !active, icon: "playtest" })}${button("Capture", "runtime-capture", { disabled: !active })}${button("Reset", "runtime-reset", { disabled: !active })}${button(state2.liveMuted ? "Unmute" : "Mute", "runtime-mute", { disabled: !active })}${field("runtime-volume", "Volume (%)", ctx2.draft("runtime-volume", String(getSettings().volume)), { type: "number", min: 0, max: 100 })}${button("Set volume", "runtime-volume", { disabled: !active })}${button("Test sound", "runtime-sound-check")}${button("Check ROM", "runtime-check", { disabled: !state2.profile })}</div></div><div class="dpad" aria-label="Controller directions">${button("↑", "runtime-input", { id: "up", disabled: !active })}${button("←", "runtime-input", { id: "left", disabled: !active })}${button("→", "runtime-input", { id: "right", disabled: !active })}${button("↓", "runtime-input", { id: "down", disabled: !active })}</div></div><div class="actions">${["a", "b", "x", "y", "l", "r", "start", "select"].map((id) => button(id.toUpperCase(), "runtime-input", { id, disabled: !active })).join("")}</div><p class="subtle">Use your saved controller keys while the game has focus.</p></details></section><section class="card playtest-setup"><h3>System setup</h3>${setup2}${button("Load game", "runtime-load", { primary: !active, disabled: active || !state2.profile })}<details class="config"><summary>Advanced core setup</summary>${field("core-path", "Native libretro core", ctx2.draft("core-path", ((_u = state2.profile) == null ? void 0 : _u.core) || readPreference("romancer-core") || ""), { placeholder: state2.capabilities.platform === "Windows" ? "C:\\RetroArch\\cores\\snes9x_libretro.dll" : "/path/to/core_libretro.so", hint: `Choose a core built for ${state2.capabilities.platform}. A Linux .so cannot load in Windows Python.` })}<div class="actions">${button("Choose core", "core-choose", { icon: "folder" })}${button("Load selected source", "runtime-load", { primary: !active, disabled: active })}</div>${jsonEditor("core-options", "Advanced core options", ctx2.draft("core-options", JSON.stringify(((_v = state2.profile) == null ? void 0 : _v.options) || {}, null, 2)))}</details><div class="config"><h3>Audio</h3>${button("Drain audio", "runtime-audio", { disabled: !active })}</div>${((_w = state2.audio) == null ? void 0 : _w.observed) ? `<canvas id="pcm-wave" width="480" height="80" aria-label="Captured PCM waveform"></canvas><audio id="pcm-player" controls aria-label="Play captured audio"></audio>${button("Save captured WAV", "runtime-audio-export", { disabled: !state2.audio.complete })}` : ""}<details class="config"><summary>Audio capture test (advanced)</summary>${jsonEditor("audio-config", "Cold-boot audio capture configuration", ctx2.draft("audio-config", JSON.stringify({ schema_version: 1, load: {}, steps: [{ frames: 1, buttons: [], port: 0 }], timeout_seconds: 30 }, null, 2)))}${jsonEditor("audio-baseline", "Exact sample-duration baseline", ctx2.draft("audio-baseline", "{}"))}${button("Capture & export WAV", "audio-export")}<p class="subtle small">Audio duration is checked against samples and an explicit rational baseline, independently of video timing.</p></details></section></div>${((_x = state2.results["runtime.smoke_profile"]) == null ? void 0 : _x.source_sha256) === ((_y = state2.artifact) == null ? void 0 : _y.sha256) ? `<section class="card"><h3>ROM startup check</h3><p>${state2.results["runtime.smoke_profile"].frames_advanced} frames · ${state2.results["runtime.smoke_profile"].frame.width} × ${state2.results["runtime.smoke_profile"].frame.height} video · ${state2.results["runtime.smoke_profile"].audio.captured_frames} audio sample frames · worker closed</p><p class="subtle">Startup observations only. Regression checks need expected results.</p><div class="actions">${button("Record a test route", "navigate", { id: "routes" })}${button("Compare regression runs", "navigate", { id: "regression" })}</div></section>` : ""}${report(state2.results["runtime.smoke_profile"], "ROM check details")}${report(state2.results["runtime.load"], "Worker capabilities")}${report(state2.results["runtime.close"], "Worker closure")}${report(state2.results["runtime.save_state"] ? { ...state2.results["runtime.save_state"], state_base64: "[local snapshot payload hidden]" } : null, "State identity")}${report(state2.audio ? { ...state2.audio, pcm_s16le_base64: "[PCM payload hidden]" } : null, "Captured audio")}${report(state2.results["audio.capture"], "WAV export")}${state2.artifact ? saveManager(ctx2, saveListing) + checkpointControls(ctx2) + traceControls(ctx2) + graphicsInvestigation(ctx2) : ""}${evidence(ctx2)}`;
+    return `${heading("", "Playtest", "", active ? button(state2.playtestExpanded ? "Show setup" : "Expand game", "runtime-view") + button("Unload game", "runtime-close", { icon: "close" }) : "")}<div class="identity">${badge(active ? state2.playing ? "Game running" : "Game paused" : state2.profileAvailable ? "Ready to play" : "Setup needed", active ? "good" : "warm")}<strong>${esc(((_s = state2.artifact) == null ? void 0 : _s.name) || "Selected source")}</strong><code>${short((_t = state2.artifact) == null ? void 0 : _t.sha256)}</code></div><div class="grid-two playtest-layout ${active && state2.playtestExpanded ? "playtest-expanded" : ""}"><section class="card"><div class="card-heading"><h3>Playtest screen</h3><span class="subtle" id="runtime-frame-label">${state2.frame ? `Frame ${state2.frame.index} · ${state2.frame.width} × ${state2.frame.height}` : "No measured frame yet"}</span></div>${stateControls}<div class="actions">${button("Inspect graphics", "graphics-show-region", { disabled: !state2.frame, icon: "assets" })}</div><div class="screen" id="runtime-controller" tabindex="0" aria-label="Game controller keyboard focus">${state2.frame || active ? '<canvas id="runtime-screen" aria-label="Measured emulator capture"></canvas>' : empty(state2.profileAvailable ? "Ready to playtest" : "Set up playtesting", state2.profileAvailable ? "Load game to begin." : "Choose the emulator under Game & emulator.")}</div><details class="manual-runtime"><summary>Controller & frame tools</summary>${controllerSetup}<div class="runtime-controls"><div><div class="field-row">${field("runtime-frames", "Frames to advance", ctx2.draft("runtime-frames", "60"), { type: "number", min: 1 })}${field("input-frames", "Frames per input", ctx2.draft("input-frames", "1"), { type: "number", min: 1 })}</div><div class="actions">${button("Advance frames", "runtime-advance", { primary: true, disabled: !active, icon: "playtest" })}${button("Capture", "runtime-capture", { disabled: !active })}${button("Reset", "runtime-reset", { disabled: !active })}${button(state2.liveMuted ? "Unmute" : "Mute", "runtime-mute", { disabled: !active })}${field("runtime-volume", "Volume (%)", ctx2.draft("runtime-volume", String(getSettings().volume)), { type: "number", min: 0, max: 100 })}${button("Set volume", "runtime-volume", { disabled: !active })}${button("Test sound", "runtime-sound-check")}${button("Check ROM", "runtime-check", { disabled: !state2.profile })}</div></div><div class="dpad" aria-label="Controller directions">${button("↑", "runtime-input", { id: "up", disabled: !active })}${button("←", "runtime-input", { id: "left", disabled: !active })}${button("→", "runtime-input", { id: "right", disabled: !active })}${button("↓", "runtime-input", { id: "down", disabled: !active })}</div></div><div class="actions">${["a", "b", "x", "y", "l", "r", "start", "select"].map((id) => button(id.toUpperCase(), "runtime-input", { id, disabled: !active })).join("")}</div><p class="subtle">Use your saved controller keys while the game has focus.</p></details></section><section class="card playtest-setup"><h3>Game &amp; emulator</h3>${setup2}<p class="subtle">Load game, then press Play. Click the game screen to use your controller keys.</p>${button("Load game", "runtime-load", { primary: !active, disabled: active || !state2.profileAvailable, reason: active ? "Unload the current game before loading another one." : "Check the setup message under Game & emulator." })}<details class="config"><summary>Advanced core setup</summary>${field("core-path", "Native libretro core", ctx2.draft("core-path", ((_u = state2.profile) == null ? void 0 : _u.core) || readPreference("romancer-core") || ""), { placeholder: state2.capabilities.platform === "Windows" ? "C:\\RetroArch\\cores\\snes9x_libretro.dll" : "/path/to/core_libretro.so", hint: `Choose a core built for ${state2.capabilities.platform}. A Linux .so cannot load in Windows Python.` })}<div class="actions">${button("Choose core", "core-choose", { icon: "folder" })}${button("Load selected source", "runtime-load", { primary: !active, disabled: active, reason: "Unload the current game before loading another one." })}</div>${jsonEditor("core-options", "Advanced core options", ctx2.draft("core-options", JSON.stringify(((_v = state2.profile) == null ? void 0 : _v.options) || {}, null, 2)))}</details><div class="config"><h3>Audio</h3>${button("Get captured audio", "runtime-audio", { disabled: !active })}</div>${((_w = state2.audio) == null ? void 0 : _w.observed) ? `<canvas id="pcm-wave" width="480" height="80" aria-label="Captured PCM waveform"></canvas><audio id="pcm-player" controls aria-label="Play captured audio"></audio>${button("Save captured WAV", "runtime-audio-export", { disabled: !state2.audio.complete })}` : ""}<details class="config"><summary>Audio capture test (advanced)</summary>${jsonEditor("audio-config", "Cold-boot audio capture configuration", ctx2.draft("audio-config", JSON.stringify({ schema_version: 1, load: {}, steps: [{ frames: 1, buttons: [], port: 0 }], timeout_seconds: 30 }, null, 2)))}${jsonEditor("audio-baseline", "Exact sample-duration baseline", ctx2.draft("audio-baseline", "{}"))}${button("Capture & export WAV", "audio-export")}<p class="subtle small">Audio duration is checked against samples and an explicit rational baseline, independently of video timing.</p></details></section></div>${((_x = state2.results["runtime.smoke_profile"]) == null ? void 0 : _x.source_sha256) === ((_y = state2.artifact) == null ? void 0 : _y.sha256) ? `<section class="card"><h3>ROM startup check</h3><p>${state2.results["runtime.smoke_profile"].frames_advanced} frames · ${state2.results["runtime.smoke_profile"].frame.width} × ${state2.results["runtime.smoke_profile"].frame.height} video · ${state2.results["runtime.smoke_profile"].audio.captured_frames} audio sample frames · worker closed</p><p class="subtle">Startup observations only. Regression checks need expected results.</p><div class="actions">${button("Record a test route", "navigate", { id: "routes" })}${button("Compare regression runs", "navigate", { id: "regression" })}</div></section>` : ""}${report(state2.results["runtime.smoke_profile"], "ROM check details")}${report(state2.results["runtime.load"], "Emulator details")}${report(state2.results["runtime.close"], "Game unload details")}${report(state2.results["runtime.save_state"] ? { ...state2.results["runtime.save_state"], state_base64: "[local snapshot payload hidden]" } : null, "State identity")}${report(state2.audio ? { ...state2.audio, pcm_s16le_base64: "[PCM payload hidden]" } : null, "Captured audio")}${report(state2.results["audio.capture"], "WAV export")}${state2.artifact ? saveManager(ctx2, saveListing) + checkpointControls(ctx2) + traceControls(ctx2) + graphicsInvestigation(ctx2) : ""}${evidence(ctx2)}`;
   }
   function mount7(ctx2) {
     mountGraphicsAccess(ctx2);
@@ -7476,8 +7487,8 @@ ${font ? `<section class="card"><h3>Font metrics · ${esc(font.id)}</h3><div cla
   // romancer/ui/views/debug.js
   async function render10(ctx2) {
     var _a, _b;
-    const { state: state2 } = ctx2, missing = requireProject(ctx2);
-    if (missing) return missing;
+    const { state: state2 } = ctx2, missing2 = requireProject(ctx2);
+    if (missing2) return missing2;
     if (!state2.artifact) return empty("Select a source or build", "A case binds exact source bytes and a registered build.");
     const scope = selectionKey(state2), params = { ...ctx2.sourceParams() }, source = state2.artifact, current2 = () => selectionKey(state2) === scope;
     const references = ((_a = state2.debugReferences) == null ? void 0 : _a.scope) === scope && state2.debugReferences.result.source_sha256 === source.sha256 ? state2.debugReferences.result : null;
@@ -7646,8 +7657,8 @@ ${font ? `<section class="card"><h3>Font metrics · ${esc(font.id)}</h3><div cla
   var exampleRoute = { schema_version: 1, id: "my-route", max_frames: 600, max_actions: 10, steps: [{ frames: 60, buttons: [], port: 0, assertions: [], transition: null, checkpoint: false }] };
   async function render11(ctx2) {
     var _a;
-    const { state: state2 } = ctx2, missing = requireProject(ctx2);
-    if (missing) return missing;
+    const { state: state2 } = ctx2, missing2 = requireProject(ctx2);
+    if (missing2) return missing2;
     const reports = (await ctx2.api.call("reports.list", ctx2.projectParams())).reports, routeReports = reports.filter((r) => r.kind === "route");
     ctx2.use({
       "route-run": () => {
@@ -7671,8 +7682,8 @@ ${font ? `<section class="card"><h3>Font metrics · ${esc(font.id)}</h3><div cla
   });
   async function render12(ctx2) {
     var _a, _b, _c, _d, _e, _f, _g;
-    const { state: state2 } = ctx2, missing = requireProject(ctx2);
-    if (missing) return missing;
+    const { state: state2 } = ctx2, missing2 = requireProject(ctx2);
+    if (missing2) return missing2;
     const definitions2 = (await ctx2.api.call("routes.list", ctx2.projectParams())).routes.filter((r) => r.complete);
     const reports = (await ctx2.api.call("reports.list", ctx2.projectParams())).reports.filter((r) => r.kind === "route");
     const suiteDefinitions = definitions2.filter((row) => !row.initial_state_id), artifacts = [...state2.project.sources, ...state2.project.builds], suite = state2.results["regression.run_suite"];
@@ -7716,7 +7727,7 @@ ${font ? `<section class="card"><h3>Font metrics · ${esc(font.id)}</h3><div cla
     return !!((preview == null ? void 0 : preview.ok) && preview.plan_id && preview.changed_bytes > 0 && preview.project_id === ((_a = state2.project) == null ? void 0 : _a.project_id) && preview.source_id === ((_b = state2.artifact) == null ? void 0 : _b.artifact_id) && preview.source_sha256 === ((_c = state2.artifact) == null ? void 0 : _c.sha256));
   }
   async function preparePatch(ctx2, file, expectedReference) {
-    if (!ctx2.state.project || !ctx2.state.artifact) throw new Error("Select the original ROM in the top bar first.");
+    if (!ctx2.state.project || !ctx2.state.artifact) throw new Error("Choose the ROM this patch was made for in the top bar.");
     if (!file) throw new Error("Choose a BPS or IPS patch first.");
     const scope = selectionKey(ctx2.state), project_id = ctx2.state.project.project_id, artifact_id = ctx2.state.artifact.artifact_id, request2 = (ctx2.state.patchRequest || 0) + 1;
     ctx2.state.patchRequest = request2;
@@ -7729,7 +7740,7 @@ ${font ? `<section class="card"><h3>Font metrics · ${esc(font.id)}</h3><div cla
     return preview;
   }
   function patchControls(ctx2) {
-    var _a, _b;
+    var _a, _b, _c;
     const { state: state2 } = ctx2, scope = selectionKey(state2), selected2 = ((_a = state2.patchImport) == null ? void 0 : _a.scope) === scope ? state2.patchImport : null, preview = selected2 == null ? void 0 : selected2.preview;
     ctx2.use({
       "patch-preview": async () => {
@@ -7750,7 +7761,7 @@ ${font ? `<section class="card"><h3>Font metrics · ${esc(font.id)}</h3><div cla
         await ctx2.navigate("playtest");
       }
     });
-    return `<section class="card" id="patch-import"><h3>Apply a downloaded patch</h3><p>Selected original: <strong>${esc(((_b = state2.artifact) == null ? void 0 : _b.name) || "Choose a ROM in the top bar")}</strong></p>
+    return `<section class="card" id="patch-import"><h3>Apply a downloaded patch</h3><p>Selected ${((_b = state2.artifact) == null ? void 0 : _b.kind) === "build" ? "build" : "ROM"} for patching: <strong>${esc(((_c = state2.artifact) == null ? void 0 : _c.name) || "Choose a ROM in the top bar")}</strong></p>
  ${fileInput("patch-file", "Patch file — choose or drop a BPS / IPS patch", ".bps,.ips")}${selected2 ? `<p>${esc(selected2.input.name)}</p>` : ""}
  ${field("patch-reference", "Expected original CRC32 or SHA256 (required for IPS)", ctx2.draft("patch-reference", ""), { hint: "Use the full-file checksum supplied by the patch author. BPS also checks its embedded checksums." })}
  <div class="actions">${button("Preview patch", "patch-preview", { primary: !preview, disabled: !state2.artifact })}</div>
@@ -7793,8 +7804,8 @@ ${font ? `<section class="card"><h3>Font metrics · ${esc(font.id)}</h3><div cla
   // romancer/ui/views/release.js
   async function render13(ctx2) {
     var _a, _b, _c, _d;
-    const { state: state2 } = ctx2, missing = requireProject(ctx2);
-    if (missing) return missing;
+    const { state: state2 } = ctx2, missing2 = requireProject(ctx2);
+    if (missing2) return missing2;
     const p = state2.project, exports = (await ctx2.api.call("exports.list", ctx2.projectParams())).exports;
     const handoff = state2.releaseHandoff;
     if (handoff) {
@@ -7812,7 +7823,7 @@ ${font ? `<section class="card"><h3>Font metrics · ${esc(font.id)}</h3><div cla
       "release-package": () => ctx2.run("release.package", { ...ctx2.projectParams(), export_ids: [...document.querySelectorAll('[name="release-export"]:checked')].map((n) => n.value), title: read("release-title") }),
       "walkthrough-export": () => ctx2.run("docs.walkthrough", { ...ctx2.projectParams(), evidence_id: read("walkthrough-id"), annotations: json("walkthrough-annotations") })
     });
-    return `${heading("Release preparation", "Export", "Generate a BPS patch, apply it independently to the exact original, and package selected public artifacts.")}${((_c = state2.downloadFeedback) == null ? void 0 : _c.project_id) === p.project_id ? `<p class="notice" role="status">Download started: ${esc(state2.downloadFeedback.name)}. Your browser handles the save location; check its Downloads list.</p>` : ""}${patchControls(ctx2)}<div class="grid-two"><section class="card"><div class="card-heading"><h3>Prepare a verified patch</h3>${badge("BPS1", "good")}</div><div class="field-row">${select2("release-source", "Original revision", p.sources, sourceId)}${select2("release-target", "Target build", p.builds, targetId)}</div>${field("release-title", "Release title", ctx2.draft("release-title", p.name))}${field("release-description", "Release notes", ctx2.draft("release-description", ""))}<div class="notice">BPS carries source, target, and patch checksums. ROMancer also binds SHA-256 identities and verifies the target with a separate decoder.</div>${button("Create verified patch", "release-patch", { primary: true, icon: "shield", disabled: !p.sources.length || !p.builds.length })}<p class="subtle small">Images up to 8 GiB. Complete reconstruction is checked before export.</p></section><section class="card"><h3>Release selection</h3><p class="subtle">Choose the patches and documents to include. ROMs, saves and private reports are excluded.</p><div class="checklist">${exports.filter((e) => ["patch", "documentation", "credits", "notice"].includes(e.role)).map((e) => `<label><input type="checkbox" name="release-export" value="${e.export_id}" checked>${esc(e.role)} · ${size(e.size)} · ${short(e.sha256)}</label>`).join("") || '<p class="subtle">Prepare a patch or export documentation first.</p>'}</div><div class="actions">${button("Package selected exports", "release-package", { icon: "release", disabled: !exports.some((e) => ["patch", "documentation", "credits", "notice"].includes(e.role)) })}</div><div class="notice">Default credit<br><strong>By RetchEWretched</strong></div></section></div><section class="card"><div class="card-heading"><h3>Prepared exports</h3><span class="subtle">${exports.length} artifacts</span></div>${exports.length ? `<div class="table-wrap"><table><thead><tr><th>File</th><th>Type</th><th>Size</th><th>SHA-256</th><th>Actions</th></tr></thead><tbody>${exports.map((e) => `<tr><td>${esc(e.download_name || e.name)}</td><td>${badge(e.role)}</td><td>${size(e.size)}</td><td><code>${short(e.sha256)}</code></td><td><div class="actions">${button("Download", "download", { id: e.export_id, name: e.download_name || e.name, icon: "download" })}${e.role === "patch" ? button("Verify", "release-verify", { id: e.export_id, icon: "shield" }) : ""}</div></td></tr>`).join("")}</tbody></table></div>` : empty("Your first release starts with a build", "Edit a source and create a separate build, then return here to prepare its patch.")}</section><section class="card"><h3>Walkthrough documentation</h3><p class="subtle">Export author annotations for measured objectives. Unknown directions retain an explicit uncertainty label.</p>${field("walkthrough-id", "Stored coverage evidence ID", ctx2.draft("walkthrough-id", ((_d = state2.results["coverage.build"]) == null ? void 0 : _d.evidence_id) || ""))}${jsonEditor("walkthrough-annotations", "Player-facing objective annotations", ctx2.draft("walkthrough-annotations", "{}"))}${button("Export walkthrough", "walkthrough-export", { icon: "download" })}</section>${report(state2.results["release.prepare"], "Independent patch verification")}${report(state2.results["release.verify"], "Reverification")}${report(state2.results["release.package"], "Positive-manifest package")}`;
+    return `${heading("Release preparation", "Export", "Generate a BPS patch, apply it independently to the exact original, and package selected public artifacts.")}${((_c = state2.downloadFeedback) == null ? void 0 : _c.project_id) === p.project_id ? `<p class="notice" role="status">Download started: ${esc(state2.downloadFeedback.name)}. Your browser handles the save location; check its Downloads list.</p>` : ""}<div class="grid-two"><section class="card"><div class="card-heading"><h3>Create a patch to share</h3>${badge("BPS1", "good")}</div><div class="field-row">${select2("release-source", "Original ROM", p.sources, sourceId)}${select2("release-target", "Edited build", p.builds, targetId)}</div>${field("release-title", "Patch name", ctx2.draft("release-title", p.name))}${field("release-description", "Notes (optional)", ctx2.draft("release-description", ""))}<p>A patch contains your changes. The person using it supplies the matching original ROM.</p><details class="config"><summary>How verification works</summary><p>BPS carries source, target and patch checksums. SHA-256 identities and a separate decoder verify the reconstructed ROM.</p></details>${button("Create verified patch", "release-patch", { primary: true, icon: "shield", disabled: !p.sources.length || !p.builds.length })}<p class="subtle small">The edited ROM is reconstructed and checked before download.</p></section><section class="card"><h3>Release selection</h3><p class="subtle">Choose the patches and documents to include. ROMs, saves and private reports are excluded.</p><div class="checklist">${exports.filter((e) => ["patch", "documentation", "credits", "notice"].includes(e.role)).map((e) => `<label><input type="checkbox" name="release-export" value="${e.export_id}" checked>${esc(e.role)} · ${size(e.size)} · ${short(e.sha256)}</label>`).join("") || '<p class="subtle">Prepare a patch or export documentation first.</p>'}</div><div class="actions">${button("Package selected exports", "release-package", { icon: "release", disabled: !exports.some((e) => ["patch", "documentation", "credits", "notice"].includes(e.role)) })}</div><div class="notice">Default credit<br><strong>By RetchEWretched</strong></div></section></div><section class="card"><div class="card-heading"><h3>Prepared exports</h3><span class="subtle">${exports.length} artifacts</span></div>${exports.length ? `<div class="table-wrap"><table><thead><tr><th>File</th><th>Type</th><th>Size</th><th>SHA-256</th><th>Actions</th></tr></thead><tbody>${exports.map((e) => `<tr><td>${esc(e.download_name || e.name)}</td><td>${badge(e.role)}</td><td>${size(e.size)}</td><td><code>${short(e.sha256)}</code></td><td><div class="actions">${button("Download", "download", { id: e.export_id, name: e.download_name || e.name, icon: "download" })}${e.role === "patch" ? button("Verify", "release-verify", { id: e.export_id, icon: "shield" }) : ""}</div></td></tr>`).join("")}</tbody></table></div>` : empty(p.builds.length ? "Create your first patch" : "No edited build yet", p.builds.length ? "Choose the original ROM and edited build above, then Create verified patch." : "Review your edits and create a build first, then return here.")}</section><details class="card apply-patch-section" ${state2.patchImport ? "open" : ""}><summary>Apply a patch downloaded from someone else</summary>${patchControls(ctx2)}</details><section class="card"><h3>Walkthrough documentation</h3><p class="subtle">Export author annotations for measured objectives. Unknown directions retain an explicit uncertainty label.</p>${field("walkthrough-id", "Stored coverage evidence ID", ctx2.draft("walkthrough-id", ((_d = state2.results["coverage.build"]) == null ? void 0 : _d.evidence_id) || ""))}${jsonEditor("walkthrough-annotations", "Player-facing objective annotations", ctx2.draft("walkthrough-annotations", "{}"))}${button("Export walkthrough", "walkthrough-export", { icon: "download" })}</section>${report(state2.results["release.prepare"], "Independent patch verification")}${report(state2.results["release.verify"], "Reverification")}${report(state2.results["release.package"], "Positive-manifest package")}`;
   }
   function select2(id, label, rows, selected2) {
     return `<label class="field"><span>${label}</span><select id="${id}">${!rows.some((r) => r.artifact_id === selected2) ? '<option value="" selected>Choose a file</option>' : ""}${rows.length ? rows.map((r) => `<option value="${r.artifact_id}"${r.artifact_id === selected2 ? " selected" : ""}>${esc(r.name)} · ${short(r.sha256)}</option>`).join("") : '<option value="">No matching artifact</option>'}</select></label>`;

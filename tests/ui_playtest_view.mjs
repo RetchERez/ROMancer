@@ -8,7 +8,11 @@ console.log('A loaded session has a video surface before its first live packet.'
 const sha='a'.repeat(64),core='c'.repeat(64);
 const ready={...ctx,state:{...ctx.state,runtime:null,profileFamily:'gb',profileLoadedFamily:'gb',profile:{core_identity:{sha256:core},input_map:{}}},api:{call:async operation=>operation==='saves.list'?{saves:[]}:operation==='runtime.checkpoints'?{checkpoints:[{snapshot_id:'matching',game_sha256:sha,core_sha256:core,run_mode:'cold_boot'},{snapshot_id:'wrong-game',game_sha256:'b'.repeat(64),core_sha256:core},{snapshot_id:'wrong-core',game_sha256:sha,core_sha256:'d'.repeat(64)}]}:{ok:true}}};
 const available=await render(ready);
-assert.match(available,/READY TO LOAD/,'a valid saved setup must not say CORE REQUIRED');
+assert.match(available,/Ready to play/,'a valid saved setup explains that the game can be loaded');
+assert.match(available,/Load game, then press Play/);
+assert.doesNotMatch(available,/NATIVE WORKER LOADED|Close worker/);
+assert.match(html,/Game paused/);assert.match(html,/Unload game/);
+assert.match(html,/Unload the current game before loading another one/,'A disabled Load button explains the actual next action.');
 assert.match(available,/value="matching"/);
 assert.doesNotMatch(available,/value="wrong-game"|value="wrong-core"/,'checkpoints must match selected ROM and core');
 console.log('Ready setup and source/core-filtered checkpoint choices.');

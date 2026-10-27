@@ -1,10 +1,12 @@
 import assert from 'node:assert/strict';
 import {readinessCards,editingReadiness} from '../romancer/ui/editing_readiness.js';
-const model={areas:[{kind:'assets',title:'Graphics',page:'assets',status:'ready',reason:'Checked layout',action:'Open editor'},{kind:'levels',title:'Levels',page:'levels',status:'needs_investigation',reason:'No definition',action:'Find a layout'}]};
+const model={areas:[{kind:'assets',title:'Graphics',page:'assets',status:'ready',reason:'Checked layout',action:'Open editor'},{kind:'levels',title:'Levels',page:'levels',status:'needs_investigation',reason:'No definition',action:'Find a layout'},{kind:'script',title:'Text',page:'scripts',status:'needs_investigation',reason:'No definition'},{kind:'sound',title:'Sound',page:'sound',status:'needs_investigation',reason:'No definition'}]};
 const html=readinessCards(model);assert.match(html,/Ready to edit/);assert.match(html,/Needs investigation/);assert(!/lesson|guided|step bar|tutorial/i.test(html));
 const state={project:{project_id:'p'},artifact:{artifact_id:'a',sha256:'s'}},actions={},calls=[];
 const ctx={state,sourceParams:()=>({project_id:'p',artifact_id:'a'}),use:r=>Object.assign(actions,r),api:{call:async()=>model},navigate:async p=>calls.push(p)};
 await editingReadiness(ctx);await actions['readiness-open']({dataset:{id:'assets'}});assert.equal(calls.at(-1),'assets');assert.equal(state.researchOpen.kind,'assets');
-await actions['readiness-open']({dataset:{id:'levels'}});assert.equal(calls.at(-1),'debug');
+await actions['readiness-open']({dataset:{id:'levels'}});assert.equal(calls.at(-1),'levels');
+await actions['readiness-open']({dataset:{id:'script'}});assert.equal(calls.at(-1),'scripts','Text setup belongs with text tools, not numeric investigation.');
+await actions['readiness-open']({dataset:{id:'sound'}});assert.equal(calls.at(-1),'sound');
 const old=actions['readiness-open'];state.artifact={artifact_id:'b',sha256:'other'};assert.throws(()=>old({dataset:{id:'assets'}}),/changed/);
 console.log('Readiness opens normal editors or investigation directly, without in-app lessons or guided steps.');

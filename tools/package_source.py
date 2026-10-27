@@ -224,11 +224,13 @@ APPROVED_FILES = APPROVED_FILES | frozenset(['romancer/debugger_failures.py', 'r
 APPROVED_FILES = APPROVED_FILES | frozenset(['user-guide/screenshots/100-welcome-guide-only.png', 'user-guide/screenshots/101-editing-readiness.png', 'user-guide/screenshots/102-studio-sprite-editor.png', 'user-guide/screenshots/103-studio-sprite-staged.png', 'user-guide/screenshots/104-studio-dialogue-preview.png', 'user-guide/screenshots/105-studio-level-object-editor.png', 'user-guide/screenshots/106-studio-named-values.png', 'user-guide/screenshots/107-help-user-guide.png', 'user-guide/screenshots/108-verified-full-scene-preview.png'])
 
 # Build38 reviewed source modules and regression tests
-APPROVED_FILES = APPROVED_FILES | frozenset(['romancer/draft_scene.py', 'romancer/ui/draft_scene.js', 'romancer/ui/graphics_formats.js', 'tests/test_draft_scene.py', 'tests/ui_draft_scene.mjs', 'tests/ui_build_continuation.mjs', 'tests/ui_release_context.mjs'])
+APPROVED_FILES = APPROVED_FILES | frozenset(['romancer/draft_scene.py', 'romancer/ui/draft_scene.js', 'romancer/ui/graphics_formats.js', 'tests/test_draft_scene.py', 'tests/ui_draft_scene.mjs', 'tests/ui_build_continuation.mjs', 'tests/ui_release_context.mjs', 'tests/ui_plain_language.mjs'])
 
 APPROVED_FILES = APPROVED_FILES | frozenset(['user-guide/ACCEPTANCE.txt', 'user-guide/screenshots/200-native-palette-draft-preview.png', 'user-guide/screenshots/201-native-preview-restored.png', 'user-guide/screenshots/202-export-correct-build.png', 'user-guide/screenshots/203-measured-palette-build-playtest.png', 'user-guide/screenshots/204-recorded-workflow-after-reopen.png'])
 
 APPROVED_FILES = APPROVED_FILES | frozenset(['user-guide/screenshots/205-original-workshop-readiness.png', 'user-guide/screenshots/206-workshop-edit-undo-redo.png', 'user-guide/screenshots/207-workshop-build-playtest.png'])
+
+APPROVED_FILES = APPROVED_FILES | frozenset(['user-guide/screenshots/210-two-clear-starting-choices.png', 'user-guide/screenshots/211-what-can-i-edit.png', 'user-guide/screenshots/212-clear-draft-preview.png', 'user-guide/screenshots/213-paused-game-save-state.png', 'user-guide/screenshots/214-explicit-original-build-export.png'])
 
 def _identity(info):
     return (info.st_dev, info.st_ino, info.st_size, info.st_mtime_ns)

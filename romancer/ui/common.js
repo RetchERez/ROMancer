@@ -18,8 +18,8 @@ export function unavailableReason(action){
  if(/page|previous|next/.test(action))return 'No more items in this direction.';
  if(/(?:apply|build)$/.test(action))return 'Review the changes first.';
  if(/package|export/.test(action))return 'Prepare and select an export first.';
- if(/state|checkpoint/.test(action))return 'Load the matching ROM and core first.';
- if(/runtime|profile/.test(action))return 'Choose compatible content and a saved core setup.';
+ if(/state|checkpoint/.test(action))return 'Load the matching ROM and emulator first.';
+ if(/runtime|profile/.test(action))return /profile/.test(action)?'Choose a system and load its emulator settings.':'Load a game in Playtest first.';
  if(/undo|redo/.test(action))return 'No edit history in this direction.';
  if(/stop/.test(action))return 'Start recording first.';
  return 'Complete the required setup for this selection.';
@@ -46,4 +46,4 @@ export const json=id=>{try{return JSON.parse(read(id));}catch{throw new Error('C
 export function report(result,title='Result'){if(!result)return '';const summary=summaryText(result),tone=result.ok===false||['FAIL','BLOCKED','REGRESSION'].includes(result.status)?'danger':['PASS','BUILT','VERIFIED','SCOPE_COVERED'].includes(result.status)?'good':'neutral';return `<section class="card result"><div class="card-heading"><h3>${esc(title)}</h3>${badge(result.status||'READY',tone)}</div>${summary?`<p class="notice change-summary" role="status">${esc(summary)}</p>`:''}${result.error?`<p class="error">${esc(typeof result.error==='string'?result.error:result.error.message)}</p>`:''}<details><summary>Inspect the full report</summary><pre tabindex="0" role="region" aria-label="${esc(title)} details">${esc(JSON.stringify(result,null,2))}</pre></details></section>`;}
 export const empty=(title,message,action='')=>`<div class="empty">${icon('folder')}<h3>${esc(title)}</h3><p>${esc(message)}</p>${action}</div>`;
 export function heading(kicker,title,description,actions=''){return `<header class="page-heading"><div><h1>${esc(title)}</h1></div><div class="actions">${actions}${title==='Help'?'':button('Help','help-topic',{icon:'shield'})}</div></header>`;}
-export function requireProject(ctx){if(!ctx.state.project)return empty('Open a project to begin','Import your own source or explore the original demonstration fixture.',button('Open demonstration','demo',{primary:true,icon:'arrow'}));return null;}
+export function requireProject(ctx){if(!ctx.state.project)return empty('Choose a ROM to begin','Try the included practice game, or import your own ROM from Overview.',button('Try the editing studio','demo-studio',{primary:true,icon:'arrow'}));return null;}

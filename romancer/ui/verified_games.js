@@ -10,7 +10,7 @@ export async function gameEdits(ctx){
  try{model=await ctx.api.call('games.inspect',params);}catch(error){if(!current())return '';return `<section class="card"><h3>Game edits unavailable</h3><p>${esc(error.message)}</p>${button('Inspect bytes','game-investigate')}</section>`;}
  if(!current())return '';
  state.gameVisualModel={scope,model};
- if(!model.profile)return `<section class="card game-definition"><div class="card-heading"><h3>Investigate this ROM</h3>${button('Open hex editor','game-investigate')}</div><p class="subtle">No verified game definition for this revision. Search bytes, compare builds, and bookmark locations in Resources.</p></section>`;
+ if(!model.profile)return `<details class="card game-definition"><summary>Find more editing data · Advanced</summary><p>Use the hex editor to search bytes, compare builds and bookmark locations. Your saved editing setups are listed above.</p>${button('Open hex editor','game-investigate')}</details>`;
  const pending=state.gameEditPlan?.scope===scope&&state.gameEditPlan.result.profile_id===model.profile.id?state.gameEditPlan:null;
  function values(){return Object.fromEntries(model.fields.map(f=>{const value=read('game-'+f.id);if(f.type==='integer'){if(!/^\d+$/.test(value)||Number(value)<f.min||Number(value)>f.max)throw Error(`${f.label}: enter ${f.min} to ${f.max}.`);return [f.id,Number(value)];}return [f.id,value];}));}
  function sameValues(chosen){try{return JSON.stringify(values())===JSON.stringify(chosen);}catch{return false;}}

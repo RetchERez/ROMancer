@@ -4,7 +4,7 @@ import {selectionKey,fileInput} from './tool_inputs.js';
 export function canApplyPatch(state,preview){return !!(preview?.ok&&preview.plan_id&&preview.changed_bytes>0&&
  preview.project_id===state.project?.project_id&&preview.source_id===state.artifact?.artifact_id&&preview.source_sha256===state.artifact?.sha256);}
 export async function preparePatch(ctx,file,expectedReference){
- if(!ctx.state.project||!ctx.state.artifact)throw new Error('Select the original ROM in the top bar first.');
+ if(!ctx.state.project||!ctx.state.artifact)throw new Error('Choose the ROM this patch was made for in the top bar.');
  if(!file)throw new Error('Choose a BPS or IPS patch first.');
  const scope=selectionKey(ctx.state),project_id=ctx.state.project.project_id,artifact_id=ctx.state.artifact.artifact_id,request=(ctx.state.patchRequest||0)+1;ctx.state.patchRequest=request;
  const current=()=>selectionKey(ctx.state)===scope&&ctx.state.patchRequest===request;
@@ -21,7 +21,7 @@ export function patchControls(ctx){
    const ticket=selectionKey(state),result=await ctx.run('patches.apply',{project_id:state.project.project_id,plan_id:saved.preview.plan_id,name:read('patch-build-name')},{render:false});
    if(ticket!==selectionKey(state))return;state.patchImport=null;await ctx.refreshProject();await ctx.setArtifact(result.artifact_id);ctx.notify('Patched build created. Your original is unchanged.');await ctx.navigate('playtest');
  }});
- return `<section class="card" id="patch-import"><h3>Apply a downloaded patch</h3><p>Selected original: <strong>${esc(state.artifact?.name||'Choose a ROM in the top bar')}</strong></p>
+ return `<section class="card" id="patch-import"><h3>Apply a downloaded patch</h3><p>Selected ${state.artifact?.kind==='build'?'build':'ROM'} for patching: <strong>${esc(state.artifact?.name||'Choose a ROM in the top bar')}</strong></p>
  ${fileInput('patch-file','Patch file — choose or drop a BPS / IPS patch','.bps,.ips')}${selected?`<p>${esc(selected.input.name)}</p>`:''}
  ${field('patch-reference','Expected original CRC32 or SHA256 (required for IPS)',ctx.draft('patch-reference',''),{hint:'Use the full-file checksum supplied by the patch author. BPS also checks its embedded checksums.'})}
  <div class="actions">${button('Preview patch','patch-preview',{primary:!preview,disabled:!state.artifact})}</div>

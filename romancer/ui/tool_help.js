@@ -1,5 +1,9 @@
 // Brief explanations of storage concepts. Game-specific meanings stay unknown.
 const TERMS=[
+ [/build/i,'A separate ROM made from your reviewed edits. Your original stays unchanged.'],
+ [/draft/i,'Editor changes saved for later. Create a build before playing the changed ROM.'],
+ [/save state|saved state/i,'An emulator snapshot for one exact ROM/build and emulator setup. A battery game save is a different file.'],
+ [/core/i,'The emulator engine that runs this console. The full Windows edition includes reviewed engines.'],
  [/offset/i,"A byte's position in the selected file, counted from zero. CPU addresses are different."],
  [/stride/i,'Bytes from the start of one record to the start of the next. This can include unused bytes.'],
  [/capacity|allocation/i,'Maximum storage reserved for this resource. An edit must fit, including terminators and padding.'],

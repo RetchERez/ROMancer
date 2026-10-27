@@ -43,8 +43,37 @@
         "term-core",
         "term-original"
       ],
-      "image": "100-welcome-guide-only",
-      "caption": "The normal welcome screen opens without a tutorial prompt or lesson panel."
+      "image": "210-two-clear-starting-choices",
+      "caption": "Start with the included playable practice game, or import your own ROM. Simple system test programs are under More practice ROMs."
+    },
+    {
+      "id": "understand-your-files",
+      "title": "Original, draft, build and patch: what changes?",
+      "part": "Basic",
+      "kicker": "Five useful terms / read this first",
+      "intro": "The editor, playable game and shared patch are different things. This is how to tell what you have saved and what you are testing.",
+      "steps": [
+        "<b>Original ROM:</b> the starting game file. Importing keeps a project copy. Editing creates separate outputs and preserves this original.",
+        "<b>Draft:</b> your saved editor changes. Draft saved means they can be reopened. Edits not built means they are not in a playable output yet. Undo and Redo change this draft; they do not erase an older build.",
+        "<b>Build:</b> a separate ROM made from reviewed changes. Create a build after editing. Playtest saved build selects that output; newer draft changes need another build.",
+        "<b>Patch:</b> a small file containing your changes for sharing. Export saved build selects the original and edited build. Create verified patch checks reconstruction. The recipient supplies the matching original ROM.",
+        "<b>Game save versus save state:</b> a game save holds normal progress, often in a .sav file. A save state is a snapshot of the whole emulator session and belongs to one exact ROM/build and emulator setup. Use Save state and Load state to return to that moment."
+      ],
+      "result": "Before Play or Export, check the selected file at the top. A saved draft and a saved build are different: only the build contains your new playable ROM edits.",
+      "note": "You do not need to learn hex, addresses or codecs to try the included original studio. Editing an unfamiliar game may require research and a verified editing setup.",
+      "related": [
+        "editing-studio",
+        "drafts",
+        "play",
+        "patches",
+        "beginner-trial"
+      ],
+      "terms": [
+        "term-original",
+        "term-draft",
+        "term-build",
+        "term-patch"
+      ]
     },
     {
       "id": "settings",
@@ -187,16 +216,16 @@
       "id": "start",
       "title": "Start with a project",
       "kicker": "YOUR FIRST FIVE MINUTES",
-      "image": "101-editing-readiness",
+      "image": "211-what-can-i-edit",
       "steps": [
         "Click <b>New project</b>. Give this piece of work a useful name, then import your ROM into that project.",
-        "Check the selected source at the top. On Overview, read <b>This ROM: editing readiness</b>. Open a ready editor directly; use Investigation when a layout needs research. Expand <b>What is known about this source</b> for identity evidence.",
+        "Check the ROM or build selected at the top. On Overview, read <b>What can I edit in this ROM?</b>. Open a ready editor, or follow the area's action to find graphics, investigate values, or check text, level and sound setup.",
         "Make one small edit, review it, create a separate <a href=\"#term-build\">build</a>, then playtest that build. Export its patch after checking the result."
       ],
       "result": "A project holds owned source copies, editing setup, builds and evidence. Start a new project for unrelated work.",
       "note": "The Windows x64 distribution includes its runtime and emulator engines. Supply your own ROMs. GB and GBC use separate system modes.",
       "part": "Basic",
-      "intro": "A project keeps one piece of work together: imported sources, definitions, drafts, builds and measured checks. Begin with a small, reversible edit.",
+      "intro": "A project keeps one piece of work together: original ROMs, saved editing changes, playable builds and test results. Start with the included editing studio to practice, or import your own ROM.",
       "related": [
         "checks",
         "drafts",
@@ -214,7 +243,7 @@
       "details": [
         {
           "title": "Choose an editing tool",
-          "text": "Editing tools opens graphics, text, numbers, levels, sound, investigation, playtesting or patches. Numbers &amp; stats opens Data tables. Ready means the saved definition inspected successfully for this exact source. It does not certify every game behavior or a missing palette, collision layer or music driver."
+          "text": "What do you want to change? opens graphics, text, numbers, levels, sound, investigation, playtesting or patches. Ready to edit means a working editing setup is saved for this ROM; it does not certify every game behavior or identify an unsupported music or level format."
         },
         {
           "title": "Find help without reading every page",
@@ -222,7 +251,7 @@
         },
         {
           "title": "Readiness is per ROM and area",
-          "text": "Ready to edit requires a source-bound saved definition that passes inspection and permits writing. Needs investigation means no usable definition is saved yet. Unsupported definition means a malformed, stale or read-only layout needs correction. Follow the area's action. These labels cover graphics, text, stats, levels and sound; a working emulator does not establish an editable sound engine or level format."
+          "text": "Ready to edit opens a working editor. Needs investigation offers a next action for that area. Setup needs fixing means the saved setup is malformed, stale or read-only; Check setup opens its editor. Technical details keeps the exact diagnostic available."
         }
       ]
     },
@@ -252,7 +281,7 @@
         "term-draft",
         "term-build"
       ],
-      "image": "206-workshop-edit-undo-redo",
+      "image": "212-clear-draft-preview",
       "caption": "The actual sprite editor shows the unchanged original beside a staged hero edit. Review and build are separate actions.",
       "extra_images": [
         {
@@ -331,7 +360,7 @@
         "Make one more staged edit, wait for Saved, reload, and confirm its draft returns. Use the beginner acceptance checklist for your own independent trial."
       ],
       "result": "The recorded example changed exactly one source byte at file offset 16400 (0x4010), from 81 to C1, in a separate build. The sequence also checks undo/redo, native playback, save/load, patch download, project reopening and a saved draft surviving a new document load.",
-      "note": "The drawing program intentionally repeats the edited tile. This is an automated demonstration, not evidence that a beginner has passed the independent usability trial. The PDF cannot play video; open the MP4 or the HTML edition.",
+      "note": "The drawing program intentionally repeats the edited tile. This is an automated demonstration, not evidence that a beginner has passed the independent usability trial. The PDF cannot play video; open the MP4 or the HTML edition. The video uses earlier interface wording; the current screens and labels are shown in this guide.",
       "details": [
         {
           "title": "Video chapter times",
@@ -843,16 +872,16 @@
       "id": "play",
       "title": "Playtest, pause and save a state",
       "kicker": "TEST THE SELECTED BUILD",
-      "image": "55-snes-visible-playtest",
+      "image": "213-paused-game-save-state",
       "steps": [
         "Check that the top selector shows the source or build you intend to test, then open <b>Playtest</b> and click <b>Load game</b>.",
         "Choose <b>Play</b> and focus the game for controller input. Use <b>Pause</b> before inspecting a frame. Controller & frame tools exposes manual stepping and input devices.",
         "Choose <b>Save state</b>. Select a saved state and click <b>Load state</b> to return to it. Ordinary battery saves are managed separately below."
       ],
       "result": "The original Chrono Trigger cartridge is visibly running at its name-entry screen. Live Play/Pause, input, save/load and repeated native state replay passed on this source. The earlier black transition frame was rejected as visual load proof.",
-      "note": "Save states are bound to the exact ROM, engine and runtime setup. Do not assume a state from the original will load on a modified build. Loading refreshes one paused frame.",
+      "note": "Save states are bound to the exact ROM, engine and runtime setup. Do not assume a state from the original will load on a modified build. Loading refreshes one paused frame. Unload game closes only the current emulator session. Builds, saved states and ordinary game saves remain in the project.",
       "part": "Basic",
-      "intro": "Load the exact source or build you intend to test. Playback, controller input, frame stepping and snapshots operate on that loaded session.",
+      "intro": "Choose the ROM or edited build you want to test. Load game prepares it; Play runs it. Game paused and Game running describe the current session.",
       "related": [
         "saves",
         "regression",
@@ -903,7 +932,7 @@
       "id": "patches",
       "title": "Export a verified patch",
       "kicker": "SHARE YOUR CHANGES",
-      "image": "10-verified-patch",
+      "image": "214-explicit-original-build-export",
       "steps": [
         "Open <b>Export</b>. Select the exact <b>Original revision</b> and the intended <b>Target build</b>. Add a useful title and notes.",
         "Click <b>Create verified patch</b>. ROMancer reconstructs the target with a separate BPS decoder and checks its identity.",
@@ -934,7 +963,7 @@
       "kicker": "Exact source / compatibility preview / separate build",
       "intro": "A patch describes a change to a particular source. A matching game title alone is insufficient.",
       "steps": [
-        "Read the patch author's required region, revision and header treatment. Import your own original into a project and select that original in the top bar; then open <b>Export</b>.",
+        "On Export, expand <b>Apply a patch downloaded from someone else</b>. Choose the exact ROM the patch requires in the top bar, then select or drop its BPS or IPS patch.",
         "Under <b>Apply a downloaded patch</b>, choose or drop one BPS or IPS file. For IPS, enter the author's full-file reference: eight hexadecimal CRC32 digits or 64 SHA-256 digits. BPS checks embedded checksums.",
         "Choose <b>Preview patch</b>. Read the format, target size and changed-byte count. Expand <b>Changed ranges and identities</b> for source/target hashes and offsets. A zero-change result has nothing to build.",
         "If the reference mismatches, stop and find the required original. Do not remove a header, edit a checksum, or substitute another revision merely to bypass the failure.",
@@ -5519,6 +5548,15 @@
         "native-draft-preview",
         "captured-edit-check",
         "palettes"
+      ]
+    },
+    {
+      "term": "Understanding drafts and builds",
+      "topics": [
+        "understand-your-files",
+        "drafts",
+        "play",
+        "patches"
       ]
     }
   ],

@@ -5,6 +5,8 @@ const a={artifact_id:'a',sha256:'a',name:'Original A'},z={artifact_id:'z',sha256
 const state={project:{project_id:'p',name:'Work',sources:[z,a],builds:[d,b,c],containers:[]},artifact:c,results:{}};
 const drafts={},ctx={state,draft:(k,f)=>drafts[k]??f,use:()=>{},projectParams:()=>({project_id:'p'}),api:{call:async()=>({exports:[]})}};
 let html=await render(ctx);assert.match(html,/id="release-source"[\s\S]*?<option value="a" selected>/);assert.match(html,/id="release-target"[\s\S]*?<option value="c" selected>/,'The selected branch is exported, not the first recorded build.');
+assert(html.indexOf('data-action="release-patch"')<html.indexOf('id="patch-file"'),'Creating a patch comes before applying somebody else’s patch.');
+assert.match(html,/Create your first patch/,'An existing build needs a patch, not another build.');assert(!html.includes('Selected original:'));
 assert(!html.includes('Disc patch sets'),'Unavailable disc tooling is absent from this cartridge-only release.');
 drafts['release-target']='b';drafts['release-source']='a';html=await render(ctx);assert.match(html,/id="release-target"[\s\S]*?<option value="b" selected>/);
 drafts['release-target']='deleted';html=await render(ctx);assert.match(html,/id="release-target"><option value="" selected>/,'A stale saved target requires an explicit choice instead of silently choosing another build.');
