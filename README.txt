@@ -1,7 +1,7 @@
 ROMancer v1.0 final
 By RetchEWretched
 
-Local ROM editing for NES, SNES, Genesis, Game Boy, Game Boy Color and GBA.
+Local ROM editing for NES, SNES, Genesis, Master System, Game Boy, Game Boy Color and GBA.
 Master System support covers validated Sega headers, checksums, literal graphics,
 declared text/byte edits, patches and playtesting; other layouts remain unknown.
 Everyday use works offline. No AI account, model, API key or subscription is required.
