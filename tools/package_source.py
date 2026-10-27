@@ -36,7 +36,7 @@ APPROVED_FILES = frozenset(ROOT_FILES | {
             ui/tool_inputs.js ui/patch_controls.js ui/revision_controls.js ui/hex_editor.js ui/build_history.js ui/project_checks.js ui/save_manager.js ui/translation_controls.js ui/visual_controls.js ui/workbench_usability.js
             ui/desktop_entry.js ui/app.bundle.js ui/bundle.json
             rom_health.py ui/rom_health.js
-            ui/tutorial.js ui/views/tutorials.js onboarding.py ui/startup.js ui/preferences.js workflow_recipes.py memory_watches.py ui/memory_watches.js ui/views/automation.js runtime_library.py ui/audio_live.js ui/playback_controls.js help_content.py ui/project_flow.js ui/views/help.js resource_discovery.py ui/discovery_controls.js data_tables.py ui/views/tables.js resource_compression.py ui/compression_controls.js resource_exports.py ui/pixel_tools.js ui/pixel_history.js ui/tilemap_editor.js
+            ui/startup.js ui/preferences.js workflow_recipes.py memory_watches.py ui/memory_watches.js ui/views/automation.js runtime_library.py ui/audio_live.js ui/playback_controls.js help_content.py ui/project_flow.js ui/views/help.js resource_discovery.py ui/discovery_controls.js data_tables.py ui/views/tables.js resource_compression.py ui/compression_controls.js resource_exports.py ui/pixel_tools.js ui/pixel_history.js ui/tilemap_editor.js
             workbench_files.py workbench_tools.py patch_import.py binary_tools.py revision_catalog.py hex_tools.py build_history.py project_checks.py support_report.py save_manager.py translation_sheets.py visual_checks.py verified_games.py ui/verified_games.js
             graphics_discovery.py ui/graphics_investigation.js rom_scan.py project_lifecycle.py ui/rom_scan.js ui/project_manager.js ui/sprite_assembly.js
             level_design.py studio_tools.py studio_examples.py ui/level_canvas.js ui/views/levels.js
@@ -114,7 +114,7 @@ APPROVED_FILES = frozenset(ROOT_FILES | {
             test_ui_bundle.py ui_settings.mjs
             ui_startup_recovery.mjs
             test_rom_health.py ui_rom_health.mjs
-            ui_tutorial.mjs test_onboarding.py ui_startup.mjs test_ui_startup.py
+            ui_startup.mjs test_ui_startup.py
             test_source_launcher.py ui_review_regressions.mjs test_regression_suite.py ui_playtest_view.mjs test_workflow_recipes.py test_memory_watches.py test_runtime_library.py test_live_playtest.py ui_audio_live.mjs
             test_help_workflows.py ui_project_flow.mjs test_resource_discovery.py test_data_tables.py ui_tables.mjs test_resource_compression.py ui_compression.mjs test_resource_exports.py ui_pixel_tools.mjs ui_pixel_history.mjs ui_tilemap_editor.mjs
             mock_libretro.c test_cd_cli.py test_cd_patch.py test_cd_reference.py
@@ -197,7 +197,7 @@ APPROVED_FILES = APPROVED_FILES | frozenset({
         '70-emerald-species-editor','71-ultraviolet-move-editor','72-automatic-table-discovery','73-reviewed-rebalance-build','74-reviewed-move-build','75-symbol-address-navigation','65-resource-research','66-research-pack-review','67-popular-game-references','68-documented-stat-prefix','69-research-byte-help',
         '01-workspace','02-castlevania-sprite','03-chrono-weapon','04-chrono-table',
         '05-immortal-text','06-wario-palettes','07-ffl2-room','08-dejavu-colors',
-        '09-playtest-states','10-verified-patch','11-hex-inspection','12-tutorials',
+        '09-playtest-states','10-verified-patch','11-hex-inspection',
         '13-settings','14-light-theme','15-dark-theme','16-connected-rooms',
         '17-object-inspector','18-byte-explanation','19-chrono-armor','20-ffl2-map-browser','21-game-knowledge',
         '22-engine-recognition','23-address-domains','24-code-references','25-cartridge-verification','26-mod-byte-comparison','27-crc-mismatch','28-text-overflow','29-audio-preview','30-project-recovery','26-universal-value-series','27-native-access-capture','28-native-source-context','29-structural-experiments','30-generated-table-editor','31-debugger-preparation','32-data-relocation','33-moved-table','34-menu-contrast','35-first-workshop-edit','36-patch-compatibility-preview','37-task-workspace','38-sprite-preview','39-build-handoff','40-light-workspace','41-guide-search','45-changes-only','46-brush-build-review','47-search-files','48-readable-download','49-palette-difference','50-clean-level-comparison','51-rastan-enemy-editor','52-rastan-blobs-playtest','53-rastan-verified-patch','54-rastan-original-playtest','55-snes-visible-playtest')),
@@ -217,6 +217,11 @@ APPROVED_FILES = APPROVED_FILES | frozenset({'tests/test_native_source_patches.p
 
 APPROVED_FILES = APPROVED_FILES | frozenset(['user-guide/screenshots/90-connected-whole-object.png', 'user-guide/screenshots/91-native-graphics-memory.png', 'user-guide/screenshots/92-captured-edit-comparison.png', 'user-guide/screenshots/93-compression-capacity.png'])
 
+
+APPROVED_FILES = APPROVED_FILES | frozenset(['romancer/debugger_failures.py', 'romancer/editing_readiness.py', 'romancer/scene_composite.py', 'romancer/studio_workshop.py', 'romancer/ui/editing_readiness.js', 'tests/test_compact_guide.py', 'tests/test_debugger_failures.py', 'tests/test_editing_readiness.py', 'tests/test_scene_composite.py', 'tests/test_studio_workshop.py', 'tests/test_no_inapp_tutorials.py', 'tests/ui_editing_readiness.mjs', 'tools/compact_guide.py'])
+
+# Build37 reviewed guide captures
+APPROVED_FILES = APPROVED_FILES | frozenset(['user-guide/screenshots/100-welcome-guide-only.png', 'user-guide/screenshots/101-editing-readiness.png', 'user-guide/screenshots/102-studio-sprite-editor.png', 'user-guide/screenshots/103-studio-sprite-staged.png', 'user-guide/screenshots/104-studio-dialogue-preview.png', 'user-guide/screenshots/105-studio-level-object-editor.png', 'user-guide/screenshots/106-studio-named-values.png', 'user-guide/screenshots/107-help-user-guide.png', 'user-guide/screenshots/108-verified-full-scene-preview.png'])
 
 def _identity(info):
     return (info.st_dev, info.st_ino, info.st_size, info.st_mtime_ns)

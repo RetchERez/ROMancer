@@ -58,7 +58,6 @@ html[data-theme="light"] .hex-bytes{color:#263c49}
 html[data-theme="light"] .hex-text{color:#166655}
 html[data-theme="light"] .hex-cell.changed{background:#fff1c9;border-color:#ad7c26;color:#694500}
 html[data-theme="light"] .graph-node{background:#e1f2e9;border-color:#9fbdac;color:#1f5f42}
-html[data-theme="light"] .lesson-check.complete{color:#21663d}
 html[data-theme="light"] #toast{background:#e2f0ea;border-color:#7da692;color:#1c3e30}
 html[data-theme="light"] #toast.error{background:#fff0eb;border-color:#c59b90;color:#923328}
 html[data-theme="dark"] dialog,html[data-theme="light"] dialog{border-color:var(--line)}
@@ -77,3 +76,8 @@ html[data-theme="light"] .nav-label,html[data-theme="light"] .app-footer{color:v
 
 /* The emulator screen keeps a dark surface in every interface theme. */
 .screen .empty,.screen .empty h3{color:#e7eded}.screen .empty p{color:#adc1ca}
+
+
+.scene-pair{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:14px}.scene-pair img,.scene-pair canvas{width:100%;max-height:260px;object-fit:contain;image-rendering:pixelated;background:#080f12}.scene-composite{margin-top:12px}@media(max-width:800px){.scene-pair{grid-template-columns:1fr}}
+
+.readiness-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(175px,1fr));gap:14px}.readiness-grid>div{border:1px solid var(--line);border-radius:6px;padding:12px}.readiness-grid p{margin:8px 0}.readiness-state.ready{color:var(--accent);font-weight:700}.readiness-state.needs_investigation{font-weight:650}.readiness-state.unsupported{font-weight:700}

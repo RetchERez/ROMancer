@@ -17,7 +17,7 @@
         "Run the Windows setup executable. Choose the install location, finish setup, then open ROMancer. The application and its saved workspace are separate.",
         "For the portable Windows ZIP, extract the entire archive and use <b>Open ROMancer.cmd</b>. Keep app, python, cores and the root launch files together.",
         "For the source edition, install Python 3.13 or 3.14 and the pinned requirements, then use <b>Launch ROMancer.cmd</b> on Windows or the supplied run.sh launcher. Read the root README for the command-line and MCP entry points.",
-        "Open <b>Help</b> for tutorials and this guide. Start a workshop or import a ROM you supply. No AI account, subscription or API key is required."
+        "Open <b>Help</b> for this guide. Start a workshop or import a ROM you supply. No AI account, subscription or API key is required."
       ],
       "result": "ROMancer opens its local interface and your project list. The full Windows edition selects a matching included engine when you load a supported system.",
       "note": "Keep the complete folder when moving a portable copy. Moving the program does not by itself move the workspace or its projects.",
@@ -42,7 +42,9 @@
       "terms": [
         "term-core",
         "term-original"
-      ]
+      ],
+      "image": "100-welcome-guide-only",
+      "caption": "The normal welcome screen opens without a tutorial prompt or lesson panel."
     },
     {
       "id": "settings",
@@ -185,10 +187,10 @@
       "id": "start",
       "title": "Start with a project",
       "kicker": "YOUR FIRST FIVE MINUTES",
-      "image": "37-task-workspace",
+      "image": "101-editing-readiness",
       "steps": [
         "Click <b>New project</b>. Give this piece of work a useful name, then import your ROM into that project.",
-        "Check the selected source at the top. On Overview, use <b>Choose a task</b> to open an editor or Investigation. Expand <b>What is known about this source</b> to check the available evidence.",
+        "Check the selected source at the top. On Overview, read <b>This ROM: editing readiness</b>. Open a ready editor directly; use Investigation when a layout needs research. Expand <b>What is known about this source</b> for identity evidence.",
         "Make one small edit, review it, create a separate <a href=\"#term-build\">build</a>, then playtest that build. Export its patch after checking the result."
       ],
       "result": "A project holds owned source copies, editing setup, builds and evidence. Start a new project for unrelated work.",
@@ -203,7 +205,7 @@
         "apply-patch",
         "share-checklist"
       ],
-      "caption": "Actual ROMancer interface. The HTML edition links to the full-resolution capture.",
+      "caption": "Readiness checks the saved definitions for this selected ROM. Each card opens its editor or Investigation directly.",
       "terms": [
         "term-original",
         "term-draft",
@@ -211,36 +213,50 @@
       ],
       "details": [
         {
-          "title": "Choose the tool for your task",
-          "text": "Choose a task opens graphics, text, numbers, levels, sound, investigation, playtesting or patch tools. Numbers &amp; stats opens Data tables. Editors need an understood or declared layout; use Investigation when byte locations or meanings are unknown."
+          "title": "Choose an editing tool",
+          "text": "Editing tools opens graphics, text, numbers, levels, sound, investigation, playtesting or patches. Numbers &amp; stats opens Data tables. Ready means the saved definition inspected successfully for this exact source. It does not certify every game behavior or a missing palette, collision layer or music driver."
         },
         {
           "title": "Find help without reading every page",
           "text": "Use Find help in the offline HTML guide to search tasks, tool names, glossary definitions and index aliases. Results link directly to a topic. The PDF retains its linked contents, glossary, index and ordinary Find command. A system match does not promise a decoded game-specific level or music format."
         }
+      ]
+    },
+    {
+      "id": "editing-studio",
+      "title": "Practice four real edits in Mossy Hollow",
+      "part": "Basic",
+      "kicker": "Original playable example / normal editing tools",
+      "intro": "Choose Try the editing studio on the welcome screen. Mossy Hollow is an original NES program with its own art and font, two animated actors, movement and a short chirp. Use the normal editors and follow the four exercises below.",
+      "steps": [
+        "Graphics: open <b>Graphics &amp; fonts</b>, leave First tile at 0 and set Tiles across and Tiles down to 2. Choose <b>Assemble tiles</b>. Paint the whole 16 by 16 hero, try Undo and Redo, then review and create a graphics build. The second hero animation uses tiles 4 to 7; edit those too for a consistent animation.",
+        "Dialogue: select the Original again and open <b>Text &amp; layout</b>. Change HELLO, EXPLORER! to WELCOME, ROM HACKER! Check the byte-capacity preview, review and create a dialogue build. The game uses its declared custom uppercase character table.",
+        "Movement: on the Original, open <b>Numbers &amp; stats</b>. Change Hero speed from 2 to 3, review the exact byte change and create a build. In Playtest, compare the distance moved using the same eight Right input frames.",
+        "Room: on the Original, open <b>Levels</b>. Select Slime start and drag its named marker upward, or open Position &amp; advanced values and change Y from 22 to 19, then choose Update preview. Paint a star terrain tile, review and create a level build.",
+        "Check each selected build in <b>Playtest</b>: arrows move, A chirps. Save and load a state for that exact build. Export a BPS patch from the original to the chosen build, verify it and keep the original, build and patch separate."
       ],
-      "image_layout": "following-page",
-      "visual_page": {
-        "title": "Overview / choose a project and next task",
-        "kicker": "Basic / actual application capture",
-        "intro": "Start with a workshop or your own imported source, then use the editor that matches the task.",
-        "panels": [
-          {
-            "image": "37-task-workspace",
-            "title": "Project overview",
-            "x": 48,
-            "top": 846,
-            "width": 1170,
-            "crop": [
-              180,
-              60,
-              1390,
-              860
-            ],
-            "caption": "The overview connects source files, builds and the next editing step. Open the HTML capture at full resolution."
-          }
-        ]
-      }
+      "result": "The four examples were built and exported through ROMancer and reconstructed independently from their patches. Native checks observed changed hero graphics, changed on-screen dialogue, faster movement and the relocated slime spawn. You can repeat the same operations yourself.",
+      "note": "This example teaches the ordinary tools; it does not decode another game automatically. Room terrain is visual and has no collision engine. The level editor uses authored reference RGB colors; these are not editable NES hardware palette bytes. No checked commercial music-driver format is supplied for this scene. The checked speed fields allow 0 to 8; zero stops movement. Actor X positions are limited to the playable horizontal area.",
+      "related": [
+        "start",
+        "levels",
+        "first-edit",
+        "captured-edit-check"
+      ],
+      "terms": [
+        "term-original",
+        "term-draft",
+        "term-build"
+      ],
+      "image": "103-studio-sprite-staged",
+      "caption": "The actual sprite editor shows the unchanged original beside a staged hero edit. Review and build are separate actions.",
+      "extra_images": [
+        {
+          "image": "105-studio-level-object-editor",
+          "title": "Room and actor placement",
+          "caption": "Slime start moves from Y22 to Y19 in the staged room preview. Review and build are still required."
+        }
+      ]
     },
     {
       "id": "find-help",
@@ -338,7 +354,7 @@
       "kicker": "Open / edit / build / test / export",
       "intro": "Use the included original drawing program to learn the full workflow without finding offsets or supplying a commercial game.",
       "steps": [
-        "If the optional tutorial prompt appears, choose <b>Not now</b> for this exercise. Save existing work; choose the blank <b>Choose a project</b> entry if needed. On the empty Overview, click <b>NES workshop</b>.",
+        "Save existing work; choose the blank <b>Choose a project</b> entry if needed. On the empty Overview, click <b>NES workshop</b>.",
         "Open <b>Graphics &amp; fonts</b>. Keep First tile 0, Tiles across 1 and Tiles down 1; click <b>Assemble tiles</b>. Leave Preview size on Fit and click brush swatch <b>1</b>.",
         "Focus the <b>Editing</b> canvas. Press Right Arrow once, then Space. Expect <b>1 pixel differs</b>; the Original picture stays unchanged. Undo sprite stroke reverses the experiment.",
         "Click <b>Review graphics changes</b>, read the byte summary, then <b>Create graphics build</b>. Name and notes are optional. Click <b>Playtest build</b> in the bottom bar to select that output and open Playtest.",
@@ -473,7 +489,7 @@
       "kicker": "Independent hands-on usability trial",
       "intro": "Check that you can finish a small edit comfortably, without outside assistance. Copy the unmarked checklist from README.txt into your own notes, or print it. Leave installed program files unchanged.",
       "steps": [
-        "Open the app and original NES workshop. Find Graphics &amp; fonts, assemble one tile and make one visible pixel change. Confirm that the fixed Original preview stays unchanged.",
+        "Open the app and choose <b>Try the editing studio</b>. Open Graphics &amp; fonts, assemble its first four tiles as a 2 by 2 image and make one visible pixel change. Confirm that Original stays unchanged.",
         "Undo and redo the stroke, review the change, and create a build. Identify the selected file as Original or Build before loading it in Playtest.",
         "Play and pause the build. Save and load a matching state, then export and download a verified BPS patch. Identify the original, build and patch as separate files.",
         "Close and reopen the project, then find the same source and build. On the original, stage one more edit, wait for Saved and reload. If a confirmation appears, continue only after saving. Confirm the draft and its staged-change status return.",
@@ -1075,24 +1091,25 @@
     },
     {
       "id": "help",
-      "title": "Learn a little at a time",
+      "title": "Find help and use the illustrated guide",
       "kicker": "HELP / BASIC AND ADVANCED",
-      "image": "12-tutorials",
+      "image": "41-guide-search",
       "steps": [
-        "Open <b>Help > Tutorials</b> whenever you want a guided lesson. The first-launch invitation is optional and includes <b>Never ask again</b>.",
-        "Choose a short <b>Basic</b> or <b>Advanced</b> lesson. Completed lessons receive a green check; skipped lessons do not.",
-        "Use <b>Help > Keyboard shortcuts</b> for the popup. Ctrl+S saves drafts; contextual Undo/Redo acts on the active editor. Text fields retain normal text undo."
+        "Open <b>Help > User guide</b>. The HTML edition includes topic search and full-resolution screenshots.",
+        "Choose <b>Basic</b> for ordinary editing or <b>Advanced</b> for definitions, investigation, native capture and automation.",
+        "Use linked glossary terms and the alphabetical index to find unfamiliar words or a specific tool.",
+        "Keep the guide open beside ROMancer. The optional original workshop provides a safe example project for the normal editors."
       ],
-      "result": "Tutorials remain available after dismissing the first-launch invitation.",
-      "note": "Saved drafts are not playable builds. Before leaving an edit session, review the Saved or Saving status and whether staged changes still require a build.",
+      "result": "The guide teaches the workflow while the application stays focused on your project and editing tools.",
+      "note": "The guide works offline. Short field explanations, diagnostic remedies and the keyboard-shortcut window remain available in the application.",
       "part": "Basic",
-      "intro": "Learn one tool at a time, or jump to an exact term. Tutorials, keyboard shortcuts, this glossary and the index remain available offline.",
+      "intro": "Use concise field help while editing, and the offline guide for complete Basic and Advanced procedures.",
       "related": [
         "drafts",
         "troubleshooting",
         "mcp"
       ],
-      "caption": "Actual ROMancer interface. The HTML edition links to the full-resolution capture.",
+      "caption": "Search the offline guide by topic, tool or term.",
       "terms": [
         "term-draft",
         "term-build"
@@ -1145,6 +1162,368 @@
               860
             ],
             "caption": "Unaltered full-resolution capture is linked in the offline HTML edition."
+          }
+        ]
+      }
+    },
+    {
+      "id": "universal-values",
+      "title": "Investigate a changing value without a game profile",
+      "part": "Basic",
+      "kicker": "Investigate / record / narrow",
+      "intro": "ROMancer can gather evidence from an unfamiliar ROM. Start with one number or a controlled change rather than guessing a game property from byte values.",
+      "steps": [
+        "Load and pause the selected ROM in <b>Playtest</b>, then open <b>Investigation</b>. Name the experiment and enter the visible number, or leave it blank for change-only tests.",
+        "Choose <b>Capture before</b>. Perform one controlled action, pause and capture again. Record whether the target increased, decreased, changed, or changed by an exact amount.",
+        "Add an unchanged control while unrelated activity continues. This helps reject background counters. Keep before, changed and control observations together.",
+        "Compare surviving RAM offsets, widths, byte order, signed/BCD encoding and display relationships. Additional observations help separate equally fitting hypotheses.",
+        "Use <b>Add watch</b> to retain a range or <b>Investigate accesses</b> for a native physical watch. Continue with the native capture chapter."
+      ],
+      "result": "A source-bound observation history and tested numeric hypotheses, without a game-specific profile or a memory write.",
+      "note": "Each observation covers at most 4096 bytes; an experiment keeps at most 32 observations. A new worker, reset or loaded state requires a fresh series. Restored project evidence remains historical and cannot supply fresh native proof.",
+      "related": [
+        "native-accesses",
+        "debug"
+      ],
+      "terms": [
+        "term-control-observation",
+        "term-hypothesis",
+        "term-evidence"
+      ],
+      "image": "26-universal-value-series",
+      "caption": "Original controller-byte experiment: 0 -> 1 -> 1 survives the unchanged control. The unrelated background counter is filtered out.",
+      "image_layout": "following-page",
+      "visual_page": {
+        "title": "Investigate a changing value / actual interface",
+        "kicker": "Actual application capture / original redistributable example",
+        "intro": "Recorded controller input identifies a changing byte without supplying a game definition.",
+        "panels": [
+          {
+            "image": "26-universal-value-series",
+            "title": "Investigate a changing value",
+            "x": 48,
+            "top": 846,
+            "width": 1170,
+            "crop": [
+              180,
+              60,
+              1390,
+              860
+            ],
+            "caption": "Actual headless application capture. The offline HTML edition links the full-resolution image."
+          }
+        ]
+      }
+    },
+    {
+      "id": "pokemon-tables",
+      "title": "Rebalance named Pokemon stats and moves",
+      "part": "Basic",
+      "kicker": "Find a table / edit a named record",
+      "intro": "For the supported GBA numeric layout, ROMancer finds the first 151 species and first 165 moves without manual offsets. The opening records and every displayed record prefix are checked.",
+      "steps": [
+        "Import your own GBA file. Automatic deep scan includes documented-table discovery. Open discovered tables from ROM investigation, or use Data tables > Find stat and move tables.",
+        "Read the result. Exact original identifies the checked Emerald revision. Pattern match means a modified ROM has matching numeric storage, not that every name or behavior is proven.",
+        "Choose Open named table. Search for Bulbasaur or a move such as Pound. Save this layout to keep its names with the source. Only the listed prefix fields are editable; omitted record bytes stay untouched.",
+        "Change one value. The cell shows original, edited, difference and percentage. Choose Review changes, check the byte plan, then Create build. Use separate builds for larger experiments.",
+        "Playtest the build and export a verified BPS patch. Returning to the original preserves its original values. A changed base stat is not necessarily the current party member’s displayed stat."
+      ],
+      "result": "The supplied Emerald example changes Bulbasaur base HP 45 to 55. The supplied Ultra Violet example changes Pound power 40 to 45. Each changes exactly one byte through ROMancer and reconstructs from its BPS patch.",
+      "note": "The tests establish the numeric edits, patch reconstruction, emulator loading and state round trips. They do not certify battle balance or a complete playthrough. Discovery covers the stated first 151/165 layout; expanded species, custom move scripts and relocated formats can need further readers.",
+      "related": [
+        "numbers",
+        "checks",
+        "research-packs"
+      ],
+      "terms": [
+        "term-offset",
+        "term-revision"
+      ],
+      "image": "70-emerald-species-editor",
+      "image_layout": "following-page",
+      "caption": "Actual Emerald species table: base HP 45 → 55 with a live numeric preview.",
+      "visual_page": {
+        "title": "Edit a named move in Ultra Violet",
+        "kicker": "Actual ROMancer editing",
+        "intro": "Working interface with the supplied local game file.",
+        "panels": [
+          {
+            "image": "71-ultraviolet-move-editor",
+            "title": "Edit a named move in Ultra Violet",
+            "x": 48,
+            "top": 850,
+            "width": 1120,
+            "crop": [
+              0,
+              0,
+              1800,
+              1100
+            ]
+          }
+        ]
+      }
+    },
+    {
+      "id": "connected-game-view",
+      "title": "Follow connected game resources",
+      "part": "Basic",
+      "kicker": "Game view / resources and editors",
+      "intro": "Game view connects saved graphics, palettes, text, named records, rooms, objects, sound, research notes and measured gameplay. It works across NES, SNES, Genesis, Master System, GB, GBC and GBA; it does not require a Pokemon profile.",
+      "steps": [
+        "Choose a source or build in the top bar, then open Game view. Find a resource by name or use Show to focus on graphics, rooms, named records or gameplay traces.",
+        "Select an entry. Read its preview, decoded fields or text and its exact byte range. The confidence label distinguishes a checked layout, a known revision, your note and a measured frame.",
+        "Follow a connection to inspect related storage. Uses tiles and Uses palette come from a saved declaration. Shares byte storage only means overlapping file ranges; it does not establish a game behavior.",
+        "Choose Open editor to continue in the existing editor, or Inspect exact bytes to inspect its file location. Keep current draft preserves work when another setup is offered.",
+        "Rooms show the declared map and object outlines. Named records show decoded fields. A missing preview or connection means that format or relationship still needs a checked declaration or measured evidence."
+      ],
+      "result": "Navigate between a visual resource, its declared dependencies and its exact storage without repeatedly entering offsets.",
+      "note": "An index of checked data is not a universal decompiler. Game-specific maps, music and scripts still need supported readers. A source change invalidates stale declarations and evidence.",
+      "related": [
+        "research-notes",
+        "numbers"
+      ],
+      "terms": [
+        "term-connected-resource",
+        "term-evidence"
+      ],
+      "image": "80-connected-room-preview",
+      "image_layout": "following-page",
+      "caption": "Follow connected game resources",
+      "visual_page": {
+        "title": "Follow connected game resources",
+        "kicker": "Actual ROMancer interface",
+        "intro": "A measured workflow, captured without controlling the desktop.",
+        "panels": [
+          {
+            "image": "80-connected-room-preview",
+            "title": "Follow connected game resources",
+            "x": 48,
+            "top": 850,
+            "width": 1120,
+            "crop": [
+              0,
+              0,
+              1800,
+              1100
+            ]
+          }
+        ]
+      }
+    },
+    {
+      "id": "saved-gameplay-traces",
+      "title": "Trace a captured object to candidate ROM graphics",
+      "part": "Basic",
+      "kicker": "Playtest / select / trace / inspect",
+      "intro": "Save a real native frame region and search the selected ROM using its tested literal tile codec. Traces retain the frame, crop, searched range and every returned pixel candidate.",
+      "steps": [
+        "Load the selected game in Playtest. Play or advance to the scene, pause, and choose Inspect graphics. Capture a fresh frame if needed.",
+        "In Frame region & screenshot checkpoints, drag a tight rectangle around the object, at least 8 by 8 and at most 256 by 256 pixels. Smaller regions reduce competing matches.",
+        "Under Trace gameplay to ROM data, name the trace and choose its source search range. Choose Trace selected object. Each request searches at most 512 KiB; read the reported coverage.",
+        "Review matching parts and competing source offsets. Choose Open saved trace in Game view to revisit the crop and its candidates. Search next ROM range continues an incomplete search.",
+        "Choose a confirmed candidate or explicitly select matching parts to open the graphics editor. Review the assembled result before editing, build separately, then playtest the changed scene."
+      ],
+      "result": "A persistent connection from measured screen pixels to literal ROM byte candidates, available to people and the MCP interface.",
+      "note": "Pixel agreement does not prove a CPU/VDP source transfer, animation ownership or the role of a sprite. Compressed, transformed or RAM-generated images can have no literal match. The supplied seven-game test includes genuine zero-match and partial results; it does not claim every sprite was found. Use Verify ROM sources to test causal origins with coded probes and independent validation.",
+      "related": [
+        "connected-game-view",
+        "sprites",
+        "checks",
+        "verify-graphic-sources"
+      ],
+      "terms": [
+        "term-gameplay-trace",
+        "term-pixel-candidate"
+      ],
+      "image": "78-nes-gameplay-trace",
+      "image_layout": "following-page",
+      "caption": "Trace a captured object to candidate ROM graphics",
+      "visual_page": {
+        "title": "Trace a captured object to candidate ROM graphics",
+        "kicker": "Actual ROMancer interface",
+        "intro": "A measured workflow, captured without controlling the desktop.",
+        "panels": [
+          {
+            "image": "78-nes-gameplay-trace",
+            "title": "Trace a captured object to candidate ROM graphics",
+            "x": 48,
+            "top": 850,
+            "width": 1120,
+            "crop": [
+              0,
+              0,
+              1800,
+              1100
+            ]
+          }
+        ]
+      }
+    },
+    {
+      "id": "automatic-build-checks",
+      "title": "Check each build automatically",
+      "part": "Basic",
+      "kicker": "Game view / Build checks",
+      "intro": "Compare a separate build with two fresh runs of its original using identical inputs and a reviewed emulator core. A saved test can run after each descendant build or imported patch.",
+      "steps": [
+        "In Game view open Automatic check setup. Give the check a name, choose the frame count and select whether visual changes need review or identical pixels are required.",
+        "Leave Run after new builds selected to queue this check automatically. Save test setup for this revision. For button sequences or a fixed comparison region, expand Advanced inputs and comparison region.",
+        "Create a build normally, or choose an existing Build to check and Run checks. The application shows progress and lets you cancel the job. It remains usable while separate workers run.",
+        "Open a recent result. Compare Original, Build and Difference. Read cartridge integrity, state replay and worker closure results alongside the visual result.",
+        "PASS means the configured checks passed. REVIEW means the image changed under the review policy. REGRESSION means an explicit assertion or integrity check failed. INCONCLUSIVE means the baseline was unstable, flat or otherwise unsuitable. BLOCKED explains why execution could not complete."
+      ],
+      "result": "Each result records three fresh workers, source/build/core identities, the configured inputs and exact compared pictures. Automatic queue failures leave a successful build intact and report that testing was not queued.",
+      "note": "Passing an opening-scene comparison does not establish that a later edited sprite, battle or room works. Add routes and screenshot assertions that reach the changed behavior; conduct the relevant hands-on playtest.",
+      "related": [
+        "checks",
+        "saved-gameplay-traces"
+      ],
+      "terms": [
+        "term-baseline",
+        "term-build-check"
+      ],
+      "image": "79-genesis-automatic-build-check",
+      "image_layout": "following-page",
+      "caption": "Check each build automatically",
+      "visual_page": {
+        "title": "Check each build automatically",
+        "kicker": "Actual ROMancer interface",
+        "intro": "A measured workflow, captured without controlling the desktop.",
+        "panels": [
+          {
+            "image": "79-genesis-automatic-build-check",
+            "title": "Check each build automatically",
+            "x": 48,
+            "top": 850,
+            "width": 1120,
+            "crop": [
+              0,
+              0,
+              1800,
+              1100
+            ]
+          }
+        ]
+      }
+    },
+    {
+      "id": "verify-graphic-sources",
+      "title": "Find the ROM bytes behind a graphic",
+      "part": "Basic",
+      "kicker": "Verified graphic sources / step by step",
+      "intro": "Go beyond matching pixels. ROMancer can recover source pixel origins with controlled builds, then test the recovered map independently. This workflow uses the tested literal tile formats across all seven supported systems.",
+      "steps": [
+        "Cold-start the game and reach the scene. Pause, capture a frame and save a tight sprite or tile trace. ROMancer records acknowledged inputs automatically.",
+        "In the saved trace choose Verify ROM sources. ROMancer replays the original twice, then runs coded probes and two independent validation patterns in temporary builds. Progress and Cancel job appear below.",
+        "Read the result. Verified visual source includes an exact file offset, a recovered pixel map and original/controlled-marker/difference pictures. Green mask pixels are verified; unresolved pixels stay red. A partial map does not certify the whole sprite.",
+        "Choose Open verified part in graphics editor. Its original source pixels and observed colors are shown. Make a small change, review it and create a separate build. Undo restores the editing stroke; the original ROM stays unchanged.",
+        "Saved source-test results retain earlier successful and unsuccessful pages. In Game view use Verified sources or Source checks to find the evidence again. Test next source locations continues a bounded search."
+      ],
+      "result": "The supplied Castlevania test verified a graphic source at 0x1B167; the Rastan test verified one at 0x10400. Both were recovered and rechecked through ROMancer, then opened in its actual visual editor.",
+      "note": "Offsets apply only to the tested revision and scene. This measures source-to-picture dependency, not CPU, mapper-bank or DMA transfers.",
+      "related": [
+        "saved-gameplay-traces",
+        "connected-game-view",
+        "source-proof-method"
+      ],
+      "terms": [
+        "term-source-verification",
+        "term-coded-probe"
+      ],
+      "image": "87-nes-verified-source",
+      "image_layout": "following-page",
+      "caption": "Find the ROM bytes behind a graphic",
+      "visual_page": {
+        "title": "Find the ROM bytes behind a graphic",
+        "kicker": "Actual ROMancer interface",
+        "intro": "Measured source verification with a supplied game, captured without desktop control.",
+        "panels": [
+          {
+            "image": "87-nes-verified-source",
+            "title": "Find the ROM bytes behind a graphic",
+            "x": 48,
+            "top": 850,
+            "width": 1120,
+            "crop": [
+              0,
+              0,
+              1800,
+              1100
+            ]
+          }
+        ]
+      }
+    },
+    {
+      "id": "whole-object-editing",
+      "title": "Edit a captured object as one connected picture",
+      "part": "Basic",
+      "kicker": "Connected editing / step by step",
+      "intro": "Bring verified parts together instead of guessing how neighboring ROM tiles form a character. A saved layout keeps the captured placements, orientation, observed colors and shared-tile relationships.",
+      "steps": [
+        "Reach a scene from a fresh cold start. Pause, select a tight region in Playtest, save its trace and choose Verify ROM sources. A whole object needs source verification for each selected part.",
+        "Under Whole object, select the verified placements that belong together. You can select parts from several saved result pages for the same trace and frame. Give the object a short name, then choose Open whole object.",
+        "The graphics editor shows the captured scene, source tiles and assembled editing preview. Select a source tile to highlight its captured placements. Empty cells stay empty, and recovered horizontal or vertical flips remain in the layout.",
+        "Paint in the assembled preview. If one stored tile appears in several places, the shared-use notice explains that all of those placements change together. Original and editing pictures, changed-pixel counts, stroke Undo and Redo remain available.",
+        "Expand <b>Full-scene preview</b> to compare the captured frame with the staged composite. The yellow outline marks the saved object. A changed-pixel count confirms the preview updated; the label says simulated because no new game frame has been run.",
+        "Review the edit, create a separate build and use Test this edit. Find the layout again in Saved objects or the Game view Saved objects category. Remove layout deletes only its metadata."
+      ],
+      "result": "You edit a measured multi-part arrangement while keeping the scene and exact source uses visible. Object names describe your intent; ROMancer does not infer whether a captured object is a particular enemy or actor.",
+      "note": "Only compatible aligned literal parts from the same authenticated trace, frame and execution setup can be combined. Overlaps, mixed codecs and ambiguous orientations are refused. A partial placement is clearly marked. Imported or historical layouts reopen as checked declarations, not fresh execution proof. Full-scene previews use captured colors at saved placements. Background behind transparency, priority, palette ownership, animation and other uses of the same bytes are not reconstructed. Old captures need a fresh trace to include the full frame.",
+      "related": [
+        "verify-graphic-sources",
+        "animation",
+        "research-packs",
+        "captured-edit-check"
+      ],
+      "terms": [
+        "term-saved-object"
+      ],
+      "image": "108-verified-full-scene-preview",
+      "caption": "The actual Mossy Hollow hero source tiles and a staged one-pixel edit in its full captured scene. The yellow outline identifies the saved object."
+    },
+    {
+      "id": "captured-edit-check",
+      "title": "Test an edit against the scene you captured",
+      "part": "Basic",
+      "kicker": "Connected editing / step by step",
+      "intro": "Use your actual captured input history to check a separate build, with no custom test JSON. ROMancer checks that the original still reproduces the recorded scene before showing the edit comparison.",
+      "steps": [
+        "Capture a fresh cold-start trace of the scene you will edit. Keep the same engine, options, controller setup and system-file identities.",
+        "Make the edit in an appropriate visual or structured editor. Review the change and create a separate build. Staged pixels or unsaved form values are previews; they cannot be replayed as a ROM build.",
+        "Expand Test this edit in Graphics, Text, Tables, Levels, Sound or Resources. Select the descendant build and the saved capture, then choose Test this edit.",
+        "ROMancer runs the original twice and the edited build once with the captured inputs. It checks the original frame, engine setup, cartridge integrity and next-frame save-state replay. The original, build and difference pictures show what changed in the captured region.",
+        "Read the outcome. REVIEW means pixels changed and you must assess whether the change was intended. PASS covers the configured checks, not the whole game. INCONCLUSIVE means the captured original was not reproduced. BLOCKED names a missing or incompatible prerequisite."
+      ],
+      "result": "The scene check is repeatable and tied to its exact source, descendant build and execution setup. It does not replace your saved automatic test policy.",
+      "note": "This shortcut allows up to 2400 frames and 20 input steps. Longer or state-based scenarios belong in Routes and Regression. A different game revision, unrelated build, historical imported trace, battery-save start or changed core setup cannot silently reuse the capture.",
+      "related": [
+        "automatic-build-checks",
+        "saved-gameplay-traces"
+      ],
+      "terms": [
+        "term-edit-check"
+      ],
+      "image": "92-captured-edit-comparison",
+      "image_layout": "following-page",
+      "caption": "Test an edit against the scene you captured",
+      "visual_page": {
+        "title": "Test an edit against the scene you captured",
+        "kicker": "Actual ROMancer interface",
+        "intro": "Captured from ROMancer using its bundled services, without desktop control.",
+        "panels": [
+          {
+            "image": "92-captured-edit-comparison",
+            "title": "Test an edit against the scene you captured",
+            "x": 48,
+            "top": 850,
+            "width": 1120,
+            "crop": [
+              0,
+              0,
+              1800,
+              1100
+            ]
           }
         ]
       }
@@ -1985,6 +2364,10 @@
         {
           "title": "Definitions and permissions",
           "text": "Definition exchange is source-bound and requires writes when it creates or stores an export. Native investigation also has typed, bounded capture operations; its separate replay starts from power on. No arbitrary shell, caller-supplied debugger script or continuous live breakpoint control is exposed. Discover current schemas before sending arguments."
+        },
+        {
+          "title": "The same current tools",
+          "text": "Read editing.readiness before choosing an editor. objects.scene returns a bounded simulated PNG preview for a fresh verified saved object. project.studio creates the original editable example and therefore requires write access. Query system.operations for the current operation catalogue."
         }
       ],
       "related": [
@@ -2304,6 +2687,10 @@
         {
           "title": "Draft save, backup or restore failed",
           "text": "Keep the window open and copy unsaved text. Check write access, available space and the active workspace. Do not remove an active writer's lock. Restore from a complete private backup or Trash, then recheck files and run fresh tests."
+        },
+        {
+          "title": "Read the actual failure",
+          "text": "An illegal-instruction exit, a missing Windows dependency, a native crash and an observer-script error have distinct messages. A generic failed exit is not automatically a CPU problem. Follow the shown remedy, retry a short capture and export diagnostics if it repeats."
         }
       ],
       "related": [
@@ -2539,55 +2926,6 @@
           "text": "The supported linear GBA cartridge format is limited to 32 MiB. An engine detector that reaches its own budget reports that limit separately; the other cartridge and resource checks remain available."
         }
       ]
-    },
-    {
-      "id": "universal-values",
-      "title": "Investigate a changing value without a game profile",
-      "part": "Basic",
-      "kicker": "Investigate / record / narrow",
-      "intro": "ROMancer can gather evidence from an unfamiliar ROM. Start with one number or a controlled change rather than guessing a game property from byte values.",
-      "steps": [
-        "Load and pause the selected ROM in <b>Playtest</b>, then open <b>Investigation</b>. Name the experiment and enter the visible number, or leave it blank for change-only tests.",
-        "Choose <b>Capture before</b>. Perform one controlled action, pause and capture again. Record whether the target increased, decreased, changed, or changed by an exact amount.",
-        "Add an unchanged control while unrelated activity continues. This helps reject background counters. Keep before, changed and control observations together.",
-        "Compare surviving RAM offsets, widths, byte order, signed/BCD encoding and display relationships. Additional observations help separate equally fitting hypotheses.",
-        "Use <b>Add watch</b> to retain a range or <b>Investigate accesses</b> for a native physical watch. Continue with the native capture chapter."
-      ],
-      "result": "A source-bound observation history and tested numeric hypotheses, without a game-specific profile or a memory write.",
-      "note": "Each observation covers at most 4096 bytes; an experiment keeps at most 32 observations. A new worker, reset or loaded state requires a fresh series. Restored project evidence remains historical and cannot supply fresh native proof.",
-      "related": [
-        "native-accesses",
-        "debug"
-      ],
-      "terms": [
-        "term-control-observation",
-        "term-hypothesis",
-        "term-evidence"
-      ],
-      "image": "26-universal-value-series",
-      "caption": "Original controller-byte experiment: 0 -> 1 -> 1 survives the unchanged control. The unrelated background counter is filtered out.",
-      "image_layout": "following-page",
-      "visual_page": {
-        "title": "Investigate a changing value / actual interface",
-        "kicker": "Actual application capture / original redistributable example",
-        "intro": "Recorded controller input identifies a changing byte without supplying a game definition.",
-        "panels": [
-          {
-            "image": "26-universal-value-series",
-            "title": "Investigate a changing value",
-            "x": 48,
-            "top": 846,
-            "width": 1170,
-            "crop": [
-              180,
-              60,
-              1390,
-              860
-            ],
-            "caption": "Actual headless application capture. The offline HTML edition links the full-resolution image."
-          }
-        ]
-      }
     },
     {
       "id": "native-accesses",
@@ -3067,54 +3405,6 @@
       }
     },
     {
-      "id": "pokemon-tables",
-      "title": "Rebalance named Pokemon stats and moves",
-      "part": "Basic",
-      "kicker": "Find a table / edit a named record",
-      "intro": "For the supported GBA numeric layout, ROMancer finds the first 151 species and first 165 moves without manual offsets. The opening records and every displayed record prefix are checked.",
-      "steps": [
-        "Import your own GBA file. Automatic deep scan includes documented-table discovery. Open discovered tables from ROM investigation, or use Data tables > Find stat and move tables.",
-        "Read the result. Exact original identifies the checked Emerald revision. Pattern match means a modified ROM has matching numeric storage, not that every name or behavior is proven.",
-        "Choose Open named table. Search for Bulbasaur or a move such as Pound. Save this layout to keep its names with the source. Only the listed prefix fields are editable; omitted record bytes stay untouched.",
-        "Change one value. The cell shows original, edited, difference and percentage. Choose Review changes, check the byte plan, then Create build. Use separate builds for larger experiments.",
-        "Playtest the build and export a verified BPS patch. Returning to the original preserves its original values. A changed base stat is not necessarily the current party member’s displayed stat."
-      ],
-      "result": "The supplied Emerald example changes Bulbasaur base HP 45 to 55. The supplied Ultra Violet example changes Pound power 40 to 45. Each changes exactly one byte through ROMancer and reconstructs from its BPS patch.",
-      "note": "The tests establish the numeric edits, patch reconstruction, emulator loading and state round trips. They do not certify battle balance or a complete playthrough. Discovery covers the stated first 151/165 layout; expanded species, custom move scripts and relocated formats can need further readers.",
-      "related": [
-        "numbers",
-        "checks",
-        "research-packs"
-      ],
-      "terms": [
-        "term-offset",
-        "term-revision"
-      ],
-      "image": "70-emerald-species-editor",
-      "image_layout": "following-page",
-      "caption": "Actual Emerald species table: base HP 45 → 55 with a live numeric preview.",
-      "visual_page": {
-        "title": "Edit a named move in Ultra Violet",
-        "kicker": "Actual ROMancer editing",
-        "intro": "Working interface with the supplied local game file.",
-        "panels": [
-          {
-            "image": "71-ultraviolet-move-editor",
-            "title": "Edit a named move in Ultra Violet",
-            "x": 48,
-            "top": 850,
-            "width": 1120,
-            "crop": [
-              0,
-              0,
-              1800,
-              1100
-            ]
-          }
-        ]
-      }
-    },
-    {
       "id": "source-symbols",
       "title": "Find named ROM addresses with symbol files",
       "part": "Advanced",
@@ -3149,149 +3439,6 @@
           {
             "image": "75-symbol-address-navigation",
             "title": "Review and search source-bound names",
-            "x": 48,
-            "top": 850,
-            "width": 1120,
-            "crop": [
-              0,
-              0,
-              1800,
-              1100
-            ]
-          }
-        ]
-      }
-    },
-    {
-      "id": "connected-game-view",
-      "title": "Follow connected game resources",
-      "part": "Basic",
-      "kicker": "Game view / resources and editors",
-      "intro": "Game view connects saved graphics, palettes, text, named records, rooms, objects, sound, research notes and measured gameplay. It works across NES, SNES, Genesis, Master System, GB, GBC and GBA; it does not require a Pokemon profile.",
-      "steps": [
-        "Choose a source or build in the top bar, then open Game view. Find a resource by name or use Show to focus on graphics, rooms, named records or gameplay traces.",
-        "Select an entry. Read its preview, decoded fields or text and its exact byte range. The confidence label distinguishes a checked layout, a known revision, your note and a measured frame.",
-        "Follow a connection to inspect related storage. Uses tiles and Uses palette come from a saved declaration. Shares byte storage only means overlapping file ranges; it does not establish a game behavior.",
-        "Choose Open editor to continue in the existing editor, or Inspect exact bytes to inspect its file location. Keep current draft preserves work when another setup is offered.",
-        "Rooms show the declared map and object outlines. Named records show decoded fields. A missing preview or connection means that format or relationship still needs a checked declaration or measured evidence."
-      ],
-      "result": "Navigate between a visual resource, its declared dependencies and its exact storage without repeatedly entering offsets.",
-      "note": "An index of checked data is not a universal decompiler. Game-specific maps, music and scripts still need supported readers. A source change invalidates stale declarations and evidence.",
-      "related": [
-        "research-notes",
-        "numbers"
-      ],
-      "terms": [
-        "term-connected-resource",
-        "term-evidence"
-      ],
-      "image": "80-connected-room-preview",
-      "image_layout": "following-page",
-      "caption": "Follow connected game resources",
-      "visual_page": {
-        "title": "Follow connected game resources",
-        "kicker": "Actual ROMancer interface",
-        "intro": "A measured workflow, captured without controlling the desktop.",
-        "panels": [
-          {
-            "image": "80-connected-room-preview",
-            "title": "Follow connected game resources",
-            "x": 48,
-            "top": 850,
-            "width": 1120,
-            "crop": [
-              0,
-              0,
-              1800,
-              1100
-            ]
-          }
-        ]
-      }
-    },
-    {
-      "id": "saved-gameplay-traces",
-      "title": "Trace a captured object to candidate ROM graphics",
-      "part": "Basic",
-      "kicker": "Playtest / select / trace / inspect",
-      "intro": "Save a real native frame region and search the selected ROM using its tested literal tile codec. Traces retain the frame, crop, searched range and every returned pixel candidate.",
-      "steps": [
-        "Load the selected game in Playtest. Play or advance to the scene, pause, and choose Inspect graphics. Capture a fresh frame if needed.",
-        "In Frame region & screenshot checkpoints, drag a tight rectangle around the object, at least 8 by 8 and at most 256 by 256 pixels. Smaller regions reduce competing matches.",
-        "Under Trace gameplay to ROM data, name the trace and choose its source search range. Choose Trace selected object. Each request searches at most 512 KiB; read the reported coverage.",
-        "Review matching parts and competing source offsets. Choose Open saved trace in Game view to revisit the crop and its candidates. Search next ROM range continues an incomplete search.",
-        "Choose a confirmed candidate or explicitly select matching parts to open the graphics editor. Review the assembled result before editing, build separately, then playtest the changed scene."
-      ],
-      "result": "A persistent connection from measured screen pixels to literal ROM byte candidates, available to people and the MCP interface.",
-      "note": "Pixel agreement does not prove a CPU/VDP source transfer, animation ownership or the role of a sprite. Compressed, transformed or RAM-generated images can have no literal match. The supplied seven-game test includes genuine zero-match and partial results; it does not claim every sprite was found. Use Verify ROM sources to test causal origins with coded probes and independent validation.",
-      "related": [
-        "connected-game-view",
-        "sprites",
-        "checks",
-        "verify-graphic-sources"
-      ],
-      "terms": [
-        "term-gameplay-trace",
-        "term-pixel-candidate"
-      ],
-      "image": "78-nes-gameplay-trace",
-      "image_layout": "following-page",
-      "caption": "Trace a captured object to candidate ROM graphics",
-      "visual_page": {
-        "title": "Trace a captured object to candidate ROM graphics",
-        "kicker": "Actual ROMancer interface",
-        "intro": "A measured workflow, captured without controlling the desktop.",
-        "panels": [
-          {
-            "image": "78-nes-gameplay-trace",
-            "title": "Trace a captured object to candidate ROM graphics",
-            "x": 48,
-            "top": 850,
-            "width": 1120,
-            "crop": [
-              0,
-              0,
-              1800,
-              1100
-            ]
-          }
-        ]
-      }
-    },
-    {
-      "id": "automatic-build-checks",
-      "title": "Check each build automatically",
-      "part": "Basic",
-      "kicker": "Game view / Build checks",
-      "intro": "Compare a separate build with two fresh runs of its original using identical inputs and a reviewed emulator core. A saved test can run after each descendant build or imported patch.",
-      "steps": [
-        "In Game view open Automatic check setup. Give the check a name, choose the frame count and select whether visual changes need review or identical pixels are required.",
-        "Leave Run after new builds selected to queue this check automatically. Save test setup for this revision. For button sequences or a fixed comparison region, expand Advanced inputs and comparison region.",
-        "Create a build normally, or choose an existing Build to check and Run checks. The application shows progress and lets you cancel the job. It remains usable while separate workers run.",
-        "Open a recent result. Compare Original, Build and Difference. Read cartridge integrity, state replay and worker closure results alongside the visual result.",
-        "PASS means the configured checks passed. REVIEW means the image changed under the review policy. REGRESSION means an explicit assertion or integrity check failed. INCONCLUSIVE means the baseline was unstable, flat or otherwise unsuitable. BLOCKED explains why execution could not complete."
-      ],
-      "result": "Each result records three fresh workers, source/build/core identities, the configured inputs and exact compared pictures. Automatic queue failures leave a successful build intact and report that testing was not queued.",
-      "note": "Passing an opening-scene comparison does not establish that a later edited sprite, battle or room works. Add routes and screenshot assertions that reach the changed behavior; conduct the relevant hands-on playtest.",
-      "related": [
-        "checks",
-        "saved-gameplay-traces"
-      ],
-      "terms": [
-        "term-baseline",
-        "term-build-check"
-      ],
-      "image": "79-genesis-automatic-build-check",
-      "image_layout": "following-page",
-      "caption": "Check each build automatically",
-      "visual_page": {
-        "title": "Check each build automatically",
-        "kicker": "Actual ROMancer interface",
-        "intro": "A measured workflow, captured without controlling the desktop.",
-        "panels": [
-          {
-            "image": "79-genesis-automatic-build-check",
-            "title": "Check each build automatically",
             "x": 48,
             "top": 850,
             "width": 1120,
@@ -3357,54 +3504,6 @@
         "term-build-check",
         "term-evidence"
       ]
-    },
-    {
-      "id": "verify-graphic-sources",
-      "title": "Find the ROM bytes behind a graphic",
-      "part": "Basic",
-      "kicker": "Verified graphic sources / step by step",
-      "intro": "Go beyond matching pixels. ROMancer can recover source pixel origins with controlled builds, then test the recovered map independently. This workflow uses the tested literal tile formats across all seven supported systems.",
-      "steps": [
-        "Cold-start the game and reach the scene. Pause, capture a frame and save a tight sprite or tile trace. ROMancer records acknowledged inputs automatically.",
-        "In the saved trace choose Verify ROM sources. ROMancer replays the original twice, then runs coded probes and two independent validation patterns in temporary builds. Progress and Cancel job appear below.",
-        "Read the result. Verified visual source includes an exact file offset, a recovered pixel map and original/controlled-marker/difference pictures. Green mask pixels are verified; unresolved pixels stay red. A partial map does not certify the whole sprite.",
-        "Choose Open verified part in graphics editor. Its original source pixels and observed colors are shown. Make a small change, review it and create a separate build. Undo restores the editing stroke; the original ROM stays unchanged.",
-        "Saved source-test results retain earlier successful and unsuccessful pages. In Game view use Verified sources or Source checks to find the evidence again. Test next source locations continues a bounded search."
-      ],
-      "result": "The supplied Castlevania test verified a graphic source at 0x1B167; the Rastan test verified one at 0x10400. Both were recovered and rechecked through ROMancer, then opened in its actual visual editor.",
-      "note": "Offsets apply only to the tested revision and scene. This measures source-to-picture dependency, not CPU, mapper-bank or DMA transfers.",
-      "related": [
-        "saved-gameplay-traces",
-        "connected-game-view",
-        "source-proof-method"
-      ],
-      "terms": [
-        "term-source-verification",
-        "term-coded-probe"
-      ],
-      "image": "87-nes-verified-source",
-      "image_layout": "following-page",
-      "caption": "Find the ROM bytes behind a graphic",
-      "visual_page": {
-        "title": "Find the ROM bytes behind a graphic",
-        "kicker": "Actual ROMancer interface",
-        "intro": "Measured source verification with a supplied game, captured without desktop control.",
-        "panels": [
-          {
-            "image": "87-nes-verified-source",
-            "title": "Find the ROM bytes behind a graphic",
-            "x": 48,
-            "top": 850,
-            "width": 1120,
-            "crop": [
-              0,
-              0,
-              1800,
-              1100
-            ]
-          }
-        ]
-      }
     },
     {
       "id": "source-proof-method",
@@ -3504,54 +3603,6 @@
       }
     },
     {
-      "id": "whole-object-editing",
-      "title": "Edit a captured object as one connected picture",
-      "part": "Basic",
-      "kicker": "Connected editing / step by step",
-      "intro": "Bring verified parts together instead of guessing how neighboring ROM tiles form a character. A saved layout keeps the captured placements, orientation, observed colors and shared-tile relationships.",
-      "steps": [
-        "Reach a scene from a fresh cold start. Pause, select a tight region in Playtest, save its trace and choose Verify ROM sources. A whole object needs source verification for each selected part.",
-        "Under Whole object, select the verified placements that belong together. You can select parts from several saved result pages for the same trace and frame. Give the object a short name, then choose Open whole object.",
-        "The graphics editor shows the captured scene, source tiles and assembled editing preview. Select a source tile to highlight its captured placements. Empty cells stay empty, and recovered horizontal or vertical flips remain in the layout.",
-        "Paint in the assembled preview. If one stored tile appears in several places, the shared-use notice explains that all of those placements change together. Original and editing pictures, changed-pixel counts, stroke Undo and Redo remain available.",
-        "Review the edit, create a separate build and use Test this edit. Find the layout again in Saved objects or the Game view Saved objects category. Remove layout deletes only its metadata."
-      ],
-      "result": "You edit a measured multi-part arrangement while keeping the scene and exact source uses visible. Object names describe your intent; ROMancer does not infer whether a captured object is a particular enemy or actor.",
-      "note": "Only compatible aligned literal parts from the same authenticated trace, frame and execution setup can be combined. Overlaps, mixed codecs and ambiguous orientations are refused. A partial placement is clearly marked. Imported or historical layouts reopen as checked declarations, not fresh execution proof.",
-      "related": [
-        "verify-graphic-sources",
-        "animation",
-        "research-packs",
-        "captured-edit-check"
-      ],
-      "terms": [
-        "term-saved-object"
-      ],
-      "image": "90-connected-whole-object",
-      "image_layout": "following-page",
-      "caption": "Edit a captured object as one connected picture",
-      "visual_page": {
-        "title": "Edit a captured object as one connected picture",
-        "kicker": "Actual ROMancer interface",
-        "intro": "Captured from ROMancer using its bundled services, without desktop control.",
-        "panels": [
-          {
-            "image": "90-connected-whole-object",
-            "title": "Edit a captured object as one connected picture",
-            "x": 48,
-            "top": 850,
-            "width": 1120,
-            "crop": [
-              0,
-              0,
-              1800,
-              1100
-            ]
-          }
-        ]
-      }
-    },
-    {
       "id": "native-graphics-trails",
       "title": "Inspect actual graphics reads, writes and video memory",
       "part": "Advanced",
@@ -3586,52 +3637,6 @@
           {
             "image": "91-native-graphics-memory",
             "title": "Inspect actual graphics reads, writes and video memory",
-            "x": 48,
-            "top": 850,
-            "width": 1120,
-            "crop": [
-              0,
-              0,
-              1800,
-              1100
-            ]
-          }
-        ]
-      }
-    },
-    {
-      "id": "captured-edit-check",
-      "title": "Test an edit against the scene you captured",
-      "part": "Basic",
-      "kicker": "Connected editing / step by step",
-      "intro": "Use your actual captured input history to check a separate build, with no custom test JSON. ROMancer checks that the original still reproduces the recorded scene before showing the edit comparison.",
-      "steps": [
-        "Capture a fresh cold-start trace of the scene you will edit. Keep the same engine, options, controller setup and system-file identities.",
-        "Make the edit in an appropriate visual or structured editor. Review the change and create a separate build. Staged pixels or unsaved form values are previews; they cannot be replayed as a ROM build.",
-        "Expand Test this edit in Graphics, Text, Tables, Levels, Sound or Resources. Select the descendant build and the saved capture, then choose Test this edit.",
-        "ROMancer runs the original twice and the edited build once with the captured inputs. It checks the original frame, engine setup, cartridge integrity and next-frame save-state replay. The original, build and difference pictures show what changed in the captured region.",
-        "Read the outcome. REVIEW means pixels changed and you must assess whether the change was intended. PASS covers the configured checks, not the whole game. INCONCLUSIVE means the captured original was not reproduced. BLOCKED names a missing or incompatible prerequisite."
-      ],
-      "result": "The scene check is repeatable and tied to its exact source, descendant build and execution setup. It does not replace your saved automatic test policy.",
-      "note": "This shortcut allows up to 2400 frames and 20 input steps. Longer or state-based scenarios belong in Routes and Regression. A different game revision, unrelated build, historical imported trace, battery-save start or changed core setup cannot silently reuse the capture.",
-      "related": [
-        "automatic-build-checks",
-        "saved-gameplay-traces"
-      ],
-      "terms": [
-        "term-edit-check"
-      ],
-      "image": "92-captured-edit-comparison",
-      "image_layout": "following-page",
-      "caption": "Test an edit against the scene you captured",
-      "visual_page": {
-        "title": "Test an edit against the scene you captured",
-        "kicker": "Actual ROMancer interface",
-        "intro": "Captured from ROMancer using its bundled services, without desktop control.",
-        "panels": [
-          {
-            "image": "92-captured-edit-comparison",
-            "title": "Test an edit against the scene you captured",
             "x": 48,
             "top": 850,
             "width": 1120,
@@ -4263,6 +4268,13 @@
       ]
     },
     {
+      "term": "Automatic build checks",
+      "topics": [
+        "automatic-build-checks",
+        "automated-workbench"
+      ]
+    },
+    {
       "term": "Automatic graphics analysis",
       "topics": [
         "settings",
@@ -4340,6 +4352,12 @@
       ]
     },
     {
+      "term": "Build check status",
+      "topics": [
+        "automatic-build-checks"
+      ]
+    },
+    {
       "term": "Build history",
       "topics": [
         "drafts"
@@ -4398,6 +4416,12 @@
       ]
     },
     {
+      "term": "Coded pixel tracing",
+      "topics": [
+        "source-proof-method"
+      ]
+    },
+    {
       "term": "Collision",
       "topics": [
         "levels"
@@ -4430,9 +4454,28 @@
       ]
     },
     {
+      "term": "Compressed resource relocation",
+      "topics": [
+        "compressed-capacity"
+      ]
+    },
+    {
       "term": "Compression",
       "topics": [
         "compression"
+      ]
+    },
+    {
+      "term": "Connected editing with AI",
+      "topics": [
+        "connected-automation"
+      ]
+    },
+    {
+      "term": "Connected resources",
+      "topics": [
+        "connected-game-view",
+        "connected-evidence"
       ]
     },
     {
@@ -4514,6 +4557,12 @@
       ]
     },
     {
+      "term": "Declared relationships",
+      "topics": [
+        "connected-evidence"
+      ]
+    },
+    {
       "term": "Decoded room terrain",
       "topics": [
         "room",
@@ -4556,6 +4605,12 @@
       "term": "Draft saving",
       "topics": [
         "drafts"
+      ]
+    },
+    {
+      "term": "Editor setup recovery",
+      "topics": [
+        "research-notes"
       ]
     },
     {
@@ -4637,6 +4692,12 @@
       ]
     },
     {
+      "term": "Game view",
+      "topics": [
+        "connected-game-view"
+      ]
+    },
+    {
       "term": "Game-specific edits",
       "topics": [
         "numbers",
@@ -4644,9 +4705,21 @@
       ]
     },
     {
+      "term": "Gameplay tracing",
+      "topics": [
+        "saved-gameplay-traces"
+      ]
+    },
+    {
       "term": "Generated table editors",
       "topics": [
         "structural-experiments"
+      ]
+    },
+    {
+      "term": "GNU nm names",
+      "topics": [
+        "source-symbols"
       ]
     },
     {
@@ -4764,6 +4837,12 @@
       ]
     },
     {
+      "term": "Mario references",
+      "topics": [
+        "popular-references"
+      ]
+    },
+    {
       "term": "Master System",
       "topics": [
         "rastan-blobs"
@@ -4802,6 +4881,19 @@
       ]
     },
     {
+      "term": "Mossy Hollow",
+      "topics": [
+        "editing-studio",
+        "whole-object-editing"
+      ]
+    },
+    {
+      "term": "Move power and PP",
+      "topics": [
+        "pokemon-tables"
+      ]
+    },
+    {
       "term": "Moved table layouts",
       "topics": [
         "data-relocation",
@@ -4831,6 +4923,12 @@
       "term": "Named object inspector",
       "topics": [
         "connections"
+      ]
+    },
+    {
+      "term": "Native graphics access trails",
+      "topics": [
+        "native-graphics-trails"
       ]
     },
     {
@@ -4871,6 +4969,12 @@
       ]
     },
     {
+      "term": "Palette-only false positives",
+      "topics": [
+        "source-proof-method"
+      ]
+    },
+    {
       "term": "Patch application",
       "topics": [
         "patches"
@@ -4891,9 +4995,22 @@
       ]
     },
     {
+      "term": "Pixel candidates",
+      "topics": [
+        "saved-gameplay-traces",
+        "connected-evidence"
+      ]
+    },
+    {
       "term": "Pixel painting",
       "topics": [
         "sprites"
+      ]
+    },
+    {
+      "term": "Pixel-to-byte map",
+      "topics": [
+        "source-proof-method"
       ]
     },
     {
@@ -4907,6 +5024,18 @@
       "term": "PNG import",
       "topics": [
         "tilemaps"
+      ]
+    },
+    {
+      "term": "Pokemon references",
+      "topics": [
+        "popular-references"
+      ]
+    },
+    {
+      "term": "Pokemon stat editing",
+      "topics": [
+        "pokemon-tables"
       ]
     },
     {
@@ -4982,6 +5111,12 @@
       ]
     },
     {
+      "term": "Rastan gameplay comparison",
+      "topics": [
+        "rastan-playtest"
+      ]
+    },
+    {
       "term": "Readable filenames",
       "topics": [
         "patches",
@@ -4992,6 +5127,18 @@
       "term": "Recipes",
       "topics": [
         "recipes"
+      ]
+    },
+    {
+      "term": "Recompression capacity",
+      "topics": [
+        "compressed-capacity"
+      ]
+    },
+    {
+      "term": "Recorded video memory",
+      "topics": [
+        "native-graphics-trails"
       ]
     },
     {
@@ -5026,6 +5173,18 @@
       ]
     },
     {
+      "term": "Research notes",
+      "topics": [
+        "research-notes"
+      ]
+    },
+    {
+      "term": "Research packs",
+      "topics": [
+        "research-packs"
+      ]
+    },
+    {
       "term": "Reserved free space",
       "topics": [
         "data-relocation"
@@ -5048,6 +5207,12 @@
       "term": "Revision catalogs",
       "topics": [
         "checks"
+      ]
+    },
+    {
+      "term": "RGBDS names",
+      "topics": [
+        "source-symbols"
       ]
     },
     {
@@ -5110,6 +5275,12 @@
       ]
     },
     {
+      "term": "Shared tile uses",
+      "topics": [
+        "whole-object-editing"
+      ]
+    },
+    {
       "term": "Shared tiles",
       "topics": [
         "animation",
@@ -5120,6 +5291,18 @@
       "term": "Sound samples and WAV",
       "topics": [
         "sound"
+      ]
+    },
+    {
+      "term": "Source proof history",
+      "topics": [
+        "verify-graphic-sources"
+      ]
+    },
+    {
+      "term": "Source verification failures",
+      "topics": [
+        "source-proof-recovery"
       ]
     },
     {
@@ -5148,10 +5331,22 @@
       ]
     },
     {
+      "term": "Symbol files",
+      "topics": [
+        "source-symbols"
+      ]
+    },
+    {
       "term": "Table fields and stride",
       "topics": [
         "tables",
         "debug"
+      ]
+    },
+    {
+      "term": "Temporary diagnostic builds",
+      "topics": [
+        "source-proof-method"
       ]
     },
     {
@@ -5164,6 +5359,12 @@
       "term": "Test skips and support reports",
       "topics": [
         "release-checks"
+      ]
+    },
+    {
+      "term": "Test this edit",
+      "topics": [
+        "captured-edit-check"
       ]
     },
     {
@@ -5220,6 +5421,12 @@
       ]
     },
     {
+      "term": "Verified graphic sources",
+      "topics": [
+        "verify-graphic-sources"
+      ]
+    },
+    {
       "term": "Volume",
       "topics": [
         "settings",
@@ -5236,6 +5443,12 @@
       "term": "Which editor to use",
       "topics": [
         "start"
+      ]
+    },
+    {
+      "term": "Whole-object editing",
+      "topics": [
+        "whole-object-editing"
       ]
     },
     {
@@ -5257,207 +5470,32 @@
         "support-editing",
         "palettes-appearance"
       ]
-    },
-    {
-      "term": "Rastan gameplay comparison",
-      "topics": [
-        "rastan-playtest"
-      ]
-    },
-    {
-      "term": "Research notes",
-      "topics": [
-        "research-notes"
-      ]
-    },
-    {
-      "term": "Research packs",
-      "topics": [
-        "research-packs"
-      ]
-    },
-    {
-      "term": "Pokemon references",
-      "topics": [
-        "popular-references"
-      ]
-    },
-    {
-      "term": "Mario references",
-      "topics": [
-        "popular-references"
-      ]
-    },
-    {
-      "term": "Editor setup recovery",
-      "topics": [
-        "research-notes"
-      ]
-    },
-    {
-      "term": "Pokemon stat editing",
-      "topics": [
-        "pokemon-tables"
-      ]
-    },
-    {
-      "term": "Move power and PP",
-      "topics": [
-        "pokemon-tables"
-      ]
-    },
-    {
-      "term": "Symbol files",
-      "topics": [
-        "source-symbols"
-      ]
-    },
-    {
-      "term": "RGBDS names",
-      "topics": [
-        "source-symbols"
-      ]
-    },
-    {
-      "term": "GNU nm names",
-      "topics": [
-        "source-symbols"
-      ]
-    },
-    {
-      "term": "Game view",
-      "topics": [
-        "connected-game-view"
-      ]
-    },
-    {
-      "term": "Connected resources",
-      "topics": [
-        "connected-game-view",
-        "connected-evidence"
-      ]
-    },
-    {
-      "term": "Gameplay tracing",
-      "topics": [
-        "saved-gameplay-traces"
-      ]
-    },
-    {
-      "term": "Pixel candidates",
-      "topics": [
-        "saved-gameplay-traces",
-        "connected-evidence"
-      ]
-    },
-    {
-      "term": "Automatic build checks",
-      "topics": [
-        "automatic-build-checks",
-        "automated-workbench"
-      ]
-    },
-    {
-      "term": "Build check status",
-      "topics": [
-        "automatic-build-checks"
-      ]
-    },
-    {
-      "term": "Declared relationships",
-      "topics": [
-        "connected-evidence"
-      ]
-    },
-    {
-      "term": "Verified graphic sources",
-      "topics": [
-        "verify-graphic-sources"
-      ]
-    },
-    {
-      "term": "Coded pixel tracing",
-      "topics": [
-        "source-proof-method"
-      ]
-    },
-    {
-      "term": "Pixel-to-byte map",
-      "topics": [
-        "source-proof-method"
-      ]
-    },
-    {
-      "term": "Source verification failures",
-      "topics": [
-        "source-proof-recovery"
-      ]
-    },
-    {
-      "term": "Temporary diagnostic builds",
-      "topics": [
-        "source-proof-method"
-      ]
-    },
-    {
-      "term": "Palette-only false positives",
-      "topics": [
-        "source-proof-method"
-      ]
-    },
-    {
-      "term": "Source proof history",
-      "topics": [
-        "verify-graphic-sources"
-      ]
-    },
-    {
-      "term": "Whole-object editing",
-      "topics": [
-        "whole-object-editing"
-      ]
-    },
-    {
-      "term": "Shared tile uses",
-      "topics": [
-        "whole-object-editing"
-      ]
-    },
-    {
-      "term": "Native graphics access trails",
-      "topics": [
-        "native-graphics-trails"
-      ]
-    },
-    {
-      "term": "Recorded video memory",
-      "topics": [
-        "native-graphics-trails"
-      ]
-    },
-    {
-      "term": "Test this edit",
-      "topics": [
-        "captured-edit-check"
-      ]
-    },
-    {
-      "term": "Recompression capacity",
-      "topics": [
-        "compressed-capacity"
-      ]
-    },
-    {
-      "term": "Compressed resource relocation",
-      "topics": [
-        "compressed-capacity"
-      ]
-    },
-    {
-      "term": "Connected editing with AI",
-      "topics": [
-        "connected-automation"
-      ]
     }
+  ],
+  "compact_pdf": true,
+  "compact_wide_topics": [
+    "ai-worked-edit",
+    "beginner-trial",
+    "compression",
+    "connections",
+    "debug",
+    "editing-studio",
+    "everyday-controls",
+    "investigation",
+    "levels",
+    "mcp",
+    "native-graphics-trails",
+    "rastan-blobs",
+    "recipes",
+    "regression",
+    "release-checks",
+    "resources",
+    "settings",
+    "support-editing",
+    "support-identity",
+    "support-playback",
+    "troubleshooting",
+    "walkthrough",
+    "whole-object-editing"
   ]
 }

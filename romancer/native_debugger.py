@@ -156,7 +156,9 @@ def capture_native(project,row,config,*,root=None,cancelled=lambda:False):
                 if any(p.stat().st_size>2*1024**2 for p in (job/'trace.tsv',job/'stdout.txt',job/'stderr.txt') if p.exists()):
                     raise ValueError('native debugger output exceeded its byte budget')
                 time.sleep(.025)
-        if process.returncode!=0:raise ValueError('native debugger did not finish its capture (exit '+str(process.returncode)+')')
+        if process.returncode!=0:
+            from .debugger_failures import process_failure,capture_output
+            raise process_failure('Native observer',process.returncode,capture_output(job))
         if verify_backend(job)!=backend:raise ValueError('The executed debugger core identity changed.')
         trace=checked_path(job/'trace.tsv')
         if not trace.is_file() or trace.stat().st_size>2*1024**2 or trace.stat().st_nlink!=1:raise ValueError('native capture output is missing or invalid')

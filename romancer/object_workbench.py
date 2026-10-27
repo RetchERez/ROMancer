@@ -113,6 +113,7 @@ class ObjectTools:
     def routes(self):
         return {'objects.create':('project_id artifact_id name parts',self.create),'objects.list':('project_id artifact_id',self.list),
             'objects.get':('project_id artifact_id object_id',self.get),'objects.open':('project_id artifact_id object_id',self.open),
+            'objects.scene':('project_id artifact_id object_id edits',self.scene),
             'objects.delete':('project_id artifact_id object_id',self.delete)}
     def _parts(self,p,parts,c=lambda:False):
         if type(parts) is not list or not 1<=len(parts)<=64:raise ValueError('Choose 1 to 64 verified parts.')
@@ -157,7 +158,8 @@ class ObjectTools:
         fresh=False
         if obj['parts']:
             try:
-                chosen,_=self._parts(p,obj['parts'],c);fresh=digest(verified_layout(row['system_id'],chosen))==digest(obj['definition'])
+                chosen,binding=self._parts(p,obj['parts'],c)
+                fresh=(binding[:2]==(obj['trace_id'],obj['frame_sha256']) and digest(verified_layout(row['system_id'],chosen))==digest(obj['definition']))
             except (ValueError,OSError,KeyError,TypeError):pass
         return {'ok':True,'source_sha256':row['sha256'],'artifact_id':row['artifact_id'],'object_id':obj['id'],'object':obj,'source_dependency_verified':fresh,'runtime_trusted':fresh}
     def open(self,p,c):
@@ -174,3 +176,21 @@ class ObjectTools:
             if c():raise KeyboardInterrupt
             projects._measure(path,row,cancelled=c);owned['object_layouts']={'source_sha256':row['sha256'],'objects':kept};projects.write_json(project/'project.json',store)
         return {'ok':True,'rom_written':False}
+    def scene(self,p,c):
+        from .scene_composite import composite
+        from .asset_codecs import decode_cell
+        result=self.get(p,c)
+        if not result['source_dependency_verified']:raise ValueError('Verify this object from a fresh local trace before using its scene preview.')
+        obj=result['object'];trace=self.api.traces.get({**p,'trace_id':obj['trace_id']},c)
+        if not trace.get('runtime_trusted'):raise ValueError('Capture a fresh authenticated local scene before using this preview.')
+        scene=trace.get('scene')
+        if not scene or scene['sha256']!=obj['frame_sha256']:raise ValueError('Capture a fresh trace with the full scene, then verify the object again.')
+        project,row,path=self.api.source(p);projects._measure(path,row,cancelled=c);cfg=obj['definition']['config'];unit=cell_size(cfg['codec'],8,8)
+        used={i for i in obj['definition']['layout']['indices'] if i is not None};tiles={}
+        with path.open('rb') as source:
+            for index in used:
+                source.seek(cfg['offset']+index*unit);raw=source.read(unit)
+                if len(raw)!=unit:raise ValueError('Object source tiles changed.')
+                tiles[index]=decode_cell(raw,codec=cfg['codec'],width=8,height=8)
+        projects._measure(path,row,cancelled=c)
+        return {**composite(scene,obj['definition'],tiles,p['edits']),'object_id':obj['id'],'source_sha256':row['sha256'],'artifact_id':row['artifact_id'],'scene_region':obj['definition']['scene_region']}

@@ -6,6 +6,27 @@ Master System support covers validated Sega headers, checksums, literal graphics
 declared text/byte edits, patches and playtesting; other layouts remain unknown.
 Everyday use works offline. No AI account, model, API key or subscription is required.
 
+EDITING TASKS
+
+The Overview reports readiness for the exact selected ROM. A checked graphics
+layout does not imply a known palette, music driver or level format. Open the
+editing tools directly. The guide provides Basic and Advanced procedures;
+concise field help and diagnostics remain available.
+
+Try the original Mossy Hollow editing studio: move with arrows and press A for
+a chirp. Edit its hero/slime graphics, dialogue, speeds, visual room and actor
+spawn positions with the normal tools. Its terrain has no collision engine;
+reference RGB colors in the level editor do not represent editable NES palette
+data. Speeds are limited to 0 through 8; zero stops movement. Actor X positions
+stay within the playable horizontal area. Other system workshops remain available.
+
+Saved verified objects can show staged pixels in a full captured scene. This is
+a simulated composite of checked placements and captured colors, not an emulated
+frame. Other uses of the same tiles, transparency and priority still need testing.
+
+The compact offline guide puts procedures and illustrations together and pairs
+short topics. All Basic/Advanced procedures, glossary and index remain linked.
+
 WHAT WORKS / WHAT NEEDS A DEFINITION
 
 Ready to use in the full Windows edition:
@@ -174,7 +195,7 @@ engine to its two-button pad: A and B are buttons 1 and 2, and Start sends Pause
 
 GITHUB RELEASE PREPARATION
 
-Use the tag v1.0.0 for the public ROMancer v1.0 release. The numeric 1.0.36 build
+Use the tag v1.0.0 for the public ROMancer v1.0 release. The numeric 1.0.37 build
 identifier is internal installer/update identity. Lead the release description
 with ROMancer-v1.0-Setup.exe, then the portable Windows ZIP, offline guide and
 walkthrough. Provide the source, engine pack, component notices and SHA256SUMS.
@@ -199,7 +220,7 @@ unchecked if you
 skip it, need outside help, or cannot tell whether it worked. Note the step,
 expected result, observed result and any unclear label. These boxes are not
 claims that a human trial has already passed. Using the built-in guide and
-tutorials is allowed; record any need for another person to explain the controls.
+the illustrated guide is allowed; record any need for another person to explain the controls.
 
 [ ] Open the app and the NES workshop without manually configuring an engine.
 [ ] Find Graphics & fonts. Assemble one tile (1 across, 1 down), choose color
@@ -439,9 +460,8 @@ source/build selector to playtest it. Export a verified BPS patch to share.
 Downloaded BPS and IPS patches can also be applied to a separate build.
 BPS includes checksums. IPS requires an external original-source reference.
 
-Help -> Tutorials contains short Basic and Advanced lessons. Completed lessons
-receive a green check; skipped lessons do not. The first-launch tutorial prompt
-can be disabled and the tutorials can always be reopened from Help.
+Help opens the offline illustrated guide, topic search and concise tool references.
+The guide contains Basic and Advanced procedures, pictures, a glossary and index.
 
 WHAT IS SUPPORTED
 

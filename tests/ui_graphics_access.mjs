@@ -1,5 +1,7 @@
 import assert from 'node:assert/strict';
-import {graphicsAccessControls,graphicsAccessReport} from '../romancer/ui/graphics_access.js';
+import {graphicsAccessControls,graphicsAccessReport,domainLabel} from '../romancer/ui/graphics_access.js';
+assert.equal(domainLabel('nesChrRom'),'Pattern graphics in ROM');
+assert.equal(domainLabel('snesSpriteRam'),'Sprite placement memory');
 const actions={},calls=[],state={project:{project_id:'p'},artifact:{artifact_id:'a',sha256:'s',system_id:'nes'},results:{}};
 const ctx={state,draft:(_,v)=>v,setDraft:()=>{},render:async()=>{},use:r=>Object.assign(actions,r),sourceParams:()=>({project_id:'p',artifact_id:'a'}),api:{call:async(op,p)=>{calls.push([op,p]);return {ok:true,evidence_id:'e',artifact_id:'a',source_sha256:'s',events:[],memory_domains:[],total_events:201,offset:0,limit:100};}},run:async(op,p)=>{calls.push([op,p]);return ctx.api.call('get',p);}};
 const trace={trace_id:'t',matches:[{offset:4096,length:16}],replay:{status:'READY',frames:10}};

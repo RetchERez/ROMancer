@@ -13,7 +13,7 @@ DEFAULT_SETTINGS={'theme':'romancer','scale':100,'autoDeepScan':True,'autoGraphi
                   'rememberWorkspace':True,'volume':80,'startMuted':False,'loopPreview':False,
                   'reduceMotion':False,'advancedTools':False}
 _PAGES={'overview','gameview','resources','scripts','assets','tables','levels','sound','playtest','release',
-        'automation','help','settings','debug','routes','regression','tutorials'}
+        'automation','help','settings','debug','routes','regression'}
 _LOCATION_FIELDS={'version','project_id','artifact_id','sha256','page','offset','selected','scroll',
                   'assetPage','scriptPage','catalogPage','catalogQuery'}
 _locks={}
@@ -83,6 +83,8 @@ def save_settings(workspace,revision,values):
 def validate_location(value):
     if value is None:return None
     if type(value) is not dict or set(value)!=_LOCATION_FIELDS:raise ValueError('Workspace location contains missing or unknown metadata')
+    # Older versions could save the retired lesson page. Keep resume usable.
+    if value.get('page')=='tutorials':value={**value,'page':'help'}
     if type(value['version']) is not int or value['version']!=1:raise ValueError('Unknown workspace location version')
     for key,size in (('project_id',32),('artifact_id',32),('sha256',64)):
         if type(value[key]) is not str or not re.fullmatch('[0-9a-f]{'+str(size)+'}',value[key]):raise ValueError('Invalid workspace '+key)

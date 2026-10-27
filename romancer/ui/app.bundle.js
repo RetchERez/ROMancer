@@ -228,6 +228,7 @@
   // romancer/ui/workspace_resume.js
   function seedWorkspaceLocation(saved) {
     if (!saved) return;
+    if (saved.page === "tutorials") saved = { ...saved, page: "help" };
     writePreference("romancer-project", saved.project_id);
     writePreference("romancer-artifact:" + saved.project_id, saved.artifact_id);
     writePreference("romancer-location:" + saved.project_id + ":" + saved.artifact_id, JSON.stringify(saved));
@@ -265,7 +266,7 @@
       }
     }
   };
-  var pages = /* @__PURE__ */ new Set(["overview", "gameview", "resources", "scripts", "assets", "tables", "levels", "sound", "playtest", "release", "automation", "help", "settings", "debug", "routes", "regression", "tutorials"]);
+  var pages = /* @__PURE__ */ new Set(["overview", "gameview", "resources", "scripts", "assets", "tables", "levels", "sound", "playtest", "release", "automation", "help", "settings", "debug", "routes", "regression"]);
   var integer = (value, max) => Number.isSafeInteger(value) && value >= 0 && value <= max;
   var locationKey = (state2) => {
     var _a, _b;
@@ -1664,187 +1665,10 @@
     };
   }
 
-  // romancer/ui/tutorial.js
-  function renderHub(data) {
-    const lessons = (data == null ? void 0 : data.lessons) || [], progress = (data == null ? void 0 : data.progress) || {};
-    return `<p>Short, optional lessons. Checks mark finished lessons; skipped lessons stay unchecked.</p><div class="grid-even">${["Basic", "Advanced"].map((section) => `<section class="card"><h2>${section}</h2>${lessons.filter((l) => l.section === section).map((lesson) => {
-      const status = progress[lesson.id], done = status === "completed";
-      return `<div class="lesson-row"><span class="lesson-check ${done ? "complete" : ""}" aria-label="${done ? "Completed" : status === "skipped" ? "Skipped" : "Not started"}">${done ? "✓" : status === "skipped" ? "–" : "○"}</span><div class="resource-meta"><strong>${esc(lesson.title)}</strong><small>${lesson.steps.length} steps${status === "skipped" ? " · Skipped" : ""}</small></div>${button(done ? "Replay" : "Start", "tutorial-start", { id: lesson.id })}</div>`;
-    }).join("")}</section>`).join("")}</div>`;
-  }
-  function createTutorial(ctx2) {
-    const { state: state2 } = ctx2;
-    state2.tutorial = null;
-    let busy = false, revision = 0, lastHighlight = "";
-    const lesson = () => {
-      var _a;
-      return (_a = state2.tutorialData) == null ? void 0 : _a.lessons.find((l) => {
-        var _a2;
-        return l.id === ((_a2 = state2.tutorial) == null ? void 0 : _a2.lesson_id);
-      });
-    };
-    async function dismissPrompt(openHub2) {
-      var _a;
-      const checked = ((_a = document.getElementById("tutorial-never")) == null ? void 0 : _a.checked) === true;
-      try {
-        state2.tutorialData = await ctx2.api.call("tutorial.preferences", { never_ask_again: checked });
-      } finally {
-        ctx2.closeModal();
-      }
-      if (openHub2) await ctx2.navigate("tutorials");
-    }
-    async function init() {
-      var _a;
-      try {
-        state2.tutorialData = await ctx2.api.call("tutorial.get");
-        if (state2.tutorialData.prompt && !((_a = document.getElementById("modal")) == null ? void 0 : _a.open)) ctx2.modal("A quick tour?", `<p>Four short lessons. Start with Basic, or explore Advanced.</p><label class="tutorial-choice"><input type="checkbox" id="tutorial-never">Never ask again</label><div class="actions">${button("Start tutorial", "tutorial-accept", { primary: true })}${button("Not now", "tutorial-decline")}</div>`);
-      } catch {
-        ctx2.notify("Tutorials are unavailable right now. Your workspace is ready.");
-      }
-    }
-    async function start(id) {
-      var _a, _b, _c, _d;
-      if (busy) return;
-      if (state2.tutorial) throw Error("Finish or skip the current lesson first.");
-      const selected2 = (_a = state2.tutorialData) == null ? void 0 : _a.lessons.find((l) => l.id === id);
-      if (!selected2) throw Error("Choose a lesson from Tutorials.");
-      busy = true;
-      const request2 = ++revision, ticket = selectionTicket(state2), previous = ((_b = state2.project) == null ? void 0 : _b.project_id) || null, previousArtifact = ((_c = state2.artifact) == null ? void 0 : _c.artifact_id) || null;
-      try {
-        const practice = await ctx2.api.call("tutorial.practice");
-        if (request2 !== revision || !selectionCurrent(state2, ticket)) return;
-        await ctx2.openProject(practice.project_id);
-        if (request2 !== revision || ((_d = state2.project) == null ? void 0 : _d.project_id) !== practice.project_id) return;
-        state2.tutorial = { lesson_id: id, step: 0, visited: [0], practice: practice.project_id, previous, previousArtifact, minimized: false };
-        lastHighlight = "";
-        await ctx2.navigate(selected2.steps[0].page);
-      } finally {
-        busy = false;
-      }
-    }
-    async function move(direction) {
-      var _a;
-      const active = state2.tutorial, current2 = lesson();
-      if (!active || !current2 || busy) return;
-      if (((_a = state2.project) == null ? void 0 : _a.project_id) !== active.practice || state2.page !== current2.steps[active.step].page) return resume();
-      const next = active.step + direction;
-      if (next < 0 || next >= current2.steps.length) return;
-      active.step = next;
-      if (!active.visited.includes(next)) active.visited.push(next);
-      await ctx2.navigate(current2.steps[next].page);
-    }
-    async function end(outcome) {
-      var _a, _b, _c;
-      const active = state2.tutorial, current2 = lesson();
-      if (!active || !current2 || busy) return;
-      if (outcome === "completed" && (active.step !== current2.steps.length - 1 || active.visited.length !== current2.steps.length)) throw Error("Reach the last step before finishing this lesson.");
-      busy = true;
-      const request2 = revision, ticket = state2.selectionRevision;
-      try {
-        const result = await ctx2.api.call("tutorial.progress", { lesson_id: active.lesson_id, outcome });
-        if (request2 !== revision || state2.tutorial !== active) return;
-        state2.tutorialData = result;
-        state2.tutorial = null;
-        revision++;
-        if (!selectionCurrent(state2, ticket)) {
-          await ctx2.render();
-          return;
-        }
-        if (((_a = state2.project) == null ? void 0 : _a.project_id) === active.practice && active.previous && active.previous !== active.practice) {
-          const restore = ctx2.openProject(active.previous), restoreTicket = state2.selectionRevision;
-          await restore;
-          if (!selectionCurrent(state2, restoreTicket)) {
-            await ctx2.render();
-            return;
-          }
-          if (active.previousArtifact && ((_b = state2.artifact) == null ? void 0 : _b.artifact_id) !== active.previousArtifact) await ctx2.setArtifact(active.previousArtifact);
-          if (!selectionCurrent(state2, restoreTicket)) {
-            await ctx2.render();
-            return;
-          }
-        } else if (((_c = state2.project) == null ? void 0 : _c.project_id) === active.practice && !active.previous) {
-          await ctx2.closeProject();
-        }
-        await ctx2.navigate("tutorials");
-      } finally {
-        busy = false;
-      }
-    }
-    async function resume() {
-      var _a, _b;
-      const active = state2.tutorial, current2 = lesson();
-      if (!active || !current2 || busy) return;
-      if (((_a = state2.project) == null ? void 0 : _a.project_id) !== active.practice) await ctx2.openProject(active.practice);
-      if (state2.tutorial !== active || ((_b = state2.project) == null ? void 0 : _b.project_id) !== active.practice) return;
-      active.minimized = false;
-      await ctx2.navigate(current2.steps[active.step].page);
-    }
-    async function openHub() {
-      if (state2.tutorial) await end("skipped");
-      else await ctx2.navigate("tutorials");
-    }
-    function bind() {
-      ctx2.use({
-        "tutorial-hub": openHub,
-        "tutorial-accept": () => dismissPrompt(true),
-        "tutorial-decline": () => dismissPrompt(false),
-        "tutorial-start": (node) => start(node.dataset.id),
-        "tutorial-next": () => move(1),
-        "tutorial-back": () => move(-1),
-        "tutorial-finish": () => end("completed"),
-        "tutorial-skip": () => end("skipped"),
-        "tutorial-resume": resume,
-        "tutorial-toggle": async () => {
-          if (state2.tutorial) {
-            state2.tutorial.minimized = !state2.tutorial.minimized;
-            await ctx2.render();
-          }
-        }
-      });
-    }
-    function panel2() {
-      var _a;
-      const active = state2.tutorial, current2 = lesson();
-      if (!active || !current2 || active.minimized) return "";
-      const step = current2.steps[active.step], paused = ((_a = state2.project) == null ? void 0 : _a.project_id) !== active.practice || state2.page !== step.page;
-      return `<aside class="tutorial-panel" aria-label="Guided tutorial"><div class="card-heading"><strong>${esc(current2.title)}</strong>${button("Minimize", "tutorial-toggle")}</div><p class="subtle">Step ${active.step + 1} of ${current2.steps.length}</p><h2 id="tutorial-title" tabindex="-1">${esc(paused ? "Lesson paused" : step.title)}</h2><p>${esc(paused ? "Resume to return to the practice workshop." : step.body)}</p><div class="actions">${paused ? button("Resume lesson", "tutorial-resume", { primary: true }) : `${button("Back", "tutorial-back", { disabled: active.step === 0 })}${active.step === current2.steps.length - 1 ? button("Finish lesson", "tutorial-finish", { primary: true }) : button("Next", "tutorial-next", { primary: true })}`}${button("Skip lesson", "tutorial-skip")}</div></aside>`;
-    }
-    function mount13() {
-      var _a, _b;
-      const active = state2.tutorial, current2 = lesson();
-      document.documentElement.classList.toggle("tutorial-running", !!active && !active.minimized);
-      document.querySelectorAll(".tutorial-target").forEach((node) => node.classList.remove("tutorial-target"));
-      if (!active || !current2 || active.minimized || ((_a = state2.project) == null ? void 0 : _a.project_id) !== active.practice || state2.page !== current2.steps[active.step].page) return;
-      const step = current2.steps[active.step], target = document.querySelector(step.target) || document.querySelector("#main .page-heading");
-      if (target) {
-        const detail = target.closest("details");
-        if (detail) detail.open = true;
-        target.classList.add("tutorial-target");
-        const key3 = active.lesson_id + ":" + active.step;
-        if (key3 !== lastHighlight) {
-          lastHighlight = key3;
-          target.scrollIntoView({ block: "center" });
-          (_b = document.getElementById("tutorial-title")) == null ? void 0 : _b.focus({ preventScroll: true });
-        }
-      }
-    }
-    return { init, bind, panel: panel2, mount: mount13, dismissPrompt };
-  }
-
-  // romancer/ui/views/tutorials.js
-  var tutorials_exports = {};
-  __export(tutorials_exports, {
-    render: () => render
-  });
-  async function render(ctx2) {
-    ctx2.state.tutorialData = await ctx2.api.call("tutorial.get");
-    return heading("", "Tutorials", "") + renderHub(ctx2.state.tutorialData);
-  }
-
   // romancer/ui/views/automation.js
   var automation_exports = {};
   __export(automation_exports, {
-    render: () => render2
+    render: () => render
   });
   async function localJSON(id, max) {
     var _a;
@@ -1856,7 +1680,7 @@
       throw new Error("This file is not valid JSON.");
     }
   }
-  async function render2(ctx2) {
+  async function render(ctx2) {
     var _a, _b;
     const { state: state2 } = ctx2, missing = requireProject(ctx2);
     if (missing) return missing;
@@ -1908,7 +1732,7 @@
   var tables_exports = {};
   __export(tables_exports, {
     mount: () => mount,
-    render: () => render3
+    render: () => render2
   });
 
   // romancer/ui/build_checks.js
@@ -2462,7 +2286,7 @@
   function recordName(row) {
     return (row == null ? void 0 : row.label) !== void 0 ? row.label + " · ID 0x" + row.record_id.toString(16).toUpperCase().padStart(2, "0") : "Row " + row.index;
   }
-  async function render3(ctx2) {
+  async function render2(ctx2) {
     var _a, _b, _c, _d, _e, _f, _g, _h, _i, _j, _k, _l, _m;
     const setupReview = useResearchSetup(ctx2, "tables");
     if (setupReview) return setupReview;
@@ -2646,7 +2470,7 @@
   // romancer/ui/views/help.js
   var help_exports = {};
   __export(help_exports, {
-    render: () => render4
+    render: () => render3
   });
 
   // romancer/ui/popular_references.js
@@ -2694,7 +2518,7 @@
   }
 
   // romancer/ui/views/help.js
-  async function render4(ctx2) {
+  async function render3(ctx2) {
     const { state: state2 } = ctx2;
     const result = await ctx2.api.call("help.list", { query: state2.helpQuery || "", topic: state2.helpTopic || "start" });
     ctx2.use({
@@ -2710,7 +2534,7 @@
     });
     const selected2 = result.selected || result.topics[0];
     const references = await popularReferences(ctx2);
-    return `${heading("", "Help", "", '<a class="guide-link" href="/user-guide/index.html" target="_blank" rel="noopener noreferrer">User guide</a>' + button("Tutorials", "tutorial-hub", { primary: true }) + button("Keyboard shortcuts", "shortcut-help"))}${references}<div class="help-layout"><section class="card help-index">${field("help-query", "Search offline help", state2.helpQuery || "")}${button("Search help", "help-search", { primary: true })}<nav aria-label="Help topics">${result.topics.map((row) => button(row.title, "help-open", { id: row.id, class: row.id === (selected2 == null ? void 0 : selected2.id) ? "selected-help" : "" })).join("") || "<p>No matching topics. Try a shorter search.</p>"}</nav></section><article class="card help-article">${selected2 ? `<h2>${esc(selected2.title)}</h2><p>${esc(selected2.summary)}</p><ol>${selected2.steps.map((step) => `<li>${esc(step)}</li>`).join("")}</ol><div class="actions">${button("Open resources", "navigate", { id: "resources" })}${button("Playtest", "navigate", { id: "playtest" })}${button("Project settings", "navigate", { id: "settings" })}</div>` : "<h2>Choose a topic</h2><p>Help is included with ROMancer and works offline.</p>"}</article></div>`;
+    return `${heading("", "Help", "", '<a class="guide-link" href="/user-guide/index.html" target="_blank" rel="noopener noreferrer">User guide</a>' + button("Keyboard shortcuts", "shortcut-help"))}${references}<div class="help-layout"><section class="card help-index">${field("help-query", "Search offline help", state2.helpQuery || "")}${button("Search help", "help-search", { primary: true })}<nav aria-label="Help topics">${result.topics.map((row) => button(row.title, "help-open", { id: row.id, class: row.id === (selected2 == null ? void 0 : selected2.id) ? "selected-help" : "" })).join("") || "<p>No matching topics. Try a shorter search.</p>"}</nav></section><article class="card help-article">${selected2 ? `<h2>${esc(selected2.title)}</h2><p>${esc(selected2.summary)}</p><ol>${selected2.steps.map((step) => `<li>${esc(step)}</li>`).join("")}</ol><div class="actions">${button("Open resources", "navigate", { id: "resources" })}${button("Playtest", "navigate", { id: "playtest" })}${button("Project settings", "navigate", { id: "settings" })}</div>` : "<h2>Choose a topic</h2><p>Help is included with ROMancer and works offline.</p>"}</article></div>`;
   }
 
   // romancer/ui/api.js
@@ -2814,7 +2638,7 @@
   var overview_exports = {};
   __export(overview_exports, {
     mount: () => mount2,
-    render: () => render5
+    render: () => render4
   });
 
   // romancer/ui/overview_tasks.js
@@ -2829,7 +2653,32 @@
     ["release", "Export & patches", "Apply or export patches"]
   ];
   function overviewTasks() {
-    return `<section class="card"><div class="card-heading"><h3>Choose a task</h3></div><div class="overview-tasks">${OVERVIEW_TASKS.map(([id, label, note]) => `<div>${button(label, "navigate", { id, icon: id })}<p class="subtle">${esc(note)}</p></div>`).join("")}</div></section>`;
+    return `<section class="card"><div class="card-heading"><h3>Editing tools</h3></div><div class="overview-tasks">${OVERVIEW_TASKS.map(([id, label, note]) => `<div>${button(label, "navigate", { id, icon: id })}<p class="subtle">${esc(note)}</p></div>`).join("")}</div></section>`;
+  }
+
+  // romancer/ui/editing_readiness.js
+  var labels = { ready: "Ready to edit", needs_investigation: "Needs investigation", unsupported: "Unsupported definition" };
+  function readinessCards(model) {
+    return '<section class="card editing-readiness"><h3>This ROM: editing readiness</h3><div class="readiness-grid">' + model.areas.map((a) => "<div><strong>" + esc(a.title) + '</strong><p class="readiness-state ' + esc(a.status) + '">' + esc(labels[a.status]) + "</p><p>" + esc(a.reason) + "</p>" + button(a.action, "readiness-open", { id: a.kind }) + "</div>").join("") + '</div><p class="subtle">Ready means the saved layout passed inspection for this revision. Names and game behavior still need evidence.</p></section>';
+  }
+  async function editingReadiness(ctx2) {
+    const scope = selectionKey(ctx2.state), current2 = () => {
+      var _a;
+      return scope === selectionKey(ctx2.state) && ((_a = ctx2.isCurrentRender) == null ? void 0 : _a.call(ctx2)) !== false;
+    };
+    const model = await ctx2.api.call("editing.readiness", ctx2.sourceParams());
+    if (!current2()) return "";
+    ctx2.use({ "readiness-open": (node) => {
+      if (!current2()) throw Error("The selected ROM changed.");
+      const area2 = model.areas.find((a) => a.kind === node.dataset.id);
+      if (!area2) throw Error("Refresh editing readiness.");
+      if (area2.status === "ready" || area2.status === "unsupported") {
+        ctx2.state.researchOpen = { scope, kind: area2.kind };
+        return ctx2.navigate(area2.page);
+      }
+      return ctx2.navigate(area2.kind === "assets" ? "playtest" : "debug");
+    } });
+    return readinessCards(model);
   }
 
   // romancer/ui/source_support.js
@@ -3317,19 +3166,20 @@
   function resource(a) {
     return `<div class="resource-row"><span class="resource-icon">${icon(a.kind === "build" ? "check" : "resources")}</span><div class="resource-meta"><strong>${esc(a.name)}</strong><small>${esc(a.system)} · ${size(a.size)} · <span class="mono">${short(a.sha256)}</span></small></div>${button("Inspect", "overview-inspect", { id: a.artifact_id, icon: "chevron" })}</div>`;
   }
-  async function render5(ctx2) {
+  async function render4(ctx2) {
     const { state: state2 } = ctx2, p = state2.project;
     ctx2.use({ "overview-inspect": async (node) => {
       await ctx2.setArtifact(node.dataset.id);
       await ctx2.navigate("resources");
     } });
-    if (!p) return `<div class="welcome">${heading("", "Overview", "")}<section class="hero"><div class="hero-copy"><h2>Open a project.</h2><p>Edit text and graphics, playtest, and export patches.</p><div class="actions">${button("Import ROM", "import", { primary: true, icon: "plus" })}${[["nes", "NES"], ["snes", "SNES"], ["genesis", "GEN"], ["gb", "Game Boy"], ["gbc", "Game Boy Color"], ["gba", "GBA"]].map(([id, label]) => button(label + " workshop", "demo-system", { id, icon: "assets" })).join("")}</div></div><div class="hero-art">${ship}</div></section><div class="welcome-grid"><section class="card"><h3>Continue a project</h3><div class="project-list">${state2.projects.length ? state2.projects.slice(0, 8).map((p2) => `<div class="resource-row"><span class="resource-icon">${icon("folder")}</span><div class="resource-meta"><strong>${esc(p2.name)}</strong><small>${p2.sources.length} source${p2.sources.length === 1 ? "" : "s"} · ${p2.builds.length} build${p2.builds.length === 1 ? "" : "s"}</small></div>${button("Open", "open-project", { id: p2.project_id })}</div>`).join("") : empty("A fresh workspace", "Your projects will appear here after your first import.")}</div></section><section class="card"><h3>Quick start</h3>${steps()}</section></div></div>`;
+    if (!p) return `<div class="welcome">${heading("", "Overview", "")}<section class="hero"><div class="hero-copy"><h2>Open a project.</h2><p>Edit text and graphics, playtest, and export patches.</p><div class="actions">${button("Import ROM", "import", { primary: true, icon: "plus" })}${button("Try the editing studio", "demo-studio", { icon: "playtest" })}${[["nes", "NES"], ["snes", "SNES"], ["genesis", "GEN"], ["gb", "Game Boy"], ["gbc", "Game Boy Color"], ["gba", "GBA"]].map(([id, label]) => button(label + " workshop", "demo-system", { id, icon: "assets" })).join("")}</div></div><div class="hero-art">${ship}</div></section><div class="welcome-grid"><section class="card"><h3>Continue a project</h3><div class="project-list">${state2.projects.length ? state2.projects.slice(0, 8).map((p2) => `<div class="resource-row"><span class="resource-icon">${icon("folder")}</span><div class="resource-meta"><strong>${esc(p2.name)}</strong><small>${p2.sources.length} source${p2.sources.length === 1 ? "" : "s"} · ${p2.builds.length} build${p2.builds.length === 1 ? "" : "s"}</small></div>${button("Open", "open-project", { id: p2.project_id })}</div>`).join("") : empty("A fresh workspace", "Your projects will appear here after your first import.")}</div></section><section class="card"><h3>Quick start</h3>${steps()}</section></div></div>`;
     const timeline = await ctx2.api.call("builds.timeline", { project_id: p.project_id });
     const progress = await ctx2.api.call("project.readiness", { project_id: p.project_id });
     const reports = (await ctx2.api.call("reports.list", { project_id: p.project_id })).reports;
     const exports = (await ctx2.api.call("exports.list", { project_id: p.project_id })).exports;
     const gameEditing = await gameEdits(ctx2);
-    return `${heading("Workspace overview", "Overview", p.demo ? "An original, redistributable fixture. Explore the real editing and release workflows." : "Your sources, builds, and recorded evidence in one place.", button("Import source", "import", { icon: "plus" }))}${sourceSupport(ctx2)}${overviewTasks()}${gameEditing}${scanControls(ctx2)}<details class="card task-checklist"><summary>Project checklist</summary>${p.demo ? badge("Practice ROM") : ""}<div class="actions">${progress.steps.map((step) => button((step.complete ? "✓ " : "") + step.title, "navigate", { id: step.page })).join("")}</div></details><div class="stats">${stat("Sources", p.sources.length, "Owned copies; originals preserved", "resources")}${stat("Builds", p.builds.length, "Content identities stored in history", "check")}${stat("Test records", reports.length, "Measured scope shown per report", "shield")}${stat("Exports", exports.length, "Selected documentation and patches", "release")}</div><section class="card"><div class="card-heading"><h3>Files</h3><span class="subtle">${p.sources.length + p.builds.length} ${p.sources.length + p.builds.length === 1 ? "item" : "items"}</span></div>${[...p.sources, ...p.builds].slice(-6).map(resource).join("") || empty("Import your first source", "Add a game file or a resource extracted from your own project.", button("Import source", "import", { primary: true }))}</section>${buildHistory(ctx2, timeline)}${projectChecks(ctx2)}`;
+    const ready = state2.artifact ? await editingReadiness(ctx2) : "";
+    return `${heading("Workspace overview", "Overview", p.demo ? "An original, redistributable fixture. Explore the real editing and release workflows." : "Your sources, builds, and recorded evidence in one place.", button("Import source", "import", { icon: "plus" }))}${sourceSupport(ctx2)}${ready}${overviewTasks()}${gameEditing}${scanControls(ctx2)}<details class="card task-checklist"><summary>Project checklist</summary>${p.demo ? badge("Practice ROM") : ""}<div class="actions">${progress.steps.map((step) => button((step.complete ? "✓ " : "") + step.title, "navigate", { id: step.page })).join("")}</div></details><div class="stats">${stat("Sources", p.sources.length, "Owned copies; originals preserved", "resources")}${stat("Builds", p.builds.length, "Content identities stored in history", "check")}${stat("Test records", reports.length, "Measured scope shown per report", "shield")}${stat("Exports", exports.length, "Selected documentation and patches", "release")}</div><section class="card"><div class="card-heading"><h3>Files</h3><span class="subtle">${p.sources.length + p.builds.length} ${p.sources.length + p.builds.length === 1 ? "item" : "items"}</span></div>${[...p.sources, ...p.builds].slice(-6).map(resource).join("") || empty("Import your first source", "Add a game file or a resource extracted from your own project.", button("Import source", "import", { primary: true }))}</section>${buildHistory(ctx2, timeline)}${projectChecks(ctx2)}`;
   }
   function stat(title, value, note, ico) {
     return `<div class="stat"><div class="stat-top"><span>${title}</span>${icon(ico)}</div><strong>${value}</strong></div>`;
@@ -3347,7 +3197,7 @@
     mount: () => mount3,
     openTraceCandidate: () => openTraceCandidate,
     openVerifiedSource: () => openVerifiedSource,
-    render: () => render6
+    render: () => render5
   });
 
   // romancer/ui/pixel_history.js
@@ -3967,7 +3817,7 @@ ${font ? `<section class="card"><h3>Font metrics · ${esc(font.id)}</h3><div cla
     return ctx2.navigate("assets");
   }
   async function objectWorkbench(ctx2, doc, bitmap) {
-    var _a, _b, _c, _d, _e, _f, _g;
+    var _a, _b, _c, _d, _e, _f, _g, _h;
     const { state: state2 } = ctx2, scope = selectionKey(state2), current2 = () => {
       var _a2;
       return scope === selectionKey(state2) && ((_a2 = ctx2.isCurrentRender) == null ? void 0 : _a2.call(ctx2)) !== false;
@@ -3990,6 +3840,18 @@ ${font ? `<section class="card"><h3>Font metrics · ${esc(font.id)}</h3><div cla
     }
     if (!current2()) return "";
     const obj = (_f = entry == null ? void 0 : entry.result) == null ? void 0 : _f.object, layout = obj == null ? void 0 : obj.definition.layout;
+    if (obj && ((_g = entry.trace) == null ? void 0 : _g.scene) && entry.result.source_dependency_verified && bitmap) {
+      try {
+        const edits = [...new Set(layout.indices.filter((i) => i !== null))].map((index) => ({ cell_index: index, pixels: pixelBuffer(ctx2, doc, bitmap, index) })).filter((edit) => JSON.stringify(edit.pixels) !== JSON.stringify(bitmap.cells[edit.cell_index].pixels));
+        entry.preview = await ctx2.api.call("objects.scene", { ...ctx2.sourceParams(), object_id: entry.object_id, edits });
+        if (!current2()) return "";
+        if (entry.preview.ok === false) throw Error(entry.preview.error);
+        entry.previewError = null;
+      } catch (error) {
+        entry.preview = null;
+        entry.previewError = error.message;
+      }
+    }
     ctx2.use({
       "object-open": (node) => {
         var _a2, _b2;
@@ -4018,6 +3880,7 @@ ${font ? `<section class="card"><h3>Font metrics · ${esc(font.id)}</h3><div cla
         return ctx2.render();
       }
     });
+    const scene = (entry == null ? void 0 : entry.preview) ? '<details class="scene-composite"><summary>Full-scene preview · ' + entry.preview.changed_pixels + ' pixels changed · simulated</summary><div class="scene-pair"><figure><figcaption>Captured frame</figcaption><img src="data:image/png;base64,' + esc(entry.preview.original_png_base64) + '" alt="Full captured scene"></figure><figure><figcaption>Staged composite · test the build for real gameplay</figcaption><canvas id="object-scene-full" data-preview="' + esc(entry.preview.preview_png_base64) + '" aria-label="Simulated full-scene preview"></canvas></figure></div><p class="subtle">Saved placements only; other uses may change. Captured colors do not establish palette ownership. Background behind transparency, priority and animation need playtesting.</p></details>' : obj ? '<p class="subtle">' + esc((entry == null ? void 0 : entry.previewError) || "Capture a new full-scene trace to preview this object in context.") + "</p>" : "";
     const saved = listing.objects.length ? select("object-choice", "Saved object", listing.objects.map((o) => [o.object_id, o.name + " · " + o.columns + " × " + o.rows + " tiles"]), (entry == null ? void 0 : entry.object_id) || listing.objects[0].object_id) + button("Open object", "object-open") : "<p>Save verified parts as an object from a captured trace in Playtest.</p>";
     if (!obj) return '<section class="card object-workbench"><h3>Saved objects</h3>' + saved + "</section>";
     const uses = /* @__PURE__ */ new Map();
@@ -4027,9 +3890,26 @@ ${font ? `<section class="card"><h3>Font metrics · ${esc(font.id)}</h3><div cla
         uses.get(index).push(place);
       }
     });
-    return '<section class="card object-workbench"><div class="card-heading"><h3>' + esc(obj.name) + "</h3>" + button("Remove layout", "object-delete", { id: entry.object_id }) + "</div><details><summary>Saved objects</summary>" + saved + '</details><div class="object-scene-source"><figure><figcaption>Captured scene · select a source tile to highlight its uses</figcaption>' + (((_g = entry.trace) == null ? void 0 : _g.crop_png_base64) ? '<canvas id="object-scene" aria-label="Captured scene with selected tile uses" data-scene="' + esc(entry.trace.crop_png_base64) + '"></canvas>' : "<p>" + esc(entry.sceneIssue || "This imported layout has no local captured scene.") + "</p>") + '</figure><div><h4>Source tiles & uses</h4><div class="actions">' + [...uses].map(([index, places]) => button("Tile " + index + " · " + places.length + " use" + (places.length === 1 ? "" : "s"), "object-source", { id: String(index), primary: entry.selected === index })).join("") + "</div>" + [...uses].filter(([, p]) => p.length > 1).map(([i, p]) => '<p class="subtle">Shared tile ' + i + " updates " + p.length + " placements together.</p>").join("") + '<p class="subtle">' + (entry.result.source_dependency_verified ? "Source origins verified for the captured placements." : "Saved declaration; imported or historical proof is not fresh execution evidence.") + " " + (obj.definition.complete_parts ? "" : "Some source pixels remain unresolved. ") + "An object name is your label.</p></div></div></section>";
+    return '<section class="card object-workbench"><div class="card-heading"><h3>' + esc(obj.name) + "</h3>" + button("Remove layout", "object-delete", { id: entry.object_id }) + "</div><details><summary>Saved objects</summary>" + saved + '</details><div class="object-scene-source"><figure><figcaption>Captured scene · select a source tile to highlight its uses</figcaption>' + (((_h = entry.trace) == null ? void 0 : _h.crop_png_base64) ? '<canvas id="object-scene" aria-label="Captured scene with selected tile uses" data-scene="' + esc(entry.trace.crop_png_base64) + '"></canvas>' : "<p>" + esc(entry.sceneIssue || "This imported layout has no local captured scene.") + "</p>") + '</figure><div><h4>Source tiles & uses</h4><div class="actions">' + [...uses].map(([index, places]) => button("Tile " + index + " · " + places.length + " use" + (places.length === 1 ? "" : "s"), "object-source", { id: String(index), primary: entry.selected === index })).join("") + "</div>" + [...uses].filter(([, p]) => p.length > 1).map(([i, p]) => '<p class="subtle">Shared tile ' + i + " updates " + p.length + " placements together.</p>").join("") + '<p class="subtle">' + (entry.result.source_dependency_verified ? "Source origins verified for the captured placements." : "Saved declaration; imported or historical proof is not fresh execution evidence.") + " " + (obj.definition.complete_parts ? "" : "Some source pixels remain unresolved. ") + "An object name is your label.</p></div></div>" + scene + "</section>";
   }
   function mountObjectWorkbench(ctx2) {
+    var _a;
+    const full = document.getElementById("object-scene-full"), model = (_a = ctx2.state.objectWorkbench) == null ? void 0 : _a.preview;
+    if (full && model) {
+      const scope2 = selectionKey(ctx2.state), img = new Image();
+      img.onload = () => {
+        if (!full.isConnected || scope2 !== selectionKey(ctx2.state)) return;
+        full.width = img.naturalWidth;
+        full.height = img.naturalHeight;
+        const draw2 = full.getContext("2d");
+        draw2.drawImage(img, 0, 0);
+        const r = model.scene_region;
+        draw2.strokeStyle = "#ffd36a";
+        draw2.lineWidth = 1;
+        draw2.strokeRect(r.x - 0.5, r.y - 0.5, r.width + 1, r.height + 1);
+      };
+      img.src = "data:image/png;base64," + full.dataset.preview;
+    }
     const canvas = document.getElementById("object-scene"), entry = ctx2.state.objectWorkbench;
     if (!canvas || !(entry == null ? void 0 : entry.trace)) return;
     const scope = selectionKey(ctx2.state), image = new Image();
@@ -4053,7 +3933,7 @@ ${font ? `<section class="card"><h3>Font metrics · ${esc(font.id)}</h3><div cla
   var categories2 = ["all", "known", "known_resource", "assets", "script", "tables", "record", "levels", "room", "actor", "sound", "note", "trace", "candidate", "verification", "verified_source", "object", "graphics_capture"];
   var names3 = { object: "Saved objects", graphics_capture: "Native graphics captures", verification: "Source checks", verified_source: "Verified sources", known: "Known locations", known_resource: "Known editing layouts", assets: "Graphics", script: "Text", tables: "Tables", record: "Named records", levels: "Levels", room: "Rooms", actor: "Objects & actors", sound: "Sound", note: "Research", trace: "Gameplay traces", candidate: "Pixel matches", all: "Everything" };
   var relation = (r) => ({ uses_verified_part: "Uses verified part", replayed_graphics_accesses: "Native replay accesses", source_verification: "Source verification", verified_visual_source: "Verified visual source", contains_record: "Contains record", uses_tiles: "Uses tiles", uses_palette: "Uses palette", shares_storage: "Shares byte storage", pixel_match: "Pixel match", located_in: "Located in", contains_object: "Contains object", uses_terrain: "Uses terrain", uses_graphics: "Uses graphics", uses_script: "Uses script", uses_sound: "Uses sound", uses_table: "Uses table" })[r] || r.replaceAll("_", " ");
-  async function render6(ctx2) {
+  async function render5(ctx2) {
     var _a, _b, _c, _d;
     const missing = requireProject(ctx2);
     if (missing) return missing;
@@ -4199,7 +4079,7 @@ ${font ? `<section class="card"><h3>Font metrics · ${esc(font.id)}</h3><div cla
   var resources_exports = {};
   __export(resources_exports, {
     mount: () => mount4,
-    render: () => render7
+    render: () => render6
   });
 
   // romancer/ui/source_symbols.js
@@ -5076,7 +4956,7 @@ ${font ? `<section class="card"><h3>Font metrics · ${esc(font.id)}</h3><div cla
   }
 
   // romancer/ui/views/resources.js
-  async function render7(ctx2) {
+  async function render6(ctx2) {
     var _a, _b, _c, _d, _e, _f;
     const { state: state2 } = ctx2, missing = requireProject(ctx2);
     if (missing) return missing;
@@ -5220,7 +5100,7 @@ ${font ? `<section class="card"><h3>Font metrics · ${esc(font.id)}</h3><div cla
   var scripts_exports = {};
   __export(scripts_exports, {
     mount: () => mount5,
-    render: () => render8
+    render: () => render7
   });
 
   // romancer/ui/menu_preview.js
@@ -5588,7 +5468,7 @@ ${font ? `<section class="card"><h3>Font metrics · ${esc(font.id)}</h3><div cla
   }
 
   // romancer/ui/views/scripts.js
-  async function render8(ctx2) {
+  async function render7(ctx2) {
     var _a, _b, _c, _d, _e, _f, _g, _h, _i;
     const setupReview = useResearchSetup(ctx2, "script");
     if (setupReview) return setupReview;
@@ -5726,7 +5606,7 @@ ${font ? `<section class="card"><h3>Font metrics · ${esc(font.id)}</h3><div cla
     literalColorCount: () => literalColorCount,
     literalRGB: () => literalRGB,
     mount: () => mount6,
-    render: () => render9
+    render: () => render8
   });
 
   // romancer/ui/palette_editor.js
@@ -6239,7 +6119,7 @@ ${font ? `<section class="card"><h3>Font metrics · ${esc(font.id)}</h3><div cla
     const shade = Math.round(18 + value / Math.max(1, count - 1) * 216);
     return { r: shade, g: shade, b: shade };
   }
-  async function render9(ctx2) {
+  async function render8(ctx2) {
     var _a, _b, _c, _d, _e, _f, _g, _h, _i, _j, _k, _l, _m, _n, _o, _p;
     const setupReview = useResearchSetup(ctx2, "assets");
     if (setupReview) return setupReview;
@@ -6439,11 +6319,14 @@ ${font ? `<section class="card"><h3>Font metrics · ${esc(font.id)}</h3><div cla
   var playtest_exports = {};
   __export(playtest_exports, {
     mount: () => mount7,
-    render: () => render10
+    render: () => render9
   });
 
   // romancer/ui/graphics_access.js
   var codecs = { nes: "tile8-planar2-msb-v1", snes: "tile8-paired4-msb-v1", sms: "tile8-rowplanar4-msb-v1", gb: "tile8-paired2-msb-v1", gbc: "tile8-paired2-msb-v1", gba: "tile8-packed4-low-v1", genesis: "tile8-packed4-high-v1" };
+  function domainLabel(name) {
+    return { nesChrRom: "Pattern graphics in ROM", nesChrRam: "Pattern graphics memory", nesPpuMemory: "Pattern and background memory", nesSpriteRam: "Sprite placement memory", nesPaletteRam: "Palette memory", nesNametableRam: "Background tile map", snesPrgRom: "Program and graphics in ROM", snesVideoRam: "Tile and background memory", snesSpriteRam: "Sprite placement memory", snesCgRam: "Palette memory", gbPrgRom: "Program and graphics in ROM", gbVideoRam: "Tile and background memory", gbSpriteRam: "Sprite placement memory", gbBgPaletteRam: "Background palette memory", gbObjPaletteRam: "Sprite palette memory", gbaPrgRom: "Program and graphics in ROM", gbaVideoRam: "Tile and background memory", gbaSpriteRam: "Sprite placement memory", gbaPaletteRam: "Palette memory", smsPrgRom: "Program and graphics in ROM", smsVideoRam: "Tile and background memory", smsPaletteRam: "Palette memory", genesisVideoRam: "Tile and background memory", genesisColorRam: "Palette memory", genesisVScrollRam: "Vertical scroll memory", genesisWorkRam: "Working RAM", cpu: "CPU bus" }[name] || "Recorded memory";
+  }
   var hex4 = (v) => Number.isSafeInteger(v) ? "0x" + v.toString(16) : "Not recorded";
   function graphicsAccessControls(ctx2, trace) {
     var _a, _b, _c, _d, _e;
@@ -6478,10 +6361,10 @@ ${font ? `<section class="card"><h3>Font metrics · ${esc(font.id)}</h3><div cla
         return ctx2.render();
       }
     });
-    return '<details class="card" id="graphics-accesses" ' + (result ? "open" : "") + '><summary>Native graphics accesses & video memory</summary><p>Replay this saved route in the native observer. Record ROM reads, video-memory writes, registers and the final scene.</p><div class="field-row">' + field("graphics-access-offset", "ROM span start", ctx2.draft("graphics-access-offset", String(((_b = (_a = trace == null ? void 0 : trace.matches) == null ? void 0 : _a[0]) == null ? void 0 : _b.offset) || 0))) + field("graphics-access-length", "ROM bytes to observe", ctx2.draft("graphics-access-length", String(((_d = (_c = trace == null ? void 0 : trace.matches) == null ? void 0 : _c[0]) == null ? void 0 : _d.length) || 32))) + field("graphics-access-start", "First frame to record", ctx2.draft("graphics-access-start", "0")) + "</div>" + button("Record native accesses", "graphics-access-capture", { primary: true, disabled: ((_e = trace == null ? void 0 : trace.replay) == null ? void 0 : _e.status) !== "READY" || state2.playing, reason: "Save a cold-start trace of up to 3600 frames and 64 input steps first." }) + "<details><summary>Open saved capture by ID</summary>" + field("graphics-access-id", "Capture ID", ctx2.draft("graphics-access-id", "")) + button("Open saved capture", "graphics-access-open") + "</details>" + (result ? graphicsAccessReport(result) + '<div class="actions">' + button("Previous events", "graphics-access-page", { id: "-1", disabled: !result.offset }) + button("Next events", "graphics-access-page", { id: "1", disabled: result.offset + result.limit >= result.total_events }) + "</div>" + (result.memory_domains.length ? '<details open><summary>Inspect recorded video memory</summary><div class="field-row">' + select("graphics-memory-domain", "Memory domain", result.memory_domains.map((d) => [d.name, d.name + " · " + d.size + " bytes"]), ctx2.draft("graphics-memory-domain", result.memory_domains[0].name)) + field("graphics-memory-offset", "Memory offset", ctx2.draft("graphics-memory-offset", "0")) + select("graphics-memory-codec", "Tile interpretation", [[codecs[state2.artifact.system_id], codecs[state2.artifact.system_id]], ...state2.artifact.system_id === "snes" ? [["tile8-paired2-msb-v1", "SNES 2bpp"]] : []], ctx2.draft("graphics-memory-codec", codecs[state2.artifact.system_id])) + "</div>" + button("Preview 32 recorded tiles", "graphics-access-tiles") + '<p class="subtle">Choose pattern/video memory, not OAM or palette memory. Grayscale shows stored indices; this view does not identify a ROM source.</p>' + (entry.tiles ? '<canvas id="graphics-memory-tiles" aria-label="Recorded video-memory tile indices"></canvas><p>' + hex4(entry.tiles.offset) + " · " + entry.tiles.cells.length + " tiles · end of capture</p>" : "") + "</details>" : "") : "") + "</details>";
+    return '<details class="card" id="graphics-accesses" ' + (result ? "open" : "") + '><summary>Native graphics accesses & video memory</summary><p>Replay this saved route in the native observer. Record ROM reads, video-memory writes, registers and the final scene.</p><div class="field-row">' + field("graphics-access-offset", "ROM span start", ctx2.draft("graphics-access-offset", String(((_b = (_a = trace == null ? void 0 : trace.matches) == null ? void 0 : _a[0]) == null ? void 0 : _b.offset) || 0))) + field("graphics-access-length", "ROM bytes to observe", ctx2.draft("graphics-access-length", String(((_d = (_c = trace == null ? void 0 : trace.matches) == null ? void 0 : _c[0]) == null ? void 0 : _d.length) || 32))) + field("graphics-access-start", "First frame to record", ctx2.draft("graphics-access-start", "0")) + "</div>" + button("Record native accesses", "graphics-access-capture", { primary: true, disabled: ((_e = trace == null ? void 0 : trace.replay) == null ? void 0 : _e.status) !== "READY" || state2.playing, reason: "Save a cold-start trace of up to 3600 frames and 64 input steps first." }) + "<details><summary>Open saved capture by ID</summary>" + field("graphics-access-id", "Capture ID", ctx2.draft("graphics-access-id", "")) + button("Open saved capture", "graphics-access-open") + "</details>" + (result ? graphicsAccessReport(result) + '<div class="actions">' + button("Previous events", "graphics-access-page", { id: "-1", disabled: !result.offset }) + button("Next events", "graphics-access-page", { id: "1", disabled: result.offset + result.limit >= result.total_events }) + "</div>" + (result.memory_domains.length ? '<details open><summary>Inspect recorded video memory</summary><div class="field-row">' + select("graphics-memory-domain", "Memory domain", result.memory_domains.map((d) => [d.name, domainLabel(d.name) + " · " + d.size + " bytes"]), ctx2.draft("graphics-memory-domain", result.memory_domains[0].name)) + field("graphics-memory-offset", "Memory offset", ctx2.draft("graphics-memory-offset", "0")) + select("graphics-memory-codec", "Tile interpretation", [[codecs[state2.artifact.system_id], codecs[state2.artifact.system_id]], ...state2.artifact.system_id === "snes" ? [["tile8-paired2-msb-v1", "SNES 2bpp"]] : []], ctx2.draft("graphics-memory-codec", codecs[state2.artifact.system_id])) + "</div>" + button("Preview 32 recorded tiles", "graphics-access-tiles") + '<p class="subtle">Choose pattern/video memory, not OAM or palette memory. Grayscale shows stored indices; this view does not identify a ROM source.</p>' + (entry.tiles ? '<canvas id="graphics-memory-tiles" aria-label="Recorded video-memory tile indices"></canvas><p>' + hex4(entry.tiles.offset) + " · " + entry.tiles.cells.length + " tiles · end of capture</p>" : "") + "</details>" : "") : "") + "</details>";
   }
   function graphicsAccessReport(r) {
-    return '<section class="notice"><h4>Recorded access trail</h4>' + (r.scene ? '<figure><img class="game-resource-preview" src="data:image/png;base64,' + esc(r.scene.png_base64) + '" alt="Native observer end-of-capture scene"><figcaption>Separate native replay · final scene</figcaption></figure>' : "") + "<p>" + r.total_events + " stored events · showing " + r.offset + "–" + Math.min(r.offset + r.limit, r.total_events) + ". " + (r.omitted_events ? r.omitted_events + " events omitted at the capture budget." : "") + "</p>" + (r.runtime_trusted === false ? '<p class="notice warm">Historical imported capture. Record a fresh replay for current execution evidence.</p>' : "") + '<div class="table-wrap"><table><thead><tr><th>Kind</th><th>Domain / address</th><th>ROM offset</th><th>Value</th><th>Native operation</th></tr></thead><tbody>' + (r.events || []).map((e) => "<tr><td>" + esc(e.kind) + "</td><td>" + esc(e.domain || "CPU bus") + " " + hex4(e.physical_offset ?? e.address) + "</td><td>" + hex4(e.file_offset) + "</td><td>" + hex4(e.value) + "</td><td>" + esc(e.operation_kind || e.actor || "Not recorded") + "</td></tr>").join("") + "</tbody></table></div><p>Adjacent reads and writes do not establish dataflow. CPU context may precede the access. Use source verification to test literal ROM-to-picture dependencies.</p><details><summary>Captured register state</summary><pre>" + esc(JSON.stringify(r.graphics_state || {}, null, 2)) + "</pre></details></section>";
+    return '<section class="notice"><h4>Recorded access trail</h4>' + (r.scene ? '<figure><img class="game-resource-preview" src="data:image/png;base64,' + esc(r.scene.png_base64) + '" alt="Native observer end-of-capture scene"><figcaption>Separate native replay · final scene</figcaption></figure>' : "") + "<p>" + r.total_events + " stored events · showing " + r.offset + "–" + Math.min(r.offset + r.limit, r.total_events) + ". " + (r.omitted_events ? r.omitted_events + " events omitted at the capture budget." : "") + "</p>" + (r.runtime_trusted === false ? '<p class="notice warm">Historical imported capture. Record a fresh replay for current execution evidence.</p>' : "") + '<div class="table-wrap"><table><thead><tr><th>Kind</th><th>Domain / address</th><th>ROM offset</th><th>Value</th><th>Native operation</th></tr></thead><tbody>' + (r.events || []).map((e) => "<tr><td>" + esc(e.kind) + "</td><td>" + esc(domainLabel(e.domain || "cpu")) + " " + hex4(e.physical_offset ?? e.address) + "</td><td>" + hex4(e.file_offset) + "</td><td>" + hex4(e.value) + "</td><td>" + esc(e.operation_kind || e.actor || "Not recorded") + "</td></tr>").join("") + "</tbody></table></div><p>Adjacent reads and writes do not establish dataflow. CPU context may precede the access. Use source verification to test literal ROM-to-picture dependencies.</p><details><summary>Technical names & register state</summary><pre>" + esc(JSON.stringify({ domains: [...new Set((r.events || []).map((e) => e.domain))], registers: r.graphics_state || {} }, null, 2)) + "</pre></details></section>";
   }
   function mountGraphicsAccess(ctx2) {
     const entry = ctx2.state.graphicsAccess, canvas = document.getElementById("graphics-memory-tiles");
@@ -6903,7 +6786,7 @@ ${font ? `<section class="card"><h3>Font metrics · ${esc(font.id)}</h3><div cla
   };
 
   // romancer/ui/views/playtest.js
-  async function render10(ctx2) {
+  async function render9(ctx2) {
     var _a, _b, _c, _d, _e, _f, _g, _h, _i, _j, _k, _l, _m, _n, _o, _p, _q, _r, _s, _t, _u, _v, _w, _x, _y;
     const { state: state2 } = ctx2;
     state2.liveMuted ??= getSettings().startMuted;
@@ -7143,7 +7026,7 @@ ${font ? `<section class="card"><h3>Font metrics · ${esc(font.id)}</h3><div cla
   var debug_exports = {};
   __export(debug_exports, {
     mount: () => mount8,
-    render: () => render11
+    render: () => render10
   });
 
   // romancer/ui/structural_lab.js
@@ -7451,7 +7334,7 @@ ${font ? `<section class="card"><h3>Font metrics · ${esc(font.id)}</h3><div cla
   }
 
   // romancer/ui/views/debug.js
-  async function render11(ctx2) {
+  async function render10(ctx2) {
     var _a, _b;
     const { state: state2 } = ctx2, missing = requireProject(ctx2);
     if (missing) return missing;
@@ -7520,7 +7403,7 @@ ${font ? `<section class="card"><h3>Font metrics · ${esc(font.id)}</h3><div cla
   // romancer/ui/views/routes.js
   var routes_exports = {};
   __export(routes_exports, {
-    render: () => render12
+    render: () => render11
   });
 
   // romancer/ui/route_controls.js
@@ -7621,7 +7504,7 @@ ${font ? `<section class="card"><h3>Font metrics · ${esc(font.id)}</h3><div cla
 
   // romancer/ui/views/routes.js
   var exampleRoute = { schema_version: 1, id: "my-route", max_frames: 600, max_actions: 10, steps: [{ frames: 60, buttons: [], port: 0, assertions: [], transition: null, checkpoint: false }] };
-  async function render12(ctx2) {
+  async function render11(ctx2) {
     var _a;
     const { state: state2 } = ctx2, missing = requireProject(ctx2);
     if (missing) return missing;
@@ -7644,9 +7527,9 @@ ${font ? `<section class="card"><h3>Font metrics · ${esc(font.id)}</h3><div cla
   // romancer/ui/views/regression.js
   var regression_exports = {};
   __export(regression_exports, {
-    render: () => render13
+    render: () => render12
   });
-  async function render13(ctx2) {
+  async function render12(ctx2) {
     var _a, _b, _c, _d, _e, _f, _g;
     const { state: state2 } = ctx2, missing = requireProject(ctx2);
     if (missing) return missing;
@@ -7684,7 +7567,7 @@ ${font ? `<section class="card"><h3>Font metrics · ${esc(font.id)}</h3><div cla
   var release_exports = {};
   __export(release_exports, {
     mount: () => mount9,
-    render: () => render14
+    render: () => render13
   });
 
   // romancer/ui/patch_controls.js
@@ -7768,7 +7651,7 @@ ${font ? `<section class="card"><h3>Font metrics · ${esc(font.id)}</h3><div cla
   }
 
   // romancer/ui/views/release.js
-  async function render14(ctx2) {
+  async function render13(ctx2) {
     var _a, _b;
     const { state: state2 } = ctx2, missing = requireProject(ctx2);
     if (missing) return missing;
@@ -7797,7 +7680,7 @@ ${font ? `<section class="card"><h3>Font metrics · ${esc(font.id)}</h3><div cla
   var settings_exports = {};
   __export(settings_exports, {
     mount: () => mount10,
-    render: () => render15
+    render: () => render14
   });
   var settingIds = { theme: "settings-theme", scale: "settings-scale", autoDeepScan: "settings-auto-deep-scan", autoGraphics: "settings-auto-graphics", rememberWorkspace: "settings-remember-workspace", volume: "settings-volume", startMuted: "settings-start-muted", loopPreview: "settings-loop-preview", reduceMotion: "settings-reduce-motion", advancedTools: "settings-advanced-tools" };
   async function editorFor(ctx2) {
@@ -7859,7 +7742,7 @@ ${font ? `<section class="card"><h3>Font metrics · ${esc(font.id)}</h3><div cla
     return `<section class="card settings-card"><form id="settings-form"><h2>Preferences</h2><p>Apply saves these preferences for this workspace. OK saves and closes; Cancel discards unapplied changes.</p>${editor.error ? `<div class="notice"><p class="error" role="alert">${esc(editor.error)}</p>${button("Reload saved settings (discard form)", "settings-reload", { disabled: editor.busy })}</div>` : ""}<div class="grid-even"><fieldset class="settings-group"${editor.busy ? " disabled" : ""}><legend>Appearance</legend>${select("settings-theme", "Theme", [["romancer", "ROMancer (default)"], ["dark", "Dark"], ["light", "Light"]], v.theme)}${select("settings-scale", "Interface size", [[100, "100%"], [125, "125%"], [150, "150%"], [200, "200%"]], v.scale)}<p class="subtle">ROMancer keeps the original sea-green appearance.</p>${checkbox(editor, "reduceMotion", "Reduce interface motion")}</fieldset><fieldset class="settings-group"${editor.busy ? " disabled" : ""}><legend>Automatic tasks</legend>${checkbox(editor, "autoDeepScan", "Auto deep scan on ROM load", "Find supported resources when a ROM is opened.")}${checkbox(editor, "autoGraphics", "Inspect gameplay graphics automatically", "Analyze available playtest frames for graphics candidates.")}${checkbox(editor, "rememberWorkspace", "Remember my workspace", "Reopen the last project, ROM, page, and editing position.")}</fieldset><fieldset class="settings-group"${editor.busy ? " disabled" : ""}><legend>Audio</legend><label class="field" for="settings-volume"><span>Volume <output id="settings-volume-value" for="settings-volume">${v.volume}%</output></span><input id="settings-volume" type="range" min="0" max="100" step="1" value="${v.volume}"></label>${checkbox(editor, "startMuted", "Start game audio muted")}${checkbox(editor, "loopPreview", "Loop audio previews")}</fieldset><fieldset class="settings-group"${editor.busy ? " disabled" : ""}><legend>Workspace tools</legend>${checkbox(editor, "advancedTools", "Show advanced tools in navigation", "Keep debugging and engineering tools within easy reach.")}<p class="subtle">Project recovery, system setup, and AI tools remain available below.</p></fieldset></div><div class="actions settings-actions">${button("OK", "settings-ok", { primary: true, disabled })}${button("Apply", "settings-apply", { disabled })}${button("Cancel", "settings-cancel", { disabled: editor.busy })}${button("Restore defaults", "settings-defaults", { disabled: editor.busy })}<span class="subtle" id="settings-form-status" role="status">${editor.busy ? "Saving settings…" : editor.dirty ? "Unapplied changes" : "Preferences apply to this workspace"}</span></div></form></section>`;
   }
   var columns = [["identification", "Identification"], ["raw_inspection", "Inspection"], ["structured_formats", "Declared formats"], ["automatic_resource_discovery", "Resource discovery"], ["runtime_control", "Saved setup"]];
-  async function render15(ctx2) {
+  async function render14(ctx2) {
     var _a, _b;
     const editor = await editorFor(ctx2);
     ctx2.use({ "settings-reload": async () => {
@@ -7914,7 +7797,7 @@ ${font ? `<section class="card"><h3>Font metrics · ${esc(font.id)}</h3><div cla
       await ctx2.render();
     }, "project-migrate": () => ctx2.run("project.migrate", ctx2.projectParams()), "project-recover": () => ctx2.run("project.recover_lock", ctx2.projectParams()) });
     return `${heading("Settings & capabilities", "Settings", "System formats, configured tools, and measured evidence are reported separately.")}
- ${settingsForm(editor)}<details class="card"><summary>Diagnostics &amp; support</summary>${supportControls(ctx2)}</details><details class="card"><summary>AI & LLM access</summary><p>Connect a local MCP client. Inspection is the default; editing uses the same reviewed plans and separate builds.</p>${select("agent-access", "Agent access", [["inspection", "Inspect only"], ["editing", "Inspect, edit & playtest"]], ctx2.draft("agent-access", "inspection"))}${field("agent-rom-root", "ROM import folder (optional)", ctx2.draft("agent-rom-root", ""))}${button("Create client configuration", "agent-config")}${(agent == null ? void 0 : agent.configuration) ? `<p>${esc(agent.note)}</p><pre>${esc(JSON.stringify(agent.configuration, null, 2))}</pre>${button("Copy configuration", "agent-copy")}` : ""}</details><section class="card"><h3>Getting started</h3><p>Basic and Advanced lessons, at your pace.</p>${button("Open tutorials", "tutorial-hub")}</section><details class="card"><summary>Projects &amp; recovery</summary>${ctx2.state.project ? `${field("backup-path", "Private backup file", ctx2.draft("backup-path", ctx2.state.project.path + "-backup.zip"))}<p class="subtle">Includes source images, builds, saves, captures and reports.</p><div class="actions">${button("Save private backup", "project-backup")}${button("Migrate project", "project-migrate")}${button("Recover abandoned lock", "project-recover")}</div>` : ""}${field("restore-path", "Backup to restore", "", { placeholder: "C:\\Backups\\project.zip" })}${button("Restore project", "project-restore")}</details><details class="card"><summary>Application &amp; system setup</summary><div class="grid-even"><section class="card"><h3>Application</h3><div class="table-wrap"><table><tbody>
+ ${settingsForm(editor)}<details class="card"><summary>Diagnostics &amp; support</summary>${supportControls(ctx2)}</details><details class="card"><summary>AI & LLM access</summary><p>Connect a local MCP client. Inspection is the default; editing uses the same reviewed plans and separate builds.</p>${select("agent-access", "Agent access", [["inspection", "Inspect only"], ["editing", "Inspect, edit & playtest"]], ctx2.draft("agent-access", "inspection"))}${field("agent-rom-root", "ROM import folder (optional)", ctx2.draft("agent-rom-root", ""))}${button("Create client configuration", "agent-config")}${(agent == null ? void 0 : agent.configuration) ? `<p>${esc(agent.note)}</p><pre>${esc(JSON.stringify(agent.configuration, null, 2))}</pre>${button("Copy configuration", "agent-copy")}` : ""}</details><section class="card"><h3>User guide</h3><a class="guide-link" href="/user-guide/index.html" target="_blank" rel="noopener noreferrer">Open the illustrated guide</a></section><details class="card"><summary>Projects &amp; recovery</summary>${ctx2.state.project ? `${field("backup-path", "Private backup file", ctx2.draft("backup-path", ctx2.state.project.path + "-backup.zip"))}<p class="subtle">Includes source images, builds, saves, captures and reports.</p><div class="actions">${button("Save private backup", "project-backup")}${button("Migrate project", "project-migrate")}${button("Recover abandoned lock", "project-recover")}</div>` : ""}${field("restore-path", "Backup to restore", "", { placeholder: "C:\\Backups\\project.zip" })}${button("Restore project", "project-restore")}</details><details class="card"><summary>Application &amp; system setup</summary><div class="grid-even"><section class="card"><h3>Application</h3><div class="table-wrap"><table><tbody>
  <tr><td>Version</td><td>${esc(c.display_version || c.version)}</td></tr><tr><td>Runtime</td><td>Python ${esc(c.python)}</td></tr><tr><td>Platform</td><td>${esc(c.platform)}</td></tr>
  <tr><td>Image support</td><td>${badge(c.pillow ? "Pillow available" : "Pillow missing", c.pillow ? "good" : "warm")}</td></tr><tr><td>Project storage</td><td>Owned source copies and separate builds</td></tr>
  <tr><td>Server</td><td>Authenticated loopback session</td></tr></tbody></table></div><div class="notice">${esc(c.runtime_note)}</div></section>
@@ -7955,7 +7838,7 @@ ${font ? `<section class="card"><h3>Font metrics · ${esc(font.id)}</h3><div cla
   var levels_exports = {};
   __export(levels_exports, {
     mount: () => mount11,
-    render: () => render16
+    render: () => render15
   });
 
   // romancer/ui/room_navigation.js
@@ -8914,7 +8797,7 @@ ${font ? `<section class="card"><h3>Font metrics · ${esc(font.id)}</h3><div cla
     return Number(text);
   };
   var practiceControls = () => `<details class="card"><summary>Advanced practice</summary><p>Open a separate test layout to learn the editor controls.</p>${button("Open test layout", "studio-example")}</details>`;
-  async function render16(ctx2) {
+  async function render15(ctx2) {
     var _a, _b, _c, _d, _e, _f, _g, _h, _i, _j, _k, _l, _m;
     const setupReview = useResearchSetup(ctx2, "levels");
     if (setupReview) return setupReview;
@@ -9138,7 +9021,7 @@ ${font ? `<section class="card"><h3>Font metrics · ${esc(font.id)}</h3><div cla
   var sound_exports = {};
   __export(sound_exports, {
     mount: () => mount12,
-    render: () => render17
+    render: () => render16
   });
 
   // romancer/ui/sound_preview.js
@@ -9313,7 +9196,7 @@ ${font ? `<section class="card"><h3>Font metrics · ${esc(font.id)}</h3><div cla
     }
     if (ownsPreview(ctx2, owned)) await ctx2.render();
   }
-  async function render17(ctx2) {
+  async function render16(ctx2) {
     var _a, _b, _c, _d;
     const setupReview = useResearchSetup(ctx2, "sound");
     if (setupReview) return setupReview;
@@ -9485,8 +9368,8 @@ ${font ? `<section class="card"><h3>Font metrics · ${esc(font.id)}</h3><div cla
   applyInterfaceScale(readPreference("romancer-scale") || 100);
   window.addEventListener("resize", () => applyInterfaceScale(getSettings().scale));
   var navigationRevision = 0;
-  var views = { tutorials: tutorials_exports, gameview: gameview_exports, overview: overview_exports, resources: resources_exports, scripts: scripts_exports, assets: assets_exports, levels: levels_exports, sound: sound_exports, tables: tables_exports, automation: automation_exports, playtest: playtest_exports, debug: debug_exports, routes: routes_exports, regression: regression_exports, release: release_exports, help: help_exports, settings: settings_exports };
-  var names5 = { tutorials: "Tutorials", automation: "Recipes & definitions", overview: "Overview", gameview: "Game view", resources: "Resources", scripts: "Text & layout", assets: "Graphics & fonts", levels: "Levels", sound: "Music & sound", tables: "Data tables", playtest: "Playtest", debug: "Investigation", routes: "Routes", regression: "Regression", release: "Export", settings: "Settings", help: "Help" };
+  var views = { gameview: gameview_exports, overview: overview_exports, resources: resources_exports, scripts: scripts_exports, assets: assets_exports, levels: levels_exports, sound: sound_exports, tables: tables_exports, automation: automation_exports, playtest: playtest_exports, debug: debug_exports, routes: routes_exports, regression: regression_exports, release: release_exports, help: help_exports, settings: settings_exports };
+  var names5 = { automation: "Recipes & definitions", overview: "Overview", gameview: "Game view", resources: "Resources", scripts: "Text & layout", assets: "Graphics & fonts", levels: "Levels", sound: "Music & sound", tables: "Data tables", playtest: "Playtest", debug: "Investigation", routes: "Routes", regression: "Regression", release: "Export", settings: "Settings", help: "Help" };
   var state = { page: "overview", projects: [], project: null, artifact: null, capabilities: null, drafts: {}, results: {}, pending: null, job: null, runtime: null, frame: null, snapshot: null };
   var actions2 = {};
   var renderRevision = 0;
@@ -9629,14 +9512,14 @@ ${font ? `<section class="card"><h3>Font metrics · ${esc(font.id)}</h3><div cla
       state.hexDraft = null;
       state.hexReview = null;
     }
-    await render18();
+    await render17();
   }
   var ctx = {
     state,
     api,
     navigate,
     notify,
-    render: render18,
+    render: render17,
     refreshProject,
     openProject,
     modal,
@@ -9649,7 +9532,6 @@ ${font ? `<section class="card"><h3>Font metrics · ${esc(font.id)}</h3><div cla
     sourceParams: () => ({ project_id: state.project.project_id, artifact_id: state.artifact.artifact_id }),
     setArtifact: (id, options) => setArtifactSelection(ctx, id, { rememberLocation, stopPlayback, flushDrafts, clearDraftCache, writePreference, resumeLocation }, options)
   };
-  var tutorial = createTutorial({ ...ctx, openProject, closeProject });
   function draftFieldKey(id) {
     var _a, _b;
     const doc = id.startsWith("script-segment-") ? (_a = state.results["script.inspect"]) == null ? void 0 : _a.document_id : ["paint-buffer", "asset-changes"].includes(id) ? (_b = state.results["assets.inspect"]) == null ? void 0 : _b.document_id : null;
@@ -9704,9 +9586,8 @@ ${font ? `<section class="card"><h3>Font metrics · ${esc(font.id)}</h3><div cla
     state.artifact = chooseArtifact(opened, (_d = state.artifact) == null ? void 0 : _d.artifact_id);
   }
   function jobTray() {
-    var _a;
     const built = createdBuild(state), job = state.job, active = job && !["COMPLETED", "FAILED", "CANCELLED", "INTERRUPTED"].includes(job.status);
-    return `<div class="job-tray ${active ? "working" : ""}"><div><span class="pulse"></span><strong>${active ? "Working" : (job == null ? void 0 : job.status) === "FAILED" ? "Action failed" : (job == null ? void 0 : job.status) === "CANCELLED" ? "Cancelled" : "Ready"}</strong><span> ${active ? " — " + esc(job.message) : ""}</span></div><div id="workspace-state-host">${workspaceStatus(state, draftWrites.snapshot(), false)}</div>${active ? button("Cancel job", "cancel-job") : `<div class="actions">${built ? button("Playtest build", "playtest-created-build", { id: built.artifact_id, icon: "playtest", primary: true }) : ""}${((_a = state.tutorial) == null ? void 0 : _a.minimized) ? button("Resume lesson", "tutorial-toggle") : ""}${button("Undo", "draft-undo", { disabled: !historyAvailable(-1), reason: "No earlier edit in the active editor." })}${button("Redo", "draft-redo", { disabled: !historyAvailable(1), reason: "No edit to redo in the active editor." })}</div>`}</div>`;
+    return `<div class="job-tray ${active ? "working" : ""}"><div><span class="pulse"></span><strong>${active ? "Working" : (job == null ? void 0 : job.status) === "FAILED" ? "Action failed" : (job == null ? void 0 : job.status) === "CANCELLED" ? "Cancelled" : "Ready"}</strong><span> ${active ? " — " + esc(job.message) : ""}</span></div><div id="workspace-state-host">${workspaceStatus(state, draftWrites.snapshot(), false)}</div>${active ? button("Cancel job", "cancel-job") : `<div class="actions">${built ? button("Playtest build", "playtest-created-build", { id: built.artifact_id, icon: "playtest", primary: true }) : ""}${button("Undo", "draft-undo", { disabled: !historyAvailable(-1), reason: "No earlier edit in the active editor." })}${button("Redo", "draft-redo", { disabled: !historyAvailable(1), reason: "No edit to redo in the active editor." })}</div>`}</div>`;
   }
   function updateJob(job) {
     state.job = job;
@@ -9747,7 +9628,7 @@ ${font ? `<section class="card"><h3>Font metrics · ${esc(font.id)}</h3><div cla
     state.page = "overview";
     await refreshProject();
     resumeLocation();
-    await render18();
+    await render17();
   }
   async function closeProject() {
     rememberLocation();
@@ -9761,7 +9642,7 @@ ${font ? `<section class="card"><h3>Font metrics · ${esc(font.id)}</h3><div cla
     lastDraft = null;
     removePreference("romancer-project");
     workspaceWrites.enqueue(null);
-    await render18();
+    await render17();
   }
   async function navigate(page) {
     var _a, _b, _c, _d, _e;
@@ -9774,7 +9655,7 @@ ${font ? `<section class="card"><h3>Font metrics · ${esc(font.id)}</h3><div cla
     if (revision !== navigationRevision || ((_c = state.project) == null ? void 0 : _c.project_id) !== project || ((_d = state.artifact) == null ? void 0 : _d.artifact_id) !== artifact || state.selectionRevision !== selection2 || !views[page]) return false;
     if (page === "settings" && state.page !== "settings") state.settingsReturnPage = state.page;
     state.page = page;
-    await render18();
+    await render17();
     (_e = document.getElementById("main")) == null ? void 0 : _e.focus({ preventScroll: true });
   }
   async function importDialog() {
@@ -9807,7 +9688,7 @@ ${font ? `<section class="card"><h3>Font metrics · ${esc(font.id)}</h3><div cla
         document.getElementById("modal").close();
         return navigate(node.dataset.id);
       },
-      "close-modal": () => document.getElementById("tutorial-never") ? tutorial.dismissPrompt(false) : document.getElementById("modal").close(),
+      "close-modal": () => document.getElementById("modal").close(),
       "import": () => {
         state.droppedImportFile = null;
         return importDialog();
@@ -9816,7 +9697,7 @@ ${font ? `<section class="card"><h3>Font metrics · ${esc(font.id)}</h3><div cla
         state.candidateReview = null;
         state.resourcePrefill = null;
         state.openDeclaration = null;
-        return render18();
+        return render17();
       },
       "help-topic": (node) => {
         state.helpTopic = node.dataset.id || ({ assets: "graphics", scripts: "text", resources: "discovery", release: "export", settings: "recovery", overview: "start", help: "start" }[state.page] || state.page);
@@ -9858,7 +9739,7 @@ ${font ? `<section class="card"><h3>Font metrics · ${esc(font.id)}</h3><div cla
         await refreshProject();
         state.artifact = state.project.sources.at(-1);
         state.page = "resources";
-        await render18();
+        await render17();
         notify("Source copied into the project. Original preserved.");
       },
       "cancel-job": async () => {
@@ -9874,7 +9755,7 @@ ${font ? `<section class="card"><h3>Font metrics · ${esc(font.id)}</h3><div cla
         if (((_a = state.project) == null ? void 0 : _a.project_id) !== project) return;
         state.downloadFeedback = { project_id: project, name };
         notify("Download started: " + name + ". Check your browser’s Downloads list.");
-        if (state.page === "release") await render18();
+        if (state.page === "release") await render17();
       },
       "search-file": async (node) => {
         var _a;
@@ -9890,7 +9771,7 @@ ${font ? `<section class="card"><h3>Font metrics · ${esc(font.id)}</h3><div cla
       ...projectActions({ ...ctx, closeProject, flushDrafts, importDialog })
     };
   }
-  async function render18() {
+  async function render17() {
     var _a, _b, _c, _d, _e, _f, _g, _h, _i, _j, _k, _l, _m, _n;
     if (((_a = document.getElementById("app")) == null ? void 0 : _a.dataset.startupRecovered) === "true") return;
     rememberLocation();
@@ -9907,12 +9788,11 @@ ${font ? `<section class="card"><h3>Font metrics · ${esc(font.id)}</h3><div cla
     state.animationClock = null;
     const revision = ++renderRevision, previousScroll = ((_f = document.getElementById("main")) == null ? void 0 : _f.scrollTop) || 0, renderScope = [(_g = state.project) == null ? void 0 : _g.project_id, (_h = state.artifact) == null ? void 0 : _h.artifact_id, state.page].join(":"), details = rememberDetails(document.getElementById("main"));
     actions2 = baseActions();
-    tutorial.bind();
     const project = state.project, artifacts = project ? [...project.sources, ...project.builds] : [];
     document.getElementById("app").innerHTML = `<div class="shell"><aside class="sidebar"><a class="brand" href="#" data-action="navigate" data-id="overview"><img src="/mark.svg" alt=""><div><strong>ROMancer</strong><small>By RetchEWretched</small></div></a><div class="nav-label">Workspace</div><nav aria-label="Workbench">${["overview", "gameview", "resources", "debug", "scripts", "assets", "levels", "sound", "playtest", "release"].map((k) => `<button class="nav-item ${state.page === k ? "active" : ""}" data-action="navigate" data-id="${k}" title="${names5[k]}" ${state.page === k ? 'aria-current="page"' : ""}>${icon(k)}<span>${names5[k]}</span></button>`).join("")}<details class="more-tools" ${getSettings().advancedTools || ["tables", "automation", "routes", "regression"].includes(state.page) ? "open" : ""}><summary title="More tools">More tools</summary>${["tables", "automation", "routes", "regression"].map((k) => `<button class="nav-item ${state.page === k ? "active" : ""}" data-action="navigate" data-id="${k}" title="${names5[k]}">${icon(k)}<span>${names5[k]}</span></button>`).join("")}</details></nav><div class="sidebar-bottom"><button class="nav-item" data-action="navigate" data-id="help" title="Help">${icon("shield")}<span>Help</span></button><button class="nav-item" data-action="projects-manage" title="Projects">${icon("folder")}<span>Projects</span></button><button class="nav-item ${state.page === "settings" ? "active" : ""}" data-action="navigate" data-id="settings" title="Settings">${icon("settings")}<span>Settings</span></button><button class="nav-item" data-action="about" title="About ROMancer">${icon("shield")}<span>About</span></button><div class="local-label"><span class="dot"></span>Runs on your computer</div></div></aside><header class="topbar"><div class="project-control">${icon("folder")}<div><small>ACTIVE PROJECT</small><br><select id="project-select" aria-label="Active project"><option value="">Choose a project</option>${state.projects.map((p) => `<option value="${p.project_id}" ${(project == null ? void 0 : project.project_id) === p.project_id ? "selected" : ""}>${esc(p.name)}</option>`).join("")}</select></div>${button("New project", "new-project", { icon: "plus", class: "compact" })}</div>${artifacts.length ? `<div class="project-control source-selector"><div><small>${((_i = state.artifact) == null ? void 0 : _i.kind) === "source" ? "ORIGINAL ROM" : "BUILD"}</small><br><select id="artifact-select" aria-label="Selected source or build">${[["Original ROMs", project.sources], ["Builds", project.builds]].filter(([, rows]) => rows.length).map(([label, rows]) => `<optgroup label="${label}">${rows.map((a) => {
       var _a2;
       return `<option value="${a.artifact_id}" ${((_a2 = state.artifact) == null ? void 0 : _a2.artifact_id) === a.artifact_id ? "selected" : ""}>${esc(a.name)}</option>`;
-    }).join("")}</optgroup>`).join("")}</select></div></div>` : ""}<label class="search">${icon("search")}<input id="global-search" placeholder="Search workspace" aria-label="Search workspace"><kbd>Ctrl K</kbd><button type="button" data-action="workspace-search" aria-label="Go: search workspace" class="search-go">Go</button></label></header><main id="main" tabindex="-1"><div class="loading">Opening ${names5[state.page]}…</div></main>${jobTray()}${tutorial.panel()}</div>`;
+    }).join("")}</optgroup>`).join("")}</select></div></div>` : ""}<label class="search">${icon("search")}<input id="global-search" placeholder="Search workspace" aria-label="Search workspace"><kbd>Ctrl K</kbd><button type="button" data-action="workspace-search" aria-label="Go: search workspace" class="search-go">Go</button></label></header><main id="main" tabindex="-1"><div class="loading">Opening ${names5[state.page]}…</div></main>${jobTray()}</div>`;
     const view = views[state.page];
     let html;
     if (project && state.artifact) {
@@ -9946,7 +9826,6 @@ ${font ? `<section class="card"><h3>Font metrics · ${esc(font.id)}</h3><div cla
     await ((_k = view.mount) == null ? void 0 : _k.call(view, ctx));
     mountBuildDetails(ctx);
     state.visualComparison = mountVisualComparisons(document.getElementById("main"), state, { reduceMotion: getSettings().reduceMotion });
-    tutorial.mount();
     updateWorkspaceStatus();
     document.getElementById("main").scrollTop = retainedScroll(lastRenderedScope, renderScope, previousScroll);
     lastRenderedScope = renderScope;
@@ -10040,11 +9919,10 @@ ${font ? `<section class="card"><h3>Font metrics · ${esc(font.id)}</h3><div cla
         state.artifact = chooseArtifact(state.project, readPreference("romancer-artifact:" + state.project.project_id));
         resumeLocation();
       }
-      await render18();
+      await render17();
       if (((_a = document.getElementById("app")) == null ? void 0 : _a.dataset.startupRecovered) !== "true") {
         startupReady = true;
         if (settingsWarning) notify(settingsWarning, true);
-        void tutorial.init();
       }
     } catch (error) {
       if (((_b = document.getElementById("app")) == null ? void 0 : _b.dataset.startupRecovered) !== "true") document.getElementById("app").innerHTML = `<div class="boot"><img src="/mark.svg" alt=""><h1>Open ROMancer from its launcher</h1><p>${esc(error.message)}</p><small>By RetchEWretched</small></div>`;
@@ -10086,12 +9964,6 @@ ${font ? `<section class="card"><h3>Font metrics · ${esc(font.id)}</h3><div cla
     disposeAudio();
     (_c = state.soundPlayer) == null ? void 0 : _c.close();
     (_d = state.animationClock) == null ? void 0 : _d.stop();
-  });
-  document.getElementById("modal").addEventListener("cancel", (event) => {
-    if (document.getElementById("tutorial-never")) {
-      event.preventDefault();
-      tutorial.dismissPrompt(false).catch((error) => notify(error.message, true));
-    }
   });
 
   // romancer/ui/desktop_entry.js

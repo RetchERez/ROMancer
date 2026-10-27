@@ -28,7 +28,7 @@ class WorkbenchAPI:
         self.projects=self.workspace/'projects';self.incoming=self.workspace/'incoming'
         self.projects.mkdir(exist_ok=True);self.incoming.mkdir(exist_ok=True)
         self.operation_locks={};self.operation_locks_guard=threading.Lock()
-        self.profile_lock=threading.Lock();self.ui_launch_lock=threading.Lock();self.ui_launches={};self.tutorial_lock=threading.RLock()
+        self.profile_lock=threading.Lock();self.ui_launch_lock=threading.Lock();self.ui_launches={}
         self.rom_scans={}
         self.project_admin_lock=threading.RLock()
         self.routes={
@@ -54,10 +54,6 @@ class WorkbenchAPI:
             'project.delete':('project_id',self._project_delete),
             'project.undelete':('trash_id',self._project_undelete),
             'rom.check':('project_id artifact_id expected_crc32 crc_scope',self._rom_check),
-            'tutorial.get':('',lambda p,c:self._tutorial('get',p,c)),
-            'tutorial.preferences':('never_ask_again',lambda p,c:self._tutorial('preferences',p,c)),
-            'tutorial.progress':('lesson_id outcome',lambda p,c:self._tutorial('progress',p,c)),
-            'tutorial.practice':('',lambda p,c:self._tutorial('practice',p,c)),
             'system.ui_ready':('launch_id',lambda p,c:self._ui_startup(p,True)),
             'system.ui_status':('launch_id',lambda p,c:self._ui_startup(p,False)),
             'recipes.list':('project_id artifact_id',self._recipes_list),
@@ -78,6 +74,7 @@ class WorkbenchAPI:
             'systems.nes_chr':('project_id artifact_id first_tile count',self._nes_chr),
             'project.demo_nes':('',self._demo_nes),
             'project.demo_system':('system_id',self._demo_system),
+            'project.studio':('',self._studio_workshop),
             'release.disc_set':('project_id source_id target_id title',self._patch_set),
             'release.apply_set':('source_cue archive destination',self._apply_patch_set),
             'drafts.list':('project_id artifact_id',self._draft_list),
@@ -231,6 +228,8 @@ class WorkbenchAPI:
         self.routes['references.template']=('project_id artifact_id template_id offset count stride',lambda p,c:inspect_template(self,p,c))
         from .data_relocation import RelocationTools
         self.relocation=RelocationTools(self);self.routes.update(self.relocation.routes())
+        from .editing_readiness import EditingReadinessTools
+        self.editing_readiness=EditingReadinessTools(self);self.routes.update(self.editing_readiness.routes())
         for operation in tuple(self.routes):
             if operation.startswith('containers.') or operation in ('runtime.load_disc','route.run_disc','release.disc_set'):
                 del self.routes[operation]
@@ -427,28 +426,11 @@ class WorkbenchAPI:
             guard_request(self,operation,parameters)
             return handler(parameters,cancelled)
         except (ValueError,OSError,KeyError,TypeError,RuntimeError,KeyboardInterrupt) as exc:
-            return {'schema_version':1,'operation':operation,'ok':False,'status':'CANCELLED' if isinstance(exc,KeyboardInterrupt) else 'BLOCKED',
+            result={'schema_version':1,'operation':operation,'ok':False,'status':'CANCELLED' if isinstance(exc,KeyboardInterrupt) else 'BLOCKED',
                     'error':str(exc)[:1024] or 'Operation cancelled'}
-
-    def _tutorial(self,operation,p,c):
-        from . import onboarding
-        with self.tutorial_lock:
-            if c():raise KeyboardInterrupt
-            if operation=='get':return onboarding.tutorial_status(self.workspace)
-            if operation=='preferences':return onboarding.set_preferences(self.workspace,p['never_ask_again'])
-            if operation=='progress':return onboarding.record_progress(self.workspace,p['lesson_id'],p['outcome'])
-            value=onboarding.load_state(self.workspace);project_id=value['practice_project_id']
-            if project_id:
-                try:
-                    project=projects.read_project(self.project({'project_id':project_id}))
-                    if project.get('demo') and project.get('demo_system')=='nes' and project.get('name') in ('ROMancer tutorial','Tutorial practice'):
-                        return {**project,'ok':True}
-                except (ValueError,OSError,KeyError):pass
-            project=self._demo_system({'system_id':'nes'},c)
-            folder=self.project({'project_id':project['project_id']});project['name']='Tutorial practice'
-            projects.write_json(folder/'project.json',project)
-            value['practice_project_id']=project['project_id'];onboarding.save_state(self.workspace,value)
-            return {**projects.read_project(folder),'ok':True}
+            from .debugger_failures import NativeCaptureError
+            if isinstance(exc,NativeCaptureError):result.update(error_code=exc.code,remedy=exc.remedy,native_exit_code=exc.exit_code)
+            return result
 
     def _ui_startup(self,p,mark):
         launch=p['launch_id']
@@ -1093,6 +1075,10 @@ class WorkbenchAPI:
     def _demo_system(self,p,c):
         from .system_demo import create_system_demo
         return create_system_demo(self.projects,self.incoming,p['system_id'])
+
+    def _studio_workshop(self,p,c):
+        from .studio_workshop import create_studio
+        return create_studio(self.projects,self.incoming)
 
     def _patch_set(self,p,c):
         from .patch_sets import create_patch_set

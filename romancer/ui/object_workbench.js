@@ -1,6 +1,7 @@
 import {esc,button,select} from './common.js';
 import {selectionKey} from './tool_inputs.js';
 import {activateCell} from './asset_controls.js';
+import {pixelBuffer} from './pixel_history.js';
 
 export async function openObject(ctx,id){
  const scope=selectionKey(ctx.state),result=await ctx.run('objects.open',{...ctx.sourceParams(),object_id:id},{render:false});
@@ -20,18 +21,28 @@ export async function objectWorkbench(ctx,doc,bitmap){
  }
  if(!current())return '';
  const obj=entry?.result?.object,layout=obj?.definition.layout;
+ if(obj&&entry.trace?.scene&&entry.result.source_dependency_verified&&bitmap){
+  try{
+   const edits=[...new Set(layout.indices.filter(i=>i!==null))].map(index=>({cell_index:index,pixels:pixelBuffer(ctx,doc,bitmap,index)})).filter(edit=>JSON.stringify(edit.pixels)!==JSON.stringify(bitmap.cells[edit.cell_index].pixels));
+   entry.preview=await ctx.api.call('objects.scene',{...ctx.sourceParams(),object_id:entry.object_id,edits});if(!current())return '';
+   if(entry.preview.ok===false)throw Error(entry.preview.error);entry.previewError=null;
+  }catch(error){entry.preview=null;entry.previewError=error.message;}
+ }
  ctx.use({
   'object-open':node=>{if(!current())throw Error('The selected ROM changed. Open this object from the current selection.');const id=node?.dataset?.id||document.getElementById('object-choice')?.value;if(!listing.objects.some(o=>o.object_id===id))throw Error('Refresh saved objects first.');return openObject(ctx,id);},
   'object-delete':async node=>{if(!current())throw Error('The selected ROM changed.');const id=node.dataset.id,chosen=listing.objects.find(o=>o.object_id===id);if(!chosen)throw Error('Refresh saved objects first.');if(!confirm('Remove the saved layout “'+chosen.name+'”? ROM bytes and builds stay unchanged.'))return;await ctx.run('objects.delete',{...ctx.sourceParams(),object_id:id},{render:false});if(!current())return;if(state.objectWorkbench?.object_id===id)state.objectWorkbench=null;return ctx.render();},
   'object-source':node=>{if(!current()||!entry||!bitmap)throw Error('The selected source changed.');const index=Number(node.dataset.id);if(!layout.indices.includes(index))throw Error('Choose a source used by this object.');activateCell(ctx,doc,bitmap.id,index);entry.selected=index;return ctx.render();}
  });
+ const scene=entry?.preview?'<details class="scene-composite"><summary>Full-scene preview · '+entry.preview.changed_pixels+' pixels changed · simulated</summary><div class="scene-pair"><figure><figcaption>Captured frame</figcaption><img src="data:image/png;base64,'+esc(entry.preview.original_png_base64)+'" alt="Full captured scene"></figure><figure><figcaption>Staged composite · test the build for real gameplay</figcaption><canvas id="object-scene-full" data-preview="'+esc(entry.preview.preview_png_base64)+'" aria-label="Simulated full-scene preview"></canvas></figure></div><p class="subtle">Saved placements only; other uses may change. Captured colors do not establish palette ownership. Background behind transparency, priority and animation need playtesting.</p></details>':obj?'<p class="subtle">'+esc(entry?.previewError||'Capture a new full-scene trace to preview this object in context.')+'</p>':'';
  const saved=listing.objects.length?select('object-choice','Saved object',listing.objects.map(o=>[o.object_id,o.name+' · '+o.columns+' × '+o.rows+' tiles']),entry?.object_id||listing.objects[0].object_id)+button('Open object','object-open'): '<p>Save verified parts as an object from a captured trace in Playtest.</p>';
  if(!obj)return '<section class="card object-workbench"><h3>Saved objects</h3>'+saved+'</section>';
  const uses=new Map();layout.indices.forEach((index,place)=>{if(index!==null){if(!uses.has(index))uses.set(index,[]);uses.get(index).push(place);}});
- return '<section class="card object-workbench"><div class="card-heading"><h3>'+esc(obj.name)+'</h3>'+button('Remove layout','object-delete',{id:entry.object_id})+'</div><details><summary>Saved objects</summary>'+saved+'</details><div class="object-scene-source"><figure><figcaption>Captured scene · select a source tile to highlight its uses</figcaption>'+(entry.trace?.crop_png_base64?'<canvas id="object-scene" aria-label="Captured scene with selected tile uses" data-scene="'+esc(entry.trace.crop_png_base64)+'"></canvas>':'<p>'+esc(entry.sceneIssue||'This imported layout has no local captured scene.')+'</p>')+'</figure><div><h4>Source tiles & uses</h4><div class="actions">'+[...uses].map(([index,places])=>button('Tile '+index+' · '+places.length+' use'+(places.length===1?'':'s'),'object-source',{id:String(index),primary:entry.selected===index})).join('')+'</div>'+[...uses].filter(([,p])=>p.length>1).map(([i,p])=>'<p class="subtle">Shared tile '+i+' updates '+p.length+' placements together.</p>').join('')+'<p class="subtle">'+(entry.result.source_dependency_verified?'Source origins verified for the captured placements.':'Saved declaration; imported or historical proof is not fresh execution evidence.')+' '+(obj.definition.complete_parts?'':'Some source pixels remain unresolved. ')+'An object name is your label.</p></div></div></section>';
+ return '<section class="card object-workbench"><div class="card-heading"><h3>'+esc(obj.name)+'</h3>'+button('Remove layout','object-delete',{id:entry.object_id})+'</div><details><summary>Saved objects</summary>'+saved+'</details><div class="object-scene-source"><figure><figcaption>Captured scene · select a source tile to highlight its uses</figcaption>'+(entry.trace?.crop_png_base64?'<canvas id="object-scene" aria-label="Captured scene with selected tile uses" data-scene="'+esc(entry.trace.crop_png_base64)+'"></canvas>':'<p>'+esc(entry.sceneIssue||'This imported layout has no local captured scene.')+'</p>')+'</figure><div><h4>Source tiles & uses</h4><div class="actions">'+[...uses].map(([index,places])=>button('Tile '+index+' · '+places.length+' use'+(places.length===1?'':'s'),'object-source',{id:String(index),primary:entry.selected===index})).join('')+'</div>'+[...uses].filter(([,p])=>p.length>1).map(([i,p])=>'<p class="subtle">Shared tile '+i+' updates '+p.length+' placements together.</p>').join('')+'<p class="subtle">'+(entry.result.source_dependency_verified?'Source origins verified for the captured placements.':'Saved declaration; imported or historical proof is not fresh execution evidence.')+' '+(obj.definition.complete_parts?'':'Some source pixels remain unresolved. ')+'An object name is your label.</p></div></div>'+scene+'</section>';
 }
 
 export function mountObjectWorkbench(ctx){
+ const full=document.getElementById('object-scene-full'),model=ctx.state.objectWorkbench?.preview;if(full&&model){const scope=selectionKey(ctx.state),img=new Image();img.onload=()=>{if(!full.isConnected||scope!==selectionKey(ctx.state))return;full.width=img.naturalWidth;full.height=img.naturalHeight;const draw=full.getContext('2d');draw.drawImage(img,0,0);const r=model.scene_region;draw.strokeStyle='#ffd36a';draw.lineWidth=1;draw.strokeRect(r.x-.5,r.y-.5,r.width+1,r.height+1);};img.src='data:image/png;base64,'+full.dataset.preview;}
+
  const canvas=document.getElementById('object-scene'),entry=ctx.state.objectWorkbench;if(!canvas||!entry?.trace)return;
  const scope=selectionKey(ctx.state),image=new Image();image.onload=()=>{
   if(!canvas.isConnected||scope!==selectionKey(ctx.state)||ctx.state.objectWorkbench!==entry)return;

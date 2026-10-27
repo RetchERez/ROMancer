@@ -12,6 +12,8 @@ import html
 import json
 from pathlib import Path
 import re
+import sys
+if __package__ in (None,''):sys.path.insert(0,str(Path(__file__).resolve().parents[1]))
 
 
 CSS = """\
@@ -79,19 +81,28 @@ def chunks(rows, count):
 
 def contents_groups(data):
     return [(part,index,group) for part in ('Basic','Advanced')
-            for index,group in enumerate(chunks([row for row in data['chapters'] if row['part']==part],21))]
+            for index,group in enumerate(chunks([row for row in data['chapters'] if row['part']==part],48 if data.get('compact_pdf') else 21))]
 
 
 def pagination(data):
     # Cover, bounded contents pages, procedures and visual continuations.
     pages = {}
     next_page = 2+len(contents_groups(data))
-    for chapter in data['chapters']:
-        pages[chapter['id']] = next_page
-        next_page += 1
-        if chapter.get('image_layout') == 'following-page':
-            pages[chapter['id'] + '-appearance'] = next_page
+    if data.get('compact_pdf'):
+        from tools.compact_guide import layout_groups,figures_for
+        for group in layout_groups(data):
+            for chapter in group:
+                pages[chapter['id']]=next_page
+                if chapter.get('image_layout')=='following-page':pages[chapter['id']+'-appearance']=next_page+(1 if chapter['id'] in data.get('compact_wide_topics',[]) else 0)
+            next_page+=1
+            if len(group)==1 and group[0]['id'] in data.get('compact_wide_topics',[]) and figures_for(group[0]):next_page+=1
+    else:
+        for chapter in data['chapters']:
+            pages[chapter['id']] = next_page
             next_page += 1
+            if chapter.get('image_layout') == 'following-page':
+                pages[chapter['id'] + '-appearance'] = next_page
+                next_page += 1
     terms = sorted(data['glossary'], key=lambda row: row['term'].casefold())
     glossary_groups = chunks(terms, 18)
     pages['glossary'] = next_page
@@ -344,8 +355,22 @@ def main():
     folder = args.guide_dir.resolve()
     data = load_content(folder)
     pages, glossary_groups, index_groups = pagination(data)
+    stats=[]
+    if not args.html_only:
+        if data.get('compact_pdf'):
+            from tools.compact_guide import build_compact_pdf,GuideOverflow,preflight_layout
+            data['compact_wide_topics']=sorted(set(data.get('compact_wide_topics',[]))|set(preflight_layout(data,pages)))
+            pages,glossary_groups,index_groups=pagination(data)
+            for attempt in range(len(data['chapters'])+1):
+                try:stats=build_compact_pdf(data,folder,pages,glossary_groups,index_groups,contents_groups);break
+                except GuideOverflow as error:
+                    if error.topic in data.get('compact_wide_topics',[]) or error.topic not in {r['id'] for r in data['chapters']}:raise
+                    data.setdefault('compact_wide_topics',[]).append(error.topic)
+                    pages,glossary_groups,index_groups=pagination(data)
+            else:raise ValueError('Guide layout could not be resolved without shrinking text.')
+            (folder/'guide.json').write_text(json.dumps(data,indent=2,ensure_ascii=False)+'\n',encoding='utf-8',newline='\n')
+        else:stats=build_pdf(data, folder, pages, glossary_groups, index_groups)
     build_html(data, folder, pages)
-    stats = [] if args.html_only else build_pdf(data, folder, pages, glossary_groups, index_groups)
     print(json.dumps({'ok': True, 'chapters': len(data['chapters']), 'screenshots': sum(bool(row.get('image')) + len(row.get('extra_images', [])) for row in data['chapters']), 'glossary_terms': len(data['glossary']), 'index_entries': len(data['index']), 'pdf_pages': len(stats), 'html_only': args.html_only}))
 
 

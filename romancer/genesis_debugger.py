@@ -169,7 +169,9 @@ def capture_genesis(project,row,config,*,root=None,cancelled=lambda:False):
                 if time.monotonic()>deadline:raise ValueError('Genesis debugger exceeded its wall-clock budget')
                 if any(p.stat().st_size>2*1024**2 for p in (job/'trace.tsv',job/'instructions.log',job/'stdout.txt',job/'stderr.txt') if p.exists()):raise ValueError('Genesis debugger exceeded its output budget')
                 time.sleep(.025)
-        if process.returncode!=0:raise ValueError('Genesis debugger did not complete (exit '+str(process.returncode)+'). Check host CPU compatibility.')
+        from .debugger_failures import process_failure,capture_output
+        diagnostic=capture_output(job)
+        if process.returncode!=0 or '[lua error]' in diagnostic.lower():raise process_failure('Genesis observer',process.returncode,diagnostic)
         def read(name,optional=False):
             path=checked_path(job/name)
             if optional and not path.exists():return ''

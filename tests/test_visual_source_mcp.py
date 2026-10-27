@@ -2,6 +2,9 @@ import unittest
 from romancer.mcp_server import READ_OPERATIONS,WRITE_OPERATIONS,_investigation_properties
 
 class VisualSourceMCPTests(unittest.TestCase):
+    def test_task_and_scene_services_have_bounded_typed_agent_inputs(self):
+        self.assertIn('editing.readiness',READ_OPERATIONS);self.assertIn('objects.scene',READ_OPERATIONS)
+        p=_investigation_properties('objects.scene');self.assertEqual(p['edits']['maxItems'],64);self.assertEqual(p['edits']['items']['properties']['pixels']['maxItems'],64)
     def test_source_proof_requires_explicit_write_and_strict_bounded_parameters(self):
         self.assertIn('traces.verify',WRITE_OPERATIONS);self.assertIn('traces.open_verified',WRITE_OPERATIONS);self.assertIn('traces.verification',READ_OPERATIONS)
         self.assertIn('traces.origin',READ_OPERATIONS)

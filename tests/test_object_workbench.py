@@ -45,6 +45,40 @@ class ObjectServiceTests(unittest.TestCase):
             m.pop('width');m.pop('codec')  # Actual pre-existing authenticated v2 producer contract.
             report={'scope':'visual_source_v2','source_sha256':self.source['sha256'],'artifact_id':self.source['artifact_id'],'trace_id':'b'*32,'frame':{'sha256':'a'*64,'width':256,'height':240,'index':10},'context':{'core_sha256':'c'*64},'status':'VERIFIED_VISUAL_SOURCE','verified_matches':[m]}
             self.proofs.append(store_evidence(self.api.project(self.sp),'runtime',report)['evidence_id'])
+    def test_full_scene_needs_current_authority_and_matching_frame_identity(self):
+        from unittest.mock import patch
+        import hashlib
+        from romancer.visual_checks import _png
+        from romancer.workbench_evidence import load_evidence,store_evidence,quarantine_restored_evidence
+        rgb=bytes([20,30,40])*256*240;sha=hashlib.sha256(rgb).hexdigest();parts=[]
+        for proof in self.proofs:
+            report=load_evidence(self.api.project(self.sp),proof,'runtime')['report']
+            report={**report,'frame':{**report['frame'],'sha256':sha}}
+            parts.append({'verification_id':store_evidence(self.api.project(self.sp),'runtime',report)['evidence_id'],'match_id':0})
+        made=self.api.dispatch('objects.create',{**self.sp,'name':'Scene object','parts':parts});self.assertTrue(made['ok'],made)
+        params={**self.sp,'object_id':made['object_id'],'edits':[]}
+        scene={'width':256,'height':240,'sha256':sha,'png_base64':_png(rgb,256,240)}
+        with patch.object(self.api.traces,'get',return_value={'scene':scene,'runtime_trusted':True}):
+            result=self.api.dispatch('objects.scene',params);self.assertTrue(result['ok'],result)
+            self.assertEqual(result['changed_pixels'],0);self.assertTrue(result['simulated']);self.assertFalse(result['rom_written'])
+        with patch.object(self.api.traces,'get',return_value={'scene':{**scene,'sha256':'0'*64}}):
+            self.assertFalse(self.api.dispatch('objects.scene',params)['ok'])
+        with patch.object(self.api.traces,'get',return_value={}):
+            self.assertFalse(self.api.dispatch('objects.scene',params)['ok'])
+        with patch.object(self.api.traces,'get',return_value={'scene':scene,'runtime_trusted':False}):
+            self.assertFalse(self.api.dispatch('objects.scene',params)['ok'])
+        quarantine_restored_evidence(self.api.project(self.sp))
+        self.assertFalse(self.api.dispatch('objects.scene',params)['ok'])
+
+    def test_changing_saved_scene_binding_does_not_reuse_an_unrelated_authentic_proof(self):
+        from romancer import workbench_projects as projects
+        made=self.api.dispatch('objects.create',{**self.sp,'name':'Bound scene','parts':[{'verification_id':self.proofs[0],'match_id':0}]})
+        project=self.api.project(self.sp)
+        with projects.locked(project) as store:
+            obj=store['sources'][0]['object_layouts']['objects'][0];obj['trace_id']='d'*32;obj['frame_sha256']='e'*64
+            projects.write_json(project/'project.json',store)
+        result=self.api.dispatch('objects.get',{**self.sp,'object_id':made['object_id']})
+        self.assertTrue(result['ok']);self.assertFalse(result['source_dependency_verified'])
     def test_create_reopen_delete_and_pack_keep_exact_revision_and_current_authority(self):
         args={**self.sp,'name':'Two-part creature','parts':[{'verification_id':p,'match_id':0} for p in self.proofs]}
         made=self.api.dispatch('objects.create',args);self.assertTrue(made['ok'],made);ident=made['object_id']

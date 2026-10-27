@@ -30,6 +30,9 @@ class GameplayTraceTools:
         width,height,rgb=_frame(frame);region=p['region'] or {'x':0,'y':0,'width':min(256,width),'height':min(256,height)};_region(region,width,height)
         report={**observed,'scope':'gameplay_trace_v1','name':p['name'],'graphics_evidence_id':observed['evidence_id'],'region':region,
                 'crop_png_base64':_png(_crop(rgb,width,region),region['width'],region['height']),'source_transfer_observed':False}
+        if width*height<=262144:
+            report['scene']={'width':width,'height':height,'sha256':frame['sha256'],'png_base64':_png(rgb,width,height)}
+        else:report['scene_unavailable']='The full scene exceeds the262144-pixel preview budget; the selected region remains available.'
         try:report['replay']=self.api.runtime.replay_snapshot(project,frame)
         except (ValueError,KeyError):report['replay']={'status':'UNAVAILABLE','reason':'No acknowledged cold-start replay is available. Load the game again and capture a fresh trace.'}
         report.pop('evidence_id',None)
