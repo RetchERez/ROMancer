@@ -30,6 +30,8 @@ class GameplayTraceTools:
         width,height,rgb=_frame(frame);region=p['region'] or {'x':0,'y':0,'width':min(256,width),'height':min(256,height)};_region(region,width,height)
         report={**observed,'scope':'gameplay_trace_v1','name':p['name'],'graphics_evidence_id':observed['evidence_id'],'region':region,
                 'crop_png_base64':_png(_crop(rgb,width,region),region['width'],region['height']),'source_transfer_observed':False}
+        try:report['replay']=self.api.runtime.replay_snapshot(project,frame)
+        except (ValueError,KeyError):report['replay']={'status':'UNAVAILABLE','reason':'No acknowledged cold-start replay is available. Load the game again and capture a fresh trace.'}
         report.pop('evidence_id',None)
         with self.api.operation_locks_guard:lock=self.api.operation_locks.setdefault(p['project_id'],threading.RLock())
         with lock:
@@ -49,7 +51,15 @@ class GameplayTraceTools:
     def get(self,p,c):
         project,row,_=self.api.source(p);record=load_evidence(project,p['trace_id'],'runtime');report=record['report']
         if report.get('scope')!='gameplay_trace_v1' or report.get('source_sha256')!=row['sha256'] or report.get('artifact_id')!=row['artifact_id']:raise ValueError('Choose a trace from this exact source revision.')
-        return {'ok':True,**report,'trace_id':p['trace_id'],'runtime_trusted':record['runtime_trusted']}
+        result={'ok':True,**report,'trace_id':p['trace_id'],'runtime_trusted':record['runtime_trusted']}
+        from .visual_source_tools import saved_verifications
+        try:
+            history=[v for v in saved_verifications(project,row) if v['report']['trace_id']==p['trace_id']]
+            result['verification_history']=[{'verification_id':v['verification_id'],'status':v['report']['status'],'runtime_trusted':v['runtime_trusted']} for v in history]
+            latest=next((v for v in reversed(history) if v['runtime_trusted'] and v['report']['status']=='VERIFIED_VISUAL_SOURCE'),history[-1] if history else None)
+            if latest:result['verification_summary']={'verification_id':latest['verification_id'],'status':latest['report']['status'],'verified_placements':len(latest['report']['verified_matches']),'runtime_trusted':latest['runtime_trusted']}
+        except (ValueError,OSError,KeyError):result['verification_issue']='Saved verification index is unavailable; capture a fresh trace and verify again.'
+        return result
     def open(self,p,c):
         report=self.get(p,c)
         if not report['runtime_trusted']:raise ValueError('This is historical imported evidence. Capture a fresh local trace before opening candidates for editing.')

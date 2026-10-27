@@ -105,6 +105,19 @@ def graph(row,path,cancelled=lambda:False,project=None):
             for index,match in enumerate(r['matches']):
                 candidate=add('candidate','Tile at '+hex(match['offset'])+' / '+str(match['x'])+', '+str(match['y']),match['offset'],match['length'],'assets',{'trace_id':item['trace_id'],'match':index},'pixel_candidate')
                 connect(trace,candidate,'pixel_match')
+    if project is not None:
+        from .visual_source_tools import saved_verifications
+        try:verifications=saved_verifications(project,row)
+        except (ValueError,OSError,KeyError):verifications=[];issues.append({'kind':'verification','message':'Source verification could not be authenticated. Run a fresh verification.'})
+        for item in reversed(verifications):
+            r=item['report']
+            trusted=item['runtime_trusted'];confidence='causal_replay' if trusted and r['verified_matches'] else 'verification_result' if trusted else 'historical_frame'
+            proof=add('verification','Source check / '+r['status'],None,0,'playtest',{'verification_id':item['verification_id'],'trace_id':r['trace_id']},confidence)
+            trace=next((n for n in nodes if n['kind']=='trace' and n['locator']['trace_id']==r['trace_id']),None)
+            if trace:connect(trace,proof,'source_verification')
+            for m in r['verified_matches']:
+                source=add('verified_source','Verified tile at '+hex(m['offset'])+' / '+str(m['x'])+', '+str(m['y']),m['offset'],m['length'],'assets',{'verification_id':item['verification_id'],'match_id':m['match_id'],'trace_id':r['trace_id']},confidence)
+                connect(proof,source,'verified_visual_source')
     try:
         for link in user_links(row):
             if link['from'] not in by_key or link['to'] not in by_key:issues.append({'kind':'link','message':'A declared link refers to a changed resource. Recreate it for the current layout.'});continue
@@ -158,7 +171,7 @@ class ConnectedGameTools:
         require_supported(row);return row,path,graph(row,path,c,project)
     def graph(self,p,c):
         label(p['query'],128,blank=True);number(p['page'],0,1024)
-        if p['kind'] not in ('all','known','known_resource','assets','script','tables','record','levels','room','actor','sound','note','trace','candidate'):raise ValueError('Choose an available resource category.')
+        if p['kind'] not in ('all','known','known_resource','assets','script','tables','record','levels','room','actor','sound','note','trace','candidate','verification','verified_source'):raise ValueError('Choose an available resource category.')
         row,_,model=self._graph(p,c);query=p['query'].casefold();rows=[r for r in model['nodes'] if p['kind'] in ('all',r['kind']) and query in r['name'].casefold()];start=p['page']*50
         selected=rows[start:start+50];page_edges={}
         for node in selected:
@@ -185,6 +198,11 @@ class ConnectedGameTools:
         if node['kind'] in ('trace','candidate'):
             trace=self.api.traces.get({**p,'trace_id':node['locator']['trace_id']},c)
             preview={'png_base64':trace['crop_png_base64'],'caption':'Measured gameplay region. Pixel matches are candidates; source transfers were not observed.','runtime_trusted':trace['runtime_trusted'],'trace_id':trace['trace_id'],'frame':trace['frame'],'region':trace['region'],'coverage':trace['coverage']}
+        if node['kind'] in ('verification','verified_source'):
+            proof=self.api.visual_sources.get({**p,'verification_id':node['locator']['verification_id']},c)
+            chosen=next((m for m in proof['verified_matches'] if m['match_id']==node['locator'].get('match_id')),proof['verified_matches'][0] if proof['verified_matches'] else None)
+            preview={'runtime_trusted':proof['runtime_trusted'],'text':proof['reason'],'caption':'Authenticated causal source test. CPU/DMA transfers were not observed.','fields':[{'name':'Result','value':proof['status']}]}
+            if chosen:preview.update(png_base64=chosen['visual'][0]['original_png_base64'],fields=preview['fields']+[{'name':'Verified opaque pixels','value':str(chosen['verified_pixels'])+' / '+str(chosen['opaque_pixels'])},{'name':'Complete opaque placement','value':str(chosen['complete_placement'])}])
         raw=b''
         if node['offset'] is not None:
             with path.open('rb') as f:f.seek(node['offset']);raw=f.read(min(node['length'],128))

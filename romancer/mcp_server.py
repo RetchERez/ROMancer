@@ -19,13 +19,13 @@ from romancer.workbench_api import WorkbenchAPI
 PROTOCOL='2025-11-25'
 MAX_MESSAGE=1024*1024
 MAX_RESULT=256*1024
-READ_OPERATIONS=frozenset('''gameview.graph gameview.detail traces.get checks.status checks.get symbols.preview symbols.search documented.scan documented.open references.catalog references.template research.note_get research.inspect research.preview system.capabilities system.operations projects.list project.open
+READ_OPERATIONS=frozenset('''gameview.graph gameview.detail traces.get traces.verification traces.origin checks.status checks.get symbols.preview symbols.search documented.scan documented.open references.catalog references.template research.note_get research.inspect research.preview system.capabilities system.operations projects.list project.open
 games.inspect games.maps.catalog games.maps.inspect cheats.catalog cheats.inspect engines.inspect systems.reference systems.classify_address rom.check catalog.list resource.inspect resources.explain resources.relationships
 hex.search hex.numbers hex.bookmarks builds.timeline builds.compare project.validate investigations.get investigations.probe debugger.capabilities debugger.get structures.survey structures.definition relocation.table_definition
 assets.inspect script.inspect tables.inspect tables.batch levels.inspect sound.inspect revision.lookup
 profiles.get profiles.validate runtime.checkpoints reports.list exports.list jobs.get
 systems.address resources.address_uses watches.compare debug.inspect compression.inspect'''.split())
-WRITE_OPERATIONS=frozenset('''gameview.link gameview.unlink traces.capture traces.open checks.configure checks.run symbols.import research.note_save research.note_delete research.export research.apply project.create project.demo project.demo_system source.import inputs.import
+WRITE_OPERATIONS=frozenset('''gameview.link gameview.unlink traces.capture traces.open traces.verify traces.open_verified checks.configure checks.run symbols.import research.note_save research.note_delete research.export research.apply project.create project.demo project.demo_system source.import inputs.import
 games.plan games.configure games.maps.plan cheats.import systems.plan_edits assets.plan script.plan tables.plan levels.plan sound.plan
 build.apply structured.apply builds.annotate hex.bookmark catalog.index rom.scan.start
 rom.scan.run release.prepare release.verify resources.declare_assets resources.declare_script tables.save_definition patches.preview patches.apply revision.import
@@ -40,6 +40,10 @@ DESCRIPTIONS={
  'traces.capture':'Save a paused native frame region and bounded system-codec ROM matches. Inputs cannot supply pixels. Competing offsets and coverage remain explicit; no source transfer is inferred.',
  'traces.get':'Read an authenticated saved gameplay trace and its candidates. Restored evidence is historical and cannot authorize candidate editing.',
  'traces.open':'Explicitly choose saved native pixel candidates for the existing graphics editor. Validates current source, trusted evidence and a bounded tile layout; does not modify ROM bytes.',
+ 'traces.verify':'Verify literal source locations using two controlled ROMancer marker builds, exact original replay controls and a restored-ROM control. Bounded causal visual dependency only; CPU/DMA transfers are not observed.',
+ 'traces.origin':'Read one authenticated source pixel map, exact format-derived byte lanes and proof images without truncating a large multi-part report. Historical evidence remains historical.',
+ 'traces.verification':'Read authenticated causal source verification, tested byte ranges, proof images and coverage. Imported evidence is historical.',
+ 'traces.open_verified':'Open only explicit parts confirmed by fresh source verification in the graphics editor. Does not modify the original ROM.',
  'checks.configure':'Save a source-bound cold-start check and optionally run it automatically for new descendant builds. Comparison can require unchanged pixels or present changes for review.',
  'checks.run':'Run the original twice and the build once in fresh reviewed workers, checking reproducibility, pixels, supported integrity checks and save-state replay. Flat or unstable originals are inconclusive.',
  'checks.status':'Read configured automatic test policy, queued job status and recent source/build results.',
@@ -115,13 +119,17 @@ def _investigation_properties(operation):
     def obj(properties):return {'type':'object','properties':properties,'required':list(properties),'additionalProperties':False}
     def array(items,maximum,minimum=0):return {'type':'array','items':items,'minItems':minimum,'maxItems':maximum}
     source={'project_id':string(),'artifact_id':string()}
-    if operation=='gameview.graph':return {**source,'query':string(128),'kind':enum(['all','known','known_resource','assets','script','tables','record','levels','room','actor','sound','note','trace','candidate']),'page':integer(0,1024)}
+    if operation=='gameview.graph':return {**source,'query':string(128),'kind':enum(['all','known','known_resource','assets','script','tables','record','levels','room','actor','sound','note','trace','candidate','verification','verified_source']),'page':integer(0,1024)}
     if operation=='gameview.detail':return {**source,'node_id':string(32)}
     if operation=='gameview.link':return {**source,'from_id':string(32),'to_id':string(32),'relation':enum(['uses_graphics','uses_palette','uses_script','uses_sound','uses_table','reference']),'note':string(256)}
     if operation=='gameview.unlink':return {**source,'link_id':string(32)}
     if operation=='traces.capture':return {**source,'name':string(80),'frame_sha256':string(64),'region':obj({'x':integer(0,2047),'y':integer(0,2047),'width':integer(8,256),'height':integer(8,256)}),'offset':integer(),'length':integer(1)}
     if operation=='traces.get':return {**source,'trace_id':string(32)}
     if operation=='traces.open':return {**source,'trace_id':string(32),'matches':array(integer(0,255),64,1)}
+    if operation=='traces.verify':return {**source,'trace_id':string(32),'start':integer(0,256),'limit':integer(1,8)}
+    if operation=='traces.verification':return {**source,'verification_id':string(32)}
+    if operation=='traces.origin':return {**source,'verification_id':string(32),'match_id':integer(0,255)}
+    if operation=='traces.open_verified':return {**source,'verification_id':string(32),'matches':array(integer(0,255),1,1)}
     if operation=='checks.status':return source
     if operation=='checks.get':return {**source,'evidence_id':string(32)}
     if operation=='checks.run':return {'project_id':string(),'source_id':string(32),'target_id':string(32)}
@@ -348,6 +356,11 @@ class MCPServer:
             public=_public_result(result)
             if operation.startswith(('gameview.','traces.','checks.')):public=_connected_previews(public,contents)
             text=json.dumps(public,ensure_ascii=False,allow_nan=False)
+            if len(text.encode('utf-8'))>MAX_RESULT and operation in ('traces.verify','traces.verification'):
+                public={k:v for k,v in public.items() if k not in ('groups','verified_matches')}
+                public['verified_origins']=[{k:m[k] for k in ('match_id','offset','length','x','y','height','unique_source_pixels','complete_placement')} for m in result.get('verified_matches',[])]
+                public['detail_omitted']='Read each exact pixel map and its byte lanes using traces.origin with verification_id and match_id.'
+                text=json.dumps(public,ensure_ascii=False,allow_nan=False)
             if len(text.encode('utf-8'))>MAX_RESULT:
                 public={'ok':bool(result.get('ok')),'result_truncated':True,'operation':operation,'note':'Result exceeds the AI response budget. Use a smaller range/page or a saved report.','job_id':result.get('job_id')};text=json.dumps(public)
             contents.insert(0,{'type':'text','text':text})

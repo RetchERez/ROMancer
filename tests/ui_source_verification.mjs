@@ -1,0 +1,10 @@
+import assert from 'node:assert/strict';
+import {visualSourceControls,sourceProofReport} from '../romancer/ui/source_verification.js';
+import {releaseProjectResources} from '../romancer/ui/project_flow.js';
+const actions={},state={project:{project_id:'p'},artifact:{artifact_id:'a',sha256:'s'},playing:false},ctx={state,use:r=>Object.assign(actions,r),sourceParams:()=>({project_id:'p',artifact_id:'a'}),draft:(_,d)=>d};
+let html=visualSourceControls(ctx,{trace_id:'t',matches:[],replay:{status:'UNAVAILABLE'}});assert.match(html,/fresh cold start/);assert.match(html,/disabled/);
+html=visualSourceControls(ctx,{trace_id:'t',matches:[{}],replay:{status:'READY'}});assert.match(html,/Verify ROM sources/);assert(actions['source-verify']);
+const r={status:'NOT_VERIFIED',reason:'No exact marker response.',verified_matches:[],groups:[],coverage:{next:1,total:2}};html=sourceProofReport(r);assert.doesNotMatch(html,/Open verified/);assert.match(html,/NOT_VERIFIED/);
+html=sourceProofReport({...r,status:'VERIFIED_VISUAL_SOURCE',verified_matches:[{match_id:3,offset:4096,x:8,y:16,height:8,visual:[],pixel_map:[],unique_source_pixels:32,verified_pixels:32,opaque_pixels:64,outside_placement_changed_pixels:[1,2]}],original_reproduced_twice:true,restored_control:{frame_matches:true},verification_id:'v'});assert.match(html,/Verified visual source/);assert.match(html,/Open verified part/);assert.match(html,/0x1000/);assert.match(html,/Shared|outside/);
+console.log('Source verification distinguishes fresh replay, unresolved results and authenticated verified editor handoff.');
+state.visualSourceProof={privatePixels:'release me'};state.verifiedVisualSource={verification_id:'v'};releaseProjectResources(state);assert.equal(state.visualSourceProof,null);assert.equal(state.verifiedVisualSource,null);

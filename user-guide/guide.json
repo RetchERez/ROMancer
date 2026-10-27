@@ -3220,11 +3220,12 @@
         "Choose a confirmed candidate or explicitly select matching parts to open the graphics editor. Review the assembled result before editing, build separately, then playtest the changed scene."
       ],
       "result": "A persistent connection from measured screen pixels to literal ROM byte candidates, available to people and the MCP interface.",
-      "note": "Pixel agreement does not prove a CPU/VDP source transfer, animation ownership or the role of a sprite. Compressed, transformed or RAM-generated images can have no literal match. The supplied seven-game test includes genuine zero-match and partial results; it does not claim every sprite was found.",
+      "note": "Pixel agreement does not prove a CPU/VDP source transfer, animation ownership or the role of a sprite. Compressed, transformed or RAM-generated images can have no literal match. The supplied seven-game test includes genuine zero-match and partial results; it does not claim every sprite was found. Use Verify ROM sources to test causal origins with coded probes and independent validation.",
       "related": [
         "connected-game-view",
         "sprites",
-        "checks"
+        "checks",
+        "verify-graphic-sources"
       ],
       "terms": [
         "term-gameplay-trace",
@@ -3345,12 +3346,158 @@
       "related": [
         "mcp",
         "automatic-build-checks",
-        "connected-evidence"
+        "connected-evidence",
+        "source-proof-method"
       ],
       "terms": [
         "term-build-check",
         "term-evidence"
       ]
+    },
+    {
+      "id": "verify-graphic-sources",
+      "title": "Find the ROM bytes behind a graphic",
+      "part": "Basic",
+      "kicker": "Verified graphic sources / step by step",
+      "intro": "Go beyond matching pixels. ROMancer can recover source pixel origins with controlled builds, then test the recovered map independently. This workflow uses the tested literal tile formats across all seven supported systems.",
+      "steps": [
+        "Cold-start the game and reach the scene. Pause, capture a frame and save a tight sprite or tile trace. ROMancer records acknowledged inputs automatically.",
+        "In the saved trace choose Verify ROM sources. ROMancer replays the original twice, then runs coded probes and two independent validation patterns in temporary builds. Progress and Cancel job appear below.",
+        "Read the result. Verified visual source includes an exact file offset, a recovered pixel map and original/controlled-marker/difference pictures. Green mask pixels are verified; unresolved pixels stay red. A partial map does not certify the whole sprite.",
+        "Choose Open verified part in graphics editor. Its original source pixels and observed colors are shown. Make a small change, review it and create a separate build. Undo restores the editing stroke; the original ROM stays unchanged.",
+        "Saved source-test results retain earlier successful and unsuccessful pages. In Game view use Verified sources or Source checks to find the evidence again. Test next source locations continues a bounded search."
+      ],
+      "result": "The supplied Castlevania test verified a graphic source at 0x1B167; the Rastan test verified one at 0x10400. Both were recovered and rechecked through ROMancer, then opened in its actual visual editor.",
+      "note": "Offsets apply only to the tested revision and scene. This measures source-to-picture dependency, not CPU, mapper-bank or DMA transfers.",
+      "related": [
+        "saved-gameplay-traces",
+        "connected-game-view",
+        "source-proof-method"
+      ],
+      "terms": [
+        "term-source-verification",
+        "term-coded-probe"
+      ],
+      "image": "87-nes-verified-source",
+      "image_layout": "following-page",
+      "caption": "Find the ROM bytes behind a graphic",
+      "visual_page": {
+        "title": "Find the ROM bytes behind a graphic",
+        "kicker": "Actual ROMancer interface",
+        "intro": "Measured source verification with a supplied game, captured without desktop control.",
+        "panels": [
+          {
+            "image": "87-nes-verified-source",
+            "title": "Find the ROM bytes behind a graphic",
+            "x": 48,
+            "top": 850,
+            "width": 1120,
+            "crop": [
+              0,
+              0,
+              1800,
+              1100
+            ]
+          }
+        ]
+      }
+    },
+    {
+      "id": "source-proof-method",
+      "title": "Read a recovered pixel map and its byte lanes",
+      "part": "Advanced",
+      "kicker": "Verified graphic sources / evidence and controls",
+      "intro": "A source code is assigned to each stored pixel. Separate native runs reveal which screen pixels carry those codes. Two additional spatial patterns test the recovered mapping; palette-only effects cannot satisfy the required distinct pixel origins.",
+      "steps": [
+        "The original must reproduce the exact captured RGB frame twice, using the same effective core options, controller setup and system-file hashes. A different second-run context is inconclusive even if the pictures look identical.",
+        "Seven coded probes identify an 8 by 8 source; an 8 by 16 source can need eight. At least 16 distinct source pixel IDs, spread across rows and columns, must be recovered. A global recolor has too few distinct origins to qualify.",
+        "Two independent color-balanced validation patterns must reproduce every accepted mapped pixel. Each tested color needs changed and unchanged spatial witnesses. Failed validation does not cherry-pick a smaller passing subset.",
+        "Expand Recovered pixel origins. Source pixel coordinates lead to encoded file-byte lanes and bit masks, then to screen coordinates. Byte lanes are derived from the tested codec; they are not a native bus-read log.",
+        "The final control reverses the probe plan, restores the exact original ROM hash and reproduces its whole frame. Worker exits, plan hashes and execution identities are recorded. Diagnostic copies are removed after teardown."
+      ],
+      "result": "You can follow a measured screen pixel back to its literal source pixel and the codec-defined bytes that store it. The displayed mask uses screen orientation, including flipped or partial placements.",
+      "note": "Compression, transformed graphics, shared storage and unstable startup can remain unresolved. Failed tests never authorize a verified source edit.",
+      "related": [
+        "verify-graphic-sources",
+        "source-proof-recovery",
+        "automated-workbench"
+      ],
+      "terms": [
+        "term-source-pixel",
+        "term-independent-validation",
+        "term-source-verification"
+      ],
+      "image": "88-nes-exact-pixel-byte-origins",
+      "image_layout": "following-page",
+      "caption": "Read a recovered pixel map and its byte lanes",
+      "visual_page": {
+        "title": "Read a recovered pixel map and its byte lanes",
+        "kicker": "Actual ROMancer interface",
+        "intro": "Measured source verification with a supplied game, captured without desktop control.",
+        "panels": [
+          {
+            "image": "88-nes-exact-pixel-byte-origins",
+            "title": "Read a recovered pixel map and its byte lanes",
+            "x": 48,
+            "top": 850,
+            "width": 1120,
+            "crop": [
+              0,
+              0,
+              1800,
+              1100
+            ]
+          }
+        ]
+      }
+    },
+    {
+      "id": "source-proof-recovery",
+      "title": "Resolve an unverified source and edit safely",
+      "part": "Advanced",
+      "kicker": "Verified graphic sources / evidence and controls",
+      "intro": "A refusal is useful evidence. It separates a genuine source from a coincidental pattern, a shared effect or an unreproducible scene. Use a focused next experiment rather than changing an unproved address.",
+      "steps": [
+        "No literal match: choose another part or source range. Keep the coverage limits in view. Compressed or RAM-generated graphics need a supported decoder or further native investigation; this tool does not guess their format.",
+        "Replay unavailable: reload the game and capture a fresh trace. State restores, battery saves, changed options and histories over 36,000 frames or 2048 steps cannot become cold-start proof.",
+        "Too few distinct origins or a color effect: choose a larger, more detailed visible part. A flat or nearly transparent region may not have enough independently testable pixels. A global palette change is not literal tile provenance.",
+        "Validation failed or original changed: retain the report, try a stable scene and inspect shared storage. Earlier positive tests remain available. Imported reports cannot authorize a verified editor handoff.",
+        "After editing, review the build and playtest the changed scene. Observed colors preview the original; palette bytes are unchanged. Choose a known color index or declare a palette. Source verification does not certify a later modification."
+      ],
+      "result": "The pictured Rastan graphic part opens from verified evidence, accepts a visual pixel edit and restores the stroke with Undo. Probe builds are isolated diagnostics and never clutter the project build history.",
+      "note": "MCP uses the same proof workflow. Cold replay and save-state regression are separate checks.",
+      "related": [
+        "verify-graphic-sources",
+        "mcp",
+        "automatic-build-checks"
+      ],
+      "terms": [
+        "term-coded-probe",
+        "term-independent-validation"
+      ],
+      "image": "86-real-sms-verified-source-editor",
+      "image_layout": "following-page",
+      "caption": "Resolve an unverified source and edit safely",
+      "visual_page": {
+        "title": "Resolve an unverified source and edit safely",
+        "kicker": "Actual ROMancer interface",
+        "intro": "Measured source verification with a supplied game, captured without desktop control.",
+        "panels": [
+          {
+            "image": "86-real-sms-verified-source-editor",
+            "title": "Resolve an unverified source and edit safely",
+            "x": 48,
+            "top": 850,
+            "width": 1120,
+            "crop": [
+              0,
+              0,
+              1800,
+              1100
+            ]
+          }
+        ]
+      }
     }
   ],
   "glossary": [
@@ -3748,6 +3895,26 @@
       "id": "term-build-check",
       "term": "Automatic build check",
       "definition": "A configured fresh-worker comparison of an original twice and a build once, including cartridge integrity and next-frame state replay. Results describe only the configured inputs and assertions."
+    },
+    {
+      "id": "term-source-verification",
+      "term": "Verified visual source",
+      "definition": "An authenticated causal source-to-picture result: coded pixel origins, independent spatial validation, repeatable originals and a restored-ROM control. It does not assert observed CPU, mapper-bank or DMA fetches."
+    },
+    {
+      "id": "term-coded-probe",
+      "term": "Coded pixel probe",
+      "definition": "A temporary ROMancer build that changes selected source pixels according to a unique bit code. Native replay responses identify source pixel IDs instead of relying on visual similarity alone."
+    },
+    {
+      "id": "term-source-pixel",
+      "term": "Source pixel origin",
+      "definition": "A stored pixel position causally linked to a screen position by coded probes and independent validation. Its encoded byte lanes are calculated using the tested literal codec."
+    },
+    {
+      "id": "term-independent-validation",
+      "term": "Independent validation",
+      "definition": "A check not used to discover the mapping: separate spatial marker patterns must reproduce all accepted recovered pixels and their changed/unchanged color controls."
     }
   ],
   "index": [
@@ -4958,6 +5125,48 @@
       "term": "Declared relationships",
       "topics": [
         "connected-evidence"
+      ]
+    },
+    {
+      "term": "Verified graphic sources",
+      "topics": [
+        "verify-graphic-sources"
+      ]
+    },
+    {
+      "term": "Coded pixel tracing",
+      "topics": [
+        "source-proof-method"
+      ]
+    },
+    {
+      "term": "Pixel-to-byte map",
+      "topics": [
+        "source-proof-method"
+      ]
+    },
+    {
+      "term": "Source verification failures",
+      "topics": [
+        "source-proof-recovery"
+      ]
+    },
+    {
+      "term": "Temporary diagnostic builds",
+      "topics": [
+        "source-proof-method"
+      ]
+    },
+    {
+      "term": "Palette-only false positives",
+      "topics": [
+        "source-proof-method"
+      ]
+    },
+    {
+      "term": "Source proof history",
+      "topics": [
+        "verify-graphic-sources"
       ]
     }
   ]

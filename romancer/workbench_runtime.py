@@ -34,7 +34,8 @@ class RuntimePool:
             load=preflight_load({**(configuration or {}),'game':row['path'],'core':str(core),'session_dir':str(Path(project)/'sessions'/uuid.uuid4().hex),
                 'expected_game_sha256':row['sha256'],'expected_core_sha256':core_id['sha256'],'core_options':options},project,allow_game_save=True)
             runtime=OwnedRuntime(load,30,cancelled=cancelled);runtime.__enter__()
-            self.sessions[str(project)]={'runtime':runtime,'touched':time.monotonic(),'artifact_id':artifact_id,'load':load}
+            from .replay_journal import ReplayJournal
+            self.sessions[str(project)]={'runtime':runtime,'touched':time.monotonic(),'artifact_id':artifact_id,'load':load,'replay_journal':ReplayJournal(game_save=bool(load.get('game_save')))}
             try:hello=runtime.request('hello')
             except BaseException:self.close_session(project);raise
             runtime.client.cancelled=None
@@ -55,6 +56,7 @@ class RuntimePool:
                 proposed=copy.deepcopy(value['recording']);append_input(proposed,parameters)
             try:
                 result=runtime.request(operation,**parameters)
+                if 'replay_journal' in value:value['replay_journal'].acknowledge(operation,parameters,result)
                 if proposed is not None:
                     proposed['acknowledged_frames']=proposed.get('acknowledged_frames',0)+parameters['frames']
                     value['recording']=proposed;write_json(Path(project)/'routes'/(proposed['definition_id']+'.json'),proposed,max_bytes=2*1024**2)
@@ -98,6 +100,15 @@ class RuntimePool:
             value=self.sessions.get(str(project))
             if value is None:raise ValueError('load a native session first')
             return {'id':value['artifact_id'],'sha256':value['load']['expected_game_sha256']}
+
+    def replay_snapshot(self,project,frame):
+        from .replay_journal import execution_context
+        with self.lock:
+            value=self.sessions.get(str(project))
+            if value is None:raise ValueError('The native session is no longer available. Capture a fresh trace after loading.')
+            if frame.get('game_sha256')!=value['load']['expected_game_sha256'] or frame.get('core_sha256')!=value['load']['expected_core_sha256']:raise ValueError('Replay source or core differs from the captured frame.')
+            packet=value['replay_journal'].snapshot(frame['index'])
+            return {**packet,'context':execution_context(value['load'])}
 
     def begin_recording(self,project,record):
         with self.lock:

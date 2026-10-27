@@ -26,6 +26,19 @@ Connected workbench across all seven systems:
 - MCP exposes the same graph, trace and test services with strict schemas and
   compact image previews. Read the Basic and Advanced guide procedures.
 
+Verified graphic sources:
+- Save a captured object trace from a fresh cold-start playtest, then choose
+  Verify ROM sources. Coded pixel probes recover distinct source origins;
+  two independent spatial validations and a restored-ROM control check them.
+- Inspect exact source offsets, screen pixel maps and codec-derived byte lanes.
+  Open a verified source part in the existing visual editor. Original ROMs stay
+  unchanged and diagnostic builds never enter the project build history.
+- This works with the tested literal tile formats on all seven systems. It does
+  not claim recorded CPU/DMA transfers, infer every compression format or label
+  a whole sprite's role automatically. Unverified and partial results stay clear.
+- GUI and MCP share the source-proof service; traces.origin reads one precise
+  pixel-byte map without a large report. See the Basic and Advanced guide.
+
 Editors need an understood layout:
 - Text, numeric tables, assembled sprites, palettes, levels and sound need a
   verified definition or an explicit declaration of the format and byte ranges.

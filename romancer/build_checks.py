@@ -42,7 +42,7 @@ def compare_frames(first,repeated,candidate,region,mode):
         'difference_png_base64':_png(difference,chosen['width'],chosen['height'])},'reason':'Selected pixels are unchanged.' if not changed else 'Pixels changed. Review whether this was intended.'}
 
 
-def run_sample(project,row,configuration,steps,cancelled):
+def run_sample(project,row,configuration,steps,cancelled,*,state_check=True):
     projects._measure(row['path'],row,cancelled=cancelled)
     core=projects._measure(configuration['core'],cancelled=cancelled)
     if core['sha256']!=configuration['expected_core_sha256']:raise ValueError('Configured engine revision changed before the test.')
@@ -54,15 +54,16 @@ def run_sample(project,row,configuration,steps,cancelled):
             r=runtime.request('advance',**step);expected+=step['frames']
             if r.get('frame_index')!=expected or r.get('game_sha256')!=row['sha256'] or r.get('core_sha256')!=configuration['expected_core_sha256']:raise ValueError('Test frame cadence or worker identity differs.')
         frame=runtime.request('capture');_frame(frame)
-        snapshot=runtime.request('save_state');runtime.request('advance',frames=1,buttons=[],port=0);next_frame=runtime.request('capture')
-        runtime.request('load_state',snapshot=snapshot);runtime.request('advance',frames=1,buttons=[],port=0);replayed=runtime.request('capture')
-        _frame(next_frame);_frame(replayed)
-        if next_frame['sha256']!=replayed['sha256']:raise ValueError('Save-state replay did not reproduce the next frame.')
+        if state_check:
+            snapshot=runtime.request('save_state');runtime.request('advance',frames=1,buttons=[],port=0);next_frame=runtime.request('capture')
+            runtime.request('load_state',snapshot=snapshot);runtime.request('advance',frames=1,buttons=[],port=0);replayed=runtime.request('capture')
+            _frame(next_frame);_frame(replayed)
+            if next_frame['sha256']!=replayed['sha256']:raise ValueError('Save-state replay did not reproduce the next frame.')
         runtime.close_verified();exit_code=runtime.exit_code
         identity={'core_sha256':configuration['expected_core_sha256'],'options':runtime.load_result.get('loaded',{}).get('core_options',{}),'controller_devices':configuration.get('controller_devices',{}),'system_files':configuration.get('system_files',[])}
     projects._measure(row['path'],row,cancelled=cancelled)
     projects._measure(configuration['core'],core,cancelled=cancelled)
-    return {'frame':frame,'state_replay':True,'worker_exit_code':exit_code,'execution_sha256':digest(identity)}
+    return {'frame':frame,'state_replay':bool(state_check),'worker_exit_code':exit_code,'execution_sha256':digest(identity)}
 
 
 class BuildCheckTools:

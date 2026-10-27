@@ -216,6 +216,8 @@ class WorkbenchAPI:
         self.connected=ConnectedGameTools(self);self.routes.update(self.connected.routes())
         from .gameplay_traces import GameplayTraceTools
         self.traces=GameplayTraceTools(self);self.routes.update(self.traces.routes())
+        from .visual_source_tools import VisualSourceTools
+        self.visual_sources=VisualSourceTools(self);self.routes.update(self.visual_sources.routes())
         from .build_checks import BuildCheckTools
         self.checks=BuildCheckTools(self);self.routes.update(self.checks.routes())
         from .popular_references import catalog as reference_catalog,inspect_template
@@ -400,7 +402,7 @@ class WorkbenchAPI:
             if operation not in self.routes:raise ValueError('unknown workbench operation')
             names,handler=self.routes[operation];fields(parameters,names)
             if cancelled():raise KeyboardInterrupt
-            if operation in ('rom.scan.run','graphics.observe','traces.capture','checks.run'):return handler(parameters,cancelled)
+            if operation in ('rom.scan.run','graphics.observe','traces.capture','traces.verify','checks.run'):return handler(parameters,cancelled)
             if 'project_id' in parameters:
                 project_id=projects.identifier(parameters['project_id'])
                 with self.operation_locks_guard:lock=self.operation_locks.setdefault(project_id,threading.RLock())
