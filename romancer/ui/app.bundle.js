@@ -1298,6 +1298,10 @@
     registerVerificationNavigation(ctx2);
     const scope = selectionKey(ctx2.state), current2 = () => selectionKey(ctx2.state) === scope;
     ctx2.use({
+      "documented-scan-tables": () => {
+        if (!current2()) return;
+        return ctx2.navigate("tables");
+      },
       "graphics-index-play": () => ctx2.navigate("playtest"),
       "structure-inspect": (node) => {
         var _a2, _b, _c, _d;
@@ -1353,10 +1357,10 @@
     return panel(ctx2, (_a = ctx2.state.romScans) == null ? void 0 : _a[scope]);
   }
   function panel(ctx2, entry) {
-    var _a, _b, _c, _d;
+    var _a, _b, _c, _d, _e, _f;
     const result = entry == null ? void 0 : entry.result, model = result == null ? void 0 : result.identification, known = model == null ? void 0 : model.profile, refs = (_a = result == null ? void 0 : result.catalog) == null ? void 0 : _a.file, matched = (refs == null ? void 0 : refs.status) === "MATCHED" ? (_b = refs.matches[0]) == null ? void 0 : _b.name : null;
     const query = ((_c = ctx2.state.romScanQuery) == null ? void 0 : _c.toLowerCase()) || "", candidates = ((result == null ? void 0 : result.candidates) || []).filter((c) => !query || [c.kind, c.preview, c.format, c.offset.toString(16)].join(" ").toLowerCase().includes(query));
-    return `<section class="card" id="rom-scan-panel"><div class="card-heading"><h3>ROM investigation</h3>${(entry == null ? void 0 : entry.status) === "SCANNING" ? badge("Scanning", "warm") + button("Cancel scan", "rom-scan-cancel", { disabled: !entry.job_id }) : button("Rescan ROM", "rom-rescan", { icon: "search" })}</div>${(entry == null ? void 0 : entry.status) === "ERROR" ? `<p class="notice warm">${esc(entry.error)}</p>` : !result ? '<p class="subtle">' + (getSettings().autoDeepScan ? "Automatic offline identification and resource scan. You can keep working." : "Automatic deep scan is off in Settings. Choose Rescan ROM to investigate this file.") + "</p>" : `<p><strong>${known ? esc(known.name) + (model.status === "MATCHED" ? " · exact revision" : " · based on matched source") : matched ? esc(matched) + " · local catalog match" : esc(((_d = result.system_id) == null ? void 0 : _d.toUpperCase()) || "Unresolved system") + " · game revision unknown"}</strong></p><p class="subtle">${result.health ? "CRC32 " + esc(result.health.crc32) + " · " : ""}${size(result.coverage.file_bytes_read)} of ${size(result.coverage.file_size)} read. ${result.coverage.whole_file_read ? "Whole file covered." : "Partial coverage."} Candidate meanings need confirmation.</p>${verificationResults(result.health)}${graphicsIndex(ctx2, result.graphics_index)}${soundIndex(result.sound_system, result.engine_recognition)}${engineFindings(result.engine_recognition)}${cheatClues(result.cheat_references)}${structureIndex(result.structures)}${structuralExperiments(result.structural_lab)}<details><summary>Discoveries · ${Object.entries(result.counts).map(([kind, count]) => esc(kind) + " " + count + (result.coverage.segments.some((s) => {
+    return `<section class="card" id="rom-scan-panel"><div class="card-heading"><h3>ROM investigation</h3>${(entry == null ? void 0 : entry.status) === "SCANNING" ? badge("Scanning", "warm") + button("Cancel scan", "rom-scan-cancel", { disabled: !entry.job_id }) : button("Rescan ROM", "rom-rescan", { icon: "search" })}</div>${(entry == null ? void 0 : entry.status) === "ERROR" ? `<p class="notice warm">${esc(entry.error)}</p>` : !result ? '<p class="subtle">' + (getSettings().autoDeepScan ? "Automatic offline identification and resource scan. You can keep working." : "Automatic deep scan is off in Settings. Choose Rescan ROM to investigate this file.") + "</p>" : `<p><strong>${known ? esc(known.name) + (model.status === "MATCHED" ? " · exact revision" : " · based on matched source") : matched ? esc(matched) + " · local catalog match" : ((_e = (_d = result.documented_tables) == null ? void 0 : _d.candidates) == null ? void 0 : _e.some((c) => c.exact_revision)) ? "Pokemon Emerald · exact original revision" : esc(((_f = result.system_id) == null ? void 0 : _f.toUpperCase()) || "Unresolved system") + " · game revision unknown"}</strong></p><p class="subtle">${result.health ? "CRC32 " + esc(result.health.crc32) + " · " : ""}${size(result.coverage.file_bytes_read)} of ${size(result.coverage.file_size)} read. ${result.coverage.whole_file_read ? "Whole file covered." : "Partial coverage."} Candidate meanings need confirmation.</p>${documentedIndex(result.documented_tables)}${verificationResults(result.health)}${graphicsIndex(ctx2, result.graphics_index)}${soundIndex(result.sound_system, result.engine_recognition)}${engineFindings(result.engine_recognition)}${cheatClues(result.cheat_references)}${structureIndex(result.structures)}${structuralExperiments(result.structural_lab)}<details><summary>Discoveries · ${Object.entries(result.counts).map(([kind, count]) => esc(kind) + " " + count + (result.coverage.segments.some((s) => {
       var _a2;
       return (_a2 = s[kind]) == null ? void 0 : _a2.results_truncated;
     }) ? "+" : "")).join(" · ")}</summary><p>Showing up to ${result.coverage.result_limit_per_kind} results per kind. Graphics are sampled; compressed streams have work limits. Exact mapped game edits are in Overview.</p><div class="toolbar">${field("rom-scan-query", "Filter discoveries", ctx2.state.romScanQuery || "", { placeholder: "text, codec, offset or preview" })}${button("Filter", "rom-scan-filter")}</div>${candidates.length ? `<div class="table-wrap"><table><thead><tr><th>Location</th><th>Candidate</th><th>Preview</th><th></th></tr></thead><tbody>${candidates.slice(0, 20).map((c) => `<tr><td><code>0x${c.offset.toString(16).toUpperCase()}</code></td><td>${esc(c.kind)}<br><small>${esc(c.confidence)}</small></td><td>${esc(c.preview)}</td><td>${button("View bytes", "rom-scan-inspect", { id: String(c.offset) })}</td></tr>`).join("")}</tbody></table></div><p class="subtle">${Math.min(20, candidates.length)} of ${candidates.length} stored discoveries. Filter to narrow results.</p>` : "<p>No matching candidates. Custom encodings and layouts need a definition.</p>"}<details><summary>Coverage and limits</summary>${result.limits.map((note) => `<p>${esc(note)}</p>`).join("")}<p>${result.coverage.segments.filter((s) => {
@@ -1384,6 +1388,11 @@
   function structuralExperiments(lab) {
     if (!lab) return "";
     return `<details><summary>Repeated layout hypotheses · ${lab.candidates.length}</summary><p>${esc(lab.scope)}</p><p>Numeric patterns can suggest record layouts. Dereferences and gameplay meanings have not been observed.</p>${lab.candidates.slice(0, 8).map((c) => `<p><code>0x${c.offset.toString(16)}</code> · ${c.count} records · ${c.stride} bytes each · ${c.width * 8} bit ${button("Investigate layout", "structure-lab-window", { id: String(c.offset) })}</p>`).join("") || "<p>No repeated layout survived the sampled experiments. Use Investigation to test a focused range.</p>"}</details>`;
+  }
+  function documentedIndex(data) {
+    var _a;
+    if (!((_a = data == null ? void 0 : data.candidates) == null ? void 0 : _a.length)) return "";
+    return `<div class="notice"><h4>Named game tables found</h4>${data.candidates.map((c) => `<p>${esc(c.name)} · ${c.count} records · 0x${c.offset.toString(16)} · ${c.exact_revision ? "exact original" : "pattern match"}</p>`).join("")}${button("Open discovered tables", "documented-scan-tables")}</div>`;
   }
 
   // romancer/ui/playback_controls.js
@@ -1896,6 +1905,40 @@
     render: () => render3
   });
 
+  // romancer/ui/documented_tables.js
+  function documentedTables(ctx2) {
+    var _a, _b, _c, _d, _e;
+    const { state: state2 } = ctx2;
+    if (((_a = state2.artifact) == null ? void 0 : _a.system_id) !== "gba") return "";
+    const scope = selectionKey(state2), params = { ...ctx2.sourceParams() }, current2 = () => {
+      var _a2;
+      return scope === selectionKey(state2) && ((_a2 = ctx2.isCurrentRender) == null ? void 0 : _a2.call(ctx2)) !== false;
+    };
+    const saved = ((_b = state2.documentedTables) == null ? void 0 : _b.scope) === scope ? state2.documentedTables.result : null, automatic = (_e = (_d = (_c = state2.romScans) == null ? void 0 : _c[scope]) == null ? void 0 : _d.result) == null ? void 0 : _e.documented_tables;
+    const result = saved || ((automatic == null ? void 0 : automatic.source_sha256) === state2.artifact.sha256 ? automatic : null);
+    ctx2.use({
+      "documented-scan": async () => {
+        if (!current2()) return;
+        const r = await ctx2.run("documented.scan", params, { render: false });
+        if (!current2()) return;
+        if (r.artifact_id !== state2.artifact.artifact_id || r.source_sha256 !== state2.artifact.sha256) throw Error("The ROM changed. Scan its tables again.");
+        state2.documentedTables = { scope, result: r };
+        return ctx2.render();
+      },
+      "documented-open": async (node) => {
+        var _a2;
+        if (!current2() || !((_a2 = result == null ? void 0 : result.candidates) == null ? void 0 : _a2.some((r2) => r2.candidate_id === node.dataset.id))) throw Error("Find a current table result first.");
+        const r = await ctx2.run("documented.open", { ...params, candidate_id: node.dataset.id }, { render: false, refresh: false });
+        if (!current2()) return;
+        if (r.artifact_id !== state2.artifact.artifact_id || r.source_sha256 !== state2.artifact.sha256) throw Error("The ROM changed. Scan its tables again.");
+        state2.tableOrigin = { scope, note: r.note };
+        state2.tableProposal = { scope, result: r };
+        return ctx2.navigate("tables");
+      }
+    });
+    return '<section class="card"><h3>Find game tables</h3><p>Locate supported Pokemon species and move layouts without entering offsets. Review each match before editing.</p>' + button("Find stat and move tables", "documented-scan") + (result ? result.candidates.map((r) => '<div class="notice"><strong>' + esc(r.name) + "</strong><p>" + r.count + " records · 0x" + r.offset.toString(16) + " · " + r.stride + " bytes per record</p><p>" + esc(r.note) + "</p>" + button("Open named table", "documented-open", { id: r.candidate_id }) + "</div>").join("") + (result.candidates.length ? "" : "<p>No supported pattern matched. Modified or expanded layouts may need a symbol file or a checked declaration.</p>") + (result.truncated ? '<p class="notice warm">The result budget was reached; this is a partial search.</p>' : "") : "") + "</section>";
+  }
+
   // romancer/ui/research_tools.js
   var names = [["all", "Everything"], ["assets", "Graphics"], ["script", "Text"], ["tables", "Numbers"], ["levels", "Levels"], ["sound", "Sound"], ["notes", "My notes"]];
   var categories = ["graphics", "text", "numbers", "level", "sound", "code", "other"];
@@ -2269,7 +2312,7 @@
     return (row == null ? void 0 : row.label) !== void 0 ? row.label + " · ID 0x" + row.record_id.toString(16).toUpperCase().padStart(2, "0") : "Row " + row.index;
   }
   async function render3(ctx2) {
-    var _a, _b, _c, _d, _e, _f, _g;
+    var _a, _b, _c, _d, _e, _f, _g, _h, _i;
     const setupReview = useResearchSetup(ctx2, "tables");
     if (setupReview) return setupReview;
     const { state: state2 } = ctx2, missing = requireProject(ctx2);
@@ -2279,7 +2322,9 @@
     const proposal = ((_a = state2.tableProposal) == null ? void 0 : _a.scope) === selectionKey(state2) && state2.tableProposal.result.source_sha256 === artifact.sha256 ? state2.tableProposal.result : null;
     if (proposal) {
       const staged2 = stored(ctx2, "table-changes", null);
-      if ((_b = staged2 == null ? void 0 : staged2.changes) == null ? void 0 : _b.length) {
+      const prior = state2.results["tables.inspect"], reset2 = prior ? Number(ctx2.draft("table-reset-" + prior.document_id, "0")) || 0 : 0;
+      const typed = (prior == null ? void 0 : prior.source_sha256) === artifact.sha256 && ((_b = prior.rows) == null ? void 0 : _b.some((row) => row.cells.some((cell, index) => String(ctx2.draft("table-cell-" + prior.document_id + (reset2 ? "-v" + reset2 : "") + "-" + row.index + "-" + index, String(cell.value))).trim() !== String(cell.value))));
+      if (((_c = staged2 == null ? void 0 : staged2.changes) == null ? void 0 : _c.length) || typed) {
         ctx2.use({ "table-cancel-proposal": () => {
           state2.tableProposal = null;
           return ctx2.render();
@@ -2293,7 +2338,7 @@
       const d = proposal.definition;
       for (const [key3, value] of Object.entries({ "table-name": d.name, "table-offset": d.offset, "table-count": d.count, "table-stride": d.stride, "table-fields": JSON.stringify(d.fields) })) ctx2.setDraft(key3, typeof value === "string" ? value : String(value));
     }
-    const saved = ((_d = (_c = artifact.descriptors) == null ? void 0 : _c.tables) == null ? void 0 : _d.source_sha256) === artifact.sha256 ? artifact.descriptors.tables.definition : null;
+    const saved = ((_e = (_d = artifact.descriptors) == null ? void 0 : _d.tables) == null ? void 0 : _e.source_sha256) === artifact.sha256 ? artifact.descriptors.tables.definition : null;
     let model = state2.results["tables.inspect"];
     if ((model == null ? void 0 : model.source_sha256) !== artifact.sha256) model = null;
     if (!model && saved) {
@@ -2328,8 +2373,8 @@
       return [...result.values()];
     }
     function definition() {
-      const names5 = model ? model.definition.label_source : saved == null ? void 0 : saved.label_source;
-      return { schema_version: 1, name: read("table-name").trim(), offset: integer3("table-offset"), count: integer3("table-count"), stride: integer3("table-stride"), fields: columns2, ...names5 ? { label_source: names5 } : {} };
+      const active = (model == null ? void 0 : model.definition) || saved, names5 = active == null ? void 0 : active.label_source;
+      return { schema_version: 1, name: read("table-name").trim(), offset: integer3("table-offset"), count: integer3("table-count"), stride: integer3("table-stride"), fields: columns2, ...names5 ? { label_source: names5 } : {}, ...(active == null ? void 0 : active.row_names) ? { row_names: active.row_names, row_id_base: active.row_id_base || 0 } : {} };
     }
     ctx2.use({
       "table-add-field": () => {
@@ -2428,8 +2473,8 @@
         await ctx2.navigate("resources");
       }
     });
-    const pending = ((_e = state2.pending) == null ? void 0 : _e.kind) === "table" && state2.pending.artifact_id === artifact.artifact_id;
-    return `${heading("", "Data tables", "")}<section class="card"><div class="card-heading"><h3>${esc((model == null ? void 0 : model.definition.name) || "Define a table")}</h3><span>${model ? model.total + " records" : "No table loaded"}</span>${model && ((_f = state2.tablePreview) == null ? void 0 : _f.scope) === selectionKey(state2) && state2.tablePreview.document_id === model.document_id ? button("Save this layout", "table-inspect") : ""}</div><details class="config" ${model ? "" : "open"}><summary>Table layout</summary><div class="field-row">${field("table-name", "Table name", ctx2.draft("table-name", (saved == null ? void 0 : saved.name) || "Data table"))}${field("table-offset", "First record offset", ctx2.draft("table-offset", (saved == null ? void 0 : saved.offset) ?? "0"))}${field("table-count", "Record count", ctx2.draft("table-count", (saved == null ? void 0 : saved.count) ?? "16"))}${field("table-stride", "Bytes per record", ctx2.draft("table-stride", (saved == null ? void 0 : saved.stride) ?? "1"))}</div><div class="table-wrap"><table><thead><tr><th>Field</th><th>Offset</th><th>Type</th><th>Order</th><th>Pointer base</th><th></th></tr></thead><tbody>${columns2.map((field2, index) => `<tr><td>${esc(field2.name)}</td><td>${field2.offset}</td><td>${esc(field2.type)}</td><td>${esc(field2.endian)}</td><td>${field2.pointer_base ?? "None"}</td><td>${button("Remove", "table-remove-field", { id: String(index) })}</td></tr>`).join("")}</tbody></table></div><details class="config"><summary>Add a field</summary><div class="field-row">${field("table-field-name", "Field name", ctx2.draft("table-field-name", ""))}${field("table-field-offset", "Offset within record", ctx2.draft("table-field-offset", "0"))}${select("table-field-type", "Numeric type", numericTypes.map((type) => [type, type]), ctx2.draft("table-field-type", "u8"))}${select("table-field-endian", "Byte order", [["little", "Little endian"], ["big", "Big endian"]], ctx2.draft("table-field-endian", "little"))}${field("table-field-base", "Pointer base (optional)", ctx2.draft("table-field-base", ""))}</div><p>For a linear pointer: target file offset = stored value − base.</p>${button("Add field", "table-add-field")}</details>${button("Load table definition", "table-inspect", { primary: !model })}</details></section>${model ? `<section class="card"><div class="card-heading"><h3>Records</h3><span>${changes.length} staged changes</span></div>${catalog.length ? `<div class="field-row">${field("table-name-query", "Search record names or IDs", query)}${button("Find records", "table-search")}</div><div class="field-row">${select("table-record-choice", "Named record", matches.map((row) => [row.index, recordName(row)]), String(((_g = matches[0]) == null ? void 0 : _g.index) ?? ""))}${button("Show selected record", "table-select-record", { disabled: !matches.length, reason: "No matching record names." })}</div><p>${matches.length} matching records. Names come from this source revision; blank and unsupported text are marked.</p>` : ""}<div class="table-wrap"><table class="numeric-table"><thead><tr><th>Row</th>${model.definition.fields.map((field2) => `<th>${esc(field2.name)}${Number.isFinite(bounds(field2).minimum) && Number.isFinite(bounds(field2).maximum) ? `<br><small>Range ${bounds(field2).minimum}–${bounds(field2).maximum}</small>` : ""}</th>`).join("")}</tr></thead><tbody>${model.rows.map((row) => `<tr><td>${esc(recordName(row))}<br>${row.label !== void 0 ? `<small>Row ${row.index}${row.label_status === "unsupported" ? " · Unsupported name bytes" : row.label_status === "blank" ? " · Blank name" : ""}</small><br>` : ""}<code>0x${row.offset.toString(16)}</code></td>${row.cells.map((cell, index) => {
+    const pending = ((_f = state2.pending) == null ? void 0 : _f.kind) === "table" && state2.pending.artifact_id === artifact.artifact_id;
+    return `${heading("", "Data tables", "")}${documentedTables(ctx2)}${((_g = state2.tableOrigin) == null ? void 0 : _g.scope) === selectionKey(state2) ? '<p class="notice">' + esc(state2.tableOrigin.note) + "</p>" : ""}<section class="card"><div class="card-heading"><h3>${esc((model == null ? void 0 : model.definition.name) || "Define a table")}</h3><span>${model ? model.total + " records" : "No table loaded"}</span>${model && ((_h = state2.tablePreview) == null ? void 0 : _h.scope) === selectionKey(state2) && state2.tablePreview.document_id === model.document_id ? button("Save this layout", "table-inspect") : ""}</div><details class="config" ${model ? "" : "open"}><summary>Table layout</summary><div class="field-row">${field("table-name", "Table name", ctx2.draft("table-name", (saved == null ? void 0 : saved.name) || "Data table"))}${field("table-offset", "First record offset", ctx2.draft("table-offset", (saved == null ? void 0 : saved.offset) ?? "0"))}${field("table-count", "Record count", ctx2.draft("table-count", (saved == null ? void 0 : saved.count) ?? "16"))}${field("table-stride", "Bytes per record", ctx2.draft("table-stride", (saved == null ? void 0 : saved.stride) ?? "1"))}</div><div class="table-wrap"><table><thead><tr><th>Field</th><th>Offset</th><th>Type</th><th>Order</th><th>Pointer base</th><th></th></tr></thead><tbody>${columns2.map((field2, index) => `<tr><td>${esc(field2.name)}</td><td>${field2.offset}</td><td>${esc(field2.type)}</td><td>${esc(field2.endian)}</td><td>${field2.pointer_base ?? "None"}</td><td>${button("Remove", "table-remove-field", { id: String(index) })}</td></tr>`).join("")}</tbody></table></div><details class="config"><summary>Add a field</summary><div class="field-row">${field("table-field-name", "Field name", ctx2.draft("table-field-name", ""))}${field("table-field-offset", "Offset within record", ctx2.draft("table-field-offset", "0"))}${select("table-field-type", "Numeric type", numericTypes.map((type) => [type, type]), ctx2.draft("table-field-type", "u8"))}${select("table-field-endian", "Byte order", [["little", "Little endian"], ["big", "Big endian"]], ctx2.draft("table-field-endian", "little"))}${field("table-field-base", "Pointer base (optional)", ctx2.draft("table-field-base", ""))}</div><p>For a linear pointer: target file offset = stored value − base.</p>${button("Add field", "table-add-field")}</details>${button("Load table definition", "table-inspect", { primary: !model })}</details></section>${model ? `<section class="card"><div class="card-heading"><h3>Records</h3><span>${changes.length} staged changes</span></div>${catalog.length ? `<div class="field-row">${field("table-name-query", "Search record names or IDs", query)}${button("Find records", "table-search")}</div><div class="field-row">${select("table-record-choice", "Named record", matches.map((row) => [row.index, recordName(row)]), String(((_i = matches[0]) == null ? void 0 : _i.index) ?? ""))}${button("Show selected record", "table-select-record", { disabled: !matches.length, reason: "No matching record names." })}</div><p>${matches.length} matching records. Names use the checked layout’s labels or decoded source text. Review pattern-based labels before editing.</p>` : ""}<div class="table-wrap"><table class="numeric-table"><thead><tr><th>Row</th>${model.definition.fields.map((field2) => `<th>${esc(field2.name)}${Number.isFinite(bounds(field2).minimum) && Number.isFinite(bounds(field2).maximum) ? `<br><small>Range ${bounds(field2).minimum}–${bounds(field2).maximum}</small>` : ""}</th>`).join("")}</tr></thead><tbody>${model.rows.map((row) => `<tr><td>${esc(recordName(row))}<br>${row.label !== void 0 ? `<small>Row ${row.index}${row.label_status === "unsupported" ? " · Unsupported name bytes" : row.label_status === "blank" ? " · Blank name" : ""}</small><br>` : ""}<code>0x${row.offset.toString(16)}</code></td>${row.cells.map((cell, index) => {
       var _a2, _b2;
       return `<td><label class="field"><span class="sr-only">${esc(cell.field)}, ${esc(recordName(row))}</span><input id="${inputId(row.index, index)}" value="${esc(ctx2.draft(inputId(row.index, index), ((_a2 = changes.find((change) => change.row === row.index && change.field === cell.field)) == null ? void 0 : _a2.after) ?? cell.value))}" inputmode="numeric" aria-label="${esc(cell.field)}, ${esc(recordName(row))}"></label><div data-number-input="${inputId(row.index, index)}" data-before="${cell.value}" data-compact="true" data-minimum="${bounds(model.definition.fields[index]).minimum}" data-maximum="${bounds(model.definition.fields[index]).maximum}">${numberComparison(cell.value, ctx2.draft(inputId(row.index, index), ((_b2 = changes.find((change) => change.row === row.index && change.field === cell.field)) == null ? void 0 : _b2.after) ?? cell.value), { compact: true, ...bounds(model.definition.fields[index]) })}</div>${cell.target_offset !== null ? button("Open target 0x" + cell.target_offset.toString(16), "table-target", { id: String(cell.target_offset) }) : cell.pointer_resolution ? "<span>Unresolved target</span>" : ""}</td>`;
     }).join("")}</tr>`).join("")}</tbody></table></div><div class="actions">${button("Previous records", "table-page", { id: "-1", disabled: !model.page })}<span>Page ${model.page + 1}</span>${button("Next records", "table-page", { id: "1", disabled: (model.page + 1) * model.limit >= model.total })}${button("Review changes", "table-review", { primary: !pending })}${pending ? button("Create build", "table-build", { primary: true }) : ""}${button("Discard changes", "table-discard")}</div></section>${changes.length ? `<details class="card"><summary>Staged changes by record</summary><ul>${changes.map((change) => `<li>${esc(recordName(catalog[change.row] || { index: change.row }))}: ${esc(change.field)} ${change.before} → ${change.after}</li>`).join("")}</ul></details>` : ""}<details class="card"><summary>Batch change</summary><p>Preview up to1024 source records. Percent changes round halves away from zero. Numeric overflow is refused; declared field limits are also enforced. First row refers to the row number shown with each record.</p><div class="field-row">${select("table-batch-field", "Field", model.definition.fields.map((field2) => [field2.name, field2.name]), ctx2.draft("table-batch-field", model.definition.fields[0].name))}${select("table-batch-operation", "Operation", [["set", "Set value"], ["add", "Add"], ["multiply", "Multiply"], ["percent", "Change by percent"]], ctx2.draft("table-batch-operation", "add"))}${field("table-batch-value", "Value", ctx2.draft("table-batch-value", "1"))}${field("table-batch-first", "First row", ctx2.draft("table-batch-first", "0"))}${field("table-batch-count", "Record count", ctx2.draft("table-batch-count", String(Math.min(10, model.total))))}</div>${button("Preview batch changes", "table-batch")}</details>` : ""}${report(state2.results["tables.plan"], "Table change plan")}${report(state2.results["build.apply"], "Built output")}`;
@@ -2552,7 +2597,7 @@
   }
   var api = {
     async uploadInput(project_id, file, kind) {
-      const limits = { patch: 64, catalog: 16, save: 8, translation: 4, audio: 2, resource: 48 / 1024 };
+      const limits = { patch: 64, catalog: 16, save: 8, translation: 4, audio: 2, resource: 48 / 1024, symbols: 2 };
       if (!file || !limits[kind]) throw new Error("Choose a supported input file.");
       if (file.size > limits[kind] * 1024 * 1024) throw new Error(kind === "resource" ? "Choose edited data up to 48 KiB." : `This ${kind} exceeds the ${limits[kind]} MiB limit.`);
       const controller = new AbortController(), timer = setTimeout(() => controller.abort(), 3e4);
@@ -3142,6 +3187,64 @@
     mount: () => mount3,
     render: () => render6
   });
+
+  // romancer/ui/source_symbols.js
+  async function sourceSymbols(ctx2) {
+    var _a, _b;
+    const { state: state2 } = ctx2, a = state2.artifact;
+    if (!["gb", "gbc", "gba"].includes(a == null ? void 0 : a.system_id)) return "";
+    const scope = selectionKey(state2), params = { ...ctx2.sourceParams() }, current2 = () => {
+      var _a2;
+      return scope === selectionKey(state2) && ((_a2 = ctx2.isCurrentRender) == null ? void 0 : _a2.call(ctx2)) !== false;
+    };
+    const model = await ctx2.api.call("symbols.search", { ...params, query: ctx2.draft("symbol-query", ""), page: state2.symbolPage || 0 });
+    if (!current2()) return "";
+    if (model.source_sha256 !== a.sha256 || model.artifact_id !== a.artifact_id) return "";
+    const packet = ((_a = state2.symbolReview) == null ? void 0 : _a.scope) === scope ? state2.symbolReview : null;
+    ctx2.use({
+      "symbol-preview": async () => {
+        var _a2;
+        if (!current2()) return;
+        const file = (_a2 = document.getElementById("symbol-file")) == null ? void 0 : _a2.files[0];
+        if (!file) throw Error("Choose a symbol file.");
+        const format = read("symbol-format");
+        state2.symbolReview = null;
+        const item = await ctx2.api.uploadInput(state2.project.project_id, file, "symbols");
+        if (!current2()) return;
+        const review2 = await ctx2.run("symbols.preview", { ...params, input_id: item.input_id, format }, { render: false });
+        if (!current2()) return;
+        state2.symbolReview = { scope, input_id: item.input_id, format, review: review2 };
+        return ctx2.render();
+      },
+      "symbol-import": async () => {
+        var _a2, _b2;
+        if (!current2() || !((_a2 = packet == null ? void 0 : packet.review) == null ? void 0 : _a2.review_id)) throw Error("Review this source’s symbols first.");
+        const acknowledged = !!((_b2 = document.getElementById("symbol-ack")) == null ? void 0 : _b2.checked);
+        await ctx2.run("symbols.import", { ...params, input_id: packet.input_id, format: packet.format, review_id: packet.review.review_id, acknowledged }, { render: false });
+        if (!current2()) return;
+        state2.symbolReview = null;
+        state2.symbolPage = 0;
+        return ctx2.render();
+      },
+      "symbol-search": () => {
+        state2.symbolPage = 0;
+        return ctx2.render();
+      },
+      "symbol-page": (node) => {
+        state2.symbolPage = Math.max(0, (state2.symbolPage || 0) + Number(node.dataset.id));
+        return ctx2.render();
+      },
+      "symbol-bytes": (node) => {
+        if (!current2()) return;
+        const offset = Number(node.dataset.id);
+        if (!model.symbols.some((r) => r.file_offset === offset)) throw Error("Reload the symbol list.");
+        state2.resourceJump = offset;
+        return ctx2.navigate("resources");
+      }
+    });
+    const rows = ((_b = packet == null ? void 0 : packet.review) == null ? void 0 : _b.symbols) || model.symbols;
+    return '<details class="card" id="source-symbols"><summary>Named addresses from a symbol file</summary><p>Import names from your matching game build. ROM labels open their bytes; RAM labels show their CPU address.</p>' + fileInput("symbol-file", "Symbol listing", ".sym,.txt,.nm") + select("symbol-format", "Format", a.system_id === "gba" ? [["gnu-nm", "GNU nm (address type name)"]] : [["rgbds", "RGBDS .sym"]], a.system_id === "gba" ? "gnu-nm" : "rgbds") + button("Review symbol file", "symbol-preview") + (packet ? '<p class="notice">' + esc(packet.review.note) + " " + packet.review.total + " entries; " + packet.review.ignored_lines + ' ignored lines.</p><label><input id="symbol-ack" type="checkbox"> This symbol file belongs to this exact ROM build.</label>' + button("Import reviewed names", "symbol-import") : "") + field("symbol-query", "Find a symbol", ctx2.draft("symbol-query", "")) + button("Find name", "symbol-search") + rows.map((r) => '<div class="notice"><strong>' + esc(r.name) + "</strong> · " + (r.bank === null ? "" : r.bank.toString(16) + ":") + "0x" + r.address.toString(16) + "<p>" + esc(r.reason) + "</p>" + (!packet && r.file_offset !== null ? button("Inspect bytes at 0x" + r.file_offset.toString(16), "symbol-bytes", { id: String(r.file_offset) }) : "") + "</div>").join("") + (!packet && model.configured ? '<div class="button-row">' + button("Previous", "symbol-page", { id: "-1", disabled: !model.page }) + "<span>" + model.total + " matches · page " + (model.page + 1) + "</span>" + button("Next", "symbol-page", { id: "1", disabled: (model.page + 1) * 50 >= model.total }) + "</div>" : "") + "</details>";
+  }
 
   // romancer/ui/execution_trace.js
   var hex2 = (v) => Number.isSafeInteger(v) ? "0x" + v.toString(16) : "Unknown";
@@ -3944,6 +4047,8 @@
     }
     const research = a ? await researchTools(ctx2) : "";
     if (!current2()) return "";
+    const symbols = a ? await sourceSymbols(ctx2) : "";
+    if (!current2()) return "";
     const references = await popularReferences(ctx2);
     if (!current2()) return "";
     const observed = a ? await observedSourceContext(ctx2) : "";
@@ -4034,7 +4139,7 @@
     });
     if (!a) return `${heading("Workspace", "Resources", "")}${empty("Import a source", "Choose a cartridge image.", button("Import source", "import", { primary: true }))}`;
     const pending = ((_c = state2.pending) == null ? void 0 : _c.kind) === "bytes" && state2.pending.artifact_id === a.artifact_id;
-    return `${heading("Resource investigator", "Resources", "Inspect the exact selected revision. Generic edits require explicit old bytes and preserve file size.", button("Import source", "import", { icon: "plus" }))}<div class="identity">${badge(a.kind, a.kind === "build" ? "good" : "neutral")}<strong>${esc(a.name)}</strong><span>${esc(a.system)} · ${size(a.size)}</span><code title="${a.sha256}">SHA-256 ${short(a.sha256)}…</code></div>${a.source_id ? `<section class="card"><h3>Continue editing this build</h3>${((_d = a.plan_annotations) == null ? void 0 : _d.kind) === "declared-data-relocation-v1" ? "<p>Data moved. Original fixed-offset declarations are not reused.</p>" + button("Inspect moved bytes", "resource-moved-open") + (((_f = (_e = state2.project.sources.concat(state2.project.builds).find((r) => r.artifact_id === a.source_id)) == null ? void 0 : _e.descriptors) == null ? void 0 : _f.tables) ? button("Open moved table layout", "resource-moved-table") : "") : button("Reuse parent resource setup", "definitions-reuse") + '<p class="subtle">Re-read declared offsets against this build.</p>'}</section>` : ""}${observed}<div class="investigation-grid">${hexEditor(ctx2, data)}${byteNotes}</div>${comparison}${research}${references}${sourceSupport(ctx2)}${relationships}${scanControls(ctx2)}<details class="card"><summary>ROM health & revision</summary>${romHealthPanel(ctx2)}${revisionControls(ctx2)}${cheatControls(ctx2)}</details><details class="card"><summary>Find resources</summary>${discoveryControls(ctx2)}</details>${compressionControls(ctx2)}${relocation}<details class="card"><summary>Declared resource catalog</summary>${catalogSection(ctx2, catalog)}</details><details class="card"><summary>System layout</summary>${systemSection(ctx2, assessment)}</details>${report(state2.results["bytes.plan"], "Proposed byte changes")}${report(state2.results["build.apply"], "Build result")}`;
+    return `${heading("Resource investigator", "Resources", "Inspect the exact selected revision. Generic edits require explicit old bytes and preserve file size.", button("Import source", "import", { icon: "plus" }))}<div class="identity">${badge(a.kind, a.kind === "build" ? "good" : "neutral")}<strong>${esc(a.name)}</strong><span>${esc(a.system)} · ${size(a.size)}</span><code title="${a.sha256}">SHA-256 ${short(a.sha256)}…</code></div>${a.source_id ? `<section class="card"><h3>Continue editing this build</h3>${((_d = a.plan_annotations) == null ? void 0 : _d.kind) === "declared-data-relocation-v1" ? "<p>Data moved. Original fixed-offset declarations are not reused.</p>" + button("Inspect moved bytes", "resource-moved-open") + (((_f = (_e = state2.project.sources.concat(state2.project.builds).find((r) => r.artifact_id === a.source_id)) == null ? void 0 : _e.descriptors) == null ? void 0 : _f.tables) ? button("Open moved table layout", "resource-moved-table") : "") : button("Reuse parent resource setup", "definitions-reuse") + '<p class="subtle">Re-read declared offsets against this build.</p>'}</section>` : ""}${observed}<div class="investigation-grid">${hexEditor(ctx2, data)}${byteNotes}</div>${comparison}${documentedTables(ctx2)}${symbols}${research}${references}${sourceSupport(ctx2)}${relationships}${scanControls(ctx2)}<details class="card"><summary>ROM health & revision</summary>${romHealthPanel(ctx2)}${revisionControls(ctx2)}${cheatControls(ctx2)}</details><details class="card"><summary>Find resources</summary>${discoveryControls(ctx2)}</details>${compressionControls(ctx2)}${relocation}<details class="card"><summary>Declared resource catalog</summary>${catalogSection(ctx2, catalog)}</details><details class="card"><summary>System layout</summary>${systemSection(ctx2, assessment)}</details>${report(state2.results["bytes.plan"], "Proposed byte changes")}${report(state2.results["build.apply"], "Build result")}`;
   }
   function parseInteger(value) {
     const n = Number(value);

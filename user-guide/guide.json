@@ -5,7 +5,7 @@
   "scope": "Investigate unfamiliar cartridges without a game definition, review exact edits, create separate builds, playtest and verify patches. Named game workflows require their exact supported revision. Observations, candidate layouts and unknown behavior remain distinct. Basic Master System support covers validated Sega headers, checksums, literal row-planar graphics, declared edits, patches and measured playtesting. It does not infer every game resource.",
   "basic_summary": "Start the application, choose saved preferences, identify a source, make a focused edit, preserve progress and export a checked patch. These procedures build the habits used throughout the guide.",
   "advanced_summary": "Use explicit definitions for graphics, text, tables, connected-room layouts, audio and bounded automation. Follow declared ranges to exact bytes, and keep editor metadata, native observations and unknown game semantics separate.",
-  "attribution": "By RetchEWretched. ROMancer code and original fixtures use the project MIT license. Instructional screenshots show third-party games, including Castlevania, Chrono Trigger, The Immortal, Wario Land 4, Final Fantasy Legend II and Deja Vu I & II and Rastan; their imagery and trademarks remain those of their respective rights holders and are separate from the code license. No ROM files, game saves, emulator states, firmware dumps or authentication data are included in this guide. The prebuilt PDF and HTML work offline; PDF rebuilding optionally uses ReportLab.",
+  "attribution": "By RetchEWretched. ROMancer code and original fixtures use the project MIT license. Instructional screenshots show third-party games, including Castlevania, Chrono Trigger, The Immortal, Wario Land 4, Final Fantasy Legend II and Deja Vu I & II and Rastan, Pokemon Emerald and the supplied Ultra Violet hack; their imagery and trademarks remain those of their respective rights holders and are separate from the code license. No ROM files, game saves, emulator states, firmware dumps or authentication data are included in this guide. The prebuilt PDF and HTML work offline; PDF rebuilding optionally uses ReportLab.",
   "chapters": [
     {
       "id": "install",
@@ -3034,12 +3034,12 @@
       "steps": [
         "Expand Popular-game references and search for Pokemon or Mario. Read the documented facts and use Primary source for the pinned project version. Links require a network connection; the bundled summaries work offline.",
         "Keep address domains separate. For example the published Super Mario Bros. lives counter is CPU RAM 0x075A, not a ROM file offset. Player power-up form at 0x0756 is a different concept from the movement-state variable.",
-        "For supported GB/GBC/GBA sources, establish a stat table base, full record stride and count from your matching project or verified symbols. ROMancer does not guess these numbers.",
+        "For GBA Pokemon layouts, use Data tables > Find stat and move tables first. The documented locator searches the source and checks record prefixes; you do not enter its offsets. Other published layouts still need a matching symbol listing or checked declaration.",
         "Choose the correct documented prefix and Preview table layout. Red/Blue uses five base stats after its Dex number; Crystal separates special attack/defense; the GBA prefix begins with six stat bytes.",
         "Inspect values and record identities in the proposed Data table. Save this layout only when the declaration is correct. Use the normal reviewed table build to make changes; omitted fields and padding stay outside the prefix."
       ],
       "result": "You have a useful source-linked lead or a checked table proposal, with no false claim that an arbitrary Pokemon or Mario hack uses the original layout.",
-      "note": "The included UI example applies a declared prefix to an original GBA workshop. It is not a Pokemon ROM compatibility test. Expanded hacks can replace tables, encodings, engines and maps. No code, game assets or ROMs from the referenced projects are bundled.",
+      "note": "The new Pokemon chapter shows actual Emerald and Ultra Violet edits. This reference-prefix chapter remains a separate manual declaration workflow. Expanded hacks can change formats and record identities. Referenced game code, assets and ROMs are not bundled.",
       "related": [
         "numbers",
         "research-packs",
@@ -3074,28 +3074,100 @@
       }
     },
     {
-      "id": "remaining-gaps",
-      "title": "Understand the remaining specialist-tool gaps",
-      "part": "Advanced",
-      "kicker": "Product scope / honest comparisons",
-      "intro": "ROMancer combines generic inspection, declared editing, playtesting and reproducible research. It does not yet have every specialist tool's depth.",
+      "id": "pokemon-tables",
+      "title": "Rebalance named Pokemon stats and moves",
+      "part": "Basic",
+      "kicker": "Find a table / edit a named record",
+      "intro": "For the supported GBA numeric layout, ROMancer finds the first 151 species and first 165 moves without manual offsets. The opening records and every displayed record prefix are checked.",
       "steps": [
-        "HexManiacAdvance combines many known Pokemon structures and cross-references. ROMancer now preserves and exchanges checked definitions and notes, but full revision-specific map/event/script coverage still requires additional format work.",
-        "Lunar Magic has deep Super Mario World level-format support. A public RAM reference or generic tilemap editor does not replace that complete decoded level workflow.",
-        "Mesen offers live instruction-level debugging, breakpoints, watches and disassembly. ROMancer's bounded native captures and replay investigations are useful evidence but not a replacement for that live debugger.",
-        "GB Studio authors scenes, actors, triggers and scripts using its own supported game engine. ROMancer edits declared data in existing games; it does not yet supply equivalent arbitrary-game authoring.",
-        "Commercial music-driver decoders, verified compression/relocation coverage and broader real-game playthroughs remain substantial development tasks. Passing unit tests does not establish that those formats are implemented."
+        "Import your own GBA file. Automatic deep scan includes documented-table discovery. Open discovered tables from ROM investigation, or use Data tables > Find stat and move tables.",
+        "Read the result. Exact original identifies the checked Emerald revision. Pattern match means a modified ROM has matching numeric storage, not that every name or behavior is proven.",
+        "Choose Open named table. Search for Bulbasaur or a move such as Pound. Save this layout to keep its names with the source. Only the listed prefix fields are editable; omitted record bytes stay untouched.",
+        "Change one value. The cell shows original, edited, difference and percentage. Choose Review changes, check the byte plan, then Create build. Use separate builds for larger experiments.",
+        "Playtest the build and export a verified BPS patch. Returning to the original preserves its original values. A changed base stat is not necessarily the current party member’s displayed stat."
       ],
-      "result": "Choose the tool whose actual decoded formats and debugging features fit the task. Keep unresolved structures explicit and retain a repeatable test for each useful new definition.",
-      "note": "References: github.com/haven1433/HexManiacAdvance; mesen.ca/docs/debugging/debugger.html; gbstudio.dev/docs/project-editor; fusoya.eludevisibility.org/lm. These are comparison sources, not bundled implementations.",
+      "result": "The supplied Emerald example changes Bulbasaur base HP 45 to 55. The supplied Ultra Violet example changes Pound power 40 to 45. Each changes exactly one byte through ROMancer and reconstructs from its BPS patch.",
+      "note": "The tests establish the numeric edits, patch reconstruction, emulator loading and state round trips. They do not certify battle balance or a complete playthrough. Discovery covers the stated first 151/165 layout; expanded species, custom move scripts and relocated formats can need further readers.",
       "related": [
-        "popular-references",
-        "research-packs",
-        "release-checks"
+        "numbers",
+        "checks",
+        "research-packs"
       ],
       "terms": [
-        "term-evidence"
-      ]
+        "term-offset",
+        "term-revision"
+      ],
+      "image": "70-emerald-species-editor",
+      "image_layout": "following-page",
+      "caption": "Actual Emerald species table: base HP 45 → 55 with a live numeric preview.",
+      "visual_page": {
+        "title": "Edit a named move in Ultra Violet",
+        "kicker": "Actual ROMancer editing",
+        "intro": "Working interface with the supplied local game file.",
+        "panels": [
+          {
+            "image": "71-ultraviolet-move-editor",
+            "title": "Edit a named move in Ultra Violet",
+            "x": 48,
+            "top": 850,
+            "width": 1120,
+            "crop": [
+              0,
+              0,
+              1800,
+              1100
+            ]
+          }
+        ]
+      }
+    },
+    {
+      "id": "source-symbols",
+      "title": "Find named ROM addresses with symbol files",
+      "part": "Advanced",
+      "kicker": "RGBDS / GNU nm",
+      "intro": "A matching symbol listing connects human-readable names to addresses. ROMancer reads RGBDS bank:address listings for GB/GBC and GNU nm address/type/name listings for GBA.",
+      "steps": [
+        "Obtain the symbol file produced for your exact game build. In Resources expand Named addresses from a symbol file. Choose the listing and its supported format, then Review symbol file.",
+        "Read entry and ignored-line counts. This text format has no embedded ROM identity, so confirm that it belongs to the selected build before importing the reviewed names.",
+        "Search a symbol name. Inspect bytes opens a mapped location inside the selected ROM. RAM and I/O symbols show the CPU address and do not offer a ROM byte button.",
+        "Keep code entry semantics separate: odd GNU code addresses are not automatically converted into Thumb code offsets. A missing or ambiguous mapping must be resolved before editing.",
+        "The import stores source-bound metadata and an owned copy of the listing. It does not modify ROM bytes, add instructions, infer field sizes or authorize an edit."
+      ],
+      "result": "You can navigate a known ROM label without confusing it with a RAM value. The pictured ExampleRomLabel / ExampleRamLabel listing is an original demonstration, not verified Emerald reverse engineering.",
+      "note": "UTF-8 listings are limited to 2 MiB and 65,536 entries; results page in groups of 50. Duplicate names at different addresses remain separate. GNU nm listings are supported; arbitrary linker map grammars are not.",
+      "related": [
+        "hardware-addresses",
+        "research-notes",
+        "mcp"
+      ],
+      "terms": [
+        "term-address-domain",
+        "term-offset"
+      ],
+      "image": "75-symbol-address-navigation",
+      "image_layout": "following-page",
+      "caption": "ROM navigation and RAM-only labels are clearly separate.",
+      "visual_page": {
+        "title": "Review and search source-bound names",
+        "kicker": "Actual ROMancer editing",
+        "intro": "Working interface with the supplied local game file.",
+        "panels": [
+          {
+            "image": "75-symbol-address-navigation",
+            "title": "Review and search source-bound names",
+            "x": 48,
+            "top": 850,
+            "width": 1120,
+            "crop": [
+              0,
+              0,
+              1800,
+              1100
+            ]
+          }
+        ]
+      }
     }
   ],
   "glossary": [
@@ -4611,9 +4683,33 @@
       ]
     },
     {
-      "term": "Specialist tool comparison",
+      "term": "Pokemon stat editing",
       "topics": [
-        "remaining-gaps"
+        "pokemon-tables"
+      ]
+    },
+    {
+      "term": "Move power and PP",
+      "topics": [
+        "pokemon-tables"
+      ]
+    },
+    {
+      "term": "Symbol files",
+      "topics": [
+        "source-symbols"
+      ]
+    },
+    {
+      "term": "RGBDS names",
+      "topics": [
+        "source-symbols"
+      ]
+    },
+    {
+      "term": "GNU nm names",
+      "topics": [
+        "source-symbols"
       ]
     }
   ]

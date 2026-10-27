@@ -23,11 +23,18 @@ def _storage_bounds(field):
 
 def validate_definition(definition,size):
     definition=json.loads(canonical_bytes(definition,max_bytes=65536))
-    _optional_fields(definition,'schema_version name offset count stride fields','label_source')
+    _optional_fields(definition,'schema_version name offset count stride fields','label_source row_names row_id_base')
     if type(definition['schema_version']) is not int or definition['schema_version']!=1:raise ValueError('unsupported table definition version')
     label(definition['name'],64);number(definition['offset'],0,size);number(definition['count'],1,65536);number(definition['stride'],1,65536)
     if definition['offset']+definition['count']*definition['stride']>size:raise ValueError('table records extend beyond the source')
     rows=definition['fields']
+    if 'row_names' in definition:
+        if 'label_source' in definition:raise ValueError('Choose declared row names or a stored name table, not both.')
+        names=definition['row_names']
+        if type(names) is not list or len(names)!=definition['count']:raise ValueError('Supply exactly one declared name per table row.')
+        for name in names:label(name,80)
+        number(definition.get('row_id_base',0),0,65536-definition['count'])
+    elif 'row_id_base' in definition:raise ValueError('A row ID base requires declared row names.')
     if type(rows) is not list or not 1<=len(rows)<=32:raise ValueError('define1..32 named table fields')
     occupied=[];names=set()
     for field in rows:
@@ -91,6 +98,7 @@ def _check_value(value,field,*,declared=True):
 
 
 def _row_catalog(stream,definition):
+    if 'row_names' in definition:return [{'index':i,'record_id':definition.get('row_id_base',0)+i,'label':name,'label_origin':'declared'} for i,name in enumerate(definition['row_names'])]
     source=definition.get('label_source')
     if source is None:return []
     from .chrono_tables import decode_name

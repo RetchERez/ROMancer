@@ -11,6 +11,16 @@ from romancer.boot_fixtures import make_boot_fixture
 
 
 class RomScanTests(unittest.TestCase):
+    def test_automatic_gba_scan_includes_documented_named_table_candidates(self):
+        import hashlib
+        from tests.test_documented_tables import DocumentedTablesTests
+        raw=bytearray(make_boot_fixture('gba')['data']);fixture=DocumentedTablesTests().fixture();raw[4096:4096+151*28]=fixture[4096:4096+151*28]
+        source=self.root/'named.gba';source.write_bytes(raw)
+        result=self.api.dispatch('source.import',{'project_id':self.p['project_id'],'path':str(source),'system':None});self.assertTrue(result['ok'],result)
+        scan=self.result(result['scan']);found=scan['documented_tables']['candidates'][0]
+        self.assertEqual(found['offset'],4096);self.assertEqual(found['count'],151);self.assertFalse(found['write_authorized'])
+        self.assertEqual(scan['documented_tables']['source_sha256'],hashlib.sha256(raw).hexdigest())
+
     def test_engine_budget_preserves_the_other_scan_results(self):
         from romancer import rom_scan,workbench_projects
         source=self.root/'bounded.gba';source.write_bytes(make_boot_fixture('gba')['data'])

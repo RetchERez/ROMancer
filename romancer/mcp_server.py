@@ -19,13 +19,13 @@ from romancer.workbench_api import WorkbenchAPI
 PROTOCOL='2025-11-25'
 MAX_MESSAGE=1024*1024
 MAX_RESULT=256*1024
-READ_OPERATIONS=frozenset('''references.catalog references.template research.note_get research.inspect research.preview system.capabilities system.operations projects.list project.open
+READ_OPERATIONS=frozenset('''symbols.preview symbols.search documented.scan documented.open references.catalog references.template research.note_get research.inspect research.preview system.capabilities system.operations projects.list project.open
 games.inspect games.maps.catalog games.maps.inspect cheats.catalog cheats.inspect engines.inspect systems.reference systems.classify_address rom.check catalog.list resource.inspect resources.explain resources.relationships
 hex.search hex.numbers hex.bookmarks builds.timeline builds.compare project.validate investigations.get investigations.probe debugger.capabilities debugger.get structures.survey structures.definition relocation.table_definition
 assets.inspect script.inspect tables.inspect tables.batch levels.inspect sound.inspect revision.lookup
 profiles.get profiles.validate runtime.checkpoints reports.list exports.list jobs.get
 systems.address resources.address_uses watches.compare debug.inspect compression.inspect'''.split())
-WRITE_OPERATIONS=frozenset('''research.note_save research.note_delete research.export research.apply project.create project.demo project.demo_system source.import inputs.import
+WRITE_OPERATIONS=frozenset('''symbols.import research.note_save research.note_delete research.export research.apply project.create project.demo project.demo_system source.import inputs.import
 games.plan games.configure games.maps.plan cheats.import systems.plan_edits assets.plan script.plan tables.plan levels.plan sound.plan
 build.apply structured.apply builds.annotate hex.bookmark catalog.index rom.scan.start
 rom.scan.run release.prepare release.verify resources.declare_assets resources.declare_script tables.save_definition patches.preview patches.apply revision.import
@@ -106,6 +106,12 @@ def _investigation_properties(operation):
     def obj(properties):return {'type':'object','properties':properties,'required':list(properties),'additionalProperties':False}
     def array(items,maximum,minimum=0):return {'type':'array','items':items,'minItems':minimum,'maxItems':maximum}
     source={'project_id':string(),'artifact_id':string()}
+    if operation in ('symbols.preview','symbols.import'):
+        base={**source,'input_id':string(64),'format':enum(['rgbds','gnu-nm'])}
+        return {**base,'review_id':string(64),'acknowledged':{'type':'boolean'}} if operation=='symbols.import' else base
+    if operation=='symbols.search':return {**source,'query':string(128),'page':integer(0,1311)}
+    if operation=='documented.scan':return source
+    if operation=='documented.open':return {**source,'candidate_id':string(64)}
     if operation=='references.catalog':return {'query':string(128),'system_filter':enum(['all','nes','snes','genesis','sms','gb','gbc','gba'])}
     if operation=='references.template':return {**source,'template_id':enum(['pokemon-red-blue','pokemon-crystal','pokemon-gba']),'offset':integer(),'count':integer(1,65536),'stride':integer(1,65536)}
     if operation=='research.inspect':return {**source,'query':string(128),'kind':enum(['all','notes','assets','script','tables','levels','sound']),'page':integer(0,4096)}

@@ -31,6 +31,18 @@ Still unknown until investigated:
   basic Master System formats.
   This does not certify every commercial game or every edit within a game.
 
+BUILT-IN DOCUMENTED GAME DATA
+
+GBA Pokemon numeric-table discovery checks the first 151 species and first
+165 moves in the supported layout. Open named records, preview stat/power/PP
+changes, review the byte plan and make a separate build. Exact Emerald identity
+and structural matches in modified games are labeled separately. Expanded
+formats and custom scripts require additional checked definitions.
+
+Resources also imports matching RGBDS GB/GBC .sym and GNU nm GBA listings.
+Search names and inspect mapped ROM bytes; RAM labels remain CPU addresses.
+These files lack an embedded ROM hash and require source acknowledgement.
+
 HACK EXAMPLES
 
 ROMancer-v1.0-Hack-Examples.zip contains the recoverable distinct editing examples

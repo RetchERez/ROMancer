@@ -208,6 +208,10 @@ class WorkbenchAPI:
         self.structures=StructureTools(self);self.routes.update(self.structures.routes())
         from .research_tools import ResearchTools
         self.research=ResearchTools(self);self.routes.update(self.research.routes())
+        from .documented_tables import DocumentedTableTools
+        self.documented=DocumentedTableTools(self);self.routes.update(self.documented.routes())
+        from .source_symbols import SymbolTools
+        self.symbols=SymbolTools(self);self.routes.update(self.symbols.routes())
         from .popular_references import catalog as reference_catalog,inspect_template
         self.routes['references.catalog']=('query system_filter',lambda p,c:reference_catalog(p['query'],p['system_filter']))
         self.routes['references.template']=('project_id artifact_id template_id offset count stride',lambda p,c:inspect_template(self,p,c))

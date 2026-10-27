@@ -15,6 +15,10 @@ state.tableProposal=proposal;ctx.draft=(id,fallback)=>id==='table-changes'?JSON.
 assert.match(await render(ctx),/Finish the current table edits first/);
 assert.equal(state.tableProposal,proposal,'Opening a generated layout must preserve existing staged edits.');
 
+state.results['tables.inspect']={source_sha256:state.artifact.sha256,document_id:'typed',rows:[{index:0,cells:[{value:45}]}]};
+ctx.draft=(id,fallback)=>id==='table-cell-typed-0-0'?'55':fallback;
+assert.match(await render(ctx),/Finish the current table edits first/,'Typed cells must not be replaced before review stages them.');
+
 {
  const definition={schema_version:1,name:'Neutral experiment',offset:32,count:1,stride:1,fields:[{name:'Value',offset:0,type:'u8',endian:'little',pointer_base:null}]};
  const sha='a'.repeat(64),inspection={source_sha256:sha,document_id:'generated',definition,total:1,page:0,limit:8,rows:[{index:0,offset:32,cells:[{field:'Value',value:5,target_offset:null}]}]};
