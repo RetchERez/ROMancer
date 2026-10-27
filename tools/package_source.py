@@ -204,6 +204,8 @@ APPROVED_FILES = APPROVED_FILES | frozenset({
 })
 
 
+APPROVED_FILES = APPROVED_FILES | frozenset({'tests/test_connected_mcp.py', 'user-guide/screenshots/80-connected-room-preview.png', 'romancer/ui/trace_controls.js', 'tests/test_build_checks.py', 'romancer/build_checks.py', 'tests/test_gameplay_traces.py', 'tests/ui_trace_controls.mjs', 'user-guide/screenshots/79-genesis-automatic-build-check.png', 'romancer/connected_game.py', 'user-guide/screenshots/78-nes-gameplay-trace.png', 'tests/test_connected_game.py', 'tests/ui_connected_game.mjs', 'tests/ui_build_checks.mjs', 'romancer/ui/views/gameview.js', 'romancer/ui/build_checks.js', 'romancer/gameplay_traces.py', 'tests/ui_connected_handoffs.mjs', 'tests/test_batched_video.py'})
+
 def _identity(info):
     return (info.st_dev, info.st_ino, info.st_size, info.st_mtime_ns)
 

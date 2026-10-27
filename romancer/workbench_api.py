@@ -212,6 +212,12 @@ class WorkbenchAPI:
         self.documented=DocumentedTableTools(self);self.routes.update(self.documented.routes())
         from .source_symbols import SymbolTools
         self.symbols=SymbolTools(self);self.routes.update(self.symbols.routes())
+        from .connected_game import ConnectedGameTools
+        self.connected=ConnectedGameTools(self);self.routes.update(self.connected.routes())
+        from .gameplay_traces import GameplayTraceTools
+        self.traces=GameplayTraceTools(self);self.routes.update(self.traces.routes())
+        from .build_checks import BuildCheckTools
+        self.checks=BuildCheckTools(self);self.routes.update(self.checks.routes())
         from .popular_references import catalog as reference_catalog,inspect_template
         self.routes['references.catalog']=('query system_filter',lambda p,c:reference_catalog(p['query'],p['system_filter']))
         self.routes['references.template']=('project_id artifact_id template_id offset count stride',lambda p,c:inspect_template(self,p,c))
@@ -394,7 +400,7 @@ class WorkbenchAPI:
             if operation not in self.routes:raise ValueError('unknown workbench operation')
             names,handler=self.routes[operation];fields(parameters,names)
             if cancelled():raise KeyboardInterrupt
-            if operation in ('rom.scan.run','graphics.observe'):return handler(parameters,cancelled)
+            if operation in ('rom.scan.run','graphics.observe','traces.capture','checks.run'):return handler(parameters,cancelled)
             if 'project_id' in parameters:
                 project_id=projects.identifier(parameters['project_id'])
                 with self.operation_locks_guard:lock=self.operation_locks.setdefault(project_id,threading.RLock())
@@ -402,7 +408,13 @@ class WorkbenchAPI:
                     if cancelled():raise KeyboardInterrupt
                     from .release_scope import guard_request
                     guard_request(self,operation,parameters)
-                    return handler(parameters,cancelled)
+                    result=handler(parameters,cancelled)
+                    if operation in ('build.apply','structured.apply','patches.apply'):
+                        try:
+                            if cancelled():result['automatic_check']={'status':'NOT_QUEUED','reason':'Build saved; automatic checks were not started after cancellation.'}
+                            else:self.checks.on_build(parameters,result)
+                        except (ValueError,OSError,RuntimeError) as error:result['automatic_check']={'status':'NOT_QUEUED','reason':str(error)[:240]}
+                    return result
             from .release_scope import guard_request
             guard_request(self,operation,parameters)
             return handler(parameters,cancelled)

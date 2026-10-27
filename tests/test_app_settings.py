@@ -82,5 +82,10 @@ class AppSettingsTests(unittest.TestCase):
         self.assertTrue(self.api.dispatch('settings.workspace.save',{'location':None})['ok'])
         self.assertIsNone(self.api.dispatch('settings.workspace.get',{})['location'])
 
+    def test_connected_game_view_can_be_saved_and_restored_as_workspace_location(self):
+        location={**LOCATION,'page':'gameview'}
+        saved=self.api.dispatch('settings.workspace.save',{'location':location});self.assertTrue(saved['ok'],saved)
+        self.assertEqual(self.api.dispatch('settings.workspace.get',{})['location'],location)
+
 
 if __name__=='__main__':unittest.main()

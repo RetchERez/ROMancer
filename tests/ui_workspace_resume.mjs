@@ -17,3 +17,7 @@ console.log('Exact project/file/hash-bound page, resource offset, cursor and scr
 let finish;const calls=[],writer=new WorkspaceLocationWriter({call:async(_op,p)=>{calls.push(p.location);if(calls.length===1)await new Promise(r=>finish=r);}});
 const queued=writer.enqueue({page:1});writer.enqueue({page:2});writer.enqueue({page:3});finish();await queued;
 assert.deepEqual(calls,[{page:1},{page:3}],'Workspace metadata writes keep only the newest pending location.');
+let failed=0,recovered=0,unavailable=true;
+const retry=new WorkspaceLocationWriter({call:async()=>{if(unavailable)throw Error('storage unavailable');}},()=>failed++,()=>recovered++);
+await retry.enqueue(saved);assert.equal(failed,1);assert.equal(recovered,0);
+unavailable=false;await retry.enqueue(saved);assert.equal(recovered,1,'A successful retry must clear its obsolete workspace warning.');

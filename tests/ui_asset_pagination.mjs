@@ -5,6 +5,7 @@ const state={project:{project_id:'p',descriptors:{}},artifact:{artifact_id:'a',s
 globalThis.document={getElementById:id=>id==='asset-changes'?{value:'[]'}:null};
 const ctx={state,draft:(key,fallback)=>drafts.get(key)??fallback,setDraft:(key,value)=>drafts.set(key,value),use:next=>Object.assign(handlers,next),render:async()=>{html=await render(ctx);}};
 await ctx.render();assert.match(html,/data-cell="64"/);
+assert.match(html,/<div class="swatches" role="group" aria-label="Declared palette colors">/,'Palette swatches need a semantic group for their accessible name.');
 await handlers['asset-group']({dataset:{id:'small'}});assert.equal(state.assetPage,0,'changing bitmap group opens its first visible page');assert.match(html,/data-cell="0"/);
 state.assetPage=999;await ctx.render();assert.equal(state.assetPage,0,'restored page outside the selected bitmap clamps to its real last page');assert.match(html,/data-cell="0"/);
 state.assetBitmapId='large';state.assetPage=999;await ctx.render();assert.equal(state.assetPage,1);assert.match(html,/data-cell="69"/);

@@ -2,11 +2,11 @@ import {selectionKey} from './tool_inputs.js';
 import {writePreference} from './preferences.js';
 export function seedWorkspaceLocation(saved){if(!saved)return;writePreference('romancer-project',saved.project_id);writePreference('romancer-artifact:'+saved.project_id,saved.artifact_id);writePreference('romancer-location:'+saved.project_id+':'+saved.artifact_id,JSON.stringify(saved));}
 export class WorkspaceLocationWriter{
- constructor(api,failed=()=>{}){this.api=api;this.failed=failed;this.pending=null;this.hasPending=false;this.promise=null;}
+ constructor(api,failed=()=>{},saved=()=>{}){this.api=api;this.failed=failed;this.saved=saved;this.pending=null;this.hasPending=false;this.promise=null;}
  enqueue(location){this.pending=location;this.hasPending=true;if(!this.promise)this.promise=this.drain().finally(()=>{this.promise=null;if(this.hasPending)this.enqueue(this.pending);});return this.promise;}
- async drain(){while(this.hasPending){const location=this.pending;this.hasPending=false;try{await this.api.call('settings.workspace.save',{location});}catch(error){this.failed(error);}}}
+ async drain(){while(this.hasPending){const location=this.pending;this.hasPending=false;try{await this.api.call('settings.workspace.save',{location});this.saved(location);}catch(error){this.failed(error);}}}
 }
-const pages=new Set(['overview','resources','scripts','assets','tables','levels','sound','playtest','release','automation','help','settings','debug','routes','regression','tutorials']);
+const pages=new Set(['overview','gameview','resources','scripts','assets','tables','levels','sound','playtest','release','automation','help','settings','debug','routes','regression','tutorials']);
 const integer=(value,max)=>Number.isSafeInteger(value)&&value>=0&&value<=max;
 export const locationKey=state=>'romancer-location:'+state.project?.project_id+':'+state.artifact?.artifact_id;
 export function locationSnapshot(state,scroll=0){

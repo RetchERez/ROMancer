@@ -11,7 +11,7 @@ const objectInteger=id=>{const text=read(id).trim();if(!/^\d+$/.test(text))throw
 const practiceControls=()=>`<details class="card"><summary>Advanced practice</summary><p>Open a separate test layout to learn the editor controls.</p>${button('Open test layout','studio-example')}</details>`;
 export async function render(ctx){const setupReview=useResearchSetup(ctx,'levels');if(setupReview)return setupReview;const {state}=ctx;ctx.use({'studio-example':async()=>{const result=await ctx.api.job('studio.example',{});await ctx.openProject(result.project_id);return ctx.navigate('levels');}});
  if(!state.project||!state.artifact)return heading('','Levels','')+empty('Choose a project or import a ROM','Choose a project above, or import your ROM to get started.',button('Import ROM','import',{primary:true}))+practiceControls();
- const scope=selectionKey(state),current=()=>scope===selectionKey(state),saved=state.artifact.descriptors?.levels;
+ const scope=selectionKey(state),current=()=>scope===selectionKey(state),saved=state.artifact.descriptors?.levels;if(state.connectedLevelJump?.scope===scope){ctx.setDraft('level-room',state.connectedLevelJump.room);state.connectedLevelJump=null;}
  let doc=state.results['levels.inspect'];if(doc?.source_sha256!==state.artifact.sha256)doc=null;
  if(!doc&&saved?.source_sha256===state.artifact.sha256){try{doc=await ctx.api.call('levels.inspect',{...ctx.sourceParams(),definition:saved});}catch{doc=null;}if(!current()||ctx.isCurrentRender?.()===false)return '';if(doc)state.results['levels.inspect']=doc;}
  state.levelRoomVisualScope=null;

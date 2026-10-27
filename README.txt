@@ -15,6 +15,17 @@ Ready to use in the full Windows edition:
 - Load supported cartridges in Playtest using the included engines. Test
   controller input, pause, and save/load states for the exact selected build.
 
+Connected workbench across all seven systems:
+- Game view connects checked resources, rooms, named records and saved native
+  gameplay traces to editors and exact bytes. It does not require a Pokemon profile.
+- Select a captured object to save literal pixel-match candidates and search
+  coverage. Matching pixels are evidence, not inferred CPU transfers or ownership.
+- Save automatic build checks: original twice/build once, cartridge integrity,
+  state replay, clean worker closure and original/build/difference pictures.
+  PASS, REVIEW, REGRESSION, INCONCLUSIVE and BLOCKED describe the configured test.
+- MCP exposes the same graph, trace and test services with strict schemas and
+  compact image previews. Read the Basic and Advanced guide procedures.
+
 Editors need an understood layout:
 - Text, numeric tables, assembled sprites, palettes, levels and sound need a
   verified definition or an explicit declaration of the format and byte ranges.

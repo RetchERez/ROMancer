@@ -26,6 +26,7 @@ export async function render(ctx){const setupReview=useResearchSetup(ctx,'tables
   state.tablePreview={scope:selectionKey(state),document_id:proposal.inspection.document_id};
   const d=proposal.definition;for(const [key,value] of Object.entries({'table-name':d.name,'table-offset':d.offset,'table-count':d.count,'table-stride':d.stride,'table-fields':JSON.stringify(d.fields)}))ctx.setDraft(key,typeof value==='string'?value:String(value));
  }
+ if(state.connectedTableJump?.scope===selectionKey(state)){const d=artifact.descriptors?.tables?.definition;if(d){const result=await ctx.api.call('tables.inspect',{...ctx.sourceParams(),definition:d,page:Math.floor(state.connectedTableJump.row/50),limit:50});if(ctx.isCurrentRender?.()===false)return '';state.results['tables.inspect']=result;}state.connectedTableJump=null;}
  const saved=artifact.descriptors?.tables?.source_sha256===artifact.sha256?artifact.descriptors.tables.definition:null;
  let model=state.results['tables.inspect'];if(model?.source_sha256!==artifact.sha256)model=null;
  if(!model&&saved){model=await ctx.api.call('tables.inspect',{...ctx.sourceParams(),definition:saved,page:0,limit:50});state.results['tables.inspect']=model;}

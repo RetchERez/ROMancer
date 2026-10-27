@@ -73,7 +73,6 @@
         }
       ],
       "related": [
-        "settings-appearance",
         "install",
         "resources",
         "sound",
@@ -530,7 +529,6 @@
         }
       ],
       "related": [
-        "checks-appearance",
         "resources",
         "debug",
         "regression",
@@ -596,7 +594,6 @@
         }
       ],
       "related": [
-        "drafts-appearance",
         "projects",
         "play",
         "patches"
@@ -1021,7 +1018,6 @@
         }
       ],
       "related": [
-        "projects-appearance",
         "drafts",
         "checks",
         "patches",
@@ -1209,7 +1205,6 @@
         }
       ],
       "related": [
-        "investigation-appearance",
         "hex-editor",
         "debug",
         "connections",
@@ -1363,7 +1358,6 @@
         }
       ],
       "related": [
-        "palettes-appearance",
         "gba-colors",
         "gbc-colors",
         "sprites"
@@ -1541,7 +1535,6 @@
         }
       ],
       "related": [
-        "translation-appearance",
         "text-layout",
         "text",
         "projects",
@@ -1638,7 +1631,6 @@
         }
       ],
       "related": [
-        "levels-appearance",
         "connections",
         "room",
         "tilemaps",
@@ -1705,7 +1697,6 @@
       ],
       "related": [
         "room",
-        "connections-appearance",
         "levels",
         "investigation",
         "recipes",
@@ -1789,7 +1780,6 @@
         }
       ],
       "related": [
-        "sound-appearance",
         "play",
         "resources",
         "regression"
@@ -3168,6 +3158,199 @@
           }
         ]
       }
+    },
+    {
+      "id": "connected-game-view",
+      "title": "Follow connected game resources",
+      "part": "Basic",
+      "kicker": "Game view / resources and editors",
+      "intro": "Game view connects saved graphics, palettes, text, named records, rooms, objects, sound, research notes and measured gameplay. It works across NES, SNES, Genesis, Master System, GB, GBC and GBA; it does not require a Pokemon profile.",
+      "steps": [
+        "Choose a source or build in the top bar, then open Game view. Find a resource by name or use Show to focus on graphics, rooms, named records or gameplay traces.",
+        "Select an entry. Read its preview, decoded fields or text and its exact byte range. The confidence label distinguishes a checked layout, a known revision, your note and a measured frame.",
+        "Follow a connection to inspect related storage. Uses tiles and Uses palette come from a saved declaration. Shares byte storage only means overlapping file ranges; it does not establish a game behavior.",
+        "Choose Open editor to continue in the existing editor, or Inspect exact bytes to inspect its file location. Keep current draft preserves work when another setup is offered.",
+        "Rooms show the declared map and object outlines. Named records show decoded fields. A missing preview or connection means that format or relationship still needs a checked declaration or measured evidence."
+      ],
+      "result": "Navigate between a visual resource, its declared dependencies and its exact storage without repeatedly entering offsets.",
+      "note": "An index of checked data is not a universal decompiler. Game-specific maps, music and scripts still need supported readers. A source change invalidates stale declarations and evidence.",
+      "related": [
+        "research-notes",
+        "numbers"
+      ],
+      "terms": [
+        "term-connected-resource",
+        "term-evidence"
+      ],
+      "image": "80-connected-room-preview",
+      "image_layout": "following-page",
+      "caption": "Follow connected game resources",
+      "visual_page": {
+        "title": "Follow connected game resources",
+        "kicker": "Actual ROMancer interface",
+        "intro": "A measured workflow, captured without controlling the desktop.",
+        "panels": [
+          {
+            "image": "80-connected-room-preview",
+            "title": "Follow connected game resources",
+            "x": 48,
+            "top": 850,
+            "width": 1120,
+            "crop": [
+              0,
+              0,
+              1800,
+              1100
+            ]
+          }
+        ]
+      }
+    },
+    {
+      "id": "saved-gameplay-traces",
+      "title": "Trace a captured object to candidate ROM graphics",
+      "part": "Basic",
+      "kicker": "Playtest / select / trace / inspect",
+      "intro": "Save a real native frame region and search the selected ROM using its tested literal tile codec. Traces retain the frame, crop, searched range and every returned pixel candidate.",
+      "steps": [
+        "Load the selected game in Playtest. Play or advance to the scene, pause, and choose Inspect graphics. Capture a fresh frame if needed.",
+        "In Frame region & screenshot checkpoints, drag a tight rectangle around the object, at least 8 by 8 and at most 256 by 256 pixels. Smaller regions reduce competing matches.",
+        "Under Trace gameplay to ROM data, name the trace and choose its source search range. Choose Trace selected object. Each request searches at most 512 KiB; read the reported coverage.",
+        "Review matching parts and competing source offsets. Choose Open saved trace in Game view to revisit the crop and its candidates. Search next ROM range continues an incomplete search.",
+        "Choose a confirmed candidate or explicitly select matching parts to open the graphics editor. Review the assembled result before editing, build separately, then playtest the changed scene."
+      ],
+      "result": "A persistent connection from measured screen pixels to literal ROM byte candidates, available to people and the MCP interface.",
+      "note": "Pixel agreement does not prove a CPU/VDP source transfer, animation ownership or the role of a sprite. Compressed, transformed or RAM-generated images can have no literal match. The supplied seven-game test includes genuine zero-match and partial results; it does not claim every sprite was found.",
+      "related": [
+        "connected-game-view",
+        "sprites",
+        "checks"
+      ],
+      "terms": [
+        "term-gameplay-trace",
+        "term-pixel-candidate"
+      ],
+      "image": "78-nes-gameplay-trace",
+      "image_layout": "following-page",
+      "caption": "Trace a captured object to candidate ROM graphics",
+      "visual_page": {
+        "title": "Trace a captured object to candidate ROM graphics",
+        "kicker": "Actual ROMancer interface",
+        "intro": "A measured workflow, captured without controlling the desktop.",
+        "panels": [
+          {
+            "image": "78-nes-gameplay-trace",
+            "title": "Trace a captured object to candidate ROM graphics",
+            "x": 48,
+            "top": 850,
+            "width": 1120,
+            "crop": [
+              0,
+              0,
+              1800,
+              1100
+            ]
+          }
+        ]
+      }
+    },
+    {
+      "id": "automatic-build-checks",
+      "title": "Check each build automatically",
+      "part": "Basic",
+      "kicker": "Game view / Build checks",
+      "intro": "Compare a separate build with two fresh runs of its original using identical inputs and a reviewed emulator core. A saved test can run after each descendant build or imported patch.",
+      "steps": [
+        "In Game view open Automatic check setup. Give the check a name, choose the frame count and select whether visual changes need review or identical pixels are required.",
+        "Leave Run after new builds selected to queue this check automatically. Save test setup for this revision. For button sequences or a fixed comparison region, expand Advanced inputs and comparison region.",
+        "Create a build normally, or choose an existing Build to check and Run checks. The application shows progress and lets you cancel the job. It remains usable while separate workers run.",
+        "Open a recent result. Compare Original, Build and Difference. Read cartridge integrity, state replay and worker closure results alongside the visual result.",
+        "PASS means the configured checks passed. REVIEW means the image changed under the review policy. REGRESSION means an explicit assertion or integrity check failed. INCONCLUSIVE means the baseline was unstable, flat or otherwise unsuitable. BLOCKED explains why execution could not complete."
+      ],
+      "result": "Each result records three fresh workers, source/build/core identities, the configured inputs and exact compared pictures. Automatic queue failures leave a successful build intact and report that testing was not queued.",
+      "note": "Passing an opening-scene comparison does not establish that a later edited sprite, battle or room works. Add routes and screenshot assertions that reach the changed behavior; conduct the relevant hands-on playtest.",
+      "related": [
+        "checks",
+        "saved-gameplay-traces"
+      ],
+      "terms": [
+        "term-baseline",
+        "term-build-check"
+      ],
+      "image": "79-genesis-automatic-build-check",
+      "image_layout": "following-page",
+      "caption": "Check each build automatically",
+      "visual_page": {
+        "title": "Check each build automatically",
+        "kicker": "Actual ROMancer interface",
+        "intro": "A measured workflow, captured without controlling the desktop.",
+        "panels": [
+          {
+            "image": "79-genesis-automatic-build-check",
+            "title": "Check each build automatically",
+            "x": 48,
+            "top": 850,
+            "width": 1120,
+            "crop": [
+              0,
+              0,
+              1800,
+              1100
+            ]
+          }
+        ]
+      }
+    },
+    {
+      "id": "connected-evidence",
+      "title": "Declare relationships and use evidence safely",
+      "part": "Advanced",
+      "kicker": "Connected storage / measured pixels / authored meaning",
+      "intro": "Connected editing keeps three things distinct: checked storage declarations, native observations and user interpretations. Saving a relationship adds project metadata without changing ROM bytes.",
+      "steps": [
+        "Select a resource in Game view and expand Add a declared relationship. Choose another currently listed resource, a relationship and an evidence note, then Save declared link.",
+        "Use Remove link to remove that authored relationship. A declared link is not promoted to a proven runtime reference, and a range overlap does not establish ownership.",
+        "Native traces are authenticated by this local application. A restored or imported trace remains useful history, but cannot authorize opening a fresh candidate for editing. Capture new evidence for the current source.",
+        "If an indexed trace is missing or damaged, capture again. Valid existing trace references are preserved; unavailable references are repaired without deleting evidence files.",
+        "Use the existing CPU access investigation separately when a supported debugger can observe transfers. The shared pixel-trace service does not fabricate instruction traces for systems without that capture capability."
+      ],
+      "result": "The same graph can connect resources from any supported console while preserving the difference between observation and interpretation.",
+      "note": "Resource lists page by 50. Detail views show up to 32 connections. Generic unnamed numeric tables sample their first 256 rows; named catalogs retain their declared records. Graph and trace limits remain visible rather than silently implying complete coverage.",
+      "related": [
+        "connected-game-view",
+        "saved-gameplay-traces",
+        "debug"
+      ],
+      "terms": [
+        "term-connected-resource",
+        "term-gameplay-trace",
+        "term-pixel-candidate"
+      ]
+    },
+    {
+      "id": "automated-workbench",
+      "title": "Use connected editing from automation and MCP",
+      "part": "Advanced",
+      "kicker": "Shared services / strict inputs / reproducible checks",
+      "intro": "The GUI and MCP call the same source-bound graph, trace, declaration and build-check services. No external AI account is required by ROMancer itself.",
+      "steps": [
+        "Use gameview.graph to search and page resources, then gameview.detail for fields, byte previews, neighbors and compact image previews. Save or remove your metadata with gameview.link and gameview.unlink.",
+        "Load a native worker, capture its current frame, then call traces.capture with that measured frame hash, region and source range. Client-submitted pixels are not accepted as native evidence.",
+        "Read traces.get and inspect candidates before calling traces.open with explicitly selected match indices. Follow the resulting checked editor setup through the normal reviewable plan/build operations.",
+        "Save checks.configure with automatic, mode, bounded input steps, optional region and completed route IDs. Call checks.run for a source and target; poll the returned job and retrieve checks.status or checks.get.",
+        "Retain source, build and core hashes and exact result statuses. Stop on stale sources, unsupported layouts, failed assertions or unavailable workers rather than inventing an offset or a successful check."
+      ],
+      "result": "Beginners can use the visual workflow, while advanced clients can reproduce its evidence and edits through strict operation schemas.",
+      "note": "Checks allow up to 20 input steps and 2400 frames; original twice plus build once. Fresh workers verify next-frame save-state replay and close after the check. Restored evidence is historical. A passing configured test never means every possible game action was tested.",
+      "related": [
+        "mcp",
+        "automatic-build-checks",
+        "connected-evidence"
+      ],
+      "terms": [
+        "term-build-check",
+        "term-evidence"
+      ]
     }
   ],
   "glossary": [
@@ -3545,6 +3728,26 @@
       "id": "term-reference-template",
       "term": "Reference template",
       "definition": "Documented field positions that can be inspected at a declared table base, record count and stride. It does not locate the table or prove compatibility with a modified game."
+    },
+    {
+      "id": "term-connected-resource",
+      "term": "Connected resource",
+      "definition": "A source-bound graphics, text, table, room, sound or research entry connected through declared storage, authored notes or measured evidence. Each relationship retains its confidence and origin."
+    },
+    {
+      "id": "term-gameplay-trace",
+      "term": "Gameplay trace",
+      "definition": "An authenticated native frame crop, source/core/frame identity, searched ROM range and literal pixel candidates. This is not automatically a CPU execution trace or proven source transfer."
+    },
+    {
+      "id": "term-pixel-candidate",
+      "term": "Pixel candidate",
+      "definition": "A literal ROM tile whose decoded pixel pattern matches part of a measured frame. Repeated patterns can match multiple offsets; a match alone does not establish sprite ownership."
+    },
+    {
+      "id": "term-build-check",
+      "term": "Automatic build check",
+      "definition": "A configured fresh-worker comparison of an original twice and a build once, including cartridge integrity and next-frame state replay. Results describe only the configured inputs and assertions."
     }
   ],
   "index": [
@@ -4710,6 +4913,51 @@
       "term": "GNU nm names",
       "topics": [
         "source-symbols"
+      ]
+    },
+    {
+      "term": "Game view",
+      "topics": [
+        "connected-game-view"
+      ]
+    },
+    {
+      "term": "Connected resources",
+      "topics": [
+        "connected-game-view",
+        "connected-evidence"
+      ]
+    },
+    {
+      "term": "Gameplay tracing",
+      "topics": [
+        "saved-gameplay-traces"
+      ]
+    },
+    {
+      "term": "Pixel candidates",
+      "topics": [
+        "saved-gameplay-traces",
+        "connected-evidence"
+      ]
+    },
+    {
+      "term": "Automatic build checks",
+      "topics": [
+        "automatic-build-checks",
+        "automated-workbench"
+      ]
+    },
+    {
+      "term": "Build check status",
+      "topics": [
+        "automatic-build-checks"
+      ]
+    },
+    {
+      "term": "Declared relationships",
+      "topics": [
+        "connected-evidence"
       ]
     }
   ]

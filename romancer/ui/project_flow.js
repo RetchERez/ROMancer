@@ -1,8 +1,9 @@
 export function selectionTicket(state){state.selectionRevision=(state.selectionRevision||0)+1;return state.selectionRevision;}
 export function selectionCurrent(state,ticket){return state.selectionRevision===ticket;}
 export function releaseProjectResources(state){
+ clearTimeout(state.buildCheckTimer);state.buildCheckTimer=null;state.connectedPage=0;
  state.gameVisualModel=null;state.animationClock?.stop();state.animationClock=null;state.animationPlaying=false;state.animationIndex=0;state.valueSearch=null;state.valueVideo=null;state.soundPlayer?.close();state.soundPlayer=null;state.soundPreview=null;
- for(const key of ['tablePreview','dataRelocation','nativeSourceContext','structuralLab','structuralPrefill','tableProposal','nativeTrace','nativeProbe','investigationSeries','gameMapsView','gameMapEditor','levelEditor','levelClipboard','levelRect','paint','pixelHistories','pixelHistoryScope','spriteHistory','hexDraft','hexReview','hexSearch','hexNumbers','hexExplanation','hexBookmarks','hexComparison','historyComparison','translationSheet','translationReview'])state[key]=null;
+ for(const key of ['savedGameplayTrace','connectedNode','connectedTraceFocus','connectedAssetSetup','connectedTableJump','connectedLevelJump','buildCheckView','buildCheckReport','tablePreview','dataRelocation','nativeSourceContext','structuralLab','structuralPrefill','tableProposal','nativeTrace','nativeProbe','investigationSeries','gameMapsView','gameMapEditor','levelEditor','levelClipboard','levelRect','paint','pixelHistories','pixelHistoryScope','spriteHistory','hexDraft','hexReview','hexSearch','hexNumbers','hexExplanation','hexBookmarks','hexComparison','historyComparison','translationSheet','translationReview'])state[key]=null;
  state.drafts={};state.romScans={};state.graphicsInvestigations={};state.graphicsPartHeight=null;state.graphicsRegionOpen=false;state.results={};
 }
 export function clearProjectState(state){

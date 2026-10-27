@@ -589,12 +589,16 @@ class LibretroFrontend:
             raise ValueError("frames must be non-negative")
         if buttons is not None:
             self.set_buttons(buttons, port)
-        for _ in range(frames):
-            self.lib.retro_run()
-            if self.shutdown_requested:
-                break
-        if release_after:
-            self.clear_buttons(port)
+        self._batch_video=True;self._pending_video=None
+        try:
+            for _ in range(frames):
+                self.lib.retro_run()
+                if self.shutdown_requested:
+                    break
+        finally:
+            self._batch_video=False;pending=self._pending_video;self._pending_video=None
+            if pending is not None:self._publish_video(*pending)
+            if release_after:self.clear_buttons(port)
         return self.last_frame
 
     def tap(self, buttons: Iterable[str], *, hold_frames: int = 1, settle_frames: int = 1, port: int = 0) -> Frame | None:
@@ -819,13 +823,19 @@ class LibretroFrontend:
         if width <= 0 or height <= 0 or pitch <= 0:
             return
         raw = ctypes.string_at(data, pitch * height)
-        rgb = self._convert_frame(raw, width, height, pitch, self.pixel_format)
+        if getattr(self,'_batch_video',False):
+            self._pending_video=(self.frame_index,raw,width,height,pitch,self.pixel_format)
+            return
+        self._publish_video(self.frame_index,raw,width,height,pitch,self.pixel_format)
+
+    def _publish_video(self,index,raw,width,height,pitch,pixel_format):
+        rgb = self._convert_frame(raw, width, height, pitch, pixel_format)
         self.last_frame = Frame(
-            index=self.frame_index,
+            index=index,
             width=width,
             height=height,
             pitch=pitch,
-            pixel_format=PIXEL_FORMAT_NAMES.get(self.pixel_format, str(self.pixel_format)),
+            pixel_format=PIXEL_FORMAT_NAMES.get(pixel_format, str(pixel_format)),
             rgb=rgb,
         )
 

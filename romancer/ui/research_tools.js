@@ -15,7 +15,7 @@ export function useResearchSetup(ctx,kind){
  const page=state.page,ownsSetup=()=>selectionKey(state)===scope&&state.page===page&&state.researchOpen===packet&&ctx.isCurrentRender?.()!==false&&Object.entries(prior).every(([key,value])=>ctx.draft(key,null)===value);
  const differs=Object.keys(wanted).some(key=>prior[key]!==null&&String(prior[key])!==wanted[key]);
  if(differs&&!packet.confirmed){
-  ctx.use({'research-keep-setup':()=>{state.researchOpen=null;return ctx.render();},
+  ctx.use({'research-keep-setup':()=>{if(!ownsSetup())return;state.researchOpen=null;for(const key of ['connectedAssetSetup','connectedTableJump','connectedLevelJump'])if(state[key]?.scope===scope)state[key]=null;return ctx.render();},
    'research-load-setup':async()=>{if(!ownsSetup())throw Error('The editor changed. Review its setup again.');let backups=[];try{backups=JSON.parse(ctx.draft('research-previous-setup','[]'));}catch{}
     if(!Array.isArray(backups))backups=[];const next=[...backups.slice(-3),{kind,sha256:state.artifact.sha256,at:new Date().toISOString(),fields:prior}];
     const value=JSON.stringify(next);if(new TextEncoder().encode(value).length>60000)throw Error('The current setup is too large for a recovery copy. Export your work before replacing it.');

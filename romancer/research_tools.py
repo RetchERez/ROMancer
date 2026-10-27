@@ -59,12 +59,13 @@ def _definition(row,path,kind):
     return definition_document(path,row['sha256'],kind,value)['definition']
 
 
-def _resources(row,path,cancelled):
+def _resources(row,path,cancelled,maximum=4096):
+    number(maximum,1,16384)
     resources=[];issues=[];total=0
     def add(kind,name,offset,length):
         nonlocal total
         number(offset,0,row['size']-1);number(length,1,row['size']-offset);total+=1
-        if len(resources)<4096:resources.append({'name':str(name)[:160],'kind':kind,'offset':offset,'length':length,'editor':{'script':'scripts','tables':'tables','assets':'assets','levels':'levels','sound':'sound'}[kind]})
+        if len(resources)<maximum:resources.append({'name':str(name)[:160],'kind':kind,'offset':offset,'length':length,'editor':{'script':'scripts','tables':'tables','assets':'assets','levels':'levels','sound':'sound'}[kind]})
     for kind in KINDS:
         if cancelled():raise KeyboardInterrupt
         if not row.get('descriptors',{}).get(kind):continue

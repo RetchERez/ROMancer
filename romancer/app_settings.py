@@ -12,7 +12,7 @@ from .workbench_projects import write_json
 DEFAULT_SETTINGS={'theme':'romancer','scale':100,'autoDeepScan':True,'autoGraphics':True,
                   'rememberWorkspace':True,'volume':80,'startMuted':False,'loopPreview':False,
                   'reduceMotion':False,'advancedTools':False}
-_PAGES={'overview','resources','scripts','assets','tables','levels','sound','playtest','release',
+_PAGES={'overview','gameview','resources','scripts','assets','tables','levels','sound','playtest','release',
         'automation','help','settings','debug','routes','regression','tutorials'}
 _LOCATION_FIELDS={'version','project_id','artifact_id','sha256','page','offset','selected','scroll',
                   'assetPage','scriptPage','catalogPage','catalogQuery'}

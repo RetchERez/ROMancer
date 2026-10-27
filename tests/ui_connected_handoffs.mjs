@@ -1,0 +1,12 @@
+import assert from 'node:assert/strict';
+import {render} from '../romancer/ui/views/assets.js';
+import {selectionKey} from '../romancer/ui/tool_inputs.js';
+import {openTraceCandidate} from '../romancer/ui/views/gameview.js';
+const drafts=new Map([['asset-schema','original unfinished schema']]),actions={},schema={source:{sha256:'sha'},bitmaps:[]};
+const state={page:'assets',project:{project_id:'p',descriptors:{}},artifact:{artifact_id:'a',sha256:'sha',descriptors:{assets:schema}},results:{}};
+const scope=selectionKey(state);state.researchOpen={scope,kind:'assets'};state.connectedAssetSetup={scope,result:{schema,inspection:{ok:true,source_sha256:'sha',document_id:'doc',bitmaps:[{id:'tiles',width:8,height:8,count:1,cells:[{pixels:Array(64).fill(0)}]}],palettes:[]},layout:{columns:1,rows:1,indices:[0],flips:[0]}}};
+const ctx={state,draft:(k,d)=>drafts.has(k)?drafts.get(k):d,setDraft:(k,v)=>drafts.set(k,v),use:h=>Object.assign(actions,h),render:async()=>{}};
+assert.match(await render(ctx),/Keep current draft/);await actions['research-keep-setup']();assert.equal(state.connectedAssetSetup,null);assert.equal(drafts.get('asset-schema'),'original unfinished schema');
+const previous={document_id:'old'};state.results['assets.inspect']=previous;ctx.run=async()=>({inspection:{document_id:'new'}});ctx.sourceParams=()=>({project_id:'p',artifact_id:'a'});ctx.navigate=async()=>{};
+await openTraceCandidate(ctx,{locator:{trace_id:'trace',match:0}},scope);assert.equal(state.results['assets.inspect'],previous,'Do not replace the old inspection before setup review.');
+console.log('Keeping a setup discards pending handoffs and preserves the old editor inspection.');

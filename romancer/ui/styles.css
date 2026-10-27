@@ -209,3 +209,5 @@ main,.scaled-compact main,.scaled-narrow main{padding:20px clamp(18px,1.5vw,28px
 .resource-meta p{white-space:pre-wrap}
 
 .comparison-blink{min-height:38px}.comparison-blink input{width:18px;height:18px;accent-color:var(--accent)}.comparison-widget{min-width:0}.map-comparison canvas{max-width:100%;height:auto;image-rendering:pixelated}
+
+.game-node-list{max-height:60vh;overflow:auto}.game-resource-preview{width:100%;max-width:480px;image-rendering:pixelated;min-width:160px;height:auto}.game-byte-preview{overflow-wrap:anywhere}.game-color{display:inline-block;width:24px;height:24px;border:1px solid var(--line)}

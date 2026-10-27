@@ -19,13 +19,13 @@ from romancer.workbench_api import WorkbenchAPI
 PROTOCOL='2025-11-25'
 MAX_MESSAGE=1024*1024
 MAX_RESULT=256*1024
-READ_OPERATIONS=frozenset('''symbols.preview symbols.search documented.scan documented.open references.catalog references.template research.note_get research.inspect research.preview system.capabilities system.operations projects.list project.open
+READ_OPERATIONS=frozenset('''gameview.graph gameview.detail traces.get checks.status checks.get symbols.preview symbols.search documented.scan documented.open references.catalog references.template research.note_get research.inspect research.preview system.capabilities system.operations projects.list project.open
 games.inspect games.maps.catalog games.maps.inspect cheats.catalog cheats.inspect engines.inspect systems.reference systems.classify_address rom.check catalog.list resource.inspect resources.explain resources.relationships
 hex.search hex.numbers hex.bookmarks builds.timeline builds.compare project.validate investigations.get investigations.probe debugger.capabilities debugger.get structures.survey structures.definition relocation.table_definition
 assets.inspect script.inspect tables.inspect tables.batch levels.inspect sound.inspect revision.lookup
 profiles.get profiles.validate runtime.checkpoints reports.list exports.list jobs.get
 systems.address resources.address_uses watches.compare debug.inspect compression.inspect'''.split())
-WRITE_OPERATIONS=frozenset('''symbols.import research.note_save research.note_delete research.export research.apply project.create project.demo project.demo_system source.import inputs.import
+WRITE_OPERATIONS=frozenset('''gameview.link gameview.unlink traces.capture traces.open checks.configure checks.run symbols.import research.note_save research.note_delete research.export research.apply project.create project.demo project.demo_system source.import inputs.import
 games.plan games.configure games.maps.plan cheats.import systems.plan_edits assets.plan script.plan tables.plan levels.plan sound.plan
 build.apply structured.apply builds.annotate hex.bookmark catalog.index rom.scan.start
 rom.scan.run release.prepare release.verify resources.declare_assets resources.declare_script tables.save_definition patches.preview patches.apply revision.import
@@ -35,6 +35,15 @@ recipes.from_plan recipes.preview recipes.import recipes.export jobs.cancel
 values.start values.narrow investigations.start investigations.capture debugger.prepare debugger.capture debugger.investigate relocation.plan watches.save video.inspect compression.extract compression.plan_reinsert
 definitions.export definitions.import'''.split())
 DESCRIPTIONS={
+ 'gameview.graph':'Browse source-bound resources, declared relationships, named records and native gameplay pixel candidates across all seven systems. Shared storage is not semantic ownership.',
+ 'gameview.detail':'Inspect a current connected resource, decoded fields, bounded byte preview, neighbors and visual preview. Labels and pixel candidates retain their evidence levels.',
+ 'traces.capture':'Save a paused native frame region and bounded system-codec ROM matches. Inputs cannot supply pixels. Competing offsets and coverage remain explicit; no source transfer is inferred.',
+ 'traces.get':'Read an authenticated saved gameplay trace and its candidates. Restored evidence is historical and cannot authorize candidate editing.',
+ 'traces.open':'Explicitly choose saved native pixel candidates for the existing graphics editor. Validates current source, trusted evidence and a bounded tile layout; does not modify ROM bytes.',
+ 'checks.configure':'Save a source-bound cold-start check and optionally run it automatically for new descendant builds. Comparison can require unchanged pixels or present changes for review.',
+ 'checks.run':'Run the original twice and the build once in fresh reviewed workers, checking reproducibility, pixels, supported integrity checks and save-state replay. Flat or unstable originals are inconclusive.',
+ 'checks.status':'Read configured automatic test policy, queued job status and recent source/build results.',
+ 'checks.get':'Read an authenticated build-check report and original/build/difference pictures. Results apply only to configured inputs and assertions.',
  'references.catalog':'Search pinned public Pokemon and Mario research. Published facts are separate from ROM revision or runtime verification; no game code is included.',
  'references.template':'Inspect a documented numeric prefix at an explicitly supplied offset, count and stride. Does not locate a table, save a definition or authorize changes.',
  'research.inspect':'Browse checked active declarations and source-bound user notes. Notes never grant edit authority or prove game behavior.',
@@ -106,6 +115,20 @@ def _investigation_properties(operation):
     def obj(properties):return {'type':'object','properties':properties,'required':list(properties),'additionalProperties':False}
     def array(items,maximum,minimum=0):return {'type':'array','items':items,'minItems':minimum,'maxItems':maximum}
     source={'project_id':string(),'artifact_id':string()}
+    if operation=='gameview.graph':return {**source,'query':string(128),'kind':enum(['all','known','known_resource','assets','script','tables','record','levels','room','actor','sound','note','trace','candidate']),'page':integer(0,1024)}
+    if operation=='gameview.detail':return {**source,'node_id':string(32)}
+    if operation=='gameview.link':return {**source,'from_id':string(32),'to_id':string(32),'relation':enum(['uses_graphics','uses_palette','uses_script','uses_sound','uses_table','reference']),'note':string(256)}
+    if operation=='gameview.unlink':return {**source,'link_id':string(32)}
+    if operation=='traces.capture':return {**source,'name':string(80),'frame_sha256':string(64),'region':obj({'x':integer(0,2047),'y':integer(0,2047),'width':integer(8,256),'height':integer(8,256)}),'offset':integer(),'length':integer(1)}
+    if operation=='traces.get':return {**source,'trace_id':string(32)}
+    if operation=='traces.open':return {**source,'trace_id':string(32),'matches':array(integer(0,255),64,1)}
+    if operation=='checks.status':return source
+    if operation=='checks.get':return {**source,'evidence_id':string(32)}
+    if operation=='checks.run':return {'project_id':string(),'source_id':string(32),'target_id':string(32)}
+    if operation=='checks.configure':
+        step=obj({'frames':integer(1,600),'buttons':array(enum(['up','down','left','right','a','b','x','y','l','r','l2','r2','l3','r3','start','select']),16),'port':integer(0,3)})
+        config=obj({'name':string(80),'automatic':{'type':'boolean'},'mode':enum(['review_changes','unchanged']),'steps':array(step,20,1),'region':nullable(obj({'x':integer(0,2047),'y':integer(0,2047),'width':integer(1,256),'height':integer(1,256)})),'route_ids':array(string(32),8)})
+        return {**source,'config':config}
     if operation in ('symbols.preview','symbols.import'):
         base={**source,'input_id':string(64),'format':enum(['rgbds','gnu-nm'])}
         return {**base,'review_id':string(64),'acknowledged':{'type':'boolean'}} if operation=='symbols.import' else base
@@ -255,6 +278,27 @@ def _public_result(value):
     return value
 
 
+def _connected_previews(value,contents):
+    if isinstance(value,dict):
+        result={}
+        for key,item in value.items():
+            if key.endswith('png_base64') and isinstance(item,str):
+                if len(contents)<3:
+                    from PIL import Image
+                    raw=base64.b64decode(item,validate=True)
+                    if len(raw)>2*1024**2:raise ValueError('PNG preview exceeds the AI image budget.')
+                    with Image.open(io.BytesIO(raw)) as img:
+                        if img.width*img.height>4*1024**2:raise ValueError('PNG preview dimensions exceed the AI budget.')
+                        img=img.convert('RGB');img.thumbnail((640,480),Image.Resampling.NEAREST);stream=io.BytesIO();img.save(stream,format='PNG')
+                        if stream.tell()>MAX_RESULT//2:img.thumbnail((192,144),Image.Resampling.NEAREST);stream=io.BytesIO();img.save(stream,format='PNG')
+                        contents.append({'type':'image','mimeType':'image/png','data':base64.b64encode(stream.getvalue()).decode('ascii')})
+                result[key]='[PNG preview supplied separately when within the three-image budget]'
+            else:result[key]=_connected_previews(item,contents)
+        return result
+    if isinstance(value,list):return [_connected_previews(item,contents) for item in value]
+    return value
+
+
 class MCPServer:
     def __init__(self,workspace,*,allow_writes=False,read_roots=()):
         self.workspace=Path(workspace).resolve();self.allow_writes=allow_writes
@@ -301,7 +345,9 @@ class MCPServer:
                 image=Image.frombytes('RGB',(width,height),base64.b64decode(frame['rgb24_base64'],validate=True));image.thumbnail((1280,960),Image.Resampling.NEAREST)
                 stream=io.BytesIO();image.save(stream,format='PNG')
                 if stream.tell()<=MAX_RESULT:contents.append({'type':'image','mimeType':'image/png','data':base64.b64encode(stream.getvalue()).decode('ascii')})
-            public=_public_result(result);text=json.dumps(public,ensure_ascii=False,allow_nan=False)
+            public=_public_result(result)
+            if operation.startswith(('gameview.','traces.','checks.')):public=_connected_previews(public,contents)
+            text=json.dumps(public,ensure_ascii=False,allow_nan=False)
             if len(text.encode('utf-8'))>MAX_RESULT:
                 public={'ok':bool(result.get('ok')),'result_truncated':True,'operation':operation,'note':'Result exceeds the AI response budget. Use a smaller range/page or a saved report.','job_id':result.get('job_id')};text=json.dumps(public)
             contents.insert(0,{'type':'text','text':text})

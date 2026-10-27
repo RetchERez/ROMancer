@@ -234,9 +234,11 @@
   }
   var WorkspaceLocationWriter = class {
     constructor(api2, failed = () => {
+    }, saved = () => {
     }) {
       this.api = api2;
       this.failed = failed;
+      this.saved = saved;
       this.pending = null;
       this.hasPending = false;
       this.promise = null;
@@ -256,13 +258,14 @@
         this.hasPending = false;
         try {
           await this.api.call("settings.workspace.save", { location: location2 });
+          this.saved(location2);
         } catch (error) {
           this.failed(error);
         }
       }
     }
   };
-  var pages = /* @__PURE__ */ new Set(["overview", "resources", "scripts", "assets", "tables", "levels", "sound", "playtest", "release", "automation", "help", "settings", "debug", "routes", "regression", "tutorials"]);
+  var pages = /* @__PURE__ */ new Set(["overview", "gameview", "resources", "scripts", "assets", "tables", "levels", "sound", "playtest", "release", "automation", "help", "settings", "debug", "routes", "regression", "tutorials"]);
   var integer = (value, max) => Number.isSafeInteger(value) && value >= 0 && value <= max;
   var locationKey = (state2) => {
     var _a, _b;
@@ -714,10 +717,10 @@
   }
 
   // romancer/ui/workspace_search.js
-  var aliases = { assets: "palette color colour sprite tiles graphics font", resources: "hex bytes offsets compare files checksums crc rom", scripts: "text dialogue translation encoding layout", tables: "numbers stats balance values table", levels: "map rooms terrain objects level", sound: "music sound audio samples", playtest: "play emulator controller save state load state", debug: "investigate find value memory watch trace", release: "export patch bps ips download", settings: "theme light dark size zoom preferences", help: "guide tutorial help shortcuts" };
-  function workspaceMatches(query, names5, project) {
+  var aliases = { gameview: "connected relationships graph gameplay trace build tests resources", assets: "palette color colour sprite tiles graphics font", resources: "hex bytes offsets compare files checksums crc rom", scripts: "text dialogue translation encoding layout", tables: "numbers stats balance values table", levels: "map rooms terrain objects level", sound: "music sound audio samples", playtest: "play emulator controller save state load state", debug: "investigate find value memory watch trace", release: "export patch bps ips download", settings: "theme light dark size zoom preferences", help: "guide tutorial help shortcuts" };
+  function workspaceMatches(query, names6, project) {
     const words = String(query).toLowerCase().trim().split(/\s+/).filter(Boolean), matches = [];
-    for (const [page, label] of Object.entries(names5)) if (words.every((w) => (label + " " + (aliases[page] || "")).toLowerCase().includes(w))) matches.push({ page, label, kind: "tool" });
+    for (const [page, label] of Object.entries(names6)) if (words.every((w) => (label + " " + (aliases[page] || "")).toLowerCase().includes(w))) matches.push({ page, label, kind: "tool" });
     for (const row of [...(project == null ? void 0 : project.sources) || [], ...(project == null ? void 0 : project.builds) || []]) if (words.every((w) => (row.name + " " + row.kind).toLowerCase().includes(w))) matches.push({ artifact_id: row.artifact_id, sha256: row.sha256, project_id: project.project_id, label: row.name, kind: row.kind });
     return matches.slice(0, 32);
   }
@@ -763,6 +766,9 @@
   }
   function releaseProjectResources(state2) {
     var _a, _b;
+    clearTimeout(state2.buildCheckTimer);
+    state2.buildCheckTimer = null;
+    state2.connectedPage = 0;
     state2.gameVisualModel = null;
     (_a = state2.animationClock) == null ? void 0 : _a.stop();
     state2.animationClock = null;
@@ -773,7 +779,7 @@
     (_b = state2.soundPlayer) == null ? void 0 : _b.close();
     state2.soundPlayer = null;
     state2.soundPreview = null;
-    for (const key3 of ["tablePreview", "dataRelocation", "nativeSourceContext", "structuralLab", "structuralPrefill", "tableProposal", "nativeTrace", "nativeProbe", "investigationSeries", "gameMapsView", "gameMapEditor", "levelEditor", "levelClipboard", "levelRect", "paint", "pixelHistories", "pixelHistoryScope", "spriteHistory", "hexDraft", "hexReview", "hexSearch", "hexNumbers", "hexExplanation", "hexBookmarks", "hexComparison", "historyComparison", "translationSheet", "translationReview"]) state2[key3] = null;
+    for (const key3 of ["savedGameplayTrace", "connectedNode", "connectedTraceFocus", "connectedAssetSetup", "connectedTableJump", "connectedLevelJump", "buildCheckView", "buildCheckReport", "tablePreview", "dataRelocation", "nativeSourceContext", "structuralLab", "structuralPrefill", "tableProposal", "nativeTrace", "nativeProbe", "investigationSeries", "gameMapsView", "gameMapEditor", "levelEditor", "levelClipboard", "levelRect", "paint", "pixelHistories", "pixelHistoryScope", "spriteHistory", "hexDraft", "hexReview", "hexSearch", "hexNumbers", "hexExplanation", "hexBookmarks", "hexComparison", "historyComparison", "translationSheet", "translationReview"]) state2[key3] = null;
     state2.drafts = {};
     state2.romScans = {};
     state2.graphicsInvestigations = {};
@@ -1410,8 +1416,8 @@
   function controllerButtons(pad) {
     var _a, _b, _c, _d, _e, _f;
     if (!pad) return [];
-    const names5 = ["b", "a", "y", "x", "l", "r", null, null, "select", "start", null, null, "up", "down", "left", "right"], result = [];
-    for (let i = 0; i < names5.length; i++) if (names5[i] && ((_b = (_a = pad.buttons) == null ? void 0 : _a[i]) == null ? void 0 : _b.pressed)) result.push(names5[i]);
+    const names6 = ["b", "a", "y", "x", "l", "r", null, null, "select", "start", null, null, "up", "down", "left", "right"], result = [];
+    for (let i = 0; i < names6.length; i++) if (names6[i] && ((_b = (_a = pad.buttons) == null ? void 0 : _a[i]) == null ? void 0 : _b.pressed)) result.push(names6[i]);
     if (((_c = pad.axes) == null ? void 0 : _c[0]) < -0.35) result.push("left");
     if (((_d = pad.axes) == null ? void 0 : _d[0]) > 0.35) result.push("right");
     if (((_e = pad.axes) == null ? void 0 : _e[1]) < -0.35) result.push("up");
@@ -1803,7 +1809,7 @@
       const step = current2.steps[active.step], paused = ((_a = state2.project) == null ? void 0 : _a.project_id) !== active.practice || state2.page !== step.page;
       return `<aside class="tutorial-panel" aria-label="Guided tutorial"><div class="card-heading"><strong>${esc(current2.title)}</strong>${button("Minimize", "tutorial-toggle")}</div><p class="subtle">Step ${active.step + 1} of ${current2.steps.length}</p><h2 id="tutorial-title" tabindex="-1">${esc(paused ? "Lesson paused" : step.title)}</h2><p>${esc(paused ? "Resume to return to the practice workshop." : step.body)}</p><div class="actions">${paused ? button("Resume lesson", "tutorial-resume", { primary: true }) : `${button("Back", "tutorial-back", { disabled: active.step === 0 })}${active.step === current2.steps.length - 1 ? button("Finish lesson", "tutorial-finish", { primary: true }) : button("Next", "tutorial-next", { primary: true })}`}${button("Skip lesson", "tutorial-skip")}</div></aside>`;
     }
-    function mount12() {
+    function mount13() {
       var _a, _b;
       const active = state2.tutorial, current2 = lesson();
       document.documentElement.classList.toggle("tutorial-running", !!active && !active.minimized);
@@ -1822,7 +1828,7 @@
         }
       }
     }
-    return { init, bind, panel: panel2, mount: mount12, dismissPrompt };
+    return { init, bind, panel: panel2, mount: mount13, dismissPrompt };
   }
 
   // romancer/ui/views/tutorials.js
@@ -1977,7 +1983,10 @@
     if (differs && !packet.confirmed) {
       ctx2.use({
         "research-keep-setup": () => {
+          var _a2;
+          if (!ownsSetup()) return;
           state2.researchOpen = null;
+          for (const key3 of ["connectedAssetSetup", "connectedTableJump", "connectedLevelJump"]) if (((_a2 = state2[key3]) == null ? void 0 : _a2.scope) === scope) state2[key3] = null;
           return ctx2.render();
         },
         "research-load-setup": async () => {
@@ -2312,7 +2321,7 @@
     return (row == null ? void 0 : row.label) !== void 0 ? row.label + " · ID 0x" + row.record_id.toString(16).toUpperCase().padStart(2, "0") : "Row " + row.index;
   }
   async function render3(ctx2) {
-    var _a, _b, _c, _d, _e, _f, _g, _h, _i;
+    var _a, _b, _c, _d, _e, _f, _g, _h, _i, _j, _k, _l, _m;
     const setupReview = useResearchSetup(ctx2, "tables");
     if (setupReview) return setupReview;
     const { state: state2 } = ctx2, missing = requireProject(ctx2);
@@ -2338,7 +2347,16 @@
       const d = proposal.definition;
       for (const [key3, value] of Object.entries({ "table-name": d.name, "table-offset": d.offset, "table-count": d.count, "table-stride": d.stride, "table-fields": JSON.stringify(d.fields) })) ctx2.setDraft(key3, typeof value === "string" ? value : String(value));
     }
-    const saved = ((_e = (_d = artifact.descriptors) == null ? void 0 : _d.tables) == null ? void 0 : _e.source_sha256) === artifact.sha256 ? artifact.descriptors.tables.definition : null;
+    if (((_d = state2.connectedTableJump) == null ? void 0 : _d.scope) === selectionKey(state2)) {
+      const d = (_f = (_e = artifact.descriptors) == null ? void 0 : _e.tables) == null ? void 0 : _f.definition;
+      if (d) {
+        const result = await ctx2.api.call("tables.inspect", { ...ctx2.sourceParams(), definition: d, page: Math.floor(state2.connectedTableJump.row / 50), limit: 50 });
+        if (((_g = ctx2.isCurrentRender) == null ? void 0 : _g.call(ctx2)) === false) return "";
+        state2.results["tables.inspect"] = result;
+      }
+      state2.connectedTableJump = null;
+    }
+    const saved = ((_i = (_h = artifact.descriptors) == null ? void 0 : _h.tables) == null ? void 0 : _i.source_sha256) === artifact.sha256 ? artifact.descriptors.tables.definition : null;
     let model = state2.results["tables.inspect"];
     if ((model == null ? void 0 : model.source_sha256) !== artifact.sha256) model = null;
     if (!model && saved) {
@@ -2373,8 +2391,8 @@
       return [...result.values()];
     }
     function definition() {
-      const active = (model == null ? void 0 : model.definition) || saved, names5 = active == null ? void 0 : active.label_source;
-      return { schema_version: 1, name: read("table-name").trim(), offset: integer3("table-offset"), count: integer3("table-count"), stride: integer3("table-stride"), fields: columns2, ...names5 ? { label_source: names5 } : {}, ...(active == null ? void 0 : active.row_names) ? { row_names: active.row_names, row_id_base: active.row_id_base || 0 } : {} };
+      const active = (model == null ? void 0 : model.definition) || saved, names6 = active == null ? void 0 : active.label_source;
+      return { schema_version: 1, name: read("table-name").trim(), offset: integer3("table-offset"), count: integer3("table-count"), stride: integer3("table-stride"), fields: columns2, ...names6 ? { label_source: names6 } : {}, ...(active == null ? void 0 : active.row_names) ? { row_names: active.row_names, row_id_base: active.row_id_base || 0 } : {} };
     }
     ctx2.use({
       "table-add-field": () => {
@@ -2473,8 +2491,8 @@
         await ctx2.navigate("resources");
       }
     });
-    const pending = ((_f = state2.pending) == null ? void 0 : _f.kind) === "table" && state2.pending.artifact_id === artifact.artifact_id;
-    return `${heading("", "Data tables", "")}${documentedTables(ctx2)}${((_g = state2.tableOrigin) == null ? void 0 : _g.scope) === selectionKey(state2) ? '<p class="notice">' + esc(state2.tableOrigin.note) + "</p>" : ""}<section class="card"><div class="card-heading"><h3>${esc((model == null ? void 0 : model.definition.name) || "Define a table")}</h3><span>${model ? model.total + " records" : "No table loaded"}</span>${model && ((_h = state2.tablePreview) == null ? void 0 : _h.scope) === selectionKey(state2) && state2.tablePreview.document_id === model.document_id ? button("Save this layout", "table-inspect") : ""}</div><details class="config" ${model ? "" : "open"}><summary>Table layout</summary><div class="field-row">${field("table-name", "Table name", ctx2.draft("table-name", (saved == null ? void 0 : saved.name) || "Data table"))}${field("table-offset", "First record offset", ctx2.draft("table-offset", (saved == null ? void 0 : saved.offset) ?? "0"))}${field("table-count", "Record count", ctx2.draft("table-count", (saved == null ? void 0 : saved.count) ?? "16"))}${field("table-stride", "Bytes per record", ctx2.draft("table-stride", (saved == null ? void 0 : saved.stride) ?? "1"))}</div><div class="table-wrap"><table><thead><tr><th>Field</th><th>Offset</th><th>Type</th><th>Order</th><th>Pointer base</th><th></th></tr></thead><tbody>${columns2.map((field2, index) => `<tr><td>${esc(field2.name)}</td><td>${field2.offset}</td><td>${esc(field2.type)}</td><td>${esc(field2.endian)}</td><td>${field2.pointer_base ?? "None"}</td><td>${button("Remove", "table-remove-field", { id: String(index) })}</td></tr>`).join("")}</tbody></table></div><details class="config"><summary>Add a field</summary><div class="field-row">${field("table-field-name", "Field name", ctx2.draft("table-field-name", ""))}${field("table-field-offset", "Offset within record", ctx2.draft("table-field-offset", "0"))}${select("table-field-type", "Numeric type", numericTypes.map((type) => [type, type]), ctx2.draft("table-field-type", "u8"))}${select("table-field-endian", "Byte order", [["little", "Little endian"], ["big", "Big endian"]], ctx2.draft("table-field-endian", "little"))}${field("table-field-base", "Pointer base (optional)", ctx2.draft("table-field-base", ""))}</div><p>For a linear pointer: target file offset = stored value − base.</p>${button("Add field", "table-add-field")}</details>${button("Load table definition", "table-inspect", { primary: !model })}</details></section>${model ? `<section class="card"><div class="card-heading"><h3>Records</h3><span>${changes.length} staged changes</span></div>${catalog.length ? `<div class="field-row">${field("table-name-query", "Search record names or IDs", query)}${button("Find records", "table-search")}</div><div class="field-row">${select("table-record-choice", "Named record", matches.map((row) => [row.index, recordName(row)]), String(((_i = matches[0]) == null ? void 0 : _i.index) ?? ""))}${button("Show selected record", "table-select-record", { disabled: !matches.length, reason: "No matching record names." })}</div><p>${matches.length} matching records. Names use the checked layout’s labels or decoded source text. Review pattern-based labels before editing.</p>` : ""}<div class="table-wrap"><table class="numeric-table"><thead><tr><th>Row</th>${model.definition.fields.map((field2) => `<th>${esc(field2.name)}${Number.isFinite(bounds(field2).minimum) && Number.isFinite(bounds(field2).maximum) ? `<br><small>Range ${bounds(field2).minimum}–${bounds(field2).maximum}</small>` : ""}</th>`).join("")}</tr></thead><tbody>${model.rows.map((row) => `<tr><td>${esc(recordName(row))}<br>${row.label !== void 0 ? `<small>Row ${row.index}${row.label_status === "unsupported" ? " · Unsupported name bytes" : row.label_status === "blank" ? " · Blank name" : ""}</small><br>` : ""}<code>0x${row.offset.toString(16)}</code></td>${row.cells.map((cell, index) => {
+    const pending = ((_j = state2.pending) == null ? void 0 : _j.kind) === "table" && state2.pending.artifact_id === artifact.artifact_id;
+    return `${heading("", "Data tables", "")}${documentedTables(ctx2)}${((_k = state2.tableOrigin) == null ? void 0 : _k.scope) === selectionKey(state2) ? '<p class="notice">' + esc(state2.tableOrigin.note) + "</p>" : ""}<section class="card"><div class="card-heading"><h3>${esc((model == null ? void 0 : model.definition.name) || "Define a table")}</h3><span>${model ? model.total + " records" : "No table loaded"}</span>${model && ((_l = state2.tablePreview) == null ? void 0 : _l.scope) === selectionKey(state2) && state2.tablePreview.document_id === model.document_id ? button("Save this layout", "table-inspect") : ""}</div><details class="config" ${model ? "" : "open"}><summary>Table layout</summary><div class="field-row">${field("table-name", "Table name", ctx2.draft("table-name", (saved == null ? void 0 : saved.name) || "Data table"))}${field("table-offset", "First record offset", ctx2.draft("table-offset", (saved == null ? void 0 : saved.offset) ?? "0"))}${field("table-count", "Record count", ctx2.draft("table-count", (saved == null ? void 0 : saved.count) ?? "16"))}${field("table-stride", "Bytes per record", ctx2.draft("table-stride", (saved == null ? void 0 : saved.stride) ?? "1"))}</div><div class="table-wrap"><table><thead><tr><th>Field</th><th>Offset</th><th>Type</th><th>Order</th><th>Pointer base</th><th></th></tr></thead><tbody>${columns2.map((field2, index) => `<tr><td>${esc(field2.name)}</td><td>${field2.offset}</td><td>${esc(field2.type)}</td><td>${esc(field2.endian)}</td><td>${field2.pointer_base ?? "None"}</td><td>${button("Remove", "table-remove-field", { id: String(index) })}</td></tr>`).join("")}</tbody></table></div><details class="config"><summary>Add a field</summary><div class="field-row">${field("table-field-name", "Field name", ctx2.draft("table-field-name", ""))}${field("table-field-offset", "Offset within record", ctx2.draft("table-field-offset", "0"))}${select("table-field-type", "Numeric type", numericTypes.map((type) => [type, type]), ctx2.draft("table-field-type", "u8"))}${select("table-field-endian", "Byte order", [["little", "Little endian"], ["big", "Big endian"]], ctx2.draft("table-field-endian", "little"))}${field("table-field-base", "Pointer base (optional)", ctx2.draft("table-field-base", ""))}</div><p>For a linear pointer: target file offset = stored value − base.</p>${button("Add field", "table-add-field")}</details>${button("Load table definition", "table-inspect", { primary: !model })}</details></section>${model ? `<section class="card"><div class="card-heading"><h3>Records</h3><span>${changes.length} staged changes</span></div>${catalog.length ? `<div class="field-row">${field("table-name-query", "Search record names or IDs", query)}${button("Find records", "table-search")}</div><div class="field-row">${select("table-record-choice", "Named record", matches.map((row) => [row.index, recordName(row)]), String(((_m = matches[0]) == null ? void 0 : _m.index) ?? ""))}${button("Show selected record", "table-select-record", { disabled: !matches.length, reason: "No matching record names." })}</div><p>${matches.length} matching records. Names use the checked layout’s labels or decoded source text. Review pattern-based labels before editing.</p>` : ""}<div class="table-wrap"><table class="numeric-table"><thead><tr><th>Row</th>${model.definition.fields.map((field2) => `<th>${esc(field2.name)}${Number.isFinite(bounds(field2).minimum) && Number.isFinite(bounds(field2).maximum) ? `<br><small>Range ${bounds(field2).minimum}–${bounds(field2).maximum}</small>` : ""}</th>`).join("")}</tr></thead><tbody>${model.rows.map((row) => `<tr><td>${esc(recordName(row))}<br>${row.label !== void 0 ? `<small>Row ${row.index}${row.label_status === "unsupported" ? " · Unsupported name bytes" : row.label_status === "blank" ? " · Blank name" : ""}</small><br>` : ""}<code>0x${row.offset.toString(16)}</code></td>${row.cells.map((cell, index) => {
       var _a2, _b2;
       return `<td><label class="field"><span class="sr-only">${esc(cell.field)}, ${esc(recordName(row))}</span><input id="${inputId(row.index, index)}" value="${esc(ctx2.draft(inputId(row.index, index), ((_a2 = changes.find((change) => change.row === row.index && change.field === cell.field)) == null ? void 0 : _a2.after) ?? cell.value))}" inputmode="numeric" aria-label="${esc(cell.field)}, ${esc(recordName(row))}"></label><div data-number-input="${inputId(row.index, index)}" data-before="${cell.value}" data-compact="true" data-minimum="${bounds(model.definition.fields[index]).minimum}" data-maximum="${bounds(model.definition.fields[index]).maximum}">${numberComparison(cell.value, ctx2.draft(inputId(row.index, index), ((_b2 = changes.find((change) => change.row === row.index && change.field === cell.field)) == null ? void 0 : _b2.after) ?? cell.value), { compact: true, ...bounds(model.definition.fields[index]) })}</div>${cell.target_offset !== null ? button("Open target 0x" + cell.target_offset.toString(16), "table-target", { id: String(cell.target_offset) }) : cell.pointer_resolution ? "<span>Unresolved target</span>" : ""}</td>`;
     }).join("")}</tr>`).join("")}</tbody></table></div><div class="actions">${button("Previous records", "table-page", { id: "-1", disabled: !model.page })}<span>Page ${model.page + 1}</span>${button("Next records", "table-page", { id: "1", disabled: (model.page + 1) * model.limit >= model.total })}${button("Review changes", "table-review", { primary: !pending })}${pending ? button("Create build", "table-build", { primary: true }) : ""}${button("Discard changes", "table-discard")}</div></section>${changes.length ? `<details class="card"><summary>Staged changes by record</summary><ul>${changes.map((change) => `<li>${esc(recordName(catalog[change.row] || { index: change.row }))}: ${esc(change.field)} ${change.before} → ${change.after}</li>`).join("")}</ul></details>` : ""}<details class="card"><summary>Batch change</summary><p>Preview up to1024 source records. Percent changes round halves away from zero. Numeric overflow is refused; declared field limits are also enforced. First row refers to the row number shown with each record.</p><div class="field-row">${select("table-batch-field", "Field", model.definition.fields.map((field2) => [field2.name, field2.name]), ctx2.draft("table-batch-field", model.definition.fields[0].name))}${select("table-batch-operation", "Operation", [["set", "Set value"], ["add", "Add"], ["multiply", "Multiply"], ["percent", "Change by percent"]], ctx2.draft("table-batch-operation", "add"))}${field("table-batch-value", "Value", ctx2.draft("table-batch-value", "1"))}${field("table-batch-first", "First row", ctx2.draft("table-batch-first", "0"))}${field("table-batch-count", "Record count", ctx2.draft("table-batch-count", String(Math.min(10, model.total))))}</div>${button("Preview batch changes", "table-batch")}</details>` : ""}${report(state2.results["tables.plan"], "Table change plan")}${report(state2.results["build.apply"], "Built output")}`;
@@ -2702,8 +2720,8 @@
       ctx2.state.resourceJump = offset;
       return ctx2.navigate("resources");
     } });
-    const names5 = new Map(result.nodes.map((n) => [n.id, n.name]));
-    return `<details class="card"><summary>Declared resource relationships</summary><p>Source-bound ranges and explicit editor relationships. Game behavior still needs native verification.</p>${result.partial ? '<p class="notice warm">Showing ' + result.exit_connections.listed + " of " + result.exit_connections.declared + " declared exit links. Undeclared relationships remain unknown.</p>" : ""}<div class="table-wrap"><table><thead><tr><th>Resource</th><th>File offset</th><th>Bytes</th></tr></thead><tbody>${result.nodes.map((n) => `<tr><td>${esc(n.name)}</td><td>${button("0x" + n.offset.toString(16), "relationship-open", { id: String(n.offset) })}</td><td>${n.length}</td></tr>`).join("")}</tbody></table></div>${result.edges.map((e) => `<p>${esc(names5.get(e.from) || e.from)} → ${esc(names5.get(e.to) || e.to)} · ${esc(e.relation)}</p>`).join("")}</details>`;
+    const names6 = new Map(result.nodes.map((n) => [n.id, n.name]));
+    return `<details class="card"><summary>Declared resource relationships</summary><p>Source-bound ranges and explicit editor relationships. Game behavior still needs native verification.</p>${result.partial ? '<p class="notice warm">Showing ' + result.exit_connections.listed + " of " + result.exit_connections.declared + " declared exit links. Undeclared relationships remain unknown.</p>" : ""}<div class="table-wrap"><table><thead><tr><th>Resource</th><th>File offset</th><th>Bytes</th></tr></thead><tbody>${result.nodes.map((n) => `<tr><td>${esc(n.name)}</td><td>${button("0x" + n.offset.toString(16), "relationship-open", { id: String(n.offset) })}</td><td>${n.length}</td></tr>`).join("")}</tbody></table></div>${result.edges.map((e) => `<p>${esc(names6.get(e.from) || e.from)} → ${esc(names6.get(e.to) || e.to)} · ${esc(e.relation)}</p>`).join("")}</details>`;
   }
 
   // romancer/ui/room_editor.js
@@ -3181,11 +3199,234 @@
     mountGameVisual(ctx2);
   }
 
+  // romancer/ui/views/gameview.js
+  var gameview_exports = {};
+  __export(gameview_exports, {
+    mount: () => mount3,
+    openTraceCandidate: () => openTraceCandidate,
+    render: () => render6
+  });
+
+  // romancer/ui/build_checks.js
+  var terminal = /* @__PURE__ */ new Set(["COMPLETED", "FAILED", "CANCELLED", "INTERRUPTED"]);
+  async function buildChecks(ctx2) {
+    var _a, _b;
+    const { state: state2 } = ctx2, a = state2.artifact;
+    if (!a) return "";
+    const scope = selectionKey(state2), params = { ...ctx2.sourceParams() }, current2 = () => {
+      var _a2;
+      return scope === selectionKey(state2) && ((_a2 = ctx2.isCurrentRender) == null ? void 0 : _a2.call(ctx2)) !== false;
+    };
+    const model = await ctx2.api.call("checks.status", params);
+    if (!current2() || model.source_sha256 !== a.sha256 || model.artifact_id !== a.artifact_id) return "";
+    state2.buildCheckView = { scope, page: state2.page, pending: (model.pending || []).some((j) => !terminal.has(j.status)) };
+    const cfg = model.config, artifacts = state2.project.sources.concat(state2.project.builds), target = ctx2.draft("check-target", a.kind === "build" ? a.artifact_id : ((_a = state2.project.builds.at(-1)) == null ? void 0 : _a.artifact_id) || a.artifact_id);
+    const packet = ((_b = state2.buildCheckReport) == null ? void 0 : _b.scope) === scope ? state2.buildCheckReport.result : null;
+    ctx2.use({
+      "check-save": async () => {
+        var _a2, _b2;
+        if (!current2()) return;
+        let steps2;
+        if (read("check-input-mode") === "custom") steps2 = JSON.parse(read("check-steps"));
+        else {
+          let remaining = Number(read("check-frames"));
+          if (!Number.isSafeInteger(remaining) || remaining < 1 || remaining > 2400) throw Error("Choose 1 to 2400 frames before capture.");
+          steps2 = [];
+          while (remaining) {
+            const count = Math.min(600, remaining);
+            steps2.push({ frames: count, buttons: [], port: 0 });
+            remaining -= count;
+          }
+        }
+        const region = ((_a2 = document.getElementById("check-region-enable")) == null ? void 0 : _a2.checked) ? Object.fromEntries(["x", "y", "width", "height"].map((k) => [k, Number(read("check-region-" + k))])) : null;
+        const config = { name: read("check-name").trim(), automatic: !!((_b2 = document.getElementById("check-auto")) == null ? void 0 : _b2.checked), mode: read("check-mode"), steps: steps2, region, route_ids: cfg.route_ids || [] };
+        await ctx2.run("checks.configure", { ...params, config }, { render: false });
+        if (current2()) return ctx2.render();
+      },
+      "check-run": async () => {
+        if (!current2()) return;
+        const target_id = read("check-target");
+        const result = await ctx2.run("checks.run", { project_id: params.project_id, source_id: model.baseline_id, target_id }, { render: false });
+        if (!current2()) return;
+        state2.buildCheckReport = { scope, result };
+        return ctx2.render();
+      },
+      "check-open": async (node) => {
+        if (!current2() || !model.results.some((r) => r.evidence_id === node.dataset.id)) throw Error("Refresh this source’s test results first.");
+        const result = await ctx2.api.call("checks.get", { ...params, evidence_id: node.dataset.id });
+        if (!current2()) return;
+        state2.buildCheckReport = { scope, result };
+        return ctx2.render();
+      },
+      "check-refresh": async () => {
+        if (!current2()) return;
+        await ctx2.refreshProject();
+        if (current2()) return ctx2.render();
+      },
+      "check-cancel": (node) => {
+        if (!current2() || !model.pending.some((j) => j.job_id === node.dataset.id)) throw Error("Refresh the active checks first.");
+        return ctx2.api.call("jobs.cancel", { job_id: node.dataset.id });
+      }
+    });
+    return '<section class="card" id="build-checks"><div class="card-heading"><h3>Build checks</h3>' + badge(model.configured ? "Configured" : "Ready to configure") + '</div><p>Run the original twice and the build once with the same inputs. Compare pictures, cartridge checks and save-state replay.</p><div id="checks-progress">' + (model.pending || []).map((j) => {
+      var _a2, _b2, _c;
+      return "<p>" + esc(j.status) + " · " + esc(((_a2 = artifacts.find((a2) => a2.artifact_id === j.target_id)) == null ? void 0 : _a2.name) || "Build") + " " + (!terminal.has(j.status) ? button("Cancel check", "check-cancel", { id: j.job_id }) : esc(((_b2 = j.outcome) == null ? void 0 : _b2.status) || ((_c = j.outcome) == null ? void 0 : _c.error) || "")) + "</p>";
+    }).join("") + '</div><div class="field-row">' + select("check-target", "Build to check", artifacts.map((r) => [r.artifact_id, r.name]), target) + button("Run checks", "check-run", { primary: true }) + button("Refresh results", "check-refresh") + "</div><details><summary>Automatic check setup</summary>" + field("check-name", "Test name", ctx2.draft("check-name", cfg.name)) + '<label><input id="check-auto" type="checkbox" ' + (cfg.automatic ? "checked" : "") + "> Check new descendant builds automatically after saving this setup</label>" + select("check-mode", "Picture comparison", [["review_changes", "Show changes for review"], ["unchanged", "Require identical selected pixels"]], ctx2.draft("check-mode", cfg.mode)) + field("check-frames", "Frames before capture", ctx2.draft("check-frames", String(cfg.steps.reduce((n, s) => n + s.frames, 0))), { type: "number", min: 1, max: 2400 }) + select("check-input-mode", "Inputs", [["simple", "Wait with no buttons"], ["custom", "Use custom input sequence below"]], ctx2.draft("check-input-mode", cfg.steps.some((s) => s.buttons.length) ? "custom" : "simple")) + "<details><summary>Advanced inputs and comparison region</summary>" + area("check-steps", "Custom input steps (frames, buttons, port)", ctx2.draft("check-steps", JSON.stringify(cfg.steps, null, 2)), 5) + '<label><input id="check-region-enable" type="checkbox" ' + (cfg.region ? "checked" : "") + '> Compare a fixed part of the screen</label><div class="field-row">' + ["x", "y", "width", "height"].map((k) => {
+      var _a2;
+      return field("check-region-" + k, k[0].toUpperCase() + k.slice(1), ctx2.draft("check-region-" + k, String(((_a2 = cfg.region) == null ? void 0 : _a2[k]) ?? (k === "width" || k === "height" ? 128 : 0))), { type: "number", min: k === "x" || k === "y" ? 0 : 1 });
+    }).join("") + "</div></details>" + button("Save test setup for this revision", "check-save") + '<p class="subtle">Up to 2400 frames. Setup follows builds descended from this revision. A flat or unstable original is inconclusive; visual changes need review unless identical pixels are required. Record longer assertions in Routes.</p></details>' + (model.results.length ? '<details open><summary>Recent results</summary><div class="actions">' + model.results.slice().reverse().map((r) => button(r.status + " · " + r.evidence_id.slice(0, 8), "check-open", { id: r.evidence_id })).join("") + "</div></details>" : "") + (packet ? checkReport(packet) : "") + "</section>";
+  }
+  function checkReport(r) {
+    return '<section class="notice"><h4>' + esc(r.name || "Build check") + " · " + esc(r.status) + "</h4><p>" + esc(r.reason || "") + "</p>" + (r.runtime_trusted === false ? '<p class="notice warm">Historical imported report. Run fresh checks for current execution evidence.</p>' : "") + (r.changed_pixels !== void 0 ? "<p>" + r.changed_pixels + " of " + r.total_pixels + " pixels changed.</p>" : "") + (r.visual ? '<div class="visual-comparison">' + [["original_png_base64", "Original"], ["build_png_base64", "Build"], ["difference_png_base64", "Difference"]].map(([key3, name]) => "<figure><figcaption>" + name + '</figcaption><img src="data:image/png;base64,' + esc(r.visual[key3]) + '" alt="' + name + ' check picture" loading="lazy"></figure>').join("") + "</div>" : "") + (r.runs ? "<p>" + r.runs.length + " fresh worker runs · " + r.runs.filter((s) => s.state_replay).length + " state replays verified · " + r.runs.filter((s) => s.worker_exit_code === 0).length + " clean exits</p>" : "") + '<p class="subtle">This covers the configured inputs and assertions. It does not certify a complete game.</p></section>';
+  }
+  function mountBuildChecks(ctx2) {
+    clearTimeout(ctx2.state.buildCheckTimer);
+    const view = ctx2.state.buildCheckView;
+    if (!(view == null ? void 0 : view.pending)) return;
+    const current2 = () => ctx2.state.buildCheckView === view && selectionKey(ctx2.state) === view.scope && ctx2.state.page === view.page && !!document.getElementById("build-checks");
+    const poll = async () => {
+      if (!current2()) return;
+      try {
+        const r = await ctx2.api.call("checks.status", ctx2.sourceParams());
+        if (!current2()) return;
+        if (!(r.pending || []).some((j) => !terminal.has(j.status))) {
+          await ctx2.refreshProject();
+          if (current2()) await ctx2.render();
+          return;
+        }
+        const node = document.getElementById("checks-progress");
+        if (node) node.textContent = r.pending.filter((j) => !terminal.has(j.status)).map((j) => j.message).join(" · ");
+      } catch (error) {
+        if (current2()) {
+          const node = document.getElementById("checks-progress");
+          if (node) node.textContent = error.message;
+          return;
+        }
+      }
+      if (current2()) ctx2.state.buildCheckTimer = setTimeout(poll, 2e3);
+    };
+    ctx2.state.buildCheckTimer = setTimeout(poll, 2e3);
+  }
+
+  // romancer/ui/views/gameview.js
+  var categories2 = ["all", "known", "known_resource", "assets", "script", "tables", "record", "levels", "room", "actor", "sound", "note", "trace", "candidate"];
+  var names3 = { known: "Known locations", known_resource: "Known editing layouts", assets: "Graphics", script: "Text", tables: "Tables", record: "Named records", levels: "Levels", room: "Rooms", actor: "Objects & actors", sound: "Sound", note: "Research", trace: "Gameplay traces", candidate: "Pixel matches", all: "Everything" };
+  var relation = (r) => ({ contains_record: "Contains record", uses_tiles: "Uses tiles", uses_palette: "Uses palette", shares_storage: "Shares byte storage", pixel_match: "Pixel match", located_in: "Located in", contains_object: "Contains object", uses_terrain: "Uses terrain", uses_graphics: "Uses graphics", uses_script: "Uses script", uses_sound: "Uses sound", uses_table: "Uses table" })[r] || r.replaceAll("_", " ");
+  async function render6(ctx2) {
+    var _a, _b, _c, _d;
+    const missing = requireProject(ctx2);
+    if (missing) return missing;
+    const { state: state2 } = ctx2, a = state2.artifact;
+    if (!a) return empty("Choose a ROM", "Import a ROM or open a workshop to connect its resources.");
+    const scope = selectionKey(state2), params = { ...ctx2.sourceParams() }, current2 = () => {
+      var _a2;
+      return scope === selectionKey(state2) && ((_a2 = ctx2.isCurrentRender) == null ? void 0 : _a2.call(ctx2)) !== false;
+    };
+    const traceFocus = ((_a = state2.connectedTraceFocus) == null ? void 0 : _a.scope) === scope ? state2.connectedTraceFocus : null;
+    if (traceFocus) {
+      ctx2.setDraft("gameview-kind", "trace");
+      ctx2.setDraft("gameview-query", "");
+      state2.connectedPage = 0;
+      state2.connectedTraceFocus = null;
+      state2.connectedNode = null;
+    }
+    const model = await ctx2.api.call("gameview.graph", { ...params, query: ctx2.draft("gameview-query", ""), kind: ctx2.draft("gameview-kind", "all"), page: state2.connectedPage || 0 });
+    if (!current2() || model.source_sha256 !== a.sha256 || model.artifact_id !== a.artifact_id) return "";
+    const chosen = ((traceFocus == null ? void 0 : traceFocus.trace_id) ? (_b = model.nodes.find((n) => {
+      var _a2;
+      return ((_a2 = n.locator) == null ? void 0 : _a2.trace_id) === traceFocus.trace_id;
+    })) == null ? void 0 : _b.id : null) || (((_c = state2.connectedNode) == null ? void 0 : _c.scope) === scope ? state2.connectedNode.id : (_d = model.nodes[0]) == null ? void 0 : _d.id);
+    let detail = null, error = "";
+    if (chosen) {
+      try {
+        detail = await ctx2.api.call("gameview.detail", { ...params, node_id: chosen });
+      } catch (e) {
+        error = e.message;
+      }
+    }
+    if (!current2()) return "";
+    if (detail && (detail.source_sha256 !== a.sha256 || detail.artifact_id !== a.artifact_id)) return "";
+    const node = detail == null ? void 0 : detail.node, preview = detail == null ? void 0 : detail.preview;
+    if (node) state2.connectedNode = { scope, id: node.id };
+    ctx2.use({
+      "gameview-find": () => {
+        state2.connectedPage = 0;
+        return current2() ? ctx2.render() : void 0;
+      },
+      "gameview-page": (el) => {
+        if (!current2()) return;
+        state2.connectedPage = Math.max(0, (state2.connectedPage || 0) + Number(el.dataset.id));
+        return ctx2.render();
+      },
+      "gameview-select": (el) => {
+        if (!current2()) return;
+        if (!model.nodes.concat((detail == null ? void 0 : detail.neighbors) || []).some((n) => n.id === el.dataset.id)) throw Error("Refresh the current resources.");
+        state2.connectedNode = { scope, id: el.dataset.id };
+        return ctx2.render();
+      },
+      "gameview-bytes": () => {
+        if (!current2() || (node == null ? void 0 : node.offset) === null) return;
+        state2.resourceJump = node.offset;
+        return ctx2.navigate("resources");
+      },
+      "gameview-link": async () => {
+        if (!current2() || !node) return;
+        await ctx2.run("gameview.link", { ...params, from_id: node.id, to_id: read("gameview-link-target"), relation: read("gameview-link-relation"), note: read("gameview-link-note") }, { render: false });
+        if (current2()) return ctx2.render();
+      },
+      "gameview-unlink": async (el) => {
+        if (!current2() || !detail.connections.some((e) => e.link_id === el.dataset.id)) throw Error("Refresh this connection first.");
+        await ctx2.run("gameview.unlink", { ...params, link_id: el.dataset.id }, { render: false });
+        if (current2()) return ctx2.render();
+      },
+      "gameview-editor": async () => {
+        if (!current2() || !(node == null ? void 0 : node.editor)) return;
+        if (node.kind === "candidate") return openTraceCandidate(ctx2, node, scope);
+        if (node.kind === "known_resource") {
+          const r = await ctx2.run("games.configure", { ...params, resource_id: node.locator.resource_id }, { render: false });
+          if (!current2()) return;
+          const kind2 = r.resource_kind === "assets" ? "assets" : "tables";
+          state2.researchOpen = { scope, kind: kind2 };
+          if (kind2 === "assets") state2.connectedAssetSetup = { scope, result: { ...r, layout: r.sprite_layout } };
+          return ctx2.navigate(kind2);
+        }
+        if (node.kind === "trace") {
+          const r = await ctx2.api.call("traces.get", { ...params, trace_id: node.locator.trace_id });
+          if (!current2()) return;
+          state2.savedGameplayTrace = { scope, result: r };
+          return ctx2.navigate("playtest");
+        }
+        const kind = { assets: "assets", scripts: "script", tables: "tables", levels: "levels", sound: "sound" }[node.editor];
+        if (kind) state2.researchOpen = { scope, kind };
+        if (node.kind === "record") state2.connectedTableJump = { scope, row: node.locator.row };
+        if (node.kind === "room" || node.kind === "actor") state2.connectedLevelJump = { scope, room: node.locator.room_id };
+        return ctx2.navigate(node.editor);
+      }
+    });
+    const checks = await buildChecks(ctx2);
+    if (!current2()) return "";
+    return heading("", "Game view", "Follow a resource to its connected data, measured gameplay and editing tools.") + '<div class="field-row">' + field("gameview-query", "Find a resource", ctx2.draft("gameview-query", "")) + select("gameview-kind", "Show", categories2.map((k) => [k, names3[k]]), ctx2.draft("gameview-kind", "all")) + button("Find resources", "gameview-find") + "</div>" + model.issues.map((r) => '<p class="notice warm">' + esc(r.kind) + ": " + esc(r.message) + "</p>").join("") + (model.partial ? '<p class="notice warm">This view reached a resource budget. Filter or open a focused editor for additional data.</p>' : "") + '<div class="grid-two"><section class="card"><div class="card-heading"><h3>Resources</h3><span>' + model.total + ' matches</span></div><div class="game-node-list" tabindex="0" role="region" aria-label="Connected resource list">' + (model.nodes.map((n) => "<p>" + button(n.name, "gameview-select", { id: n.id, primary: n.id === chosen }) + '<br><span class="subtle">' + esc(names3[n.kind]) + " · " + (n.offset === null ? "Captured frame" : "0x" + n.offset.toString(16) + " · " + n.length + " bytes") + "</span></p>").join("") || "<p>No saved resources yet. Use Resources to declare a layout, or select a captured gameplay region in Playtest and save a trace.</p>") + '</div><div class="actions">' + button("Previous", "gameview-page", { id: "-1", disabled: !model.page }) + "<span>Page " + (model.page + 1) + "</span>" + button("Next", "gameview-page", { id: "1", disabled: (model.page + 1) * 50 >= model.total }) + '</div></section><section class="card"><h3>' + esc((node == null ? void 0 : node.name) || "Choose a resource") + "</h3>" + (error ? "<p>" + esc(error) + "</p>" : "") + (node ? "<p>" + esc({ checked_revision: "Verified game revision", checked_source_history: "Known original in build history", checked_declaration: "Checked resource layout", native_frame: "Measured gameplay frame", historical_frame: "Historical imported frame", pixel_candidate: "Matching pixels · source needs confirmation", user_note: "Your research note" }[node.confidence] || node.confidence.replaceAll("_", " ")) + "</p>" + ((preview == null ? void 0 : preview.png_base64) ? '<figure><img class="game-resource-preview" src="data:image/png;base64,' + esc(preview.png_base64) + '" alt="Selected resource preview"><figcaption>' + esc(preview.caption || "") + "</figcaption></figure>" : "") + ((preview == null ? void 0 : preview.colors) ? '<div class="actions">' + preview.colors.map((c) => '<span class="game-color" title="RGB ' + c.r + ", " + c.g + ", " + c.b + '" data-color="' + c.r + "," + c.g + "," + c.b + '"></span>').join("") + "</div>" : "") + ((preview == null ? void 0 : preview.fields) ? "<dl>" + preview.fields.map((f) => "<dt>" + esc(f.name) + "</dt><dd>" + esc(f.value) + "</dd>").join("") + "</dl>" : "") + ((preview == null ? void 0 : preview.text) ? "<p>" + esc(preview.text) + "</p>" : "") + '<div class="actions">' + (node.offset !== null ? button("Inspect exact bytes", "gameview-bytes") : "") + (node.editor ? button(node.kind === "candidate" ? "Open chosen graphics candidate" : node.kind === "trace" ? "Open saved trace" : "Open editor", "gameview-editor", { primary: true, disabled: (preview == null ? void 0 : preview.runtime_trusted) === false }) : "") + "</div><h4>Connections</h4>" + (detail.connections_truncated ? '<p class="subtle">Showing 32 of ' + detail.connections_total + " connections. Open the focused editor for the complete resource list.</p>" : "") + (detail.connections.map((e) => {
+      const other = e.from === node.id ? e.to : e.from, n = detail.neighbors.find((n2) => n2.id === other);
+      return n ? '<div class="notice"><span>' + esc(relation(e.relation)) + "</span> → " + button(n.name, "gameview-select", { id: n.id }) + (e.confidence === "user_declared" ? "<p>Your declared link · " + esc(e.note) + "</p>" + button("Remove link", "gameview-unlink", { id: e.link_id }) : "") + "</div>" : "";
+    }).join("") || "<p>No checked or declared connection has been recorded for this resource yet.</p>") + "<details><summary>Add a declared relationship</summary>" + select("gameview-link-target", "Connected resource", model.nodes.filter((n) => n.id !== node.id).map((n) => [n.id, n.name]), "") + select("gameview-link-relation", "Relationship", ["uses_graphics", "uses_palette", "uses_script", "uses_sound", "uses_table", "reference"].map((v) => [v, v.replaceAll("_", " ")]), "reference") + field("gameview-link-note", "Evidence or note", ctx2.draft("gameview-link-note", "")) + button("Save declared link", "gameview-link", { disabled: model.nodes.filter((n) => n.id !== node.id).length === 0 }) + '<p>Author-declared metadata. This does not change ROM bytes or prove a runtime reference.</p></details><details><summary>Byte preview</summary><code class="game-byte-preview">' + esc(detail.hex_preview) + "</code></details>" : "") + '</section></div><details class="card"><summary>How to read the connections</summary><p>Checked declarations describe storage. A shared byte range is not proof of game behavior. Native frame traces preserve measured pixels; a pixel match is a candidate until the source transfer is observed. Repeated patterns can have several matching offsets.</p></details>' + checks;
+  }
+  async function openTraceCandidate(ctx2, node, scope) {
+    const result = await ctx2.run("traces.open", { ...ctx2.sourceParams(), trace_id: node.locator.trace_id, matches: [node.locator.match] }, { render: false });
+    if (scope !== selectionKey(ctx2.state)) return;
+    ctx2.state.connectedAssetSetup = { scope, result };
+    ctx2.state.researchOpen = { scope, kind: "assets" };
+    await ctx2.navigate("assets");
+  }
+  function mount3(ctx2) {
+    mountBuildChecks(ctx2);
+    for (const node of document.querySelectorAll(".game-color")) node.style.backgroundColor = "rgb(" + node.dataset.color + ")";
+  }
+
   // romancer/ui/views/resources.js
   var resources_exports = {};
   __export(resources_exports, {
-    mount: () => mount3,
-    render: () => render6
+    mount: () => mount4,
+    render: () => render7
   });
 
   // romancer/ui/source_symbols.js
@@ -4018,7 +4259,7 @@
   }
 
   // romancer/ui/views/resources.js
-  async function render6(ctx2) {
+  async function render7(ctx2) {
     var _a, _b, _c, _d, _e, _f;
     const { state: state2 } = ctx2, missing = requireProject(ctx2);
     if (missing) return missing;
@@ -4154,15 +4395,15 @@
   function catalogSection(ctx2, catalog) {
     return `<section class="card"><div class="card-heading"><h3>Resource catalog</h3><span>${catalog.total} entries</span></div><div class="toolbar">${field("catalog-query", "Find resources", ctx2.state.catalogQuery || "")}${button("Search resources", "catalog-search")}${button("Index declared resources", "catalog-index")}</div>${catalog.resources.length ? `<div class="table-wrap"><table><thead><tr><th>Resource</th><th>Kind</th><th>Offset</th><th>Bytes</th><th></th></tr></thead><tbody>${catalog.resources.map((r) => `<tr><td>${esc(r.name)}</td><td>${esc(r.kind)}</td><td>0x${r.offset.toString(16)}</td><td>${size(r.length)}</td><td>${button("Inspect", "catalog-open", { id: String(r.offset), name: String(r.length) })}</td></tr>`).join("")}</tbody></table></div><div class="actions">${button("Previous resources", "catalog-page", { id: "-1", disabled: !catalog.page })}<span>Page ${catalog.page + 1}</span>${button("Next resources", "catalog-page", { id: "1", disabled: (catalog.page + 1) * catalog.limit >= catalog.total })}</div>` : '<p class="subtle">Index your declared text and graphics to browse them here.</p>'}</section>`;
   }
-  function mount3(ctx2) {
+  function mount4(ctx2) {
     mountHexEditor(ctx2);
   }
 
   // romancer/ui/views/scripts.js
   var scripts_exports = {};
   __export(scripts_exports, {
-    mount: () => mount4,
-    render: () => render7
+    mount: () => mount5,
+    render: () => render8
   });
 
   // romancer/ui/menu_preview.js
@@ -4180,13 +4421,13 @@
     if (schema.length > 1024 ** 2 || config.length > 1024 ** 2) throw Error("Menu declaration exceeds its preview budget.");
     return { schema: JSON.parse(schema), config: JSON.parse(config) };
   }
-  function names3(ctx2, doc) {
+  function names4(ctx2, doc) {
     return doc.records.map((record, index) => ({ record, texts: record.segments.map((segment) => {
       var _a;
       return ((_a = document.getElementById(`script-segment-${index}-${segment.index}`)) == null ? void 0 : _a.value) ?? ctx2.draft(`script-segment-${index}-${segment.index}`, segment.text);
     }) }));
   }
-  var textSignature = (ctx2, doc) => JSON.stringify(names3(ctx2, doc).map((row) => [row.record.id, row.texts]));
+  var textSignature = (ctx2, doc) => JSON.stringify(names4(ctx2, doc).map((row) => [row.record.id, row.texts]));
   function current(ctx2, owned) {
     var _a;
     const { state: state2 } = ctx2, doc = state2.results["script.inspect"];
@@ -4344,7 +4585,7 @@
         root.innerHTML = '<p class="error" role="status">Menu preview unavailable: source or declarations changed. Preview menu again.</p>';
         return;
       }
-      const drafts = new Map(names3(ctx2, doc).map((row) => [row.record.id, row]));
+      const drafts = new Map(names4(ctx2, doc).map((row) => [row.record.id, row]));
       for (const [i, row] of owned.preview.cases.entries()) {
         let before = null, after = null;
         const errors = [];
@@ -4530,7 +4771,7 @@
   }
 
   // romancer/ui/views/scripts.js
-  async function render7(ctx2) {
+  async function render8(ctx2) {
     var _a, _b, _c, _d, _e, _f, _g, _h, _i;
     const setupReview = useResearchSetup(ctx2, "script");
     if (setupReview) return setupReview;
@@ -4641,7 +4882,7 @@
       return `<article class="script-line"><div class="line-meta"><strong>${esc(((_a2 = row.annotations) == null ? void 0 : _a2.label) || row.id)}</strong><span>${row.used_bytes ?? "?"} / ${row.capacity} bytes · offset ${row.offset}</span></div><p class="preview-caption">System-font comparison · game font requires a declared layout or playtest</p>${row.segments.map((segment) => `<div class="preview-pair script-comparison"><div><span>Original segment ${segment.index + 1}</span><div class="text-window">${esc(segment.text)}</div></div><div>${area(`script-segment-${i}-${segment.index}`, "Edited segment " + (segment.index + 1), ctx2.draft(`script-segment-${i}-${segment.index}`, segment.text), 3)}</div></div>`).join("")}<div id="script-capacity-${i}">${capacitySummary(textCapacity(row, row.segments.map((segment) => ctx2.draft(`script-segment-${i}-${segment.index}`, segment.text)), document2.encoding_glyphs))}</div>${row.tokens.some((t) => t.kind === "control") ? `<div class="notice">Preserved controls: ${row.tokens.filter((t) => t.kind === "control").map((t) => esc(t.control_id)).join(", ")}</div>` : ""}${((_b2 = row.read_only_reasons) == null ? void 0 : _b2.map((r) => `<p class="error small">${esc(r)}</p>`).join("")) || ""}</article>`;
     }).join("") : empty("Load a revision-bound script schema", "Unknown encodings remain read only. The original demonstration includes an editable schema.")}<div class="actions">${button("Previous records", "script-page", { id: "-1", disabled: !(state2.scriptPage > 0) })}${button("Next records", "script-page", { id: "1", disabled: !document2 || ((state2.scriptPage || 0) + 1) * 20 >= document2.records.filter((row) => !state2.scriptFilter || row.segments.some((s) => s.text.toLowerCase().includes(state2.scriptFilter))).length })}</div><div class="actions">${button("Review text changes", "script-plan", { primary: !pending, icon: "arrow", disabled: !(document2 == null ? void 0 : document2.write_supported) })}${pending ? button("Create dialogue build", "script-apply", { primary: true, icon: "check" }) + button("Discard changes", "script-discard") : ""}</div></section><div>${menuPreviewPanel(ctx2)}<section class="card"><h3>Text setup</h3>${textDeclaration(ctx2)}${layoutDeclaration(ctx2)}${jsonEditor("script-schema", "Advanced script schema", schemaText, false)}${button("Inspect script", "script-inspect", { icon: "scripts" })}${jsonEditor("layout-config", "Advanced layout configuration", ctx2.draft("layout-config", JSON.stringify({ font_artifact_id: "", font_schema: {}, policy: {}, request: {} }, null, 2)))}<div class="actions">${button("Measure font", "font-measure")}${button("Check layout", "layout-check")}${button("Plan layout", "layout-plan")}</div>${jsonEditor("menu-config", "Menu display configuration", ctx2.draft("menu-config", JSON.stringify({ profile: {}, cases: {}, font_artifact_id: "", font_schema: {} }, null, 2)))}<div class="actions">${button("Inspect menu", "menu-inspect")}${button("Preview menu", "menu-preview")}${button("Compare native menu captures", "menu-compare")}</div></section></div></div>${report(state2.results["script.plan"], "Proposed dialogue changes")}${report(state2.results["structured.apply"], "Structured build")}${report(state2.results["font.measure"], "Measured font")}${report(state2.results["layout.check"], "Layout check")}${report(state2.results["layout.plan"], "Layout proposal")}${report(state2.results["menu.inspect"], "Declared menu")}${report(menuPreviewReport(ctx2), "Declared menu report")}${report(state2.results["menu.compare"], "Native menu comparison")}`;
   }
-  function mount4(ctx2) {
+  function mount5(ctx2) {
     mountTranslation(ctx2);
     const doc = ctx2.state.results["script.inspect"];
     if (!(doc == null ? void 0 : doc.ok)) return;
@@ -4667,8 +4908,8 @@
   __export(assets_exports, {
     literalColorCount: () => literalColorCount,
     literalRGB: () => literalRGB,
-    mount: () => mount5,
-    render: () => render8
+    mount: () => mount6,
+    render: () => render9
   });
 
   // romancer/ui/palette_editor.js
@@ -5787,13 +6028,27 @@ ${font ? `<section class="card"><h3>Font metrics · ${esc(font.id)}</h3><div cla
     const shade = Math.round(18 + value / Math.max(1, count - 1) * 216);
     return { r: shade, g: shade, b: shade };
   }
-  async function render8(ctx2) {
+  async function render9(ctx2) {
     var _a, _b, _c, _d, _e, _f, _g, _h, _i, _j, _k, _l, _m, _n, _o;
     const setupReview = useResearchSetup(ctx2, "assets");
     if (setupReview) return setupReview;
     const { state: state2 } = ctx2, missing = requireProject(ctx2);
     if (missing) return missing;
     if (!state2.artifact) return empty("Import an asset resource", "A declared uncompressed codec and source revision are required.");
+    const connected = state2.connectedAssetSetup;
+    if ((connected == null ? void 0 : connected.scope) === selectionKey(state2)) {
+      state2.connectedAssetSetup = null;
+      state2.results["assets.inspect"] = connected.result.inspection;
+      const bitmap2 = connected.result.inspection.bitmaps[0], layout = { document_id: connected.result.inspection.document_id, bitmap_id: bitmap2.id, ...connected.result.layout };
+      ctx2.setDraft("asset-schema", JSON.stringify(connected.result.schema, null, 2));
+      ctx2.setDraft("sprite-layout", JSON.stringify(layout));
+      ctx2.setDraft("sprite-first", "0");
+      ctx2.setDraft("sprite-columns", String(layout.columns));
+      ctx2.setDraft("sprite-rows", String(layout.rows));
+      ctx2.setDraft("sprite-order", layout.order || "rows");
+      ctx2.setDraft("sprite-map", layout.indices.map((v, i) => v === null ? "." : String(v) + (layout.flips[i] & 1 ? "h" : "") + (layout.flips[i] & 2 ? "v" : "")).join(", "));
+      state2.spriteHistory = null;
+    }
     const fallback = ((_a = state2.candidateReview) == null ? void 0 : _a.artifact_id) === state2.artifact.artifact_id ? {} : ((_b = state2.artifact.descriptors) == null ? void 0 : _b.assets) || ((_c = state2.project.descriptors) == null ? void 0 : _c.assets) || {};
     let document2 = ((_d = state2.candidateReview) == null ? void 0 : _d.artifact_id) === state2.artifact.artifact_id ? null : state2.results["assets.inspect"];
     if ((document2 == null ? void 0 : document2.source_sha256) !== state2.artifact.sha256) document2 = null;
@@ -5911,7 +6166,7 @@ ${font ? `<section class="card"><h3>Font metrics · ${esc(font.id)}</h3><div cla
     });
     if (((_k = state2.candidateReview) == null ? void 0 : _k.artifact_id) === state2.artifact.artifact_id) return `${heading("", "Confirm graphics candidate", "")}<section class="card"><p>${esc(state2.candidateReview.reason)}</p><p>Confirm the format and allocation, then load the declaration.</p>${graphicsDeclaration(ctx2)}${button("Cancel candidate", "candidate-cancel")}</section>`;
     const pending = ((_l = state2.pending) == null ? void 0 : _l.kind) === "assets" && state2.pending.artifact_id === state2.artifact.artifact_id;
-    return `${heading("Asset workshop", "Graphics & fonts", "Inspect declared tiles, palettes, maps, and fonts. Shared consumers require explicit acknowledgment.")}<div class="identity"><strong>${esc(state2.artifact.name)}</strong><code>${short(state2.artifact.sha256)}</code>${badge((document2 == null ? void 0 : document2.write_supported) ? "Editable" : "Declaration needed", (document2 == null ? void 0 : document2.write_supported) ? "good" : "warm")}</div><div class="grid-two asset-workspace"><div class="asset-editors">${spriteAssembly(ctx2, document2, bitmap, palette2)}${animationStudio(ctx2, document2, bitmap)}${paletteEditor(ctx2, palette2)}${assetTools(ctx2, document2, bitmap, palette2)}<section class="card asset-collection"><div class="card-heading"><h3>Tile collection</h3><span class="subtle">${(bitmap == null ? void 0 : bitmap.count) || 0} cells · ${esc((bitmap == null ? void 0 : bitmap.codec) || "No codec loaded")}</span></div>${bitmap ? `<div class="pixel-grid">${bitmap.cells.slice((state2.assetPage || 0) * 64, (state2.assetPage || 0) * 64 + 64).map((cell) => `<div class="pixel-card"><canvas width="${bitmap.width}" height="${bitmap.height}" data-cell="${cell.index}" aria-label="Tile ${cell.index}"></canvas>${button("Edit tile " + cell.index, "asset-select-cell", { id: String(cell.index) })}</div>`).join("")}</div>` : empty("Load a declared asset descriptor", "Unknown compression and codecs remain read only.")}<div class="actions">${button("Previous page", "asset-page", { id: "-1", disabled: !(state2.assetPage > 0) })}${button("Next page", "asset-page", { id: "1", disabled: !bitmap || (state2.assetPage || 0) * 64 + 64 >= bitmap.count })}</div><div class="swatches" aria-label="Declared palette colors">${(palette2 == null ? void 0 : palette2.entries.slice(0, 64).map((entry, i) => `<span class="swatch" data-color-index="${i}" title="Color ${entry.index} (${entry.components.r}, ${entry.components.g}, ${entry.components.b})"></span>`).join("")) || ""}</div></section>${bitmap ? `<section class="card asset-pixel-editor"><div class="card-heading"><h3>Pixel editor · cell ${selected2}</h3><span id="pixel-edit-status">${JSON.stringify(pixelBuffer(ctx2, document2, bitmap, selected2)) !== JSON.stringify(bitmap.cells[selected2].pixels) ? badge("Staged", "warm") : badge("Unchanged")}</span></div><div class="preview-pair pixel-comparison"><div><span>Original tile</span><div class="pixel-card"><canvas id="paint-original" aria-label="Original selected tile"></canvas></div></div><div><span>Editing · paint here</span><div class="pixel-card"><canvas id="paint-canvas" width="${bitmap.width}" height="${bitmap.height}" tabindex="0" role="img" aria-label="Pixel editor: arrows move; Space paints selected index"></canvas><small>Drag to paint. Undo restores a complete stroke.</small></div></div></div><p id="pixel-preview-status" class="preview-caption" role="status" aria-live="polite"></p><div>${field("paint-color", "Palette index", ctx2.draft("paint-color", "1"), { type: "number", min: 0 })}<p class="subtle small">Grayscale shows stored indices when no palette is declared.</p>${button("Discard pending pixels", "asset-discard")}</div></section>` : ""}</div><section class="card"><h3>Graphics setup</h3>${graphicsDeclaration(ctx2)}${jsonEditor("asset-schema", "Advanced asset schema", ctx2.draft("asset-schema", JSON.stringify(fallback, null, 2)), false)}${button("Inspect assets", "asset-inspect", { icon: "assets" })}${jsonEditor("asset-changes", "Additional cell / palette / map / advance changes", ctx2.draft("asset-changes", "[]"), false)}<div class="actions">${button("Review graphics changes", "asset-plan", { primary: !pending, disabled: !(document2 == null ? void 0 : document2.write_supported) })}${pending ? button("Create graphics build", "asset-apply", { primary: true, icon: "check" }) : ""}</div>${((_n = (_m = state2.results["assets.plan"]) == null ? void 0 : _m.required_consumers) == null ? void 0 : _n.length) && !((_o = state2.results["assets.plan"]) == null ? void 0 : _o.ok) ? `<div class="notice warm">${state2.results["assets.plan"].required_consumers.length} declared consumers are affected. Read the report below before acknowledging them.</div>${button("Acknowledge listed consumers", "asset-acknowledge")}` : ""}</section></div>${report(state2.results["assets.plan"], "Asset plan & affected consumers")}${report(state2.results["structured.apply"], "Build result")}`;
+    return `${heading("Asset workshop", "Graphics & fonts", "Inspect declared tiles, palettes, maps, and fonts. Shared consumers require explicit acknowledgment.")}<div class="identity"><strong>${esc(state2.artifact.name)}</strong><code>${short(state2.artifact.sha256)}</code>${badge((document2 == null ? void 0 : document2.write_supported) ? "Editable" : "Declaration needed", (document2 == null ? void 0 : document2.write_supported) ? "good" : "warm")}</div><div class="grid-two asset-workspace"><div class="asset-editors">${spriteAssembly(ctx2, document2, bitmap, palette2)}${animationStudio(ctx2, document2, bitmap)}${paletteEditor(ctx2, palette2)}${assetTools(ctx2, document2, bitmap, palette2)}<section class="card asset-collection"><div class="card-heading"><h3>Tile collection</h3><span class="subtle">${(bitmap == null ? void 0 : bitmap.count) || 0} cells · ${esc((bitmap == null ? void 0 : bitmap.codec) || "No codec loaded")}</span></div>${bitmap ? `<div class="pixel-grid">${bitmap.cells.slice((state2.assetPage || 0) * 64, (state2.assetPage || 0) * 64 + 64).map((cell) => `<div class="pixel-card"><canvas width="${bitmap.width}" height="${bitmap.height}" data-cell="${cell.index}" aria-label="Tile ${cell.index}"></canvas>${button("Edit tile " + cell.index, "asset-select-cell", { id: String(cell.index) })}</div>`).join("")}</div>` : empty("Load a declared asset descriptor", "Unknown compression and codecs remain read only.")}<div class="actions">${button("Previous page", "asset-page", { id: "-1", disabled: !(state2.assetPage > 0) })}${button("Next page", "asset-page", { id: "1", disabled: !bitmap || (state2.assetPage || 0) * 64 + 64 >= bitmap.count })}</div><div class="swatches" role="group" aria-label="Declared palette colors">${(palette2 == null ? void 0 : palette2.entries.slice(0, 64).map((entry, i) => `<span class="swatch" data-color-index="${i}" title="Color ${entry.index} (${entry.components.r}, ${entry.components.g}, ${entry.components.b})"></span>`).join("")) || ""}</div></section>${bitmap ? `<section class="card asset-pixel-editor"><div class="card-heading"><h3>Pixel editor · cell ${selected2}</h3><span id="pixel-edit-status">${JSON.stringify(pixelBuffer(ctx2, document2, bitmap, selected2)) !== JSON.stringify(bitmap.cells[selected2].pixels) ? badge("Staged", "warm") : badge("Unchanged")}</span></div><div class="preview-pair pixel-comparison"><div><span>Original tile</span><div class="pixel-card"><canvas id="paint-original" aria-label="Original selected tile"></canvas></div></div><div><span>Editing · paint here</span><div class="pixel-card"><canvas id="paint-canvas" width="${bitmap.width}" height="${bitmap.height}" tabindex="0" role="img" aria-label="Pixel editor: arrows move; Space paints selected index"></canvas><small>Drag to paint. Undo restores a complete stroke.</small></div></div></div><p id="pixel-preview-status" class="preview-caption" role="status" aria-live="polite"></p><div>${field("paint-color", "Palette index", ctx2.draft("paint-color", "1"), { type: "number", min: 0 })}<p class="subtle small">Grayscale shows stored indices when no palette is declared.</p>${button("Discard pending pixels", "asset-discard")}</div></section>` : ""}</div><section class="card"><h3>Graphics setup</h3>${graphicsDeclaration(ctx2)}${jsonEditor("asset-schema", "Advanced asset schema", ctx2.draft("asset-schema", JSON.stringify(fallback, null, 2)), false)}${button("Inspect assets", "asset-inspect", { icon: "assets" })}${jsonEditor("asset-changes", "Additional cell / palette / map / advance changes", ctx2.draft("asset-changes", "[]"), false)}<div class="actions">${button("Review graphics changes", "asset-plan", { primary: !pending, disabled: !(document2 == null ? void 0 : document2.write_supported) })}${pending ? button("Create graphics build", "asset-apply", { primary: true, icon: "check" }) : ""}</div>${((_n = (_m = state2.results["assets.plan"]) == null ? void 0 : _m.required_consumers) == null ? void 0 : _n.length) && !((_o = state2.results["assets.plan"]) == null ? void 0 : _o.ok) ? `<div class="notice warm">${state2.results["assets.plan"].required_consumers.length} declared consumers are affected. Read the report below before acknowledging them.</div>${button("Acknowledge listed consumers", "asset-acknowledge")}` : ""}</section></div>${report(state2.results["assets.plan"], "Asset plan & affected consumers")}${report(state2.results["structured.apply"], "Build result")}`;
   }
   function documentNode(id) {
     return document.getElementById(id);
@@ -5943,7 +6198,7 @@ ${font ? `<section class="card"><h3>Font metrics · ${esc(font.id)}</h3><div cla
     (_c = documentNode("animation-canvas")) == null ? void 0 : _c.dispatchEvent(new Event("animation-refresh"));
     (_d = documentNode("map-preview")) == null ? void 0 : _d.dispatchEvent(new Event("map-refresh"));
   }
-  function mount5(ctx2) {
+  function mount6(ctx2) {
     const doc = ctx2.state.results["assets.inspect"];
     if (!(doc == null ? void 0 : doc.ok)) return;
     const bitmap = doc.bitmaps.find((b) => b.id === ctx2.state.assetBitmapId) || doc.bitmaps[0], palette2 = doc.palettes.find((p) => p.id === bitmap.palette_id);
@@ -5969,9 +6224,53 @@ ${font ? `<section class="card"><h3>Font metrics · ${esc(font.id)}</h3><div cla
   // romancer/ui/views/playtest.js
   var playtest_exports = {};
   __export(playtest_exports, {
-    mount: () => mount6,
-    render: () => render9
+    mount: () => mount7,
+    render: () => render10
   });
+
+  // romancer/ui/trace_controls.js
+  function traceControls(ctx2) {
+    var _a, _b, _c;
+    const { state: state2 } = ctx2, a = state2.artifact;
+    if (!a) return "";
+    const scope = selectionKey(state2), params = { ...ctx2.sourceParams() }, current2 = () => {
+      var _a2;
+      return scope === selectionKey(state2) && ((_a2 = ctx2.isCurrentRender) == null ? void 0 : _a2.call(ctx2)) !== false;
+    };
+    const selected2 = ((_a = state2.visualRegion) == null ? void 0 : _a.scope) === scope && state2.visualRegion.frame_sha256 === ((_b = state2.frame) == null ? void 0 : _b.sha256) && state2.visualRegion.region.width >= 8 && state2.visualRegion.region.height >= 8 ? state2.visualRegion : null;
+    const result = ((_c = state2.savedGameplayTrace) == null ? void 0 : _c.scope) === scope ? state2.savedGameplayTrace.result : null, partHeight = (result == null ? void 0 : result.matches.some((m) => m.height === 16)) ? 16 : 8, groups = candidateGroups(result, partHeight).slice(0, 16);
+    const save = async (offset, length) => {
+      if (!current2() || !selected2) throw Error("Pause, capture a frame and select a current region first.");
+      stopPlayback(state2);
+      const r = await ctx2.run("traces.capture", { ...params, name: read("trace-name").trim(), frame_sha256: selected2.frame_sha256, region: selected2.region, offset, length }, { render: false });
+      if (!current2()) return;
+      state2.savedGameplayTrace = { scope, result: r };
+      return ctx2.render();
+    };
+    ctx2.use({
+      "trace-save": () => save(Number(read("trace-offset")), Number(read("trace-length"))),
+      "trace-next": () => {
+        if (!(result == null ? void 0 : result.coverage) || !current2()) return;
+        return save(result.coverage.next_offset, a.size - result.coverage.next_offset);
+      },
+      "trace-gameview": () => {
+        if (!current2()) return;
+        state2.connectedTraceFocus = { scope, trace_id: result == null ? void 0 : result.trace_id };
+        return ctx2.navigate("gameview");
+      },
+      "trace-open": async () => {
+        if (!current2() || !(result == null ? void 0 : result.trace_id)) throw Error("Save a fresh source-bound trace first.");
+        const matches = groups.map((g, i) => read("trace-part-" + i)).filter((v) => v !== "").map(Number);
+        if (!matches.length) throw Error("Choose the source offset for a matching part.");
+        const r = await ctx2.run("traces.open", { ...params, trace_id: result.trace_id, matches }, { render: false });
+        if (!current2()) return;
+        state2.connectedAssetSetup = { scope, result: r };
+        state2.researchOpen = { scope, kind: "assets" };
+        return ctx2.navigate("assets");
+      }
+    });
+    return '<section class="card" id="saved-gameplay-trace"><h3>Trace gameplay to ROM data</h3><p>Select a sprite or object in the captured frame above, then save its matching source locations in Game view.</p>' + field("trace-name", "Trace name", ctx2.draft("trace-name", "Gameplay selection")) + '<div class="field-row">' + field("trace-offset", "ROM start offset", ctx2.draft("trace-offset", "0")) + field("trace-length", "ROM bytes to request", ctx2.draft("trace-length", String(a.size))) + "</div>" + button("Trace selected object", "trace-save", { primary: true, disabled: !selected2 || !state2.runtime || state2.playing, reason: "Pause and select a current region at least 8 by 8 pixels." }) + '<p class="subtle">Each search reads up to 512 KiB using the system’s tested literal tile codec. Source transfers and animation ownership are not inferred.</p>' + (result ? '<div class="notice"><h4>' + esc(result.name) + '</h4><img class="game-resource-preview" src="data:image/png;base64,' + esc(result.crop_png_base64) + '" alt="Saved native gameplay region"><p>' + result.matches.length + " matching parts · " + result.coverage.bytes_scanned + " source bytes examined · " + (result.coverage.whole_source ? "whole source" : "partial range") + '</p><p>Matches are pixel evidence. Repeated graphics can have several source offsets.</p><div class="actions">' + button("Open saved trace in Game view", "trace-gameview") + (result.coverage.next_offset < a.size ? button("Search next ROM range", "trace-next", { disabled: !selected2 || state2.playing }) : "") + "</div>" + (groups.length ? '<div class="table-wrap"><table><thead><tr><th>Frame placement</th><th>Choose source</th></tr></thead><tbody>' + groups.map((g, i) => "<tr><td>" + g.x + ", " + g.y + " · 8 × " + g.height + "</td><td>" + select("trace-part-" + i, "Part " + (i + 1), [["", "Select an offset"], ...g.choices.map((m) => [String(m.index), "0x" + m.offset.toString(16) + (m.flip_x ? " · flip H" : "") + (m.flip_y ? " · flip V" : "")])], g.choices.length === 1 ? String(g.choices[0].index) : "") + "</td></tr>").join("") + "</tbody></table></div>" + button("Open chosen parts in graphics editor", "trace-open", { disabled: state2.playing || candidateGroups(result, partHeight).length > 16 }) : "<p>No literal match in this range. Try the next range or a different region. Compressed, transformed or RAM-generated graphics need a supported decoder or further native investigation.</p>") + "</div>" : "") + "</section>";
+  }
 
   // romancer/ui/visual_controls.js
   function selectedRegion(rect, start, end, width, height) {
@@ -6255,7 +6554,7 @@ ${font ? `<section class="card"><h3>Font metrics · ${esc(font.id)}</h3><div cla
   };
 
   // romancer/ui/views/playtest.js
-  async function render9(ctx2) {
+  async function render10(ctx2) {
     var _a, _b, _c, _d, _e, _f, _g, _h, _i, _j, _k, _l, _m, _n, _o, _p, _q, _r, _s, _t, _u, _v, _w, _x, _y;
     const { state: state2 } = ctx2;
     state2.liveMuted ??= getSettings().startMuted;
@@ -6465,9 +6764,9 @@ ${font ? `<section class="card"><h3>Font metrics · ${esc(font.id)}</h3><div cla
     const physicalChoices = [[-1, "Automatic gamepad"], [-2, "Keyboard only"], ...pads.map((p) => [p.index, p.id || "Gamepad " + (p.index + 1)])];
     const controllerSetup = `<div class="field-row">${select("physical-pad", "Input device", physicalChoices, state2.physicalPadIndex ?? -1)}${button("Use input device", "controller-physical")}</div>${active ? `<div class="field-row">${select("controller-type", "Emulated controller", controllerChoices, ((_p = loaded == null ? void 0 : loaded.controller_devices) == null ? void 0 : _p["0"]) ?? 1)}${button("Apply type & restart game", "controller-reload")}</div><p class="subtle">Changing the emulated type restarts the selected ROM. Save states require the same controller setup.</p>` : ""}`;
     const stateControls = `<div class="playtest-toolbar"><div class="actions">${state2.playing ? button("Pause", "runtime-pause", { primary: true }) : button("Play", "runtime-play", { disabled: !active, primary: true })}${button("Save state", "runtime-save", { disabled: !active })}</div><div class="actions state-slot">${select("checkpoint-id", "Saved state", checkpoints.map((c) => [c.snapshot_id, c.created_utc ? c.created_utc.replace("T", " ").replace("+00:00", " UTC") : c.snapshot_id.slice(0, 8) + " · " + c.run_mode]), ((_q = state2.snapshot) == null ? void 0 : _q.snapshot_id) || ((_r = checkpoints.at(-1)) == null ? void 0 : _r.snapshot_id))}${button("Load state", "runtime-restore", { disabled: !active || !checkpoints.length })}</div></div>`;
-    return `${heading("", "Playtest", "", active ? button(state2.playtestExpanded ? "Show setup" : "Expand game", "runtime-view") + button("Close worker", "runtime-close", { icon: "close" }) : "")}<div class="identity">${badge(active ? "NATIVE WORKER LOADED" : state2.profileAvailable ? "READY TO LOAD" : "SETUP REQUIRED", active ? "good" : "warm")}<strong>${esc(((_s = state2.artifact) == null ? void 0 : _s.name) || "Selected source")}</strong><code>${short((_t = state2.artifact) == null ? void 0 : _t.sha256)}</code></div><div class="grid-two playtest-layout ${active && state2.playtestExpanded ? "playtest-expanded" : ""}"><section class="card"><div class="card-heading"><h3>Playtest screen</h3><span class="subtle" id="runtime-frame-label">${state2.frame ? `Frame ${state2.frame.index} · ${state2.frame.width} × ${state2.frame.height}` : "No measured frame yet"}</span></div>${stateControls}<div class="actions">${button("Inspect graphics", "graphics-show-region", { disabled: !state2.frame, icon: "assets" })}</div><div class="screen" id="runtime-controller" tabindex="0" aria-label="Game controller keyboard focus">${state2.frame || active ? '<canvas id="runtime-screen" aria-label="Measured emulator capture"></canvas>' : empty(state2.profileAvailable ? "Ready to playtest" : "Connect a compatible core", state2.profileAvailable ? "Load game to begin." : "Choose a core in System setup.")}</div><details class="manual-runtime"><summary>Controller & frame tools</summary>${controllerSetup}<div class="runtime-controls"><div><div class="field-row">${field("runtime-frames", "Frames to advance", ctx2.draft("runtime-frames", "60"), { type: "number", min: 1 })}${field("input-frames", "Frames per input", ctx2.draft("input-frames", "1"), { type: "number", min: 1 })}</div><div class="actions">${button("Advance frames", "runtime-advance", { primary: true, disabled: !active, icon: "playtest" })}${button("Capture", "runtime-capture", { disabled: !active })}${button("Reset", "runtime-reset", { disabled: !active })}${button(state2.liveMuted ? "Unmute" : "Mute", "runtime-mute", { disabled: !active })}${field("runtime-volume", "Volume (%)", ctx2.draft("runtime-volume", String(getSettings().volume)), { type: "number", min: 0, max: 100 })}${button("Set volume", "runtime-volume", { disabled: !active })}${button("Test sound", "runtime-sound-check")}${button("Check ROM", "runtime-check", { disabled: !state2.profile })}</div></div><div class="dpad" aria-label="Controller directions">${button("↑", "runtime-input", { id: "up", disabled: !active })}${button("←", "runtime-input", { id: "left", disabled: !active })}${button("→", "runtime-input", { id: "right", disabled: !active })}${button("↓", "runtime-input", { id: "down", disabled: !active })}</div></div><div class="actions">${["a", "b", "x", "y", "l", "r", "start", "select"].map((id) => button(id.toUpperCase(), "runtime-input", { id, disabled: !active })).join("")}</div><p class="subtle">Use your saved controller keys while the game has focus.</p></details></section><section class="card playtest-setup"><h3>System setup</h3>${setup2}${button("Load game", "runtime-load", { primary: !active, disabled: active || !state2.profile })}<details class="config"><summary>Advanced core setup</summary>${field("core-path", "Native libretro core", ctx2.draft("core-path", ((_u = state2.profile) == null ? void 0 : _u.core) || readPreference("romancer-core") || ""), { placeholder: state2.capabilities.platform === "Windows" ? "C:\\RetroArch\\cores\\snes9x_libretro.dll" : "/path/to/core_libretro.so", hint: `Choose a core built for ${state2.capabilities.platform}. A Linux .so cannot load in Windows Python.` })}<div class="actions">${button("Choose core", "core-choose", { icon: "folder" })}${button("Load selected source", "runtime-load", { primary: !active, disabled: active })}</div>${jsonEditor("core-options", "Advanced core options", ctx2.draft("core-options", JSON.stringify(((_v = state2.profile) == null ? void 0 : _v.options) || {}, null, 2)))}</details><div class="config"><h3>Audio</h3>${button("Drain audio", "runtime-audio", { disabled: !active })}</div>${((_w = state2.audio) == null ? void 0 : _w.observed) ? `<canvas id="pcm-wave" width="480" height="80" aria-label="Captured PCM waveform"></canvas><audio id="pcm-player" controls aria-label="Play captured audio"></audio>${button("Save captured WAV", "runtime-audio-export", { disabled: !state2.audio.complete })}` : ""}<details class="config"><summary>Audio capture test (advanced)</summary>${jsonEditor("audio-config", "Cold-boot audio capture configuration", ctx2.draft("audio-config", JSON.stringify({ schema_version: 1, load: {}, steps: [{ frames: 1, buttons: [], port: 0 }], timeout_seconds: 30 }, null, 2)))}${jsonEditor("audio-baseline", "Exact sample-duration baseline", ctx2.draft("audio-baseline", "{}"))}${button("Capture & export WAV", "audio-export")}<p class="subtle small">Audio duration is checked against samples and an explicit rational baseline, independently of video timing.</p></details></section></div>${((_x = state2.results["runtime.smoke_profile"]) == null ? void 0 : _x.source_sha256) === ((_y = state2.artifact) == null ? void 0 : _y.sha256) ? `<section class="card"><h3>ROM startup check</h3><p>${state2.results["runtime.smoke_profile"].frames_advanced} frames · ${state2.results["runtime.smoke_profile"].frame.width} × ${state2.results["runtime.smoke_profile"].frame.height} video · ${state2.results["runtime.smoke_profile"].audio.captured_frames} audio sample frames · worker closed</p><p class="subtle">Startup observations only. Regression checks need expected results.</p><div class="actions">${button("Record a test route", "navigate", { id: "routes" })}${button("Compare regression runs", "navigate", { id: "regression" })}</div></section>` : ""}${report(state2.results["runtime.smoke_profile"], "ROM check details")}${report(state2.results["runtime.load"], "Worker capabilities")}${report(state2.results["runtime.close"], "Worker closure")}${report(state2.results["runtime.save_state"] ? { ...state2.results["runtime.save_state"], state_base64: "[local snapshot payload hidden]" } : null, "State identity")}${report(state2.audio ? { ...state2.audio, pcm_s16le_base64: "[PCM payload hidden]" } : null, "Captured audio")}${report(state2.results["audio.capture"], "WAV export")}${state2.artifact ? saveManager(ctx2, saveListing) + checkpointControls(ctx2) + graphicsInvestigation(ctx2) : ""}${evidence(ctx2)}`;
+    return `${heading("", "Playtest", "", active ? button(state2.playtestExpanded ? "Show setup" : "Expand game", "runtime-view") + button("Close worker", "runtime-close", { icon: "close" }) : "")}<div class="identity">${badge(active ? "NATIVE WORKER LOADED" : state2.profileAvailable ? "READY TO LOAD" : "SETUP REQUIRED", active ? "good" : "warm")}<strong>${esc(((_s = state2.artifact) == null ? void 0 : _s.name) || "Selected source")}</strong><code>${short((_t = state2.artifact) == null ? void 0 : _t.sha256)}</code></div><div class="grid-two playtest-layout ${active && state2.playtestExpanded ? "playtest-expanded" : ""}"><section class="card"><div class="card-heading"><h3>Playtest screen</h3><span class="subtle" id="runtime-frame-label">${state2.frame ? `Frame ${state2.frame.index} · ${state2.frame.width} × ${state2.frame.height}` : "No measured frame yet"}</span></div>${stateControls}<div class="actions">${button("Inspect graphics", "graphics-show-region", { disabled: !state2.frame, icon: "assets" })}</div><div class="screen" id="runtime-controller" tabindex="0" aria-label="Game controller keyboard focus">${state2.frame || active ? '<canvas id="runtime-screen" aria-label="Measured emulator capture"></canvas>' : empty(state2.profileAvailable ? "Ready to playtest" : "Connect a compatible core", state2.profileAvailable ? "Load game to begin." : "Choose a core in System setup.")}</div><details class="manual-runtime"><summary>Controller & frame tools</summary>${controllerSetup}<div class="runtime-controls"><div><div class="field-row">${field("runtime-frames", "Frames to advance", ctx2.draft("runtime-frames", "60"), { type: "number", min: 1 })}${field("input-frames", "Frames per input", ctx2.draft("input-frames", "1"), { type: "number", min: 1 })}</div><div class="actions">${button("Advance frames", "runtime-advance", { primary: true, disabled: !active, icon: "playtest" })}${button("Capture", "runtime-capture", { disabled: !active })}${button("Reset", "runtime-reset", { disabled: !active })}${button(state2.liveMuted ? "Unmute" : "Mute", "runtime-mute", { disabled: !active })}${field("runtime-volume", "Volume (%)", ctx2.draft("runtime-volume", String(getSettings().volume)), { type: "number", min: 0, max: 100 })}${button("Set volume", "runtime-volume", { disabled: !active })}${button("Test sound", "runtime-sound-check")}${button("Check ROM", "runtime-check", { disabled: !state2.profile })}</div></div><div class="dpad" aria-label="Controller directions">${button("↑", "runtime-input", { id: "up", disabled: !active })}${button("←", "runtime-input", { id: "left", disabled: !active })}${button("→", "runtime-input", { id: "right", disabled: !active })}${button("↓", "runtime-input", { id: "down", disabled: !active })}</div></div><div class="actions">${["a", "b", "x", "y", "l", "r", "start", "select"].map((id) => button(id.toUpperCase(), "runtime-input", { id, disabled: !active })).join("")}</div><p class="subtle">Use your saved controller keys while the game has focus.</p></details></section><section class="card playtest-setup"><h3>System setup</h3>${setup2}${button("Load game", "runtime-load", { primary: !active, disabled: active || !state2.profile })}<details class="config"><summary>Advanced core setup</summary>${field("core-path", "Native libretro core", ctx2.draft("core-path", ((_u = state2.profile) == null ? void 0 : _u.core) || readPreference("romancer-core") || ""), { placeholder: state2.capabilities.platform === "Windows" ? "C:\\RetroArch\\cores\\snes9x_libretro.dll" : "/path/to/core_libretro.so", hint: `Choose a core built for ${state2.capabilities.platform}. A Linux .so cannot load in Windows Python.` })}<div class="actions">${button("Choose core", "core-choose", { icon: "folder" })}${button("Load selected source", "runtime-load", { primary: !active, disabled: active })}</div>${jsonEditor("core-options", "Advanced core options", ctx2.draft("core-options", JSON.stringify(((_v = state2.profile) == null ? void 0 : _v.options) || {}, null, 2)))}</details><div class="config"><h3>Audio</h3>${button("Drain audio", "runtime-audio", { disabled: !active })}</div>${((_w = state2.audio) == null ? void 0 : _w.observed) ? `<canvas id="pcm-wave" width="480" height="80" aria-label="Captured PCM waveform"></canvas><audio id="pcm-player" controls aria-label="Play captured audio"></audio>${button("Save captured WAV", "runtime-audio-export", { disabled: !state2.audio.complete })}` : ""}<details class="config"><summary>Audio capture test (advanced)</summary>${jsonEditor("audio-config", "Cold-boot audio capture configuration", ctx2.draft("audio-config", JSON.stringify({ schema_version: 1, load: {}, steps: [{ frames: 1, buttons: [], port: 0 }], timeout_seconds: 30 }, null, 2)))}${jsonEditor("audio-baseline", "Exact sample-duration baseline", ctx2.draft("audio-baseline", "{}"))}${button("Capture & export WAV", "audio-export")}<p class="subtle small">Audio duration is checked against samples and an explicit rational baseline, independently of video timing.</p></details></section></div>${((_x = state2.results["runtime.smoke_profile"]) == null ? void 0 : _x.source_sha256) === ((_y = state2.artifact) == null ? void 0 : _y.sha256) ? `<section class="card"><h3>ROM startup check</h3><p>${state2.results["runtime.smoke_profile"].frames_advanced} frames · ${state2.results["runtime.smoke_profile"].frame.width} × ${state2.results["runtime.smoke_profile"].frame.height} video · ${state2.results["runtime.smoke_profile"].audio.captured_frames} audio sample frames · worker closed</p><p class="subtle">Startup observations only. Regression checks need expected results.</p><div class="actions">${button("Record a test route", "navigate", { id: "routes" })}${button("Compare regression runs", "navigate", { id: "regression" })}</div></section>` : ""}${report(state2.results["runtime.smoke_profile"], "ROM check details")}${report(state2.results["runtime.load"], "Worker capabilities")}${report(state2.results["runtime.close"], "Worker closure")}${report(state2.results["runtime.save_state"] ? { ...state2.results["runtime.save_state"], state_base64: "[local snapshot payload hidden]" } : null, "State identity")}${report(state2.audio ? { ...state2.audio, pcm_s16le_base64: "[PCM payload hidden]" } : null, "Captured audio")}${report(state2.results["audio.capture"], "WAV export")}${state2.artifact ? saveManager(ctx2, saveListing) + checkpointControls(ctx2) + traceControls(ctx2) + graphicsInvestigation(ctx2) : ""}${evidence(ctx2)}`;
   }
-  function mount6(ctx2) {
+  function mount7(ctx2) {
     mountController(ctx2);
     mountCheckpoint(ctx2);
     mountAudio(ctx2.state.audio);
@@ -6493,8 +6792,8 @@ ${font ? `<section class="card"><h3>Font metrics · ${esc(font.id)}</h3><div cla
   // romancer/ui/views/debug.js
   var debug_exports = {};
   __export(debug_exports, {
-    mount: () => mount7,
-    render: () => render10
+    mount: () => mount8,
+    render: () => render11
   });
 
   // romancer/ui/structural_lab.js
@@ -6665,13 +6964,13 @@ ${font ? `<section class="card"><h3>Font metrics · ${esc(font.id)}</h3><div cla
       "series-capture": async () => {
         if (!owned() || !result) throw Error("Start an investigation for the selected source first.");
         if (!result.runtime_trusted) throw Error("Historical investigations are read-only. Start a fresh investigation.");
-        const relation = read("series-relation");
+        const relation2 = read("series-relation");
         return save("investigations.capture", {
           investigation_id: result.investigation_id,
           label: read("series-label").trim() || "Observation " + (result.observation_count + 1),
           value: seriesNumber(read("series-value")),
-          relation,
-          delta: relation === "delta" ? seriesNumber(read("series-delta")) : null
+          relation: relation2,
+          delta: relation2 === "delta" ? seriesNumber(read("series-delta")) : null
         }, true);
       },
       "series-refresh": async () => {
@@ -6802,7 +7101,7 @@ ${font ? `<section class="card"><h3>Font metrics · ${esc(font.id)}</h3><div cla
   }
 
   // romancer/ui/views/debug.js
-  async function render10(ctx2) {
+  async function render11(ctx2) {
     var _a, _b;
     const { state: state2 } = ctx2, missing = requireProject(ctx2);
     if (missing) return missing;
@@ -6864,14 +7163,14 @@ ${font ? `<section class="card"><h3>Font metrics · ${esc(font.id)}</h3><div cla
       return `<tr><td>${esc(p.probe_id)}</td><td>${esc(p.status)}</td><td><code>${esc(((_a2 = p.source) == null ? void 0 : _a2.raw_hex) || "Unresolved")}</code></td></tr>`;
     }).join("")}</tbody></table></div>` : ""}</section></div></details>${report(state2.results["debug.inspect"], "Case inspection")}${report(state2.results["debug.observe"], "Measured before & after")}`;
   }
-  function mount7(ctx2) {
+  function mount8(ctx2) {
     mountValueFinder(ctx2);
   }
 
   // romancer/ui/views/routes.js
   var routes_exports = {};
   __export(routes_exports, {
-    render: () => render11
+    render: () => render12
   });
 
   // romancer/ui/route_controls.js
@@ -6972,7 +7271,7 @@ ${font ? `<section class="card"><h3>Font metrics · ${esc(font.id)}</h3><div cla
 
   // romancer/ui/views/routes.js
   var exampleRoute = { schema_version: 1, id: "my-route", max_frames: 600, max_actions: 10, steps: [{ frames: 60, buttons: [], port: 0, assertions: [], transition: null, checkpoint: false }] };
-  async function render11(ctx2) {
+  async function render12(ctx2) {
     var _a;
     const { state: state2 } = ctx2, missing = requireProject(ctx2);
     if (missing) return missing;
@@ -6995,9 +7294,9 @@ ${font ? `<section class="card"><h3>Font metrics · ${esc(font.id)}</h3><div cla
   // romancer/ui/views/regression.js
   var regression_exports = {};
   __export(regression_exports, {
-    render: () => render12
+    render: () => render13
   });
-  async function render12(ctx2) {
+  async function render13(ctx2) {
     var _a, _b, _c, _d, _e, _f, _g;
     const { state: state2 } = ctx2, missing = requireProject(ctx2);
     if (missing) return missing;
@@ -7034,8 +7333,8 @@ ${font ? `<section class="card"><h3>Font metrics · ${esc(font.id)}</h3><div cla
   // romancer/ui/views/release.js
   var release_exports = {};
   __export(release_exports, {
-    mount: () => mount8,
-    render: () => render13
+    mount: () => mount9,
+    render: () => render14
   });
 
   // romancer/ui/patch_controls.js
@@ -7119,7 +7418,7 @@ ${font ? `<section class="card"><h3>Font metrics · ${esc(font.id)}</h3><div cla
   }
 
   // romancer/ui/views/release.js
-  async function render13(ctx2) {
+  async function render14(ctx2) {
     var _a, _b;
     const { state: state2 } = ctx2, missing = requireProject(ctx2);
     if (missing) return missing;
@@ -7140,15 +7439,15 @@ ${font ? `<section class="card"><h3>Font metrics · ${esc(font.id)}</h3><div cla
   function containerSelect(id, label, rows) {
     return `<label class="field"><span>${label}</span><select id="${id}">${rows.map((r) => `<option value="${r.container_id}">${esc(r.name || r.cue || r.container_id)}</option>`).join("")}</select></label>`;
   }
-  function mount8(ctx2) {
+  function mount9(ctx2) {
     mountPatchControls(ctx2);
   }
 
   // romancer/ui/views/settings.js
   var settings_exports = {};
   __export(settings_exports, {
-    mount: () => mount9,
-    render: () => render14
+    mount: () => mount10,
+    render: () => render15
   });
   var settingIds = { theme: "settings-theme", scale: "settings-scale", autoDeepScan: "settings-auto-deep-scan", autoGraphics: "settings-auto-graphics", rememberWorkspace: "settings-remember-workspace", volume: "settings-volume", startMuted: "settings-start-muted", loopPreview: "settings-loop-preview", reduceMotion: "settings-reduce-motion", advancedTools: "settings-advanced-tools" };
   async function editorFor(ctx2) {
@@ -7210,7 +7509,7 @@ ${font ? `<section class="card"><h3>Font metrics · ${esc(font.id)}</h3><div cla
     return `<section class="card settings-card"><form id="settings-form"><h2>Preferences</h2><p>Apply saves these preferences for this workspace. OK saves and closes; Cancel discards unapplied changes.</p>${editor.error ? `<div class="notice"><p class="error" role="alert">${esc(editor.error)}</p>${button("Reload saved settings (discard form)", "settings-reload", { disabled: editor.busy })}</div>` : ""}<div class="grid-even"><fieldset class="settings-group"${editor.busy ? " disabled" : ""}><legend>Appearance</legend>${select("settings-theme", "Theme", [["romancer", "ROMancer (default)"], ["dark", "Dark"], ["light", "Light"]], v.theme)}${select("settings-scale", "Interface size", [[100, "100%"], [125, "125%"], [150, "150%"], [200, "200%"]], v.scale)}<p class="subtle">ROMancer keeps the original sea-green appearance.</p>${checkbox(editor, "reduceMotion", "Reduce interface motion")}</fieldset><fieldset class="settings-group"${editor.busy ? " disabled" : ""}><legend>Automatic tasks</legend>${checkbox(editor, "autoDeepScan", "Auto deep scan on ROM load", "Find supported resources when a ROM is opened.")}${checkbox(editor, "autoGraphics", "Inspect gameplay graphics automatically", "Analyze available playtest frames for graphics candidates.")}${checkbox(editor, "rememberWorkspace", "Remember my workspace", "Reopen the last project, ROM, page, and editing position.")}</fieldset><fieldset class="settings-group"${editor.busy ? " disabled" : ""}><legend>Audio</legend><label class="field" for="settings-volume"><span>Volume <output id="settings-volume-value" for="settings-volume">${v.volume}%</output></span><input id="settings-volume" type="range" min="0" max="100" step="1" value="${v.volume}"></label>${checkbox(editor, "startMuted", "Start game audio muted")}${checkbox(editor, "loopPreview", "Loop audio previews")}</fieldset><fieldset class="settings-group"${editor.busy ? " disabled" : ""}><legend>Workspace tools</legend>${checkbox(editor, "advancedTools", "Show advanced tools in navigation", "Keep debugging and engineering tools within easy reach.")}<p class="subtle">Project recovery, system setup, and AI tools remain available below.</p></fieldset></div><div class="actions settings-actions">${button("OK", "settings-ok", { primary: true, disabled })}${button("Apply", "settings-apply", { disabled })}${button("Cancel", "settings-cancel", { disabled: editor.busy })}${button("Restore defaults", "settings-defaults", { disabled: editor.busy })}<span class="subtle" id="settings-form-status" role="status">${editor.busy ? "Saving settings…" : editor.dirty ? "Unapplied changes" : "Preferences apply to this workspace"}</span></div></form></section>`;
   }
   var columns = [["identification", "Identification"], ["raw_inspection", "Inspection"], ["structured_formats", "Declared formats"], ["automatic_resource_discovery", "Resource discovery"], ["runtime_control", "Saved setup"]];
-  async function render14(ctx2) {
+  async function render15(ctx2) {
     var _a, _b;
     const editor = await editorFor(ctx2);
     ctx2.use({ "settings-reload": async () => {
@@ -7279,7 +7578,7 @@ ${font ? `<section class="card"><h3>Font metrics · ${esc(font.id)}</h3><div cla
  <details><summary>What these statuses mean</summary><p>Available describes the listed editing feature. Header-based identification, including SNES, can remain ambiguous. Ready means included or saved core inputs were checked; it does not certify every game.</p><p>Choose core is a setup step for this workspace. Open Set up to find a local core. ROM health checks live in Resources.</p></details></section>
  ${report(c.systems, "Current system registry")}</details>`;
   }
-  function mount9(ctx2) {
+  function mount10(ctx2) {
     var _a;
     const editor = ctx2.state.settingsEditor;
     if (!editor) return;
@@ -7305,8 +7604,8 @@ ${font ? `<section class="card"><h3>Font metrics · ${esc(font.id)}</h3><div cla
   // romancer/ui/views/levels.js
   var levels_exports = {};
   __export(levels_exports, {
-    mount: () => mount10,
-    render: () => render15
+    mount: () => mount11,
+    render: () => render16
   });
 
   // romancer/ui/room_navigation.js
@@ -7350,11 +7649,11 @@ ${font ? `<section class="card"><h3>Font metrics · ${esc(font.id)}</h3><div cla
     return { width, height, pixels };
   }
   function roomNavigation(doc, model, id) {
-    const connections = roomConnections(doc, model), names5 = new Map(doc.rooms.map((room) => [room.id, room.name]));
+    const connections = roomConnections(doc, model), names6 = new Map(doc.rooms.map((room) => [room.id, room.name]));
     return `<section class="level-room-navigation"><h3>Choose a room</h3><p class="subtle">Select an object to move it, or choose a terrain brush to paint.</p><div class="level-room-list">${doc.rooms.map((room) => {
       const count = connections.filter((connection) => connection.room_id === room.id).length;
       return `<button type="button" class="level-room-card" data-action="levels-open-room" data-id="${esc(room.id)}" aria-pressed="${room.id === id}"><canvas data-level-room-preview="${esc(room.id)}" aria-hidden="true"></canvas><strong>${esc(room.name)}</strong><span>${count} room ${count === 1 ? "link" : "links"}</span></button>`;
-    }).join("")}</div><div class="level-connection-list">${connections.map((connection) => `<div class="level-connection"><span>${esc(names5.get(connection.room_id))}</span>${button(connection.name, "levels-select-object", { id: String(connection.index), name: connection.room_id })}<span aria-hidden="true">→</span>${button(names5.get(connection.target_room_id), "levels-open-room", { id: connection.target_room_id })}</div>`).join("")}</div></section>`;
+    }).join("")}</div><div class="level-connection-list">${connections.map((connection) => `<div class="level-connection"><span>${esc(names6.get(connection.room_id))}</span>${button(connection.name, "levels-select-object", { id: String(connection.index), name: connection.room_id })}<span aria-hidden="true">→</span>${button(names6.get(connection.target_room_id), "levels-open-room", { id: connection.target_room_id })}</div>`).join("")}</div></section>`;
   }
   function objectChoices(doc, model, id, allRecords = false) {
     return model.objects(id).flatMap((object, index) => {
@@ -7376,8 +7675,8 @@ ${font ? `<section class="card"><h3>Font metrics · ${esc(font.id)}</h3><div cla
     const allRecords = ctx2.draft("level-overlay", "objects") === "records", choices = objectChoices(doc, model, id, allRecords);
     if (!choices.length) return `<section class="card level-object-inspector"><h3>Objects</h3><p>No named objects in this room.</p>${model.objects(id).length ? "<details><summary>Advanced records</summary><p>Choose All records (Advanced) in Overlay to inspect or move raw record slots.</p></details>" : ""}</section>`;
     const index = selectedObjectIndex(ctx2, model, id), object = model.objects(id)[index], metadata = objectMetadata(doc, id, index), reference = (metadata == null ? void 0 : metadata.role) === "exit" ? metadata.reference : null;
-    const names5 = new Map(doc.rooms.map((room) => [room.id, room.name]));
-    const destination = reference ? select("level-object-destination", "Destination room", reference.targets.map((target) => [target.value, names5.get(target.room_id)]), object[reference.field]) : "";
+    const names6 = new Map(doc.rooms.map((room) => [room.id, room.name]));
+    const destination = reference ? select("level-object-destination", "Destination room", reference.targets.map((target) => [target.value, names6.get(target.room_id)]), object[reference.field]) : "";
     const controls = objectFields(doc, id).map((field2, position) => {
       if ((reference == null ? void 0 : reference.field) === field2.name) return "";
       const maximum = objectMaximum(doc, id, field2), label = field2.name === "x" ? "X position" : field2.name === "y" ? "Y position" : field2.name;
@@ -8265,8 +8564,8 @@ ${font ? `<section class="card"><h3>Font metrics · ${esc(font.id)}</h3><div cla
     return Number(text);
   };
   var practiceControls = () => `<details class="card"><summary>Advanced practice</summary><p>Open a separate test layout to learn the editor controls.</p>${button("Open test layout", "studio-example")}</details>`;
-  async function render15(ctx2) {
-    var _a, _b, _c, _d, _e, _f, _g, _h, _i, _j, _k, _l;
+  async function render16(ctx2) {
+    var _a, _b, _c, _d, _e, _f, _g, _h, _i, _j, _k, _l, _m;
     const setupReview = useResearchSetup(ctx2, "levels");
     if (setupReview) return setupReview;
     const { state: state2 } = ctx2;
@@ -8277,6 +8576,10 @@ ${font ? `<section class="card"><h3>Font metrics · ${esc(font.id)}</h3><div cla
     } });
     if (!state2.project || !state2.artifact) return heading("", "Levels", "") + empty("Choose a project or import a ROM", "Choose a project above, or import your ROM to get started.", button("Import ROM", "import", { primary: true })) + practiceControls();
     const scope = selectionKey(state2), current2 = () => scope === selectionKey(state2), saved = (_a = state2.artifact.descriptors) == null ? void 0 : _a.levels;
+    if (((_b = state2.connectedLevelJump) == null ? void 0 : _b.scope) === scope) {
+      ctx2.setDraft("level-room", state2.connectedLevelJump.room);
+      state2.connectedLevelJump = null;
+    }
     let doc = state2.results["levels.inspect"];
     if ((doc == null ? void 0 : doc.source_sha256) !== state2.artifact.sha256) doc = null;
     if (!doc && (saved == null ? void 0 : saved.source_sha256) === state2.artifact.sha256) {
@@ -8285,7 +8588,7 @@ ${font ? `<section class="card"><h3>Font metrics · ${esc(font.id)}</h3><div cla
       } catch {
         doc = null;
       }
-      if (!current2() || ((_b = ctx2.isCurrentRender) == null ? void 0 : _b.call(ctx2)) === false) return "";
+      if (!current2() || ((_c = ctx2.isCurrentRender) == null ? void 0 : _c.call(ctx2)) === false) return "";
       if (doc) state2.results["levels.inspect"] = doc;
     }
     state2.levelRoomVisualScope = null;
@@ -8296,27 +8599,27 @@ ${font ? `<section class="card"><h3>Font metrics · ${esc(font.id)}</h3><div cla
         game = await ctx2.api.call("games.inspect", ctx2.sourceParams());
       } catch {
       }
-      if (!current2() || ((_c = ctx2.isCurrentRender) == null ? void 0 : _c.call(ctx2)) === false) return "";
-      if (((_d = game == null ? void 0 : game.profile) == null ? void 0 : _d.id) === "ffl2-usa" && (game.map_workbench || ((_e = game.visual) == null ? void 0 : _e.kind) === "room-map")) {
+      if (!current2() || ((_d = ctx2.isCurrentRender) == null ? void 0 : _d.call(ctx2)) === false) return "";
+      if (((_e = game == null ? void 0 : game.profile) == null ? void 0 : _e.id) === "ffl2-usa" && (game.map_workbench || ((_f = game.visual) == null ? void 0 : _f.kind) === "room-map")) {
         ctx2.use({ "ffl2-maps-open": () => {
           if (!current2()) return;
           ctx2.setDraft("ffl2-map-mode", "browser");
           return ctx2.render();
         } });
         if (ctx2.draft("ffl2-map-mode", "simple") === "browser" || !game.visual) {
-          const markup2 = await gameMaps(ctx2, { simpleAvailable: ((_f = game.visual) == null ? void 0 : _f.kind) === "room-map" });
-          if (!current2() || ((_g = ctx2.isCurrentRender) == null ? void 0 : _g.call(ctx2)) === false) return "";
+          const markup2 = await gameMaps(ctx2, { simpleAvailable: ((_g = game.visual) == null ? void 0 : _g.kind) === "room-map" });
+          if (!current2() || ((_h = ctx2.isCurrentRender) == null ? void 0 : _h.call(ctx2)) === false) return "";
           state2.gameMapRenderScope = scope;
           return heading("", "Levels", "") + markup2;
         }
         const markup = await gameEdits(ctx2);
-        if (!current2() || ((_h = ctx2.isCurrentRender) == null ? void 0 : _h.call(ctx2)) === false) return "";
+        if (!current2() || ((_i = ctx2.isCurrentRender) == null ? void 0 : _i.call(ctx2)) === false) return "";
         state2.levelRoomVisualScope = scope;
         return heading("", "Levels", "") + `<section class="card"><h3>Explore the actual game</h3><p>Open the ROM’s room catalog, terrain commands, NPC definitions and arrivals.</p>${button("Browse game maps", "ffl2-maps-open")}</section>` + markup;
       }
-      if (((_i = game == null ? void 0 : game.visual) == null ? void 0 : _i.kind) === "room-map") {
+      if (((_j = game == null ? void 0 : game.visual) == null ? void 0 : _j.kind) === "room-map") {
         const markup = await gameEdits(ctx2);
-        if (!current2() || ((_j = ctx2.isCurrentRender) == null ? void 0 : _j.call(ctx2)) === false) return "";
+        if (!current2() || ((_k = ctx2.isCurrentRender) == null ? void 0 : _k.call(ctx2)) === false) return "";
         state2.levelRoomVisualScope = scope;
         return heading("", "Levels", "") + markup;
       }
@@ -8441,10 +8744,10 @@ ${font ? `<section class="card"><h3>Font metrics · ${esc(font.id)}</h3><div cla
     });
     const setup2 = `<details class="card"><summary>Advanced level setup</summary><p>Level editing needs a layout definition for this ROM. Confirm tile grids, object fields, and room-reference mappings before using them. Names and roles alone do not establish game behavior.</p><details><summary>Single-room layout form</summary><div class="field-row">${field("level-name", "Room name", ctx2.draft("level-name", "Room"))}${field("level-width", "Blocks across", ctx2.draft("level-width", "16"), { type: "number", min: 1 })}${field("level-height", "Blocks down", ctx2.draft("level-height", "14"), { type: "number", min: 1 })}${select("level-entry", "Grid integer bytes", [[1, "8 bit"], [2, "16 bit"]], ctx2.draft("level-entry", "1"))}${select("level-endian", "Grid byte order", [["little", "Little endian"], ["big", "Big endian"]], ctx2.draft("level-endian", "little"))}</div><div class="field-row">${field("level-tiles-offset", "Tiles offset", ctx2.draft("level-tiles-offset", "0"))}${field("level-tiles-count", "Tile count", ctx2.draft("level-tiles-count", "16"))}${select("level-codec", "Tile format", Object.entries(codecs).map(([system2, codec]) => [codec, system2.toUpperCase()]), ctx2.draft("level-codec", codecs[state2.artifact.system_id] || codecs.nes))}${field("level-palette-offset", "Palette offset", ctx2.draft("level-palette-offset", "0"))}${select("level-palette-format", "Palette format", [["rgb888", "RGB888"], ["rgb555-le", "RGB555 little endian"], ["rgb555-be", "RGB555 big endian"]], ctx2.draft("level-palette-format", "rgb555-le"))}</div><div class="field-row">${field("level-blocks-offset", "Metatile table offset", ctx2.draft("level-blocks-offset", "0"))}${field("level-blocks-count", "Metatile count", ctx2.draft("level-blocks-count", "16"))}${field("level-block-width", "Tiles per block across", ctx2.draft("level-block-width", "2"))}${field("level-block-height", "Tiles per block down", ctx2.draft("level-block-height", "2"))}${field("level-terrain-offset", "Terrain grid offset", ctx2.draft("level-terrain-offset", "0"))}${field("level-collision-offset", "Collision grid offset (optional)", ctx2.draft("level-collision-offset", ""))}</div>${button("Check declared layout", "levels-declare")}</details>${jsonEditor("level-definition", "Verified layout definition", ctx2.draft("level-definition", JSON.stringify(definition, null, 2)))}<div class="actions">${button("Inspect layout", "levels-inspect")}${button("Save checked definition", "levels-save")}</div></details>`;
     if (!(doc == null ? void 0 : doc.ok)) return heading("", "Levels", "") + empty("No supported level map for this ROM yet", "Inspect the ROM in Resources. A supported map definition is needed before its levels can be shown.", button("Investigate bytes", "navigate", { id: "resources", primary: true })) + setup2 + practiceControls();
-    const objects = model.objects(room.id), namedObjects = objects.some((object, index) => !!objectMetadata(doc, room.id, index)), block = Number(ctx2.draft("level-block-index", "0")), uses = doc.uses[String(block)] || [], pending = ((_k = state2.pending) == null ? void 0 : _k.kind) === "levels" && state2.pending.document_id === doc.document_id;
-    return `${heading("", "Levels", "")}<div class="identity"><strong>${esc(state2.artifact.name)}</strong><span>${model.values().length} preview changes</span></div><section class="card">${state2.project.demo && ((_l = doc.definition) == null ? void 0 : _l.name) === "Hillside editor-layout workshop" ? '<p class="notice">Practice layout. These room links and object records do not run in Playtest; only Hillside terrain and music do.</p>' : ""}${roomNavigation(doc, model, room.id)}<div class="field-row level-toolbar">${select("level-room", "Room", doc.rooms.map((r) => [r.id, r.name]), room.id)}${select("level-layer", "Paint layer", [["terrain", "Terrain"], ...room.collision ? [["collision", "Collision values"]] : []], layer)}${select("level-tool", "Tool", [["paint", "Paint"], ["pick", "Pick from room"], ["fill", "Fill"], ["select", "Select rectangle"], ["paste", "Paste rectangle"], ...objects.some((o) => Number.isSafeInteger(o.x) && Number.isSafeInteger(o.y)) ? [["objects", "Move object"]] : []], ctx2.draft("level-tool", namedObjects ? "objects" : "paint"))}<details><summary>Advanced brush value</summary>${field("level-brush", "Brush value", ctx2.draft("level-brush", "1"), { type: "number", min: 0 })}</details>${select("level-overlay", "Overlay", [["none", "Terrain only"], ...room.collision ? [["collision", "Collision values"]] : [], ...objects.length ? [["objects", "Named objects"], ["records", "All records (Advanced)"]] : []], ctx2.draft("level-overlay", "objects"))}${select("level-zoom", "Zoom", [["fit", "Fit"], ["1", "1x"], ["2", "2x"], ["3", "3x"]], ctx2.draft("level-zoom", "fit"))}</div><div class="level-brush-panel"><strong>Terrain brushes</strong><p class="subtle">Choose a thumbnail to paint, or use Pick from room to sample an existing cell.</p>${levelBrushPalette(doc, model, ctx2.draft("level-brush", "1"))}</div><div class="level-editor-layout"><div class="level-room-editor"><div class="preview-pair room-comparison"><div><span>Original room</span><div class="hex-scroll"><canvas id="level-original" aria-label="Original declared room"></canvas></div></div><div><span>Editing · highlighted cells changed</span><div class="hex-scroll"><canvas id="level-canvas" tabindex="0" role="application" aria-label="Room editor: arrows select, Space paints"></canvas></div></div></div><p id="level-difference-count" class="preview-caption" role="status" aria-live="polite"></p><p id="level-position">Select an object or choose a terrain brush to begin.</p></div>${objectInspector(ctx2, doc, model, room.id)}</div><div class="actions">${button("Undo stroke", "levels-undo", { disabled: !model.past.length })}${button("Redo stroke", "levels-redo", { disabled: !model.future.length })}${button("Copy rectangle", "levels-copy")}${button("Review level changes", "levels-plan", { primary: !pending, disabled: !model.values().length })}${pending ? button("Create level build", "levels-build", { primary: true }) : ""}</div><p class="subtle">Review changes and create a build to save this in the ROM.</p></section><details class="card"><summary>Metatiles & shared uses</summary><div class="field-row">${field("level-block-index", "Metatile index", ctx2.draft("level-block-index", "0"))}${field("level-block-part", "Part index", ctx2.draft("level-block-part", "0"))}${field("level-block-tile", "Replacement tile index", ctx2.draft("level-block-tile", "1"))}</div>${button("Stage block change", "levels-block")}<p>Selected block is used in ${uses.length} declared cells. Changes affect every use.</p><p>${uses.slice(0, 32).map((u) => esc(u.room_id) + " cell " + u.cell).join(" · ")}</p></details>${setup2}${practiceControls()}${report(state2.results["levels.plan"], "Level review")}${report(state2.results["build.apply"], "Separate build")}`;
+    const objects = model.objects(room.id), namedObjects = objects.some((object, index) => !!objectMetadata(doc, room.id, index)), block = Number(ctx2.draft("level-block-index", "0")), uses = doc.uses[String(block)] || [], pending = ((_l = state2.pending) == null ? void 0 : _l.kind) === "levels" && state2.pending.document_id === doc.document_id;
+    return `${heading("", "Levels", "")}<div class="identity"><strong>${esc(state2.artifact.name)}</strong><span>${model.values().length} preview changes</span></div><section class="card">${state2.project.demo && ((_m = doc.definition) == null ? void 0 : _m.name) === "Hillside editor-layout workshop" ? '<p class="notice">Practice layout. These room links and object records do not run in Playtest; only Hillside terrain and music do.</p>' : ""}${roomNavigation(doc, model, room.id)}<div class="field-row level-toolbar">${select("level-room", "Room", doc.rooms.map((r) => [r.id, r.name]), room.id)}${select("level-layer", "Paint layer", [["terrain", "Terrain"], ...room.collision ? [["collision", "Collision values"]] : []], layer)}${select("level-tool", "Tool", [["paint", "Paint"], ["pick", "Pick from room"], ["fill", "Fill"], ["select", "Select rectangle"], ["paste", "Paste rectangle"], ...objects.some((o) => Number.isSafeInteger(o.x) && Number.isSafeInteger(o.y)) ? [["objects", "Move object"]] : []], ctx2.draft("level-tool", namedObjects ? "objects" : "paint"))}<details><summary>Advanced brush value</summary>${field("level-brush", "Brush value", ctx2.draft("level-brush", "1"), { type: "number", min: 0 })}</details>${select("level-overlay", "Overlay", [["none", "Terrain only"], ...room.collision ? [["collision", "Collision values"]] : [], ...objects.length ? [["objects", "Named objects"], ["records", "All records (Advanced)"]] : []], ctx2.draft("level-overlay", "objects"))}${select("level-zoom", "Zoom", [["fit", "Fit"], ["1", "1x"], ["2", "2x"], ["3", "3x"]], ctx2.draft("level-zoom", "fit"))}</div><div class="level-brush-panel"><strong>Terrain brushes</strong><p class="subtle">Choose a thumbnail to paint, or use Pick from room to sample an existing cell.</p>${levelBrushPalette(doc, model, ctx2.draft("level-brush", "1"))}</div><div class="level-editor-layout"><div class="level-room-editor"><div class="preview-pair room-comparison"><div><span>Original room</span><div class="hex-scroll"><canvas id="level-original" aria-label="Original declared room"></canvas></div></div><div><span>Editing · highlighted cells changed</span><div class="hex-scroll"><canvas id="level-canvas" tabindex="0" role="application" aria-label="Room editor: arrows select, Space paints"></canvas></div></div></div><p id="level-difference-count" class="preview-caption" role="status" aria-live="polite"></p><p id="level-position">Select an object or choose a terrain brush to begin.</p></div>${objectInspector(ctx2, doc, model, room.id)}</div><div class="actions">${button("Undo stroke", "levels-undo", { disabled: !model.past.length })}${button("Redo stroke", "levels-redo", { disabled: !model.future.length })}${button("Copy rectangle", "levels-copy")}${button("Review level changes", "levels-plan", { primary: !pending, disabled: !model.values().length })}${pending ? button("Create level build", "levels-build", { primary: true }) : ""}</div><p class="subtle">Review changes and create a build to save this in the ROM.</p></section><details class="card"><summary>Metatiles & shared uses</summary><div class="field-row">${field("level-block-index", "Metatile index", ctx2.draft("level-block-index", "0"))}${field("level-block-part", "Part index", ctx2.draft("level-block-part", "0"))}${field("level-block-tile", "Replacement tile index", ctx2.draft("level-block-tile", "1"))}</div>${button("Stage block change", "levels-block")}<p>Selected block is used in ${uses.length} declared cells. Changes affect every use.</p><p>${uses.slice(0, 32).map((u) => esc(u.room_id) + " cell " + u.cell).join(" · ")}</p></details>${setup2}${practiceControls()}${report(state2.results["levels.plan"], "Level review")}${report(state2.results["build.apply"], "Separate build")}`;
   }
-  function mount10(ctx2) {
+  function mount11(ctx2) {
     var _a, _b, _c, _d, _e, _f, _g;
     if (ctx2.state.gameMapRenderScope === selectionKey(ctx2.state)) {
       mountGameMaps(ctx2);
@@ -8484,8 +8787,8 @@ ${font ? `<section class="card"><h3>Font metrics · ${esc(font.id)}</h3><div cla
   // romancer/ui/views/sound.js
   var sound_exports = {};
   __export(sound_exports, {
-    mount: () => mount11,
-    render: () => render16
+    mount: () => mount12,
+    render: () => render17
   });
 
   // romancer/ui/sound_preview.js
@@ -8660,7 +8963,7 @@ ${font ? `<section class="card"><h3>Font metrics · ${esc(font.id)}</h3><div cla
     }
     if (ownsPreview(ctx2, owned)) await ctx2.render();
   }
-  async function render16(ctx2) {
+  async function render17(ctx2) {
     var _a, _b, _c, _d;
     const setupReview = useResearchSetup(ctx2, "sound");
     if (setupReview) return setupReview;
@@ -8800,7 +9103,7 @@ ${font ? `<section class="card"><h3>Font metrics · ${esc(font.id)}</h3><div cla
       return `<td>${esc(((_a2 = changes.find((c) => c.kind === "note" && c.song_id === song.id && c.index === index && c.field === field2)) == null ? void 0 : _a2.value) ?? event[field2])}</td>`;
     }).join("")}</tr>`).join("")}</tbody></table></div>` : "<p>No supported sequence driver is identified. Native music recording and supported sample formats remain available.</p>"}</section></div><section class="card"><div class="actions">${button("Review sound changes", "sound-plan", { primary: !pending, disabled: !changes.length })}${pending ? button("Create sound build", "sound-build", { primary: true }) : ""}${button("Discard sound edits", "sound-discard", { disabled: !changes.length })}</div></section>` : ""}${setup2}${report(state2.results["sound.plan"], "Sound review")}`;
   }
-  function mount11(ctx2) {
+  function mount12(ctx2) {
     var _a, _b;
     const packet = visiblePreview(ctx2);
     (_a = ctx2.state.soundPlayer) == null ? void 0 : _a.close();
@@ -8832,18 +9135,28 @@ ${font ? `<section class="card"><h3>Font metrics · ${esc(font.id)}</h3><div cla
   applyInterfaceScale(readPreference("romancer-scale") || 100);
   window.addEventListener("resize", () => applyInterfaceScale(getSettings().scale));
   var navigationRevision = 0;
-  var views = { tutorials: tutorials_exports, overview: overview_exports, resources: resources_exports, scripts: scripts_exports, assets: assets_exports, levels: levels_exports, sound: sound_exports, tables: tables_exports, automation: automation_exports, playtest: playtest_exports, debug: debug_exports, routes: routes_exports, regression: regression_exports, release: release_exports, help: help_exports, settings: settings_exports };
-  var names4 = { tutorials: "Tutorials", automation: "Recipes & definitions", overview: "Overview", resources: "Resources", scripts: "Text & layout", assets: "Graphics & fonts", levels: "Levels", sound: "Music & sound", tables: "Data tables", playtest: "Playtest", debug: "Investigation", routes: "Routes", regression: "Regression", release: "Export", settings: "Settings", help: "Help" };
+  var views = { tutorials: tutorials_exports, gameview: gameview_exports, overview: overview_exports, resources: resources_exports, scripts: scripts_exports, assets: assets_exports, levels: levels_exports, sound: sound_exports, tables: tables_exports, automation: automation_exports, playtest: playtest_exports, debug: debug_exports, routes: routes_exports, regression: regression_exports, release: release_exports, help: help_exports, settings: settings_exports };
+  var names5 = { tutorials: "Tutorials", automation: "Recipes & definitions", overview: "Overview", gameview: "Game view", resources: "Resources", scripts: "Text & layout", assets: "Graphics & fonts", levels: "Levels", sound: "Music & sound", tables: "Data tables", playtest: "Playtest", debug: "Investigation", routes: "Routes", regression: "Regression", release: "Export", settings: "Settings", help: "Help" };
   var state = { page: "overview", projects: [], project: null, artifact: null, capabilities: null, drafts: {}, results: {}, pending: null, job: null, runtime: null, frame: null, snapshot: null };
   var actions2 = {};
   var renderRevision = 0;
   var toastTimer;
   var lastRenderedScope = null;
+  var workspaceWarning = "Workspace restore could not be saved. Your editing drafts are separate.";
   var workspaceWriteWarning = false;
   var workspaceWrites = new WorkspaceLocationWriter(api, (error) => {
     if (!workspaceWriteWarning) {
       workspaceWriteWarning = true;
-      notify("Workspace restore could not be saved. Your editing drafts are separate.", true);
+      notify(workspaceWarning, true);
+    }
+  }, () => {
+    if (workspaceWriteWarning) {
+      workspaceWriteWarning = false;
+      if (state.lastError === workspaceWarning) {
+        state.lastError = null;
+        const panel2 = document.getElementById("error-panel");
+        if (panel2) panel2.innerHTML = "";
+      }
     }
   });
   var draftRevisions = /* @__PURE__ */ new Map();
@@ -8966,14 +9279,14 @@ ${font ? `<section class="card"><h3>Font metrics · ${esc(font.id)}</h3><div cla
       state.hexDraft = null;
       state.hexReview = null;
     }
-    await render17();
+    await render18();
   }
   var ctx = {
     state,
     api,
     navigate,
     notify,
-    render: render17,
+    render: render18,
     refreshProject,
     openProject,
     modal,
@@ -9007,7 +9320,12 @@ ${font ? `<section class="card"><h3>Font metrics · ${esc(font.id)}</h3><div cla
     if (error) {
       state.lastError = String(message);
       const panel2 = document.getElementById("error-panel");
-      if (panel2) panel2.innerHTML = errorNotice();
+      if (panel2) {
+        panel2.innerHTML = errorNotice();
+        toast.style.display = "none";
+        clearTimeout(toastTimer);
+        return;
+      }
       const advice = helpForError(message), link = document.createElement("button");
       link.type = "button";
       link.dataset.action = "help-topic";
@@ -9079,7 +9397,7 @@ ${font ? `<section class="card"><h3>Font metrics · ${esc(font.id)}</h3><div cla
     state.page = "overview";
     await refreshProject();
     resumeLocation();
-    await render17();
+    await render18();
   }
   async function closeProject() {
     rememberLocation();
@@ -9093,7 +9411,7 @@ ${font ? `<section class="card"><h3>Font metrics · ${esc(font.id)}</h3><div cla
     lastDraft = null;
     removePreference("romancer-project");
     workspaceWrites.enqueue(null);
-    await render17();
+    await render18();
   }
   async function navigate(page) {
     var _a, _b, _c, _d, _e;
@@ -9106,7 +9424,7 @@ ${font ? `<section class="card"><h3>Font metrics · ${esc(font.id)}</h3><div cla
     if (revision !== navigationRevision || ((_c = state.project) == null ? void 0 : _c.project_id) !== project || ((_d = state.artifact) == null ? void 0 : _d.artifact_id) !== artifact || state.selectionRevision !== selection2 || !views[page]) return false;
     if (page === "settings" && state.page !== "settings") state.settingsReturnPage = state.page;
     state.page = page;
-    await render17();
+    await render18();
     (_e = document.getElementById("main")) == null ? void 0 : _e.focus({ preventScroll: true });
   }
   async function importDialog() {
@@ -9114,7 +9432,7 @@ ${font ? `<section class="card"><h3>Font metrics · ${esc(font.id)}</h3><div cla
     modal(state.project ? "Import ROM" : "New ROM project", `${!state.project ? field("new-project-name", "Project name", dropped ? dropped.name.replace(/\.[^.]+$/, "") : "My ROM project") : ""}<p>Your original file stays unchanged.</p>${dropped ? `<p class="notice">Selected: <strong>${esc(dropped.name)}</strong></p>` : ""}<label class="field"><span>Choose a ROM file</span><input type="file" id="import-file" accept=".nes,.sfc,.smc,.md,.gen,.bin,.gb,.gbc,.gba,.sms,.rom"></label><details class="config"><summary>Advanced path import</summary>${field("import-path", "Absolute file path", "", { placeholder: "C:\\Games\\My game.sfc" })}${button("Browse this computer", "choose-input", { icon: "folder" })}<p>Use a path for files larger than64MiB.</p></details><div class="actions">${button("Import ROM", "import-confirm", { primary: true, icon: "plus" })}${button("Import help", "help-topic", { id: "import" }) + button("Start a new project", "new-project")}</div>`);
   }
   function showSearch() {
-    const query = document.getElementById("global-search").value, matches = workspaceMatches(query, names4, state.project);
+    const query = document.getElementById("global-search").value, matches = workspaceMatches(query, names5, state.project);
     modal("Find tools or files", `<div class="search-results">${matches.map((row, index) => row.page ? button(row.label, "search-open", { id: row.page, class: "search-result", icon: row.page }) : button(row.label + " · " + (row.kind === "build" ? "Build" : "Original"), "search-file", { id: String(index), class: "search-result", icon: "folder" })).join("") || '<p class="subtle">No matching tools or file names. Try palette, sprite, hex or save state.</p>'}</div>`);
     state.searchMatches = matches;
   }
@@ -9148,7 +9466,7 @@ ${font ? `<section class="card"><h3>Font metrics · ${esc(font.id)}</h3><div cla
         state.candidateReview = null;
         state.resourcePrefill = null;
         state.openDeclaration = null;
-        return render17();
+        return render18();
       },
       "help-topic": (node) => {
         state.helpTopic = node.dataset.id || ({ assets: "graphics", scripts: "text", resources: "discovery", release: "export", settings: "recovery", overview: "start", help: "start" }[state.page] || state.page);
@@ -9190,7 +9508,7 @@ ${font ? `<section class="card"><h3>Font metrics · ${esc(font.id)}</h3><div cla
         await refreshProject();
         state.artifact = state.project.sources.at(-1);
         state.page = "resources";
-        await render17();
+        await render18();
         notify("Source copied into the project. Original preserved.");
       },
       "cancel-job": async () => {
@@ -9206,7 +9524,7 @@ ${font ? `<section class="card"><h3>Font metrics · ${esc(font.id)}</h3><div cla
         if (((_a = state.project) == null ? void 0 : _a.project_id) !== project) return;
         state.downloadFeedback = { project_id: project, name };
         notify("Download started: " + name + ". Check your browser’s Downloads list.");
-        if (state.page === "release") await render17();
+        if (state.page === "release") await render18();
       },
       "search-file": async (node) => {
         var _a;
@@ -9222,10 +9540,12 @@ ${font ? `<section class="card"><h3>Font metrics · ${esc(font.id)}</h3><div cla
       ...projectActions({ ...ctx, closeProject, flushDrafts, importDialog })
     };
   }
-  async function render17() {
+  async function render18() {
     var _a, _b, _c, _d, _e, _f, _g, _h, _i, _j, _k, _l, _m, _n;
     if (((_a = document.getElementById("app")) == null ? void 0 : _a.dataset.startupRecovered) === "true") return;
     rememberLocation();
+    clearTimeout(state.buildCheckTimer);
+    state.buildCheckTimer = null;
     (_b = state.visualComparison) == null ? void 0 : _b.dispose();
     state.visualComparison = null;
     (_c = state.spritePreviewObserver) == null ? void 0 : _c.disconnect();
@@ -9239,10 +9559,10 @@ ${font ? `<section class="card"><h3>Font metrics · ${esc(font.id)}</h3><div cla
     actions2 = baseActions();
     tutorial.bind();
     const project = state.project, artifacts = project ? [...project.sources, ...project.builds] : [];
-    document.getElementById("app").innerHTML = `<div class="shell"><aside class="sidebar"><a class="brand" href="#" data-action="navigate" data-id="overview"><img src="/mark.svg" alt=""><div><strong>ROMancer</strong><small>By RetchEWretched</small></div></a><div class="nav-label">Workspace</div><nav aria-label="Workbench">${["overview", "resources", "debug", "scripts", "assets", "levels", "sound", "playtest", "release"].map((k) => `<button class="nav-item ${state.page === k ? "active" : ""}" data-action="navigate" data-id="${k}" title="${names4[k]}" ${state.page === k ? 'aria-current="page"' : ""}>${icon(k)}<span>${names4[k]}</span></button>`).join("")}<details class="more-tools" ${getSettings().advancedTools || ["tables", "automation", "routes", "regression"].includes(state.page) ? "open" : ""}><summary title="More tools">More tools</summary>${["tables", "automation", "routes", "regression"].map((k) => `<button class="nav-item ${state.page === k ? "active" : ""}" data-action="navigate" data-id="${k}" title="${names4[k]}">${icon(k)}<span>${names4[k]}</span></button>`).join("")}</details></nav><div class="sidebar-bottom"><button class="nav-item" data-action="navigate" data-id="help" title="Help">${icon("shield")}<span>Help</span></button><button class="nav-item" data-action="projects-manage" title="Projects">${icon("folder")}<span>Projects</span></button><button class="nav-item ${state.page === "settings" ? "active" : ""}" data-action="navigate" data-id="settings" title="Settings">${icon("settings")}<span>Settings</span></button><button class="nav-item" data-action="about" title="About ROMancer">${icon("shield")}<span>About</span></button><div class="local-label"><span class="dot"></span>Runs on your computer</div></div></aside><header class="topbar"><div class="project-control">${icon("folder")}<div><small>ACTIVE PROJECT</small><br><select id="project-select" aria-label="Active project"><option value="">Choose a project</option>${state.projects.map((p) => `<option value="${p.project_id}" ${(project == null ? void 0 : project.project_id) === p.project_id ? "selected" : ""}>${esc(p.name)}</option>`).join("")}</select></div>${button("New project", "new-project", { icon: "plus", class: "compact" })}</div>${artifacts.length ? `<div class="project-control source-selector"><div><small>${((_i = state.artifact) == null ? void 0 : _i.kind) === "source" ? "ORIGINAL ROM" : "BUILD"}</small><br><select id="artifact-select" aria-label="Selected source or build">${[["Original ROMs", project.sources], ["Builds", project.builds]].filter(([, rows]) => rows.length).map(([label, rows]) => `<optgroup label="${label}">${rows.map((a) => {
+    document.getElementById("app").innerHTML = `<div class="shell"><aside class="sidebar"><a class="brand" href="#" data-action="navigate" data-id="overview"><img src="/mark.svg" alt=""><div><strong>ROMancer</strong><small>By RetchEWretched</small></div></a><div class="nav-label">Workspace</div><nav aria-label="Workbench">${["overview", "gameview", "resources", "debug", "scripts", "assets", "levels", "sound", "playtest", "release"].map((k) => `<button class="nav-item ${state.page === k ? "active" : ""}" data-action="navigate" data-id="${k}" title="${names5[k]}" ${state.page === k ? 'aria-current="page"' : ""}>${icon(k)}<span>${names5[k]}</span></button>`).join("")}<details class="more-tools" ${getSettings().advancedTools || ["tables", "automation", "routes", "regression"].includes(state.page) ? "open" : ""}><summary title="More tools">More tools</summary>${["tables", "automation", "routes", "regression"].map((k) => `<button class="nav-item ${state.page === k ? "active" : ""}" data-action="navigate" data-id="${k}" title="${names5[k]}">${icon(k)}<span>${names5[k]}</span></button>`).join("")}</details></nav><div class="sidebar-bottom"><button class="nav-item" data-action="navigate" data-id="help" title="Help">${icon("shield")}<span>Help</span></button><button class="nav-item" data-action="projects-manage" title="Projects">${icon("folder")}<span>Projects</span></button><button class="nav-item ${state.page === "settings" ? "active" : ""}" data-action="navigate" data-id="settings" title="Settings">${icon("settings")}<span>Settings</span></button><button class="nav-item" data-action="about" title="About ROMancer">${icon("shield")}<span>About</span></button><div class="local-label"><span class="dot"></span>Runs on your computer</div></div></aside><header class="topbar"><div class="project-control">${icon("folder")}<div><small>ACTIVE PROJECT</small><br><select id="project-select" aria-label="Active project"><option value="">Choose a project</option>${state.projects.map((p) => `<option value="${p.project_id}" ${(project == null ? void 0 : project.project_id) === p.project_id ? "selected" : ""}>${esc(p.name)}</option>`).join("")}</select></div>${button("New project", "new-project", { icon: "plus", class: "compact" })}</div>${artifacts.length ? `<div class="project-control source-selector"><div><small>${((_i = state.artifact) == null ? void 0 : _i.kind) === "source" ? "ORIGINAL ROM" : "BUILD"}</small><br><select id="artifact-select" aria-label="Selected source or build">${[["Original ROMs", project.sources], ["Builds", project.builds]].filter(([, rows]) => rows.length).map(([label, rows]) => `<optgroup label="${label}">${rows.map((a) => {
       var _a2;
       return `<option value="${a.artifact_id}" ${((_a2 = state.artifact) == null ? void 0 : _a2.artifact_id) === a.artifact_id ? "selected" : ""}>${esc(a.name)}</option>`;
-    }).join("")}</optgroup>`).join("")}</select></div></div>` : ""}<label class="search">${icon("search")}<input id="global-search" placeholder="Search workspace" aria-label="Search workspace"><kbd>Ctrl K</kbd><button type="button" data-action="workspace-search" aria-label="Go: search workspace" class="search-go">Go</button></label></header><main id="main" tabindex="-1"><div class="loading">Opening ${names4[state.page]}…</div></main>${jobTray()}${tutorial.panel()}</div>`;
+    }).join("")}</optgroup>`).join("")}</select></div></div>` : ""}<label class="search">${icon("search")}<input id="global-search" placeholder="Search workspace" aria-label="Search workspace"><kbd>Ctrl K</kbd><button type="button" data-action="workspace-search" aria-label="Go: search workspace" class="search-go">Go</button></label></header><main id="main" tabindex="-1"><div class="loading">Opening ${names5[state.page]}…</div></main>${jobTray()}${tutorial.panel()}</div>`;
     const view = views[state.page];
     let html;
     if (project && state.artifact) {
@@ -9267,7 +9587,7 @@ ${font ? `<section class="card"><h3>Font metrics · ${esc(font.id)}</h3><div cla
         if (revision === renderRevision) ctx.use(handlers);
       } });
     } catch (error) {
-      html = `${heading("Workspace", names4[state.page], "")}<div class="card"><p class="error">${esc(error.message)}</p>${button("Return to overview", "navigate", { id: "overview" })}</div>`;
+      html = `${heading("Workspace", names5[state.page], "")}<div class="card"><p class="error">${esc(error.message)}</p>${button("Return to overview", "navigate", { id: "overview" })}</div>`;
     }
     if (revision !== renderRevision) return;
     if (((_j = document.getElementById("app")) == null ? void 0 : _j.dataset.startupRecovered) === "true") return;
@@ -9370,7 +9690,7 @@ ${font ? `<section class="card"><h3>Font metrics · ${esc(font.id)}</h3><div cla
         state.artifact = chooseArtifact(state.project, readPreference("romancer-artifact:" + state.project.project_id));
         resumeLocation();
       }
-      await render17();
+      await render18();
       if (((_a = document.getElementById("app")) == null ? void 0 : _a.dataset.startupRecovered) !== "true") {
         startupReady = true;
         if (settingsWarning) notify(settingsWarning, true);
@@ -9405,6 +9725,7 @@ ${font ? `<section class="card"><h3>Font metrics · ${esc(font.id)}</h3><div cla
   });
   window.addEventListener("pagehide", () => {
     var _a, _b, _c, _d;
+    clearTimeout(state.buildCheckTimer);
     clearTimeout(locationTimer);
     rememberLocation();
     (_a = state.visualComparison) == null ? void 0 : _a.dispose();
