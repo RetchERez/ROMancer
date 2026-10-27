@@ -28,6 +28,7 @@ brushes[1].events.click();assert.equal(nodes['level-layer'].value,'terrain');ass
 assert.deepEqual(Array.from(brushes[1].thumb.graphics.last.data.slice(0,4)),[200,210,220,255]);
 canvas.events.pointerdown(event(5,5));canvas.events.pointerup(event(5,5));assert.equal(model.cells('room','terrain')[0],1);
 assert.match(levelBrushPalette(doc,model,1),/data-level-brush="1" aria-pressed="true"/);
+const zoomNode=nodes['level-zoom'];delete nodes['level-canvas'];delete nodes['level-zoom'];assert.doesNotThrow(()=>nodes['level-overlay'].events.change(),'A redraw queued behind navigation must ignore the detached canvas.');nodes['level-canvas']=canvas;nodes['level-zoom']=zoomNode;
 
 let calls=0;const controls={},viewCtx={...ctx,state:{...state,results:{'levels.inspect':doc}},draft:(name,fallback)=>fallback,use:actions=>Object.assign(controls,actions),api:{call:async()=>{calls++;return {ok:true,visual:{kind:'rgb555-palettes'},profile:{id:'other-game'}};}},sourceParams:()=>({project_id:'p',artifact_id:'a'})};
 const html=await render(viewCtx);assert.equal(calls,0,'declared documents take precedence over named game definitions');assert.match(html,/Pick from room/);assert.match(html,/Move object/);assert.match(html,/Terrain brushes/);assert.match(html,/<details><summary>Advanced brush value/);

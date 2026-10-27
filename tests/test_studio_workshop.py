@@ -37,7 +37,7 @@ class StudioWorkshopTests(unittest.TestCase):
                 for kind in ('assets','script','tables','levels'):
                     self.assertTrue(_definition(row,Path(row['path']),kind),kind)
                 sp={'project_id':p['project_id'],'artifact_id':row['artifact_id']}
-                ready=api.dispatch('editing.readiness',sp);self.assertEqual(sum(a['status']=='ready' for a in ready['areas']),4)
+                ready=api.dispatch('editing.readiness',sp);self.assertEqual(sum(a['status']=='ready' for a in ready['areas']),5)
                 self.assertIn('Mossy Hollow',p['name']);self.assertTrue(p['original_workshop'])
             finally:api.close()
 

@@ -257,39 +257,35 @@
     },
     {
       "id": "editing-studio",
-      "title": "Practice four real edits in Mossy Hollow",
+      "title": "Practice real edits in Mossy Hollow",
       "part": "Basic",
       "kicker": "Original playable example / normal editing tools",
-      "intro": "Choose Try the editing studio on the welcome screen. Mossy Hollow is an original NES program with its own art and font, two animated actors, movement and a short chirp. Use the normal editors and follow the four exercises below.",
+      "intro": "Choose Try the editing studio. This original NES program has animated actors, solid walls, damage floors, contact combat, editable hitboxes and a short melody. Use the normal editors; no in-app lesson is required.",
       "steps": [
-        "Graphics: open <b>Graphics &amp; fonts</b>, leave First tile at 0 and set Tiles across and Tiles down to 2. Choose <b>Assemble tiles</b>. Paint the whole 16 by 16 hero, try Undo and Redo, then review and create a graphics build. The second hero animation uses tiles 4 to 7; edit those too for a consistent animation.",
-        "Dialogue: select the Original again and open <b>Text &amp; layout</b>. Change HELLO, EXPLORER! to WELCOME, ROM HACKER! Check the byte-capacity preview, review and create a dialogue build. The game uses its declared custom uppercase character table.",
-        "Movement: on the Original, open <b>Numbers &amp; stats</b>. Change Hero speed from 2 to 3, review the exact byte change and create a build. In Playtest, compare the distance moved using the same eight Right input frames.",
-        "Room: on the Original, open <b>Levels</b>. Select Slime start and drag its named marker upward, or open Position &amp; advanced values and change Y from 22 to 19, then choose Update preview. Paint a star terrain tile, review and create a level build.",
-        "Check each selected build in <b>Playtest</b>: arrows move, A chirps. Save and load a state for that exact build. Export a BPS patch from the original to the chosen build, verify it and keep the original, build and patch separate."
+        "Graphics: open <b>Graphics &amp; fonts</b>, set Tiles across and Tiles down to 2, then Assemble tiles. Paint the first four hero tiles, try Undo and Redo, review and create a separate graphics build. Edit the second hero animation too for a consistent result.",
+        "Dialogue: select the Original again and open <b>Text &amp; layout</b>. Replace HELLO, EXPLORER! with WELCOME, ROM HACKER! Check capacity, review and build. The character table supports uppercase letters.",
+        "Movement: in <b>Numbers &amp; stats</b>, change Hero speed from 2 to 3, review and build. Compare equal Right input frames in Playtest. Zero stops movement; the checked limit is8 pixels per frame.",
+        "Levels: choose Terrain to paint the visible room, Collision to paint movement rules, or Move object to reposition an actor. Starting hitboxes shows independent contact rectangles. Follow the linked collision procedure for a complete wall edit.",
+        "Music: in <b>Music &amp; sound</b>, click a melody note or choose its Event, change Note number and choose Stage note edit. Inspect the note view and Original/Edited waveform previews. Review, build and listen in Playtest.",
+        "Playtest controls: arrows move, A attacks an overlapping enemy and chirps, Start restarts. HP0 stops the hero; an enemy with0 health disappears. Save/load states belong to that exact build. Export and verify a patch from its Original."
       ],
-      "result": "The four examples were built and exported through ROMancer and reconstructed independently from their patches. Native checks observed changed hero graphics, changed on-screen dialogue, faster movement and the relocated slime spawn. You can repeat the same operations yourself.",
-      "note": "This example teaches the ordinary tools; it does not decode another game automatically. Room terrain is visual and has no collision engine. The level editor uses authored reference RGB colors; these are not editable NES hardware palette bytes. No checked commercial music-driver format is supplied for this scene. The checked speed fields allow 0 to 8; zero stops movement. Actor X positions are limited to the playable horizontal area.",
+      "result": "The original program supports these declared fields. Native tests checked collision, contact damage, movement, attacks, changed music and save-state replay. The included examples were created and verified through ROMancer.",
+      "note": "This is a small original practice game, not a decoder for another game. Level colors are authored reference RGB colors. Starting sprites and hitboxes are editor previews; Playtest produces the live scene. Open test layout under Advanced practice remains the separate Hillside navigation exercise.",
       "related": [
-        "start",
+        "collision-actors",
+        "known-music",
         "levels",
-        "first-edit",
-        "captured-edit-check"
+        "first-edit"
       ],
       "terms": [
         "term-original",
         "term-draft",
-        "term-build"
+        "term-build",
+        "term-hitbox"
       ],
-      "image": "212-clear-draft-preview",
-      "caption": "The actual sprite editor shows the unchanged original beside a staged hero edit. Review and build are separate actions.",
-      "extra_images": [
-        {
-          "image": "105-studio-level-object-editor",
-          "title": "Room and actor placement",
-          "caption": "Slime start moves from Y22 to Y19 in the staged room preview. Review and build are still required."
-        }
-      ]
+      "image": "220-five-editing-tools-ready",
+      "caption": "The original studio has checked editing layouts for graphics, text, numbers, levels and music.",
+      "extra_images": []
     },
     {
       "id": "find-help",
@@ -2064,12 +2060,12 @@
       "intro": "Levels needs a checked game-specific definition. The matched FFL II bedroom is a bounded real-game example. An unsupported source has no level definition; optional Advanced practice teaches the declared format without pretending to decode that game.",
       "steps": [
         "Open <b>Levels</b> for the selected source. If it says <b>No supported level map for this ROM yet</b>, investigate the source or supply a checked map definition through Advanced level setup. The separate collapsed <b>Advanced practice > Open test layout</b> is a learning exercise, not your game.",
-        "Choose <b>Room</b> and <b>Paint layer</b>: Terrain or declared Collision values. Select a Terrain brushes thumbnail, or use <b>Pick from room</b> to sample a cell. Compare Original room with the editing canvas; paint, fill or select/copy/paste within the declared grid.",
-        "Use <b>Undo stroke</b> and <b>Redo stroke</b>. With <b>Named objects</b> and <b>Move object</b>, select or drag a named label. Use <b>Objects > Update preview</b> for a declared destination. Raw coordinates and fields stay inside <b>Position & advanced values</b>; unnamed slots require All records (Advanced).",
+        "Choose <b>Paint layer</b>: Terrain changes appearance; Collision edits a separately declared grid. Choose a named collision brush or a raw value. Pick from room samples existing data; Paint, Fill and rectangle copy/paste stay inside the declared bounds.",
+        "Use Undo stroke and Redo stroke. With Move object, drag a named label. When a starting sprite is declared, its preview moves too. Starting hitboxes shows declared rectangles. Pixel hitbox dimensions are separate from cell-based positions; use Update preview before reviewing.",
         "Choose <b>Review level changes</b>, inspect the exact changes, then <b>Create level build</b>. Visit the room and test walking, collision, boundaries and transitions."
       ],
       "result": "Changed grid/object fields stay within the declared ranges. The game renders the room, moves through it and follows the intended transitions.",
-      "note": "Visual terrain does not establish collision semantics. Collision values are raw stored data. Only declared names appear by default; raw slot kinds and records stay Advanced. Named roles do not establish native actors or doors, and the practice layout is not an executable game-authoring workflow.",
+      "note": "A visible wall is not automatically a collision wall. Labels, sprite assemblies and hitboxes come from a checked declaration; generic declarations do not prove gameplay behavior. If collision is not mapped, the editor says so. Only the implemented original runtime has the collision/combat behavior described in the linked practice procedure.",
       "details": [
         {
           "title": "Shared metatiles",
@@ -2084,7 +2080,8 @@
         "connections",
         "room",
         "tilemaps",
-        "regression"
+        "regression",
+        "collision-actors"
       ],
       "terms": [
         "term-metatile",
@@ -2210,15 +2207,15 @@
       "title": "Preview sound and respect driver limits",
       "part": "Advanced",
       "kicker": "Music & sound",
-      "intro": "Console audio hardware and a game's music driver are different layers. Native audio recording can work even when sequence editing is unavailable.",
+      "intro": "Native recording captures the game’s mixed output. A decoded sample or note view is an editing preview. Known sequence drivers have separate, bounded readers; a console name does not identify one.",
       "steps": [
-        "Open <b>Music & sound</b>. Read the hardware information and <b>Music driver</b> status. Unknown driver means sequence editing is unavailable.",
+        "Open <b>Music &amp; sound</b>. Check the identified driver. Mossy Hollow and Hillside have original sequence formats. The checked Wario Land4 M4A layout supplies selected songs automatically. Other drivers need an implemented reader.",
         "For actual game output, load the source in Playtest, reach the sound, then use <b>Record native preview</b>. Play, pause, seek or loop the resulting preview and save a WAV when useful.",
         "For a supported sample, use a verified offset, allocation, codec and preview sample rate. Choose <b>Check declared sample</b>, then preview gain, reverse, silence or supported WAV replacement before staging. Staged edits update Original and Edited PCM waveform previews; use their play controls when ready. Audio does not autoplay.",
         "Review sound changes, create a sound build and test the real scene. Use note/event or transpose operations only when a supported sequence definition is identified."
       ],
       "result": "The decoded preview corresponds to the intended declared sample, and the game plays the built result at the expected rate and without an unintended neighboring change.",
-      "note": "A valid codec does not locate a sample or determine its rate, loop or instrument. Lossy re-encoding can change sound quality. A synthesized sequence preview does not certify the native driver result. Supported sequence editing is available in the workshop definition; that does not establish a commercial game driver.",
+      "note": "A valid sample codec does not locate a sample or establish its instrument, loop or rate. Re-encoding may be lossy. Note sketches omit game instruments and effects. Selected Wario songs with conditional memory behavior or budget limits stay read-only; the guide’s Known music procedure describes the exact supported fields.",
       "details": [
         {
           "title": "Two preview paths",
@@ -2226,13 +2223,14 @@
         },
         {
           "title": "When music cannot be edited",
-          "text": "Keep unknown driver data unchanged. Use native recording, document the observed scene and find evidence for the exact driver and revision. Do not invent note commands from a console hardware label."
+          "text": "Use native recording when a sequence reader is unavailable. In the checked M4A layout, commands, pointers, waits, instruments, shared structure and unsupported controls are protected. Explicit value edits still require a build and native test."
         }
       ],
       "related": [
         "play",
         "resources",
-        "regression"
+        "regression",
+        "known-music"
       ],
       "terms": [
         "term-driver",
@@ -2438,7 +2436,7 @@
         },
         {
           "title": "The same current tools",
-          "text": "Read editing.readiness before choosing an editor. objects.scene returns a bounded simulated PNG preview for a fresh verified saved object. project.studio creates the original editable example and therefore requires write access. Query system.operations for the current operation catalogue."
+          "text": "Read editing.readiness before choosing an editor. sound.system returns known music definitions read-only; select one song before sound.inspect to stay within the response budget. With explicit writes, sound.plan or levels.plan followed by build.apply uses the same checked services as the GUI. These paths reproduced the native-tested targets. Query system.operations and the MCP tool list for current schemas."
         }
       ],
       "related": [
@@ -3791,6 +3789,70 @@
         "mcp"
       ],
       "terms": []
+    },
+    {
+      "id": "collision-actors",
+      "title": "Change collision, hitboxes and enemy movement",
+      "part": "Advanced",
+      "kicker": "Original runtime / layers and actor behavior",
+      "intro": "Open the original Mossy Hollow studio in Levels. These fields are consumed by its program; the same generic editor needs verified mappings before it can change another game’s behavior.",
+      "steps": [
+        "Choose <b>Collision</b> in Paint layer. Open floor0 allows movement, Solid wall1 blocks it, and Damage floor2 reduces hero health. Paint Open floor over the vertical wall at column16, rows18 through23. Undo and redo the stroke.",
+        "Choose <b>Terrain</b>, select brush0 and clear the same visible wall cells. Terrain and collision are separate edits: clearing one alone does not clear the other.",
+        "Choose <b>Starting hitboxes</b>. Select Hero start or Slime start. Width, height and offsets are pixels; X/Y are8-pixel cells. Change width, then Update preview. The artwork stays separate from the contact rectangle.",
+        "Try Starting health, Contact damage, Movement enabled, Left/Right movement limit and Damage cooldown. Movement enabled0 stops that actor’s movement, not its contact damage. Damage cooldown belongs to the actor receiving damage. Starting X must lie between its movement limits.",
+        "Review and create a level build. In Playtest, walk through the opened wall; compare equal input sequences from fresh starts. Test damage floors and enemy contact. A attacks only while rectangles overlap. Start resets health and positions. Export and verify the patch."
+      ],
+      "result": "Native checks observed a blocked hero at X114 and passage after opening the collision wall. Separate tests observed less damage with a narrower enemy hitbox, a stationary enemy, damage-floor health loss and a contact attack.",
+      "note": "Starting sprites and rectangles are static editor previews, not live actor positions. A drawing change does not change collision, damage, enemy logic or animation assembly. Other games can use different coordinate units, multiple hitboxes or compressed collision maps.",
+      "related": [
+        "levels",
+        "editing-studio",
+        "play",
+        "regression"
+      ],
+      "terms": [
+        "term-collision",
+        "term-hitbox",
+        "term-layer"
+      ],
+      "image": "222-independent-actor-hitbox-controls",
+      "caption": "The actual editor shows starting sprites, an independently narrowed hero rectangle and checked actor fields. Build and playtest are separate actions."
+    },
+    {
+      "id": "known-music",
+      "title": "Edit a verified music sequence",
+      "part": "Advanced",
+      "kicker": "Known drivers / safe explicit values",
+      "intro": "Mossy Hollow and Hillside have original pulse sequences. Wario Land4 US/Europe has a fingerprinted M4A reader for five individually checked song entries. Three currently permit value edits; two remain read-only.",
+      "steps": [
+        "Open <b>Music &amp; sound</b>. For Wario Land4, choose Opening cutscene, Wario’s Workout or Sound Room. Engine code, song headers, track pointers and protected sequence bytes must match their checked layouts.",
+        "Click a note in the note view, or choose Event. For Opening cutscene, Track2 at tick114 has an explicit note50; change Note number to62 and choose Stage note edit. Yellow shows the changed pitch and an outline shows the original. Track numbers in the interface start at1.",
+        "Only explicit operands are editable: note0–127, note velocity0–127, channel volume0–127 and tempo value1–127. A tempo value is half the driver’s BPM. Inherited values and durations have no editable operand here. Shared patterns can change multiple notes at once.",
+        "Use the play/pause controls to compare reference previews. The note sketch omits the game’s instruments, envelopes, ties and modulation. Review, create a sound build, then load that build in Playtest and record native audio.",
+        "The Opening cutscene note edit was cold-boot tested: original audio matched a second original run, while the built edit changed recorded audio. Level Select exceeds the current playback budget; Palm Tree Paradise also uses runtime memory conditions. Both are explicitly read-only."
+      ],
+      "result": "A checked one-byte note change produces a separate build and verified patch. The actual native audio differs while the original source hash stays unchanged.",
+      "note": "This is not a general M4A authoring or sample-bank editor. It does not insert tracks, rewrite commands, relocate music, change instruments or infer another game’s driver. Format research is pinned to lilDavid/warioland4 commit abb7800a8d8fa6d7f7f003627893e06bc2879329; ROMancer distributes its own reader and fingerprints, not game code or music.",
+      "details": [
+        {
+          "title": "Research reference",
+          "text": "<a href=\"https://github.com/lilDavid/warioland4/tree/abb7800a8d8fa6d7f7f003627893e06bc2879329\">Pinned format research</a>. Source structures, opcode dispatch and control-flow handlers were checked against the supplied revision."
+        }
+      ],
+      "related": [
+        "sound",
+        "play",
+        "patches",
+        "regression"
+      ],
+      "terms": [
+        "term-driver",
+        "term-note-velocity",
+        "term-build"
+      ],
+      "image": "225-wario-decoded-note-edit-and-preview",
+      "caption": "Actual Wario Land4 sequence editing: a selected note changes from50 to62, with a staged note view and reference-audio preview."
     }
   ],
   "glossary": [
@@ -3818,6 +3880,11 @@
       "id": "term-assertion",
       "term": "Assertion",
       "definition": "An explicit expected observation used by a route or check. A test cannot infer the correct gameplay outcome for you."
+    },
+    {
+      "id": "term-build-check",
+      "term": "Automatic build check",
+      "definition": "A configured fresh-worker comparison of an original twice and a build once, including cartridge integrity and next-frame state replay. Results describe only the configured inputs and assertions."
     },
     {
       "id": "term-bank",
@@ -3860,6 +3927,11 @@
       "definition": "A possible resource or structural match that requires confirmation. Plausible text or pixels are not proof of game semantics."
     },
     {
+      "id": "term-edit-check",
+      "term": "Captured edit check",
+      "definition": "A source-bound replay comparison of the captured original twice and a descended edited build once, with reproducible original-frame and execution-context requirements."
+    },
+    {
       "id": "term-checkpoint",
       "term": "Checkpoint",
       "definition": "A recorded test observation at a defined point in an input route, such as a screenshot region and expected comparison."
@@ -3875,6 +3947,11 @@
       "definition": "The rule for decoding or encoding stored graphics, samples or compressed data. A codec does not locate a resource."
     },
     {
+      "id": "term-coded-probe",
+      "term": "Coded pixel probe",
+      "definition": "A temporary ROMancer build that changes selected source pixels according to a unique bit code. Native replay responses identify source pixel IDs instead of relying on visual similarity alone."
+    },
+    {
       "id": "term-collision",
       "term": "Collision",
       "definition": "Data or game behavior controlling movement and contact. Visual terrain does not by itself establish collision semantics."
@@ -3883,6 +3960,11 @@
       "id": "term-compare-byte",
       "term": "Compare byte",
       "definition": "An original byte encoded by some replacement codes. It can reject incompatible candidate locations but cannot by itself establish the active bank or prove the effect."
+    },
+    {
+      "id": "term-connected-resource",
+      "term": "Connected resource",
+      "definition": "A source-bound graphics, text, table, room, sound or research entry connected through declared storage, authored notes or measured evidence. Each relationship retains its confidence and origin."
     },
     {
       "id": "term-checksum",
@@ -3960,6 +4042,11 @@
       "definition": "A video update or explicitly assembled animation view. A preview frame and a measured native game frame have different origins."
     },
     {
+      "id": "term-gameplay-trace",
+      "term": "Gameplay trace",
+      "definition": "An authenticated native frame crop, source/core/frame identity, searched ROM range and literal pixel candidates. This is not automatically a CPU execution trace or proven source transfer."
+    },
+    {
       "id": "term-glyph",
       "term": "Glyph",
       "definition": "A stored shape used to display a character. A shared glyph edit can affect every string that uses it."
@@ -3970,9 +4057,19 @@
       "definition": "Base-16 notation using 0-9 and A-F. The prefix 0x marks a hexadecimal number."
     },
     {
+      "id": "term-hitbox",
+      "term": "Hitbox",
+      "definition": "A rectangle or other collision shape used for contact tests. It can be independent of visible sprite pixels. ROMancer’s declared starting rectangles are not live runtime observations."
+    },
+    {
       "id": "term-hypothesis",
       "term": "Hypothesis",
       "definition": "An interpretation that fits the tested observations. It stays a candidate until additional evidence supports its meaning and scope."
+    },
+    {
+      "id": "term-independent-validation",
+      "term": "Independent validation",
+      "definition": "A check not used to discover the mapping: separate spatial marker patterns must reproduce all accepted recovered pixels and their changed/unchanged color controls."
     },
     {
       "id": "term-ips",
@@ -4020,6 +4117,16 @@
       "definition": "Application-owned evidence recorded through actual emulator callbacks or native instruction tracing, bound to the source and capture setup. Imported JSON does not become fresh native proof."
     },
     {
+      "id": "term-native-graphics-trail",
+      "term": "Native graphics access trail",
+      "definition": "Observed ROM or memory accesses and operation details recorded by a reviewed native observer. Temporal proximity does not establish read-to-write dataflow or game meaning."
+    },
+    {
+      "id": "term-note-velocity",
+      "term": "Note velocity",
+      "definition": "A per-note intensity value used by a sound driver. It is separate from channel volume; instruments and envelopes also affect the audible result."
+    },
+    {
       "id": "term-metadata",
       "term": "Object metadata",
       "definition": "Optional per-slot index, name, role and declared reference annotations. Metadata does not replace the checked record layout or establish actor/event behavior."
@@ -4043,6 +4150,11 @@
       "id": "term-patch",
       "term": "Patch",
       "definition": "A file describing changes from an original to a target build. Compatibility depends on the exact expected source bytes."
+    },
+    {
+      "id": "term-pixel-candidate",
+      "term": "Pixel candidate",
+      "definition": "A literal ROM tile whose decoded pixel pattern matches part of a measured frame. Repeated patterns can match multiple offsets; a match alone does not establish sprite ownership."
     },
     {
       "id": "term-plan",
@@ -4070,6 +4182,11 @@
       "definition": "One entry in a declared table or script. A row ID is not automatically a known in-game item or character name."
     },
     {
+      "id": "term-reference-template",
+      "term": "Reference template",
+      "definition": "Documented field positions that can be inspected at a declared table base, record count and stride. It does not locate the table or prove compatibility with a modified game."
+    },
+    {
       "id": "term-regression",
       "term": "Regression",
       "definition": "An unintended change detected by a defined test. A successful route covers its assertions, not the entire game."
@@ -4078,6 +4195,16 @@
       "id": "term-relocation",
       "term": "Relocation",
       "definition": "Moving data and updating its required references. ROMancer's declared data mover checks supplied linear references and reservations; it does not prove every consumer was found."
+    },
+    {
+      "id": "term-research-pack",
+      "term": "Research pack",
+      "definition": "An exact-revision JSON exchange of supported checked resource definitions and user notes. Import reviews replacements and changes metadata, never ROM bytes."
+    },
+    {
+      "id": "term-reserved-move",
+      "term": "Reserved resource move",
+      "definition": "A move into an author-reserved allocation with checked fill, capacity, alignment, bank constraints and explicitly declared external references. The program does not infer reservation or completeness."
     },
     {
       "id": "term-reset-vector",
@@ -4110,6 +4237,11 @@
       "definition": "An emulator snapshot tied to exact ROM, engine and setup identities. It is different from persistent battery save data."
     },
     {
+      "id": "term-saved-object",
+      "term": "Saved object layout",
+      "definition": "An exact-revision arrangement of verified literal source parts, including flips, gaps and shared uses. A user label is not an inferred actor identity. Imported layouts carry declarations rather than execution trust."
+    },
+    {
       "id": "term-scope",
       "term": "Scope",
       "definition": "The exact bytes, scene, route or format a claim covers. Whole-file and cartridge-payload hashes use different scopes."
@@ -4135,6 +4267,11 @@
       "definition": "The recorded reason for associating an observed native event with file bytes. An observed mapping and a byte-pattern candidate are different evidence."
     },
     {
+      "id": "term-source-pixel",
+      "term": "Source pixel origin",
+      "definition": "A stored pixel position causally linked to a screen position by coded probes and independent validation. Its encoded byte lanes are calculated using the tested literal codec."
+    },
+    {
       "id": "term-stride",
       "term": "Stride",
       "definition": "The number of bytes from one table record to the next. Each field has its own offset within a record."
@@ -4155,69 +4292,9 @@
       "definition": "A grid of references to tiles, sometimes including palette banks or flip bits. Its storage format must be established."
     },
     {
-      "id": "term-workspace",
-      "term": "Workspace",
-      "definition": "The local folder that owns projects and workspace preferences. It is separate from the installed application version."
-    },
-    {
-      "id": "term-research-pack",
-      "term": "Research pack",
-      "definition": "An exact-revision JSON exchange of supported checked resource definitions and user notes. Import reviews replacements and changes metadata, never ROM bytes."
-    },
-    {
-      "id": "term-reference-template",
-      "term": "Reference template",
-      "definition": "Documented field positions that can be inspected at a declared table base, record count and stride. It does not locate the table or prove compatibility with a modified game."
-    },
-    {
-      "id": "term-connected-resource",
-      "term": "Connected resource",
-      "definition": "A source-bound graphics, text, table, room, sound or research entry connected through declared storage, authored notes or measured evidence. Each relationship retains its confidence and origin."
-    },
-    {
-      "id": "term-gameplay-trace",
-      "term": "Gameplay trace",
-      "definition": "An authenticated native frame crop, source/core/frame identity, searched ROM range and literal pixel candidates. This is not automatically a CPU execution trace or proven source transfer."
-    },
-    {
-      "id": "term-pixel-candidate",
-      "term": "Pixel candidate",
-      "definition": "A literal ROM tile whose decoded pixel pattern matches part of a measured frame. Repeated patterns can match multiple offsets; a match alone does not establish sprite ownership."
-    },
-    {
-      "id": "term-build-check",
-      "term": "Automatic build check",
-      "definition": "A configured fresh-worker comparison of an original twice and a build once, including cartridge integrity and next-frame state replay. Results describe only the configured inputs and assertions."
-    },
-    {
       "id": "term-source-verification",
       "term": "Verified visual source",
       "definition": "An authenticated causal source-to-picture result: coded pixel origins, independent spatial validation, repeatable originals and a restored-ROM control. It does not assert observed CPU, mapper-bank or DMA fetches."
-    },
-    {
-      "id": "term-coded-probe",
-      "term": "Coded pixel probe",
-      "definition": "A temporary ROMancer build that changes selected source pixels according to a unique bit code. Native replay responses identify source pixel IDs instead of relying on visual similarity alone."
-    },
-    {
-      "id": "term-source-pixel",
-      "term": "Source pixel origin",
-      "definition": "A stored pixel position causally linked to a screen position by coded probes and independent validation. Its encoded byte lanes are calculated using the tested literal codec."
-    },
-    {
-      "id": "term-independent-validation",
-      "term": "Independent validation",
-      "definition": "A check not used to discover the mapping: separate spatial marker patterns must reproduce all accepted recovered pixels and their changed/unchanged color controls."
-    },
-    {
-      "id": "term-saved-object",
-      "term": "Saved object layout",
-      "definition": "An exact-revision arrangement of verified literal source parts, including flips, gaps and shared uses. A user label is not an inferred actor identity. Imported layouts carry declarations rather than execution trust."
-    },
-    {
-      "id": "term-native-graphics-trail",
-      "term": "Native graphics access trail",
-      "definition": "Observed ROM or memory accesses and operation details recorded by a reviewed native observer. Temporal proximity does not establish read-to-write dataflow or game meaning."
     },
     {
       "id": "term-video-snapshot",
@@ -4225,17 +4302,19 @@
       "definition": "Recorded video memory, registers and decoded screen at the end of a native capture. It does not represent all mid-frame changes or the live Playtest process."
     },
     {
-      "id": "term-edit-check",
-      "term": "Captured edit check",
-      "definition": "A source-bound replay comparison of the captured original twice and a descended edited build once, with reproducible original-frame and execution-context requirements."
-    },
-    {
-      "id": "term-reserved-move",
-      "term": "Reserved resource move",
-      "definition": "A move into an author-reserved allocation with checked fill, capacity, alignment, bank constraints and explicitly declared external references. The program does not infer reservation or completeness."
+      "id": "term-workspace",
+      "term": "Workspace",
+      "definition": "The local folder that owns projects and workspace preferences. It is separate from the installed application version."
     }
   ],
   "index": [
+    {
+      "term": "Actor hitboxes",
+      "topics": [
+        "collision-actors",
+        "levels"
+      ]
+    },
     {
       "term": "Address domains",
       "topics": [
@@ -4499,6 +4578,13 @@
       ]
     },
     {
+      "term": "Collision brushes",
+      "topics": [
+        "collision-actors",
+        "levels"
+      ]
+    },
+    {
       "term": "Collision values and layers",
       "topics": [
         "room",
@@ -4689,6 +4775,12 @@
       "topics": [
         "translation",
         "text-layout"
+      ]
+    },
+    {
+      "term": "Enemy movement and damage",
+      "topics": [
+        "collision-actors"
       ]
     },
     {
@@ -4908,6 +5000,13 @@
       ]
     },
     {
+      "term": "M4A music",
+      "topics": [
+        "known-music",
+        "sound"
+      ]
+    },
+    {
       "term": "Mario references",
       "topics": [
         "popular-references"
@@ -4978,6 +5077,13 @@
       ]
     },
     {
+      "term": "Music note view",
+      "topics": [
+        "known-music",
+        "sound"
+      ]
+    },
+    {
       "term": "Named edits",
       "topics": [
         "numbers",
@@ -4994,6 +5100,14 @@
       "term": "Named object inspector",
       "topics": [
         "connections"
+      ]
+    },
+    {
+      "term": "Native draft preview",
+      "topics": [
+        "native-draft-preview",
+        "captured-edit-check",
+        "palettes"
       ]
     },
     {
@@ -5478,6 +5592,15 @@
       ]
     },
     {
+      "term": "Understanding drafts and builds",
+      "topics": [
+        "understand-your-files",
+        "drafts",
+        "play",
+        "patches"
+      ]
+    },
+    {
       "term": "Undo and Redo",
       "topics": [
         "drafts",
@@ -5511,6 +5634,12 @@
       ]
     },
     {
+      "term": "Wario Land4 music",
+      "topics": [
+        "known-music"
+      ]
+    },
+    {
       "term": "Which editor to use",
       "topics": [
         "start"
@@ -5541,23 +5670,6 @@
         "support-editing",
         "palettes-appearance"
       ]
-    },
-    {
-      "term": "Native draft preview",
-      "topics": [
-        "native-draft-preview",
-        "captured-edit-check",
-        "palettes"
-      ]
-    },
-    {
-      "term": "Understanding drafts and builds",
-      "topics": [
-        "understand-your-files",
-        "drafts",
-        "play",
-        "patches"
-      ]
     }
   ],
   "compact_pdf": true,
@@ -5571,6 +5683,7 @@
     "editing-studio",
     "everyday-controls",
     "investigation",
+    "known-music",
     "levels",
     "mcp",
     "native-graphics-trails",
@@ -5581,6 +5694,7 @@
     "release-checks",
     "resources",
     "settings",
+    "sound",
     "support-editing",
     "support-identity",
     "support-playback",

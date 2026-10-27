@@ -23,6 +23,9 @@ ctx.run=()=>new Promise(resolve=>finish=resolve);const building=handlers['sound-
 assert.equal(JSON.parse(drafts.get('sound-changes')).changes[0]?.value,62,'build completion preserves a newer sound draft');
 drafts.set('sound-changes',JSON.stringify({document_id:'sd',changes:[note('<button data-action="sound-discard">Injected</button>')]}));await ctx.render();
 assert.doesNotMatch(html,/<td><button/,'restored drafts cannot introduce active HTML');assert.match(html,/Saved audio edits/);
+const oldDocument=globalThis.document;globalThis.document={getElementById:id=>id==='sound-song'?{value:'s',addEventListener(){}}:null};
+for(const invalid of ['{invalid JSON',JSON.stringify({document_id:'sd',changes:[note(200)]})]){drafts.set('sound-changes',invalid);await ctx.render();assert.match(html,/Saved audio edits/);assert.doesNotThrow(()=>soundView.mount(ctx),'Invalid persisted edits must leave the discard recovery accessible.');assert.equal(drafts.get('sound-changes'),invalid,'Recovery must not silently erase the saved draft.');}
+globalThis.document=oldDocument;
 drafts.set('sound-changes',JSON.stringify({document_id:'sd',changes:[note(62)]}));await ctx.render();
 const planning=handlers['sound-plan']();state.results['sound.inspect']={...soundDoc,document_id:'sd-new'};drafts.set('sound-changes',JSON.stringify({document_id:'sd-new',changes:[note(62)]}));await ctx.render();finish({ok:true,plan_id:'old-plan'});await planning;
 assert.equal(state.pending,null,'a review for an old sound definition cannot authorize the new definition');

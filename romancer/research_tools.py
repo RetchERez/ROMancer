@@ -180,7 +180,6 @@ class ResearchTools:
         for kind in KINDS:
             if c():raise KeyboardInterrupt
             if kind in defs:
-                if row.get('system_id')=='sms' and kind in ('levels','sound'):raise ValueError('Master System level/sound declarations are not supported.')
                 checked[kind]=definition_document(path,row['sha256'],kind,defs[kind])['definition']
                 if existing.get(kind) is not None:replacements.append(kind+' definition')
         incoming=_notes(document['notes'],row['size']);old={n['id']:n for n in notes_for(row)}

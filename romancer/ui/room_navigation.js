@@ -1,4 +1,5 @@
 import {esc,button,select} from './common.js';
+import {objectFieldLabel} from './level_semantics.js';
 
 export function objectMetadata(doc,id,index){
  const room=doc.rooms.find(room=>room.id===id),definition=doc.definition?.rooms?.find(room=>room.id===id);
@@ -66,11 +67,11 @@ export function objectInspector(ctx,doc,model,id){
  const destination=reference?select('level-object-destination','Destination room',reference.targets.map(target=>[target.value,names.get(target.room_id)]),object[reference.field]):'';
  const controls=objectFields(doc,id).map((field,position)=>{
   if(reference?.field===field.name)return '';
-  const maximum=objectMaximum(doc,id,field),label=field.name==='x'?'X position':field.name==='y'?'Y position':field.name;
-  return `<label class="field"><span>${esc(label)}</span><input id="level-object-input-${position}" type="number" min="0" max="${maximum}" step="1" value="${object[field.name]}"><small>0 to ${maximum}</small></label>`;
+  const maximum=objectMaximum(doc,id,field),minimum=field.minimum??0,label=objectFieldLabel(field,metadata);
+  return `<label class="field"><span>${esc(label)}</span><input id="level-object-input-${position}" type="number" min="${minimum}" max="${maximum}" step="1" value="${object[field.name]}"><small>${minimum} to ${maximum}</small></label>`;
  }).join('');
  const instruction=Number.isSafeInteger(object.x)&&Number.isSafeInteger(object.y)?"Choose Move object, then drag its label on the map.":'This object has no map position. Its values are available below.';
- return `<section class="card level-object-inspector"><h3>${allRecords?'Records (Advanced)':'Objects'}</h3>${select('level-object-index','Selected object',choices.map(choice=>[choice.index,choice.label]),index)}<p class="subtle">${instruction}</p>${destination}${button('Update preview','levels-object-apply')}<details class="level-object-advanced"><summary>Position & advanced values</summary><div class="field-row">${controls}</div><p class="subtle">These values come from the layout definition. Names and roles do not establish game behavior.</p><details><summary>Raw record</summary><pre>${esc(JSON.stringify(object,null,2))}</pre></details></details></section>`;
+ return `<section class="card level-object-inspector"><h3>${allRecords?'Records (Advanced)':'Objects'}</h3>${select('level-object-index','Selected object',choices.map(choice=>[choice.index,choice.label]),index)}<p class="subtle">${instruction}</p>${destination}${metadata?.hitbox?'<p class="subtle">Hitboxes show the starting position. Build and playtest to check contact during movement.</p>':''}${button('Update preview','levels-object-apply')}<details class="level-object-advanced"${metadata?.hitbox?' open':''}><summary>${metadata?.hitbox?'Position, hitbox & behavior':'Position & advanced values'}</summary><div class="field-row">${controls}</div><p class="subtle">These values come from the layout definition. Names and roles do not establish game behavior.</p><details><summary>Raw record</summary><pre>${esc(JSON.stringify(object,null,2))}</pre></details></details></section>`;
 }
 
 export function mountRoomNavigation(doc,model){

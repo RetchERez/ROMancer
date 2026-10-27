@@ -3,7 +3,8 @@ By RetchEWretched
 
 Local ROM editing for NES, SNES, Genesis, Master System, Game Boy, Game Boy Color and GBA.
 Master System support covers validated Sega headers, checksums, literal graphics,
-declared text/byte edits, patches and playtesting; other layouts remain unknown.
+declared text/byte edits, checked level layouts, patches and playtesting.
+Game-specific collision, music and actor behavior require verified definitions.
 Everyday use works offline. No AI account, model, API key or subscription is required.
 
 EDITING TASKS
@@ -13,12 +14,12 @@ layout does not imply a known palette, music driver or level format. Open the
 editing tools directly. The guide provides Basic and Advanced procedures;
 concise field help and diagnostics remain available.
 
-Try the original Mossy Hollow editing studio: move with arrows and press A for
-a chirp. Edit its hero/slime graphics, dialogue, speeds, visual room and actor
-spawn positions with the normal tools. Its terrain has no collision engine;
-reference RGB colors in the level editor do not represent editable NES palette
-data. Speeds are limited to 0 through 8; zero stops movement. Actor X positions
-stay within the playable horizontal area. Other system workshops remain available.
+Try the original Mossy Hollow editing studio: arrows move, A attacks on contact
+and chirps, Start restarts. Edit graphics, dialogue, speeds, visible terrain,
+collision rules, actor hitboxes, health, damage, patrol limits and the melody.
+Starting sprite/hitbox previews are separate from live Playtest frames. Speeds
+are0 through8 pixels per frame. Reference level colors are authored RGB colors.
+Older workshop sources remain reproducible for the included patch examples.
 
 Saved verified objects can show staged pixels in a full captured scene. This is
 a simulated composite of checked placements and captured colors, not an emulated
@@ -195,7 +196,7 @@ engine to its two-button pad: A and B are buttons 1 and 2, and Start sends Pause
 
 GITHUB RELEASE PREPARATION
 
-Use the tag v1.0.0 for the public ROMancer v1.0 release. The numeric 1.0.39 build
+Use the tag v1.0.0 for the public ROMancer v1.0 release. The numeric 1.0.40 build
 identifier is internal installer/update identity. Lead the release description
 with ROMancer-v1.0-Setup.exe, then the portable Windows ZIP, offline guide and
 walkthrough. Provide the source, engine pack, component notices and SHA256SUMS.
@@ -519,13 +520,14 @@ declared layout or a native playtest. Numeric comparisons show stored values,
 not inferred damage or gameplay formulas. Palette colors use the declared bit
 ranges; the picker may quantize a chosen color to the supported hardware format.
 
-Sound hardware is not a music driver. The exact original Wario Land 4 US/EU
-revision is documented as m4a/MusicPlayer2000, but a commercial sequence decoder
-is not implemented. Note editing currently supports only the identified original
-Hillside workshop driver. Sample editing requires a declared location, capacity
-and codec. DPCM/wave/BRR re-encoding is lossy. Reference previews do not reproduce
-hardware filters, envelopes, echo or a game's mixer. Native recordings contain
-measured mixed output, not isolated hardware channels.
+Sound hardware is not a music driver. Original Hillside and Mossy Hollow
+sequences support checked note edits. The fingerprinted Wario Land4 M4A reader
+walks five selected song entries; three allow explicit note, velocity, volume
+and tempo value edits. Conditional or over-budget songs remain read-only.
+Commands, pointers and instruments are protected. The opening-cutscene note
+example was verified with repeatable original audio and changed build audio.
+Reference note sketches do not reproduce game instruments or effects. Native
+recordings contain measured mixed output, not isolated hardware channels.
 
 Declared rooms and object fields use existing fixed storage. They do not add a
 game engine, infer collision meanings or allocate new rooms. Unsupported layouts,

@@ -1459,6 +1459,12 @@
         ctx2.state.structuralPrefill = { scope, offset: candidate.offset, length: Math.min(4096, ctx2.state.artifact.size - candidate.offset) };
         return ctx2.navigate("debug");
       },
+      "checked-format-open": (node) => {
+        var _a2, _b, _c, _d;
+        if (!current2()) return;
+        const feature = (_d = (_c = (_b = (_a2 = ctx2.state.romScans) == null ? void 0 : _a2[scope]) == null ? void 0 : _b.result) == null ? void 0 : _c.checked_formats) == null ? void 0 : _d.features.find((row) => row.id === node.dataset.id);
+        if (feature && ["levels", "sound"].includes(feature.page)) return ctx2.navigate(feature.page);
+      },
       "sound-index-open": () => ctx2.navigate("sound"),
       "graphics-index-view": async (node) => {
         var _a2, _b, _c;
@@ -1500,7 +1506,7 @@
     var _a, _b, _c, _d, _e, _f;
     const result = entry == null ? void 0 : entry.result, model = result == null ? void 0 : result.identification, known = model == null ? void 0 : model.profile, refs = (_a = result == null ? void 0 : result.catalog) == null ? void 0 : _a.file, matched = (refs == null ? void 0 : refs.status) === "MATCHED" ? (_b = refs.matches[0]) == null ? void 0 : _b.name : null;
     const query = ((_c = ctx2.state.romScanQuery) == null ? void 0 : _c.toLowerCase()) || "", candidates = ((result == null ? void 0 : result.candidates) || []).filter((c) => !query || [c.kind, c.preview, c.format, c.offset.toString(16)].join(" ").toLowerCase().includes(query));
-    return `<section class="card" id="rom-scan-panel"><div class="card-heading"><h3>ROM investigation</h3>${(entry == null ? void 0 : entry.status) === "SCANNING" ? badge("Scanning", "warm") + button("Cancel scan", "rom-scan-cancel", { disabled: !entry.job_id }) : button("Rescan ROM", "rom-rescan", { icon: "search" })}</div>${(entry == null ? void 0 : entry.status) === "ERROR" ? `<p class="notice warm">${esc(entry.error)}</p>` : !result ? '<p class="subtle">' + (getSettings().autoDeepScan ? "Automatic offline identification and resource scan. You can keep working." : "Automatic deep scan is off in Settings. Choose Rescan ROM to investigate this file.") + "</p>" : `<p><strong>${known ? esc(known.name) + (model.status === "MATCHED" ? " · exact revision" : " · based on matched source") : matched ? esc(matched) + " · local catalog match" : ((_e = (_d = result.documented_tables) == null ? void 0 : _d.candidates) == null ? void 0 : _e.some((c) => c.exact_revision)) ? "Pokemon Emerald · exact original revision" : esc(((_f = result.system_id) == null ? void 0 : _f.toUpperCase()) || "Unresolved system") + " · game revision unknown"}</strong></p><p class="subtle">${result.health ? "CRC32 " + esc(result.health.crc32) + " · " : ""}${size(result.coverage.file_bytes_read)} of ${size(result.coverage.file_size)} read. ${result.coverage.whole_file_read ? "Whole file covered." : "Partial coverage."} Candidate meanings need confirmation.</p>${documentedIndex(result.documented_tables)}${verificationResults(result.health)}${graphicsIndex(ctx2, result.graphics_index)}${soundIndex(result.sound_system, result.engine_recognition)}${engineFindings(result.engine_recognition)}${cheatClues(result.cheat_references)}${structureIndex(result.structures)}${structuralExperiments(result.structural_lab)}<details><summary>Discoveries · ${Object.entries(result.counts).map(([kind, count]) => esc(kind) + " " + count + (result.coverage.segments.some((s) => {
+    return `<section class="card" id="rom-scan-panel"><div class="card-heading"><h3>ROM investigation</h3>${(entry == null ? void 0 : entry.status) === "SCANNING" ? badge("Scanning", "warm") + button("Cancel scan", "rom-scan-cancel", { disabled: !entry.job_id }) : button("Rescan ROM", "rom-rescan", { icon: "search" })}</div>${(entry == null ? void 0 : entry.status) === "ERROR" ? `<p class="notice warm">${esc(entry.error)}</p>` : !result ? '<p class="subtle">' + (getSettings().autoDeepScan ? "Automatic offline identification and resource scan. You can keep working." : "Automatic deep scan is off in Settings. Choose Rescan ROM to investigate this file.") + "</p>" : `<p><strong>${known ? esc(known.name) + (model.status === "MATCHED" ? " · exact revision" : " · based on matched source") : matched ? esc(matched) + " · local catalog match" : ((_e = (_d = result.documented_tables) == null ? void 0 : _d.candidates) == null ? void 0 : _e.some((c) => c.exact_revision)) ? "Pokemon Emerald · exact original revision" : esc(((_f = result.system_id) == null ? void 0 : _f.toUpperCase()) || "Unresolved system") + " · game revision unknown"}</strong></p><p class="subtle">${result.health ? "CRC32 " + esc(result.health.crc32) + " · " : ""}${size(result.coverage.file_bytes_read)} of ${size(result.coverage.file_size)} read. ${result.coverage.whole_file_read ? "Whole file covered." : "Partial coverage."} Candidate meanings need confirmation.</p>${checkedFormatIndex(result.checked_formats)}${documentedIndex(result.documented_tables)}${verificationResults(result.health)}${graphicsIndex(ctx2, result.graphics_index)}${soundIndex(result.sound_system, result.engine_recognition)}${engineFindings(result.engine_recognition)}${cheatClues(result.cheat_references)}${structureIndex(result.structures)}${structuralExperiments(result.structural_lab)}<details><summary>Discoveries · ${Object.entries(result.counts).map(([kind, count]) => esc(kind) + " " + count + (result.coverage.segments.some((s) => {
       var _a2;
       return (_a2 = s[kind]) == null ? void 0 : _a2.results_truncated;
     }) ? "+" : "")).join(" · ")}</summary><p>Showing up to ${result.coverage.result_limit_per_kind} results per kind. Graphics are sampled; compressed streams have work limits. Exact mapped game edits are in Overview.</p><div class="toolbar">${field("rom-scan-query", "Filter discoveries", ctx2.state.romScanQuery || "", { placeholder: "text, codec, offset or preview" })}${button("Filter", "rom-scan-filter")}</div>${candidates.length ? `<div class="table-wrap"><table><thead><tr><th>Location</th><th>Candidate</th><th>Preview</th><th></th></tr></thead><tbody>${candidates.slice(0, 20).map((c) => `<tr><td><code>0x${c.offset.toString(16).toUpperCase()}</code></td><td>${esc(c.kind)}<br><small>${esc(c.confidence)}</small></td><td>${esc(c.preview)}</td><td>${button("View bytes", "rom-scan-inspect", { id: String(c.offset) })}</td></tr>`).join("")}</tbody></table></div><p class="subtle">${Math.min(20, candidates.length)} of ${candidates.length} stored discoveries. Filter to narrow results.</p>` : "<p>No matching candidates. Custom encodings and layouts need a definition.</p>"}<details><summary>Coverage and limits</summary>${result.limits.map((note) => `<p>${esc(note)}</p>`).join("")}<p>${result.coverage.segments.filter((s) => {
@@ -1513,6 +1519,10 @@
     if (!index || index.status !== "STORAGE_CANDIDATES") return "";
     const scope = selectionKey(ctx2.state), observed = (_b = (_a = ctx2.state.graphicsInvestigations) == null ? void 0 : _a[scope]) == null ? void 0 : _b.result;
     return `<div class="graphics-index"><h4>Graphics organization</h4><p>${index.sampled_cells} stored cells sampled · stride ${index.cell_sampling_stride} · ${esc(index.codec)}</p><p>${observed ? "Gameplay candidates available" : "Waiting for gameplay"} · ${button("Investigate in Playtest", "graphics-index-play")}</p><details><summary>Storage banks and repeated patterns</summary><p>Storage groups are candidates. Byte-identical data can suggest reuse; it does not prove shared game objects or palette ownership.</p><table><thead><tr><th>Bank range</th><th>Nonflat samples</th><th></th></tr></thead><tbody>${index.banks.slice(0, 8).map((bank) => `<tr><td><code>0x${bank.offset.toString(16).toUpperCase()}</code> · ${size(bank.length)}</td><td>${bank.sampled_nonflat_cells}</td><td>${button("View bank", "graphics-index-view", { id: String(bank.offset) })}</td></tr>`).join("")}</tbody></table><p>${index.repeated_patterns.length} repeated-pattern groups stored (up to32).</p>${index.repeated_patterns.slice(0, 8).map((pattern) => `<p>${pattern.count} byte-identical cells · ${pattern.offsets.map((offset) => button("0x" + offset.toString(16).toUpperCase(), "graphics-index-view", { id: String(offset) })).join(" ")}</p>`).join("")}<p class="subtle">Initial indexing assumes tile alignment and samples up to65,536cells. Gameplay matching searches every byte alignment in each requested range.</p></details></div>`;
+  }
+  function checkedFormatIndex(info) {
+    if (!(info == null ? void 0 : info.engine)) return "";
+    return `<section class="notice"><h4>Known engine: ${esc(info.engine.name)}</h4><p>${esc(info.engine.evidence)}</p>${info.features.map((row) => `<p><strong>${esc(row.name)}</strong> · ${esc(row.detail)} ${button(row.action, "checked-format-open", { id: row.id })}</p>`).join("")}<p>Engine recognition is separate from a native playtest result.</p></section>`;
   }
   function soundIndex(info, recognition) {
     var _a;
@@ -2794,9 +2804,9 @@
   var missing = { assets: ["Play this ROM, pause, then inspect a sprite to find its graphics.", "Find graphics"], script: ["Text needs a character table and text locations before it can be edited.", "Check text setup"], tables: ["Find a changing value, then save its table layout.", "Find values"], levels: ["Level editing needs a saved map layout, tiles and object records.", "Check level setup"], sound: ["Preview supported samples, or capture audio from Playtest. Editing music needs a supported format.", "Open sound tools"] };
   function readinessCards(model) {
     return '<section class="card editing-readiness"><h3>What can I edit in this ROM?</h3><div class="readiness-grid">' + model.areas.map((a) => {
-      const suggestion = missing[a.kind] || ["Find and save an editing setup for this ROM.", "Investigate"], summary = a.status === "ready" ? "A working editing setup is saved for this ROM." : a.status === "unsupported" ? "The saved setup does not work with this ROM. Open it to check the details." : suggestion[0], action = a.status === "ready" ? "Open editor" : a.status === "unsupported" ? "Check setup" : suggestion[1];
+      const suggestion = missing[a.kind] || ["Find and save an editing setup for this ROM.", "Investigate"], summary = a.status === "ready" ? "A checked editing setup is available for this ROM." : a.status === "unsupported" ? "The saved setup does not work with this ROM. Open it to check the details." : suggestion[0], action = a.status === "ready" ? "Open editor" : a.status === "unsupported" ? "Check setup" : suggestion[1];
       return "<div><strong>" + esc(a.title) + '</strong><p class="readiness-state ' + esc(a.status) + '">' + esc(labels[a.status]) + "</p><p>" + esc(summary) + "</p>" + button(action, "readiness-open", { id: a.kind }) + '<details class="readiness-details"><summary>Technical details</summary><p>' + esc(a.reason) + "</p></details></div>";
-    }).join("") + '</div><p class="subtle">Ready applies to the saved layout, not every part of the game. Playtest your changes.</p></section>';
+    }).join("") + '</div><p class="subtle">Ready applies to the checked layout, not every part of the game. Playtest your changes.</p></section>';
   }
   async function editingReadiness(ctx2) {
     const scope = selectionKey(ctx2.state), current2 = () => {
@@ -8006,6 +8016,47 @@ ${font ? `<section class="card"><h3>Font metrics · ${esc(font.id)}</h3><div cla
     render: () => render15
   });
 
+  // romancer/ui/level_semantics.js
+  function collisionBrushes(room, values) {
+    const rows = (room.collision_types || []).map((row) => ({ ...row })), known = new Set(rows.map((row) => row.value));
+    for (const value of [...new Set(values)].sort((a, b) => a - b)) if (!known.has(value)) rows.push({ value, name: "Raw value " + value, kind: "unmapped", color: [110, 130, 150] });
+    return rows;
+  }
+  function collisionPalette(room, values, selected2) {
+    return `<div class="level-collision-palette" role="group" aria-label="Collision brushes">${collisionBrushes(room, values).map((row) => `<button type="button" data-level-collision="${row.value}" aria-pressed="${Number(selected2) === row.value}"><span class="collision-swatch" style="background:rgb(${row.color.join(",")})" aria-hidden="true"></span><strong>${esc(row.name)}</strong><span>${row.value} · ${esc(row.kind)}</span></button>`).join("")}</div>`;
+  }
+  function actorHitboxes(doc, model, id) {
+    var _a, _b, _c;
+    const room = doc.rooms.find((row) => row.id === id), metadata = (room == null ? void 0 : room.object_metadata) || ((_c = (_b = (_a = doc.definition) == null ? void 0 : _a.rooms) == null ? void 0 : _b.find((row) => row.id === id)) == null ? void 0 : _c.object_metadata) || [], objects = model.objects(id);
+    return metadata.flatMap((row) => {
+      const object = objects[row.index], box = row.hitbox;
+      if (!box || !object || !Number.isSafeInteger(object.x) || !Number.isSafeInteger(object.y)) return [];
+      const [ox, oy, width, height] = ["offset_x", "offset_y", "width", "height"].map((key3) => object[box[key3]]);
+      if (![ox, oy, width, height].every(Number.isSafeInteger) || ox < 0 || oy < 0 || width < 1 || height < 1) return [];
+      return [{ index: row.index, name: row.name, left: object.x * doc.block_width * 8 + ox, top: object.y * doc.block_height * 8 + oy, width, height }];
+    });
+  }
+  function objectFieldLabel(field2, metadata) {
+    var _a;
+    const component = (_a = Object.entries((metadata == null ? void 0 : metadata.hitbox) || {}).find(([, name]) => name === field2.name)) == null ? void 0 : _a[0];
+    if (component) return { offset_x: "Hitbox left offset (pixels)", offset_y: "Hitbox top offset (pixels)", width: "Hitbox width (pixels)", height: "Hitbox height (pixels)" }[component];
+    return { x: "X position (cells)", y: "Y position (cells)", starting_health: "Starting health", contact_damage: "Contact damage", ai_enabled: "Movement enabled (0 off, 1 on)", patrol_left: "Left movement limit (cells)", patrol_right: "Right movement limit (cells)", damage_cooldown: "Damage cooldown (frames)" }[field2.name] || field2.name;
+  }
+  function paintStartingSprites(doc, model, id, pixels, width, height) {
+    const room = doc.rooms.find((row) => row.id === id), metadata = (room == null ? void 0 : room.object_metadata) || [], objects = model.objects(id);
+    for (const entry of metadata) {
+      const sprite = entry.sprite, object = objects[entry.index];
+      if (!sprite || !Number.isSafeInteger(object == null ? void 0 : object.x) || !Number.isSafeInteger(object == null ? void 0 : object.y)) continue;
+      const left = object.x * doc.block_width * 8, top = object.y * doc.block_height * 8;
+      for (const [part, index] of sprite.tiles.entries()) for (const [pixel, value] of doc.tiles[index].entries()) {
+        if (value === sprite.transparent_index) continue;
+        const x = left + part % sprite.width * 8 + pixel % 8, y = top + Math.floor(part / sprite.width) * 8 + Math.floor(pixel / 8);
+        if (x >= 0 && x < width && y >= 0 && y < height) pixels.set([...doc.palette[value], 255], (y * width + x) * 4);
+      }
+    }
+    return pixels;
+  }
+
   // romancer/ui/room_navigation.js
   function objectMetadata(doc, id, index) {
     var _a, _b;
@@ -8077,11 +8128,11 @@ ${font ? `<section class="card"><h3>Font metrics · ${esc(font.id)}</h3><div cla
     const destination = reference ? select("level-object-destination", "Destination room", reference.targets.map((target) => [target.value, names7.get(target.room_id)]), object[reference.field]) : "";
     const controls = objectFields(doc, id).map((field2, position) => {
       if ((reference == null ? void 0 : reference.field) === field2.name) return "";
-      const maximum = objectMaximum(doc, id, field2), label = field2.name === "x" ? "X position" : field2.name === "y" ? "Y position" : field2.name;
-      return `<label class="field"><span>${esc(label)}</span><input id="level-object-input-${position}" type="number" min="0" max="${maximum}" step="1" value="${object[field2.name]}"><small>0 to ${maximum}</small></label>`;
+      const maximum = objectMaximum(doc, id, field2), minimum = field2.minimum ?? 0, label = objectFieldLabel(field2, metadata);
+      return `<label class="field"><span>${esc(label)}</span><input id="level-object-input-${position}" type="number" min="${minimum}" max="${maximum}" step="1" value="${object[field2.name]}"><small>${minimum} to ${maximum}</small></label>`;
     }).join("");
     const instruction = Number.isSafeInteger(object.x) && Number.isSafeInteger(object.y) ? "Choose Move object, then drag its label on the map." : "This object has no map position. Its values are available below.";
-    return `<section class="card level-object-inspector"><h3>${allRecords ? "Records (Advanced)" : "Objects"}</h3>${select("level-object-index", "Selected object", choices.map((choice) => [choice.index, choice.label]), index)}<p class="subtle">${instruction}</p>${destination}${button("Update preview", "levels-object-apply")}<details class="level-object-advanced"><summary>Position & advanced values</summary><div class="field-row">${controls}</div><p class="subtle">These values come from the layout definition. Names and roles do not establish game behavior.</p><details><summary>Raw record</summary><pre>${esc(JSON.stringify(object, null, 2))}</pre></details></details></section>`;
+    return `<section class="card level-object-inspector"><h3>${allRecords ? "Records (Advanced)" : "Objects"}</h3>${select("level-object-index", "Selected object", choices.map((choice) => [choice.index, choice.label]), index)}<p class="subtle">${instruction}</p>${destination}${(metadata == null ? void 0 : metadata.hitbox) ? '<p class="subtle">Hitboxes show the starting position. Build and playtest to check contact during movement.</p>' : ""}${button("Update preview", "levels-object-apply")}<details class="level-object-advanced"${(metadata == null ? void 0 : metadata.hitbox) ? " open" : ""}><summary>${(metadata == null ? void 0 : metadata.hitbox) ? "Position, hitbox & behavior" : "Position & advanced values"}</summary><div class="field-row">${controls}</div><p class="subtle">These values come from the layout definition. Names and roles do not establish game behavior.</p><details><summary>Raw record</summary><pre>${esc(JSON.stringify(object, null, 2))}</pre></details></details></section>`;
   }
   function mountRoomNavigation(doc, model) {
     var _a;
@@ -8124,7 +8175,7 @@ ${font ? `<section class="card"><h3>Font metrics · ${esc(font.id)}</h3><div cla
     }
     set(c) {
       var _a, _b, _c, _d, _e, _f;
-      let original, max;
+      let original, max, min = 0;
       if (c.kind === "metatile") {
         integer13(c.index, 0, this.doc.metatiles.length - 1);
         integer13(c.part, 0, this.doc.metatiles[c.index].length - 1);
@@ -8137,6 +8188,7 @@ ${font ? `<section class="card"><h3>Font metrics · ${esc(font.id)}</h3><div cla
           if (!(c.field in r.objects[c.index])) throw Error("Unknown object field.");
           original = r.objects[c.index][c.field];
           const declared2 = (_c = (_b = (_a = this.doc.definition) == null ? void 0 : _a.rooms.find((x) => x.id === r.id)) == null ? void 0 : _b.objects) == null ? void 0 : _c.fields.find((f) => f.name === c.field);
+          min = (declared2 == null ? void 0 : declared2.minimum) ?? 0;
           max = Math.min((declared2 == null ? void 0 : declared2.maximum) ?? 65535, c.field === "x" ? r.width - 1 : c.field === "y" ? r.height - 1 : c.field === "exit_room" ? this.doc.rooms.length - 1 : 65535);
         } else {
           if (!["terrain", "collision"].includes(c.kind) || !r[c.kind]) throw Error("This layer is not declared.");
@@ -8146,7 +8198,7 @@ ${font ? `<section class="card"><h3>Font metrics · ${esc(font.id)}</h3><div cla
           max = c.kind === "terrain" ? this.doc.metatiles.length - 1 : 2 ** (8 * ((declared2 == null ? void 0 : declared2.entry_bytes) || 1)) - 1;
         }
       }
-      integer13(c.value, 0, max);
+      integer13(c.value, min, max);
       if (c.kind === "object") {
         const metadata = objectMetadata(this.doc, c.room_id, c.index);
         if ((metadata == null ? void 0 : metadata.role) === "exit" && ((_f = metadata.reference) == null ? void 0 : _f.field) === c.field && !metadata.reference.targets.some((target) => target.value === c.value)) throw Error("Exit destination is not mapped.");
@@ -8260,7 +8312,7 @@ ${font ? `<section class="card"><h3>Font metrics · ${esc(font.id)}</h3><div cla
         });
       });
     });
-    return out;
+    return paintStartingSprites(doc, model, id, out, width, height);
   }
   function changedRoomCells(doc, model, id) {
     const room = model.room(id), changedBlocks = new Set(model.values().filter((c) => c.kind === "metatile").map((c) => c.index)), terrain = model.cells(id, "terrain"), collision = room.collision ? model.cells(id, "collision") : null, result = /* @__PURE__ */ new Set();
@@ -8301,7 +8353,7 @@ ${font ? `<section class="card"><h3>Font metrics · ${esc(font.id)}</h3><div cla
     return `<div class="level-brush-palette" role="group" aria-label="Terrain brushes">${model.blocks().map((_, index) => `<button type="button" data-level-brush="${index}" aria-pressed="${Number(selected2) === index}" aria-label="Paint with metatile ${index}" title="Metatile ${index}"><canvas data-level-block="${index}" aria-hidden="true"></canvas><span>${index}</span></button>`).join("")}</div>`;
   }
   function mountLevel(ctx2, doc, model, id, persist) {
-    var _a, _b;
+    var _a, _b, _c;
     const canvas = document.getElementById("level-canvas");
     if (!canvas) return;
     const scope = selectionKey(ctx2.state), current2 = () => scope === selectionKey(ctx2.state) && ctx2.state.page === "levels", room = model.room(id);
@@ -8332,22 +8384,32 @@ ${font ? `<section class="card"><h3>Font metrics · ${esc(font.id)}</h3><div cla
     }
     const originalPixels = originalCanvas ? roomPixels2(doc, new LevelDraft(doc), id) : null;
     const draw2 = () => {
+      if (document.getElementById("level-canvas") !== canvas) return;
       canvas.width = room.width * doc.block_width * 8;
       canvas.height = room.height * doc.block_height * 8;
       canvas.style.width = canvas.width * levelScale(canvas.width, canvas.height, window.innerHeight, canvas.parentElement.clientWidth, read("level-zoom")) + "px";
       const c = canvas.getContext("2d"), image = c.createImageData(canvas.width, canvas.height);
       image.data.set(roomPixels2(doc, model, id));
       c.putImageData(image, 0, 0);
-      rememberPreview(canvas, canvas.width, canvas.height, image.data, { note: "Terrain graphics only; collision values and object markers are separate overlays." });
+      rememberPreview(canvas, canvas.width, canvas.height, image.data, { note: "Declared terrain and starting sprites; collision and hitboxes are separate overlays. Playtest shows actual movement." });
       const w = doc.block_width * 8, h = doc.block_height * 8;
-      if (read("level-overlay") === "collision" && room.collision) {
-        const colors = ["#e75d6d88", "#66b9f088", "#ffca5c88"];
-        model.cells(id, "collision").forEach((value, i) => {
+      if ((read("level-overlay") === "collision" || read("level-layer") === "collision") && room.collision) {
+        const values = model.cells(id, "collision"), colors = new Map(collisionBrushes(room, values).map((row) => [row.value, row.color]));
+        values.forEach((value, i) => {
           if (value) {
-            c.fillStyle = colors[value % 4] || "#e75d6d88";
+            c.fillStyle = "rgba(" + colors.get(value).join(",") + ",0.65)";
             c.fillRect(i % room.width * w, Math.floor(i / room.width) * h, w, h);
           }
         });
+      }
+      if (read("level-overlay") === "hitboxes") {
+        for (const box of actorHitboxes(doc, model, id)) {
+          c.fillStyle = "#ffca5c44";
+          c.fillRect(box.left, box.top, box.width, box.height);
+          c.strokeStyle = "#ffca5c";
+          c.lineWidth = 1;
+          c.strokeRect(box.left + 0.5, box.top + 0.5, box.width - 1, box.height - 1);
+        }
       }
       for (const marker of markerRects()) {
         c.fillStyle = "#76e2bd";
@@ -8501,8 +8563,14 @@ ${font ? `<section class="card"><h3>Font metrics · ${esc(font.id)}</h3><div cla
         draw2();
       });
     }
-    for (const name of ["level-overlay", "level-zoom", "level-tool"]) (_a = document.getElementById(name)) == null ? void 0 : _a.addEventListener("change", draw2);
-    (_b = document.getElementById("level-brush")) == null ? void 0 : _b.addEventListener("change", () => chooseBrush(Number(read("level-brush"))));
+    for (const node of ((_a = document.querySelectorAll) == null ? void 0 : _a.call(document, "[data-level-collision]")) || []) if (node.dataset.levelCollision !== void 0) node.addEventListener("click", () => {
+      if (!current2()) return;
+      chooseBrush(Number(node.dataset.levelCollision));
+      ctx2.setDraft("level-tool", "paint");
+      ctx2.render();
+    });
+    for (const name of ["level-overlay", "level-zoom", "level-tool"]) (_b = document.getElementById(name)) == null ? void 0 : _b.addEventListener("change", draw2);
+    (_c = document.getElementById("level-brush")) == null ? void 0 : _c.addEventListener("change", () => chooseBrush(Number(read("level-brush"))));
     draw2();
   }
 
@@ -8955,7 +9023,7 @@ ${font ? `<section class="card"><h3>Font metrics · ${esc(font.id)}</h3><div cla
   }
 
   // romancer/ui/views/levels.js
-  var codecs2 = { nes: "tile8-planar2-msb-v1", snes: "tile8-paired4-msb-v1", genesis: "tile8-packed4-high-v1", gb: "tile8-paired2-msb-v1", gbc: "tile8-paired2-msb-v1", gba: "tile8-packed4-low-v1" };
+  var codecs2 = { sms: "tile8-rowplanar4-msb-v1", nes: "tile8-planar2-msb-v1", snes: "tile8-paired4-msb-v1", genesis: "tile8-packed4-high-v1", gb: "tile8-paired2-msb-v1", gbc: "tile8-paired2-msb-v1", gba: "tile8-packed4-low-v1" };
   var objectInteger = (id) => {
     const text = read(id).trim();
     if (!/^\d+$/.test(text)) throw Error("Enter a whole number for every object field.");
@@ -8963,7 +9031,7 @@ ${font ? `<section class="card"><h3>Font metrics · ${esc(font.id)}</h3><div cla
   };
   var practiceControls = () => `<details class="card"><summary>Advanced practice</summary><p>Open a separate test layout to learn the editor controls.</p>${button("Open test layout", "studio-example")}</details>`;
   async function render15(ctx2) {
-    var _a, _b, _c, _d, _e, _f, _g, _h, _i, _j, _k, _l, _m;
+    var _a, _b, _c, _d, _e, _f, _g, _h, _i, _j, _k, _l, _m, _n;
     const setupReview = useResearchSetup(ctx2, "levels");
     if (setupReview) return setupReview;
     const { state: state2 } = ctx2;
@@ -9035,7 +9103,7 @@ ${font ? `<section class="card"><h3>Font metrics · ${esc(font.id)}</h3><div cla
       model.scope = scope;
       state2.levelEditor = model;
     }
-    const room = (doc == null ? void 0 : doc.rooms.find((r) => r.id === ctx2.draft("level-room", ""))) || (doc == null ? void 0 : doc.rooms[0]), layer = ctx2.draft("level-layer", "terrain");
+    const room = (doc == null ? void 0 : doc.rooms.find((r) => r.id === ctx2.draft("level-room", ""))) || (doc == null ? void 0 : doc.rooms[0]), layer = (room == null ? void 0 : room.collision) && ctx2.draft("level-layer", "terrain") === "collision" ? "collision" : "terrain";
     const persist = () => {
       if (!current2()) return;
       state2.historyEditor = "level-canvas";
@@ -9143,10 +9211,10 @@ ${font ? `<section class="card"><h3>Font metrics · ${esc(font.id)}</h3><div cla
     const setup2 = `<details class="card"><summary>Advanced level setup</summary><p>Level editing needs a layout definition for this ROM. Confirm tile grids, object fields, and room-reference mappings before using them. Names and roles alone do not establish game behavior.</p><details><summary>Single-room layout form</summary><div class="field-row">${field("level-name", "Room name", ctx2.draft("level-name", "Room"))}${field("level-width", "Blocks across", ctx2.draft("level-width", "16"), { type: "number", min: 1 })}${field("level-height", "Blocks down", ctx2.draft("level-height", "14"), { type: "number", min: 1 })}${select("level-entry", "Grid integer bytes", [[1, "8 bit"], [2, "16 bit"]], ctx2.draft("level-entry", "1"))}${select("level-endian", "Grid byte order", [["little", "Little endian"], ["big", "Big endian"]], ctx2.draft("level-endian", "little"))}</div><div class="field-row">${field("level-tiles-offset", "Tiles offset", ctx2.draft("level-tiles-offset", "0"))}${field("level-tiles-count", "Tile count", ctx2.draft("level-tiles-count", "16"))}${select("level-codec", "Tile format", Object.entries(codecs2).map(([system2, codec]) => [codec, system2.toUpperCase()]), ctx2.draft("level-codec", codecs2[state2.artifact.system_id] || codecs2.nes))}${field("level-palette-offset", "Palette offset", ctx2.draft("level-palette-offset", "0"))}${select("level-palette-format", "Palette format", [["rgb888", "RGB888"], ["rgb555-le", "RGB555 little endian"], ["rgb555-be", "RGB555 big endian"]], ctx2.draft("level-palette-format", "rgb555-le"))}</div><div class="field-row">${field("level-blocks-offset", "Metatile table offset", ctx2.draft("level-blocks-offset", "0"))}${field("level-blocks-count", "Metatile count", ctx2.draft("level-blocks-count", "16"))}${field("level-block-width", "Tiles per block across", ctx2.draft("level-block-width", "2"))}${field("level-block-height", "Tiles per block down", ctx2.draft("level-block-height", "2"))}${field("level-terrain-offset", "Terrain grid offset", ctx2.draft("level-terrain-offset", "0"))}${field("level-collision-offset", "Collision grid offset (optional)", ctx2.draft("level-collision-offset", ""))}</div>${button("Check declared layout", "levels-declare")}</details>${jsonEditor("level-definition", "Verified layout definition", ctx2.draft("level-definition", JSON.stringify(definition, null, 2)))}<div class="actions">${button("Inspect layout", "levels-inspect")}${button("Save checked definition", "levels-save")}</div></details>`;
     if (!(doc == null ? void 0 : doc.ok)) return heading("", "Levels", "") + empty("No supported level map for this ROM yet", "Inspect the ROM in Resources. A supported map definition is needed before its levels can be shown.", button("Investigate bytes", "navigate", { id: "resources", primary: true })) + setup2 + practiceControls();
     const objects = model.objects(room.id), namedObjects = objects.some((object, index) => !!objectMetadata(doc, room.id, index)), block = Number(ctx2.draft("level-block-index", "0")), uses = doc.uses[String(block)] || [], pending = ((_l = state2.pending) == null ? void 0 : _l.kind) === "levels" && state2.pending.document_id === doc.document_id;
-    return `${heading("", "Levels", "")}${editCheckControls(ctx2)}<div class="identity"><strong>${esc(state2.artifact.name)}</strong><span>${model.values().length} preview changes</span></div><section class="card">${state2.project.demo && ((_m = doc.definition) == null ? void 0 : _m.name) === "Hillside editor-layout workshop" ? '<p class="notice">Practice layout. These room links and object records do not run in Playtest; only Hillside terrain and music do.</p>' : ""}${roomNavigation(doc, model, room.id)}<div class="field-row level-toolbar">${select("level-room", "Room", doc.rooms.map((r) => [r.id, r.name]), room.id)}${select("level-layer", "Paint layer", [["terrain", "Terrain"], ...room.collision ? [["collision", "Collision values"]] : []], layer)}${select("level-tool", "Tool", [["paint", "Paint"], ["pick", "Pick from room"], ["fill", "Fill"], ["select", "Select rectangle"], ["paste", "Paste rectangle"], ...objects.some((o) => Number.isSafeInteger(o.x) && Number.isSafeInteger(o.y)) ? [["objects", "Move object"]] : []], ctx2.draft("level-tool", namedObjects ? "objects" : "paint"))}<details><summary>Advanced brush value</summary>${field("level-brush", "Brush value", ctx2.draft("level-brush", "1"), { type: "number", min: 0 })}</details>${select("level-overlay", "Overlay", [["none", "Terrain only"], ...room.collision ? [["collision", "Collision values"]] : [], ...objects.length ? [["objects", "Named objects"], ["records", "All records (Advanced)"]] : []], ctx2.draft("level-overlay", "objects"))}${select("level-zoom", "Zoom", [["fit", "Fit"], ["1", "1x"], ["2", "2x"], ["3", "3x"]], ctx2.draft("level-zoom", "fit"))}</div><div class="level-brush-panel"><strong>Terrain brushes</strong><p class="subtle">Choose a thumbnail to paint, or use Pick from room to sample an existing cell.</p>${levelBrushPalette(doc, model, ctx2.draft("level-brush", "1"))}</div><div class="level-editor-layout"><div class="level-room-editor"><div class="preview-pair room-comparison"><div><span>Original room</span><div class="hex-scroll"><canvas id="level-original" aria-label="Original declared room"></canvas></div></div><div><span>Editing · highlighted cells changed</span><div class="hex-scroll"><canvas id="level-canvas" tabindex="0" role="application" aria-label="Room editor: arrows select, Space paints"></canvas></div></div></div><p id="level-difference-count" class="preview-caption" role="status" aria-live="polite"></p><p id="level-position">Select an object or choose a terrain brush to begin.</p></div>${objectInspector(ctx2, doc, model, room.id)}</div><div class="actions">${button("Undo stroke", "levels-undo", { disabled: !model.past.length })}${button("Redo stroke", "levels-redo", { disabled: !model.future.length })}${button("Copy rectangle", "levels-copy")}${button("Review level changes", "levels-plan", { primary: !pending, disabled: !model.values().length })}${pending ? button("Create level build", "levels-build", { primary: true }) : ""}</div><p class="subtle">Review changes and create a build to save this in the ROM.</p></section><details class="card"><summary>Metatiles & shared uses</summary><div class="field-row">${field("level-block-index", "Metatile index", ctx2.draft("level-block-index", "0"))}${field("level-block-part", "Part index", ctx2.draft("level-block-part", "0"))}${field("level-block-tile", "Replacement tile index", ctx2.draft("level-block-tile", "1"))}</div>${button("Stage block change", "levels-block")}<p>Selected block is used in ${uses.length} declared cells. Changes affect every use.</p><p>${uses.slice(0, 32).map((u) => esc(u.room_id) + " cell " + u.cell).join(" · ")}</p></details>${setup2}${practiceControls()}${report(state2.results["levels.plan"], "Level review")}${report(state2.results["build.apply"], "Separate build")}`;
+    return `${heading("", "Levels", "")}${editCheckControls(ctx2)}<div class="identity"><strong>${esc(state2.artifact.name)}</strong><span>${model.values().length} preview changes</span></div><section class="card">${state2.project.demo && ((_m = doc.definition) == null ? void 0 : _m.name) === "Hillside editor-layout workshop" ? '<p class="notice">Practice layout. These room links and object records do not run in Playtest; only Hillside terrain and music do.</p>' : ""}${roomNavigation(doc, model, room.id)}<div class="field-row level-toolbar">${select("level-room", "Room", doc.rooms.map((r) => [r.id, r.name]), room.id)}${select("level-layer", "Paint layer", [["terrain", "Terrain"], ...room.collision ? [["collision", "Collision"]] : []], layer)}${select("level-tool", "Tool", [["paint", "Paint"], ["pick", "Pick from room"], ["fill", "Fill"], ["select", "Select rectangle"], ["paste", "Paste rectangle"], ...objects.some((o) => Number.isSafeInteger(o.x) && Number.isSafeInteger(o.y)) ? [["objects", "Move object"]] : []], ctx2.draft("level-tool", namedObjects ? "objects" : "paint"))}<details><summary>Advanced brush value</summary>${field("level-brush", "Brush value", ctx2.draft("level-brush", "1"), { type: "number", min: 0 })}</details>${select("level-overlay", "Overlay", [["none", "No extra overlays"], ...room.collision ? [["collision", "Collision"]] : [], ...objects.length ? [["objects", "Named objects"], ...((_n = room.object_metadata) == null ? void 0 : _n.some((row) => row.hitbox)) ? [["hitboxes", "Starting hitboxes"]] : [], ["records", "All records (Advanced)"]] : []], ctx2.draft("level-overlay", "objects"))}${select("level-zoom", "Zoom", [["fit", "Fit"], ["1", "1x"], ["2", "2x"], ["3", "3x"]], ctx2.draft("level-zoom", "fit"))}</div><div class="level-brush-panel"><strong>${layer === "collision" ? "Collision brushes" : "Terrain brushes"}</strong><p class="subtle">${layer === "collision" ? "Paint where movement is blocked or allowed. Labels come from this layout; raw values have no mapped meaning." : "Choose a thumbnail to paint, or use Pick from room to sample an existing cell."}</p>${layer === "collision" ? collisionPalette(room, model.cells(room.id, "collision"), ctx2.draft("level-brush", "1")) : levelBrushPalette(doc, model, ctx2.draft("level-brush", "1"))}${!room.collision ? '<p class="notice">Collision is not mapped for this room. Terrain changes its appearance; investigate the collision layout to change movement.</p>' : ""}</div><div class="level-editor-layout"><div class="level-room-editor"><div class="preview-pair room-comparison"><div><span>Original room</span><div class="hex-scroll"><canvas id="level-original" aria-label="Original declared room"></canvas></div></div><div><span>Editing · highlighted cells changed</span><div class="hex-scroll"><canvas id="level-canvas" tabindex="0" role="application" aria-label="Room editor: arrows select, Space paints"></canvas></div></div></div><p id="level-difference-count" class="preview-caption" role="status" aria-live="polite"></p><p id="level-position">Select an object or choose a terrain brush to begin.</p></div>${objectInspector(ctx2, doc, model, room.id)}</div><div class="actions">${button("Undo stroke", "levels-undo", { disabled: !model.past.length })}${button("Redo stroke", "levels-redo", { disabled: !model.future.length })}${button("Copy rectangle", "levels-copy")}${button("Review level changes", "levels-plan", { primary: !pending, disabled: !model.values().length })}${pending ? button("Create level build", "levels-build", { primary: true }) : ""}</div><p class="subtle">Review changes and create a build to save this in the ROM.</p></section><details class="card"><summary>Metatiles & shared uses</summary><div class="field-row">${field("level-block-index", "Metatile index", ctx2.draft("level-block-index", "0"))}${field("level-block-part", "Part index", ctx2.draft("level-block-part", "0"))}${field("level-block-tile", "Replacement tile index", ctx2.draft("level-block-tile", "1"))}</div>${button("Stage block change", "levels-block")}<p>Selected block is used in ${uses.length} declared cells. Changes affect every use.</p><p>${uses.slice(0, 32).map((u) => esc(u.room_id) + " cell " + u.cell).join(" · ")}</p></details>${setup2}${practiceControls()}${report(state2.results["levels.plan"], "Level review")}${report(state2.results["build.apply"], "Separate build")}`;
   }
   function mount11(ctx2) {
-    var _a, _b, _c, _d, _e, _f, _g;
+    var _a, _b, _c, _d, _e, _f, _g, _h;
     if (ctx2.state.gameMapRenderScope === selectionKey(ctx2.state)) {
       mountGameMaps(ctx2);
       return;
@@ -9176,6 +9244,13 @@ ${font ? `<section class="card"><h3>Font metrics · ${esc(font.id)}</h3><div cla
     });
     (_g = document.getElementById("level-overlay")) == null ? void 0 : _g.addEventListener("change", (event) => {
       ctx2.setDraft("level-overlay", event.target.value);
+      ctx2.render();
+    });
+    (_h = document.getElementById("level-layer")) == null ? void 0 : _h.addEventListener("change", (event) => {
+      ctx2.setDraft("level-layer", event.target.value);
+      ctx2.setDraft("level-brush", "1");
+      ctx2.setDraft("level-tool", "paint");
+      ctx2.setDraft("level-overlay", event.target.value === "collision" ? "collision" : "objects");
       ctx2.render();
     });
     mountLevel(ctx2, doc, model, id, persist);
@@ -9278,11 +9353,25 @@ ${font ? `<section class="card"><h3>Font metrics · ${esc(font.id)}</h3><div cla
     }
     c.stroke();
   }
+  function sameOperand(song, change, index, field2) {
+    var _a, _b, _c, _d;
+    if (change.kind !== "note" || change.song_id !== song.id || change.field !== field2) return false;
+    if (change.index === index) return true;
+    const offset = (_b = (_a = song.events[index]) == null ? void 0 : _a.edit_offsets) == null ? void 0 : _b[field2];
+    return song.driver === "wl4-m4a-v1" && Number.isSafeInteger(offset) && ((_d = (_c = song.events[change.index]) == null ? void 0 : _c.edit_offsets) == null ? void 0 : _d[field2]) === offset;
+  }
+  function soundEventValue(song, changes, index, field2) {
+    var _a;
+    return ((_a = changes.find((change) => sameOperand(song, change, index, field2))) == null ? void 0 : _a.value) ?? song.events[index][field2];
+  }
   function stageNote(doc, changes, songId, index, field2, value) {
-    const song = doc.songs.find((s) => s.id === songId), bounds2 = { note: [33, 108], duration: [1, 6e3], volume: [0, 127] };
+    var _a, _b;
+    const song = doc.songs.find((s) => s.id === songId), bounds2 = (song == null ? void 0 : song.driver) === "wl4-m4a-v1" ? { note: [0, 127], volume: [0, 127], channel_volume: [0, 127], tempo: [1, 127] } : { note: [33, 108], duration: [1, 6e3], volume: [0, 127] };
+    if ((song == null ? void 0 : song.driver) === "wl4-m4a-v1" && (!song.sequence_edit_supported || !((_b = (_a = song.events[index]) == null ? void 0 : _a.editable_fields) == null ? void 0 : _b.includes(field2)))) throw Error("This value is inherited, protected or read-only. Choose an explicit editable event.");
     if (!song || !Number.isInteger(index) || index < 0 || index >= song.events.length || !bounds2[field2] || !Number.isInteger(value) || value < bounds2[field2][0] || value > bounds2[field2][1]) throw Error("Choose a supported song field and an in-range value.");
-    const result = changes.filter((c) => !(c.kind === "note" && c.song_id === songId && c.index === index && c.field === field2));
+    const result = changes.filter((change) => !sameOperand(song, change, index, field2));
     if (value !== song.events[index][field2]) result.push({ kind: "note", song_id: songId, index, field: field2, value });
+    if (result.length > 256) throw Error("Review at most256 sound changes. Create a build before staging more.");
     return result;
   }
   function restoreSoundChanges(doc, encoded) {
@@ -9297,6 +9386,8 @@ ${font ? `<section class="card"><h3>Font metrics · ${esc(font.id)}</h3><div cla
       const key3 = JSON.stringify([c.kind, c.song_id ?? c.sample_id, c.index, c.field]);
       if (seen.has(key3)) throw Error("Saved audio edits contain duplicate changes.");
       seen.add(key3);
+      const song = c.kind === "note" ? doc.songs.find((song2) => song2.id === c.song_id) : null;
+      if ((song == null ? void 0 : song.driver) === "wl4-m4a-v1" && result.some((change) => sameOperand(song, change, c.index, c.field))) throw Error("Saved audio edits contain duplicate shared-pattern changes.");
       if (c.kind === "note") result = stageNote(doc, result, c.song_id, c.index, c.field, c.value);
       else if (c.kind === "sample") {
         if (!doc.samples.some((s) => s.id === c.sample_id) || !["gain", "reverse", "silence", "replace_wav"].includes(c.operation)) throw Error("Saved audio edits reference an unsupported sample.");
@@ -9310,6 +9401,72 @@ ${font ? `<section class="card"><h3>Font metrics · ${esc(font.id)}</h3><div cla
       } else throw Error("Saved audio edits contain an unsupported change.");
     }
     return result;
+  }
+
+  // romancer/ui/music_sequence.js
+  function sequenceNotes(song, changes) {
+    let tick = 0;
+    return song.events.flatMap((event, index) => {
+      const staged = (field2) => soundEventValue(song, changes, index, field2), start = event.tick ?? tick, duration = staged("duration");
+      if (event.tick === void 0) tick += duration;
+      return event.kind && event.kind !== "note" ? [] : [{ index, tick: start, duration: Math.max(1, duration), note: staged("note"), original_note: event.note, channel: event.channel ?? 0, volume: staged("volume") }];
+    });
+  }
+  function mountMusicSequence(ctx2, song, changes) {
+    const canvas = document.getElementById("music-note-canvas");
+    if (!canvas || !song) return;
+    const notes = sequenceNotes(song, changes);
+    if (!notes.length) return;
+    const c = canvas.getContext("2d"), width = canvas.width, height = canvas.height, first = Math.max(0, Math.min(...notes.map((n) => Math.min(n.note, n.original_note))) - 2), last = Math.min(127, Math.max(...notes.map((n) => Math.max(n.note, n.original_note))) + 2), range = Math.max(1, last - first + 1), end = Math.max(1, ...notes.map((n) => n.tick + n.duration)), keyHeight = (height - 36) / range;
+    const rect = (note) => ({ x: 48 + note.tick / end * (width - 60), y: 10 + (last - note.note) * keyHeight, w: Math.max(3, note.duration / end * (width - 60)), h: Math.max(2, keyHeight - 1) });
+    c.fillStyle = "#0b151d";
+    c.fillRect(0, 0, width, height);
+    c.font = "12px sans-serif";
+    for (let key3 = first; key3 <= last; key3++) {
+      const y = 10 + (last - key3) * keyHeight;
+      c.strokeStyle = key3 % 12 === 0 ? "#637a86" : "#263e49";
+      c.beginPath();
+      c.moveTo(44, y);
+      c.lineTo(width - 8, y);
+      c.stroke();
+      if (key3 % 12 === 0 || range < 16) {
+        c.fillStyle = "#d6e5e8";
+        c.fillText(String(key3), 8, y + keyHeight * 0.7);
+      }
+    }
+    for (const note of notes) {
+      const r = rect(note);
+      c.fillStyle = note.note !== note.original_note ? "#ffcb63" : ["#73d7ba", "#8ec9f2", "#c4aff5", "#f1a3b7"][note.channel % 4];
+      c.fillRect(r.x, r.y, r.w, r.h);
+      if (note.note !== note.original_note) {
+        const old = rect({ ...note, note: note.original_note });
+        c.strokeStyle = "#ffcb63";
+        c.strokeRect(old.x, old.y, old.w, old.h);
+      }
+    }
+    c.fillStyle = "#d6e5e8";
+    c.fillText("Time →", 48, height - 8);
+    canvas.addEventListener("click", (event) => {
+      var _a;
+      if (document.getElementById("music-note-canvas") !== canvas) return;
+      const bounds2 = canvas.getBoundingClientRect(), x = (event.clientX - bounds2.left) / bounds2.width * width, y = (event.clientY - bounds2.top) / bounds2.height * height, note = [...notes].reverse().find((n) => {
+        const r = rect(n);
+        return x >= r.x && x <= r.x + r.w && y >= r.y && y <= r.y + r.h;
+      });
+      if (!note) return;
+      ctx2.setDraft("sound-event", String(note.index));
+      ctx2.setDraft("sound-note-field", ((_a = song.events[note.index].editable_fields) == null ? void 0 : _a.includes("note")) === false ? song.events[note.index].editable_fields[0] || "note" : "note");
+      ctx2.setDraft("sound-note-value", "");
+      ctx2.render();
+    });
+  }
+  function musicSequenceControls(ctx2, song, changes) {
+    var _a;
+    const m4a = song.driver === "wl4-m4a-v1", index = Math.min(Math.max(0, Number(ctx2.draft("sound-event", "0")) || 0), song.events.length - 1), event = song.events[index];
+    const labels2 = { note: "Note number", duration: "Duration ticks", volume: m4a ? "Note velocity" : "Volume", channel_volume: "Channel volume", tempo: "Tempo value (BPM ÷2)" };
+    const editable = m4a ? (event == null ? void 0 : event.editable_fields) || [] : ["note", "duration", "volume"], choice = ctx2.draft("sound-note-field", "note"), name = editable.includes(choice) ? choice : editable[0];
+    const events = m4a ? select("sound-event", "Event", song.events.map((e, i) => [i, "Track " + (e.channel + 1) + " · tick " + e.tick + " · " + e.kind + " · #" + i]), index) : field("sound-event", "Event index", ctx2.draft("sound-event", "0"));
+    return `<p>${esc(song.driver_scope)}</p>${((_a = song.issues) == null ? void 0 : _a.length) ? `<p class="notice">Read-only: ${song.issues.map(esc).join(" ")}</p>` : ""}<canvas id="music-note-canvas" class="music-note-canvas" width="1000" height="220" aria-label="Decoded notes: time increases to the right, pitch increases upward. Use Event to select a note."></canvas><p class="subtle">Click a note or choose Event. Yellow marks changed notes; outlined notes show the original pitch.</p><div class="field-row">${events}${select("sound-note-field", "Field", editable.map((name2) => [name2, labels2[name2]]), name)}${field("sound-note-value", "New value", ctx2.draft("sound-note-value", "") || String(event ? soundEventValue(song, changes, index, name) ?? 64 : 64))}</div>${button("Stage note edit", "sound-note-stage", { disabled: m4a && (!song.sequence_edit_supported || !editable.length), reason: "This song or event is read-only." })}${!m4a ? `<div class="field-row">${field("sound-transpose", "Transpose semitones", ctx2.draft("sound-transpose", "0"))}</div>${button("Transpose song", "sound-transpose")}` : ""}${button("Preview song & edits", "sound-song-preview", { primary: true })}<div class="table-wrap" tabindex="0" role="region" aria-label="Decoded music events"><table><thead><tr><th>Event</th>${m4a ? "<th>Track / tick</th><th>Type</th>" : ""}<th>Note</th><th>Ticks</th><th>Volume</th></tr></thead><tbody>${song.events.slice(0, 160).map((event2, index2) => `<tr><td>${index2}</td>${m4a ? `<td>${event2.channel + 1} / ${event2.tick}</td><td>${esc(event2.kind)}</td>` : ""}${["note", "duration", "volume"].map((field2) => `<td>${esc(soundEventValue(song, changes, index2, field2) ?? "—")}</td>`).join("")}</tr>`).join("")}</tbody></table></div>${song.events.length > 160 ? "<p>Showing160 events. Use Event above to select any decoded event.</p>" : ""}`;
   }
 
   // romancer/ui/views/sound.js
@@ -9362,7 +9519,7 @@ ${font ? `<section class="card"><h3>Font metrics · ${esc(font.id)}</h3><div cla
     if (ownsPreview(ctx2, owned)) await ctx2.render();
   }
   async function render16(ctx2) {
-    var _a, _b, _c, _d;
+    var _a, _b, _c, _d, _e;
     const setupReview = useResearchSetup(ctx2, "sound");
     if (setupReview) return setupReview;
     const { state: state2 } = ctx2;
@@ -9375,6 +9532,11 @@ ${font ? `<section class="card"><h3>Font metrics · ${esc(font.id)}</h3><div cla
     if (!doc && (saved == null ? void 0 : saved.source_sha256) === state2.artifact.sha256) {
       doc = await ctx2.api.call("sound.inspect", { ...params, definition: saved });
       if (!current2() || ((_c = ctx2.isCurrentRender) == null ? void 0 : _c.call(ctx2)) === false) return "";
+      state2.results["sound.inspect"] = doc;
+    }
+    if (!doc && system2.known_definition) {
+      doc = await ctx2.api.call("sound.inspect", { ...params, definition: system2.known_definition });
+      if (!current2() || ((_d = ctx2.isCurrentRender) == null ? void 0 : _d.call(ctx2)) === false) return "";
       state2.results["sound.inspect"] = doc;
     }
     let changes = [], draftError = "";
@@ -9431,7 +9593,7 @@ ${font ? `<section class="card"><h3>Font metrics · ${esc(font.id)}</h3><div cla
       },
       "sound-transpose": () => {
         var _a2;
-        if (!song) throw Error("No supported music driver is identified.");
+        if (!song || song.driver === "wl4-m4a-v1") throw Error("Shared M4A patterns require individual explicit edits.");
         const shift = Number(read("sound-transpose"));
         if (!Number.isInteger(shift) || Math.abs(shift) > 24) throw Error("Transpose by at most24semitones.");
         let next = changes;
@@ -9494,15 +9656,12 @@ ${font ? `<section class="card"><h3>Font metrics · ${esc(font.id)}</h3><div cla
         return ctx2.render();
       }
     });
-    const hardware = system2.hardware, driver = system2.driver, packet = visiblePreview(ctx2), previewRequest = ownsPreview(ctx2, state2.soundPreviewRequest) ? state2.soundPreviewRequest : null, pending = ((_d = state2.pending) == null ? void 0 : _d.kind) === "sound" && state2.pending.document_id === (doc == null ? void 0 : doc.document_id);
+    const hardware = system2.hardware, driver = system2.driver, packet = visiblePreview(ctx2), previewRequest = ownsPreview(ctx2, state2.soundPreviewRequest) ? state2.soundPreviewRequest : null, pending = ((_e = state2.pending) == null ? void 0 : _e.kind) === "sound" && state2.pending.document_id === (doc == null ? void 0 : doc.document_id);
     const setup2 = `<details class="card" ${!doc ? "open" : ""}><summary>Supported sample setup</summary><p>Use a verified sample offset and allocation. A valid codec does not identify a sample's location, rate, loop or instrument.</p><div class="field-row">${field("sound-name", "Sample name", ctx2.draft("sound-name", "Sample"))}${field("sound-offset", "File offset", ctx2.draft("sound-offset", "0"))}${field("sound-length", "Allocated bytes", ctx2.draft("sound-length", "16"))}${select("sound-codec", "Sample format", Object.entries(codecNames), ctx2.draft("sound-codec", hardware.sample_formats[0]))}${field("sound-rate", "Preview sample rate (Hz)", ctx2.draft("sound-rate", "16000"))}${field("sound-initial", "DPCM initial level", ctx2.draft("sound-initial", "64"))}</div>${button("Check declared sample", "sound-declare")}${jsonEditor("sound-definition", "Source-bound sound definition", ctx2.draft("sound-definition", JSON.stringify((doc == null ? void 0 : doc.definition) || saved || {}, null, 2)))}<div class="actions">${button("Inspect definition", "sound-inspect")}${button("Save checked definition", "sound-save")}</div></details>`;
-    return `${heading("", "Music & sound", "")}${editCheckControls(ctx2)}<div class="identity"><strong>${esc(state2.artifact.name)}</strong><span>${changes.length} staged changes</span></div>${draftError ? `<p class="notice warm">${esc(draftError)} ${button("Discard saved audio edits", "sound-discard")}</p>` : ""}<div class="grid-two"><section class="card"><h3>${esc(hardware.name)}</h3><p>${hardware.channels.map(esc).join(" · ")}</p><p><strong>Music driver: ${esc(driver.name)}</strong></p><p>${esc(driver.status === "UNKNOWN" ? "Unknown driver: sequence editing unavailable." : driver.evidence)}</p><details><summary>Hardware and driver references</summary><p>${esc(hardware.notes)}</p>${[...hardware.references, ...driver.reference ? [driver.reference] : []].map((url) => `<p><a href="${esc(url)}" target="_blank" rel="noopener noreferrer">${esc(new URL(url).hostname)} reference</a></p>`).join("")}</details></section><section class="card"><h3>Native game audio</h3><p>Load this source in Playtest, reach the music or sound you want, then record its mixed output here.</p>${field("sound-frames", "Frames to record (1–300)", ctx2.draft("sound-frames", "120"), { type: "number", min: 1 })}${button("Record native preview", "sound-capture", { primary: !doc, disabled: !state2.runtime || state2.runtime.game_sha256 !== state2.artifact.sha256 })}${button("Open Playtest", "navigate", { id: "playtest" })}</section></div>${(previewRequest == null ? void 0 : previewRequest.status) === "loading" ? '<section class="card"><p class="preview-caption" role="status">Decoding original and edited audio…</p></section>' : (previewRequest == null ? void 0 : previewRequest.status) === "error" ? `<section class="card"><p class="error" role="status">Preview unavailable: ${esc(previewRequest.message)}</p></section>` : ""}${packet ? `<section class="card"><h3>Audio preview</h3>${packet.comparison ? `<div class="preview-pair"><div><span>Original</span><canvas id="original-waveform" width="720" height="140" style="display:block;width:100%;height:auto" aria-label="Original decoded audio waveform"></canvas></div><div><span>Edited</span><canvas id="edited-waveform" width="720" height="140" style="display:block;width:100%;height:auto" aria-label="Edited decoded audio waveform"></canvas></div></div><p class="preview-caption" role="status">${packet.comparison.changed ? "Preview updated · decoded audio changed · not built" : "Unchanged decoded audio preview"} · ${packet.kind === "sample" ? "Sample" : "Song reference"} · ${esc(packet.resource_id)}</p>` : ""}<audio id="sound-player" controls preload="metadata" aria-label="Sound preview play, pause and seek"></audio><div class="actions">${button("Toggle loop", "sound-loop")}${button("Save preview WAV", "sound-export-preview")}</div><p>${esc(packet.preview_scope)}${packet.truncated ? " Preview shortened to20seconds." : ""}</p><p>${packet.sample_frames} frames · ${packet.sample_rate}Hz${packet.channels ? " · " + packet.channels + " channels" : ""}</p></section>` : ""}${doc ? `<div class="grid-two"><section class="card"><h3>Samples</h3>${sample ? `${select("sound-sample", "Sample", doc.samples.map((s) => [s.id, s.name]), sample.id)}<span>Original sample</span><canvas id="sample-waveform" width="720" height="140" aria-label="Original decoded sample waveform"></canvas><p>${sample.sample_count} samples · ${sample.duration_seconds.toFixed(3)}s · ${esc(sample.codec)}</p><div class="field-row">${select("sound-operation", "Edit", [["gain", "Set gain"], ["reverse", "Reverse"], ["silence", "Silence target"], ["replace_wav", "Replace from WAV"]], ctx2.draft("sound-operation", "gain"))}${field("sound-gain", "Gain (%)", ctx2.draft("sound-gain", "100"))}</div><label class="field"><span>Replacement PCM WAV, up to2MiB</span><input type="file" id="sound-wav" accept=".wav,audio/wav"></label><div class="actions">${button("Stage sample edit", "sound-sample-stage")}${button("Preview sample & edits", "sound-sample-preview", { primary: true })}</div><p>${sample.encoding_lossy ? "Re-encoding is lossy; preview and native-test the resulting build." : "Edits preserve the declared byte allocation."}</p>` : "<p>No sample storage declared.</p>"}</section><section class="card"><h3>Music sequences</h3>${song ? `${select("sound-song", "Identified song", doc.songs.map((s) => [s.id, s.name]), song.id)}<p>${esc(song.driver_scope)}</p><div class="field-row">${field("sound-event", "Event index", ctx2.draft("sound-event", "0"))}${select("sound-note-field", "Field", [["note", "Note number"], ["duration", "Duration ticks"], ["volume", "Volume"]], ctx2.draft("sound-note-field", "note"))}${field("sound-note-value", "New value", ctx2.draft("sound-note-value", "64"))}</div>${button("Stage note edit", "sound-note-stage")}<div class="field-row">${field("sound-transpose", "Transpose semitones", ctx2.draft("sound-transpose", "0"))}</div>${button("Transpose song", "sound-transpose")}${button("Preview song & edits", "sound-song-preview", { primary: true })}<div class="table-wrap"><table><thead><tr><th>Event</th><th>Note</th><th>Ticks</th><th>Volume</th></tr></thead><tbody>${song.events.map((event, index) => `<tr><td>${index}</td>${["note", "duration", "volume"].map((field2) => {
-      var _a2;
-      return `<td>${esc(((_a2 = changes.find((c) => c.kind === "note" && c.song_id === song.id && c.index === index && c.field === field2)) == null ? void 0 : _a2.value) ?? event[field2])}</td>`;
-    }).join("")}</tr>`).join("")}</tbody></table></div>` : "<p>No supported sequence driver is identified. Native music recording and supported sample formats remain available.</p>"}</section></div><section class="card"><div class="actions">${button("Review sound changes", "sound-plan", { primary: !pending, disabled: !changes.length })}${pending ? button("Create sound build", "sound-build", { primary: true }) : ""}${button("Discard sound edits", "sound-discard", { disabled: !changes.length })}</div></section>` : ""}${setup2}${report(state2.results["sound.plan"], "Sound review")}`;
+    return `${heading("", "Music & sound", "")}${editCheckControls(ctx2)}<div class="identity"><strong>${esc(state2.artifact.name)}</strong><span>${changes.length} staged changes</span></div>${draftError ? `<p class="notice warm">${esc(draftError)} ${button("Discard saved audio edits", "sound-discard")}</p>` : ""}<div class="grid-two"><section class="card"><h3>${esc(hardware.name)}</h3><p>${hardware.channels.map(esc).join(" · ")}</p><p><strong>Music driver: ${esc(driver.name)}</strong></p><p>${esc(driver.status === "UNKNOWN" ? "Unknown driver: sequence editing unavailable." : driver.evidence)}</p><details><summary>Hardware and driver references</summary><p>${esc(hardware.notes)}</p>${[...hardware.references, ...driver.reference ? [driver.reference] : []].map((url) => `<p><a href="${esc(url)}" target="_blank" rel="noopener noreferrer">${esc(new URL(url).hostname)} reference</a></p>`).join("")}</details></section><section class="card"><h3>Native game audio</h3><p>Load this source in Playtest, reach the music or sound you want, then record its mixed output here.</p>${field("sound-frames", "Frames to record (1–300)", ctx2.draft("sound-frames", "120"), { type: "number", min: 1 })}${button("Record native preview", "sound-capture", { primary: !doc, disabled: !state2.runtime || state2.runtime.game_sha256 !== state2.artifact.sha256 })}${button("Open Playtest", "navigate", { id: "playtest" })}</section></div>${(previewRequest == null ? void 0 : previewRequest.status) === "loading" ? '<section class="card"><p class="preview-caption" role="status">Decoding original and edited audio…</p></section>' : (previewRequest == null ? void 0 : previewRequest.status) === "error" ? `<section class="card"><p class="error" role="status">Preview unavailable: ${esc(previewRequest.message)}</p></section>` : ""}${packet ? `<section class="card"><h3>Audio preview</h3>${packet.comparison ? `<div class="preview-pair"><div><span>Original</span><canvas id="original-waveform" width="720" height="140" style="display:block;width:100%;height:auto" aria-label="Original decoded audio waveform"></canvas></div><div><span>Edited</span><canvas id="edited-waveform" width="720" height="140" style="display:block;width:100%;height:auto" aria-label="Edited decoded audio waveform"></canvas></div></div><p class="preview-caption" role="status">${packet.comparison.changed ? "Preview updated · decoded audio changed · not built" : "Unchanged decoded audio preview"} · ${packet.kind === "sample" ? "Sample" : "Song reference"} · ${esc(packet.resource_id)}</p>` : ""}<audio id="sound-player" controls preload="metadata" aria-label="Sound preview play, pause and seek"></audio><div class="actions">${button("Toggle loop", "sound-loop")}${button("Save preview WAV", "sound-export-preview")}</div><p>${esc(packet.preview_scope)}${packet.truncated ? " Preview shortened to20seconds." : ""}</p><p>${packet.sample_frames} frames · ${packet.sample_rate}Hz${packet.channels ? " · " + packet.channels + " channels" : ""}</p></section>` : ""}${doc ? `<div class="grid-two ${doc.samples.length ? "" : "sound-song-only"}"><section class="card"><h3>Samples</h3>${sample ? `${select("sound-sample", "Sample", doc.samples.map((s) => [s.id, s.name]), sample.id)}<span>Original sample</span><canvas id="sample-waveform" width="720" height="140" aria-label="Original decoded sample waveform"></canvas><p>${sample.sample_count} samples · ${sample.duration_seconds.toFixed(3)}s · ${esc(sample.codec)}</p><div class="field-row">${select("sound-operation", "Edit", [["gain", "Set gain"], ["reverse", "Reverse"], ["silence", "Silence target"], ["replace_wav", "Replace from WAV"]], ctx2.draft("sound-operation", "gain"))}${field("sound-gain", "Gain (%)", ctx2.draft("sound-gain", "100"))}</div><label class="field"><span>Replacement PCM WAV, up to2MiB</span><input type="file" id="sound-wav" accept=".wav,audio/wav"></label><div class="actions">${button("Stage sample edit", "sound-sample-stage")}${button("Preview sample & edits", "sound-sample-preview", { primary: true })}</div><p>${sample.encoding_lossy ? "Re-encoding is lossy; preview and native-test the resulting build." : "Edits preserve the declared byte allocation."}</p>` : "<p>No sample storage declared.</p>"}</section><section class="card"><h3>Music sequences</h3>${song ? `${select("sound-song", "Identified song", doc.songs.map((s) => [s.id, s.name]), song.id)}${musicSequenceControls(ctx2, song, changes)}` : "<p>No supported sequence driver is identified. Native music recording and supported sample formats remain available.</p>"}</section></div><section class="card"><div class="actions">${button("Review sound changes", "sound-plan", { primary: !pending, disabled: !changes.length })}${pending ? button("Create sound build", "sound-build", { primary: true }) : ""}${button("Discard sound edits", "sound-discard", { disabled: !changes.length })}</div></section>` : ""}${setup2}${report(state2.results["sound.plan"], "Sound review")}`;
   }
   function mount12(ctx2) {
-    var _a, _b;
+    var _a, _b, _c, _d;
     const packet = visiblePreview(ctx2);
     (_a = ctx2.state.soundPlayer) == null ? void 0 : _a.close();
     ctx2.state.soundPlayer = null;
@@ -9517,12 +9676,29 @@ ${font ? `<section class="card"><h3>Font metrics · ${esc(font.id)}</h3><div cla
         drawWaveform(document.getElementById("edited-waveform"), packet.comparison.edited.peaks);
       }
     }
+    for (const id of ["sound-event", "sound-note-field"]) (_c = (_b = document.getElementById(id)) == null ? void 0 : _b.addEventListener) == null ? void 0 : _c.call(_b, "change", (event) => {
+      ctx2.setDraft(id, event.target.value);
+      ctx2.setDraft("sound-note-value", "");
+      ctx2.render();
+    });
     const doc = ctx2.state.results["sound.inspect"], sample = doc == null ? void 0 : doc.samples.find((s) => {
       var _a2;
       return s.id === ((_a2 = document.getElementById("sound-sample")) == null ? void 0 : _a2.value);
     });
     if (sample) drawWaveform(document.getElementById("sample-waveform"), sample.peaks || []);
-    for (const [id, kind] of [["sound-sample", "sample"], ["sound-song", "song"]]) (_b = document.getElementById(id)) == null ? void 0 : _b.addEventListener("change", (event) => {
+    const song = doc == null ? void 0 : doc.songs.find((s) => {
+      var _a2;
+      return s.id === ((_a2 = document.getElementById("sound-song")) == null ? void 0 : _a2.value);
+    });
+    if (song) {
+      let changes = [];
+      try {
+        changes = restoreSoundChanges(doc, ctx2.draft("sound-changes", "{}"));
+      } catch {
+      }
+      mountMusicSequence(ctx2, song, changes);
+    }
+    for (const [id, kind] of [["sound-sample", "sample"], ["sound-song", "song"]]) (_d = document.getElementById(id)) == null ? void 0 : _d.addEventListener("change", (event) => {
       ctx2.setDraft(id, event.target.value);
       previewSound(ctx2, doc, kind, event.target.value).catch((error) => ctx2.notify(error.message, true));
     });

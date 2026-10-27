@@ -3,6 +3,7 @@ import hashlib
 from .asset_schema import fields,number,label
 from .asset_codecs import cell_size,decode_cell,CODECS
 from .script_schema import canonical_bytes
+from .level_semantics import collision_types,validate_hitbox,validate_changed_hitboxes,validate_sprite
 
 
 def _identity(raw,definition,source_sha256):
@@ -15,16 +16,18 @@ def object_maximum(field,room,room_count):
     return min(field['maximum'],room['width']-1 if field['name']=='x' else room['height']-1 if field['name']=='y' else room_count-1 if field['name']=='exit_room' else field['maximum'])
 
 
-def _connections(rooms,definitions):
+def _connections(rooms,definitions,tile_count,color_count):
     """Explicit editor annotations describe references, never runtime behavior."""
     room_ids={room['id'] for room in rooms};connections=[]
     for room,definition in zip(rooms,definitions):
         metadata=definition.get('object_metadata',[]);storage=definition['objects'];seen=set()
         if type(metadata) is not list or len(metadata)>256:raise ValueError('declare at most 256 object metadata entries per room')
         for entry in metadata:
-            fields(entry,'index name role reference');number(entry['index'],0,len(room['objects'])-1);label(entry['name'])
+            fields(entry,'index name role reference'+''.join(' '+key for key in ('hitbox','sprite') if type(entry) is dict and key in entry));number(entry['index'],0,len(room['objects'])-1);label(entry['name'])
             if entry['index'] in seen:raise ValueError('duplicate object metadata slot')
             seen.add(entry['index'])
+            validate_hitbox(entry,storage,room['objects'][entry['index']])
+            validate_sprite(entry,tile_count,color_count)
             if entry['role'] not in ('object','actor','start','exit','trigger'):raise ValueError('unknown declared object role')
             reference=entry['reference']
             if entry['role']!='exit':
@@ -51,6 +54,8 @@ def _connections(rooms,definitions):
 
 def inspect_level(raw,definition,source_sha256):
     _identity(raw,definition,source_sha256)
+    from .studio_runtime import validate_studio_data
+    validate_studio_data(raw)
     d=__import__('json').loads(canonical_bytes(definition,max_bytes=256*1024))
     fields(d,'schema_version source_sha256 name tiles metatiles rooms');number(d['schema_version'],1,1);label(d['name'])
     ranges=[]
@@ -83,7 +88,7 @@ def inspect_level(raw,definition,source_sha256):
     if type(d['rooms']) is not list or not 1<=len(d['rooms'])<=32:raise ValueError('declare 1 to 32 rooms')
     rooms=[];ids=set();uses={str(i):[] for i in range(m['count'])};total=0
     for r in d['rooms']:
-        fields(r,'id name width height terrain collision objects'+(' object_metadata' if type(r) is dict and 'object_metadata' in r else ''));label(r['id']);label(r['name'])
+        fields(r,'id name width height terrain collision objects'+''.join(' '+key for key in ('object_metadata','collision_types') if type(r) is dict and key in r));label(r['id']);label(r['name'])
         if r['id'] in ids:raise ValueError('duplicate room ID')
         ids.add(r['id']);number(r['width'],1,128);number(r['height'],1,128);count=r['width']*r['height'];total+=count
         if total>32768 or count*parts*64>4*1024**2:raise ValueError('level preview exceeds pixel budget')
@@ -96,7 +101,7 @@ def inspect_level(raw,definition,source_sha256):
             if type(o['fields']) is not list or not 1<=len(o['fields'])<=16:raise ValueError('invalid object fields')
             used=set();names=set()
             for f in o['fields']:
-                fields(f,'name offset bytes endian maximum');label(f['name']);number(f['offset'],0,o['stride']-1);number(f['bytes'],1,2);number(f['maximum'],0,(1<<(8*f['bytes']))-1)
+                fields(f,'name offset bytes endian maximum'+(' minimum' if type(f) is dict and 'minimum' in f else ''));label(f['name']);number(f['offset'],0,o['stride']-1);number(f['bytes'],1,2);number(f['maximum'],0,(1<<(8*f['bytes']))-1);number(f.get('minimum',0),0,f['maximum'])
                 if f['endian'] not in ('little','big') or f['offset']+f['bytes']>o['stride']:raise ValueError('object field exceeds record')
                 span=set(range(f['offset'],f['offset']+f['bytes']))
                 if span&used or f['name'] in names:raise ValueError('object fields overlap or duplicate')
@@ -106,11 +111,11 @@ def inspect_level(raw,definition,source_sha256):
                 for f in o['fields']:
                     at=o['offset']+index*o['stride']+f['offset'];value=int.from_bytes(raw[at:at+f['bytes']],f['endian'])
                     maximum=object_maximum(f,r,len(d['rooms']))
-                    number(value,0,maximum);obj[f['name']]=value
+                    number(value,f.get('minimum',0),maximum);obj[f['name']]=value
                 objects.append(obj)
         for i,value in enumerate(terrain):uses[str(value)].append({'room_id':r['id'],'cell':i})
-        rooms.append({'id':r['id'],'name':r['name'],'width':r['width'],'height':r['height'],'terrain':terrain,'collision':collision,'objects':objects})
-    connections=_connections(rooms,d['rooms'])
+        rooms.append({'id':r['id'],'name':r['name'],'width':r['width'],'height':r['height'],'terrain':terrain,'collision':collision,'collision_types':collision_types(r),'objects':objects})
+    connections=_connections(rooms,d['rooms'],len(tiles),colors)
     document_id=hashlib.sha256(canonical_bytes(d,max_bytes=256*1024)).hexdigest()
     result={'ok':True,'document_id':document_id,'source_sha256':source_sha256,'definition':d,'tiles':tiles,'palette':palette,'metatiles':blocks,'block_width':m['width'],'block_height':m['height'],'rooms':rooms,'connections':connections,'uses':uses,'ranges':[{'offset':a,'length':b-a,'name':name} for a,b,name in ranges],'game_semantics_verified':False}
     try:canonical_bytes(result,max_bytes=2*1024**2)
@@ -142,7 +147,7 @@ def plan_level(raw,definition,document_id,changes,source_sha256):
                 maximum=object_maximum(f,r,len(d['rooms']))
                 metadata=next((entry for entry in r.get('object_metadata',[]) if entry['index']==change['index']),None)
                 if metadata and metadata['role']=='exit' and metadata['reference']['field']==f['name'] and change['value'] not in [target['value'] for target in metadata['reference']['targets']]:raise ValueError('exit destination is not mapped')
-                number(change['value'],0,maximum);offset=o['offset']+change['index']*o['stride']+f['offset'];width=f['bytes'];endian=f['endian']
+                number(change['value'],f.get('minimum',0),maximum);offset=o['offset']+change['index']*o['stride']+f['offset'];width=f['bytes'];endian=f['endian']
             else:
                 fields(change,'kind room_id index value');number(change['index'],0,r['width']*r['height']-1);g=r[kind]
                 if g is None:raise ValueError('collision is not declared')
@@ -153,4 +158,9 @@ def plan_level(raw,definition,document_id,changes,source_sha256):
         seen.add(key);after=change['value'].to_bytes(width,endian);before=raw[offset:offset+width]
         if before!=after:writes[offset]={'offset':offset,'before':before.hex(),'after':after.hex()}
     if not writes:raise ValueError('no changed level bytes')
+    shadow=bytearray(raw)
+    for change in writes.values():shadow[change['offset']:change['offset']+len(bytes.fromhex(change['after']))]=bytes.fromhex(change['after'])
+    validate_changed_hitboxes(shadow,d['rooms'])
+    from .studio_runtime import validate_studio_data
+    validate_studio_data(bytes(shadow))
     return {'ok':True,'edits':[writes[k] for k in sorted(writes)],'affected_rooms':sorted(affected),'document_id':document_id,'source_sha256':source_sha256}

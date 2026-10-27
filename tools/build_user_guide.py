@@ -194,7 +194,8 @@ def build_pdf(data, folder, pages, glossary_groups, index_groups):
 
     def para(text, x, y, column_width, size=18, color=ink):
         # Body content uses the same small markup vocabulary in both editions.
-        text = re.sub(r'<a href="#([^"]+)">', r'<link href="#\1" color="' + accent + '">', text).replace('</a>', '</link>')
+        from tools.compact_guide import pdf_links
+        text = pdf_links(text,accent)
         style = ParagraphStyle('p', parent=body, fontSize=size, leading=size * 1.42, textColor=HexColor(color), linkUnderline=True)
         item = Paragraph(text, style)
         _, used = item.wrap(column_width, 2000)

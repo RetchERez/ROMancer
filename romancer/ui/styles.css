@@ -161,6 +161,8 @@ main,.scaled-compact main,.scaled-narrow main{padding:20px clamp(18px,1.5vw,28px
 .level-brush-panel{margin:12px 0}.level-brush-palette{display:grid;grid-template-columns:repeat(auto-fill,minmax(52px,1fr));gap:6px;max-height:240px;overflow:auto}
 .level-brush-palette button{display:flex;flex-direction:column;align-items:center;gap:3px;padding:6px}.level-brush-palette canvas{width:32px;height:32px;image-rendering:pixelated}
 .level-brush-palette button[aria-pressed=true]{border-color:var(--accent);outline:1px solid var(--accent)}
+.level-collision-palette{display:flex;gap:8px;flex-wrap:wrap}.level-collision-palette button{display:grid;grid-template-columns:24px auto;gap:4px 8px;align-items:center;text-align:left;min-height:48px}.level-collision-palette button>span:last-child{grid-column:2;color:var(--muted)}.collision-swatch{width:22px;height:22px;border:1px solid var(--text);border-radius:4px;grid-row:span 2}.level-collision-palette button[aria-pressed=true]{outline:2px solid var(--accent);outline-offset:2px}
+.sound-song-only{display:block}.sound-song-only>section:first-child{display:none}.music-note-canvas{display:block;width:100%;height:auto;min-height:140px;border:1px solid var(--line);border-radius:6px;margin:12px 0}.sound-song-only .table-wrap{max-height:320px;overflow:auto}
 @media(max-width:1050px){.game-definition:has(.room-object-preview) .game-definition-grid{grid-template-columns:minmax(0,1fr)}}
 
 /* Connected declared rooms use the same readable controls and theme colors. */

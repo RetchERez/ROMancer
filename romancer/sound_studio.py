@@ -29,18 +29,32 @@ def inspect_sound(raw,definition,source_sha256):
         samples.append({**s,'sample_count':len(values),'duration_seconds':len(values)/s['sample_rate'],'peaks':peaks,'encoding_lossy':s['codec'] in ('nes-dpcm','gb-wave4','snes-brr'),'preview_scope':'Decoded mono sample; hardware filters, envelopes, loops and driver mixing are not emulated.'})
     for song in d['songs']:
         fields(song,'id name driver offset count stride tempo ticks_per_beat channels');identity(song)
-        if song['driver']!='hillside-pulse-v1':raise ValueError('music driver is not supported for sequence editing')
-        from .studio_examples import make_studio_example
-        example=make_studio_example();length=example['driver_length']
-        if raw[:16]!=example['raw'][:16] or raw[16:16+length]!=example['raw'][16:16+length] or raw[0x3a10:0x3b10]!=example['raw'][0x3a10:0x3b10]:raise ValueError('Hillside driver code or pitch table differs')
-        if (song['offset'],song['count'],song['stride'],song['tempo'],song['ticks_per_beat'],song['channels'])!=(0x3810,16,6,150,24,1):raise ValueError('Hillside driver layout differs from its verified format')
-        if any(a<16+length and b>16 or a<0x3b10 and b>0x3a10 for a,b,_ in ranges):raise ValueError('sound allocation overlaps identified driver code')
+        if song['driver']=='wl4-m4a-v1':
+            from .m4a_music import inspect_song
+            if d['samples'] or any(s['driver']!='wl4-m4a-v1' for s in d['songs']):raise ValueError('Keep identified M4A songs in a separate sound definition.')
+            decoded=inspect_song(raw,song['id'],source_sha256)
+            if song!=decoded['definition']:raise ValueError('M4A song layout differs from its checked header and decoded events.')
+            roles=decoded.pop('roles');positions=sorted(roles)
+            for at in positions:
+                if ranges and ranges[-1][1]==at and ranges[-1][2]==song['name']:ranges[-1]=(ranges[-1][0],at+1,song['name'])
+                else:ranges.append((at,at+1,song['name']))
+            songs.append(decoded);continue
+        if song['driver']=='hillside-pulse-v1':
+            from .studio_examples import make_studio_example
+            example=make_studio_example();expected=example['raw'];length=example['driver_length'];pitch=0x3a10;pitch_end=0x3b10;sequence=0x3810
+        elif song['driver']=='mossy-pulse-v1':
+            from .studio_runtime import make_collision_studio_rom
+            example=make_collision_studio_rom();expected=example['data'];length=example['program_size'];pitch=example['pitch_offset'];pitch_end=pitch+76*2;sequence=example['music_offset']
+        else:raise ValueError('music driver is not supported for sequence editing')
+        if len(raw)!=len(expected) or raw[:16]!=expected[:16] or raw[16:16+length]!=expected[16:16+length] or raw[16394:16400]!=expected[16394:16400] or raw[pitch:pitch_end]!=expected[pitch:pitch_end]:raise ValueError('Original music driver code, vectors or pitch table differs')
+        if (song['offset'],song['count'],song['stride'],song['tempo'],song['ticks_per_beat'],song['channels'])!=(sequence,16,6,150,24,1):raise ValueError('Original music driver layout differs from its verified format')
+        if any(a<16+length and b>16 or a<pitch_end and b>pitch for a,b,_ in ranges):raise ValueError('sound allocation overlaps identified driver code')
         storage(song['offset'],song['count']*song['stride'],song['id']);events=[]
         for i in range(song['count']):
             at=song['offset']+i*6;note=raw[at];duration=int.from_bytes(raw[at+1:at+3],'little');volume,channel,instrument=raw[at+3:at+6]
             number(note,33,108);number(duration,1,6000);number(volume,0,127);number(channel,0,0);number(instrument,0,0)
             events.append({'note':note,'duration':duration,'volume':volume,'channel':channel,'instrument':instrument})
-        songs.append({**song,'events':events,'sequence_edit_supported':True,'driver_scope':'Original ROMancer Hillside practice driver only; no commercial music-driver format is inferred.'})
+        songs.append({**song,'events':events,'sequence_edit_supported':True,'driver_scope':'Identified original practice driver; no commercial music-driver format is inferred.'})
     return {'ok':True,'document_id':hashlib.sha256(canonical_bytes(d,max_bytes=128*1024)).hexdigest(),'source_sha256':source_sha256,'definition':d,'samples':samples,'songs':songs,'ranges':[{'offset':a,'length':b-a,'name':n} for a,b,n in ranges]}
 
 
@@ -71,6 +85,15 @@ def plan_sound(raw,definition,document_id,changes,source_sha256):
         elif c.get('kind')=='note':
             fields(c,'kind song_id index field value');song=next((s for s in doc['songs'] if s['id']==c['song_id']),None)
             if song is None:raise ValueError('unknown or unsupported music driver')
+            if song['driver']=='wl4-m4a-v1':
+                from .m4a_music import plan_song
+                planned=plan_song(raw,song['definition'],song['document_id'],[c],source_sha256)
+                edit=planned['edits'][0];at=edit['offset'];before=bytes.fromhex(edit['before']);after=bytes.fromhex(edit['after']);key=('music_byte',at)
+                if key in seen:
+                    previous=next(e for e in edits if e['offset']==at)
+                    if previous['after']!=edit['after']:raise ValueError('Shared pattern edits conflict at one byte.')
+                    continue
+                seen.add(key);edits.append(edit);continue
             number(c['index'],0,song['count']-1)
             bounds={'note':(0,1,33,108),'duration':(1,2,1,6000),'volume':(3,1,0,127)}
             if c['field'] not in bounds:raise ValueError('this driver field is not editable')
@@ -96,8 +119,13 @@ def preview_sound(raw,definition,source_sha256,kind,resource_id,changes=None):
     if kind!='song':raise ValueError('choose a sample or an identified song')
     song=next((s for s in doc['songs'] if s['id']==resource_id),None)
     if song is None:raise ValueError('unknown music driver')
+    if song['driver']=='wl4-m4a-v1':
+        from .m4a_music import inspect_song,reference_preview
+        return reference_preview(inspect_song(raw,song['id'],hashlib.sha256(raw).hexdigest()))
     rate=22050;values=[];total=0;limit=rate*20
     for i in range(song['count']):
-        at=song['offset']+i*6;note=raw[at];duration=int.from_bytes(raw[at+1:at+3],'little');volume=raw[at+3]>>3;period=int.from_bytes(raw[0x3a10+note*2:0x3a12+note*2],'little');frequency=1789773/(16*(period+1));count=round(duration/60*rate);total+=count
+        at=song['offset']+i*6;note=raw[at];duration=int.from_bytes(raw[at+1:at+3],'little');volume=raw[at+3]>>3
+        pitch=0x1c10+(note-33)*2 if song['driver']=='mossy-pulse-v1' else 0x3a10+note*2
+        period=int.from_bytes(raw[pitch:pitch+2],'little');frequency=1789773/(16*(period+1));count=round((duration+1 if song['driver']=='mossy-pulse-v1' else duration)/60*rate);total+=count
         for n in range(min(count,limit-len(values))):values.append(round((1 if (n*frequency/rate)%1<.5 else -1)*volume/15*10000))
     return wav_bytes(values,rate),{'kind':'song','sample_rate':rate,'sample_frames':len(values),'truncated':total>limit,'preview_scope':'Reference pulse preview, up to20seconds. Native playback verifies the actual driver, mixer and timing.'}

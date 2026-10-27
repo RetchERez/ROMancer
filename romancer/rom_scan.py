@@ -18,7 +18,7 @@ from .audio_systems import audio_system_info
 MAX_SCAN=64*1024**2
 WINDOW=1024**2
 PER_KIND=100
-VERSION=14
+VERSION=15
 
 
 def cache_path(project,row):
@@ -125,6 +125,11 @@ def run(project,row,*,cancelled=lambda:False,publish=None):
         'total_candidates':lab_total,'truncated':lab_total>len(lab_candidates),'dereference_observed':False,
         'game_profile_required':False,'write_authorized':False,
         'scope':'Sampled first 4096 bytes of each 1 MiB segment. Use focused structural experiments to test other ranges and byte alignments.'}
+    if supported and row['size']<=32*1024**2:
+        from .format_readiness import checked_formats
+        from .workbench_files import read_bounded
+        formats=checked_formats(read_bounded(path,32*1024**2,row,cancelled=cancelled),row['sha256'],row.get('descriptors',{}))
+        formats.pop('suggested_definitions',None);result['checked_formats']=formats
     if system=='gba' and row['size']<=32*1024**2:
         from .documented_tables import scan as documented_tables
         from .workbench_files import read_bounded

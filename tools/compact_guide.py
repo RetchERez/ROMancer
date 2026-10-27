@@ -1,6 +1,10 @@
 """Dense, readable guide spreads with explicit overflow fallbacks."""
 import html,re
 
+def pdf_links(text,accent=None):
+    color=' color="'+accent+'"' if accent else ''
+    return re.sub(r'<a href="([^"]+)">',lambda match:'<link href="'+match.group(1)+'"'+color+'>',text).replace('</a>','</link>')
+
 def figures_for(row):
     if row.get('image_layout')=='following-page':return row.get('visual_page',{}).get('panels',[])
     result=[{'image':row['image'],'title':row.get('caption','Actual interface'),'caption':''}] if row.get('image') else []
@@ -36,7 +40,7 @@ def preflight_layout(data,pages):
     for row in data['chapters']:
         width=640;y=927 if figures_for(row) else 850
         for text,size,color in topic_blocks(row,titles,terms,pages):
-            text=re.sub(r'<a href="#([^" ]+)">',r'<link href="#\1">',text).replace('</a>','</link>')
+            text=pdf_links(text)
             item=Paragraph(text,ParagraphStyle('preflight',fontName='Helvetica',fontSize=size,leading=size*1.36))
             y-=item.wrap(width,3000)[1]+6
         if y<82:wide.append(row['id'])
@@ -60,7 +64,7 @@ def build_compact_pdf(data,folder,pages,glossary_groups,index_groups,contents_gr
     def label(text,x,y,size=14,color=muted,bold=False):
         pdf.setFillColor(HexColor(color));pdf.setFont('Helvetica-Bold' if bold else 'Helvetica',size);pdf.drawString(x,y,text)
     def paragraph(text,x,y,width,size=18,color=ink,draw=True):
-        text=re.sub(r'<a href="#([^"]+)">',r'<link href="#\1" color="'+accent+'">',text).replace('</a>','</link>')
+        text=pdf_links(text,accent)
         item=Paragraph(text,ParagraphStyle('p',parent=style,fontSize=size,leading=size*1.36,textColor=HexColor(color)))
         _,height=item.wrap(width,3000)
         if y-height<82:raise GuideOverflow(active,'text exceeds its readable column')

@@ -1,6 +1,9 @@
 import unittest
 
 class CompactGuideTests(unittest.TestCase):
+    def test_pdf_links_convert_both_internal_and_primary_source_urls(self):
+        from tools.compact_guide import pdf_links
+        self.assertEqual(pdf_links('<a href="#topic">Topic</a> <a href="https://example.com/source">Source</a>'),'<link href="#topic">Topic</link> <link href="https://example.com/source">Source</link>')
     def test_short_topics_share_pages_illustrated_topics_keep_all_visuals_and_wide_fallback_is_explicit(self):
         from tools.compact_guide import layout_groups,figures_for
         rows=[{'id':'one','part':'Basic'},{'id':'two','part':'Basic'},

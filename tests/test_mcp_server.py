@@ -10,6 +10,11 @@ from romancer.mcp_server import MCPServer
 
 
 class MCPTests(unittest.TestCase):
+    def test_audio_engine_and_known_layout_discovery_are_available_read_only(self):
+        from romancer.boot_fixtures import make_boot_fixture
+        project=self.server.api.dispatch('project.create',{'name':'Audio discovery'});fixture=make_boot_fixture('gba');path=self.root/'original.gba';path.write_bytes(fixture['data']);source=self.server.api.dispatch('source.import',{'project_id':project['project_id'],'path':str(path),'system':None})
+        response=self.server.call('romancer_call',{'operation':'sound.system','parameters':{'project_id':project['project_id'],'artifact_id':source['artifact_id']}})
+        self.assertFalse(response['isError'],response);self.assertEqual(response['structuredContent']['system_id'],'gba');self.assertNotIn('sound.plan',self.server.operations)
     def test_memory_observation_requires_write_opt_in_and_numeric_region(self):
         self.assertNotIn('runtime.memory',self.server.operations)
         server=MCPServer(self.root/'observing',allow_writes=True);self.addCleanup(server.close);self.start(server)

@@ -26,7 +26,7 @@ TOPICS=(
         'Open Music & sound to see documented audio hardware and the identified driver, or Unknown.',
         'Load this source in Playtest and reach a useful sound. Record native preview captures its mixed output; use play, pause, seek and loop.',
         'A supported sample definition allows waveform preview and fixed-allocation edits. Quantized re-encoding is lossy.',
-        'Sequence editing is enabled only for an implemented, verified driver. The original Hillside workshop demonstrates notes; it does not describe commercial music formats.'], 'music audio sample sound engine driver wav brr dpcm'),
+        'Sequence editing is enabled only for an implemented, verified driver. Hillside and Mossy Hollow have original note formats. The checked Wario Land4 M4A reader supports explicit values in selected songs; conditional songs stay read-only.'], 'music audio sample sound engine driver wav brr dpcm'),
     _topic('projects','Create and delete projects','Keep separate work in separate projects.',[
         'Choose New project, enter a name, then Create & import ROM or Create empty project.',
         'Open Projects in the sidebar to switch projects or choose Delete project.',

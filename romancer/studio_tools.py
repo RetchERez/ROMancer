@@ -89,9 +89,9 @@ class StudioTools:
         return {'ok':True,'source_sha256':packet['game_sha256'],'observation':packet,'codec':p['codec'],'tiles':tiles,
           'rom_location_known':False,'palette_known':False,'scope':'available_video_memory_tiles'}
 
-    def source(self,p,c,*,allow_sms=False):
+    def source(self,p,c,*,allow_sms=True):
         project,row,path=self.api.source(p)
-        if row.get('system_id') not in ('nes','snes','genesis','gb','gbc','gba') and not (allow_sms and row.get('system_id')=='sms'):raise ValueError('studio editing requires a supported NES, SNES, Genesis, Game Boy or GBA source')
+        if row.get('system_id') not in ('nes','snes','genesis','gb','gbc','gba') and not (allow_sms and row.get('system_id')=='sms'):raise ValueError('studio editing requires a supported cartridge source')
         raw=read_bounded(path,64*1024**2,row,cancelled=c)
         return project,row,raw
 
@@ -132,12 +132,25 @@ class StudioTools:
     def sound_system(self,p,c):
         from .audio_systems import audio_system_info
         _,row,_=self.api.source(p);result=audio_system_info(row.get('system_id'),row['sha256'])
+        if row.get('system_id')=='gba' and row.get('size')==8388608:
+            from .m4a_music import identified,inspect_song,CATALOG,REFERENCE,DRIVER
+            _,_,raw=self.source(p,c)
+            if identified(raw):
+                songs=[]
+                for item in CATALOG:
+                    if c():raise KeyboardInterrupt
+                    try:songs.append(inspect_song(raw,str(item[0]),row['sha256']))
+                    except ValueError:continue
+                if songs:
+                    result.update(sequence_edit_supported=any(s['sequence_edit_supported'] for s in songs),known_definition={'schema_version':1,'source_sha256':row['sha256'],'samples':[],'songs':[s['definition'] for s in songs]})
+                    result['driver']={'status':'CHECKED_ENGINE_LAYOUT','id':DRIVER,'name':'Wario Land4 M4A','reference':REFERENCE,'evidence':'Immutable engine, selected song headers and pointers checked. Explicit notes, velocity, volume and tempo can be edited in fully decoded songs. Conditional or over-budget songs stay read-only.'}
         definition=row.get('descriptors',{}).get('sound')
         if definition and definition.get('songs'):
             try:
                 doc=self.sound_inspect({**p,'definition':definition},c)
                 if doc['songs']:
-                    result['driver']={'status':'VERIFIED_WORKSHOP_DRIVER','id':'hillside-pulse-v1','name':'Hillside pulse driver (original workshop)','reference':None,'evidence':'Driver code, pitch table and event layout checked against the original workshop implementation.'};result['sequence_edit_supported']=True
+                    if doc['songs'][0]['driver'] in ('hillside-pulse-v1','mossy-pulse-v1'):
+                        ident=doc['songs'][0]['driver'];result['driver']={'status':'VERIFIED_WORKSHOP_DRIVER','id':ident,'name':'Mossy Hollow pulse driver' if ident=='mossy-pulse-v1' else 'Hillside pulse driver','reference':None,'evidence':'Driver code, pitch table and event layout checked against the original workshop implementation.'};result['sequence_edit_supported']=True
             except ValueError:pass
         return result
 

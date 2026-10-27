@@ -1140,6 +1140,20 @@ class WorkbenchAPI:
         if detected.get('status')!='IDENTIFIED' or detected.get('system_id') not in SYSTEMS:
             raise ValueError('Choose a recognized, supported cartridge format listed in Settings. Unknown, ambiguous and unsupported layouts cannot be imported; a filename or system hint does not verify a format.')
         result=projects.register_source(self.project(p),Path(p['path']),p['system'],cancelled=c)
+        if result.get('system_id')=='nes' and result.get('size')==24592:
+            from .studio_runtime import matches_studio_runtime,make_collision_studio_rom,runtime_definitions
+            from .workflow_recipes import definition_document
+            from .workbench_files import read_bounded
+            raw=read_bounded(result['path'],24592,result,cancelled=c)
+            if matches_studio_runtime(raw):
+                definitions=runtime_definitions(make_collision_studio_rom(),result['sha256']);checked={}
+                for kind,definition in definitions.items():
+                    try:checked[kind]=definition_document(Path(result['path']),result['sha256'],kind,definition)['definition']
+                    except ValueError:continue
+                if checked:
+                    with projects.locked(self.project(p)) as value:
+                        owned=next(row for row in value['sources'] if row['artifact_id']==result['artifact_id']);owned.setdefault('descriptors',{}).update(checked)
+                    result['descriptors']=checked
         try:result['scan']=self._scan_start({'project_id':p['project_id'],'artifact_id':result['artifact_id'],'rescan':False},c)
         except (ValueError,OSError,RuntimeError) as error:result['scan']={'status':'NOT_STARTED','reason':str(error)}
         return result

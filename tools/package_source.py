@@ -220,6 +220,12 @@ APPROVED_FILES = APPROVED_FILES | frozenset(['user-guide/screenshots/90-connecte
 
 APPROVED_FILES = APPROVED_FILES | frozenset(['romancer/debugger_failures.py', 'romancer/editing_readiness.py', 'romancer/scene_composite.py', 'romancer/studio_workshop.py', 'romancer/ui/editing_readiness.js', 'tests/test_compact_guide.py', 'tests/test_debugger_failures.py', 'tests/test_editing_readiness.py', 'tests/test_scene_composite.py', 'tests/test_studio_workshop.py', 'tests/test_no_inapp_tutorials.py', 'tests/ui_editing_readiness.mjs', 'tools/compact_guide.py'])
 
+APPROVED_FILES = APPROVED_FILES | frozenset({'tests/test_studio_systems.py'})
+APPROVED_FILES = APPROVED_FILES | frozenset({'user-guide/screenshots/'+name+'.png' for name in ('220-five-editing-tools-ready','221-collision-brushes-and-live-preview','222-independent-actor-hitbox-controls','223-native-collision-lab-playtest','224-original-melody-edit-and-preview','225-wario-decoded-note-edit-and-preview','226-conditional-song-read-only')})
+
+# Build37 reviewed guide captures
+APPROVED_FILES = APPROVED_FILES | frozenset({'romancer/level_semantics.py','romancer/studio_runtime.py','romancer/m4a_music.py','romancer/format_readiness.py','romancer/ui/level_semantics.js','romancer/ui/music_sequence.js','tests/test_level_semantics.py','tests/test_studio_runtime.py','tests/test_m4a_music.py','tests/test_format_readiness.py','tests/ui_level_semantics.mjs','tests/ui_music_sequence.mjs'})
+
 # Build37 reviewed guide captures
 APPROVED_FILES = APPROVED_FILES | frozenset(['user-guide/screenshots/100-welcome-guide-only.png', 'user-guide/screenshots/101-editing-readiness.png', 'user-guide/screenshots/102-studio-sprite-editor.png', 'user-guide/screenshots/103-studio-sprite-staged.png', 'user-guide/screenshots/104-studio-dialogue-preview.png', 'user-guide/screenshots/105-studio-level-object-editor.png', 'user-guide/screenshots/106-studio-named-values.png', 'user-guide/screenshots/107-help-user-guide.png', 'user-guide/screenshots/108-verified-full-scene-preview.png'])
 

@@ -108,7 +108,8 @@ def create_studio(root,incoming):
     from .resource_forms import graphics_schema,script_schema
     from .data_tables import inspect_table
     from .level_design import inspect_level
-    fixture=make_studio_rom();project=Path(projects.create_project(root,'Mossy Hollow - editing studio')['path'])
+    from .studio_runtime import make_collision_studio_rom,runtime_definitions
+    fixture=make_collision_studio_rom();project=Path(projects.create_project(root,'Mossy Hollow - editing studio')['path'])
     path=Path(incoming)/(uuid.uuid4().hex+'.nes');path.write_bytes(fixture['data'])
     try:source=projects.register_source(project,path,None)
     finally:path.unlink(missing_ok=True)
@@ -117,9 +118,9 @@ def create_studio(root,incoming):
     script=script_schema(source_path,sha,{'system_id':'nes','offset':fixture['dialogue_offset'],'capacity':27,'count':1,'encoding':'table','table':'\n'.join(format(i+32,'02X')+'='+chr(i) for i in range(32,96))})
     table={'schema_version':1,'name':'Scene controls','offset':fixture['stats_offset'],'count':1,'stride':3,'row_names':['Mossy Hollow'],'fields':[{'name':name,'offset':i,'type':'u8','endian':'little','pointer_base':None,**({'minimum':0,'maximum':8} if i<2 else {})} for i,name in enumerate(('Hero speed','Slime speed','Chirp pitch value'))]}
     inspect_table(source_path,sha,table,0,1)
-    levels={'schema_version':1,'source_sha256':sha,'name':'Mossy Hollow room','tiles':{'offset':16400,'count':128,'codec':'tile8-planar2-msb-v1','palette_offset':0x1910,'palette_format':'rgb888'},'metatiles':{'offset':0x1a10,'count':128,'width':1,'height':1,'entry_bytes':1,'endian':'little'},'rooms':[{'id':'hollow','name':'Mossy Hollow','width':32,'height':30,'terrain':{'offset':fixture['map_offset'],'entry_bytes':1,'endian':'little'},'collision':None,'objects':{'offset':fixture['spawn_offset'],'count':2,'stride':2,'fields':[{'name':'x','offset':0,'bytes':1,'endian':'little','maximum':28},{'name':'y','offset':1,'bytes':1,'endian':'little','maximum':29}]},'object_metadata':[{'index':0,'name':'Hero start','role':'actor','reference':None},{'index':1,'name':'Slime start','role':'actor','reference':None}]}]}
+    runtime=runtime_definitions(fixture,sha);levels=runtime['levels']
     inspect_level(fixture['data'],levels,sha)
     value=projects.read_project(project);value.update(demo=True,demo_type='original-studio',original_workshop=True,demo_system='nes')
-    value['sources'][0].update(name='Mossy Hollow - original.nes',descriptors={'assets':assets,'script':script,'tables':{'source_sha256':sha,'definition':table},'levels':levels})
+    value['sources'][0].update(name='Mossy Hollow - original.nes',descriptors={'assets':assets,'script':script,'tables':{'source_sha256':sha,'definition':table},'levels':levels,'sound':runtime['sound']})
     projects.write_json(project/'project.json',value)
-    return {**projects.read_project(project),'ok':True,'status':'CREATED','path':str(project),'workshop_note':'Original interactive scene: arrows move, A chirps; hero/slime animation, editable graphics, dialogue, speeds and room/spawn positions. Level-editor RGB colors are an authored reference preview, not editable NES palette data. Room terrain is visual; collision is not implemented.'}
+    return {**projects.read_project(project),'ok':True,'status':'CREATED','path':str(project),'workshop_note':'Original interactive scene: arrows move, A attacks on contact and chirps, Start restarts. Edit terrain, solid walls, damage floors, actor hitboxes, health, contact damage, patrol bounds, graphics, dialogue, speeds and melody. Hitbox overlays show starting positions; playtesting shows live behavior. Level-editor RGB colors are an authored reference preview.'}
