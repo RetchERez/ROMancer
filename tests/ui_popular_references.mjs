@@ -1,0 +1,17 @@
+import assert from 'node:assert/strict';
+import fs from 'node:fs';
+const url=new URL('../romancer/ui/popular_references.js',import.meta.url);
+assert.ok(fs.existsSync(url),'Popular-game references need an accessible library.');
+const {popularReferences}=await import(url);
+const values={'reference-template':'pokemon-gba','reference-offset':'0x1000','reference-count':'4','reference-stride':'28'};
+globalThis.document={getElementById:id=>({value:values[id]??''})};
+const state={project:{project_id:'p'},artifact:{artifact_id:'a',sha256:'sha',system_id:'gba'}},actions={},calls=[];
+const result={ok:true,references:[{id:'ref',title:'Pokemon <test>',system_id:'gba',url:'https://github.com/pret/pokeemerald/blob/'+'a'.repeat(40)+'/include/pokemon.h',commit:'a'.repeat(40),facts:['Documented'],templates:['pokemon-gba'],addresses:[]}]};
+const ctx={state,use:h=>Object.assign(actions,h),draft:(id,d)=>values[id]??d,api:{call:async()=>result},sourceParams:()=>({project_id:'p',artifact_id:state.artifact.artifact_id}),render:async()=>{},navigate:async name=>calls.push(['navigate',name]),run:async(op,p)=>{calls.push([op,p]);return {ok:true,artifact_id:'a',source_sha256:'sha',definition:{},inspection:{}};}};
+assert.match(await popularReferences(ctx),/Pokemon &lt;test&gt;/);
+values['reference-offset']='';await assert.rejects(actions['reference-table'](),/offset|whole|number/i);
+values['reference-offset']='0x1000';await actions['reference-table']();
+assert.equal(calls[0][0],'references.template');assert.equal(calls[0][1].offset,4096);
+assert.equal(state.tableProposal.result.source_sha256,'sha');assert.deepEqual(calls.at(-1),['navigate','tables']);
+assert(!calls.some(c=>c[0]==='tables.save_definition'));
+console.log('Pinned public references escape labels and open explicitly located table previews without saving or claiming a revision match.');

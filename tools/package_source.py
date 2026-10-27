@@ -31,6 +31,7 @@ APPROVED_FILES = frozenset(ROOT_FILES | {
     for directory, names in {
         '.github': 'workflows/ci.yml ISSUE_TEMPLATE/bug_report.yml',
         'romancer': '''
+            research_tools.py popular_references.py ui/research_tools.js ui/popular_references.js
             mcp_server.py bundled_cores.py core_pins.py controller_devices.py ui/workspace_status.js ui/workspace_resume.js ui/shortcuts.js ui/tool_help.js
             ui/tool_inputs.js ui/patch_controls.js ui/revision_controls.js ui/hex_editor.js ui/build_history.js ui/project_checks.js ui/save_manager.js ui/translation_controls.js ui/visual_controls.js ui/workbench_usability.js
             ui/desktop_entry.js ui/app.bundle.js ui/bundle.json
@@ -103,6 +104,7 @@ APPROVED_FILES = frozenset(ROOT_FILES | {
             universal.json visual_novel.json
         ''',
         'tests': '''
+            test_research_tools.py test_popular_references.py ui_research_tools.mjs ui_popular_references.mjs
             test_download_input.py test_sms_format.py ui_sms_input.mjs
             test_mcp_server.py test_bundled_cores.py test_controller_devices.py test_setup_installer.py ui_controller_choices.mjs ui_workspace_status.mjs ui_shortcuts.mjs ui_tool_help.mjs ui_workspace_resume.mjs
             test_level_design.py test_studio_tools.py test_value_search.py test_studio_discovery.py test_source_information.py test_release_scope.py ui_level_design.mjs ui_animation_studio.mjs ui_value_finder.mjs ui_edit_previews.mjs ui_game_visuals.mjs ui_visual_live.mjs ui_publish_drafts.mjs ui_audio_preview.mjs
@@ -192,6 +194,7 @@ APPROVED_FILES = APPROVED_FILES | frozenset({
     'romancer/app_settings.py','romancer/ui/app_settings.js','tests/test_app_settings.py','tests/ui_app_settings.mjs','tests/ui_scan_preferences.mjs',
     'tools/build_user_guide.py','user-guide/index.html','user-guide/guide.css','user-guide/guide.pdf','user-guide/guide.json',
     *('user-guide/screenshots/'+name+'.png' for name in (
+        '65-resource-research','66-research-pack-review','67-popular-game-references','68-documented-stat-prefix','69-research-byte-help',
         '01-workspace','02-castlevania-sprite','03-chrono-weapon','04-chrono-table',
         '05-immortal-text','06-wario-palettes','07-ffl2-room','08-dejavu-colors',
         '09-playtest-states','10-verified-patch','11-hex-inspection','12-tutorials',

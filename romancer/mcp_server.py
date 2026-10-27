@@ -19,13 +19,13 @@ from romancer.workbench_api import WorkbenchAPI
 PROTOCOL='2025-11-25'
 MAX_MESSAGE=1024*1024
 MAX_RESULT=256*1024
-READ_OPERATIONS=frozenset('''system.capabilities system.operations projects.list project.open
+READ_OPERATIONS=frozenset('''references.catalog references.template research.note_get research.inspect research.preview system.capabilities system.operations projects.list project.open
 games.inspect games.maps.catalog games.maps.inspect cheats.catalog cheats.inspect engines.inspect systems.reference systems.classify_address rom.check catalog.list resource.inspect resources.explain resources.relationships
 hex.search hex.numbers hex.bookmarks builds.timeline builds.compare project.validate investigations.get investigations.probe debugger.capabilities debugger.get structures.survey structures.definition relocation.table_definition
 assets.inspect script.inspect tables.inspect tables.batch levels.inspect sound.inspect revision.lookup
 profiles.get profiles.validate runtime.checkpoints reports.list exports.list jobs.get
 systems.address resources.address_uses watches.compare debug.inspect compression.inspect'''.split())
-WRITE_OPERATIONS=frozenset('''project.create project.demo project.demo_system source.import inputs.import
+WRITE_OPERATIONS=frozenset('''research.note_save research.note_delete research.export research.apply project.create project.demo project.demo_system source.import inputs.import
 games.plan games.configure games.maps.plan cheats.import systems.plan_edits assets.plan script.plan tables.plan levels.plan sound.plan
 build.apply structured.apply builds.annotate hex.bookmark catalog.index rom.scan.start
 rom.scan.run release.prepare release.verify resources.declare_assets resources.declare_script tables.save_definition patches.preview patches.apply revision.import
@@ -35,6 +35,11 @@ recipes.from_plan recipes.preview recipes.import recipes.export jobs.cancel
 values.start values.narrow investigations.start investigations.capture debugger.prepare debugger.capture debugger.investigate relocation.plan watches.save video.inspect compression.extract compression.plan_reinsert
 definitions.export definitions.import'''.split())
 DESCRIPTIONS={
+ 'references.catalog':'Search pinned public Pokemon and Mario research. Published facts are separate from ROM revision or runtime verification; no game code is included.',
+ 'references.template':'Inspect a documented numeric prefix at an explicitly supplied offset, count and stride. Does not locate a table, save a definition or authorize changes.',
+ 'research.inspect':'Browse checked active declarations and source-bound user notes. Notes never grant edit authority or prove game behavior.',
+ 'research.preview':'Validate a portable research pack for the exact source and list replacements. Read-only; returns a review digest bound to current metadata.',
+ 'research.apply':'Atomically import a previously reviewed exact-revision research pack. Requires explicit acknowledgement of replacements and never modifies ROM bytes.',
  'project.create':'Create a separate ROM project. Never overwrite an original.',
  'source.import':'Import an owned ROM copy from an explicitly allowed local folder.',
  'games.inspect':'Identify an exact supported game revision and inspect verified named fields.',
@@ -101,6 +106,17 @@ def _investigation_properties(operation):
     def obj(properties):return {'type':'object','properties':properties,'required':list(properties),'additionalProperties':False}
     def array(items,maximum,minimum=0):return {'type':'array','items':items,'minItems':minimum,'maxItems':maximum}
     source={'project_id':string(),'artifact_id':string()}
+    if operation=='references.catalog':return {'query':string(128),'system_filter':enum(['all','nes','snes','genesis','sms','gb','gbc','gba'])}
+    if operation=='references.template':return {**source,'template_id':enum(['pokemon-red-blue','pokemon-crystal','pokemon-gba']),'offset':integer(),'count':integer(1,65536),'stride':integer(1,65536)}
+    if operation=='research.inspect':return {**source,'query':string(128),'kind':enum(['all','notes','assets','script','tables','levels','sound']),'page':integer(0,4096)}
+    if operation=='research.note_get':return {**source,'note_id':string(32)}
+    if operation=='research.note_delete':return {**source,'revision':string(64),'note_id':string(32)}
+    if operation=='research.note_save':
+        note=obj({'id':nullable(string(32)),'title':string(80),'offset':integer(),'length':integer(1),'category':enum(['graphics','text','numbers','level','sound','code','other']),'text':string(2000),'reference':string(512)})
+        return {**source,'revision':string(64),'note':note}
+    if operation in ('research.preview','research.apply'):
+        base={**source,'document':{'type':'object','description':'ROMancer research JSON, up to 1 MiB; exact source, definitions and user notes. Service validates every field.'}}
+        return {**base,'review_id':string(64),'replace':{'type':'boolean'}} if operation=='research.apply' else base
     if operation=='relocation.table_definition':return source
     if operation=='relocation.plan':
         reference=obj({'offset':integer(0,64*1024**2),'width':integer(2,4),'endian':enum(['little','big']),

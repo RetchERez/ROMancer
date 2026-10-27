@@ -1,3 +1,4 @@
+import {useResearchSetup} from '../research_tools.js';
 import {esc,button,field,select,read,json,jsonEditor,heading,empty,report} from '../common.js';
 import {selectionKey} from '../tool_inputs.js';
 import {WavPreview,stageNote,restoreSoundChanges,compareWavPreviews,drawWaveform} from '../sound_preview.js';
@@ -24,7 +25,7 @@ async function previewSound(ctx,doc,kind,id){
  }catch(error){if(!ownsPreview(ctx,owned))return;state.soundPreview=null;state.soundPreviewRequest={...owned,status:'error',message:error.message};}
  if(ownsPreview(ctx,owned))await ctx.render();
 }
-export async function render(ctx){const {state}=ctx;if(!state.project||!state.artifact)return heading('','Music & sound','')+empty('Open a source to inspect audio','Audio hardware and game music drivers are identified separately.');
+export async function render(ctx){const setupReview=useResearchSetup(ctx,'sound');if(setupReview)return setupReview;const {state}=ctx;if(!state.project||!state.artifact)return heading('','Music & sound','')+empty('Open a source to inspect audio','Audio hardware and game music drivers are identified separately.');
  const scope=selectionKey(state),current=()=>scope===selectionKey(state),params={...ctx.sourceParams()},saved=state.artifact.descriptors?.sound;
  const system=await ctx.api.call('sound.system',params);if(!current()||ctx.isCurrentRender?.()===false)return '';
  let doc=state.results['sound.inspect'];if(doc?.source_sha256!==state.artifact.sha256)doc=null;

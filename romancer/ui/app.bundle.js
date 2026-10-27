@@ -174,7 +174,7 @@
   function report(result, title = "Result") {
     if (!result) return "";
     const summary = summaryText(result), tone = result.ok === false || ["FAIL", "BLOCKED", "REGRESSION"].includes(result.status) ? "danger" : ["PASS", "BUILT", "VERIFIED", "SCOPE_COVERED"].includes(result.status) ? "good" : "neutral";
-    return `<section class="card result"><div class="card-heading"><h3>${esc(title)}</h3>${badge(result.status || "READY", tone)}</div>${summary ? `<p class="notice change-summary" role="status">${esc(summary)}</p>` : ""}${result.error ? `<p class="error">${esc(typeof result.error === "string" ? result.error : result.error.message)}</p>` : ""}<details><summary>Inspect the full report</summary><pre>${esc(JSON.stringify(result, null, 2))}</pre></details></section>`;
+    return `<section class="card result"><div class="card-heading"><h3>${esc(title)}</h3>${badge(result.status || "READY", tone)}</div>${summary ? `<p class="notice change-summary" role="status">${esc(summary)}</p>` : ""}${result.error ? `<p class="error">${esc(typeof result.error === "string" ? result.error : result.error.message)}</p>` : ""}<details><summary>Inspect the full report</summary><pre tabindex="0" role="region" aria-label="${esc(title)} details">${esc(JSON.stringify(result, null, 2))}</pre></details></section>`;
   }
   var empty = (title, message, action = "") => `<div class="empty">${icon("folder")}<h3>${esc(title)}</h3><p>${esc(message)}</p>${action}</div>`;
   function heading(kicker, title, description, actions3 = "") {
@@ -715,9 +715,9 @@
 
   // romancer/ui/workspace_search.js
   var aliases = { assets: "palette color colour sprite tiles graphics font", resources: "hex bytes offsets compare files checksums crc rom", scripts: "text dialogue translation encoding layout", tables: "numbers stats balance values table", levels: "map rooms terrain objects level", sound: "music sound audio samples", playtest: "play emulator controller save state load state", debug: "investigate find value memory watch trace", release: "export patch bps ips download", settings: "theme light dark size zoom preferences", help: "guide tutorial help shortcuts" };
-  function workspaceMatches(query, names4, project) {
+  function workspaceMatches(query, names5, project) {
     const words = String(query).toLowerCase().trim().split(/\s+/).filter(Boolean), matches = [];
-    for (const [page, label] of Object.entries(names4)) if (words.every((w) => (label + " " + (aliases[page] || "")).toLowerCase().includes(w))) matches.push({ page, label, kind: "tool" });
+    for (const [page, label] of Object.entries(names5)) if (words.every((w) => (label + " " + (aliases[page] || "")).toLowerCase().includes(w))) matches.push({ page, label, kind: "tool" });
     for (const row of [...(project == null ? void 0 : project.sources) || [], ...(project == null ? void 0 : project.builds) || []]) if (words.every((w) => (row.name + " " + row.kind).toLowerCase().includes(w))) matches.push({ artifact_id: row.artifact_id, sha256: row.sha256, project_id: project.project_id, label: row.name, kind: row.kind });
     return matches.slice(0, 32);
   }
@@ -1401,8 +1401,8 @@
   function controllerButtons(pad) {
     var _a, _b, _c, _d, _e, _f;
     if (!pad) return [];
-    const names4 = ["b", "a", "y", "x", "l", "r", null, null, "select", "start", null, null, "up", "down", "left", "right"], result = [];
-    for (let i = 0; i < names4.length; i++) if (names4[i] && ((_b = (_a = pad.buttons) == null ? void 0 : _a[i]) == null ? void 0 : _b.pressed)) result.push(names4[i]);
+    const names5 = ["b", "a", "y", "x", "l", "r", null, null, "select", "start", null, null, "up", "down", "left", "right"], result = [];
+    for (let i = 0; i < names5.length; i++) if (names5[i] && ((_b = (_a = pad.buttons) == null ? void 0 : _a[i]) == null ? void 0 : _b.pressed)) result.push(names5[i]);
     if (((_c = pad.axes) == null ? void 0 : _c[0]) < -0.35) result.push("left");
     if (((_d = pad.axes) == null ? void 0 : _d[0]) > 0.35) result.push("right");
     if (((_e = pad.axes) == null ? void 0 : _e[1]) < -0.35) result.push("up");
@@ -1896,6 +1896,240 @@
     render: () => render3
   });
 
+  // romancer/ui/research_tools.js
+  var names = [["all", "Everything"], ["assets", "Graphics"], ["script", "Text"], ["tables", "Numbers"], ["levels", "Levels"], ["sound", "Sound"], ["notes", "My notes"]];
+  var categories = ["graphics", "text", "numbers", "level", "sound", "code", "other"];
+  var integer2 = (id) => {
+    const text = read(id).trim(), value = Number(text);
+    if (!text || !Number.isSafeInteger(value) || value < 0) throw Error("Enter a nonnegative offset or byte length.");
+    return value;
+  };
+  function researchNoteHelp(notes = []) {
+    return notes.length ? "<h4>User research</h4>" + notes.map((n) => "<dl><dt>" + esc(n.title) + "</dt><dd>" + esc(n.text) + "<br>Reference: " + esc(n.reference || "None supplied") + "</dd></dl>").join("") + '<p class="subtle">User notes are not automatically verified game behavior.</p>' : "";
+  }
+  function useResearchSetup(ctx2, kind) {
+    var _a;
+    const { state: state2 } = ctx2, scope = selectionKey(state2), packet = state2.researchOpen, restore = state2.researchRestore;
+    if ((restore == null ? void 0 : restore.scope) === scope && restore.kind === kind) {
+      state2.researchRestore = null;
+      for (const [key3, value] of Object.entries(restore.fields)) ctx2.setDraft(key3, value);
+      delete state2.results[kind + ".inspect"];
+      state2.pending = null;
+      return "";
+    }
+    if ((packet == null ? void 0 : packet.scope) !== scope || packet.kind !== kind) return "";
+    const d = (_a = state2.artifact.descriptors) == null ? void 0 : _a[kind];
+    if (!d) {
+      state2.researchOpen = null;
+      return "";
+    }
+    const keys2 = { assets: "asset-schema", script: "script-schema", levels: "level-definition", sound: "sound-definition" };
+    const wanted = kind === "tables" ? { "table-name": d.definition.name, "table-offset": String(d.definition.offset), "table-count": String(d.definition.count), "table-stride": String(d.definition.stride), "table-fields": JSON.stringify(d.definition.fields) } : { [keys2[kind]]: JSON.stringify(d, null, 2) };
+    const prior = Object.fromEntries(Object.keys(wanted).map((key3) => [key3, ctx2.draft(key3, null)]));
+    const page = state2.page, ownsSetup = () => {
+      var _a2;
+      return selectionKey(state2) === scope && state2.page === page && state2.researchOpen === packet && ((_a2 = ctx2.isCurrentRender) == null ? void 0 : _a2.call(ctx2)) !== false && Object.entries(prior).every(([key3, value]) => ctx2.draft(key3, null) === value);
+    };
+    const differs = Object.keys(wanted).some((key3) => prior[key3] !== null && String(prior[key3]) !== wanted[key3]);
+    if (differs && !packet.confirmed) {
+      ctx2.use({
+        "research-keep-setup": () => {
+          state2.researchOpen = null;
+          return ctx2.render();
+        },
+        "research-load-setup": async () => {
+          if (!ownsSetup()) throw Error("The editor changed. Review its setup again.");
+          let backups = [];
+          try {
+            backups = JSON.parse(ctx2.draft("research-previous-setup", "[]"));
+          } catch {
+          }
+          if (!Array.isArray(backups)) backups = [];
+          const next = [...backups.slice(-3), { kind, sha256: state2.artifact.sha256, at: (/* @__PURE__ */ new Date()).toISOString(), fields: prior }];
+          const value = JSON.stringify(next);
+          if (new TextEncoder().encode(value).length > 6e4) throw Error("The current setup is too large for a recovery copy. Export your work before replacing it.");
+          const params = { ...ctx2.sourceParams(), key: state2.page + ":research-previous-setup" }, old = await ctx2.api.call("drafts.get", params);
+          if (!ownsSetup()) return;
+          await ctx2.api.call("drafts.save", { ...params, revision: old.revision, value });
+          if (!ownsSetup()) return;
+          ctx2.setDraft("research-previous-setup", value);
+          state2.researchOpen = { ...packet, confirmed: true };
+          return ctx2.render();
+        },
+        "research-restore-setup": () => {
+          const backups = JSON.parse(ctx2.draft("research-previous-setup", "[]")), last = backups.at(-1);
+          if ((last == null ? void 0 : last.sha256) !== state2.artifact.sha256) throw Error("The recovery setup belongs to another ROM.");
+          for (const [key3, value] of Object.entries(last.fields)) ctx2.setDraft(key3, value);
+          state2.researchOpen = null;
+          return ctx2.render();
+        }
+      });
+      return '<section class="card"><h2>Load saved resource setup?</h2><p>This editor has a different setup draft. Keep it, or load the checked saved definition after storing a recovery copy. Existing document-specific edits stay separate.</p>' + button("Keep current draft", "research-keep-setup") + button("Load saved setup", "research-load-setup") + "</section>";
+    }
+    state2.researchOpen = null;
+    for (const [key3, value] of Object.entries(wanted)) ctx2.setDraft(key3, value);
+    delete state2.results[kind + ".inspect"];
+    state2.candidateReview = null;
+    state2.pending = null;
+    if (kind === "assets") state2.paint = null;
+    return "";
+  }
+  async function researchTools(ctx2) {
+    var _a, _b, _c;
+    const { state: state2 } = ctx2, a = state2.artifact;
+    if (!a) return "";
+    const scope = selectionKey(state2), params = { ...ctx2.sourceParams() }, generation = (state2.researchGeneration || 0) + 1;
+    state2.researchGeneration = generation;
+    const current2 = () => {
+      var _a2;
+      return scope === selectionKey(state2) && generation === state2.researchGeneration && ((_a2 = ctx2.isCurrentRender) == null ? void 0 : _a2.call(ctx2)) !== false;
+    };
+    let model;
+    try {
+      model = await ctx2.api.call("research.inspect", { ...params, query: ctx2.draft("research-query", ""), kind: ctx2.draft("research-kind", "all"), page: state2.researchPage || 0 });
+    } catch (error) {
+      if (!current2()) return "";
+      return '<details class="card"><summary>Resource browser & research</summary><p>' + esc(error.message) + "</p></details>";
+    }
+    if (!current2()) return "";
+    if (!(model == null ? void 0 : model.ok) || model.artifact_id !== a.artifact_id || model.source_sha256 !== a.sha256) return "";
+    state2.researchBrowser = { scope, result: model };
+    const resources = model.resources || [], notes = model.notes || [], saved = ((_a = state2.researchImport) == null ? void 0 : _a.scope) === scope ? state2.researchImport : null;
+    const requireCurrent = () => {
+      if (!current2()) throw Error("The selected ROM changed. Reload its research.");
+    };
+    const run2 = async (op, extra) => {
+      requireCurrent();
+      const result = await ctx2.run(op, { ...params, ...extra }, { render: false });
+      requireCurrent();
+      return result;
+    };
+    const fill = (note) => {
+      var _a2;
+      state2.researchEditing = { scope, id: (note == null ? void 0 : note.id) || null };
+      for (const [key3, value] of Object.entries({ title: (note == null ? void 0 : note.title) || "", offset: (note == null ? void 0 : note.offset) ?? ((_a2 = state2.hexDraft) == null ? void 0 : _a2.selected) ?? 0, length: (note == null ? void 0 : note.length) ?? 1, category: (note == null ? void 0 : note.category) || "other", text: (note == null ? void 0 : note.text) || "", reference: (note == null ? void 0 : note.reference) || "" })) ctx2.setDraft("research-note-" + key3, String(value));
+    };
+    const showNote = async () => {
+      var _a2, _b2, _c2;
+      await ctx2.render();
+      if (selectionKey(state2) !== scope) return;
+      const form = document.getElementById("research-note-form");
+      if (form) {
+        form.open = true;
+        (_a2 = form.scrollIntoView) == null ? void 0 : _a2.call(form, { block: "nearest" });
+      }
+      (_c2 = (_b2 = document.getElementById("research-note-title")) == null ? void 0 : _b2.focus) == null ? void 0 : _c2.call(_b2);
+    };
+    ctx2.use({
+      "research-search": () => {
+        state2.researchPage = 0;
+        return ctx2.render();
+      },
+      "research-page": (node) => {
+        state2.researchPage = Math.max(0, (state2.researchPage || 0) + Number(node.dataset.id));
+        return ctx2.render();
+      },
+      "research-bytes": (node) => {
+        requireCurrent();
+        const offset = Number(node.dataset.id);
+        if (!resources.some((r) => r.offset === offset) && !notes.some((n) => n.offset === offset)) throw Error("Reload the current resource list.");
+        state2.resourceJump = offset;
+        return ctx2.navigate("resources");
+      },
+      "research-editor": (node) => {
+        requireCurrent();
+        const editor = node.dataset.id, row = resources.find((r) => r.editor === editor);
+        if (!row) throw Error("Reload the current resource list.");
+        state2.researchOpen = { scope, kind: row.kind };
+        return ctx2.navigate(editor);
+      },
+      "research-new": () => {
+        requireCurrent();
+        fill(null);
+        return showNote();
+      },
+      "research-edit": async (node) => {
+        requireCurrent();
+        if (!notes.some((n) => n.id === node.dataset.id)) throw Error("Reload the note.");
+        const result = await ctx2.api.call("research.note_get", { ...params, note_id: node.dataset.id });
+        requireCurrent();
+        if (result.source_sha256 !== a.sha256 || result.artifact_id !== a.artifact_id) throw Error("The note belongs to another ROM.");
+        fill(result.note);
+        return showNote();
+      },
+      "research-save": async () => {
+        var _a2;
+        const note = { id: ((_a2 = state2.researchEditing) == null ? void 0 : _a2.scope) === scope ? state2.researchEditing.id : null, title: read("research-note-title"), offset: integer2("research-note-offset"), length: integer2("research-note-length"), category: read("research-note-category"), text: read("research-note-text"), reference: read("research-note-reference") };
+        await run2("research.note_save", { revision: model.revision, note });
+        state2.researchImport = null;
+        fill(null);
+        await ctx2.render();
+        ctx2.notify("Research note saved. ROM bytes unchanged.");
+      },
+      "research-delete": async (node) => {
+        requireCurrent();
+        if (!notes.some((n) => n.id === node.dataset.id)) throw Error("Reload the note.");
+        if (!confirm("Remove this research note? ROM bytes will stay unchanged.")) return;
+        await run2("research.note_delete", { revision: model.revision, note_id: node.dataset.id });
+        state2.researchImport = null;
+        await ctx2.render();
+      },
+      "research-export": async () => {
+        const result = await run2("research.export", {});
+        state2.researchExport = { scope, result };
+        await ctx2.render();
+      },
+      "research-preview": async () => {
+        var _a2;
+        requireCurrent();
+        const file = (_a2 = document.getElementById("research-file")) == null ? void 0 : _a2.files[0];
+        if (!file) throw Error("Choose a research JSON file.");
+        if (file.size > 1024 ** 2) throw Error("Research packs are limited to 1 MiB.");
+        const documentValue = JSON.parse(await file.text());
+        requireCurrent();
+        state2.researchImport = null;
+        const review3 = await run2("research.preview", { document: documentValue });
+        state2.researchImport = { scope, document: documentValue, review: review3, file, name: file.name };
+        ctx2.setDraft("research-replace", "");
+        return ctx2.render();
+      },
+      "research-apply": async () => {
+        var _a2, _b2, _c2;
+        requireCurrent();
+        const packet = state2.researchImport;
+        if ((packet == null ? void 0 : packet.scope) !== scope || !((_a2 = packet.review) == null ? void 0 : _a2.review_id)) throw Error("Review this research pack first.");
+        const selected2 = (_b2 = document.getElementById("research-file")) == null ? void 0 : _b2.files[0];
+        if (packet.file && selected2 && packet.file !== selected2) throw Error("The file changed. Review the new pack first.");
+        const replace = !!((_c2 = document.getElementById("research-replace")) == null ? void 0 : _c2.checked);
+        if (packet.review.replacements.length && !replace) throw Error("Acknowledge the listed replacements first.");
+        await run2("research.apply", { document: packet.document, review_id: packet.review.review_id, replace });
+        state2.researchImport = null;
+        for (const kind of ["assets", "script", "tables", "levels", "sound"]) delete state2.results[kind + ".inspect"];
+        state2.pending = null;
+        await ctx2.render();
+        ctx2.notify("Research imported. Saved editor drafts remain separate.");
+      }
+    });
+    const exp = ((_b = state2.researchExport) == null ? void 0 : _b.scope) === scope ? state2.researchExport.result.export : null, review2 = saved == null ? void 0 : saved.review;
+    const recovered = [];
+    for (const [kind, page] of [["assets", "assets"], ["script", "scripts"], ["tables", "tables"], ["levels", "levels"], ["sound", "sound"]]) {
+      try {
+        const list = JSON.parse(((_c = state2.drafts) == null ? void 0 : _c[state2.project.project_id + ":" + a.artifact_id + ":" + page + ":research-previous-setup"]) || "[]");
+        for (const row of list) if (row.sha256 === a.sha256 && row.kind === kind && row.fields) recovered.push({ ...row, page });
+      } catch {
+      }
+    }
+    ctx2.use({ "research-recover-editor": (node) => {
+      requireCurrent();
+      const backup = recovered[Number(node.dataset.id)];
+      if (!backup) throw Error("Reload recovery setups.");
+      state2.researchRestore = { scope, kind: backup.kind, fields: backup.fields };
+      return ctx2.navigate(backup.page);
+    } });
+    const results = resources.length || notes.length;
+    return '<details class="card" open><summary>Resource browser & research</summary><p class="subtle">Checked saved layouts and your own notes for this exact ROM. Notes do not prove game behavior.</p><div class="field-row">' + field("research-query", "Find a resource or note", ctx2.draft("research-query", "")) + select("research-kind", "Show", names, ctx2.draft("research-kind", "all")) + "</div>" + button("Find", "research-search") + (model.issues || []).map((r) => '<p class="notice warm">' + esc(r.kind) + ": " + esc(r.message) + "</p>").join("") + (model.partial ? '<p class="notice warm">Showing the first 4,096 declared ranges. Narrow the source declarations to inspect more.</p>' : "") + (results ? '<div class="table-wrap"><table><thead><tr><th>Name</th><th>Kind</th><th>File range</th><th>Open</th></tr></thead><tbody>' + resources.map((r) => "<tr><td>" + esc(r.name) + "</td><td>" + esc(r.kind) + "</td><td>0x" + r.offset.toString(16) + " · " + r.length + " bytes</td><td>" + button("Bytes", "research-bytes", { id: String(r.offset) }) + button("Editor", "research-editor", { id: r.editor }) + "</td></tr>").join("") + notes.map((n) => "<tr><td>" + esc(n.title) + "</td><td>User note · " + esc(n.category) + "</td><td>0x" + n.offset.toString(16) + " · " + n.length + " bytes</td><td>" + button("Bytes", "research-bytes", { id: String(n.offset) }) + button("Edit note", "research-edit", { id: n.id }) + button("Remove", "research-delete", { id: n.id }) + "</td></tr>").join("") + "</tbody></table></div>" : "<p>No matching saved resources or notes. Open a known resource, save a checked layout, or add a note below.</p>") + '<div class="actions">' + button("Previous", "research-page", { id: "-1", disabled: !model.page }) + "<span>Page " + ((model.page || 0) + 1) + "</span>" + button("Next", "research-page", { id: "1", disabled: ((model.page || 0) + 1) * 50 >= Math.max(model.resources_total || 0, model.notes_total || 0) }) + '</div><details id="research-note-form"><summary>Research note</summary>' + button("New note at selected byte", "research-new") + field("research-note-title", "Name", ctx2.draft("research-note-title", "")) + '<div class="field-row">' + field("research-note-offset", "File offset", ctx2.draft("research-note-offset", "0")) + field("research-note-length", "Byte length", ctx2.draft("research-note-length", "1")) + select("research-note-category", "Category", categories.map((n) => [n, n]), ctx2.draft("research-note-category", "other")) + "</div>" + area("research-note-text", "What you found", ctx2.draft("research-note-text", ""), 3) + field("research-note-reference", "Evidence or source reference", ctx2.draft("research-note-reference", "")) + button("Save note", "research-save") + '<p class="subtle">User-authored research. Save notes separately from ROM builds.</p></details>' + (recovered.length ? "<details><summary>Previous editor setups</summary><p>Restore an explicitly replaced setup draft. This does not alter saved resource definitions or ROM bytes.</p>" + recovered.map((r, i) => button(r.kind + " · " + r.at, "research-recover-editor", { id: String(i) })).join("") + "</details>" : "") + "<details><summary>Share or import research</summary><p>One exact-revision pack carries saved definitions and notes. Review names, references and definition byte guards before sharing. It contains no game saves or emulator states.</p>" + button("Export research pack", "research-export") + (exp ? button("Download research JSON", "download", { id: exp.export_id }) : "") + fileInput("research-file", "Research pack JSON", ".json") + button("Review selected pack", "research-preview") + (review2 ? '<section class="notice"><h3>Import review</h3><p>' + esc(saved.name || "Research pack") + " · " + review2.definitions.length + " definitions · " + review2.note_count + " notes</p><p>Replaces: " + esc(review2.replacements.join(", ") || "Nothing") + '</p><label><input type="checkbox" id="research-replace"> Replace the listed definitions and matching notes</label><p>Other notes stay. ROM bytes stay unchanged. Existing editor drafts are retained.</p>' + button("Import reviewed research", "research-apply") + "</section>" : "") + "</details></details>";
+  }
+
   // romancer/ui/edit_preview.js
   function numberDelta(before, after) {
     if (typeof after === "string" && !after.trim()) throw Error("Enter a whole number.");
@@ -2016,7 +2250,7 @@
   // romancer/ui/views/tables.js
   var numericTypes = ["u8", "s8", "u16", "s16", "u24", "s24", "u32", "s32"];
   var starter = [{ name: "Value", offset: 0, type: "u8", endian: "little", pointer_base: null }];
-  function integer2(id) {
+  function integer3(id) {
     const text = read(id).trim(), value = Number(text);
     if (!text || !Number.isSafeInteger(value)) throw new Error("Enter a whole number for " + id + ".");
     return value;
@@ -2036,6 +2270,8 @@
   }
   async function render3(ctx2) {
     var _a, _b, _c, _d, _e, _f, _g;
+    const setupReview = useResearchSetup(ctx2, "tables");
+    if (setupReview) return setupReview;
     const { state: state2 } = ctx2, missing = requireProject(ctx2);
     if (missing) return missing;
     const artifact = state2.artifact;
@@ -2085,21 +2321,21 @@
       for (const row of model.rows) for (const [index, cell] of row.cells.entries()) {
         const node = document.getElementById(inputId(row.index, index));
         if (!node) continue;
-        const after = integer2(node.id), key3 = row.index + ":" + cell.field;
+        const after = integer3(node.id), key3 = row.index + ":" + cell.field;
         if (after === cell.value) result.delete(key3);
         else result.set(key3, { row: row.index, field: cell.field, before: cell.value, after });
       }
       return [...result.values()];
     }
     function definition() {
-      const names4 = model ? model.definition.label_source : saved == null ? void 0 : saved.label_source;
-      return { schema_version: 1, name: read("table-name").trim(), offset: integer2("table-offset"), count: integer2("table-count"), stride: integer2("table-stride"), fields: columns2, ...names4 ? { label_source: names4 } : {} };
+      const names5 = model ? model.definition.label_source : saved == null ? void 0 : saved.label_source;
+      return { schema_version: 1, name: read("table-name").trim(), offset: integer3("table-offset"), count: integer3("table-count"), stride: integer3("table-stride"), fields: columns2, ...names5 ? { label_source: names5 } : {} };
     }
     ctx2.use({
       "table-add-field": () => {
         const name = read("table-field-name").trim();
         if (!name) throw new Error("Name the field first.");
-        const field2 = { name, offset: integer2("table-field-offset"), type: read("table-field-type"), endian: read("table-field-endian"), pointer_base: read("table-field-base").trim() ? integer2("table-field-base") : null };
+        const field2 = { name, offset: integer3("table-field-offset"), type: read("table-field-type"), endian: read("table-field-endian"), pointer_base: read("table-field-base").trim() ? integer3("table-field-base") : null };
         ctx2.setDraft("table-fields", JSON.stringify([...columns2, field2]));
         return ctx2.render();
       },
@@ -2127,7 +2363,7 @@
       },
       "table-select-record": async () => {
         if (!model) return;
-        const index = integer2("table-record-choice");
+        const index = integer3("table-record-choice");
         if (!catalog.some((row) => row.index === index)) throw Error("Choose a record from the current table.");
         saveChanges(collectVisible());
         await ctx2.run("tables.inspect", { ...ctx2.sourceParams(), definition: model.definition, page: Math.floor(index / model.limit), limit: model.limit });
@@ -2168,7 +2404,7 @@
         var _a2;
         if (!model) throw new Error("Load a table definition first.");
         const current2 = collectVisible();
-        const result = await ctx2.run("tables.batch", { ...ctx2.sourceParams(), definition: model.definition, field: read("table-batch-field"), operation: read("table-batch-operation"), value: integer2("table-batch-value"), first: integer2("table-batch-first"), count: integer2("table-batch-count") }, { render: false });
+        const result = await ctx2.run("tables.batch", { ...ctx2.sourceParams(), definition: model.definition, field: read("table-batch-field"), operation: read("table-batch-operation"), value: integer3("table-batch-value"), first: integer3("table-batch-first"), count: integer3("table-batch-count") }, { render: false });
         if (((_a2 = state2.results["tables.inspect"]) == null ? void 0 : _a2.document_id) !== model.document_id || result.document_id !== model.document_id) throw Error("Table definition changed. Repeat the batch preview.");
         const merged2 = new Map(current2.map((change) => [change.row + ":" + change.field, change]));
         for (const change of result.changes) {
@@ -2207,6 +2443,52 @@
   __export(help_exports, {
     render: () => render4
   });
+
+  // romancer/ui/popular_references.js
+  var integer4 = (id) => {
+    const text = read(id).trim(), value = Number(text);
+    if (!text || !Number.isSafeInteger(value) || value < 0) throw Error("Enter an explicit whole number for the table offset, record count and stride.");
+    return value;
+  };
+  async function popularReferences(ctx2) {
+    var _a;
+    const { state: state2 } = ctx2, scope = selectionKey(state2), generation = (state2.referenceGeneration || 0) + 1;
+    state2.referenceGeneration = generation;
+    const current2 = () => {
+      var _a2;
+      return scope === selectionKey(state2) && state2.referenceGeneration === generation && ((_a2 = ctx2.isCurrentRender) == null ? void 0 : _a2.call(ctx2)) !== false;
+    };
+    let result;
+    try {
+      result = await ctx2.api.call("references.catalog", { query: state2.referenceQuery || "", system_filter: "all" });
+    } catch (error) {
+      return current2() ? '<details class="card"><summary>Popular-game references</summary><p>' + esc(error.message) + "</p></details>" : "";
+    }
+    if (!current2()) return "";
+    const rows = (result == null ? void 0 : result.references) || [];
+    ctx2.use({
+      "reference-search": () => {
+        state2.referenceQuery = read("reference-query").slice(0, 128);
+        return ctx2.render();
+      },
+      "reference-table": async () => {
+        if (!current2() || !state2.artifact) throw Error("Select a matching-system ROM first.");
+        const params = { ...ctx2.sourceParams(), template_id: read("reference-template"), offset: integer4("reference-offset"), count: integer4("reference-count"), stride: integer4("reference-stride") };
+        const checked = await ctx2.run("references.template", params, { render: false, refresh: false });
+        if (!current2()) return;
+        if (checked.artifact_id !== state2.artifact.artifact_id || checked.source_sha256 !== state2.artifact.sha256) throw Error("The selected ROM changed. Inspect its table again.");
+        state2.tableProposal = { scope, result: checked };
+        return ctx2.navigate("tables");
+      }
+    });
+    const system2 = (_a = state2.artifact) == null ? void 0 : _a.system_id, templates = system2 === "gba" ? [["pokemon-gba", "GBA Pokemon six-stat prefix"]] : system2 === "gb" ? [["pokemon-red-blue", "Red / Blue five-stat prefix"]] : system2 === "gbc" ? [["pokemon-crystal", "Crystal six-stat prefix"]] : [];
+    return '<details class="card"><summary>Popular-game references</summary><p>Primary research for common Pokemon and Mario hacking. These references do not identify your ROM revision or certify modified hacks.</p><div class="toolbar">' + field("reference-query", "Find a game or topic", state2.referenceQuery || "") + button("Search references", "reference-search") + "</div>" + rows.map((r) => {
+      var _a2;
+      return '<details class="config"><summary>' + esc(r.title) + " · " + esc(r.system_id) + "</summary><ul>" + r.facts.map((s) => "<li>" + esc(s) + "</li>").join("") + "</ul>" + (((_a2 = r.addresses) == null ? void 0 : _a2.length) ? '<div class="table-wrap"><table><thead><tr><th>Published label</th><th>CPU RAM address</th></tr></thead><tbody>' + r.addresses.map((a) => "<tr><td>" + esc(a.name) + "</td><td>0x" + a.address.toString(16) + "</td></tr>").join("") + '</tbody></table></div><p class="subtle">Runtime RAM leads; these are not ROM file offsets.</p>' : "") + '<a href="' + esc(r.url) + '" target="_blank" rel="noopener noreferrer">Primary source · ' + esc(r.commit.slice(0, 12)) + "</a></details>";
+    }).join("") + (templates.length ? '<details class="config"><summary>Preview a documented stat-table layout</summary><p>Establish the table base, actual record stride and record count from your matching project or verified symbols. No address is guessed. Only the documented prefix is exposed; other bytes stay outside this template.</p>' + select("reference-template", "Layout", templates, ctx2.draft("reference-template", templates[0][0])) + '<div class="field-row">' + field("reference-offset", "Verified table file offset", ctx2.draft("reference-offset", "")) + field("reference-count", "Record count", ctx2.draft("reference-count", "1")) + field("reference-stride", "Bytes per full record", ctx2.draft("reference-stride", "")) + "</div>" + button("Preview table layout", "reference-table") + '<p class="subtle">This opens a table proposal. Save the layout only after checking its values and identities.</p></details>' : '<p class="subtle">Select a GB, GBC or GBA ROM to inspect an applicable documented stat-prefix template.</p>') + "</details>";
+  }
+
+  // romancer/ui/views/help.js
   async function render4(ctx2) {
     const { state: state2 } = ctx2;
     const result = await ctx2.api.call("help.list", { query: state2.helpQuery || "", topic: state2.helpTopic || "start" });
@@ -2222,7 +2504,8 @@
       }
     });
     const selected2 = result.selected || result.topics[0];
-    return `${heading("", "Help", "", '<a class="guide-link" href="/user-guide/index.html" target="_blank" rel="noopener noreferrer">User guide</a>' + button("Tutorials", "tutorial-hub", { primary: true }) + button("Keyboard shortcuts", "shortcut-help"))}<div class="help-layout"><section class="card help-index">${field("help-query", "Search offline help", state2.helpQuery || "")}${button("Search help", "help-search", { primary: true })}<nav aria-label="Help topics">${result.topics.map((row) => button(row.title, "help-open", { id: row.id, class: row.id === (selected2 == null ? void 0 : selected2.id) ? "selected-help" : "" })).join("") || "<p>No matching topics. Try a shorter search.</p>"}</nav></section><article class="card help-article">${selected2 ? `<h2>${esc(selected2.title)}</h2><p>${esc(selected2.summary)}</p><ol>${selected2.steps.map((step) => `<li>${esc(step)}</li>`).join("")}</ol><div class="actions">${button("Open resources", "navigate", { id: "resources" })}${button("Playtest", "navigate", { id: "playtest" })}${button("Project settings", "navigate", { id: "settings" })}</div>` : "<h2>Choose a topic</h2><p>Help is included with ROMancer and works offline.</p>"}</article></div>`;
+    const references = await popularReferences(ctx2);
+    return `${heading("", "Help", "", '<a class="guide-link" href="/user-guide/index.html" target="_blank" rel="noopener noreferrer">User guide</a>' + button("Tutorials", "tutorial-hub", { primary: true }) + button("Keyboard shortcuts", "shortcut-help"))}${references}<div class="help-layout"><section class="card help-index">${field("help-query", "Search offline help", state2.helpQuery || "")}${button("Search help", "help-search", { primary: true })}<nav aria-label="Help topics">${result.topics.map((row) => button(row.title, "help-open", { id: row.id, class: row.id === (selected2 == null ? void 0 : selected2.id) ? "selected-help" : "" })).join("") || "<p>No matching topics. Try a shorter search.</p>"}</nav></section><article class="card help-article">${selected2 ? `<h2>${esc(selected2.title)}</h2><p>${esc(selected2.summary)}</p><ol>${selected2.steps.map((step) => `<li>${esc(step)}</li>`).join("")}</ol><div class="actions">${button("Open resources", "navigate", { id: "resources" })}${button("Playtest", "navigate", { id: "playtest" })}${button("Project settings", "navigate", { id: "settings" })}</div>` : "<h2>Choose a topic</h2><p>Help is included with ROMancer and works offline.</p>"}</article></div>`;
   }
 
   // romancer/ui/api.js
@@ -2346,13 +2629,13 @@
 
   // romancer/ui/source_support.js
   var systems = /* @__PURE__ */ new Set(["nes", "snes", "genesis", "gb", "gbc", "gba", "sms"]);
-  var names = { nes: "NES", snes: "SNES", genesis: "Genesis", gb: "Game Boy", gbc: "Game Boy Color", gba: "GBA", sms: "Master System (basic)" };
+  var names2 = { nes: "NES", snes: "SNES", genesis: "Genesis", gb: "Game Boy", gbc: "Game Boy Color", gba: "GBA", sms: "Master System (basic)" };
   function sourceSupport(ctx2) {
     var _a, _b, _c, _d, _e, _f, _g;
     const a = ctx2.state.artifact;
     if (!a) return "";
     const allowed = systems.has(a.system_id), d = a.descriptors || {}, scan = (_b = (_a = ctx2.state.romScans) == null ? void 0 : _a[selectionKey(ctx2.state)]) == null ? void 0 : _b.result, profile = ((_c = scan == null ? void 0 : scan.identification) == null ? void 0 : _c.status) === "MATCHED";
-    return `<details class="card"><summary>What is known about this source ${badge(allowed ? "Supported system" : "Inspect only", allowed ? "good" : "warm")}</summary><p>System: ${esc(allowed ? names[a.system_id] : "Unresolved or unsupported")} · ${profile ? "Exact game revision verified" : "Game-specific meanings require a verified definition"}</p><p>Saved definitions: ${Object.entries({ Graphics: !!d.assets, Text: !!d.script, Tables: !!d.tables, Levels: !!d.levels, Samples: !!((_e = (_d = d.sound) == null ? void 0 : _d.samples) == null ? void 0 : _e.length), Music: !!((_g = (_f = d.sound) == null ? void 0 : _f.songs) == null ? void 0 : _g.length) }).filter(([, v]) => v).map(([name]) => name).join(" · ") || "None yet"}</p><p>Known means a verified revision or documented system format. Saved declarations are checked when opened. Candidates and unknown data do not establish game behavior.</p><div class="actions">${button("Inspect bytes & health", "navigate", { id: "resources" })}${button("System setup", "navigate", { id: "playtest", disabled: !allowed })}</div></details>`;
+    return `<details class="card"><summary>What is known about this source ${badge(allowed ? "Supported system" : "Inspect only", allowed ? "good" : "warm")}</summary><p>System: ${esc(allowed ? names2[a.system_id] : "Unresolved or unsupported")} · ${profile ? "Exact game revision verified" : "Game-specific meanings require a verified definition"}</p><p>Saved definitions: ${Object.entries({ Graphics: !!d.assets, Text: !!d.script, Tables: !!d.tables, Levels: !!d.levels, Samples: !!((_e = (_d = d.sound) == null ? void 0 : _d.samples) == null ? void 0 : _e.length), Music: !!((_g = (_f = d.sound) == null ? void 0 : _f.songs) == null ? void 0 : _g.length) }).filter(([, v]) => v).map(([name]) => name).join(" · ") || "None yet"}</p><p>Known means a verified revision or documented system format. Saved declarations are checked when opened. Candidates and unknown data do not establish game behavior.</p><div class="actions">${button("Inspect bytes & health", "navigate", { id: "resources" })}${button("System setup", "navigate", { id: "playtest", disabled: !allowed })}</div></details>`;
   }
   async function resourceRelationships(ctx2) {
     var _a, _b, _c, _d;
@@ -2374,8 +2657,8 @@
       ctx2.state.resourceJump = offset;
       return ctx2.navigate("resources");
     } });
-    const names4 = new Map(result.nodes.map((n) => [n.id, n.name]));
-    return `<details class="card"><summary>Declared resource relationships</summary><p>Source-bound ranges and explicit editor relationships. Game behavior still needs native verification.</p>${result.partial ? '<p class="notice warm">Showing ' + result.exit_connections.listed + " of " + result.exit_connections.declared + " declared exit links. Undeclared relationships remain unknown.</p>" : ""}<div class="table-wrap"><table><thead><tr><th>Resource</th><th>File offset</th><th>Bytes</th></tr></thead><tbody>${result.nodes.map((n) => `<tr><td>${esc(n.name)}</td><td>${button("0x" + n.offset.toString(16), "relationship-open", { id: String(n.offset) })}</td><td>${n.length}</td></tr>`).join("")}</tbody></table></div>${result.edges.map((e) => `<p>${esc(names4.get(e.from) || e.from)} → ${esc(names4.get(e.to) || e.to)} · ${esc(e.relation)}</p>`).join("")}</details>`;
+    const names5 = new Map(result.nodes.map((n) => [n.id, n.name]));
+    return `<details class="card"><summary>Declared resource relationships</summary><p>Source-bound ranges and explicit editor relationships. Game behavior still needs native verification.</p>${result.partial ? '<p class="notice warm">Showing ' + result.exit_connections.listed + " of " + result.exit_connections.declared + " declared exit links. Undeclared relationships remain unknown.</p>" : ""}<div class="table-wrap"><table><thead><tr><th>Resource</th><th>File offset</th><th>Bytes</th></tr></thead><tbody>${result.nodes.map((n) => `<tr><td>${esc(n.name)}</td><td>${button("0x" + n.offset.toString(16), "relationship-open", { id: String(n.offset) })}</td><td>${n.length}</td></tr>`).join("")}</tbody></table></div>${result.edges.map((e) => `<p>${esc(names5.get(e.from) || e.from)} → ${esc(names5.get(e.to) || e.to)} · ${esc(e.relation)}</p>`).join("")}</details>`;
   }
 
   // romancer/ui/room_editor.js
@@ -2866,7 +3149,7 @@
     var _a, _b;
     return (r == null ? void 0 : r.source_sha256) === ((_a = state2.artifact) == null ? void 0 : _a.sha256) && r.artifact_id === ((_b = state2.artifact) == null ? void 0 : _b.artifact_id);
   };
-  function integer3(id, min, max) {
+  function integer5(id, min, max) {
     const text = read(id), v = Number(text);
     if (!text.trim() || !Number.isSafeInteger(v) || v < min || v > max) throw Error("Enter a whole number from " + min + " to " + max + ".");
     return v;
@@ -2906,7 +3189,7 @@
     }
     const result = identity(state2, entry.result) ? entry.result : null, available = ((_b = entry.capabilities) == null ? void 0 : _b.available) === true;
     const reason = ((_c = entry.capabilities) == null ? void 0 : _c.reason) || entry.error || "The native debugger is unavailable for this source or host.";
-    const steps2 = () => entry.steps.map((_, i) => ({ frames: integer3("trace-frames-" + i, 1, 3600), buttons: read("trace-buttons-" + i).split(/[\s,]+/).filter(Boolean), port: 0 }));
+    const steps2 = () => entry.steps.map((_, i) => ({ frames: integer5("trace-frames-" + i, 1, 3600), buttons: read("trace-buttons-" + i).split(/[\s,]+/).filter(Boolean), port: 0 }));
     const accept = async (operation, parameters) => {
       if (!current2()) throw Error("The selected source changed. Open its native capture again.");
       const generation = ++entry.generation;
@@ -2923,9 +3206,9 @@
       "trace-capture": () => {
         if (!current2()) throw Error("The selected source changed.");
         if (!available) throw Error(reason);
-        const replay = { steps: steps2(), start_frame: integer3("trace-start", 0, 3599), event_limit: integer3("trace-limit", 1, 2e3), instruction_limit: 2e7, timeout: 30 };
+        const replay = { steps: steps2(), start_frame: integer5("trace-start", 0, 3599), event_limit: integer5("trace-limit", 1, 2e3), instruction_limit: 2e7, timeout: 30 };
         if (proposal) return accept("debugger.investigate", { investigation_id: proposal.investigation_id, candidate_id: proposal.candidate.candidate_id, replay });
-        const start = integer3("trace-address", 0, 268435455), length = integer3("trace-length", 1, 4096);
+        const start = integer5("trace-address", 0, 268435455), length = integer5("trace-length", 1, 4096);
         return accept("debugger.capture", { config: { ...replay, probes: [{ kind: read("trace-kind"), start, end: start + length - 1 }] } });
       },
       "trace-add-step": async () => {
@@ -3033,7 +3316,7 @@
   }
 
   // romancer/ui/data_relocation.js
-  function integer4(id) {
+  function integer6(id) {
     const text = read(id), value = Number(text);
     if (!text.trim() || !Number.isSafeInteger(value)) throw Error("Enter a whole number for " + id + ".");
     return value;
@@ -3051,23 +3334,23 @@
     const originDefault = state2.artifact.system_id === "nes" ? (prg == null ? void 0 : prg.offset) ?? 16 : 0;
     const baseDefault = state2.artifact.system_id === "nes" ? 32768 - originDefault : state2.artifact.system_id === "gba" ? 134217728 : 0;
     const references = () => entry.references.map((_, i) => ({
-      offset: integer4("reloc-ref-offset-" + i),
-      width: integer4("reloc-ref-width-" + i),
+      offset: integer6("reloc-ref-offset-" + i),
+      width: integer6("reloc-ref-width-" + i),
       endian: read("reloc-ref-endian-" + i),
-      base: integer4("reloc-ref-base-" + i),
-      target_delta: integer4("reloc-ref-delta-" + i)
+      base: integer6("reloc-ref-base-" + i),
+      target_delta: integer6("reloc-ref-delta-" + i)
     }));
     const spec = () => {
       var _a2;
       return {
-        source_offset: integer4("reloc-source"),
-        source_length: integer4("reloc-length"),
-        target_offset: integer4("reloc-target"),
-        target_capacity: integer4("reloc-capacity"),
-        fill_byte: integer4("reloc-fill"),
-        alignment: integer4("reloc-alignment"),
-        bank_size: integer4("reloc-bank"),
-        bank_origin: integer4("reloc-origin"),
+        source_offset: integer6("reloc-source"),
+        source_length: integer6("reloc-length"),
+        target_offset: integer6("reloc-target"),
+        target_capacity: integer6("reloc-capacity"),
+        fill_byte: integer6("reloc-fill"),
+        alignment: integer6("reloc-alignment"),
+        bank_size: integer6("reloc-bank"),
+        bank_origin: integer6("reloc-origin"),
         references: references(),
         references_complete: document.getElementById("reloc-references-complete").checked,
         destination_reserved: document.getElementById("reloc-destination-reserved").checked,
@@ -3197,7 +3480,7 @@
       return [...this.changes].sort(([a], [b]) => a - b).map(([offset, after]) => ({ offset, before: this.original.get(offset), after }));
     }
   };
-  var integer5 = (value) => {
+  var integer7 = (value) => {
     const n = Number(value);
     if (!Number.isSafeInteger(n) || n < 0) throw Error("Enter a nonnegative decimal or 0x hex offset.");
     return n;
@@ -3226,7 +3509,7 @@
     return draft;
   }
   function hexEditor(ctx2, data) {
-    var _a, _b, _c, _d, _e, _f, _g, _h;
+    var _a, _b, _c, _d, _e, _f, _g, _h, _i;
     const { state: state2 } = ctx2;
     if (data.artifact_id !== ((_a = state2.artifact) == null ? void 0 : _a.artifact_id) || data.sha256 !== ((_b = state2.artifact) == null ? void 0 : _b.sha256)) throw Error("The selected ROM changed. Load bytes for the current selection.");
     const ticket = selectionKey(state2);
@@ -3258,7 +3541,7 @@
       return result;
     };
     const go = async (offset) => {
-      const result = await scoped("resource.inspect", { offset: Math.min(integer5(offset), Math.max(0, state2.artifact.size - 1)), length: 256 });
+      const result = await scoped("resource.inspect", { offset: Math.min(integer7(offset), Math.max(0, state2.artifact.size - 1)), length: 256 });
       state2.results["resource.inspect"] = result;
       draft.selected = result.offset;
       ctx2.setDraft("hex-offset", String(result.offset));
@@ -3275,7 +3558,7 @@
         return ctx2.render();
       },
       "hex-search": async () => {
-        state2.hexSearch = { scope: ticket, result: await scoped("hex.search", { kind: read("hex-search-kind"), query: read("hex-search-query"), start: integer5(read("hex-search-start")), endian: read("hex-endian"), width: Number(read("hex-width")), signed: read("hex-signed") === "true" }) };
+        state2.hexSearch = { scope: ticket, result: await scoped("hex.search", { kind: read("hex-search-kind"), query: read("hex-search-query"), start: integer7(read("hex-search-start")), endian: read("hex-endian"), width: Number(read("hex-width")), signed: read("hex-signed") === "true" }) };
         await ctx2.render();
       },
       "hex-search-more": async () => {
@@ -3348,7 +3631,7 @@
  ${reviewed ? `<div class="notice">${state2.hexReview.plan.changed_bytes} bytes in the reviewed plan, including supported checksum repairs.</div>` : ""}
  <details><summary>Search bytes, text or numbers</summary><div class="field-row">${select("hex-search-kind", "Search for", [["hex", "Hex pattern (?? wildcard)"], ["text", "UTF-8 text"], ["number", "Integer"]], ctx2.draft("hex-search-kind", "hex"))}${field("hex-search-query", "Pattern or value", ctx2.draft("hex-search-query", ""))}${field("hex-search-start", "Start offset", ctx2.draft("hex-search-start", "0"))}</div><div class="field-row">${select("hex-endian", "Byte order", [["little", "Little endian"], ["big", "Big endian"]], ctx2.draft("hex-endian", "little"))}${select("hex-width", "Number width", [[1, "8-bit"], [2, "16-bit"], [4, "32-bit"]], ctx2.draft("hex-width", "2"))}${select("hex-signed", "Number sign", [["false", "Unsigned"], ["true", "Signed"]], ctx2.draft("hex-signed", "false"))}</div>${button("Search selected file", "hex-search")}
  ${search ? `<p>${search.offsets.length} matches · ${search.complete ? "Reached end of file" : `Scanned through 0x${search.scanned_to.toString(16)}`}</p><div class="actions">${search.offsets.slice(0, 1e3).map((o) => button("0x" + o.toString(16), "hex-jump", { id: String(o) })).join("")}</div>${search.complete ? "" : button("Set next search position", "hex-search-more")}` : ""}</details>
- <details><summary>Number inspector & bookmarks</summary><p>Selected offset: <code id="hex-selected">0x${draft.selected.toString(16)}</code></p>${button("Explain selected bytes", "hex-explain")}${button("Inspect selected number", "hex-numbers")}<div id="hex-explanation">${((_h = state2.hexExplanation) == null ? void 0 : _h.scope) === ticket && state2.hexExplanation.result.offset === draft.selected ? `<p>${esc(state2.hexExplanation.result.note)}</p>${state2.hexExplanation.result.interpretations.map((row) => `<dl><dt>${esc(row.name)} · declared</dt><dd>File offset 0x${row.offset.toString(16)} · ${row.length} bytes${row.type ? " · " + esc(row.type) + " " + esc(row.endian) + " · value " + esc(row.value) + " · numeric range " + row.minimum + "–" + row.maximum : ""}${row.description ? "<br>" + esc(row.description) : ""}</dd></dl>`).join("")}` : ""}</div><div id="hex-number-result">${numbers ? `<dl>${Object.entries(numbers.values).map(([k, v]) => `<dt>${esc(k)}</dt><dd>${esc(v)}</dd>`).join("")}</dl>` : ""}</div>${field("hex-bookmark-name", "Bookmark name", ctx2.draft("hex-bookmark-name", ""))}<div class="actions">${button("Bookmark selected byte", "hex-bookmark")}${button("Load bookmarks", "hex-bookmarks")}</div>${((marks == null ? void 0 : marks.bookmarks) || []).map((r) => `<div class="actions">${button(`${r.name} · 0x${r.offset.toString(16)}`, "hex-jump", { id: String(r.offset) })}${button("Remove", "hex-unbookmark", { id: String(r.offset) })}</div>`).join("")}</details></section>`;
+ <details><summary>Number inspector & bookmarks</summary><p>Selected offset: <code id="hex-selected">0x${draft.selected.toString(16)}</code></p>${button("Explain selected bytes", "hex-explain")}${button("Inspect selected number", "hex-numbers")}<div id="hex-explanation">${((_h = state2.hexExplanation) == null ? void 0 : _h.scope) === ticket && state2.hexExplanation.result.offset === draft.selected ? researchNoteHelp(state2.hexExplanation.result.research_notes) : ""}${((_i = state2.hexExplanation) == null ? void 0 : _i.scope) === ticket && state2.hexExplanation.result.offset === draft.selected ? `<p>${esc(state2.hexExplanation.result.note)}</p>${state2.hexExplanation.result.interpretations.map((row) => `<dl><dt>${esc(row.name)} · declared</dt><dd>File offset 0x${row.offset.toString(16)} · ${row.length} bytes${row.type ? " · " + esc(row.type) + " " + esc(row.endian) + " · value " + esc(row.value) + " · numeric range " + row.minimum + "–" + row.maximum : ""}${row.description ? "<br>" + esc(row.description) : ""}</dd></dl>`).join("")}` : ""}</div><div id="hex-number-result">${numbers ? `<dl>${Object.entries(numbers.values).map(([k, v]) => `<dt>${esc(k)}</dt><dd>${esc(v)}</dd>`).join("")}</dl>` : ""}</div>${field("hex-bookmark-name", "Bookmark name", ctx2.draft("hex-bookmark-name", ""))}<div class="actions">${button("Bookmark selected byte", "hex-bookmark")}${button("Load bookmarks", "hex-bookmarks")}</div>${((marks == null ? void 0 : marks.bookmarks) || []).map((r) => `<div class="actions">${button(`${r.name} · 0x${r.offset.toString(16)}`, "hex-jump", { id: String(r.offset) })}${button("Remove", "hex-unbookmark", { id: String(r.offset) })}</div>`).join("")}</details></section>`;
   }
   async function hexComparison(ctx2, data) {
     const saved = ctx2.state.hexComparison, a = ctx2.state.artifact, p = ctx2.state.project, scope = selectionKey(ctx2.state);
@@ -3507,7 +3790,7 @@
   }
 
   // romancer/ui/compression_controls.js
-  function integer6(id) {
+  function integer8(id) {
     const text = read(id).trim(), value = Number(text);
     if (!text || !Number.isSafeInteger(value)) throw new Error("Enter a whole number for " + id + ".");
     return value;
@@ -3540,7 +3823,7 @@
       var _a2;
       return ((_a2 = compressedRoot(state2, row)) == null ? void 0 : _a2.artifact_id) === root.artifact_id;
     }) : [];
-    const parameters = () => ({ ...ctx2.sourceParams(), offset: integer6("compression-offset"), allocation: integer6("compression-allocation"), codec: read("compression-codec") });
+    const parameters = () => ({ ...ctx2.sourceParams(), offset: integer8("compression-offset"), allocation: integer8("compression-allocation"), codec: read("compression-codec") });
     ctx2.use({
       "compression-inspect": () => ctx2.run("compression.inspect", parameters()),
       "compression-extract": () => ctx2.run("compression.extract", parameters()),
@@ -3579,7 +3862,7 @@
 
   // romancer/ui/discovery_controls.js
   var systems2 = [["nes", "NES"], ["snes", "SNES"], ["genesis", "GEN"], ["gb", "Game Boy"], ["gbc", "Game Boy Color"], ["gba", "GBA"], ["sms", "Master System"]];
-  function integer7(id) {
+  function integer9(id) {
     const text = read(id).trim(), value = Number(text);
     if (!text || !Number.isSafeInteger(value)) throw new Error("Enter a whole number for " + id + ".");
     return value;
@@ -3594,8 +3877,8 @@
         const kind = read("discover-kind");
         state2.discoveryPage = 0;
         const kinds = kind === "all" ? ["text", "graphics", "compression"] : [kind];
-        const target = kind === "pointers" ? { offset: integer7("discover-target"), width: integer7("discover-width"), endian: read("discover-endian"), base: integer7("discover-base") } : null;
-        return ctx2.run("resources.discover", { ...ctx2.sourceParams(), config: { system_id: read("discover-system"), start: integer7("discover-start"), length: integer7("discover-length"), kinds, target } });
+        const target = kind === "pointers" ? { offset: integer9("discover-target"), width: integer9("discover-width"), endian: read("discover-endian"), base: integer9("discover-base") } : null;
+        return ctx2.run("resources.discover", { ...ctx2.sourceParams(), config: { system_id: read("discover-system"), start: integer9("discover-start"), length: integer9("discover-length"), kinds, target } });
       },
       "discover-compressed": async (node) => {
         const row = result == null ? void 0 : result.candidates.find((row2) => row2.candidate_id === node.dataset.id);
@@ -3659,6 +3942,10 @@
         state2.resourceJump = null;
       }
     }
+    const research = a ? await researchTools(ctx2) : "";
+    if (!current2()) return "";
+    const references = await popularReferences(ctx2);
+    if (!current2()) return "";
     const observed = a ? await observedSourceContext(ctx2) : "";
     if (!current2()) return "";
     const relocation = a ? await relocationControls(ctx2) : "";
@@ -3747,7 +4034,7 @@
     });
     if (!a) return `${heading("Workspace", "Resources", "")}${empty("Import a source", "Choose a cartridge image.", button("Import source", "import", { primary: true }))}`;
     const pending = ((_c = state2.pending) == null ? void 0 : _c.kind) === "bytes" && state2.pending.artifact_id === a.artifact_id;
-    return `${heading("Resource investigator", "Resources", "Inspect the exact selected revision. Generic edits require explicit old bytes and preserve file size.", button("Import source", "import", { icon: "plus" }))}<div class="identity">${badge(a.kind, a.kind === "build" ? "good" : "neutral")}<strong>${esc(a.name)}</strong><span>${esc(a.system)} · ${size(a.size)}</span><code title="${a.sha256}">SHA-256 ${short(a.sha256)}…</code></div>${a.source_id ? `<section class="card"><h3>Continue editing this build</h3>${((_d = a.plan_annotations) == null ? void 0 : _d.kind) === "declared-data-relocation-v1" ? "<p>Data moved. Original fixed-offset declarations are not reused.</p>" + button("Inspect moved bytes", "resource-moved-open") + (((_f = (_e = state2.project.sources.concat(state2.project.builds).find((r) => r.artifact_id === a.source_id)) == null ? void 0 : _e.descriptors) == null ? void 0 : _f.tables) ? button("Open moved table layout", "resource-moved-table") : "") : button("Reuse parent resource setup", "definitions-reuse") + '<p class="subtle">Re-read declared offsets against this build.</p>'}</section>` : ""}${observed}<div class="investigation-grid">${hexEditor(ctx2, data)}${byteNotes}</div>${comparison}${sourceSupport(ctx2)}${relationships}${scanControls(ctx2)}<details class="card"><summary>ROM health & revision</summary>${romHealthPanel(ctx2)}${revisionControls(ctx2)}${cheatControls(ctx2)}</details><details class="card"><summary>Find resources</summary>${discoveryControls(ctx2)}</details>${compressionControls(ctx2)}${relocation}<details class="card"><summary>Declared resource catalog</summary>${catalogSection(ctx2, catalog)}</details><details class="card"><summary>System layout</summary>${systemSection(ctx2, assessment)}</details>${report(state2.results["bytes.plan"], "Proposed byte changes")}${report(state2.results["build.apply"], "Build result")}`;
+    return `${heading("Resource investigator", "Resources", "Inspect the exact selected revision. Generic edits require explicit old bytes and preserve file size.", button("Import source", "import", { icon: "plus" }))}<div class="identity">${badge(a.kind, a.kind === "build" ? "good" : "neutral")}<strong>${esc(a.name)}</strong><span>${esc(a.system)} · ${size(a.size)}</span><code title="${a.sha256}">SHA-256 ${short(a.sha256)}…</code></div>${a.source_id ? `<section class="card"><h3>Continue editing this build</h3>${((_d = a.plan_annotations) == null ? void 0 : _d.kind) === "declared-data-relocation-v1" ? "<p>Data moved. Original fixed-offset declarations are not reused.</p>" + button("Inspect moved bytes", "resource-moved-open") + (((_f = (_e = state2.project.sources.concat(state2.project.builds).find((r) => r.artifact_id === a.source_id)) == null ? void 0 : _e.descriptors) == null ? void 0 : _f.tables) ? button("Open moved table layout", "resource-moved-table") : "") : button("Reuse parent resource setup", "definitions-reuse") + '<p class="subtle">Re-read declared offsets against this build.</p>'}</section>` : ""}${observed}<div class="investigation-grid">${hexEditor(ctx2, data)}${byteNotes}</div>${comparison}${research}${references}${sourceSupport(ctx2)}${relationships}${scanControls(ctx2)}<details class="card"><summary>ROM health & revision</summary>${romHealthPanel(ctx2)}${revisionControls(ctx2)}${cheatControls(ctx2)}</details><details class="card"><summary>Find resources</summary>${discoveryControls(ctx2)}</details>${compressionControls(ctx2)}${relocation}<details class="card"><summary>Declared resource catalog</summary>${catalogSection(ctx2, catalog)}</details><details class="card"><summary>System layout</summary>${systemSection(ctx2, assessment)}</details>${report(state2.results["bytes.plan"], "Proposed byte changes")}${report(state2.results["build.apply"], "Build result")}`;
   }
   function parseInteger(value) {
     const n = Number(value);
@@ -3774,7 +4061,7 @@
   });
 
   // romancer/ui/menu_preview.js
-  var integer8 = (value, min, max, label) => {
+  var integer10 = (value, min, max, label) => {
     if (!Number.isSafeInteger(value) || value < min || value > max) throw Error("Invalid declared " + label + ".");
     return value;
   };
@@ -3788,13 +4075,13 @@
     if (schema.length > 1024 ** 2 || config.length > 1024 ** 2) throw Error("Menu declaration exceeds its preview budget.");
     return { schema: JSON.parse(schema), config: JSON.parse(config) };
   }
-  function names2(ctx2, doc) {
+  function names3(ctx2, doc) {
     return doc.records.map((record, index) => ({ record, texts: record.segments.map((segment) => {
       var _a;
       return ((_a = document.getElementById(`script-segment-${index}-${segment.index}`)) == null ? void 0 : _a.value) ?? ctx2.draft(`script-segment-${index}-${segment.index}`, segment.text);
     }) }));
   }
-  var textSignature = (ctx2, doc) => JSON.stringify(names2(ctx2, doc).map((row) => [row.record.id, row.texts]));
+  var textSignature = (ctx2, doc) => JSON.stringify(names3(ctx2, doc).map((row) => [row.record.id, row.texts]));
   function current(ctx2, owned) {
     var _a;
     const { state: state2 } = ctx2, doc = state2.results["script.inspect"];
@@ -3811,13 +4098,13 @@
     const result = /* @__PURE__ */ new Map();
     let budget = 0;
     for (const glyph of metrics.glyphs) {
-      const bitmap = glyph.bitmap || {}, width = integer8(bitmap.width, 1, 32, "glyph width"), height = integer8(bitmap.height, 1, 32, "glyph height"), stride = integer8(bitmap.row_stride, 1, 4, "glyph row stride");
+      const bitmap = glyph.bitmap || {}, width = integer10(bitmap.width, 1, 32, "glyph width"), height = integer10(bitmap.height, 1, 32, "glyph height"), stride = integer10(bitmap.row_stride, 1, 4, "glyph row stride");
       if (stride !== Math.ceil(width / 8) || typeof bitmap.raw_hex !== "string" || bitmap.raw_hex.length !== stride * height * 2 || !/^[a-f0-9]+$/i.test(bitmap.raw_hex) || result.has(glyph.id)) throw Error("Measured glyph bitmap data is unavailable or ambiguous.");
       const raw = Uint8Array.from(bitmap.raw_hex.match(/../g), (value) => parseInt(value, 16)), mask = (1 << (8 - width % 8) % 8) - 1;
       for (let y = 0; y < height; y++) if (raw[(y + 1) * stride - 1] & mask) throw Error("Measured glyph has unsupported padding bits.");
-      integer8((_a = glyph.bearing) == null ? void 0 : _a.x, -64, 64, "glyph bearing");
-      integer8((_b = glyph.bearing) == null ? void 0 : _b.y, -64, 64, "glyph bearing");
-      integer8(glyph.advance_pixels, 0, 128, "glyph advance");
+      integer10((_a = glyph.bearing) == null ? void 0 : _a.x, -64, 64, "glyph bearing");
+      integer10((_b = glyph.bearing) == null ? void 0 : _b.y, -64, 64, "glyph bearing");
+      integer10(glyph.advance_pixels, 0, 128, "glyph advance");
       budget += raw.length;
       if (budget > 65536) throw Error("Measured font bitmap budget exceeded.");
       result.set(glyph.id, { ...glyph, width, height, stride, raw });
@@ -3840,8 +4127,8 @@
     if (((_b = config.font_schema) == null ? void 0 : _b.codec) !== "mono-row-msb-v1") throw Error("This font storage format has no declared bitmap preview.");
     if (preview.source_sha256 !== doc.source_sha256 || preview.document_id !== doc.document_id || preview.schema_sha256 !== doc.schema_sha256 || ((_c = preview.script) == null ? void 0 : _c.document_id) !== doc.document_id) throw Error("Menu layout belongs to different source text.");
     if (preview.font_sha256 !== metrics.source_sha256 || metrics.source_sha256 !== ((_d = config.font_schema.source) == null ? void 0 : _d.sha256) || preview.font_schema_sha256 !== metrics.font_schema_sha256 || preview.metrics_id !== metrics.metrics_id) throw Error("Menu placements and font measurements have different identities.");
-    const viewport = (_e = preview.profile) == null ? void 0 : _e.viewport, width = integer8(viewport == null ? void 0 : viewport.width, 1, 1024, "viewport width"), height = integer8(viewport == null ? void 0 : viewport.height, 1, 1024, "viewport height");
-    integer8(preview.profile.line_height_px, 1, 64, "line height");
+    const viewport = (_e = preview.profile) == null ? void 0 : _e.viewport, width = integer10(viewport == null ? void 0 : viewport.width, 1, 1024, "viewport width"), height = integer10(viewport == null ? void 0 : viewport.height, 1, 1024, "viewport height");
+    integer10(preview.profile.line_height_px, 1, 64, "line height");
     if (!Array.isArray(preview.cases) || !preview.cases.length || preview.cases.length > 32 || width * height * preview.cases.length > 8 * 1024 ** 2) throw Error("Declared cases exceed the menu canvas budget.");
     let cells = 0, placements = 0;
     for (const row of preview.cases) {
@@ -3910,14 +4197,14 @@
     for (const cell of row.cells) {
       const bounds2 = cell.box_bounds;
       if (!Array.isArray(bounds2) || bounds2.length !== 4) throw Error("Declared cell bounds are unavailable.");
-      for (const value of bounds2) integer8(value, -131072, 131072, "cell bounds");
+      for (const value of bounds2) integer10(value, -131072, 131072, "cell bounds");
       const { placements, advance } = placementsFor(cell, edited, drafts, owned.prepared);
       if (Number.isSafeInteger(advance) && advance > bounds2[2] - bounds2[0]) warnings.add("Text advance exceeds a declared box.");
       if (owned.preview.profile.line_height_px > bounds2[3] - bounds2[1]) warnings.add("Declared line height exceeds its box.");
       for (const placement of placements) {
         const glyph = font.get(placement.glyph_id);
         if (!glyph) throw Error("A placed glyph is missing from the measured font.");
-        const left = integer8(placement.x, -131072, 131072, "glyph position") + glyph.bearing.x, top = integer8(placement.y, -131072, 131072, "glyph position") + glyph.bearing.y;
+        const left = integer10(placement.x, -131072, 131072, "glyph position") + glyph.bearing.x, top = integer10(placement.y, -131072, 131072, "glyph position") + glyph.bearing.y;
         for (let y = 0; y < glyph.height; y++) for (let x = 0; x < glyph.width; x++) if (glyph.raw[y * glyph.stride + (x >> 3)] & 128 >> x % 8) {
           const px = left + x, py = top + y;
           if (px < bounds2[0] || px >= bounds2[2] || py < bounds2[1] || py >= bounds2[3]) warnings.add("Glyph ink exceeds a declared box.");
@@ -3952,7 +4239,7 @@
         root.innerHTML = '<p class="error" role="status">Menu preview unavailable: source or declarations changed. Preview menu again.</p>';
         return;
       }
-      const drafts = new Map(names2(ctx2, doc).map((row) => [row.record.id, row]));
+      const drafts = new Map(names3(ctx2, doc).map((row) => [row.record.id, row]));
       for (const [i, row] of owned.preview.cases.entries()) {
         let before = null, after = null;
         const errors = [];
@@ -4066,12 +4353,12 @@
 
   // romancer/ui/declarations.js
   var systems3 = [["nes", "NES"], ["snes", "SNES"], ["genesis", "Genesis"], ["gb", "Game Boy"], ["gbc", "Game Boy Color"], ["gba", "GBA"], ["sms", "Master System"]];
-  var integer9 = (id) => {
+  var integer11 = (id) => {
     const text = read(id).trim(), value = Number(text);
     if (!text || !Number.isSafeInteger(value)) throw new Error("Enter a whole number for " + id + ".");
     return value;
   };
-  var optional = (id) => read(id).trim() ? integer9(id) : null;
+  var optional = (id) => read(id).trim() ? integer11(id) : null;
   function system(ctx2, prefix) {
     return select(prefix + "-system", "System", systems3, ctx2.draft(prefix + "-system", resourceSystem(ctx2.state)));
   }
@@ -4098,14 +4385,14 @@
         const [id, opcode, args, role] = line.split(",").map((s) => s.trim());
         return { id, opcode: parseInt(opcode, 16), argument_length: Number(args), position_independent: true, layout_role: role };
       });
-      return declared(ctx2, "script", { system_id: read("text-system"), offset: integer9("text-offset"), capacity: integer9("text-capacity"), count: integer9("text-count"), stride: integer9("text-stride"), pointer_offset: optional("text-pointer"), pointer_width: integer9("text-pointer-width"), pointer_endian: read("text-endian"), pointer_base: integer9("text-base"), terminator: integer9("text-terminator"), padding: integer9("text-padding"), encoding: read("text-encoding"), table: read("text-table"), controls });
+      return declared(ctx2, "script", { system_id: read("text-system"), offset: integer11("text-offset"), capacity: integer11("text-capacity"), count: integer11("text-count"), stride: integer11("text-stride"), pointer_offset: optional("text-pointer"), pointer_width: integer11("text-pointer-width"), pointer_endian: read("text-endian"), pointer_base: integer11("text-base"), terminator: integer11("text-terminator"), padding: integer11("text-padding"), encoding: read("text-encoding"), table: read("text-table"), controls });
     } });
     return `<details class="config" ${ctx2.state.openDeclaration === "text" ? "open" : ""}><summary>Declare text slots</summary>${system(ctx2, "text")}<div class="field-row">${number(ctx2, "text-offset", "First text offset", "0")}${number(ctx2, "text-capacity", "Bytes per slot", "64")}${number(ctx2, "text-count", "Slot count", "1")}${number(ctx2, "text-stride", "Slot stride", "64")}${number(ctx2, "text-pointer", "Pointer table offset (optional)", "")}${number(ctx2, "text-pointer-width", "Pointer bytes", "2")}${number(ctx2, "text-base", "Add to stored pointer for file offset", "0")}${select("text-endian", "Pointer byte order", [["little", "Little endian"], ["big", "Big endian"]], ctx2.draft("text-endian", "little"))}${number(ctx2, "text-terminator", "Terminator byte", "0")}${number(ctx2, "text-padding", "Padding byte", "255")}</div>${select("text-encoding", "Encoding", [["ascii", "ASCII"], ["table", "Custom single-byte table"]], ctx2.draft("text-encoding", "ascii"))}${area("text-table", "Custom table (HH=character)", ctx2.draft("text-table", ""), 3)}${area("text-controls", "Controls (name, hex opcode, argument bytes, line/page/pause/opaque)", ctx2.draft("text-controls", ""), 2)}<p class="subtle">Text pointer formula: file offset = stored value + adjustment. For a GBA ROM window beginning at 0x08000000, use -134217728. This differs from the subtraction base in Data tables.</p>${button("Load text declaration", "declare-text")}</details>`;
   }
   function graphicsDeclaration(ctx2) {
     prefill(ctx2, "gfx");
     ctx2.use({ "declare-graphics": () => {
-      const config = { system_id: read("gfx-system"), offset: integer9("gfx-offset"), count: integer9("gfx-count"), codec: read("gfx-codec"), width: integer9("gfx-width"), height: integer9("gfx-height"), palette_offset: optional("gfx-palette"), palette_banks: integer9("gfx-banks"), palette_format: read("gfx-palette-format"), map_offset: optional("gfx-map"), map_width: integer9("gfx-map-width"), map_height: integer9("gfx-map-height"), font_chars: read("gfx-chars"), advance_offset: optional("gfx-advance"), advance_pixels: integer9("gfx-advance-pixels") };
+      const config = { system_id: read("gfx-system"), offset: integer11("gfx-offset"), count: integer11("gfx-count"), codec: read("gfx-codec"), width: integer11("gfx-width"), height: integer11("gfx-height"), palette_offset: optional("gfx-palette"), palette_banks: integer11("gfx-banks"), palette_format: read("gfx-palette-format"), map_offset: optional("gfx-map"), map_width: integer11("gfx-map-width"), map_height: integer11("gfx-map-height"), font_chars: read("gfx-chars"), advance_offset: optional("gfx-advance"), advance_pixels: integer11("gfx-advance-pixels") };
       return declared(ctx2, "assets", config);
     } });
     return `<details class="config" ${ctx2.state.openDeclaration === "gfx" ? "open" : ""}><summary>Declare graphics or font</summary>${system(ctx2, "gfx")}${select("gfx-codec", "Storage layout", [["", "System tile template"], ["mono-row-msb-v1", "Mono font rows"], ["tile8-planar2-msb-v1", "NES 2bpp separate planes"], ["tile8-paired2-msb-v1", "Game Boy 2bpp paired planes"], ["tile8-rowplanar4-msb-v1", "SMS 4bpp row planes"], ["tile8-paired4-msb-v1", "4bpp paired planes"], ["tile8-packed4-high-v1", "4bpp high nibble first"], ["tile8-packed4-low-v1", "4bpp low nibble first"]], ctx2.draft("gfx-codec", ""))}<div class="field-row">${number(ctx2, "gfx-offset", "Bitmap offset", "0")}${number(ctx2, "gfx-count", "Tile or glyph count", "1")}${number(ctx2, "gfx-width", "Cell width", "8")}${number(ctx2, "gfx-height", "Cell height", "8")}${number(ctx2, "gfx-palette", "Palette offset (optional)", "")}${number(ctx2, "gfx-banks", "Palette banks", "1")}${select("gfx-palette-format", "Palette layout", [["rgb555-le", "RGB555 little endian"], ["rgb555-be", "RGB555 big endian"], ["genesis", "Genesis RGB333"], ["sms-rgb222", "Master System RGB222"]], ctx2.draft("gfx-palette-format", ctx2.state.artifact.system_id === "genesis" ? "genesis" : ctx2.state.artifact.system_id === "sms" ? "sms-rgb222" : "rgb555-le"))}${number(ctx2, "gfx-map", "Tilemap offset (optional)", "")}${number(ctx2, "gfx-map-width", "Map columns", "1")}${number(ctx2, "gfx-map-height", "Map rows", "1")}</div>${field("gfx-chars", "Font characters in cell order (optional)", ctx2.draft("gfx-chars", ""))}<div class="field-row">${number(ctx2, "gfx-advance", "Stored advance table offset (optional)", "")}${number(ctx2, "gfx-advance-pixels", "Fixed advance in pixels", "8")}</div>${button("Load graphics declaration", "declare-graphics")}</details>`;
@@ -4117,11 +4404,11 @@
       return (_a2 = r.descriptors) == null ? void 0 : _a2.font;
     });
     ctx2.use({ "configure-menu": async () => {
-      const result = await ctx2.run("resources.menu_form", { ...ctx2.sourceParams(), font_artifact_id: read("layout-font"), width: integer9("layout-width"), height: integer9("layout-height"), line_height: integer9("layout-line-height") }, { render: false });
+      const result = await ctx2.run("resources.menu_form", { ...ctx2.sourceParams(), font_artifact_id: read("layout-font"), width: integer11("layout-width"), height: integer11("layout-height"), line_height: integer11("layout-line-height") }, { render: false });
       ctx2.setDraft("menu-config", JSON.stringify({ font_artifact_id: result.font_artifact_id, font_schema: result.font_schema, profile: result.profile, cases: result.cases, request: {} }, null, 2));
       await ctx2.render();
     }, "configure-layout": async () => {
-      const result = await ctx2.run("resources.layout_form", { ...ctx2.sourceParams(), font_artifact_id: read("layout-font"), width: integer9("layout-width"), height: integer9("layout-height"), line_height: integer9("layout-line-height") }, { render: false });
+      const result = await ctx2.run("resources.layout_form", { ...ctx2.sourceParams(), font_artifact_id: read("layout-font"), width: integer11("layout-width"), height: integer11("layout-height"), line_height: integer11("layout-line-height") }, { render: false });
       ctx2.setDraft("layout-config", JSON.stringify({ font_artifact_id: result.font_artifact_id, font_schema: result.font_schema, policy: result.policy, request: result.request }, null, 2));
       await ctx2.render();
     } });
@@ -4140,6 +4427,8 @@
   // romancer/ui/views/scripts.js
   async function render7(ctx2) {
     var _a, _b, _c, _d, _e, _f, _g, _h, _i;
+    const setupReview = useResearchSetup(ctx2, "script");
+    if (setupReview) return setupReview;
     const { state: state2 } = ctx2, missing = requireProject(ctx2);
     if (missing) return missing;
     if (!state2.artifact) return empty("Import a resource", "Select a source with a declared fixed-slot script schema.");
@@ -5395,6 +5684,8 @@ ${font ? `<section class="card"><h3>Font metrics · ${esc(font.id)}</h3><div cla
   }
   async function render8(ctx2) {
     var _a, _b, _c, _d, _e, _f, _g, _h, _i, _j, _k, _l, _m, _n, _o;
+    const setupReview = useResearchSetup(ctx2, "assets");
+    if (setupReview) return setupReview;
     const { state: state2 } = ctx2, missing = requireProject(ctx2);
     if (missing) return missing;
     if (!state2.artifact) return empty("Import an asset resource", "A declared uncompressed codec and source revision are required.");
@@ -6107,7 +6398,7 @@ ${font ? `<section class="card"><h3>Font metrics · ${esc(font.id)}</h3><div cla
     var _a, _b;
     return (r == null ? void 0 : r.source_sha256) === ((_a = state2.artifact) == null ? void 0 : _a.sha256) && r.artifact_id === ((_b = state2.artifact) == null ? void 0 : _b.artifact_id);
   };
-  function integer10(id, min, max) {
+  function integer12(id, min, max) {
     const text = read(id), value = Number(text);
     if (!text.trim() || !Number.isSafeInteger(value) || value < min || value > max) throw Error("Choose a whole number from " + min + " to " + max + ".");
     return value;
@@ -6128,7 +6419,7 @@ ${font ? `<section class="card"><h3>Font metrics · ${esc(font.id)}</h3><div cla
     ctx2.use({
       "lab-survey": async () => {
         if (!current2()) throw Error("The selected source changed.");
-        const window2 = { offset: integer10("lab-offset", 0, 64 * 1024 ** 2), length: integer10("lab-length", 1, 65536) }, generation = ++entry.generation;
+        const window2 = { offset: integer12("lab-offset", 0, 64 * 1024 ** 2), length: integer12("lab-length", 1, 65536) }, generation = ++entry.generation;
         const r = await ctx2.run("structures.survey", { ...params, ...window2 }, { render: false, refresh: false });
         if (!current2() || entry.generation !== generation) return;
         if ((r == null ? void 0 : r.ok) === false || !bound(state2, r)) throw Error(r.error || "Experiment belongs to another source.");
@@ -6954,11 +7245,11 @@ ${font ? `<section class="card"><h3>Font metrics · ${esc(font.id)}</h3><div cla
     return { width, height, pixels };
   }
   function roomNavigation(doc, model, id) {
-    const connections = roomConnections(doc, model), names4 = new Map(doc.rooms.map((room) => [room.id, room.name]));
+    const connections = roomConnections(doc, model), names5 = new Map(doc.rooms.map((room) => [room.id, room.name]));
     return `<section class="level-room-navigation"><h3>Choose a room</h3><p class="subtle">Select an object to move it, or choose a terrain brush to paint.</p><div class="level-room-list">${doc.rooms.map((room) => {
       const count = connections.filter((connection) => connection.room_id === room.id).length;
       return `<button type="button" class="level-room-card" data-action="levels-open-room" data-id="${esc(room.id)}" aria-pressed="${room.id === id}"><canvas data-level-room-preview="${esc(room.id)}" aria-hidden="true"></canvas><strong>${esc(room.name)}</strong><span>${count} room ${count === 1 ? "link" : "links"}</span></button>`;
-    }).join("")}</div><div class="level-connection-list">${connections.map((connection) => `<div class="level-connection"><span>${esc(names4.get(connection.room_id))}</span>${button(connection.name, "levels-select-object", { id: String(connection.index), name: connection.room_id })}<span aria-hidden="true">→</span>${button(names4.get(connection.target_room_id), "levels-open-room", { id: connection.target_room_id })}</div>`).join("")}</div></section>`;
+    }).join("")}</div><div class="level-connection-list">${connections.map((connection) => `<div class="level-connection"><span>${esc(names5.get(connection.room_id))}</span>${button(connection.name, "levels-select-object", { id: String(connection.index), name: connection.room_id })}<span aria-hidden="true">→</span>${button(names5.get(connection.target_room_id), "levels-open-room", { id: connection.target_room_id })}</div>`).join("")}</div></section>`;
   }
   function objectChoices(doc, model, id, allRecords = false) {
     return model.objects(id).flatMap((object, index) => {
@@ -6980,8 +7271,8 @@ ${font ? `<section class="card"><h3>Font metrics · ${esc(font.id)}</h3><div cla
     const allRecords = ctx2.draft("level-overlay", "objects") === "records", choices = objectChoices(doc, model, id, allRecords);
     if (!choices.length) return `<section class="card level-object-inspector"><h3>Objects</h3><p>No named objects in this room.</p>${model.objects(id).length ? "<details><summary>Advanced records</summary><p>Choose All records (Advanced) in Overlay to inspect or move raw record slots.</p></details>" : ""}</section>`;
     const index = selectedObjectIndex(ctx2, model, id), object = model.objects(id)[index], metadata = objectMetadata(doc, id, index), reference = (metadata == null ? void 0 : metadata.role) === "exit" ? metadata.reference : null;
-    const names4 = new Map(doc.rooms.map((room) => [room.id, room.name]));
-    const destination = reference ? select("level-object-destination", "Destination room", reference.targets.map((target) => [target.value, names4.get(target.room_id)]), object[reference.field]) : "";
+    const names5 = new Map(doc.rooms.map((room) => [room.id, room.name]));
+    const destination = reference ? select("level-object-destination", "Destination room", reference.targets.map((target) => [target.value, names5.get(target.room_id)]), object[reference.field]) : "";
     const controls = objectFields(doc, id).map((field2, position) => {
       if ((reference == null ? void 0 : reference.field) === field2.name) return "";
       const maximum = objectMaximum(doc, id, field2), label = field2.name === "x" ? "X position" : field2.name === "y" ? "Y position" : field2.name;
@@ -7003,7 +7294,7 @@ ${font ? `<section class="card"><h3>Font metrics · ${esc(font.id)}</h3><div cla
   }
 
   // romancer/ui/level_canvas.js
-  var integer11 = (v, min, max) => {
+  var integer13 = (v, min, max) => {
     if (!Number.isSafeInteger(v) || v < min || v > max) throw Error("Level value is outside declared bounds.");
     return v;
   };
@@ -7011,7 +7302,7 @@ ${font ? `<section class="card"><h3>Font metrics · ${esc(font.id)}</h3><div cla
   function levelScale(width, height, viewportHeight, availableWidth, mode) {
     if (mode === "fit") return Math.max(0.25, Math.min(3, Math.max(160, viewportHeight - 420) / height, availableWidth / width));
     const value = Number(mode);
-    integer11(value, 1, 3);
+    integer13(value, 1, 3);
     return value;
   }
   var LevelDraft = class {
@@ -7033,27 +7324,27 @@ ${font ? `<section class="card"><h3>Font metrics · ${esc(font.id)}</h3><div cla
       var _a, _b, _c, _d, _e, _f;
       let original, max;
       if (c.kind === "metatile") {
-        integer11(c.index, 0, this.doc.metatiles.length - 1);
-        integer11(c.part, 0, this.doc.metatiles[c.index].length - 1);
+        integer13(c.index, 0, this.doc.metatiles.length - 1);
+        integer13(c.part, 0, this.doc.metatiles[c.index].length - 1);
         original = this.doc.metatiles[c.index][c.part];
         max = this.doc.tiles.length - 1;
       } else {
         const r = this.room(c.room_id);
         if (c.kind === "object") {
-          integer11(c.index, 0, r.objects.length - 1);
+          integer13(c.index, 0, r.objects.length - 1);
           if (!(c.field in r.objects[c.index])) throw Error("Unknown object field.");
           original = r.objects[c.index][c.field];
           const declared2 = (_c = (_b = (_a = this.doc.definition) == null ? void 0 : _a.rooms.find((x) => x.id === r.id)) == null ? void 0 : _b.objects) == null ? void 0 : _c.fields.find((f) => f.name === c.field);
           max = Math.min((declared2 == null ? void 0 : declared2.maximum) ?? 65535, c.field === "x" ? r.width - 1 : c.field === "y" ? r.height - 1 : c.field === "exit_room" ? this.doc.rooms.length - 1 : 65535);
         } else {
           if (!["terrain", "collision"].includes(c.kind) || !r[c.kind]) throw Error("This layer is not declared.");
-          integer11(c.index, 0, r[c.kind].length - 1);
+          integer13(c.index, 0, r[c.kind].length - 1);
           original = r[c.kind][c.index];
           const declared2 = (_e = (_d = this.doc.definition) == null ? void 0 : _d.rooms.find((x) => x.id === r.id)) == null ? void 0 : _e[c.kind];
           max = c.kind === "terrain" ? this.doc.metatiles.length - 1 : 2 ** (8 * ((declared2 == null ? void 0 : declared2.entry_bytes) || 1)) - 1;
         }
       }
-      integer11(c.value, 0, max);
+      integer13(c.value, 0, max);
       if (c.kind === "object") {
         const metadata = objectMetadata(this.doc, c.room_id, c.index);
         if ((metadata == null ? void 0 : metadata.role) === "exit" && ((_f = metadata.reference) == null ? void 0 : _f.field) === c.field && !metadata.reference.targets.some((target) => target.value === c.value)) throw Error("Exit destination is not mapped.");
@@ -7124,8 +7415,8 @@ ${font ? `<section class="card"><h3>Font metrics · ${esc(font.id)}</h3><div cla
     }
     fill(id, layer, index, value) {
       const r = this.room(id), cells = this.cells(id, layer);
-      integer11(index, 0, cells.length - 1);
-      integer11(value, 0, layer === "terrain" ? this.doc.metatiles.length - 1 : 65535);
+      integer13(index, 0, cells.length - 1);
+      integer13(value, 0, layer === "terrain" ? this.doc.metatiles.length - 1 : 65535);
       const old = cells[index];
       if (old === value) return;
       const queue = [index], seen = /* @__PURE__ */ new Set();
@@ -7140,15 +7431,15 @@ ${font ? `<section class="card"><h3>Font metrics · ${esc(font.id)}</h3><div cla
     }
     copy(id, layer, rect) {
       const r = this.room(id);
-      for (const k of ["x", "y"]) integer11(rect[k], 0, (k === "x" ? r.width : r.height) - 1);
-      integer11(rect.width, 1, r.width - rect.x);
-      integer11(rect.height, 1, r.height - rect.y);
+      for (const k of ["x", "y"]) integer13(rect[k], 0, (k === "x" ? r.width : r.height) - 1);
+      integer13(rect.width, 1, r.width - rect.x);
+      integer13(rect.height, 1, r.height - rect.y);
       const cells = this.cells(id, layer);
       return { width: rect.width, height: rect.height, values: Array.from({ length: rect.width * rect.height }, (_, i) => cells[(rect.y + Math.floor(i / rect.width)) * r.width + rect.x + i % rect.width]) };
     }
     paste(id, layer, index, clip) {
       const r = this.room(id);
-      integer11(index, 0, r.width * r.height - 1);
+      integer13(index, 0, r.width * r.height - 1);
       if (!clip || !Array.isArray(clip.values)) throw Error("Copy a rectangle first.");
       const x = index % r.width, y = Math.floor(index / r.width);
       if (clip.width < 1 || clip.height < 1 || clip.values.length !== clip.width * clip.height || x + clip.width > r.width || y + clip.height > r.height) throw Error("Copied rectangle must fit inside room bounds.");
@@ -7181,7 +7472,7 @@ ${font ? `<section class="card"><h3>Font metrics · ${esc(font.id)}</h3><div cla
     return [...result].sort((a, b) => a - b);
   }
   function blockPixels(doc, model, index) {
-    integer11(index, 0, doc.metatiles.length - 1);
+    integer13(index, 0, doc.metatiles.length - 1);
     const width = doc.block_width * 8, height = doc.block_height * 8, pixels = new Uint8ClampedArray(width * height * 4);
     for (const [part, tile] of model.blocks()[index].entries()) for (const [pixel, value] of doc.tiles[tile].entries()) {
       const x = part % doc.block_width * 8 + pixel % 8, y = Math.floor(part / doc.block_width) * 8 + Math.floor(pixel / 8);
@@ -7191,14 +7482,14 @@ ${font ? `<section class="card"><h3>Font metrics · ${esc(font.id)}</h3><div cla
   }
   function pickLevelBrush(model, id, layer, index) {
     const cells = model.cells(id, layer);
-    integer11(index, 0, cells.length - 1);
+    integer13(index, 0, cells.length - 1);
     return cells[index];
   }
   function moveLevelObject(model, id, index, x, y) {
     const room = model.room(id);
-    integer11(index, 0, room.objects.length - 1);
-    integer11(x, 0, room.width - 1);
-    integer11(y, 0, room.height - 1);
+    integer13(index, 0, room.objects.length - 1);
+    integer13(x, 0, room.width - 1);
+    integer13(y, 0, room.height - 1);
     const object = room.objects[index];
     if (!Object.hasOwn(object, "x") || !Object.hasOwn(object, "y")) throw Error("Object coordinates are not declared.");
     model.set({ kind: "object", room_id: id, index, field: "x", value: x });
@@ -7871,6 +8162,8 @@ ${font ? `<section class="card"><h3>Font metrics · ${esc(font.id)}</h3><div cla
   var practiceControls = () => `<details class="card"><summary>Advanced practice</summary><p>Open a separate test layout to learn the editor controls.</p>${button("Open test layout", "studio-example")}</details>`;
   async function render15(ctx2) {
     var _a, _b, _c, _d, _e, _f, _g, _h, _i, _j, _k, _l;
+    const setupReview = useResearchSetup(ctx2, "levels");
+    if (setupReview) return setupReview;
     const { state: state2 } = ctx2;
     ctx2.use({ "studio-example": async () => {
       const result = await ctx2.api.job("studio.example", {});
@@ -8264,6 +8557,8 @@ ${font ? `<section class="card"><h3>Font metrics · ${esc(font.id)}</h3><div cla
   }
   async function render16(ctx2) {
     var _a, _b, _c, _d;
+    const setupReview = useResearchSetup(ctx2, "sound");
+    if (setupReview) return setupReview;
     const { state: state2 } = ctx2;
     if (!state2.project || !state2.artifact) return heading("", "Music & sound", "") + empty("Open a source to inspect audio", "Audio hardware and game music drivers are identified separately.");
     const scope = selectionKey(state2), current2 = () => scope === selectionKey(state2), params = { ...ctx2.sourceParams() }, saved = (_a = state2.artifact.descriptors) == null ? void 0 : _a.sound;
@@ -8433,7 +8728,7 @@ ${font ? `<section class="card"><h3>Font metrics · ${esc(font.id)}</h3><div cla
   window.addEventListener("resize", () => applyInterfaceScale(getSettings().scale));
   var navigationRevision = 0;
   var views = { tutorials: tutorials_exports, overview: overview_exports, resources: resources_exports, scripts: scripts_exports, assets: assets_exports, levels: levels_exports, sound: sound_exports, tables: tables_exports, automation: automation_exports, playtest: playtest_exports, debug: debug_exports, routes: routes_exports, regression: regression_exports, release: release_exports, help: help_exports, settings: settings_exports };
-  var names3 = { tutorials: "Tutorials", automation: "Recipes & definitions", overview: "Overview", resources: "Resources", scripts: "Text & layout", assets: "Graphics & fonts", levels: "Levels", sound: "Music & sound", tables: "Data tables", playtest: "Playtest", debug: "Investigation", routes: "Routes", regression: "Regression", release: "Export", settings: "Settings", help: "Help" };
+  var names4 = { tutorials: "Tutorials", automation: "Recipes & definitions", overview: "Overview", resources: "Resources", scripts: "Text & layout", assets: "Graphics & fonts", levels: "Levels", sound: "Music & sound", tables: "Data tables", playtest: "Playtest", debug: "Investigation", routes: "Routes", regression: "Regression", release: "Export", settings: "Settings", help: "Help" };
   var state = { page: "overview", projects: [], project: null, artifact: null, capabilities: null, drafts: {}, results: {}, pending: null, job: null, runtime: null, frame: null, snapshot: null };
   var actions2 = {};
   var renderRevision = 0;
@@ -8714,7 +9009,7 @@ ${font ? `<section class="card"><h3>Font metrics · ${esc(font.id)}</h3><div cla
     modal(state.project ? "Import ROM" : "New ROM project", `${!state.project ? field("new-project-name", "Project name", dropped ? dropped.name.replace(/\.[^.]+$/, "") : "My ROM project") : ""}<p>Your original file stays unchanged.</p>${dropped ? `<p class="notice">Selected: <strong>${esc(dropped.name)}</strong></p>` : ""}<label class="field"><span>Choose a ROM file</span><input type="file" id="import-file" accept=".nes,.sfc,.smc,.md,.gen,.bin,.gb,.gbc,.gba,.sms,.rom"></label><details class="config"><summary>Advanced path import</summary>${field("import-path", "Absolute file path", "", { placeholder: "C:\\Games\\My game.sfc" })}${button("Browse this computer", "choose-input", { icon: "folder" })}<p>Use a path for files larger than64MiB.</p></details><div class="actions">${button("Import ROM", "import-confirm", { primary: true, icon: "plus" })}${button("Import help", "help-topic", { id: "import" }) + button("Start a new project", "new-project")}</div>`);
   }
   function showSearch() {
-    const query = document.getElementById("global-search").value, matches = workspaceMatches(query, names3, state.project);
+    const query = document.getElementById("global-search").value, matches = workspaceMatches(query, names4, state.project);
     modal("Find tools or files", `<div class="search-results">${matches.map((row, index) => row.page ? button(row.label, "search-open", { id: row.page, class: "search-result", icon: row.page }) : button(row.label + " · " + (row.kind === "build" ? "Build" : "Original"), "search-file", { id: String(index), class: "search-result", icon: "folder" })).join("") || '<p class="subtle">No matching tools or file names. Try palette, sprite, hex or save state.</p>'}</div>`);
     state.searchMatches = matches;
   }
@@ -8839,10 +9134,10 @@ ${font ? `<section class="card"><h3>Font metrics · ${esc(font.id)}</h3><div cla
     actions2 = baseActions();
     tutorial.bind();
     const project = state.project, artifacts = project ? [...project.sources, ...project.builds] : [];
-    document.getElementById("app").innerHTML = `<div class="shell"><aside class="sidebar"><a class="brand" href="#" data-action="navigate" data-id="overview"><img src="/mark.svg" alt=""><div><strong>ROMancer</strong><small>By RetchEWretched</small></div></a><div class="nav-label">Workspace</div><nav aria-label="Workbench">${["overview", "resources", "debug", "scripts", "assets", "levels", "sound", "playtest", "release"].map((k) => `<button class="nav-item ${state.page === k ? "active" : ""}" data-action="navigate" data-id="${k}" title="${names3[k]}" ${state.page === k ? 'aria-current="page"' : ""}>${icon(k)}<span>${names3[k]}</span></button>`).join("")}<details class="more-tools" ${getSettings().advancedTools || ["tables", "automation", "routes", "regression"].includes(state.page) ? "open" : ""}><summary title="More tools">More tools</summary>${["tables", "automation", "routes", "regression"].map((k) => `<button class="nav-item ${state.page === k ? "active" : ""}" data-action="navigate" data-id="${k}" title="${names3[k]}">${icon(k)}<span>${names3[k]}</span></button>`).join("")}</details></nav><div class="sidebar-bottom"><button class="nav-item" data-action="navigate" data-id="help" title="Help">${icon("shield")}<span>Help</span></button><button class="nav-item" data-action="projects-manage" title="Projects">${icon("folder")}<span>Projects</span></button><button class="nav-item ${state.page === "settings" ? "active" : ""}" data-action="navigate" data-id="settings" title="Settings">${icon("settings")}<span>Settings</span></button><button class="nav-item" data-action="about" title="About ROMancer">${icon("shield")}<span>About</span></button><div class="local-label"><span class="dot"></span>Runs on your computer</div></div></aside><header class="topbar"><div class="project-control">${icon("folder")}<div><small>ACTIVE PROJECT</small><br><select id="project-select" aria-label="Active project"><option value="">Choose a project</option>${state.projects.map((p) => `<option value="${p.project_id}" ${(project == null ? void 0 : project.project_id) === p.project_id ? "selected" : ""}>${esc(p.name)}</option>`).join("")}</select></div>${button("New project", "new-project", { icon: "plus", class: "compact" })}</div>${artifacts.length ? `<div class="project-control source-selector"><div><small>${((_i = state.artifact) == null ? void 0 : _i.kind) === "source" ? "ORIGINAL ROM" : "BUILD"}</small><br><select id="artifact-select" aria-label="Selected source or build">${[["Original ROMs", project.sources], ["Builds", project.builds]].filter(([, rows]) => rows.length).map(([label, rows]) => `<optgroup label="${label}">${rows.map((a) => {
+    document.getElementById("app").innerHTML = `<div class="shell"><aside class="sidebar"><a class="brand" href="#" data-action="navigate" data-id="overview"><img src="/mark.svg" alt=""><div><strong>ROMancer</strong><small>By RetchEWretched</small></div></a><div class="nav-label">Workspace</div><nav aria-label="Workbench">${["overview", "resources", "debug", "scripts", "assets", "levels", "sound", "playtest", "release"].map((k) => `<button class="nav-item ${state.page === k ? "active" : ""}" data-action="navigate" data-id="${k}" title="${names4[k]}" ${state.page === k ? 'aria-current="page"' : ""}>${icon(k)}<span>${names4[k]}</span></button>`).join("")}<details class="more-tools" ${getSettings().advancedTools || ["tables", "automation", "routes", "regression"].includes(state.page) ? "open" : ""}><summary title="More tools">More tools</summary>${["tables", "automation", "routes", "regression"].map((k) => `<button class="nav-item ${state.page === k ? "active" : ""}" data-action="navigate" data-id="${k}" title="${names4[k]}">${icon(k)}<span>${names4[k]}</span></button>`).join("")}</details></nav><div class="sidebar-bottom"><button class="nav-item" data-action="navigate" data-id="help" title="Help">${icon("shield")}<span>Help</span></button><button class="nav-item" data-action="projects-manage" title="Projects">${icon("folder")}<span>Projects</span></button><button class="nav-item ${state.page === "settings" ? "active" : ""}" data-action="navigate" data-id="settings" title="Settings">${icon("settings")}<span>Settings</span></button><button class="nav-item" data-action="about" title="About ROMancer">${icon("shield")}<span>About</span></button><div class="local-label"><span class="dot"></span>Runs on your computer</div></div></aside><header class="topbar"><div class="project-control">${icon("folder")}<div><small>ACTIVE PROJECT</small><br><select id="project-select" aria-label="Active project"><option value="">Choose a project</option>${state.projects.map((p) => `<option value="${p.project_id}" ${(project == null ? void 0 : project.project_id) === p.project_id ? "selected" : ""}>${esc(p.name)}</option>`).join("")}</select></div>${button("New project", "new-project", { icon: "plus", class: "compact" })}</div>${artifacts.length ? `<div class="project-control source-selector"><div><small>${((_i = state.artifact) == null ? void 0 : _i.kind) === "source" ? "ORIGINAL ROM" : "BUILD"}</small><br><select id="artifact-select" aria-label="Selected source or build">${[["Original ROMs", project.sources], ["Builds", project.builds]].filter(([, rows]) => rows.length).map(([label, rows]) => `<optgroup label="${label}">${rows.map((a) => {
       var _a2;
       return `<option value="${a.artifact_id}" ${((_a2 = state.artifact) == null ? void 0 : _a2.artifact_id) === a.artifact_id ? "selected" : ""}>${esc(a.name)}</option>`;
-    }).join("")}</optgroup>`).join("")}</select></div></div>` : ""}<label class="search">${icon("search")}<input id="global-search" placeholder="Search workspace" aria-label="Search workspace"><kbd>Ctrl K</kbd><button type="button" data-action="workspace-search" aria-label="Go: search workspace" class="search-go">Go</button></label></header><main id="main" tabindex="-1"><div class="loading">Opening ${names3[state.page]}…</div></main>${jobTray()}${tutorial.panel()}</div>`;
+    }).join("")}</optgroup>`).join("")}</select></div></div>` : ""}<label class="search">${icon("search")}<input id="global-search" placeholder="Search workspace" aria-label="Search workspace"><kbd>Ctrl K</kbd><button type="button" data-action="workspace-search" aria-label="Go: search workspace" class="search-go">Go</button></label></header><main id="main" tabindex="-1"><div class="loading">Opening ${names4[state.page]}…</div></main>${jobTray()}${tutorial.panel()}</div>`;
     const view = views[state.page];
     let html;
     if (project && state.artifact) {
@@ -8867,7 +9162,7 @@ ${font ? `<section class="card"><h3>Font metrics · ${esc(font.id)}</h3><div cla
         if (revision === renderRevision) ctx.use(handlers);
       } });
     } catch (error) {
-      html = `${heading("Workspace", names3[state.page], "")}<div class="card"><p class="error">${esc(error.message)}</p>${button("Return to overview", "navigate", { id: "overview" })}</div>`;
+      html = `${heading("Workspace", names4[state.page], "")}<div class="card"><p class="error">${esc(error.message)}</p>${button("Return to overview", "navigate", { id: "overview" })}</div>`;
     }
     if (revision !== renderRevision) return;
     if (((_j = document.getElementById("app")) == null ? void 0 : _j.dataset.startupRecovered) === "true") return;

@@ -206,6 +206,11 @@ class WorkbenchAPI:
         self.debugger=DebuggerTools(self);self.routes.update(self.debugger.routes())
         from .structure_tools import StructureTools
         self.structures=StructureTools(self);self.routes.update(self.structures.routes())
+        from .research_tools import ResearchTools
+        self.research=ResearchTools(self);self.routes.update(self.research.routes())
+        from .popular_references import catalog as reference_catalog,inspect_template
+        self.routes['references.catalog']=('query system_filter',lambda p,c:reference_catalog(p['query'],p['system_filter']))
+        self.routes['references.template']=('project_id artifact_id template_id offset count stride',lambda p,c:inspect_template(self,p,c))
         from .data_relocation import RelocationTools
         self.relocation=RelocationTools(self);self.routes.update(self.relocation.routes())
         for operation in tuple(self.routes):

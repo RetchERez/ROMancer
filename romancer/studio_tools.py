@@ -33,8 +33,11 @@ class StudioTools:
 
     def explain(self,p,c):
         from .source_information import explain_bytes
+        from .research_tools import notes_for,note_summaries
         _,row,raw=self.source(p,c,allow_sms=True)
-        return explain_bytes(raw,row.get('descriptors',{}),row['sha256'],p['offset'])
+        result=explain_bytes(raw,row.get('descriptors',{}),row['sha256'],p['offset'])
+        result['research_notes']=note_summaries([n for n in notes_for(row) if n['offset']<=p['offset']<n['offset']+n['length']])
+        return result
 
     def observe(self,p,c,region,offset,length):
         project,row,_=self.api.source(p)

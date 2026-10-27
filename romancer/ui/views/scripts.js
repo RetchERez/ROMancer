@@ -1,10 +1,11 @@
+import {useResearchSetup} from '../research_tools.js';
 import {loadMenuPreview,menuPreviewPanel,mountMenuPreview,menuPreviewReport} from '../menu_preview.js';
 import {textCapacity,capacitySummary} from '../edit_preview.js';
 import {selectionKey} from '../tool_inputs.js';
 import {translationControls,mountTranslation} from '../translation_controls.js';
 import {textDeclaration,layoutDeclaration} from '../declarations.js';
 import {esc,button,badge,field,area,jsonEditor,read,json,short,heading,report,requireProject,empty} from '../common.js';
-export async function render(ctx){const {state}=ctx,missing=requireProject(ctx);if(missing)return missing;if(!state.artifact)return empty('Import a resource','Select a source with a declared fixed-slot script schema.');
+export async function render(ctx){const setupReview=useResearchSetup(ctx,'script');if(setupReview)return setupReview;const {state}=ctx,missing=requireProject(ctx);if(missing)return missing;if(!state.artifact)return empty('Import a resource','Select a source with a declared fixed-slot script schema.');
  const fallback=state.candidateReview?.artifact_id===state.artifact.artifact_id?{}:state.artifact.descriptors?.script||state.project.descriptors?.script||{};const schemaText=ctx.draft('script-schema',JSON.stringify(fallback,null,2));
  let document=state.candidateReview?.artifact_id===state.artifact.artifact_id?null:state.results['script.inspect'];if(document?.source_sha256!==state.artifact.sha256)document=null;
  if(!document&&fallback.profile?.accepted_sha256?.includes(state.artifact.sha256)){document=await ctx.api.call('script.inspect',{...ctx.sourceParams(),schema:fallback});state.results['script.inspect']=document;}

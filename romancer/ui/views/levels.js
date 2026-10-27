@@ -1,3 +1,4 @@
+import {useResearchSetup} from '../research_tools.js';
 import {esc,button,field,select,read,json,jsonEditor,heading,empty,report} from '../common.js';
 import {selectionKey} from '../tool_inputs.js';
 import {LevelDraft,mountLevel,levelBrushPalette} from '../level_canvas.js';
@@ -8,7 +9,7 @@ import {roomNavigation,mountRoomNavigation,objectInspector,objectFields,objectMe
 const codecs={nes:'tile8-planar2-msb-v1',snes:'tile8-paired4-msb-v1',genesis:'tile8-packed4-high-v1',gb:'tile8-paired2-msb-v1',gbc:'tile8-paired2-msb-v1',gba:'tile8-packed4-low-v1'};
 const objectInteger=id=>{const text=read(id).trim();if(!/^\d+$/.test(text))throw Error('Enter a whole number for every object field.');return Number(text);};
 const practiceControls=()=>`<details class="card"><summary>Advanced practice</summary><p>Open a separate test layout to learn the editor controls.</p>${button('Open test layout','studio-example')}</details>`;
-export async function render(ctx){const {state}=ctx;ctx.use({'studio-example':async()=>{const result=await ctx.api.job('studio.example',{});await ctx.openProject(result.project_id);return ctx.navigate('levels');}});
+export async function render(ctx){const setupReview=useResearchSetup(ctx,'levels');if(setupReview)return setupReview;const {state}=ctx;ctx.use({'studio-example':async()=>{const result=await ctx.api.job('studio.example',{});await ctx.openProject(result.project_id);return ctx.navigate('levels');}});
  if(!state.project||!state.artifact)return heading('','Levels','')+empty('Choose a project or import a ROM','Choose a project above, or import your ROM to get started.',button('Import ROM','import',{primary:true}))+practiceControls();
  const scope=selectionKey(state),current=()=>scope===selectionKey(state),saved=state.artifact.descriptors?.levels;
  let doc=state.results['levels.inspect'];if(doc?.source_sha256!==state.artifact.sha256)doc=null;

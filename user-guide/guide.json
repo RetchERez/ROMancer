@@ -672,6 +672,54 @@
       ]
     },
     {
+      "id": "research-notes",
+      "title": "Keep discoveries with the exact ROM",
+      "part": "Basic",
+      "kicker": "Resource browser / user research",
+      "intro": "A useful discovery should be easy to find again. Research notes name a byte range and record what you observed without turning a theory into a verified game format.",
+      "steps": [
+        "Open Resources and use Resource browser & research to search saved graphics, text, numbers, levels, sound or notes. Bytes opens the exact range; Editor opens the saved layout.",
+        "Expand Research note. Choose New note at selected byte, enter a short name, file offset and byte length, then record what you found and its evidence reference.",
+        "Choose Save note. The note belongs to this exact source revision and does not change the ROM. Select Edit note to load its complete text, or Remove to delete it after confirmation.",
+        "In the hex editor, choose Explain selected bytes. Matching notes appear under User research, separately from decoded storage facts.",
+        "If opening an editor would replace a different setup draft, choose Keep current draft or Load saved setup. Loading first stores a recovery copy; Resources > Previous editor setups can restore it. Document-specific pixel and text edits remain separate."
+      ],
+      "result": "Find the note by a word in its name, text or reference, inspect its byte range and verify it survives reopening the project.",
+      "note": "A note is user-authored research, not automatic game knowledge or edit permission. Browser lists use short summaries; Edit note loads the complete record. Up to 256 notes are stored per source.",
+      "related": [
+        "drafts",
+        "checks",
+        "research-packs"
+      ],
+      "terms": [
+        "term-offset",
+        "term-evidence"
+      ],
+      "image": "65-resource-research",
+      "image_layout": "following-page",
+      "caption": "A range note attached to the supplied Rastan source.",
+      "visual_page": {
+        "title": "Find resources and your research",
+        "kicker": "Actual ROMancer interface",
+        "intro": "This is a capture of the working interface, not a mockup.",
+        "panels": [
+          {
+            "image": "65-resource-research",
+            "title": "Find resources and your research",
+            "x": 48,
+            "top": 850,
+            "width": 1120,
+            "crop": [
+              0,
+              0,
+              1600,
+              1100
+            ]
+          }
+        ]
+      }
+    },
+    {
       "id": "text",
       "title": "Change text without overrunning it",
       "kicker": "GENESIS / THE IMMORTAL",
@@ -2928,6 +2976,126 @@
           }
         ]
       }
+    },
+    {
+      "id": "research-packs",
+      "title": "Share checked definitions and research",
+      "part": "Advanced",
+      "kicker": "Portable knowledge / exact revision",
+      "intro": "A research pack carries the active supported resource definitions and notes in one JSON file. It is meant for repeating work on the same exact ROM revision.",
+      "steps": [
+        "In Resources, expand Share or import research. Choose Export research pack, then Download research JSON. Review the file before sharing; notes, references and definition byte guards can contain material you entered.",
+        "In the destination project select the matching ROM. Choose the JSON file and Review selected pack. A different ROM hash, size, system or invalid definition is refused.",
+        "Read the definition and note counts and the replacement list. Explicitly acknowledge replacements before choosing Import reviewed research. Other notes remain.",
+        "Import validates the whole pack again and commits metadata together. If the source, document or current research changed since review, review again. It never writes ROM bytes.",
+        "Use the Resource browser to open an imported layout. A different existing setup draft gets its own review and recovery copy; it is not silently discarded."
+      ],
+      "result": "The imported definitions inspect the destination source and the original notes remain searchable. Compare the source hash before and after; it must be identical.",
+      "note": "Packs are limited to 1 MiB and are not executable extensions. They contain neither emulator states nor game saves. They do not make a new game revision compatible. AI clients use research.inspect, research.note_get, research.preview and research.apply with the same guards.",
+      "related": [
+        "research-notes",
+        "recipes",
+        "mcp"
+      ],
+      "terms": [
+        "term-research-pack",
+        "term-revision"
+      ],
+      "image": "66-research-pack-review",
+      "image_layout": "following-page",
+      "caption": "Actual replacement review before a research pack is imported.",
+      "visual_page": {
+        "title": "Review exact-revision research import",
+        "kicker": "Actual ROMancer interface",
+        "intro": "This is a capture of the working interface, not a mockup.",
+        "panels": [
+          {
+            "image": "66-research-pack-review",
+            "title": "Review exact-revision research import",
+            "x": 48,
+            "top": 850,
+            "width": 1120,
+            "crop": [
+              0,
+              0,
+              1600,
+              1100
+            ]
+          }
+        ]
+      }
+    },
+    {
+      "id": "popular-references",
+      "title": "Use published Pokemon and Mario research",
+      "part": "Advanced",
+      "kicker": "Primary references / declared numeric prefixes",
+      "intro": "Help and Resources include a searchable library of pinned public research for Pokemon Red/Blue, Crystal, FireRed/LeafGreen, Emerald, Super Mario Bros. and Super Mario World.",
+      "steps": [
+        "Expand Popular-game references and search for Pokemon or Mario. Read the documented facts and use Primary source for the pinned project version. Links require a network connection; the bundled summaries work offline.",
+        "Keep address domains separate. For example the published Super Mario Bros. lives counter is CPU RAM 0x075A, not a ROM file offset. Player power-up form at 0x0756 is a different concept from the movement-state variable.",
+        "For supported GB/GBC/GBA sources, establish a stat table base, full record stride and count from your matching project or verified symbols. ROMancer does not guess these numbers.",
+        "Choose the correct documented prefix and Preview table layout. Red/Blue uses five base stats after its Dex number; Crystal separates special attack/defense; the GBA prefix begins with six stat bytes.",
+        "Inspect values and record identities in the proposed Data table. Save this layout only when the declaration is correct. Use the normal reviewed table build to make changes; omitted fields and padding stay outside the prefix."
+      ],
+      "result": "You have a useful source-linked lead or a checked table proposal, with no false claim that an arbitrary Pokemon or Mario hack uses the original layout.",
+      "note": "The included UI example applies a declared prefix to an original GBA workshop. It is not a Pokemon ROM compatibility test. Expanded hacks can replace tables, encodings, engines and maps. No code, game assets or ROMs from the referenced projects are bundled.",
+      "related": [
+        "numbers",
+        "research-packs",
+        "hardware-addresses"
+      ],
+      "terms": [
+        "term-reference-template",
+        "term-address-domain"
+      ],
+      "image": "67-popular-game-references",
+      "image_layout": "following-page",
+      "caption": "Pinned public reference library inside ROMancer.",
+      "visual_page": {
+        "title": "Inspect a declared numeric prefix",
+        "kicker": "Actual ROMancer interface",
+        "intro": "This is a capture of the working interface, not a mockup.",
+        "panels": [
+          {
+            "image": "68-documented-stat-prefix",
+            "title": "Inspect a declared numeric prefix",
+            "x": 48,
+            "top": 850,
+            "width": 1120,
+            "crop": [
+              0,
+              0,
+              1600,
+              1100
+            ]
+          }
+        ]
+      }
+    },
+    {
+      "id": "remaining-gaps",
+      "title": "Understand the remaining specialist-tool gaps",
+      "part": "Advanced",
+      "kicker": "Product scope / honest comparisons",
+      "intro": "ROMancer combines generic inspection, declared editing, playtesting and reproducible research. It does not yet have every specialist tool's depth.",
+      "steps": [
+        "HexManiacAdvance combines many known Pokemon structures and cross-references. ROMancer now preserves and exchanges checked definitions and notes, but full revision-specific map/event/script coverage still requires additional format work.",
+        "Lunar Magic has deep Super Mario World level-format support. A public RAM reference or generic tilemap editor does not replace that complete decoded level workflow.",
+        "Mesen offers live instruction-level debugging, breakpoints, watches and disassembly. ROMancer's bounded native captures and replay investigations are useful evidence but not a replacement for that live debugger.",
+        "GB Studio authors scenes, actors, triggers and scripts using its own supported game engine. ROMancer edits declared data in existing games; it does not yet supply equivalent arbitrary-game authoring.",
+        "Commercial music-driver decoders, verified compression/relocation coverage and broader real-game playthroughs remain substantial development tasks. Passing unit tests does not establish that those formats are implemented."
+      ],
+      "result": "Choose the tool whose actual decoded formats and debugging features fit the task. Keep unresolved structures explicit and retain a repeatable test for each useful new definition.",
+      "note": "References: github.com/haven1433/HexManiacAdvance; mesen.ca/docs/debugging/debugger.html; gbstudio.dev/docs/project-editor; fusoya.eludevisibility.org/lm. These are comparison sources, not bundled implementations.",
+      "related": [
+        "popular-references",
+        "research-packs",
+        "release-checks"
+      ],
+      "terms": [
+        "term-evidence"
+      ]
     }
   ],
   "glossary": [
@@ -3295,6 +3463,16 @@
       "id": "term-workspace",
       "term": "Workspace",
       "definition": "The local folder that owns projects and workspace preferences. It is separate from the installed application version."
+    },
+    {
+      "id": "term-research-pack",
+      "term": "Research pack",
+      "definition": "An exact-revision JSON exchange of supported checked resource definitions and user notes. Import reviews replacements and changes metadata, never ROM bytes."
+    },
+    {
+      "id": "term-reference-template",
+      "term": "Reference template",
+      "definition": "Documented field positions that can be inspected at a declared table base, record count and stride. It does not locate the table or prove compatibility with a modified game."
     }
   ],
   "index": [
@@ -4400,6 +4578,42 @@
       "term": "Rastan gameplay comparison",
       "topics": [
         "rastan-playtest"
+      ]
+    },
+    {
+      "term": "Research notes",
+      "topics": [
+        "research-notes"
+      ]
+    },
+    {
+      "term": "Research packs",
+      "topics": [
+        "research-packs"
+      ]
+    },
+    {
+      "term": "Pokemon references",
+      "topics": [
+        "popular-references"
+      ]
+    },
+    {
+      "term": "Mario references",
+      "topics": [
+        "popular-references"
+      ]
+    },
+    {
+      "term": "Editor setup recovery",
+      "topics": [
+        "research-notes"
+      ]
+    },
+    {
+      "term": "Specialist tool comparison",
+      "topics": [
+        "remaining-gaps"
       ]
     }
   ]

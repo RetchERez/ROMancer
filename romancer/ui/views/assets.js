@@ -1,3 +1,4 @@
+import {useResearchSetup} from '../research_tools.js';
 import {rememberPreview} from '../clean_preview.js';
 import {paletteEditor,mountPaletteEditor} from '../palette_editor.js';
 import {editorPalette} from '../edit_preview.js';
@@ -11,7 +12,7 @@ import {esc,button,badge,field,area,jsonEditor,read,json,short,heading,report,re
 const codecBits={'tile8-packed4-low-v1':4,'mono-row-msb-v1':1,'tile8-paired2-msb-v1':2,'tile8-planar2-msb-v1':2,'tile8-paired4-msb-v1':4,'tile8-rowplanar4-msb-v1':4,'tile8-packed4-high-v1':4};
 export function literalColorCount(bitmap,palette){const bits=codecBits[bitmap.codec];return bits?Math.min(2**bits,palette?.colors_per_bank||2**bits):0;}
 export function literalRGB(bitmap,value){const count=literalColorCount(bitmap);const shade=Math.round(18+value/Math.max(1,count-1)*216);return {r:shade,g:shade,b:shade};}
-export async function render(ctx){const {state}=ctx,missing=requireProject(ctx);if(missing)return missing;if(!state.artifact)return empty('Import an asset resource','A declared uncompressed codec and source revision are required.');
+export async function render(ctx){const setupReview=useResearchSetup(ctx,'assets');if(setupReview)return setupReview;const {state}=ctx,missing=requireProject(ctx);if(missing)return missing;if(!state.artifact)return empty('Import an asset resource','A declared uncompressed codec and source revision are required.');
  const fallback=state.candidateReview?.artifact_id===state.artifact.artifact_id?{}:state.artifact.descriptors?.assets||state.project.descriptors?.assets||{};let document=state.candidateReview?.artifact_id===state.artifact.artifact_id?null:state.results['assets.inspect'];if(document?.source_sha256!==state.artifact.sha256)document=null;
  if(!document&&fallback.source?.sha256===state.artifact.sha256){document=await ctx.api.call('assets.inspect',{...ctx.sourceParams(),schema:fallback});state.results['assets.inspect']=document;}
  const key=document?.document_id;if(state.paint?.document_id!==key)state.paint=null;

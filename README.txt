@@ -82,9 +82,10 @@ launcher. Uninstall preserves projects and installed versions for recovery.
 
 VERIFICATION STATUS
 
-Build 1.0.31: the source suite ran 1241 tests with 80 platform/optional skips.
+Build 1.0.32 adds portable research and pinned popular-game references.
+The source suite runs 1256 tests, with platform/optional skips reported separately.
 The full Windows bundle is checked separately with its bundled Python.
-All 78 UI regression suites passed. Automated accessibility checks covered
+All 80 UI regression suites passed. Automated accessibility checks covered
 42 view/theme combinations with zero reported violations, plus bounded
 keyboard and browser-width checks. Skipped tests are not counted as passes.
 The recorded original NES workshop verifies editing, undo/redo, separate build
@@ -236,6 +237,43 @@ looping, reduced motion and advanced-tool visibility are configurable. Settings
 and workspace restore metadata persist independently of the browser port.
 
 KNOWLEDGE AND INVESTIGATION
+
+Resources -> Resource browser & research lists checked active layouts and
+source-bound user range notes. Search by resource kind or words in a note.
+Explain selected bytes keeps user research separate from decoded storage facts.
+Edit note loads its full text; browser/MCP lists use bounded summaries.
+
+Share or import research exchanges the five supported active definition kinds
+and notes as one exact-revision JSON pack, up to 1 MiB. Preview checks every
+entry, lists replacements and binds review to the current metadata. Import
+commits metadata atomically; changed reviews and wrong ROM revisions are refused.
+Existing other notes remain. No ROM bytes are written. Review user text and
+definition byte guards before sharing; packs are not sanitized support reports.
+
+Opening a saved resource setup reviews a different existing editor draft first.
+Load saved setup stores a source-bound recovery copy before replacement;
+Resources -> Previous editor setups restores it. Document-specific editing
+drafts remain separate. Recovery storage is bounded and is not a project backup.
+
+Help and Resources -> Popular-game references include pinned primary research
+for Pokemon Red/Blue, Crystal, FireRed/LeafGreen, Emerald, Super Mario Bros.
+and Super Mario World. No source code, graphics, music or ROMs from these projects
+are bundled. Published RAM labels are not ROM file offsets.
+
+Documented stat-prefix templates cover Red/Blue, Crystal and GBA Pokemon layouts.
+You must establish the table offset, full record stride and count for your
+matching project. Preview table layout opens a checked numeric proposal; it
+does not locate the table or certify an arbitrary modified hack. Check values
+and record identities before saving or editing. The illustrated prefix example
+uses an original GBA workshop, not a claimed Pokemon ROM compatibility test.
+
+These are original factual summaries of public references, pinned in the
+application: github.com/pret/pokered, github.com/pret/pokecrystal,
+github.com/pret/pokefirered, github.com/pret/pokeemerald,
+github.com/Xkeeper0/smb1 and github.com/IsoFrieze/SMWDisX.
+MCP clients can use references.catalog, references.template, research.inspect,
+research.note_get, research.note_save, research.preview and research.apply.
+The same source guards and review requirements apply to humans and automation.
 
 Hardware & address help includes standard tile, palette and map storage facts
 for all seven system choices, with technical sources and explicit format scope.

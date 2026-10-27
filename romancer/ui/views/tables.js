@@ -1,3 +1,4 @@
+import {useResearchSetup} from '../research_tools.js';
 import {numberComparison,mountNumberPreviews,numericBounds} from '../edit_preview.js';
 import {selectionKey} from '../tool_inputs.js';
 import {esc,button,field,select,read,heading,requireProject,empty,report} from '../common.js';
@@ -8,7 +9,7 @@ function stored(ctx,key,fallback){try{return JSON.parse(ctx.draft(key,JSON.strin
 function bounds(field){return {...numericBounds(field.type),...(field.minimum!==undefined?{minimum:field.minimum}:{}),...(field.maximum!==undefined?{maximum:field.maximum}:{})};}
 function recordName(row){return row?.label!==undefined?row.label+' · ID 0x'+row.record_id.toString(16).toUpperCase().padStart(2,'0'):'Row '+row.index;}
 
-export async function render(ctx){
+export async function render(ctx){const setupReview=useResearchSetup(ctx,'tables');if(setupReview)return setupReview;
  const {state}=ctx,missing=requireProject(ctx);if(missing)return missing;
  const artifact=state.artifact;if(!artifact)return empty('Import a ROM first','A table needs an exact source revision.',button('Import ROM','import',{primary:true}));
  const proposal=state.tableProposal?.scope===selectionKey(state)&&state.tableProposal.result.source_sha256===artifact.sha256?state.tableProposal.result:null;
