@@ -2597,7 +2597,7 @@
       "intro": "A changed RAM value is a lead. A native capture adds real access callbacks, execution context and supported source mappings.",
       "steps": [
         "Choose <b>Investigate accesses</b> beside a value hypothesis. ROMancer derives a physical watch from the pinned core interface. Unknown core layouts are refused.",
-        "Choose <b>Prepare debugger</b> if needed. Official tools are downloaded once and hash-checked. No ROM is uploaded. Normal playtesting needs no debugger download.",
+        "The full Windows package is ready to capture. In a source-only or smaller build, choose <b>Prepare debugger</b> if needed. Pinned tools are downloaded and checked once; no ROM is uploaded.",
         "Set a short route of frames and held buttons. It replays from power on in a separate debugger; Playtest and libretro save states are not resumed.",
         "Set the first recording frame and sample limit, then replay. Check route completion and truncation separately. Empty results may require another route or watch range.",
         "Inspect access address, value, execution context and registers. A source button opens its recorded file location; Resources explains the association and links back."
@@ -2708,18 +2708,18 @@
     },
     {
       "id": "debugger-setup",
-      "title": "Prepare or repair the optional native debugger tools",
+      "title": "Set up or repair native investigation",
       "part": "Advanced",
       "kicker": "Setup / source records / recovery",
-      "intro": "Native investigation tools are separate from the emulator engines included for everyday playtesting.",
+      "intro": "The full Windows edition includes reviewed native observers, separate from the everyday playtesting engines. Source-only builds can prepare a pinned cache.",
       "steps": [
-        "Open <b>Investigation > Trace actual accesses</b>. Read the one-time download size, upstream source link and external license. Windows x64 is required for the pinned debugger builds; the Genesis build also requires an x86-64-v2 CPU.",
-        "Choose <b>Prepare debugger</b>. ROMancer downloads only fixed official HTTPS artifacts, checks their exact sizes and SHA-256 hashes, and rejects unexpected archive layouts. It accepts no caller-supplied download URL or executable path.",
-        "After preparation, reuse the verified cache offline. MesenCE retains its exact upstream project source snapshot and GPL license; MAME retains its COPYING and supplied legal texts with pinned source links. These external programs keep their own licenses.",
-        "If cache checks fail, prepare a verified replacement. The old changed cache is preserved while a fresh generation becomes active. A locked temporary download is marked for bounded cleanup retries; it does not contain user ROM data."
+        "Open <b>Investigation > Trace actual accesses</b>. Check observer availability. The full Windows edition already includes MesenCE and MAME. Windows x64 is required; Genesis also needs an x86-64-v2 CPU.",
+        "In a source-only or smaller custom build, choose <b>Prepare debugger</b> if needed. Fixed official HTTPS artifacts are checked by exact size and SHA-256. No caller-supplied executable or download URL is accepted.",
+        "Bundled observers and prepared caches work offline after verification. The full Windows package retains complete matching observer source and licenses. Prepared upstream tools keep their own source records and notices.",
+        "If bundled checks fail, reinstall the current full package; an old cache cannot replace it silently. In source-only mode, Prepare debugger preserves a changed cache while activating a verified replacement. No ROM is uploaded."
       ],
-      "result": "A verified local debugger cache that can be used by both the interface and the typed MCP operations.",
-      "note": "ROMancer release assets do not redistribute these debugger binaries. The original wrapper remains MIT licensed. Source links and snapshots identify upstream material; they are not a claim that every transitive upstream build input has been independently audited.",
+      "result": "A checked bundled observer or prepared cache, available to both the interface and typed MCP operations.",
+      "note": "Bundled MesenCE and MAME retain their upstream licenses and complete corresponding source. The original ROMancer wrapper remains MIT licensed. Exact hashes establish the distributed files, not an independent audit of every upstream build input.",
       "related": [
         "native-accesses",
         "checks"

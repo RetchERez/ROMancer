@@ -2,7 +2,28 @@ from pathlib import Path
 import importlib.util
 import tempfile
 import unittest
+import os
 from tests.test_native_debugger import config
+
+
+@unittest.skipUnless(os.environ.get('ROMANCER_GENESIS_TEST_OBSERVER'),'Reviewed native Genesis observer not supplied')
+class GenesisObserverLifetimeTests(unittest.TestCase):
+    def test_repeated_captures_exit_cleanly_after_snapshot_and_map_watches(self):
+        from romancer.boot_fixtures import make_boot_fixture
+        from romancer import workbench_projects as projects
+        from romancer.genesis_debugger import capture_genesis
+        with tempfile.TemporaryDirectory() as temp:
+            root=Path(temp);rom=root/'original.md';rom.write_bytes(make_boot_fixture('genesis')['data'])
+            project=Path(projects.create_project(root/'workspace','Observer lifetime')['path'])
+            row=projects.register_source(project,rom,None)
+            request={'steps':[{'frames':240,'buttons':[],'port':0}],
+                'probes':[{'kind':'read','start':0x1000,'end':0x101f},{'kind':'write','start':0xc00000,'end':0xc0001f}],
+                'start_frame':0,'event_limit':2000,'instruction_limit':20000000,'timeout':60,'graphics_snapshot':True}
+            for attempt in range(5):
+                with self.subTest(attempt=attempt):
+                    result=capture_genesis(project,row,request,root=Path(os.environ['ROMANCER_GENESIS_TEST_OBSERVER']))
+                    self.assertEqual(result['worker_exit_code'],0)
+                    self.assertTrue(result['route_complete']);self.assertTrue(result['graphics_snapshot']['frame'])
 
 
 class GenesisDebuggerTests(unittest.TestCase):

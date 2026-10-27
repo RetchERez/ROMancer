@@ -92,6 +92,10 @@ _G.romancer_memory_map_subscription=space:add_change_notifier(function()
 end)
 local function graphicsSnapshot()
  if not @GRAPHICS_SNAPSHOT@ then return end
+ -- The pinned item reader can corrupt its Lua state if collection runs during
+ -- this large native callback. This bounded snapshot is the child's final
+ -- operation; defer collection to state close, then reap the entire worker.
+ collectgarbage('stop')
  local device=assert(manager.machine.devices[':gen_vdp'])
  local function words(domain,key,count,allocated)
   local item=emu.item(assert(device.items[key]))
