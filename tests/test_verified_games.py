@@ -22,6 +22,8 @@ class VerifiedGameTests(unittest.TestCase):
             self.assertEqual(opened['resource_kind'],'assets');self.assertEqual(opened['inspection']['bitmaps'][0]['count'],60)
             self.assertEqual(opened['inspection']['bitmaps'][0]['codec'],'tile8-rowplanar4-msb-v1')
             self.assertEqual(opened['sprite_layout']['indices'],[30,32,31,33,52,54,53,55])
+            explained=self.api.dispatch('resources.explain',{**p,'offset':0x10000});self.assertTrue(explained['ok'],explained)
+            self.assertEqual(explained['interpretations'][0]['plane'],0)
             refused=self.api.dispatch('games.plan',{**p,'profile_id':profile['id'],'values':{}});self.assertFalse(refused['ok']);self.assertIn('Graphics',refused['error'])
             self.assertEqual(source.read_bytes(),raw)
 

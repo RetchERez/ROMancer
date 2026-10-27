@@ -28,12 +28,12 @@ class StudioTools:
 
     def relationships(self,p,c):
         from .studio_discovery import resource_relationships
-        _,row,raw=self.source(p,c)
+        _,row,raw=self.source(p,c,allow_sms=True)
         return resource_relationships(raw,row.get('descriptors',{}),row['sha256'])
 
     def explain(self,p,c):
         from .source_information import explain_bytes
-        _,row,raw=self.source(p,c)
+        _,row,raw=self.source(p,c,allow_sms=True)
         return explain_bytes(raw,row.get('descriptors',{}),row['sha256'],p['offset'])
 
     def observe(self,p,c,region,offset,length):
@@ -86,9 +86,9 @@ class StudioTools:
         return {'ok':True,'source_sha256':packet['game_sha256'],'observation':packet,'codec':p['codec'],'tiles':tiles,
           'rom_location_known':False,'palette_known':False,'scope':'available_video_memory_tiles'}
 
-    def source(self,p,c):
+    def source(self,p,c,*,allow_sms=False):
         project,row,path=self.api.source(p)
-        if row.get('system_id') not in ('nes','snes','genesis','gb','gbc','gba'):raise ValueError('studio editing requires a supported NES, SNES, Genesis, Game Boy or GBA source')
+        if row.get('system_id') not in ('nes','snes','genesis','gb','gbc','gba') and not (allow_sms and row.get('system_id')=='sms'):raise ValueError('studio editing requires a supported NES, SNES, Genesis, Game Boy or GBA source')
         raw=read_bounded(path,64*1024**2,row,cancelled=c)
         return project,row,raw
 

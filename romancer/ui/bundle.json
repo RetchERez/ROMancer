@@ -20,7 +20,7 @@
     "romancer/ui/common.js": "02e6b48b9164bfc3d181bfe88fa94170aa166a9cb87e77292ad0326e6e90e93f",
     "romancer/ui/compression_controls.js": "90e00c2e3e7cfed9c55544bf4dd3fafc6becc6bcca331efcc3ab6487b35f6b48",
     "romancer/ui/data_relocation.js": "8bd0d9a8068fd568ab3bdec94dc13a87a4b7c7cc9f3c504a97fa23611d086a44",
-    "romancer/ui/declarations.js": "f07e226165a1b50129a2affa9d499eae3fc4ddd27846dd0076838ad9bb9eb824",
+    "romancer/ui/declarations.js": "be303bc8ba6b582a3b43edff150bd93d072fe4536bcbf1f76b49c82150b375ce",
     "romancer/ui/desktop_entry.js": "45d1ae7522cd7b6aa4f80b983c9c80e2da800320ca1ed9e787b084a1b03e215a",
     "romancer/ui/discovery_controls.js": "40cf3f99306b825fde1faddd3dfa74bfe80a2b38d221de75402a329d303bbf56",
     "romancer/ui/edit_preview.js": "927aceeaac250d727ae1c569db73510b5ede93564dba5d950f24afb39767eecc",
@@ -29,7 +29,7 @@
     "romancer/ui/game_maps.js": "1737776c77e3519565f40f85c4aed7540f402c0024dfb80d8d5505c7213d0ca0",
     "romancer/ui/game_visuals.js": "6df11b065b205146be44e9d1b0673d98a57ab6f3836e5a756ae92605e66be655",
     "romancer/ui/graphics_investigation.js": "cc3455e76ad62b1513fe22afa95f9c4d2653900a3bb7ffdc6e272f2e710d39db",
-    "romancer/ui/hardware_reference.js": "20d946135d35c706b64dfdca6a4e0d82d4760950211b66e389913ce8567ff477",
+    "romancer/ui/hardware_reference.js": "b0206e6041643fc1e93b0641234950e400a7c0f7f95931472e30771435f4f802",
     "romancer/ui/hex_editor.js": "6742dd9608391d5ce5d938f9c1e99cb85a3e1983132828c634f477a5fc489be5",
     "romancer/ui/icons.js": "54b4e56205917bdaddfae74d2335106ae5e83541c68e0d0efea047f1097e9b40",
     "romancer/ui/interface_scale.js": "943998f0b2e83bcd42fd26ba1c45637bf395eb69fbde61afc5e090886130e81f",
@@ -90,5 +90,5 @@
     "romancer/ui/workspace_search.js": "b914fb5fe309641e2ee34e8fefe78f399446e0c2f1917e79f1a0ef0adb7fa772",
     "romancer/ui/workspace_status.js": "36ab851ac108b56ae4bdc1274eb52b62139397c83c90c18ca5efc9767dc5172c"
   },
-  "sha256": "2e8494135945200c815ab4fa3f121299a9f8ad22b4d2f7a5f7b2e8bc8eb1475f"
+  "sha256": "b7a297f844b3ff7a465d1d367cd12506fd7a2304c7d6345d0dbe33de1bb6b504"
 }

@@ -12,6 +12,8 @@ class HardwareReferenceTests(unittest.TestCase):
             doc=reference_for(system)
             self.assertTrue(doc['references']);self.assertIn('cpu',doc['domains'])
             self.assertFalse(doc['write_authorized'])
+            self.assertEqual(set(doc['storage_formats']),{'tiles','palettes','maps'})
+            self.assertTrue(all(isinstance(value,str) and value for value in doc['storage_formats'].values()))
         with self.assertRaises(ValueError):reference_for('unsupported')
 
     def test_sms_documented_windows_are_distinct_from_mapper_and_file_bytes(self):

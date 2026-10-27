@@ -82,7 +82,7 @@ launcher. Uninstall preserves projects and installed versions for recovery.
 
 VERIFICATION STATUS
 
-Build 1.0.31: the source suite ran 1240 tests with 80 platform/optional skips.
+Build 1.0.31: the source suite ran 1241 tests with 80 platform/optional skips.
 The full Windows bundle is checked separately with its bundled Python.
 All 78 UI regression suites passed. Automated accessibility checks covered
 42 view/theme combinations with zero reported violations, plus bounded
@@ -237,6 +237,9 @@ and workspace restore metadata persist independently of the browser port.
 
 KNOWLEDGE AND INVESTIGATION
 
+Hardware & address help includes standard tile, palette and map storage facts
+for all seven system choices, with technical sources and explicit format scope.
+
 Automatic cartridge verification includes conservative startup-vector/entry
 checks, documented boot-header fingerprints and standard mirrored SNES checksums
 for ordinary LoROM/HiROM up to 4 MiB. Warnings and unsupported checks stay distinct
@@ -354,6 +357,8 @@ WHAT IS SUPPORTED
 - Tiles, palettes, fonts, tilemaps and assembled sprites with stroke undo/redo.
 - Live original/edited sprite, tile and room comparisons with change markers.
 - Palette color picker with before/after swatches and declared color quantization.
+  Master System Mode 4 uses checked one-byte RGB222 palettes and its own tilemap
+  masks, preserving priority and undeclared bits.
 - Live text/capacity and numeric comparisons with explicit preview status.
 - Explicit animation-frame layouts and shared-tile information.
 - Declared fixed-capacity terrain, metatiles, collision values and object fields.

@@ -16,7 +16,7 @@ def collect_report(workspace,project=None,*,cancelled=lambda:False):
     pillow=importlib.util.find_spec('PIL') is not None;check('IMAGE_LIBRARY','PASS' if pillow else 'MISSING')
     setups={}
     from .runtime_profiles import load_profile,validate_profile
-    for system in ('nes','snes','genesis','gb','gbc','gba'):
+    for system in ('nes','snes','genesis','gb','gbc','gba','sms'):
         if cancelled():raise KeyboardInterrupt
         try:
             profile=load_profile(workspace,system)['profile']

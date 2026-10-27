@@ -5,6 +5,25 @@ import unittest
 
 
 class ResourceFormsTests(unittest.TestCase):
+    def test_sms_palette_and_tilemap_use_documented_mode4_bits(self):
+        from romancer.resource_forms import graphics_schema
+        from romancer.assets import inspect_assets
+        with tempfile.TemporaryDirectory() as temp:
+            path=Path(temp)/'declared-data';raw=bytearray(96);raw[0]=0x80;raw[33]=0x03;raw[64:66]=(0xfe00).to_bytes(2,'little');path.write_bytes(raw);sha=hashlib.sha256(raw).hexdigest()
+            schema=graphics_schema(path,sha,{'system_id':'sms','offset':0,'count':1,'palette_offset':32,'palette_banks':2,'map_offset':64,'map_width':1,'map_height':1})
+            self.assertEqual(schema['palettes'][0]['entry_bytes'],1);self.assertEqual(schema['palettes'][0]['channels'],{'r':3,'g':12,'b':48})
+            self.assertEqual(schema['tilemaps'][0]['fields']['tile_index']['mask'],0x1ff)
+            self.assertEqual(schema['tilemaps'][0]['fields']['flip_x']['mask'],0x200);self.assertEqual(schema['tilemaps'][0]['fields']['flip_y']['mask'],0x400)
+            self.assertEqual(schema['tilemaps'][0]['fields']['palette_bank']['mask'],0x800)
+            doc=inspect_assets(path,schema);self.assertTrue(doc['ok'],doc);self.assertEqual(doc['palettes'][0]['entries'][1]['rgb'],{'r':255,'g':0,'b':0})
+            from romancer.assets import plan_assets
+            from romancer.asset_patch import apply_assets
+            request={'schema_version':1,'document_id':doc['document_id'],'changes':[{'kind':'map','tilemap_id':'map','entry_index':0,'before':doc['tilemaps'][0]['entries'][0]['values'],'after':{'tile_index':0,'palette_bank':0,'flip_x':0,'flip_y':0}}],'acknowledged_consumers':[{'kind':'map','id':'map','entry_index':0}]}
+            plan=plan_assets(path,schema,request);self.assertTrue(plan['ok'],plan)
+            output=Path(temp)/'edited';self.assertTrue(apply_assets(path,output,schema,request,expected_plan_id=plan['plan_id'])['ok'])
+            self.assertEqual(output.read_bytes()[64:66],bytes.fromhex('00f0'),'Priority and unused bits must survive map editing.')
+            self.assertEqual(path.read_bytes(),raw)
+
     def test_guided_pointer_base_accepts_real_32_bit_rom_addresses(self):
         from romancer.resource_forms import script_schema
         from romancer.script import inspect_script

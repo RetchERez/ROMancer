@@ -12,11 +12,34 @@ _MD='https://www.plutiedev.com/memory-map'
 _GBA='https://problemkaputt.de/gbatek.htm#gbamemorymap'
 _SMS='https://www.smspower.org/Development/MemoryMap'
 
+_STORAGE={
+ 'nes':{'tiles':'An 8×8 2bpp pattern uses 16 bytes: 8 low-plane rows followed by 8 high-plane rows.',
+        'palettes':'PPU palette bytes select 6-bit system color indices; they are not RGB555 values. Emphasis and display conversion are separate.',
+        'maps':'Background tile indices are bytes. A separate attribute byte contains four 2-bit palette choices for four 16×16-pixel areas.'},
+ 'snes':{'tiles':'Common planar 8×8 patterns use 16, 32 or 64 bytes for 2, 4 or 8 bits per pixel. Mode 7 uses a different arrangement.',
+         'palettes':'CGRAM colors use little-endian RGB555: red bits 0–4, green 5–9 and blue 10–14.',
+         'maps':'Ordinary BG words use tile bits 0–9, palette 10–12, priority 13, horizontal flip 14 and vertical flip 15. Mode 7 is separate.'},
+ 'genesis':{'tiles':'An 8×8 4bpp pattern uses 32 bytes, with the left pixel in the high nibble of each byte.',
+            'palettes':'A big-endian color word uses red bits 1–3, green 5–7 and blue 9–11. Each palette line contains 16 entries.',
+            'maps':'VDP tile words use index bits 0–10, horizontal flip 11, vertical flip 12, palette 13–14 and priority 15.'},
+ 'gb':{'tiles':'An 8×8 2bpp pattern uses 16 bytes: low and high bitplanes alternate for each row.',
+       'palettes':'DMG BGP/OBP registers select four shades using 2 bits per stored index. They do not contain RGB colors.',
+       'maps':'A background map cell is an 8-bit tile number. LCDC tile-addressing mode determines whether it is interpreted as signed or unsigned.'},
+ 'gbc':{'tiles':'CGB patterns retain the Game Boy 16-byte paired-plane format; the selected VRAM bank matters.',
+        'palettes':'CGB palette entries are little-endian RGB555, with red bits 0–4, green 5–9 and blue 10–14.',
+        'maps':'Tile numbers and attributes occupy separate VRAM banks. Attributes select palette, tile bank, horizontal/vertical flips and priority.'},
+ 'gba':{'tiles':'4bpp 8×8 patterns use 32 bytes, low nibble first; 8bpp patterns use 64 bytes. Bitmap and affine layouts are separate.',
+        'palettes':'Palette RAM stores little-endian RGB555: red bits 0–4, green 5–9 and blue 10–14.',
+        'maps':'Regular text-BG words use tile bits 0–9, horizontal flip 10, vertical flip 11 and palette bank 12–15. Affine maps and objects use other layouts.'},
+ 'sms':{'tiles':'Mode 4 patterns use 32 bytes per 8×8 tile: four bitplane bytes for each row, leftmost pixel in bit 7.',
+        'palettes':'Mode 4 color entries are one byte, RGB222: red bits 0–1, green 2–3 and blue 4–5. Game Gear uses a different format.',
+        'maps':'Mode 4 little-endian words use tile bits 0–8, horizontal flip 9, vertical flip 10, palette 11 and priority 12. Other bits are preserved, not assigned game meanings.'}}
+
 _SYSTEMS={
  'sms':dict(name='Master System',cpu='Z80',endian='little',domains={'cpu':0xffff,'vram':0x3fff},
    graphics='Mode 4 uses 8×8 tiles with four bitplane bytes per row, 32 bytes per tile and 16 stored indices. Palette selection and sprite assembly are separate data.',
    mapping='CPU cartridge windows are not file offsets. The documented Sega mapper has three 16 KiB slots and an unpaged first 1 KiB; the header alone does not prove this mapper or its active bank state.',
-   references=[_SMS,'https://www.smspower.org/Development/Tiles','https://www.smspower.org/Development/ROMHeader','https://www.smspower.org/Development/SN76489']),
+   references=[_SMS,'https://www.smspower.org/Development/Tiles','https://www.smspower.org/Development/Palette','https://www.smspower.org/Development/Tilemap','https://www.smspower.org/Development/ROMHeader','https://www.smspower.org/Development/SN76489']),
  'nes':dict(name='NES',cpu='Ricoh 2A03/2A07 · 6502 family',endian='little',domains={'cpu':0xffff,'ppu':0x3fff},
    graphics='Common 8×8 tiles use 16 bytes: eight low-plane rows, then eight high-plane rows. CHR-RAM graphics may be generated or decompressed during play.',
    mapping='Read the 16-byte header, optional 512-byte trainer, PRG size and mapper. CPU and PPU have separate buses.',
@@ -47,6 +70,8 @@ _SYSTEMS={
 def reference_for(system_id):
     if type(system_id) is not str or system_id not in _SYSTEMS:raise ValueError('unsupported reference system')
     return {'ok':True,'system_id':system_id,**deepcopy(_SYSTEMS[system_id]),
+            'storage_formats':deepcopy(_STORAGE[system_id]),
+            'storage_scope':'Common documented hardware layouts. These facts do not locate game resources, identify a compression driver or enable every graphics mode.',
             'endian_note':'CPU convention only; game data can use custom encodings.',
             'checks':['Keep file offset, CPU address and video-memory offset separate.',
                       'A changing RAM value does not identify its ROM initializer or writer.',

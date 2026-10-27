@@ -75,17 +75,18 @@ def graphics_schema(path,sha,config):
     palettes=[];maps=[];fonts=[]
     if palette_offset is not None:
         number(palette_offset,0,source['size']);banks=number(config.get('palette_banks',1),1,16);colors=2**CODECS[codec]
-        fmt=config.get('palette_format','genesis' if system in ('genesis','segacd') else 'rgb555-le')
-        formats={'genesis':('big',{'r':14,'g':224,'b':3584}),'rgb555-le':('little',{'r':31,'g':992,'b':31744}),'rgb555-be':('big',{'r':31,'g':992,'b':31744})}
+        fmt=config.get('palette_format','genesis' if system in ('genesis','segacd') else 'sms-rgb222' if system=='sms' else 'rgb555-le')
+        formats={'genesis':(2,'big',{'r':14,'g':224,'b':3584}),'rgb555-le':(2,'little',{'r':31,'g':992,'b':31744}),'rgb555-be':(2,'big',{'r':31,'g':992,'b':31744}),'sms-rgb222':(1,'little',{'r':3,'g':12,'b':48})}
         if fmt not in formats:raise ValueError('unsupported palette format')
-        byte_order,channels=formats[fmt]
-        palettes=[{'id':'colors','offset':palette_offset,'length':banks*colors*2,'entry_bytes':2,'byte_order':byte_order,'banks':banks,'colors_per_bank':colors,'channels':channels,'provenance':PROVENANCE}]
+        entry_bytes,byte_order,channels=formats[fmt]
+        palettes=[{'id':'colors','offset':palette_offset,'length':banks*colors*entry_bytes,'entry_bytes':entry_bytes,'byte_order':byte_order,'banks':banks,'colors_per_bank':colors,'channels':channels,'provenance':PROVENANCE}]
     if config.get('map_offset') is not None:
         if not palettes or (width,height)!=(8,8):raise ValueError('tilemap requires a palette and8x8 tiles')
         mw=number(config.get('map_width',1),1,64);mh=number(config.get('map_height',1),1,64)
         if system in ('nes','gb','gbc'):entry=1;fields={'tile_index':255,'palette_bank':None,'flip_x':None,'flip_y':None}
         elif system=='gba':entry=2;fields={'tile_index':1023,'palette_bank':61440,'flip_x':1024,'flip_y':2048}
         elif system=='snes':entry=2;fields={'tile_index':1023,'palette_bank':7168,'flip_x':16384,'flip_y':32768}
+        elif system=='sms':entry=2;fields={'tile_index':511,'palette_bank':2048,'flip_x':512,'flip_y':1024}
         else:entry=2;fields={'tile_index':2047,'palette_bank':24576,'flip_x':2048,'flip_y':4096}
         maps=[{'id':'map','offset':config['map_offset'],'length':entry*mw*mh,'entry_bytes':entry,'byte_order':'big' if system in ('genesis','segacd') else 'little',
                'width':mw,'height':mh,'bitmap_id':'tiles','palette_id':'colors','fields':{key:({'kind':'constant','value':0} if mask is None else {'kind':'bits','mask':mask}) for key,mask in fields.items()},'provenance':PROVENANCE}]

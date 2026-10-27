@@ -1308,6 +1308,10 @@
         {
           "title": "Original versus edited",
           "text": "The original view remains the reference while the edited view follows staged values. Saving the editor draft does not modify the playable source. Build and reload before judging the in-game effect."
+        },
+        {
+          "title": "Master System Mode 4 colors",
+          "text": "Choose Master System RGB222 for declared Mode 4 color bytes: one byte stores two bits per channel. Tilemap entries use the SMS index, flip and palette masks; priority and unused bits remain preserved. The reference color preview does not emulate analog display differences."
         }
       ],
       "related": [
@@ -2432,7 +2436,13 @@
             "caption": "Unaltered full-resolution capture is linked in the offline HTML edition."
           }
         ]
-      }
+      },
+      "details": [
+        {
+          "title": "Standard formats across systems",
+          "text": "Hardware & address help -> Standard graphics formats explains documented tile storage, palette encodings and map attributes for all seven choices. These are hardware facts, not a promise that a game stores its ROM resources uncompressed in the same layout."
+        }
+      ]
     },
     {
       "id": "startup-verification",

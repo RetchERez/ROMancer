@@ -8,13 +8,13 @@ class SourceInformationTests(unittest.TestCase):
         from romancer.source_information import explain_bytes
         from romancer.resource_forms import graphics_schema
         with tempfile.TemporaryDirectory() as d:
-            path=Path(d)/'graphics';raw=bytes(64)+bytes.fromhex('00001f00')+bytes(28);path.write_bytes(raw);sha=hashlib.sha256(raw).hexdigest()
+            path=Path(d)/'graphics';raw=bytes(64)+bytes.fromhex('0003')+bytes(30);path.write_bytes(raw);sha=hashlib.sha256(raw).hexdigest()
             schema=graphics_schema(path,sha,{'system_id':'sms','offset':0,'count':2,'palette_offset':64})
             tile=explain_bytes(raw,{'assets':schema},sha,34)['interpretations'][0]
             self.assertEqual((tile['kind'],tile['cell_index'],tile['row'],tile['plane']),('bitmap-byte',1,0,2));self.assertEqual(tile['codec'],'tile8-rowplanar4-msb-v1')
-            color=explain_bytes(raw,{'assets':schema},sha,67)['interpretations'][0]
-            self.assertEqual((color['kind'],color['bank'],color['index'],color['value']),('palette-entry',0,1,31));self.assertEqual(color['channels']['r'],31)
-            self.assertFalse(explain_bytes(raw,{'assets':schema},sha,67)['write_authorized'])
+            color=explain_bytes(raw,{'assets':schema},sha,65)['interpretations'][0]
+            self.assertEqual((color['kind'],color['bank'],color['index'],color['value']),('palette-entry',0,1,3));self.assertEqual(color['channels']['r'],3)
+            self.assertFalse(explain_bytes(raw,{'assets':schema},sha,65)['write_authorized'])
             schema['source']['sha256']='0'*64
             self.assertEqual(explain_bytes(raw,{'assets':schema},sha,34)['interpretations'],[])
 
