@@ -6,3 +6,4 @@
 *.ico binary
 *.zip binary
 *.pdf binary
+*.patch -text

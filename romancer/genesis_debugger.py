@@ -51,7 +51,7 @@ def make_script(config,nonce):
     probes=['{kind="'+p['kind']+'",start='+str(p['start'])+',finish='+str(p['end'])+',domain="'+p.get('domain','cpu')+'"}' for p in v['probes']]
     replacements={'STEPS':'{'+','.join(steps)+'}','PROBES':'{'+','.join(probes)+'}','NONCE':nonce,
         'FRAMES':str(v['frames']),'START_FRAME':str(v['start_frame']),'EVENT_LIMIT':str(v['event_limit']),
-        'TRACE_LIMIT':str(min(v['instruction_limit'],2000))}
+        'TRACE_LIMIT':str(min(v['instruction_limit'],2000)),'GRAPHICS_SNAPSHOT':'true' if v.get('graphics_snapshot') else 'false'}
     script=Path(__file__).with_name('genesis_capture.lua').read_text(encoding='utf-8')
     for key,value in replacements.items():script=script.replace('@'+key+'@',value)
     if re.search('@[A-Z_]+@',script):raise ValueError('Genesis observer template is incomplete')
@@ -71,14 +71,18 @@ def parse_capture(text,instructions,nonce,raw,config):
     if type(text) is not str or type(instructions) is not str or max(len(text.encode()),len(instructions.encode()))>2*1024**2:raise ValueError('Genesis capture exceeds its output budget')
     lines=text.splitlines()
     if not lines or lines[0]!='BEGIN\t1\t'+nonce+'\tgenesis':raise ValueError('Genesis capture identity differs')
-    events=[];end=None;windows={}
+    events=[];end=None;windows={};graphics={}
     def integer(text,low,high):
         if re.fullmatch('[0-9]{1,16}',text) is None:raise ValueError('invalid native integer')
         return number(int(text),low,high)
     for line in lines[1:]:
         if end is not None:raise ValueError('unexpected data after native end record')
         p=line.split('\t')
-        if p[0]=='E' and len(p)==11:
+        if p[0] in ('M','SCREEN','S'):
+            if not v.get('graphics_snapshot'):raise ValueError('Graphics snapshot was not requested.')
+            from .graphics_snapshot import parse_graphics_record
+            parse_graphics_record(line,'genesis',graphics)
+        elif p[0]=='E' and len(p)==11:
             ident=integer(p[1],1,v['event_limit']);kind=p[2]
             if ident!=len(events)+1 or kind not in ('read','write'):raise ValueError('Genesis event order or kind differs')
             address=integer(p[3],0,0xffffff);value=integer(p[4],0,255);pc=integer(p[5],0,0xffffff)
@@ -127,7 +131,11 @@ def parse_capture(text,instructions,nonce,raw,config):
         else:raise ValueError('malformed native instruction output')
     if pending is not None:raise ValueError('incomplete native instruction output')
     limited=len(samples)>=limit
-    return {'ok':True,'system_id':'genesis','status':'BUDGET_EXCEEDED' if end['omitted_events'] or limited else 'CAPTURED',
+    snapshot={}
+    if v.get('graphics_snapshot'):
+        from .graphics_snapshot import finish_snapshot
+        snapshot['graphics_snapshot']=finish_snapshot(graphics,'genesis')
+    return {'ok':True,'system_id':'genesis','status':'BUDGET_EXCEEDED' if end['omitted_events'] or limited else 'CAPTURED',**snapshot,
         'events':events,'instruction_samples':samples,'instruction_sample_limit':limit,'instruction_samples_truncated':limited,
         'native_callbacks_observed':bool(events or samples),'merged_instruction_access_order_known':False,
         'observer_reads_filtered':True,'write_authorized':False,'memory_written':False,**end,

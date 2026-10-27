@@ -41,3 +41,6 @@ The Windows setup executable uses NSIS 3.13 (zlib installer compression).
 Its original component licenses are retained in app/NSIS-LICENSE.txt and the
 source-only package. NSIS is credited third-party code, not part of ROMancer's
 MIT authorship claim. The build uses a pinned official compiler archive.
+
+The full Windows package can also include separately licensed native observers:
+MesenCE 2.2.1 (GPL-3.0-or-later) with the documented ROMancer physical-PPU/operation-metadata patch, and unmodified MAME 0.289 (GPL-2.0-or-later and retained component licenses). Complete matching sources, upstream notices, build instructions and exact identities are in debuggers/. Patches in tools/patches/ modify upstream GPL files and retain those upstream licenses; they are not relicensed by ROMancer's MIT license. Playback's BlastEm adapter also includes the documented SMS two-button/Pause mapping correction, with matching modified source in CORE-SOURCES.zip.

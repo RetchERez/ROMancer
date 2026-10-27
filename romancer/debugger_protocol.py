@@ -2,24 +2,29 @@
 import re
 from .asset_schema import fields,number
 
-LIMITS={'nes':0xffff,'snes':0xffffff,'gb':0xffff,'gbc':0xffff,'gba':0xfffffff,'genesis':0xffffff}
+LIMITS={'nes':0xffff,'snes':0xffffff,'gb':0xffff,'gbc':0xffff,'gba':0xfffffff,'genesis':0xffffff,'sms':0xffff}
 PHYSICAL_DOMAINS={'nes':{'nesInternalRam':2047,'nesPrgRom':64*1024**2-1},
     'snes':{'snesWorkRam':131071,'snesPrgRom':8*1024**2-1},
     'gb':{'gbWorkRam':8191,'gbPrgRom':8*1024**2-1},
     'gbc':{'gbWorkRam':32767,'gbPrgRom':8*1024**2-1},
     'gba':{'gbaExtWorkRam':262143,'gbaIntWorkRam':32767,'gbaPrgRom':32*1024**2-1},
-    'genesis':{'genesisWorkRam':65535}}
+    'genesis':{'genesisWorkRam':65535},'sms':{'smsPrgRom':4*1024**2-1,'smsWorkRam':8191,'smsVideoRam':16383,'smsPaletteRam':31}}
+PHYSICAL_DOMAINS['nes'].update(nesChrRom=64*1024**2-1,nesChrRam=32767,nesSpriteRam=255,nesPaletteRam=31,nesNametableRam=4095)
+PHYSICAL_DOMAINS['snes'].update(snesVideoRam=65535,snesSpriteRam=543,snesCgRam=511)
+for _system in ('gb','gbc'):PHYSICAL_DOMAINS[_system].update(gbVideoRam=16383 if _system=='gbc' else 8191,gbSpriteRam=159,gbBgPaletteRam=63,gbObjPaletteRam=63)
+PHYSICAL_DOMAINS['gba'].update(gbaVideoRam=98303,gbaSpriteRam=1023,gbaPaletteRam=1023)
 BUTTONS={'nes':{'a','b','select','start','up','down','left','right'},
     'snes':{'a','b','x','y','l','r','select','start','up','down','left','right'},
     'gb':{'a','b','select','start','up','down','left','right'},
     'gbc':{'a','b','select','start','up','down','left','right'},
     'gba':{'a','b','l','r','select','start','up','down','left','right'},
-    'genesis':{'a','b','c','start','up','down','left','right'}}
+    'genesis':{'a','b','c','start','up','down','left','right'},'sms':{'one','two','pause','up','down','left','right'}}
 
 
 def validate_capture(system,config):
     if system not in LIMITS:raise ValueError('this native trace backend does not support the selected system')
-    fields(config,'steps probes event_limit instruction_limit timeout'+(' start_frame' if 'start_frame' in config else ''))
+    fields(config,'steps probes event_limit instruction_limit timeout'+(' start_frame' if 'start_frame' in config else '')+(' graphics_snapshot' if 'graphics_snapshot' in config else ''))
+    if 'graphics_snapshot' in config and type(config['graphics_snapshot']) is not bool:raise ValueError('Choose whether to capture a graphics snapshot.')
     number(config['event_limit'],1,2000);number(config['instruction_limit'],1000,20000000);number(config['timeout'],1,60)
     if type(config['steps']) is not list or not 1<=len(config['steps'])<=64:raise ValueError('record 1 to 64 input steps')
     total=0
@@ -62,6 +67,10 @@ def _rom_regions(raw,system):
         return {'snesPrgRom':next(iter(regions))} if len(regions)==1 else {}
     if system in ('gb','gbc'):return {'gbPrgRom':(0,len(raw))}
     if system=='gba':return {'gbaPrgRom':(0,len(raw))}
+    if system=='sms':
+        from .system_formats.sms import candidates
+        layouts=[c for c in candidates(Reader()) if c['layout_valid']]
+        return {'smsPrgRom':(0,len(raw))} if len(layouts)==1 else {}
     return {}
 
 
@@ -70,7 +79,7 @@ def parse_capture(text,nonce,system,raw,config):
     if type(text) is not str or len(text.encode('utf-8'))>2*1024**2:raise ValueError('native event output exceeds its budget')
     lines=text.splitlines()
     if not lines or lines[0]!='BEGIN\t1\t'+nonce+'\t'+system:raise ValueError('native capture identity or protocol differs')
-    domains={};events=[];by_id={};end=None;regions=_rom_regions(raw,system)
+    domains={};events=[];by_id={};end=None;regions=_rom_regions(raw,system);graphics={}
     def integer(value,minimum=0,maximum=2**53-1):
         if re.fullmatch('-?[0-9]{1,16}',value) is None:raise ValueError('invalid native integer')
         return number(int(value),minimum,maximum)
@@ -82,7 +91,11 @@ def parse_capture(text,nonce,system,raw,config):
     for line in lines[1:]:
         if end is not None:raise ValueError('unexpected data after native end record')
         part=line.split('\t');kind=part[0]
-        if kind=='DOMAIN' and len(part)==3:
+        if kind in ('M','SCREEN','S'):
+            if not config.get('graphics_snapshot'):raise ValueError('Graphics snapshot was not requested.')
+            from .graphics_snapshot import parse_graphics_record
+            parse_graphics_record(line,system,graphics)
+        elif kind=='DOMAIN' and len(part)==3:
             if events or len(domains)>=128 or re.fullmatch('[A-Za-z][A-Za-z0-9_]{0,63}',part[1]) is None:raise ValueError('invalid native domain declaration')
             ident=integer(part[2],0,255)
             if ident in domains or part[1] in domains.values():raise ValueError('duplicate native domain')
@@ -110,6 +123,14 @@ def parse_capture(text,nonce,system,raw,config):
                     'file_offset':context_offset,'mapping_observed_at':'execution_callback'},
                 'registers':{},'access_width':None,'actor':None,'causation_proven':False}
             events.append(event);by_id[ident]=event
+        elif kind=='N' and len(part)==6:
+            ident=integer(part[1],1,config['event_limit']);event=by_id.get(ident)
+            operations={'read':{'Read','DmaRead','DummyRead','PpuRenderingRead'},'write':{'Write','DmaWrite','DummyWrite'},'exec':{'ExecOpCode','ExecOperand'}}
+            width=integer(part[3],1,4);domain=integer(part[4],-1,255);physical=integer(part[5],-1,64*1024**2)
+            if event is None or ident!=len(events) or 'operation_kind' in event or part[2] not in operations[event['kind']] or width not in (1,2,4):raise ValueError('Native operation details differ from the observed access.')
+            name,_=mapping(domain,physical)
+            if name!=event['domain'] or (physical if physical>=0 else None)!=event['physical_offset']:raise ValueError('Native physical mapping details differ.')
+            event.update(operation_kind=part[2],callback_value_bytes=width,dma_channel=None,actor='dma' if part[2] in ('DmaRead','DmaWrite') else 'ppu_renderer' if part[2]=='PpuRenderingRead' else None)
         elif kind=='R' and len(part)==5:
             event=by_id.get(integer(part[1],1,config['event_limit']));name=part[2]
             if event is None or len(event['registers'])>=64 or re.fullmatch('[A-Za-z][A-Za-z0-9_.]{0,63}',name) is None or name in event['registers']:raise ValueError('invalid native register record')
@@ -126,7 +147,11 @@ def parse_capture(text,nonce,system,raw,config):
             end={'frames_observed':frame,'omitted_events':omitted,'executed_callbacks':executed,'stop_reason':reason,'route_complete':reason=='frames'}
         else:raise ValueError('unknown or malformed native event record')
     if end is None:raise ValueError('native capture did not produce its end record')
-    return {'ok':True,'status':'CAPTURED' if end['route_complete'] and not end['omitted_events'] else 'BUDGET_EXCEEDED',
+    snapshot={}
+    if config.get('graphics_snapshot'):
+        from .graphics_snapshot import finish_snapshot
+        snapshot['graphics_snapshot']=finish_snapshot(graphics,system)
+    return {'ok':True,'status':'CAPTURED' if end['route_complete'] and not end['omitted_events'] else 'BUDGET_EXCEEDED',**snapshot,
         'system_id':system,'native_callbacks_observed':True,'events':events,**end,
         'write_authorized':False,'memory_written':False,'runtime_scope':'main CPU callbacks from a bounded cold-start input route',
         'limitations':['Access width, DMA actor and dummy-read subtype are not exposed by this backend API.',

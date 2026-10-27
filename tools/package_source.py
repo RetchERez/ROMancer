@@ -207,6 +207,16 @@ APPROVED_FILES = APPROVED_FILES | frozenset({
 APPROVED_FILES = APPROVED_FILES | frozenset({'tests/test_connected_mcp.py', 'user-guide/screenshots/80-connected-room-preview.png', 'romancer/ui/trace_controls.js', 'tests/test_build_checks.py', 'romancer/build_checks.py', 'tests/test_gameplay_traces.py', 'tests/ui_trace_controls.mjs', 'user-guide/screenshots/79-genesis-automatic-build-check.png', 'romancer/connected_game.py', 'user-guide/screenshots/78-nes-gameplay-trace.png', 'tests/test_connected_game.py', 'tests/ui_connected_game.mjs', 'tests/ui_build_checks.mjs', 'romancer/ui/views/gameview.js', 'romancer/ui/build_checks.js', 'romancer/gameplay_traces.py', 'tests/ui_connected_handoffs.mjs', 'tests/test_batched_video.py'})
 
 APPROVED_FILES = APPROVED_FILES | frozenset(['romancer/replay_journal.py', 'romancer/ui/source_verification.js', 'romancer/visual_source.py', 'romancer/visual_source_tools.py', 'tests/test_replay_journal.py', 'tests/test_visual_source.py', 'tests/test_visual_source_mcp.py', 'tests/test_visual_source_tools.py', 'tests/ui_source_verification.mjs', 'user-guide/screenshots/86-real-sms-verified-source-editor.png', 'user-guide/screenshots/87-nes-verified-source.png', 'user-guide/screenshots/88-nes-exact-pixel-byte-origins.png'])
+APPROVED_FILES = APPROVED_FILES | frozenset({'romancer/object_workbench.py','romancer/graphics_snapshot.py','romancer/graphics_access.py','romancer/ui/object_workbench.js','tests/ui_object_workbench.mjs','tests/test_object_workbench.py','tests/test_graphics_snapshot.py','tests/test_graphics_access.py'})
+
+APPROVED_FILES = APPROVED_FILES | frozenset(['romancer/bundled_debuggers.py', 'romancer/observer_pins.py', 'tests/test_bundled_debuggers.py', 'tests/test_sms_controller_native.py', 'romancer/ui/graphics_access.js', 'romancer/ui/edit_checks.js', 'tests/ui_graphics_access.mjs', 'tests/ui_edit_checks.mjs'])
+
+APPROVED_FILES = APPROVED_FILES | frozenset({'tools/patches/mesen-graphics.patch','tools/patches/blastem-sms-input.patch'})
+
+APPROVED_FILES = APPROVED_FILES | frozenset({'tests/test_native_source_patches.py'})
+
+APPROVED_FILES = APPROVED_FILES | frozenset(['user-guide/screenshots/90-connected-whole-object.png', 'user-guide/screenshots/91-native-graphics-memory.png', 'user-guide/screenshots/92-captured-edit-comparison.png', 'user-guide/screenshots/93-compression-capacity.png'])
+
 
 def _identity(info):
     return (info.st_dev, info.st_ino, info.st_size, info.st_mtime_ns)

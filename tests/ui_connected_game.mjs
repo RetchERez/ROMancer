@@ -13,3 +13,7 @@ console.log('Shared Game view renders known fields and guards source-bound navig
  const trace={...node,id:'wanted-node',kind:'trace',offset:null,locator:{trace_id:'wanted'}};const original=ctx.api.call;ctx.api.call=async(op,p)=>op==='gameview.graph'?(requested=p,{ok:true,artifact_id:'a',source_sha256:'s',nodes:[trace],edges:[],total:1,page:0,issues:[]}):op==='gameview.detail'?{ok:true,artifact_id:'a',source_sha256:'s',node:trace,neighbors:[],connections:[],preview:{},hex_preview:''}:original(op,p);
  await render(ctx);assert.equal(requested.page,0);assert.equal(requested.query,'');assert.equal(requested.kind,'trace');assert.equal(state.connectedNode.id,'wanted-node');
 }
+
+state.artifact={artifact_id:'a',sha256:'s',system_id:'snes'};
+await render(ctx);assert(state.connectedNode);
+await actions['gameview-find']();assert.equal(state.connectedNode,null,'Changing a resource filter must not keep a detail from the previous category.');

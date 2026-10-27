@@ -19,13 +19,13 @@ from romancer.workbench_api import WorkbenchAPI
 PROTOCOL='2025-11-25'
 MAX_MESSAGE=1024*1024
 MAX_RESULT=256*1024
-READ_OPERATIONS=frozenset('''gameview.graph gameview.detail traces.get traces.verification traces.origin checks.status checks.get symbols.preview symbols.search documented.scan documented.open references.catalog references.template research.note_get research.inspect research.preview system.capabilities system.operations projects.list project.open
+READ_OPERATIONS=frozenset('''objects.list objects.get graphics.accesses.list graphics.accesses.tiles graphics.accesses.get graphics.accesses.memory gameview.graph gameview.detail traces.get traces.verification traces.origin checks.status checks.get symbols.preview symbols.search documented.scan documented.open references.catalog references.template research.note_get research.inspect research.preview system.capabilities system.operations projects.list project.open
 games.inspect games.maps.catalog games.maps.inspect cheats.catalog cheats.inspect engines.inspect systems.reference systems.classify_address rom.check catalog.list resource.inspect resources.explain resources.relationships
 hex.search hex.numbers hex.bookmarks builds.timeline builds.compare project.validate investigations.get investigations.probe debugger.capabilities debugger.get structures.survey structures.definition relocation.table_definition
 assets.inspect script.inspect tables.inspect tables.batch levels.inspect sound.inspect revision.lookup
 profiles.get profiles.validate runtime.checkpoints reports.list exports.list jobs.get
-systems.address resources.address_uses watches.compare debug.inspect compression.inspect'''.split())
-WRITE_OPERATIONS=frozenset('''gameview.link gameview.unlink traces.capture traces.open traces.verify traces.open_verified checks.configure checks.run symbols.import research.note_save research.note_delete research.export research.apply project.create project.demo project.demo_system source.import inputs.import
+systems.address resources.address_uses watches.compare debug.inspect compression.inspect compression.preview_reinsert'''.split())
+WRITE_OPERATIONS=frozenset('''objects.create objects.open objects.delete graphics.accesses.capture gameview.link gameview.unlink traces.capture traces.open traces.verify traces.open_verified checks.configure checks.run checks.from_trace compression.plan_relocate symbols.import research.note_save research.note_delete research.export research.apply project.create project.demo project.demo_system source.import inputs.import
 games.plan games.configure games.maps.plan cheats.import systems.plan_edits assets.plan script.plan tables.plan levels.plan sound.plan
 build.apply structured.apply builds.annotate hex.bookmark catalog.index rom.scan.start
 rom.scan.run release.prepare release.verify resources.declare_assets resources.declare_script tables.save_definition patches.preview patches.apply revision.import
@@ -35,12 +35,25 @@ recipes.from_plan recipes.preview recipes.import recipes.export jobs.cancel
 values.start values.narrow investigations.start investigations.capture debugger.prepare debugger.capture debugger.investigate relocation.plan watches.save video.inspect compression.extract compression.plan_reinsert
 definitions.export definitions.import'''.split())
 DESCRIPTIONS={
+ 'objects.create':'Save a whole-object layout from explicitly selected fresh verified parts belonging to one exact frame and execution context. Recovers flips from measured pixel origins; shared tiles and holes remain explicit.',
+ 'graphics.accesses.list':'List source-bound native graphics capture IDs without raw memory.',
+ 'graphics.accesses.tiles':'Decode at most64 complete tiles from recorded video memory with an explicitly chosen tested codec. Stored indices only; no ROM source or palette is inferred.',
+ 'checks.from_trace':'Test a saved descendant build with a fresh authenticated cold-start trace. Requires unchanged execution context and captured-frame reproduction on two original runs. Does not overwrite automatic test setup.',
+ 'compression.preview_reinsert':'Independently verify recompression and report packed size, free bytes and overflow without creating a plan.',
+ 'compression.plan_relocate':'Plan a checked recompressed stream move into author-reserved space, with all declared external start references, same-bank constraints and before-byte checks. Original stream remains. No completeness is inferred.',
+ 'objects.list':'List saved exact-revision object layouts. Names are author labels, not inferred game roles.',
+ 'objects.get':'Inspect a saved object layout and whether its local runtime proof is still fresh. Imported layouts retain declaration-only trust.',
+ 'objects.open':'Open a saved whole-object layout in the visual editor. Fresh proof is rechecked; historical/imported layouts are clearly marked checked declarations.',
+ 'objects.delete':'Remove a saved object layout; ROM bytes and builds stay unchanged.',
+ 'graphics.accesses.capture':'Replay a saved cold-start input route in the pinned native observer and capture source reads, graphics writes, operation details when exposed, video memory and a decoded scene. Different from Playtest state; no read-to-write causation is invented.',
+ 'graphics.accesses.get':'Read a bounded page of native graphic access events, scene and video-memory identities. Budget omissions and snapshot coverage remain explicit.',
+ 'graphics.accesses.memory':'Read at most4096 bytes from a recorded video-memory domain. Read-only historical observation, not ROM editing authority.',
  'gameview.graph':'Browse source-bound resources, declared relationships, named records and native gameplay pixel candidates across all seven systems. Shared storage is not semantic ownership.',
  'gameview.detail':'Inspect a current connected resource, decoded fields, bounded byte preview, neighbors and visual preview. Labels and pixel candidates retain their evidence levels.',
  'traces.capture':'Save a paused native frame region and bounded system-codec ROM matches. Inputs cannot supply pixels. Competing offsets and coverage remain explicit; no source transfer is inferred.',
  'traces.get':'Read an authenticated saved gameplay trace and its candidates. Restored evidence is historical and cannot authorize candidate editing.',
  'traces.open':'Explicitly choose saved native pixel candidates for the existing graphics editor. Validates current source, trusted evidence and a bounded tile layout; does not modify ROM bytes.',
- 'traces.verify':'Verify literal source locations using two controlled ROMancer marker builds, exact original replay controls and a restored-ROM control. Bounded causal visual dependency only; CPU/DMA transfers are not observed.',
+ 'traces.verify':'Verify literal source locations using coded pixel probes and two independent validation patterns, exact original replay controls and a restored-ROM control. Bounded causal visual dependency only; CPU/DMA transfers are not observed.',
  'traces.origin':'Read one authenticated source pixel map, exact format-derived byte lanes and proof images without truncating a large multi-part report. Historical evidence remains historical.',
  'traces.verification':'Read authenticated causal source verification, tested byte ranges, proof images and coverage. Imported evidence is historical.',
  'traces.open_verified':'Open only explicit parts confirmed by fresh source verification in the graphics editor. Does not modify the original ROM.',
@@ -82,7 +95,7 @@ DESCRIPTIONS={
  'debugger.investigate':'Replay bounded controller input from power on and capture real writes to an authenticated candidate. Derives physical probes server-side, including banked RAM. Links evidence without claiming the replay resumes Playtest or proves causation.',
  'debugger.capabilities':'Inspect actual system/host/pinned-backend availability for bounded native instruction and memory-access investigations. A documented capability does not mean an installed backend.',
  'debugger.prepare':'Deliberately download pinned official upstream debugger artifacts into the workspace cache and verify hashes before any helper runs. Requires network once; no caller URL, executable or path is accepted. Nothing is uploaded; external binaries are separate from ROMancer release assets.',
- 'debugger.capture':'Run a bounded cold-start input route with the pinned headless debugger, recording real access callbacks, instruction context and observed mappings. No arbitrary script/executable/path is accepted. Access width, DMA actor and causation remain explicit unknowns.',
+ 'debugger.capture':'Run a bounded cold-start input route with the pinned headless debugger, recording real access callbacks, instruction context and observed mappings. No arbitrary script/executable/path is accepted. Operation kinds and callback value widths are retained when exposed by the reviewed backend. DMA channel, actual instruction access width and causation remain unestablished.',
  'debugger.get':'Read a page of application-authenticated native trace events and source-bound execution contexts. Historical captures are labeled; imported JSON never becomes fresh native evidence.',
  'structures.survey':'Test bounded repeated numeric record layouts without game profiles. Reports exact tested widths, byte orders, sampling, target bounds and in-window previews. These are structural hypotheses, not named properties or observed dereferences.',
  'structures.definition':'Reproduce a structural hypothesis from current source bytes and generate a validated neutral table editor definition. Numeric interpretation is separate from an explicitly selected linear-pointer hypothesis. Does not save a definition or modify ROM bytes.',
@@ -119,19 +132,28 @@ def _investigation_properties(operation):
     def obj(properties):return {'type':'object','properties':properties,'required':list(properties),'additionalProperties':False}
     def array(items,maximum,minimum=0):return {'type':'array','items':items,'minItems':minimum,'maxItems':maximum}
     source={'project_id':string(),'artifact_id':string()}
-    if operation=='gameview.graph':return {**source,'query':string(128),'kind':enum(['all','known','known_resource','assets','script','tables','record','levels','room','actor','sound','note','trace','candidate','verification','verified_source']),'page':integer(0,1024)}
+    if operation=='gameview.graph':return {**source,'query':string(128),'kind':enum(['all','known','known_resource','assets','script','tables','record','levels','room','actor','sound','note','trace','candidate','verification','verified_source','object','graphics_capture']),'page':integer(0,1024)}
     if operation=='gameview.detail':return {**source,'node_id':string(32)}
     if operation=='gameview.link':return {**source,'from_id':string(32),'to_id':string(32),'relation':enum(['uses_graphics','uses_palette','uses_script','uses_sound','uses_table','reference']),'note':string(256)}
     if operation=='gameview.unlink':return {**source,'link_id':string(32)}
     if operation=='traces.capture':return {**source,'name':string(80),'frame_sha256':string(64),'region':obj({'x':integer(0,2047),'y':integer(0,2047),'width':integer(8,256),'height':integer(8,256)}),'offset':integer(),'length':integer(1)}
     if operation=='traces.get':return {**source,'trace_id':string(32)}
     if operation=='traces.open':return {**source,'trace_id':string(32),'matches':array(integer(0,255),64,1)}
+    if operation=='objects.create':return {**source,'name':string(80),'parts':array(obj({'verification_id':string(32),'match_id':integer(0,255)}),64,1)}
+    if operation=='graphics.accesses.list':return source
+    if operation=='graphics.accesses.tiles':return {**source,'evidence_id':string(32),'domain':string(64),'offset':integer(0,98303),'count':integer(1,64),'codec':string(48)}
+    if operation=='objects.list':return source
+    if operation in ('objects.get','objects.open','objects.delete'):return {**source,'object_id':string(32)}
+    if operation=='graphics.accesses.capture':return {**source,'trace_id':string(32),'offset':integer(0,64*1024**2),'length':integer(1,2048),'start_frame':integer(0,3599)}
+    if operation=='graphics.accesses.get':return {**source,'evidence_id':string(64),'offset':integer(0,2000),'limit':integer(1,100)}
+    if operation=='graphics.accesses.memory':return {**source,'evidence_id':string(64),'domain':string(64),'offset':integer(0,98303),'length':integer(1,4096)}
     if operation=='traces.verify':return {**source,'trace_id':string(32),'start':integer(0,256),'limit':integer(1,8)}
     if operation=='traces.verification':return {**source,'verification_id':string(32)}
     if operation=='traces.origin':return {**source,'verification_id':string(32),'match_id':integer(0,255)}
     if operation=='traces.open_verified':return {**source,'verification_id':string(32),'matches':array(integer(0,255),1,1)}
     if operation=='checks.status':return source
     if operation=='checks.get':return {**source,'evidence_id':string(32)}
+    if operation=='checks.from_trace':return {'project_id':string(),'source_id':string(),'target_id':string(),'trace_id':string(32)}
     if operation=='checks.run':return {'project_id':string(),'source_id':string(32),'target_id':string(32)}
     if operation=='checks.configure':
         step=obj({'frames':integer(1,600),'buttons':array(enum(['up','down','left','right','a','b','x','y','l','r','l2','r2','l3','r3','start','select']),16),'port':integer(0,3)})
@@ -178,16 +200,17 @@ def _investigation_properties(operation):
     if operation in ('debugger.capabilities','debugger.prepare'):return source
     if operation=='debugger.get':return {**source,'evidence_id':string(64),'offset':integer(0,2000),'limit':integer(1,100)}
     if operation in ('debugger.capture','debugger.investigate'):
-        step=obj({'frames':integer(1,3600),'buttons':array(enum(['a','b','c','x','y','l','r','select','start','up','down','left','right']),12),'port':integer(0,0)})
+        step=obj({'frames':integer(1,3600),'buttons':array(enum(['a','b','c','x','y','l','r','select','start','up','down','left','right','one','two','pause']),12),'port':integer(0,0)})
         probe=obj({'kind':enum(['read','write','exec']),'start':integer(0,0xfffffff),'end':integer(0,0xfffffff)})
         probe['properties']['domain']=enum(['cpu','nesInternalRam','nesPrgRom','snesWorkRam','snesPrgRom',
-            'gbWorkRam','gbPrgRom','gbaExtWorkRam','gbaIntWorkRam','gbaPrgRom','genesisWorkRam'])
+            'gbWorkRam','gbPrgRom','gbaExtWorkRam','gbaIntWorkRam','gbaPrgRom','genesisWorkRam','smsPrgRom','smsWorkRam','smsVideoRam','smsPaletteRam','nesChrRom','nesChrRam','nesSpriteRam','nesPaletteRam','nesNametableRam','snesVideoRam','snesSpriteRam','snesCgRam','gbVideoRam','gbSpriteRam','gbBgPaletteRam','gbObjPaletteRam','gbaVideoRam','gbaSpriteRam','gbaPaletteRam'])
         configuration=obj({'steps':array(step,64,1),'probes':array(probe,8,1),'event_limit':integer(1,2000),
             'instruction_limit':integer(1000,20000000),'timeout':integer(1,60)})
         configuration['properties']['start_frame']=integer(0,3599)
         if operation=='debugger.investigate':
             del configuration['properties']['probes'];configuration['required'].remove('probes')
             return {**source,'investigation_id':string(64),'candidate_id':string(64),'replay':configuration}
+        configuration['properties']['graphics_snapshot']={'type':'boolean'}
         return {**source,'config':configuration}
     if operation=='cheats.inspect':return {**source,'query':string(240),'page':integer(0,20000),'limit':integer(1,20)}
     if operation=='systems.reference':return {'system_id':enum(['nes','snes','genesis','gb','gbc','gba','sms'])}
@@ -233,9 +256,11 @@ def _investigation_properties(operation):
         return {'before':snapshot,'after':snapshot}
     if operation=='video.inspect':return {**source,'offset':integer(0,256*1024**2),'length':integer(1,4096),'codec':enum([
         'tile8-rowplanar4-msb-v1','tile8-planar2-msb-v1','tile8-paired2-msb-v1','tile8-paired4-msb-v1','tile8-packed4-high-v1','tile8-packed4-low-v1'])}
-    if operation in ('compression.inspect','compression.extract','compression.plan_reinsert'):
-        identity=source if operation!='compression.plan_reinsert' else {'project_id':string(),'parent_id':string(),'decoded_id':string(),'edited_id':string()}
-        return {**identity,'offset':integer(),'allocation':integer(4,48*1024),'codec':codecs}
+    if operation in ('compression.inspect','compression.extract','compression.plan_reinsert','compression.preview_reinsert','compression.plan_relocate'):
+        identity=source if operation in ('compression.inspect','compression.extract') else {'project_id':string(),'parent_id':string(),'decoded_id':string(),'edited_id':string()}
+        properties={**identity,'offset':integer(),'allocation':integer(4,48*1024),'codec':codecs}
+        if operation=='compression.plan_relocate':properties['spec']=_investigation_properties('relocation.plan')['spec']
+        return properties
     if operation=='definitions.export':return {**source,'kind':kinds}
     if operation=='definitions.import':return {**source,'document':obj({'format':enum(['romancer-definition-v1']),
         'source':obj({'sha256':{'type':'string','pattern':'^[0-9a-f]{64}$'},'size':integer(0,8*1024**3)}),'kind':kinds,'definition':{'type':'object'}})}
@@ -354,7 +379,7 @@ class MCPServer:
                 stream=io.BytesIO();image.save(stream,format='PNG')
                 if stream.tell()<=MAX_RESULT:contents.append({'type':'image','mimeType':'image/png','data':base64.b64encode(stream.getvalue()).decode('ascii')})
             public=_public_result(result)
-            if operation.startswith(('gameview.','traces.','checks.')):public=_connected_previews(public,contents)
+            if operation.startswith(('gameview.','traces.','checks.','graphics.accesses.')):public=_connected_previews(public,contents)
             text=json.dumps(public,ensure_ascii=False,allow_nan=False)
             if len(text.encode('utf-8'))>MAX_RESULT and operation in ('traces.verify','traces.verification'):
                 public={k:v for k,v in public.items() if k not in ('groups','verified_matches')}

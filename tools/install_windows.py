@@ -45,11 +45,11 @@ def verify_tree(root):
         name=safe_name(row['path'])
         if name.casefold() in names or name.casefold()=='bundle.json':raise ValueError('duplicate bundle member')
         names.add(name.casefold());expected.add(name)
-        if type(row['size']) is not int or not 0<=row['size']<=256*1024**2:raise ValueError('bundle member exceeds budget')
+        if type(row['size']) is not int or not 0<=row['size']<=384*1024**2:raise ValueError('bundle member exceeds budget')
         measured=_hash(root/name)
         if measured!={k:row[k] for k in ('size','sha256')}:raise ValueError('bundle member identity mismatch: '+name)
         total+=row['size']
-    if total>512*1024**2:raise ValueError('bundle aggregate budget exceeded')
+    if total>1024*1024**2:raise ValueError('bundle aggregate budget exceeded')
     actual=set()
     for path in root.rglob('*'):
         if path.is_symlink() or path.is_junction():raise ValueError('linked bundle directory/member')

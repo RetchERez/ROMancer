@@ -39,7 +39,7 @@ def guard_request(api,operation,p):
     if writes and 'artifact_id' in p:
         project=api.project(p);row=projects.artifact(project,p['artifact_id'])
         (require_editable(project,row) if operation.endswith('.plan') or operation in ('systems.plan_edits','patches.preview','recipes.preview') else require_supported(row))
-    if operation=='compression.plan_reinsert':require_supported(projects.artifact(api.project(p),p['parent_id']))
+    if operation in ('compression.plan_reinsert','compression.preview_reinsert','compression.plan_relocate'):require_supported(projects.artifact(api.project(p),p['parent_id']))
     if operation in ('build.apply','structured.apply','patches.apply'):
         project=api.project(p);ident=projects.identifier(p['plan_id']);plan=load_script_json(project/'plans'/(ident+'.json'),max_bytes=8*1024**2)
         require_editable(project,projects.artifact(project,plan.get('source_id',plan.get('artifact_id'))))

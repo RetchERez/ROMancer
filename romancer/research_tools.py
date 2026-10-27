@@ -38,7 +38,7 @@ def notes_for(row):
 
 
 def revision(row):
-    raw=canonical_bytes({'descriptors':row.get('descriptors',{}),'notes':notes_for(row)},max_bytes=projects.MAX_STORE)
+    raw=canonical_bytes({'descriptors':row.get('descriptors',{}),'notes':notes_for(row),'objects':row.get('object_layouts')},max_bytes=projects.MAX_STORE)
     return hashlib.sha256(raw).hexdigest()
 
 
@@ -162,13 +162,16 @@ class ResearchTools:
             if row.get('descriptors',{}).get(kind):definitions[kind]=_definition(row,path,kind)
         document={'format':'romancer-research-v1','source':{'sha256':row['sha256'],'size':row['size'],'system_id':row.get('system_id')},
                   'definitions':definitions,'notes':notes_for(row)}
+        from .object_workbench import portable_objects
+        objects=portable_objects(row)
+        if objects:document.update(format='romancer-research-v2',objects=objects)
         canonical_bytes(document,max_bytes=PACK_LIMIT);projects._measure(path,row,cancelled=c)
         return self.api._export_declaration(project,document,c)
 
     def _review(self,row,path,document,c):
         from .workflow_recipes import definition_document
-        document=json.loads(canonical_bytes(document,max_bytes=PACK_LIMIT));fields(document,'format source definitions notes')
-        if document['format']!='romancer-research-v1':raise ValueError('Choose a ROMancer research pack.')
+        document=json.loads(canonical_bytes(document,max_bytes=PACK_LIMIT));fields(document,'format source definitions notes'+(' objects' if document.get('format')=='romancer-research-v2' else ''))
+        if document['format'] not in ('romancer-research-v1','romancer-research-v2'):raise ValueError('Choose a ROMancer research pack.')
         fields(document['source'],'sha256 size system_id')
         if document['source']!={'sha256':row['sha256'],'size':row['size'],'system_id':row.get('system_id')}:raise ValueError('Research pack requires the exact matching ROM revision and system.')
         defs=document['definitions']
@@ -181,6 +184,8 @@ class ResearchTools:
                 checked[kind]=definition_document(path,row['sha256'],kind,defs[kind])['definition']
                 if existing.get(kind) is not None:replacements.append(kind+' definition')
         incoming=_notes(document['notes'],row['size']);old={n['id']:n for n in notes_for(row)}
+        from .object_workbench import review_objects
+        objects,object_replacements=review_objects(row,document.get('objects',[]));replacements.extend(object_replacements)
         for n in incoming:
             if n['id'] in old and old[n['id']]!=n:replacements.append('note: '+n['title'])
             old[n['id']]=n
@@ -190,7 +195,7 @@ class ResearchTools:
         projects._measure(path,row,cancelled=c)
         return normalized,list(old.values()),{'ok':True,'artifact_id':row['artifact_id'],'source_sha256':row['sha256'],
                  'review_id':review_id,'definitions':list(checked),'notes':[{k:n[k] for k in ('id','title','offset','length','category')} for n in incoming[:50]],'notes_truncated':len(incoming)>50,'replacements':replacements,
-                 'note_count':len(incoming),'merged_note_count':len(old),'write_authorized':False,'game_semantics_verified':False,
+                 'note_count':len(incoming),'merged_note_count':len(old),'object_count':len(document.get('objects',[])),'merged_object_count':len(objects),'write_authorized':False,'game_semantics_verified':False,
                  'scope':'Checked declarations and user research only. No ROM bytes are changed.'}
 
     def preview(self,p,c):
@@ -210,6 +215,9 @@ class ResearchTools:
                 from .resource_forms import font_schema_from_assets
                 descriptors['font']=font_schema_from_assets(document['definitions']['assets'])
             _store_notes(owned,notes)
+            if 'objects' in document:
+                from .object_workbench import review_objects
+                objects,_=review_objects(owned,document['objects']);owned['object_layouts']={'source_sha256':row['sha256'],'objects':objects}
             if c():raise KeyboardInterrupt
             projects._measure(path,row,cancelled=c);projects.write_json(project/'project.json',store)
         return {**self._public(owned),'status':'IMPORTED','definitions':review['definitions']}

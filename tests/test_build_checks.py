@@ -37,3 +37,27 @@ class BuildCheckTests(unittest.TestCase):
         self.assertEqual(validate_config(good)['mode'],'unchanged')
         for change in ({'automatic':'yes'},{'mode':'guess'},{'steps':[{'frames':6001,'buttons':[],'port':0}]},{'route_ids':['a'*32]*9}):
             with self.assertRaises(ValueError):validate_config({**good,**change})
+
+    def test_edit_check_uses_authenticated_trace_and_refuses_unrelated_build_or_changed_context(self):
+        from romancer.workbench_evidence import store_evidence
+        from romancer.replay_journal import execution_context
+        folder=self.enterContext(tempfile.TemporaryDirectory());api=WorkbenchAPI(Path(folder)/'work');self.addCleanup(api.close)
+        demo=api.dispatch('project.demo_system',{'system_id':'nes'});sp={'project_id':demo['project_id'],'artifact_id':demo['sources'][0]['artifact_id']}
+        source=demo['sources'][0];raw=Path(source['path']).read_bytes()
+        plan=api.dispatch('bytes.plan',{**sp,'edits':[{'offset':4096,'before':raw[4096:4097].hex(),'after':bytes([raw[4096]^1]).hex()}]})
+        target=api.dispatch('build.apply',{'project_id':sp['project_id'],'plan_id':plan['plan_id']})
+        cfg={'expected_core_sha256':'c'*64,'core_options':{},'controller_devices':{},'system_files':[]}
+        pic=frame(bytes([0,0,0,255,0,0])*32)
+        trace=store_evidence(api.project(sp),'runtime',{'scope':'gameplay_trace_v1','source_sha256':source['sha256'],'artifact_id':source['artifact_id'],'frame':pic,'region':{'x':0,'y':0,'width':8,'height':8},'replay':{'status':'READY','steps':[{'frames':10,'buttons':['a'],'port':0}],'frames':10,'context':execution_context(cfg)}})
+        args={'project_id':sp['project_id'],'source_id':source['artifact_id'],'target_id':target['artifact_id'],'trace_id':trace['evidence_id']}
+        sample={'frame':pic,'state_replay':True,'worker_exit_code':0,'execution_sha256':'e'*64}
+        with patch.object(api,'_profile_load_config',return_value=cfg),patch('romancer.build_checks.run_sample',return_value=sample) as run:
+            result=api.dispatch('checks.from_trace',args)
+        self.assertTrue(result['ok'],result);self.assertEqual(result['trace_id'],trace['evidence_id']);self.assertEqual(run.call_args.args[3],[{'frames':10,'buttons':['a'],'port':0}])
+        other=api.dispatch('project.demo_system',{'system_id':'nes'})
+        with patch.object(api,'_profile_load_config',return_value=cfg):
+            rejected=api.dispatch('checks.from_trace',{**args,'target_id':source['artifact_id']})
+        self.assertFalse(rejected['ok'])
+        with patch.object(api,'_profile_load_config',return_value={**cfg,'core_options':{'changed':'yes'}}):
+            rejected=api.dispatch('checks.from_trace',args)
+        self.assertFalse(rejected['ok']);self.assertRegex(rejected['error'],'context|setup')

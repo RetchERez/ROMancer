@@ -22,3 +22,17 @@ class WindowsPublicationTests(unittest.TestCase):
             another=root/'next';another.mkdir()
             with self.assertRaises(ValueError):_publish_directory(another,target)
             self.assertTrue(another.is_dir());self.assertEqual((target/'owned.txt').read_text(),'original')
+
+    def test_large_verified_bundle_can_wait_for_a_bounded_scanner_lock(self):
+        from romancer.patch_sets import _publish_directory
+        with tempfile.TemporaryDirectory() as folder:
+            root=Path(folder);source=root/'staging';source.mkdir();target=root/'ready';real=os.rename;attempts=[]
+            def scanner(a,b):
+                attempts.append(1)
+                if len(attempts)<9:
+                    error=PermissionError('scanner still checks new native files');error.winerror=32;raise error
+                return real(a,b)
+            with patch('romancer.patch_sets.os.rename',side_effect=scanner),patch('time.sleep') as sleep:
+                _publish_directory(source,target)
+            self.assertTrue(target.is_dir());self.assertEqual(len(attempts),9)
+            self.assertLessEqual(sum(c.args[0] for c in sleep.call_args_list),30)

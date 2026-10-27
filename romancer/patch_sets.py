@@ -31,13 +31,13 @@ def _publish_directory(source,target):
     if os.name=='nt':
         import time
         source=checked_path(Path(source));target=checked_path(Path(target));owned=source.stat()
-        for attempt in range(6):
+        for attempt in range(9):
             if target.exists():raise ValueError('output directory already exists')
             checked_path(source);checked_path(target)
             if not os.path.samestat(owned,source.stat()):raise ValueError('staged directory identity changed')
             try:os.rename(source,target);return
             except PermissionError as error:
-                if getattr(error,'winerror',None) not in (5,32,33) or attempt==5:raise
+                if getattr(error,'winerror',None) not in (5,32,33) or attempt==8:raise
                 # Scanners can briefly hold a just-verified restore tree open.
                 # Retry the same no-replace operation; never copy or overwrite.
                 time.sleep(.05*(2**attempt))

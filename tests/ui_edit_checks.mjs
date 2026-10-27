@@ -1,0 +1,12 @@
+import assert from 'node:assert/strict';
+import {editCheckControls,editCheckSelection} from '../romancer/ui/edit_checks.js';
+const source={artifact_id:'s',sha256:'s',kind:'source',system_id:'nes',gameplay_traces:{source_sha256:'s',ids:['t']}},target={artifact_id:'b',sha256:'b',kind:'build',system_id:'nes',source_id:'s'};
+const state={project:{project_id:'p',sources:[source],builds:[target]},artifact:source},actions={},calls=[];
+const ctx={state,draft:(_,v)=>v,use:r=>Object.assign(actions,r),run:async(op,p)=>{calls.push([op,p]);return {ok:true,status:'REVIEW',source_sha256:'s',target_sha256:'b'};},render:async()=>{}};
+assert.equal(editCheckSelection(state).targets[0].artifact_id,'b');
+let html=editCheckControls(ctx);assert.match(html,/Test this edit/);
+globalThis.document={getElementById:id=>({value:id==='edit-check-target'?'b':'t'})};
+await actions['edit-check-run']();assert.deepEqual(calls[0],['checks.from_trace',{project_id:'p',source_id:'s',target_id:'b',trace_id:'t'}]);
+state.artifact=target;assert.equal(editCheckSelection(state).baseline.artifact_id,'s');html=editCheckControls(ctx);assert.match(html,/REVIEW/);
+const old=actions['edit-check-run'];state.artifact={artifact_id:'other',sha256:'z'};await assert.rejects(old(),/changed/);
+console.log('Edit checks use a saved baseline trace, descendant builds and guarded source selection.');

@@ -7,6 +7,7 @@ local debugger=assert(manager.machine.debugger)
 local pad=assert(manager.machine.ioport.ports[':ctrl1:mdpad:PAD'])
 local steps=@STEPS@
 local probes=@PROBES@
+local perProbe=math.max(1,math.floor(@EVENT_LIMIT@/#probes))
 local frame,emitted,omitted,observer_depth=0,0,0,0
 local finished,trace_started=false,false
 local masks={up=1,down=2,left=4,right=8,b=16,c=32,a=64,start=128}
@@ -38,7 +39,7 @@ local function matches(kind,address)
   if probe.kind==kind then
    local physical=probe.domain=='genesisWorkRam'
    local value=physical and (address&0xffff) or address
-   if (not physical or address>=0xe00000) and value>=probe.start and value<=probe.finish then return true end
+   if (not physical or address>=0xe00000) and value>=probe.start and value<=probe.finish then return probe end
   end
  end
  return false
@@ -60,9 +61,11 @@ for _,kind in ipairs({'read','write'}) do
    for lane=0,1 do
     local shift=lane==0 and 8 or 0
     local byte_address=address+lane
-    if ((mask>>shift)&255)~=0 and matches(kind,byte_address) then
-     if emitted>=@EVENT_LIMIT@ then omitted=omitted+1
+    local probe=matches(kind,byte_address)
+    if ((mask>>shift)&255)~=0 and probe then
+     if emitted>=@EVENT_LIMIT@ or (probe.emitted or 0)>=perProbe then omitted=omitted+1
      else
+      probe.emitted=(probe.emitted or 0)+1
       emitted=emitted+1
       local pc=cpu.state['CURPC'].value
       local value=(data>>shift)&255
@@ -80,6 +83,37 @@ for _,kind in ipairs({'read','write'}) do
   else taps[#taps+1]=space:install_write_tap(low&0xfffffe,high|1,'romancer_writes',callback) end
  end
 end
+local reinstalling=false
+_G.romancer_memory_map_subscription=space:add_change_notifier(function()
+ if reinstalling or finished then return end
+ reinstalling=true
+ for _,tap in ipairs(taps) do tap:reinstall() end
+ reinstalling=false
+end)
+local function graphicsSnapshot()
+ if not @GRAPHICS_SNAPSHOT@ then return end
+ local device=assert(manager.machine.devices[':gen_vdp'])
+ local function words(domain,key,count,allocated)
+  local item=emu.item(assert(device.items[key]))
+  assert(item.size==2 and item.count==allocated)
+  local bytes={}
+  for i=0,count-1 do bytes[#bytes+1]=string.format('%04x',item:read(i)&0xffff) end
+  output:write('M\t'..domain..'\t'..(count*2)..'\t'..table.concat(bytes)..'\n')
+ end
+ words('genesisVideoRam','0/m_vram',32768,32768)
+ words('genesisColorRam','0/m_cram',64,64)
+ words('genesisVScrollRam','0/m_vsram',40,64)
+ local regs=emu.item(assert(device.items['0/m_regs']));assert(regs.size==2 and regs.count==32)
+ for i=0,31 do output:write('S\tvdp.reg'..i..'\tn\t'..regs:read(i)..'\n') end
+ for _,key in ipairs({'m_vdp_address','m_vdp_code','m_imode','m_sprite_attribute_base'}) do
+  local item=emu.item(assert(device.items['0/'..key]));assert(item.count==1)
+  output:write('S\tvdp.'..key..'\tn\t'..item:read(0)..'\n')
+ end
+ local screen=assert(manager.machine.screens[':megadriv']);local pixels,w,h=screen:pixels();assert(w*h<=262144)
+ local bytes={}
+ for i=1,#pixels,4 do bytes[#bytes+1]=string.format('%06x',string.unpack('<I4',pixels,i)&0xffffff) end
+ output:write('SCREEN\t'..w..'\t'..h..'\t'..table.concat(bytes)..'\n')
+end
 local function trace()
  if trace_started then return end
  trace_started=true;debugger.visible_cpu=cpu
@@ -94,6 +128,7 @@ _G.romancer_frames=emu.add_machine_frame_notifier(function()
  frame=frame+1
  if frame>=@FRAMES@ then
   finished=true
+  graphicsSnapshot()
   if trace_started then debugger:command('trace off,:maincpu') end
   for _,field in pairs(fields) do field:clear_value() end
   output:write(string.format('END\t%d\t%d\t%d\n',frame,emitted,omitted));output:close();manager.machine:exit()

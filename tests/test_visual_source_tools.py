@@ -99,3 +99,18 @@ class VisualSourceToolTests(unittest.TestCase):
         self.assertFalse(r['ok']);self.assertEqual(list((self.api.project(sp)/'sessions').glob('test-*')),[])
 
 if __name__=='__main__':unittest.main()
+
+class SourceTestCleanupTests(unittest.TestCase):
+    def test_closed_worker_loader_locks_are_retried_without_deleting_an_unowned_directory(self):
+        from romancer.visual_source_tools import source_test_directory
+        import tempfile,shutil
+        from unittest.mock import patch
+        with tempfile.TemporaryDirectory() as temp:
+            root=Path(temp);real=shutil.rmtree;attempts=[]
+            def delayed(path,*a,**kw):
+                attempts.append(Path(path))
+                if len(attempts)<9:raise PermissionError('closed DLL still scanned')
+                return real(path,*a,**kw)
+            with patch('romancer.visual_source_tools.shutil.rmtree',side_effect=delayed),patch('romancer.visual_source_tools.time.sleep') as sleep:
+                with source_test_directory(root) as owned:(owned/'owned.dll').write_bytes(b'original test')
+            self.assertFalse(owned.exists());self.assertEqual(len(attempts),9);self.assertTrue(all(p.parent==root for p in attempts));self.assertLessEqual(sum(c.args[0] for c in sleep.call_args_list),30)

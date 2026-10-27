@@ -1819,7 +1819,7 @@
       "title": "Extract and reinsert supported compression",
       "part": "Advanced",
       "kicker": "Allocations and independent decoding",
-      "intro": "A decoded resource is not automatically safe to write back at a new size. Recompression must fit an established parent allocation.",
+      "intro": "A decoded resource must return through a checked parent allocation or a separately reviewed reserved move. Preview recompression shows the exact capacity before planning.",
       "steps": [
         "Select a validated supported LZ10 or RLE stream in Resources. Confirm its codec, file offset and allocated capacity using evidence for this revision.",
         "Extract the decoded resource into the project. Inspect and edit it through the normal supported editors, then create the edited decoded build.",
@@ -1827,7 +1827,7 @@
         "Create the parent build only when the stream fits. Inspect the independently decoded comparison, then playtest the actual game resource."
       ],
       "result": "The encoded stream fits without overwriting neighbors, and independent decoding reconstructs every intended decoded byte.",
-      "note": "Unrecognized compression remains read-only. A run of zeroes or another fill pattern does not establish unowned capacity. Do not increase an allocation or move a stream to clear an error without a separately supported ownership and pointer model. Recompression is checked by the primary decoder and a separate original token parser; this is implementation diversity, not independent emulator certification.",
+      "note": "Unrecognized compression remains read-only. A run of zeroes or another fill pattern does not establish unowned capacity. Do not increase an allocation or move a stream to clear an error without a separately supported ownership and pointer model. Recompression is checked by the primary decoder and a separate original token parser; this is implementation diversity, not independent emulator certification. Use Preview recompression for free/overflow bytes, and the advanced reserved-move workflow only with an established complete reference set.",
       "details": [
         {
           "title": "Parent and child",
@@ -1842,7 +1842,8 @@
         "resources",
         "checks",
         "tilemaps",
-        "data-relocation"
+        "data-relocation",
+        "compressed-capacity"
       ],
       "terms": [
         "term-allocation",
@@ -2602,12 +2603,13 @@
         "Inspect access address, value, execution context and registers. A source button opens its recorded file location; Resources explains the association and links back."
       ],
       "result": "Application-authenticated native evidence that humans and MCP clients can reopen and page through.",
-      "note": "MesenCE covers NES/SNES/GB/GBC/GBA; Genesis uses MAME. Width, DMA ownership and meaning may remain unknown. Genesis has read/write watches and separate global instruction samples; no execution-range watch. Pattern matches stay candidates. No live break/continue.",
+      "note": "MesenCE covers NES/SNES/GB/GBC/GBA/SMS; Genesis uses MAME. The full Windows package includes the reviewed observers and corresponding source. Source-only installations retain deliberate preparation of pinned upstream tools. Operation kinds are recorded where exposed; DMA channel, instruction width and game meaning are not inferred. Genesis has read/write watches and separate global instruction samples, with no execution-range watch or live break/continue.",
       "related": [
         "universal-values",
         "debugger-setup",
         "debug",
-        "game-knowledge"
+        "game-knowledge",
+        "native-graphics-trails"
       ],
       "terms": [
         "term-native-capture",
@@ -2972,7 +2974,7 @@
       "title": "Share checked definitions and research",
       "part": "Advanced",
       "kicker": "Portable knowledge / exact revision",
-      "intro": "A research pack carries the active supported resource definitions and notes in one JSON file. It is meant for repeating work on the same exact ROM revision.",
+      "intro": "A research pack carries the active supported resource definitions and notes in one JSON file. It is meant for repeating work on the same exact ROM revision. Saved whole-object layouts can travel in a research-v2 pack for the same exact source.",
       "steps": [
         "In Resources, expand Share or import research. Choose Export research pack, then Download research JSON. Review the file before sharing; notes, references and definition byte guards can contain material you entered.",
         "In the destination project select the matching ROM. Choose the JSON file and Review selected pack. A different ROM hash, size, system or invalid definition is refused.",
@@ -2981,11 +2983,12 @@
         "Use the Resource browser to open an imported layout. A different existing setup draft gets its own review and recovery copy; it is not silently discarded."
       ],
       "result": "The imported definitions inspect the destination source and the original notes remain searchable. Compare the source hash before and after; it must be identical.",
-      "note": "Packs are limited to 1 MiB and are not executable extensions. They contain neither emulator states nor game saves. They do not make a new game revision compatible. AI clients use research.inspect, research.note_get, research.preview and research.apply with the same guards.",
+      "note": "Packs are limited to 1 MiB and are not executable extensions. They contain neither emulator states nor game saves. They do not make a new game revision compatible. AI clients use research.inspect, research.note_get, research.preview and research.apply with the same guards. Object layouts retain flips and shared uses, but imported layouts deliberately lose local proof references and fresh runtime authority.",
       "related": [
         "research-notes",
         "recipes",
-        "mcp"
+        "mcp",
+        "whole-object-editing"
       ],
       "terms": [
         "term-research-pack",
@@ -3347,7 +3350,8 @@
         "mcp",
         "automatic-build-checks",
         "connected-evidence",
-        "source-proof-method"
+        "source-proof-method",
+        "connected-automation"
       ],
       "terms": [
         "term-build-check",
@@ -3498,6 +3502,219 @@
           }
         ]
       }
+    },
+    {
+      "id": "whole-object-editing",
+      "title": "Edit a captured object as one connected picture",
+      "part": "Basic",
+      "kicker": "Connected editing / step by step",
+      "intro": "Bring verified parts together instead of guessing how neighboring ROM tiles form a character. A saved layout keeps the captured placements, orientation, observed colors and shared-tile relationships.",
+      "steps": [
+        "Reach a scene from a fresh cold start. Pause, select a tight region in Playtest, save its trace and choose Verify ROM sources. A whole object needs source verification for each selected part.",
+        "Under Whole object, select the verified placements that belong together. You can select parts from several saved result pages for the same trace and frame. Give the object a short name, then choose Open whole object.",
+        "The graphics editor shows the captured scene, source tiles and assembled editing preview. Select a source tile to highlight its captured placements. Empty cells stay empty, and recovered horizontal or vertical flips remain in the layout.",
+        "Paint in the assembled preview. If one stored tile appears in several places, the shared-use notice explains that all of those placements change together. Original and editing pictures, changed-pixel counts, stroke Undo and Redo remain available.",
+        "Review the edit, create a separate build and use Test this edit. Find the layout again in Saved objects or the Game view Saved objects category. Remove layout deletes only its metadata."
+      ],
+      "result": "You edit a measured multi-part arrangement while keeping the scene and exact source uses visible. Object names describe your intent; ROMancer does not infer whether a captured object is a particular enemy or actor.",
+      "note": "Only compatible aligned literal parts from the same authenticated trace, frame and execution setup can be combined. Overlaps, mixed codecs and ambiguous orientations are refused. A partial placement is clearly marked. Imported or historical layouts reopen as checked declarations, not fresh execution proof.",
+      "related": [
+        "verify-graphic-sources",
+        "animation",
+        "research-packs",
+        "captured-edit-check"
+      ],
+      "terms": [
+        "term-saved-object"
+      ],
+      "image": "90-connected-whole-object",
+      "image_layout": "following-page",
+      "caption": "Edit a captured object as one connected picture",
+      "visual_page": {
+        "title": "Edit a captured object as one connected picture",
+        "kicker": "Actual ROMancer interface",
+        "intro": "Captured from ROMancer using its bundled services, without desktop control.",
+        "panels": [
+          {
+            "image": "90-connected-whole-object",
+            "title": "Edit a captured object as one connected picture",
+            "x": 48,
+            "top": 850,
+            "width": 1120,
+            "crop": [
+              0,
+              0,
+              1800,
+              1100
+            ]
+          }
+        ]
+      }
+    },
+    {
+      "id": "native-graphics-trails",
+      "title": "Inspect actual graphics reads, writes and video memory",
+      "part": "Advanced",
+      "kicker": "Connected editing / evidence and controls",
+      "intro": "Source verification tests a ROM-to-picture dependency. A native graphics capture adds a separate access trail and a measured video-memory snapshot. The two kinds of evidence answer different questions.",
+      "steps": [
+        "Save a fresh cold-start trace in Playtest. Expand Native graphics accesses & video memory. Set a focused ROM span up to 2048 bytes, and choose Record native accesses. The trace must fit 3600 frames and 64 supported input steps without truncation.",
+        "The reviewed observer replays the route in an isolated process. NES, SNES, Game Boy, Game Boy Color, GBA and SMS use MesenCE; Genesis uses MAME. The full Windows package includes these tools and their corresponding sources.",
+        "Read the event page: access kind, physical memory domain or CPU-bus address, measured file offset where mapping was established, value and native operation kind. Move between pages. Omitted-event counts show when a capture budget was reached.",
+        "Inspect the final scene and registers. Choose the pattern/video-memory domain, offset and tested tile codec to preview 32 complete stored tiles. Grayscale shows indices; it does not guess a palette or a ROM origin.",
+        "Reopen saved captures through Game view or their capture ID. Pair the trail with a verified visual source or a controlled value investigation. Export reusable layouts and notes as checked research, keeping runtime evidence local and source-bound."
+      ],
+      "result": "You can distinguish a measured ROM read, a video-memory write, a backend-reported DMA operation and a literal picture dependency. Genesis bus addresses remain bus observations unless a physical source mapping was established. These snapshots are from the end of a separate native replay, not the live Playtest state. Mid-frame banks, palettes and layer changes may differ. Nearby reads and writes do not prove dataflow, decompression ownership or a DMA channel. A callback parameter width is not necessarily the CPU instruction access width. Budget omissions are not absence-of-access proof.",
+      "note": "This is a separate native replay. End-of-capture memory may differ from mid-frame state. Read/write adjacency is not dataflow. A callback width is not an instruction width, and budget omissions are not absence-of-access proof.",
+      "related": [
+        "native-accesses",
+        "source-proof-method",
+        "automated-workbench"
+      ],
+      "terms": [
+        "term-native-graphics-trail",
+        "term-video-snapshot"
+      ],
+      "image": "91-native-graphics-memory",
+      "image_layout": "following-page",
+      "caption": "Inspect actual graphics reads, writes and video memory",
+      "visual_page": {
+        "title": "Inspect actual graphics reads, writes and video memory",
+        "kicker": "Actual ROMancer interface",
+        "intro": "Captured from ROMancer using its bundled services, without desktop control.",
+        "panels": [
+          {
+            "image": "91-native-graphics-memory",
+            "title": "Inspect actual graphics reads, writes and video memory",
+            "x": 48,
+            "top": 850,
+            "width": 1120,
+            "crop": [
+              0,
+              0,
+              1800,
+              1100
+            ]
+          }
+        ]
+      }
+    },
+    {
+      "id": "captured-edit-check",
+      "title": "Test an edit against the scene you captured",
+      "part": "Basic",
+      "kicker": "Connected editing / step by step",
+      "intro": "Use your actual captured input history to check a separate build, with no custom test JSON. ROMancer checks that the original still reproduces the recorded scene before showing the edit comparison.",
+      "steps": [
+        "Capture a fresh cold-start trace of the scene you will edit. Keep the same engine, options, controller setup and system-file identities.",
+        "Make the edit in an appropriate visual or structured editor. Review the change and create a separate build. Staged pixels or unsaved form values are previews; they cannot be replayed as a ROM build.",
+        "Expand Test this edit in Graphics, Text, Tables, Levels, Sound or Resources. Select the descendant build and the saved capture, then choose Test this edit.",
+        "ROMancer runs the original twice and the edited build once with the captured inputs. It checks the original frame, engine setup, cartridge integrity and next-frame save-state replay. The original, build and difference pictures show what changed in the captured region.",
+        "Read the outcome. REVIEW means pixels changed and you must assess whether the change was intended. PASS covers the configured checks, not the whole game. INCONCLUSIVE means the captured original was not reproduced. BLOCKED names a missing or incompatible prerequisite."
+      ],
+      "result": "The scene check is repeatable and tied to its exact source, descendant build and execution setup. It does not replace your saved automatic test policy.",
+      "note": "This shortcut allows up to 2400 frames and 20 input steps. Longer or state-based scenarios belong in Routes and Regression. A different game revision, unrelated build, historical imported trace, battery-save start or changed core setup cannot silently reuse the capture.",
+      "related": [
+        "automatic-build-checks",
+        "saved-gameplay-traces"
+      ],
+      "terms": [
+        "term-edit-check"
+      ],
+      "image": "92-captured-edit-comparison",
+      "image_layout": "following-page",
+      "caption": "Test an edit against the scene you captured",
+      "visual_page": {
+        "title": "Test an edit against the scene you captured",
+        "kicker": "Actual ROMancer interface",
+        "intro": "Captured from ROMancer using its bundled services, without desktop control.",
+        "panels": [
+          {
+            "image": "92-captured-edit-comparison",
+            "title": "Test an edit against the scene you captured",
+            "x": 48,
+            "top": 850,
+            "width": 1120,
+            "crop": [
+              0,
+              0,
+              1800,
+              1100
+            ]
+          }
+        ]
+      }
+    },
+    {
+      "id": "compressed-capacity",
+      "title": "Preview compressed size and review a reserved move",
+      "part": "Advanced",
+      "kicker": "Connected editing / evidence and controls",
+      "intro": "Inspect a supported LZ10 or RLE stream inside its confirmed allocation, edit its decoded resource and preview the exact recompression before planning a parent build.",
+      "steps": [
+        "Extract a known LZ10/RLE stream from its confirmed parent allocation. Edit the decoded child and create a build descended from that child.",
+        "Choose the edited decoded build, then Preview recompression. Read packed bytes, confirmed allocation, free bytes or overflow. A separate token parser independently checks the encoded data against the edited decoded bytes.",
+        "If the output fits, choose Review reinsertion and Create parent build. Changing the selected child after review invalidates that plan. The source ROM remains unchanged.",
+        "If it does not fit, reduce the edit or use Move to reserved space only when you understand its references. Declare the reserved destination, expected fill, capacity, alignment, bank origin/window and the existing linear pointer to the stream start.",
+        "The form supports one complete external reference. Confirm reservation and completeness only when established. The automation API supports up to 128 explicitly declared references. Review the move and create a separate parent build, then inspect the pointer and playtest the resource in its real scene."
+      ],
+      "result": "Recompression gives concrete capacity numbers, and supported moves check actual before-bytes, destination fill, pointer representation, source identity and bank boundaries. The old stream remains available in the separate build.",
+      "note": "Fill bytes alone do not prove unused space, and numeric pointer matches do not prove completeness. Interior pointers into compressed streams, embedded references, position-dependent code and cross-bank moves remain unavailable. The API refuses an external replacement that could bypass the verified recompression.",
+      "related": [
+        "compression",
+        "data-relocation",
+        "captured-edit-check"
+      ],
+      "terms": [
+        "term-reserved-move"
+      ],
+      "image": "93-compression-capacity",
+      "image_layout": "following-page",
+      "caption": "Preview compressed size and review a reserved move",
+      "visual_page": {
+        "title": "Preview compressed size and review a reserved move",
+        "kicker": "Actual ROMancer interface",
+        "intro": "Captured from ROMancer using its bundled services, without desktop control.",
+        "panels": [
+          {
+            "image": "93-compression-capacity",
+            "title": "Preview compressed size and review a reserved move",
+            "x": 48,
+            "top": 850,
+            "width": 1120,
+            "crop": [
+              0,
+              0,
+              1800,
+              1100
+            ]
+          }
+        ]
+      }
+    },
+    {
+      "id": "connected-automation",
+      "title": "Automate connected editing with the same safeguards",
+      "part": "Advanced",
+      "kicker": "GUI and MCP / reproducible editing",
+      "intro": "AI and script clients use the same source-bound services as the visual editor. Work from measured evidence, keep ranges bounded and review separate builds.",
+      "steps": [
+        "Use objects.create with verification_id/match_id pairs from one authenticated frame. objects.list/get/open/delete manage exact-revision layouts. Imported layouts retain declarations only.",
+        "Use graphics.accesses.capture for a saved cold route and focused ROM span. Read get in pages, memory up to 4096 bytes, or tiles up to 64 cells. Native scenes arrive as bounded model-visible image blocks.",
+        "Use compression.preview_reinsert before plan_reinsert or plan_relocate. Moves require a reserved allocation and every declared external stream-start reference. Raw replacements cannot bypass recompression checks.",
+        "Call checks.from_trace with source_id, target_id and trace_id after creating a reviewed build. Changed execution context and unrelated targets are refused. Read the comparison images and status.",
+        "Enable MCP writes explicitly and configure allowed import roots. research.export/preview/apply exchange checked metadata on the same exact source. Preserve receipts and have a person review gameplay changes."
+      ],
+      "result": "Automation can locate verified source parts, open connected objects, inspect actual native observations, plan safe edits and test a descendant build without a model-specific editing backend.",
+      "note": "Matching pixels, nearby accesses, author declarations and imported history retain distinct meanings. The application validates source hashes and evidence for both people and automation.",
+      "related": [
+        "whole-object-editing",
+        "native-graphics-trails",
+        "captured-edit-check",
+        "compressed-capacity",
+        "mcp"
+      ],
+      "terms": []
     }
   ],
   "glossary": [
@@ -3915,6 +4132,31 @@
       "id": "term-independent-validation",
       "term": "Independent validation",
       "definition": "A check not used to discover the mapping: separate spatial marker patterns must reproduce all accepted recovered pixels and their changed/unchanged color controls."
+    },
+    {
+      "id": "term-saved-object",
+      "term": "Saved object layout",
+      "definition": "An exact-revision arrangement of verified literal source parts, including flips, gaps and shared uses. A user label is not an inferred actor identity. Imported layouts carry declarations rather than execution trust."
+    },
+    {
+      "id": "term-native-graphics-trail",
+      "term": "Native graphics access trail",
+      "definition": "Observed ROM or memory accesses and operation details recorded by a reviewed native observer. Temporal proximity does not establish read-to-write dataflow or game meaning."
+    },
+    {
+      "id": "term-video-snapshot",
+      "term": "Video-memory snapshot",
+      "definition": "Recorded video memory, registers and decoded screen at the end of a native capture. It does not represent all mid-frame changes or the live Playtest process."
+    },
+    {
+      "id": "term-edit-check",
+      "term": "Captured edit check",
+      "definition": "A source-bound replay comparison of the captured original twice and a descended edited build once, with reproducible original-frame and execution-context requirements."
+    },
+    {
+      "id": "term-reserved-move",
+      "term": "Reserved resource move",
+      "definition": "A move into an author-reserved allocation with checked fill, capacity, alignment, bank constraints and explicitly declared external references. The program does not infer reservation or completeness."
     }
   ],
   "index": [
@@ -5167,6 +5409,54 @@
       "term": "Source proof history",
       "topics": [
         "verify-graphic-sources"
+      ]
+    },
+    {
+      "term": "Whole-object editing",
+      "topics": [
+        "whole-object-editing"
+      ]
+    },
+    {
+      "term": "Shared tile uses",
+      "topics": [
+        "whole-object-editing"
+      ]
+    },
+    {
+      "term": "Native graphics access trails",
+      "topics": [
+        "native-graphics-trails"
+      ]
+    },
+    {
+      "term": "Recorded video memory",
+      "topics": [
+        "native-graphics-trails"
+      ]
+    },
+    {
+      "term": "Test this edit",
+      "topics": [
+        "captured-edit-check"
+      ]
+    },
+    {
+      "term": "Recompression capacity",
+      "topics": [
+        "compressed-capacity"
+      ]
+    },
+    {
+      "term": "Compressed resource relocation",
+      "topics": [
+        "compressed-capacity"
+      ]
+    },
+    {
+      "term": "Connected editing with AI",
+      "topics": [
+        "connected-automation"
       ]
     }
   ]

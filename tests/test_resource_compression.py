@@ -67,7 +67,7 @@ class CompressionTests(unittest.TestCase):
         from romancer.workbench_api import WorkbenchAPI
         from romancer.boot_fixtures import make_boot_fixture
         with tempfile.TemporaryDirectory() as folder:
-            root=Path(folder);raw=bytearray(make_boot_fixture('gba')['data']);raw[0x500:0x500+len(RLE)]=RLE;source=root/'compressed.gba';source.write_bytes(raw)
+            root=Path(folder);raw=bytearray(make_boot_fixture('gba')['data']);raw[0x500:0x500+len(RLE)]=RLE;raw[0x300:0x304]=(0x08000500).to_bytes(4,'little');raw[0x800:0x820]=b'\xff'*32;source=root/'compressed.gba';source.write_bytes(raw)
             api=WorkbenchAPI(root/'workspace')
             try:
                 project=api.dispatch('project.create',{'name':'Compressed resource'});parent=api.dispatch('source.import',{'project_id':project['project_id'],'path':str(source),'system':None});params={'project_id':project['project_id'],'artifact_id':parent['artifact_id'],'offset':0x500,'allocation':32,'codec':'gba-rle'}
@@ -87,6 +87,7 @@ class CompressionTests(unittest.TestCase):
                 with patch.object(service,'encode_stream',return_value=wrong),patch.object(service,'decode_stream',side_effect=misleading_decode):
                     rejected=api.dispatch('compression.plan_reinsert',arguments)
                 self.assertFalse(rejected['ok'],'A second parser must reject incorrect encoded bytes even when the primary decoder agrees.')
+                preview=api.dispatch('compression.preview_reinsert',arguments);self.assertTrue(preview['ok'],preview);self.assertTrue(preview['fits']);self.assertEqual(preview['free_bytes'],32-preview['packed_size']);self.assertTrue(preview['independent_decode_verified'])
                 planned=api.dispatch('compression.plan_reinsert',arguments);self.assertTrue(planned['ok'],planned);self.assertTrue(planned['independent_decode_verified'])
                 built=api.dispatch('build.apply',{'project_id':project['project_id'],'plan_id':planned['plan_id']});self.assertTrue(built['ok'],built)
                 expected=bytearray(raw);expected[0x507]=ord('Z');self.assertEqual(Path(built['path']).read_bytes(),expected)
@@ -97,6 +98,14 @@ class CompressionTests(unittest.TestCase):
                 tight_build=api.dispatch('build.apply',{'project_id':project['project_id'],'plan_id':replacement['plan_id']})
                 too_large=api.dispatch('compression.plan_reinsert',{**arguments,'decoded_id':tight['artifact_id'],'edited_id':tight_build['artifact_id'],'allocation':10})
                 self.assertFalse(too_large['ok']);self.assertIn('fit',too_large['error'])
+                overflow_args={**arguments,'decoded_id':tight['artifact_id'],'edited_id':tight_build['artifact_id'],'allocation':10}
+                preview=api.dispatch('compression.preview_reinsert',overflow_args);self.assertTrue(preview['ok'],preview);self.assertFalse(preview['fits']);self.assertEqual(preview['overflow_bytes'],3)
+
+                spec={'source_offset':0x500,'source_length':10,'target_offset':0x800,'target_capacity':32,'fill_byte':255,'alignment':4,'bank_size':0,'bank_origin':0,'references':[{'offset':0x300,'width':4,'endian':'little','base':0x08000000,'target_delta':0}],'references_complete':True,'destination_reserved':True,'replacement_input_id':None}
+                refused=api.dispatch('compression.plan_relocate',{**overflow_args,'spec':{**spec,'references_complete':False}});self.assertFalse(refused['ok'])
+                moved=api.dispatch('compression.plan_relocate',{**overflow_args,'spec':spec});self.assertTrue(moved['ok'],moved)
+                relocated=api.dispatch('build.apply',{'project_id':project['project_id'],'plan_id':moved['plan_id']});self.assertTrue(relocated['ok'],relocated)
+                content=Path(relocated['path']).read_bytes();self.assertEqual(int.from_bytes(content[0x300:0x304],'little'),0x08000800);self.assertEqual(service.decode_stream(content[0x800:0x820],'gba-rle')['data'],b'ABCDEFGH');self.assertEqual(source.read_bytes(),raw)
                 project_path=Path(project['path']);value=bytearray(Path(parent['path']).read_bytes());value[-1]^=1;Path(parent['path']).write_bytes(value)
                 with self.assertRaises(ValueError):service.plan_reinsert(project_path,parent['artifact_id'],child['artifact_id'],edited['artifact_id'],0x500,32,'gba-rle')
             finally:api.close()

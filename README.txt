@@ -39,6 +39,25 @@ Verified graphic sources:
 - GUI and MCP share the source-proof service; traces.origin reads one precise
   pixel-byte map without a large report. See the Basic and Advanced guide.
 
+Connected editing:
+- Select verified placements from one captured scene, name them and open the
+  whole object. Flips, gaps, captured colors and shared tile uses stay visible.
+  Saved layouts reopen from Game view and travel as checked research metadata.
+- Record a native graphics access replay for actual source reads, video writes,
+  operation details, registers, video memory and the final scene. Full Windows
+  packages include reviewed MesenCE/MAME observers and complete matching source.
+  A nearby read and write does not prove dataflow; snapshot palettes/banks can
+  differ from mid-frame state. Physical ROM mapping stays explicit.
+- Test this edit reuses a fresh captured route for a descendant build. The
+  original must reproduce twice with the same core setup. See original, build
+  and difference pictures; intentional changes require human review.
+- Preview recompression reports packed size, free bytes or overflow. Supported
+  reserved moves check declared pointers, fill, capacity and bank constraints.
+  Reservation and reference completeness are author declarations, never guesses.
+- GUI and MCP share these services. Read the Basic and Advanced guide for
+  whole-object editing, native graphics trails, captured checks and compression.
+  Reviewed tools retain their upstream licenses, matching source and notices.
+
 Editors need an understood layout:
 - Text, numeric tables, assembled sprites, palettes, levels and sound need a
   verified definition or an explicit declaration of the format and byte ranges.

@@ -1911,6 +1911,148 @@
     render: () => render3
   });
 
+  // romancer/ui/build_checks.js
+  var terminal = /* @__PURE__ */ new Set(["COMPLETED", "FAILED", "CANCELLED", "INTERRUPTED"]);
+  async function buildChecks(ctx2) {
+    var _a, _b;
+    const { state: state2 } = ctx2, a = state2.artifact;
+    if (!a) return "";
+    const scope = selectionKey(state2), params = { ...ctx2.sourceParams() }, current2 = () => {
+      var _a2;
+      return scope === selectionKey(state2) && ((_a2 = ctx2.isCurrentRender) == null ? void 0 : _a2.call(ctx2)) !== false;
+    };
+    const model = await ctx2.api.call("checks.status", params);
+    if (!current2() || model.source_sha256 !== a.sha256 || model.artifact_id !== a.artifact_id) return "";
+    state2.buildCheckView = { scope, page: state2.page, pending: (model.pending || []).some((j) => !terminal.has(j.status)) };
+    const cfg = model.config, artifacts = state2.project.sources.concat(state2.project.builds), target = ctx2.draft("check-target", a.kind === "build" ? a.artifact_id : ((_a = state2.project.builds.at(-1)) == null ? void 0 : _a.artifact_id) || a.artifact_id);
+    const packet = ((_b = state2.buildCheckReport) == null ? void 0 : _b.scope) === scope ? state2.buildCheckReport.result : null;
+    ctx2.use({
+      "check-save": async () => {
+        var _a2, _b2;
+        if (!current2()) return;
+        let steps2;
+        if (read("check-input-mode") === "custom") steps2 = JSON.parse(read("check-steps"));
+        else {
+          let remaining = Number(read("check-frames"));
+          if (!Number.isSafeInteger(remaining) || remaining < 1 || remaining > 2400) throw Error("Choose 1 to 2400 frames before capture.");
+          steps2 = [];
+          while (remaining) {
+            const count = Math.min(600, remaining);
+            steps2.push({ frames: count, buttons: [], port: 0 });
+            remaining -= count;
+          }
+        }
+        const region = ((_a2 = document.getElementById("check-region-enable")) == null ? void 0 : _a2.checked) ? Object.fromEntries(["x", "y", "width", "height"].map((k) => [k, Number(read("check-region-" + k))])) : null;
+        const config = { name: read("check-name").trim(), automatic: !!((_b2 = document.getElementById("check-auto")) == null ? void 0 : _b2.checked), mode: read("check-mode"), steps: steps2, region, route_ids: cfg.route_ids || [] };
+        await ctx2.run("checks.configure", { ...params, config }, { render: false });
+        if (current2()) return ctx2.render();
+      },
+      "check-run": async () => {
+        if (!current2()) return;
+        const target_id = read("check-target");
+        const result = await ctx2.run("checks.run", { project_id: params.project_id, source_id: model.baseline_id, target_id }, { render: false });
+        if (!current2()) return;
+        state2.buildCheckReport = { scope, result };
+        return ctx2.render();
+      },
+      "check-open": async (node) => {
+        if (!current2() || !model.results.some((r) => r.evidence_id === node.dataset.id)) throw Error("Refresh this source’s test results first.");
+        const result = await ctx2.api.call("checks.get", { ...params, evidence_id: node.dataset.id });
+        if (!current2()) return;
+        state2.buildCheckReport = { scope, result };
+        return ctx2.render();
+      },
+      "check-refresh": async () => {
+        if (!current2()) return;
+        await ctx2.refreshProject();
+        if (current2()) return ctx2.render();
+      },
+      "check-cancel": (node) => {
+        if (!current2() || !model.pending.some((j) => j.job_id === node.dataset.id)) throw Error("Refresh the active checks first.");
+        return ctx2.api.call("jobs.cancel", { job_id: node.dataset.id });
+      }
+    });
+    return '<section class="card" id="build-checks"><div class="card-heading"><h3>Build checks</h3>' + badge(model.configured ? "Configured" : "Ready to configure") + '</div><p>Run the original twice and the build once with the same inputs. Compare pictures, cartridge checks and save-state replay.</p><div id="checks-progress">' + (model.pending || []).map((j) => {
+      var _a2, _b2, _c;
+      return "<p>" + esc(j.status) + " · " + esc(((_a2 = artifacts.find((a2) => a2.artifact_id === j.target_id)) == null ? void 0 : _a2.name) || "Build") + " " + (!terminal.has(j.status) ? button("Cancel check", "check-cancel", { id: j.job_id }) : esc(((_b2 = j.outcome) == null ? void 0 : _b2.status) || ((_c = j.outcome) == null ? void 0 : _c.error) || "")) + "</p>";
+    }).join("") + '</div><div class="field-row">' + select("check-target", "Build to check", artifacts.map((r) => [r.artifact_id, r.name]), target) + button("Run checks", "check-run", { primary: true }) + button("Refresh results", "check-refresh") + "</div><details><summary>Automatic check setup</summary>" + field("check-name", "Test name", ctx2.draft("check-name", cfg.name)) + '<label><input id="check-auto" type="checkbox" ' + (cfg.automatic ? "checked" : "") + "> Check new descendant builds automatically after saving this setup</label>" + select("check-mode", "Picture comparison", [["review_changes", "Show changes for review"], ["unchanged", "Require identical selected pixels"]], ctx2.draft("check-mode", cfg.mode)) + field("check-frames", "Frames before capture", ctx2.draft("check-frames", String(cfg.steps.reduce((n, s) => n + s.frames, 0))), { type: "number", min: 1, max: 2400 }) + select("check-input-mode", "Inputs", [["simple", "Wait with no buttons"], ["custom", "Use custom input sequence below"]], ctx2.draft("check-input-mode", cfg.steps.some((s) => s.buttons.length) ? "custom" : "simple")) + "<details><summary>Advanced inputs and comparison region</summary>" + area("check-steps", "Custom input steps (frames, buttons, port)", ctx2.draft("check-steps", JSON.stringify(cfg.steps, null, 2)), 5) + '<label><input id="check-region-enable" type="checkbox" ' + (cfg.region ? "checked" : "") + '> Compare a fixed part of the screen</label><div class="field-row">' + ["x", "y", "width", "height"].map((k) => {
+      var _a2;
+      return field("check-region-" + k, k[0].toUpperCase() + k.slice(1), ctx2.draft("check-region-" + k, String(((_a2 = cfg.region) == null ? void 0 : _a2[k]) ?? (k === "width" || k === "height" ? 128 : 0))), { type: "number", min: k === "x" || k === "y" ? 0 : 1 });
+    }).join("") + "</div></details>" + button("Save test setup for this revision", "check-save") + '<p class="subtle">Up to 2400 frames. Setup follows builds descended from this revision. A flat or unstable original is inconclusive; visual changes need review unless identical pixels are required. Record longer assertions in Routes.</p></details>' + (model.results.length ? '<details open><summary>Recent results</summary><div class="actions">' + model.results.slice().reverse().map((r) => button(r.status + " · " + r.evidence_id.slice(0, 8), "check-open", { id: r.evidence_id })).join("") + "</div></details>" : "") + (packet ? checkReport(packet) : "") + "</section>";
+  }
+  function checkReport(r) {
+    return '<section class="notice"><h4>' + esc(r.name || "Build check") + " · " + esc(r.status) + "</h4><p>" + esc(r.reason || "") + "</p>" + (r.runtime_trusted === false ? '<p class="notice warm">Historical imported report. Run fresh checks for current execution evidence.</p>' : "") + (r.changed_pixels !== void 0 ? "<p>" + r.changed_pixels + " of " + r.total_pixels + " pixels changed.</p>" : "") + (r.visual ? '<div class="visual-comparison">' + [["original_png_base64", "Original"], ["build_png_base64", "Build"], ["difference_png_base64", "Difference"]].map(([key3, name]) => "<figure><figcaption>" + name + '</figcaption><img src="data:image/png;base64,' + esc(r.visual[key3]) + '" alt="' + name + ' check picture" loading="lazy"></figure>').join("") + "</div>" : "") + (r.runs ? "<p>" + r.runs.length + " fresh worker runs · " + r.runs.filter((s) => s.state_replay).length + " state replays verified · " + r.runs.filter((s) => s.worker_exit_code === 0).length + " clean exits</p>" : "") + '<p class="subtle">This covers the configured inputs and assertions. It does not certify a complete game.</p></section>';
+  }
+  function mountBuildChecks(ctx2) {
+    clearTimeout(ctx2.state.buildCheckTimer);
+    const view = ctx2.state.buildCheckView;
+    if (!(view == null ? void 0 : view.pending)) return;
+    const current2 = () => ctx2.state.buildCheckView === view && selectionKey(ctx2.state) === view.scope && ctx2.state.page === view.page && !!document.getElementById("build-checks");
+    const poll = async () => {
+      if (!current2()) return;
+      try {
+        const r = await ctx2.api.call("checks.status", ctx2.sourceParams());
+        if (!current2()) return;
+        if (!(r.pending || []).some((j) => !terminal.has(j.status))) {
+          await ctx2.refreshProject();
+          if (current2()) await ctx2.render();
+          return;
+        }
+        const node = document.getElementById("checks-progress");
+        if (node) node.textContent = r.pending.filter((j) => !terminal.has(j.status)).map((j) => j.message).join(" · ");
+      } catch (error) {
+        if (current2()) {
+          const node = document.getElementById("checks-progress");
+          if (node) node.textContent = error.message;
+          return;
+        }
+      }
+      if (current2()) ctx2.state.buildCheckTimer = setTimeout(poll, 2e3);
+    };
+    ctx2.state.buildCheckTimer = setTimeout(poll, 2e3);
+  }
+
+  // romancer/ui/edit_checks.js
+  function editCheckSelection(state2) {
+    var _a, _b;
+    const rows = [...((_a = state2.project) == null ? void 0 : _a.sources) || [], ...((_b = state2.project) == null ? void 0 : _b.builds) || []], byId = new Map(rows.map((r) => [r.artifact_id, r]));
+    const chain = (artifact) => {
+      const seen = /* @__PURE__ */ new Set(), list = [];
+      for (let n = 0; artifact && n < 128; n++) {
+        if (seen.has(artifact.artifact_id)) break;
+        seen.add(artifact.artifact_id);
+        list.push(artifact);
+        artifact = byId.get(artifact.source_id);
+      }
+      return list;
+    };
+    const baseline = chain(state2.artifact).find((r) => {
+      var _a2, _b2;
+      return ((_a2 = r.gameplay_traces) == null ? void 0 : _a2.source_sha256) === r.sha256 && ((_b2 = r.gameplay_traces.ids) == null ? void 0 : _b2.length);
+    });
+    if (!baseline) return { baseline: null, targets: [], traces: [] };
+    const targets = rows.filter((r) => r.kind === "build" && r.artifact_id !== baseline.artifact_id && r.system_id === baseline.system_id && chain(r).some((a) => a.artifact_id === baseline.artifact_id));
+    return { baseline, targets, traces: baseline.gameplay_traces.ids };
+  }
+  function editCheckControls(ctx2) {
+    var _a;
+    const { state: state2 } = ctx2;
+    if (!state2.artifact) return "";
+    const scope = selectionKey(state2), choice = editCheckSelection(state2), current2 = () => scope === selectionKey(state2);
+    ctx2.use({ "edit-check-run": async () => {
+      if (!current2()) throw Error("The selected ROM changed.");
+      const target_id = read("edit-check-target"), trace_id = read("edit-check-trace");
+      if (!choice.baseline || !choice.targets.some((r) => r.artifact_id === target_id) || !choice.traces.includes(trace_id)) throw Error("Choose a descendant build and captured trace.");
+      const result2 = await ctx2.run("checks.from_trace", { project_id: state2.project.project_id, source_id: choice.baseline.artifact_id, target_id, trace_id }, { render: false });
+      if (!current2()) return;
+      state2.editCheckResult = result2;
+      return ctx2.render();
+    } });
+    const result = state2.editCheckResult, matching = result && ((_a = choice.baseline) == null ? void 0 : _a.sha256) === result.source_sha256 && choice.targets.some((t) => t.sha256 === result.target_sha256);
+    const reason = !choice.baseline ? "Capture a fresh cold-start trace in Playtest first." : !choice.targets.length ? "Review your edit and create a separate build first." : "";
+    return '<details class="card edit-checks" ' + (matching ? "open" : "") + "><summary>Test this edit</summary><p>Replay your captured inputs on the original twice and the edited build once. Compare the original, build and difference pictures.</p>" + (choice.targets.length ? select("edit-check-target", "Edited build", choice.targets.map((r) => [r.artifact_id, r.name || r.artifact_id]), ctx2.draft("edit-check-target", state2.artifact.kind === "build" ? state2.artifact.artifact_id : choice.targets.at(-1).artifact_id)) : "") + (choice.traces.length ? select("edit-check-trace", "Saved trace", choice.traces.map((id, i) => [id, "Capture " + (i + 1) + " · " + id.slice(0, 8)]), ctx2.draft("edit-check-trace", choice.traces.at(-1))) : "") + button("Test this edit", "edit-check-run", { primary: true, disabled: !!reason, reason }) + button("Open Playtest", "navigate", { id: "playtest" }) + '<p class="subtle">Up to 2400 frames and 20 input steps. The original must reproduce the captured scene. A visible change needs review; it is not automatically a failure.</p>' + (matching ? checkReport(result) : "") + "</details>";
+  }
+
   // romancer/ui/documented_tables.js
   function documentedTables(ctx2) {
     var _a, _b, _c, _d, _e;
@@ -2243,9 +2385,9 @@
       return [c, Math.round(value / maximum * 255)];
     }));
   }
-  function quantizeColor(hex6, channels) {
-    if (typeof hex6 !== "string" || !/^#[a-f0-9]{6}$/i.test(hex6)) throw Error("Choose a valid RGB color.");
-    return Object.fromEntries(["r", "g", "b"].map((c, i) => [c, Math.round(parseInt(hex6.slice(1 + i * 2, 3 + i * 2), 16) / 255 * channelMaximum(channels[c]))]));
+  function quantizeColor(hex7, channels) {
+    if (typeof hex7 !== "string" || !/^#[a-f0-9]{6}$/i.test(hex7)) throw Error("Choose a valid RGB color.");
+    return Object.fromEntries(["r", "g", "b"].map((c, i) => [c, Math.round(parseInt(hex7.slice(1 + i * 2, 3 + i * 2), 16) / 255 * channelMaximum(channels[c]))]));
   }
   function editedPalette(palette2, changes) {
     if (!palette2) return palette2;
@@ -2492,7 +2634,7 @@
       }
     });
     const pending = ((_j = state2.pending) == null ? void 0 : _j.kind) === "table" && state2.pending.artifact_id === artifact.artifact_id;
-    return `${heading("", "Data tables", "")}${documentedTables(ctx2)}${((_k = state2.tableOrigin) == null ? void 0 : _k.scope) === selectionKey(state2) ? '<p class="notice">' + esc(state2.tableOrigin.note) + "</p>" : ""}<section class="card"><div class="card-heading"><h3>${esc((model == null ? void 0 : model.definition.name) || "Define a table")}</h3><span>${model ? model.total + " records" : "No table loaded"}</span>${model && ((_l = state2.tablePreview) == null ? void 0 : _l.scope) === selectionKey(state2) && state2.tablePreview.document_id === model.document_id ? button("Save this layout", "table-inspect") : ""}</div><details class="config" ${model ? "" : "open"}><summary>Table layout</summary><div class="field-row">${field("table-name", "Table name", ctx2.draft("table-name", (saved == null ? void 0 : saved.name) || "Data table"))}${field("table-offset", "First record offset", ctx2.draft("table-offset", (saved == null ? void 0 : saved.offset) ?? "0"))}${field("table-count", "Record count", ctx2.draft("table-count", (saved == null ? void 0 : saved.count) ?? "16"))}${field("table-stride", "Bytes per record", ctx2.draft("table-stride", (saved == null ? void 0 : saved.stride) ?? "1"))}</div><div class="table-wrap"><table><thead><tr><th>Field</th><th>Offset</th><th>Type</th><th>Order</th><th>Pointer base</th><th></th></tr></thead><tbody>${columns2.map((field2, index) => `<tr><td>${esc(field2.name)}</td><td>${field2.offset}</td><td>${esc(field2.type)}</td><td>${esc(field2.endian)}</td><td>${field2.pointer_base ?? "None"}</td><td>${button("Remove", "table-remove-field", { id: String(index) })}</td></tr>`).join("")}</tbody></table></div><details class="config"><summary>Add a field</summary><div class="field-row">${field("table-field-name", "Field name", ctx2.draft("table-field-name", ""))}${field("table-field-offset", "Offset within record", ctx2.draft("table-field-offset", "0"))}${select("table-field-type", "Numeric type", numericTypes.map((type) => [type, type]), ctx2.draft("table-field-type", "u8"))}${select("table-field-endian", "Byte order", [["little", "Little endian"], ["big", "Big endian"]], ctx2.draft("table-field-endian", "little"))}${field("table-field-base", "Pointer base (optional)", ctx2.draft("table-field-base", ""))}</div><p>For a linear pointer: target file offset = stored value − base.</p>${button("Add field", "table-add-field")}</details>${button("Load table definition", "table-inspect", { primary: !model })}</details></section>${model ? `<section class="card"><div class="card-heading"><h3>Records</h3><span>${changes.length} staged changes</span></div>${catalog.length ? `<div class="field-row">${field("table-name-query", "Search record names or IDs", query)}${button("Find records", "table-search")}</div><div class="field-row">${select("table-record-choice", "Named record", matches.map((row) => [row.index, recordName(row)]), String(((_m = matches[0]) == null ? void 0 : _m.index) ?? ""))}${button("Show selected record", "table-select-record", { disabled: !matches.length, reason: "No matching record names." })}</div><p>${matches.length} matching records. Names use the checked layout’s labels or decoded source text. Review pattern-based labels before editing.</p>` : ""}<div class="table-wrap"><table class="numeric-table"><thead><tr><th>Row</th>${model.definition.fields.map((field2) => `<th>${esc(field2.name)}${Number.isFinite(bounds(field2).minimum) && Number.isFinite(bounds(field2).maximum) ? `<br><small>Range ${bounds(field2).minimum}–${bounds(field2).maximum}</small>` : ""}</th>`).join("")}</tr></thead><tbody>${model.rows.map((row) => `<tr><td>${esc(recordName(row))}<br>${row.label !== void 0 ? `<small>Row ${row.index}${row.label_status === "unsupported" ? " · Unsupported name bytes" : row.label_status === "blank" ? " · Blank name" : ""}</small><br>` : ""}<code>0x${row.offset.toString(16)}</code></td>${row.cells.map((cell, index) => {
+    return `${heading("", "Data tables", "")}${editCheckControls(ctx2)}${documentedTables(ctx2)}${((_k = state2.tableOrigin) == null ? void 0 : _k.scope) === selectionKey(state2) ? '<p class="notice">' + esc(state2.tableOrigin.note) + "</p>" : ""}<section class="card"><div class="card-heading"><h3>${esc((model == null ? void 0 : model.definition.name) || "Define a table")}</h3><span>${model ? model.total + " records" : "No table loaded"}</span>${model && ((_l = state2.tablePreview) == null ? void 0 : _l.scope) === selectionKey(state2) && state2.tablePreview.document_id === model.document_id ? button("Save this layout", "table-inspect") : ""}</div><details class="config" ${model ? "" : "open"}><summary>Table layout</summary><div class="field-row">${field("table-name", "Table name", ctx2.draft("table-name", (saved == null ? void 0 : saved.name) || "Data table"))}${field("table-offset", "First record offset", ctx2.draft("table-offset", (saved == null ? void 0 : saved.offset) ?? "0"))}${field("table-count", "Record count", ctx2.draft("table-count", (saved == null ? void 0 : saved.count) ?? "16"))}${field("table-stride", "Bytes per record", ctx2.draft("table-stride", (saved == null ? void 0 : saved.stride) ?? "1"))}</div><div class="table-wrap"><table><thead><tr><th>Field</th><th>Offset</th><th>Type</th><th>Order</th><th>Pointer base</th><th></th></tr></thead><tbody>${columns2.map((field2, index) => `<tr><td>${esc(field2.name)}</td><td>${field2.offset}</td><td>${esc(field2.type)}</td><td>${esc(field2.endian)}</td><td>${field2.pointer_base ?? "None"}</td><td>${button("Remove", "table-remove-field", { id: String(index) })}</td></tr>`).join("")}</tbody></table></div><details class="config"><summary>Add a field</summary><div class="field-row">${field("table-field-name", "Field name", ctx2.draft("table-field-name", ""))}${field("table-field-offset", "Offset within record", ctx2.draft("table-field-offset", "0"))}${select("table-field-type", "Numeric type", numericTypes.map((type) => [type, type]), ctx2.draft("table-field-type", "u8"))}${select("table-field-endian", "Byte order", [["little", "Little endian"], ["big", "Big endian"]], ctx2.draft("table-field-endian", "little"))}${field("table-field-base", "Pointer base (optional)", ctx2.draft("table-field-base", ""))}</div><p>For a linear pointer: target file offset = stored value − base.</p>${button("Add field", "table-add-field")}</details>${button("Load table definition", "table-inspect", { primary: !model })}</details></section>${model ? `<section class="card"><div class="card-heading"><h3>Records</h3><span>${changes.length} staged changes</span></div>${catalog.length ? `<div class="field-row">${field("table-name-query", "Search record names or IDs", query)}${button("Find records", "table-search")}</div><div class="field-row">${select("table-record-choice", "Named record", matches.map((row) => [row.index, recordName(row)]), String(((_m = matches[0]) == null ? void 0 : _m.index) ?? ""))}${button("Show selected record", "table-select-record", { disabled: !matches.length, reason: "No matching record names." })}</div><p>${matches.length} matching records. Names use the checked layout’s labels or decoded source text. Review pattern-based labels before editing.</p>` : ""}<div class="table-wrap"><table class="numeric-table"><thead><tr><th>Row</th>${model.definition.fields.map((field2) => `<th>${esc(field2.name)}${Number.isFinite(bounds(field2).minimum) && Number.isFinite(bounds(field2).maximum) ? `<br><small>Range ${bounds(field2).minimum}–${bounds(field2).maximum}</small>` : ""}</th>`).join("")}</tr></thead><tbody>${model.rows.map((row) => `<tr><td>${esc(recordName(row))}<br>${row.label !== void 0 ? `<small>Row ${row.index}${row.label_status === "unsupported" ? " · Unsupported name bytes" : row.label_status === "blank" ? " · Blank name" : ""}</small><br>` : ""}<code>0x${row.offset.toString(16)}</code></td>${row.cells.map((cell, index) => {
       var _a2, _b2;
       return `<td><label class="field"><span class="sr-only">${esc(cell.field)}, ${esc(recordName(row))}</span><input id="${inputId(row.index, index)}" value="${esc(ctx2.draft(inputId(row.index, index), ((_a2 = changes.find((change) => change.row === row.index && change.field === cell.field)) == null ? void 0 : _a2.after) ?? cell.value))}" inputmode="numeric" aria-label="${esc(cell.field)}, ${esc(recordName(row))}"></label><div data-number-input="${inputId(row.index, index)}" data-before="${cell.value}" data-compact="true" data-minimum="${bounds(model.definition.fields[index]).minimum}" data-maximum="${bounds(model.definition.fields[index]).maximum}">${numberComparison(cell.value, ctx2.draft(inputId(row.index, index), ((_b2 = changes.find((change) => change.row === row.index && change.field === cell.field)) == null ? void 0 : _b2.after) ?? cell.value), { compact: true, ...bounds(model.definition.fields[index]) })}</div>${cell.target_offset !== null ? button("Open target 0x" + cell.target_offset.toString(16), "table-target", { id: String(cell.target_offset) }) : cell.pointer_resolution ? "<span>Unresolved target</span>" : ""}</td>`;
     }).join("")}</tr>`).join("")}</tbody></table></div><div class="actions">${button("Previous records", "table-page", { id: "-1", disabled: !model.page })}<span>Page ${model.page + 1}</span>${button("Next records", "table-page", { id: "1", disabled: (model.page + 1) * model.limit >= model.total })}${button("Review changes", "table-review", { primary: !pending })}${pending ? button("Create build", "table-build", { primary: true }) : ""}${button("Discard changes", "table-discard")}</div></section>${changes.length ? `<details class="card"><summary>Staged changes by record</summary><ul>${changes.map((change) => `<li>${esc(recordName(catalog[change.row] || { index: change.row }))}: ${esc(change.field)} ${change.before} → ${change.after}</li>`).join("")}</ul></details>` : ""}<details class="card"><summary>Batch change</summary><p>Preview up to1024 source records. Percent changes round halves away from zero. Numeric overflow is refused; declared field limits are also enforced. First row refers to the row number shown with each record.</p><div class="field-row">${select("table-batch-field", "Field", model.definition.fields.map((field2) => [field2.name, field2.name]), ctx2.draft("table-batch-field", model.definition.fields[0].name))}${select("table-batch-operation", "Operation", [["set", "Set value"], ["add", "Add"], ["multiply", "Multiply"], ["percent", "Change by percent"]], ctx2.draft("table-batch-operation", "add"))}${field("table-batch-value", "Value", ctx2.draft("table-batch-value", "1"))}${field("table-batch-first", "First row", ctx2.draft("table-batch-first", "0"))}${field("table-batch-count", "Record count", ctx2.draft("table-batch-count", String(Math.min(10, model.total))))}</div>${button("Preview batch changes", "table-batch")}</details>` : ""}${report(state2.results["tables.plan"], "Table change plan")}${report(state2.results["build.apply"], "Built output")}`;
@@ -3208,111 +3350,709 @@
     render: () => render6
   });
 
-  // romancer/ui/build_checks.js
-  var terminal = /* @__PURE__ */ new Set(["COMPLETED", "FAILED", "CANCELLED", "INTERRUPTED"]);
-  async function buildChecks(ctx2) {
+  // romancer/ui/pixel_history.js
+  var PixelHistory = class {
+    constructor(scope, pixels, limit = 64) {
+      this.scope = scope;
+      this.current = [...pixels];
+      this.limit = limit;
+      this.past = [];
+      this.future = [];
+      this.start = null;
+    }
+    get canUndo() {
+      return this.past.length > 0;
+    }
+    get canRedo() {
+      return this.future.length > 0;
+    }
+    begin(pixels) {
+      if (JSON.stringify(pixels) !== JSON.stringify(this.current)) {
+        this.past = [];
+        this.future = [];
+        this.current = [...pixels];
+      }
+      this.start = [...pixels];
+    }
+    commit(pixels) {
+      const before = this.start || this.current;
+      this.start = null;
+      if (JSON.stringify(before) === JSON.stringify(pixels)) return;
+      this.past.push([...before]);
+      if (this.past.length > this.limit) this.past.shift();
+      this.current = [...pixels];
+      this.future = [];
+    }
+    undo() {
+      if (this.canUndo) {
+        this.future.push([...this.current]);
+        this.current = this.past.pop();
+      }
+      return [...this.current];
+    }
+    redo() {
+      if (this.canRedo) {
+        this.past.push([...this.current]);
+        this.current = this.future.pop();
+      }
+      return [...this.current];
+    }
+  };
+  function historyFor(ctx2, doc, bitmap, index, pixels) {
+    const scope = selectionKey(ctx2.state) + ":" + doc.document_id;
+    if (ctx2.state.pixelHistoryScope !== scope || !(ctx2.state.pixelHistories instanceof Map)) {
+      ctx2.state.pixelHistories = /* @__PURE__ */ new Map();
+      ctx2.state.pixelHistoryScope = scope;
+    }
+    const key3 = bitmap + ":" + index;
+    let history3 = ctx2.state.pixelHistories.get(key3);
+    if (!history3) history3 = new PixelHistory(scope + ":" + key3, pixels);
+    ctx2.state.pixelHistories.delete(key3);
+    ctx2.state.pixelHistories.set(key3, history3);
+    while (ctx2.state.pixelHistories.size > 32) ctx2.state.pixelHistories.delete(ctx2.state.pixelHistories.keys().next().value);
+    return history3;
+  }
+  function recordPixels(ctx2, doc, bitmap, index, before, after) {
+    const history3 = historyFor(ctx2, doc, bitmap, index, before);
+    history3.begin(before);
+    history3.commit(after);
+    return history3;
+  }
+  function pixelBuffer(ctx2, doc, bitmap, index) {
+    var _a;
+    const paint = ctx2.state.paint;
+    if ((paint == null ? void 0 : paint.document_id) === doc.document_id && paint.bitmap_id === bitmap.id && paint.cell_index === index) return paint.pixels;
+    let changes = [];
+    try {
+      changes = JSON.parse(ctx2.draft("asset-changes", "[]"));
+    } catch {
+    }
+    return ((_a = changes.find((c) => c.kind === "cell" && c.bitmap_id === bitmap.id && c.cell_index === index)) == null ? void 0 : _a.after_pixels) || bitmap.cells[index].pixels;
+  }
+  function setPixelBuffer(ctx2, doc, bitmap, index, pixels, persist = true) {
+    ctx2.state.paint = { document_id: doc.document_id, bitmap_id: bitmap.id, cell_index: index, pixels: [...pixels] };
+    ctx2.state.assetAcknowledgements = [];
+    ctx2.state.pending = null;
+    if (persist) ctx2.setDraft("paint-buffer", JSON.stringify(ctx2.state.paint));
+  }
+  function mountPixelStrokes(ctx2, doc, bitmap, redraw) {
+    const canvas = document.getElementById("paint-canvas");
+    if (!canvas) return;
+    canvas.style.touchAction = "none";
+    let pointer = null, history3 = null, start = null;
+    const index = () => {
+      var _a;
+      return ((_a = ctx2.state.paint) == null ? void 0 : _a.cell_index) ?? 0;
+    };
+    const paint = (event) => {
+      const rect = canvas.getBoundingClientRect(), x = Math.floor((event.clientX - rect.left) / rect.width * bitmap.width), y = Math.floor((event.clientY - rect.top) / rect.height * bitmap.height);
+      if (x < 0 || y < 0 || x >= bitmap.width || y >= bitmap.height) return;
+      const color = Number(document.getElementById("paint-color").value), bits2 = { "mono-row-msb-v1": 1, "tile8-paired2-msb-v1": 2, "tile8-planar2-msb-v1": 2, "tile8-rowplanar4-msb-v1": 4, "tile8-paired4-msb-v1": 4, "tile8-packed4-high-v1": 4, "tile8-packed4-low-v1": 4 }[bitmap.codec];
+      if (!Number.isInteger(color) || color < 0 || color >= 2 ** bits2) throw Error("Choose a valid color index.");
+      const pixels = [...pixelBuffer(ctx2, doc, bitmap, index())];
+      pixels[y * bitmap.width + x] = color;
+      ctx2.state.pixelCursor = { x, y };
+      setPixelBuffer(ctx2, doc, bitmap, index(), pixels, false);
+      redraw();
+    };
+    canvas.addEventListener("pointerdown", (event) => {
+      if (event.button !== 0) return;
+      event.preventDefault();
+      canvas.focus();
+      pointer = event.pointerId;
+      canvas.setPointerCapture(pointer);
+      ctx2.state.pending = null;
+      ctx2.state.assetEditRevision = (ctx2.state.assetEditRevision || 0) + 1;
+      start = [...pixelBuffer(ctx2, doc, bitmap, index())];
+      history3 = historyFor(ctx2, doc, bitmap.id, index(), start);
+      history3.begin(start);
+      try {
+        paint(event);
+      } catch (error) {
+        ctx2.notify(error.message, true);
+      }
+    });
+    canvas.addEventListener("pointermove", (event) => {
+      if (pointer !== event.pointerId) return;
+      try {
+        paint(event);
+      } catch (error) {
+        ctx2.notify(error.message, true);
+      }
+    });
+    const finish = async (event) => {
+      if (pointer !== event.pointerId) return;
+      pointer = null;
+      history3.commit(pixelBuffer(ctx2, doc, bitmap, index()));
+      setPixelBuffer(ctx2, doc, bitmap, index(), pixelBuffer(ctx2, doc, bitmap, index()));
+      await ctx2.render();
+    };
+    canvas.addEventListener("pointerup", finish);
+    canvas.addEventListener("pointercancel", finish);
+  }
+
+  // romancer/ui/pixel_tools.js
+  function checkedPixels(pixels, width, height, colorCount) {
+    if (!Number.isInteger(width) || !Number.isInteger(height) || width < 1 || height < 1 || width > 32 || height > 32 || !Array.isArray(pixels) || pixels.length !== width * height) throw new Error("Tile dimensions do not match the pixel buffer.");
+    if (!Number.isInteger(colorCount) || colorCount < 2 || colorCount > 256 || pixels.some((value) => !Number.isInteger(value) || value < 0 || value >= colorCount)) throw new Error("A pixel index is outside the destination palette.");
+    return [...pixels];
+  }
+  function transformPixels(pixels, width, height, operation, color = 0, colorCount = 256) {
+    const source = checkedPixels(pixels, width, height, colorCount), output = [...source];
+    if (!["fill", "clear", "flip-x", "flip-y", "rotate-cw", "rotate-ccw"].includes(operation)) throw new Error("Choose a supported tile transform.");
+    if (operation === "fill") {
+      if (!Number.isInteger(color) || color < 0 || color >= colorCount) throw new Error("Choose a color index inside the palette.");
+      return output.fill(color);
+    }
+    if (operation === "clear") return output.fill(0);
+    if (operation.startsWith("rotate") && width !== height) throw new Error("90 degree rotation requires a square tile.");
+    for (let y = 0; y < height; y++) for (let x = 0; x < width; x++) {
+      const index = operation === "flip-x" ? y * width + (width - 1 - x) : operation === "flip-y" ? (height - 1 - y) * width + x : operation === "rotate-cw" ? (height - 1 - x) * width + y : x * width + (width - 1 - y);
+      output[y * width + x] = source[index];
+    }
+    return output;
+  }
+  function copyTile(pixels, width, height, colorCount) {
+    return { format: "romancer-tile-v1", width, height, pixels: checkedPixels(pixels, width, height, colorCount) };
+  }
+  function pasteTile(clipboard, width, height, colorCount) {
+    if (!clipboard || typeof clipboard !== "object" || Object.keys(clipboard).sort().join(",") !== "format,height,pixels,width" || clipboard.format !== "romancer-tile-v1") throw new Error("Copy a tile inside ROMancer first.");
+    if (clipboard.width !== width || clipboard.height !== height) throw new Error("Clipboard tile dimensions differ from this cell.");
+    return checkedPixels(clipboard.pixels, width, height, colorCount);
+  }
+  function mergeCellChanges(changes, incoming) {
+    if (!Array.isArray(changes) || !Array.isArray(incoming) || changes.length > 1024 || incoming.length > 1024) throw new Error("Review at most1024 asset changes at a time.");
+    const keys2 = /* @__PURE__ */ new Set();
+    for (const change of incoming) {
+      if (change.kind !== "cell" || typeof change.bitmap_id !== "string" || !Number.isSafeInteger(change.cell_index) || change.cell_index < 0 || !Array.isArray(change.before_pixels) || !Array.isArray(change.after_pixels) || change.before_pixels.length !== change.after_pixels.length || change.before_pixels.length > 1024) throw new Error("Invalid staged tile change.");
+      keys2.add(change.bitmap_id + ":" + change.cell_index);
+    }
+    const merged2 = [...changes.filter((change) => change.kind !== "cell" || !keys2.has(change.bitmap_id + ":" + change.cell_index)), ...incoming.filter((change) => JSON.stringify(change.before_pixels) !== JSON.stringify(change.after_pixels))];
+    if (merged2.length > 1024) throw new Error("Review at most1024 asset changes at a time.");
+    return JSON.parse(JSON.stringify(merged2));
+  }
+
+  // romancer/ui/tilemap_editor.js
+  function canvasCell(rect, x, y, width, height) {
+    if (rect.width <= 0 || rect.height <= 0 || x < rect.left || y < rect.top || x >= rect.left + rect.width || y >= rect.top + rect.height) return null;
+    return Math.floor((y - rect.top) / rect.height * height) * width + Math.floor((x - rect.left) / rect.width * width);
+  }
+  function paintMapCell(doc, map, changes, index, brush) {
+    if (Object.keys(brush).sort().join(",") !== "flip_x,flip_y,palette_bank,tile_index") throw Error("Provide tile, palette and both flip values.");
+    const bitmap = doc.bitmaps.find((r) => r.id === map.bitmap_id), palette2 = doc.palettes.find((r) => r.id === map.palette_id), entry = map.entries[index];
+    if (!entry) throw Error("Choose a declared map cell.");
+    for (const [key3, value] of Object.entries(brush)) {
+      if (!["tile_index", "palette_bank", "flip_x", "flip_y"].includes(key3) || !Number.isInteger(value) || value < 0) throw Error("Invalid map brush value.");
+      const field2 = map.fields[key3];
+      if (field2.kind === "constant" && value !== field2.value) throw Error(key3 + " is constant in this declaration.");
+      if (field2.kind === "bits") {
+        const shift = Math.log2(field2.mask & -field2.mask), max = field2.mask >>> shift;
+        if (value > max) throw Error(key3 + " exceeds its declared storage field.");
+      }
+    }
+    if (brush.tile_index >= bitmap.count) throw Error("Choose an existing tile.");
+    if (brush.palette_bank >= palette2.banks) throw Error("Choose an existing palette bank.");
+    if (brush.flip_x > 1 || brush.flip_y > 1) throw Error("Flips must be on or off.");
+    const result = changes.filter((c) => !(c.kind === "map" && c.tilemap_id === map.id && c.entry_index === index));
+    if (JSON.stringify(brush) !== JSON.stringify(entry.values)) result.push({ kind: "map", tilemap_id: map.id, entry_index: index, before: { ...entry.values }, after: { ...brush } });
+    if (result.length > 1024) throw Error("Review at most 1024 asset changes per build.");
+    return result;
+  }
+  function colorFor(palette2, bank, index, changes) {
+    const entry = palette2.entries[bank * palette2.colors_per_bank + index], change = changes.find((c) => c.kind === "palette" && c.palette_id === palette2.id && c.bank === bank && c.index === index);
+    if (!change) return entry.rgb;
+    const rgb = {};
+    for (const name of ["r", "g", "b"]) {
+      const mask = palette2.channels[name], maximum = mask >> Math.log2(mask & -mask);
+      rgb[name] = Math.round(change.after[name] * 255 / maximum);
+    }
+    return rgb;
+  }
+  function mapPixels(doc, map, changes) {
     var _a, _b;
-    const { state: state2 } = ctx2, a = state2.artifact;
-    if (!a) return "";
-    const scope = selectionKey(state2), params = { ...ctx2.sourceParams() }, current2 = () => {
+    const tiles = doc.bitmaps.find((b) => b.id === map.bitmap_id), palette2 = doc.palettes.find((p) => p.id === map.palette_id), width = map.width * tiles.width, height = map.height * tiles.height;
+    if (width > 32768 || height > 32768 || width * height > 262144) throw Error("Declared map preview exceeds the canvas budget.");
+    const image = new Uint8ClampedArray(width * height * 4);
+    for (const entry of map.entries) {
+      const v = ((_a = changes.find((c) => c.kind === "map" && c.tilemap_id === map.id && c.entry_index === entry.index)) == null ? void 0 : _a.after) || entry.values, pixels = ((_b = changes.find((c) => c.kind === "cell" && c.bitmap_id === tiles.id && c.cell_index === v.tile_index)) == null ? void 0 : _b.after_pixels) || tiles.cells[v.tile_index].pixels;
+      for (let y = 0; y < tiles.height; y++) for (let x = 0; x < tiles.width; x++) {
+        const px = v.flip_x ? tiles.width - 1 - x : x, py = v.flip_y ? tiles.height - 1 - y : y, c = colorFor(palette2, v.palette_bank, pixels[py * tiles.width + px], changes), offset = ((Math.floor(entry.index / map.width) * tiles.height + y) * width + entry.index % map.width * tiles.width + x) * 4;
+        image.set([c.r, c.g, c.b, 255], offset);
+      }
+    }
+    return image;
+  }
+  function flipSelect(ctx2, map, key3, label) {
+    const field2 = map.fields[key3], id = "map-" + key3.replaceAll("_", "-");
+    return field2.kind === "constant" ? `<p>${esc(label)}: ${field2.value ? "On" : "Off"} (fixed)<input id="${id}" type="hidden" value="${field2.value}"></p>` : select(id, label, [["0", "Off"], ["1", "On"]], ctx2.draft(id, "0"));
+  }
+  function tilemapControls(ctx2, doc, map) {
+    var _a;
+    if (!map) return "";
+    const tiles = doc.bitmaps.find((r) => r.id === map.bitmap_id), palette2 = doc.palettes.find((r) => r.id === map.palette_id), page = Math.min(Math.floor((tiles.count - 1) / 64), ctx2.state.mapTilePage || 0);
+    ctx2.use({ "map-pick-tile": (node) => {
+      ctx2.setDraft("map-tile", node.dataset.id);
+      return ctx2.render();
+    }, "map-tiles-page": (node) => {
+      ctx2.state.mapTilePage = Math.max(0, page + Number(node.dataset.id));
+      return ctx2.render();
+    }, "map-use-pixel-tile": () => {
+      var _a2;
+      if (((_a2 = ctx2.state.paint) == null ? void 0 : _a2.bitmap_id) !== tiles.id) throw Error("Select a tile from this map’s bitmap first.");
+      ctx2.setDraft("map-tile", String(ctx2.state.paint.cell_index));
+      return ctx2.render();
+    } });
+    return `<section class="card" id="tilemap-editor"><h3>Tilemap · ${esc(map.id)}</h3><div class="actions">${doc.tilemaps.length > 1 ? doc.tilemaps.map((r) => button(r.id, "asset-map-group", { id: r.id })).join("") : ""}</div><p>Pick a tile, then paint map cells. Review asset changes to create a build.</p>
+ <div class="preview-pair map-comparison"><div><span>Original</span><div class="hex-scroll"><canvas id="map-original" aria-label="Original tilemap"></canvas></div></div><div><span>Editing · paint here</span><div class="hex-scroll"><canvas id="map-preview" tabindex="0" aria-label="Tilemap editor: arrows move, Space paints the selected tile"></canvas></div></div></div><p id="map-position">Cell 0</p><p id="map-preview-status" class="preview-caption" role="status" aria-live="polite"></p>
+ <div class="field-row">${field("map-tile", "Brush tile index", ctx2.draft("map-tile", String(map.fields.tile_index.kind === "constant" ? map.fields.tile_index.value : 0)), { readonly: map.fields.tile_index.kind === "constant" })}${field("map-bank", "Palette bank", ctx2.draft("map-bank", String(map.fields.palette_bank.kind === "constant" ? map.fields.palette_bank.value : 0)), { readonly: map.fields.palette_bank.kind === "constant" })}${flipSelect(ctx2, map, "flip_x", "Horizontal flip")}${flipSelect(ctx2, map, "flip_y", "Vertical flip")}</div>
+ <div class="pixel-grid map-tile-picker">${tiles.cells.slice(page * 64, page * 64 + 64).map((c) => `<div class="pixel-card"><canvas width="${tiles.width}" height="${tiles.height}" data-map-tile="${c.index}" aria-label="Brush tile ${c.index}"></canvas>${button(String(c.index), "map-pick-tile", { id: String(c.index), disabled: map.fields.tile_index.kind === "constant" && c.index !== map.fields.tile_index.value })}</div>`).join("")}</div><div class="actions">${button("Previous tiles", "map-tiles-page", { id: "-1", disabled: !page })}${button("Next tiles", "map-tiles-page", { id: "1", disabled: (page + 1) * 64 >= tiles.count })}${button("Use selected pixel tile", "map-use-pixel-tile", { disabled: ((_a = ctx2.state.paint) == null ? void 0 : _a.bitmap_id) !== tiles.id })}</div><details><summary>Single-cell controls</summary>${field("map-entry", "Cell index", ctx2.draft("map-entry", "0"))}${button("Load map entry", "asset-open-map-entry")}${button("Stage map change", "asset-map-change")}</details></section>`;
+  }
+  function mountTilemap(ctx2, doc, map, changes) {
+    const canvas = document.getElementById("map-preview");
+    if (!map || !canvas) return;
+    const tiles = doc.bitmaps.find((b) => b.id === map.bitmap_id), palette2 = doc.palettes.find((p) => p.id === map.palette_id);
+    let current2 = changes, selected2 = 0, pointer = null;
+    const draw2 = () => {
+      canvas.width = map.width * tiles.width;
+      canvas.height = map.height * tiles.height;
+      canvas.style.imageRendering = "pixelated";
+      canvas.style.width = Math.min(1024, canvas.width * 3) + "px";
+      canvas.style.touchAction = "none";
+      const context = canvas.getContext("2d"), image = context.createImageData(canvas.width, canvas.height);
+      image.data.set(mapPixels(doc, map, current2));
+      context.putImageData(image, 0, 0);
+      rememberPreview(canvas, canvas.width, canvas.height, image.data);
+      const before = document.getElementById("map-original");
+      if (before) {
+        before.width = canvas.width;
+        before.height = canvas.height;
+        before.style.width = canvas.style.width;
+        const g = before.getContext("2d"), original = g.createImageData(canvas.width, canvas.height);
+        original.data.set(mapPixels(doc, map, []));
+        g.putImageData(original, 0, 0);
+        rememberPreview(before, canvas.width, canvas.height, original.data);
+      }
+    };
+    const persist = (save = true) => {
+      var _a;
+      if (save) ctx2.setDraft("asset-changes", JSON.stringify(current2, null, 2));
+      const node = document.getElementById("asset-changes");
+      if (node) node.value = JSON.stringify(current2, null, 2);
+      ctx2.state.pending = null;
+      ctx2.state.assetAcknowledgements = [];
+      (_a = document.querySelector('[data-action="asset-apply"]')) == null ? void 0 : _a.setAttribute("disabled", "");
+    };
+    const paint = (index, save = true) => {
+      const brush = { tile_index: Number(read("map-tile")), palette_bank: Number(read("map-bank")), flip_x: map.fields.flip_x.kind === "constant" ? map.fields.flip_x.value : Number(read("map-flip-x")), flip_y: map.fields.flip_y.kind === "constant" ? map.fields.flip_y.value : Number(read("map-flip-y")) };
+      current2 = paintMapCell(doc, map, current2, index, brush);
+      selected2 = index;
+      persist(save);
+      draw2();
+      previewStatus();
+      const label = document.getElementById("map-position");
+      if (label) label.textContent = "Cell " + selected2 + " · " + current2.filter((c) => c.kind === "map" && c.tilemap_id === map.id).length + " staged cell" + (current2.filter((c) => c.kind === "map" && c.tilemap_id === map.id).length === 1 ? "" : "s");
+    };
+    const eventPaint = (event) => {
+      const index = canvasCell(canvas.getBoundingClientRect(), event.clientX, event.clientY, map.width, map.height);
+      if (index !== null) paint(index, false);
+    };
+    canvas.addEventListener("pointerdown", (event) => {
+      if (event.button !== 0) return;
+      event.preventDefault();
+      canvas.focus();
+      pointer = event.pointerId;
+      canvas.setPointerCapture(pointer);
+      try {
+        eventPaint(event);
+      } catch (error) {
+        ctx2.notify(error.message, true);
+      }
+    });
+    canvas.addEventListener("pointermove", (event) => {
+      if (event.pointerId !== pointer) return;
+      try {
+        eventPaint(event);
+      } catch (error) {
+        ctx2.notify(error.message, true);
+      }
+    });
+    const finish = () => {
+      if (pointer !== null) {
+        pointer = null;
+        persist();
+      }
+    };
+    canvas.addEventListener("pointerup", finish);
+    canvas.addEventListener("pointercancel", finish);
+    canvas.addEventListener("keydown", (event) => {
+      const delta = { ArrowLeft: -1, ArrowRight: 1, ArrowUp: -map.width, ArrowDown: map.width }[event.key];
+      if (delta) {
+        event.preventDefault();
+        selected2 = Math.max(0, Math.min(map.entries.length - 1, selected2 + delta));
+        document.getElementById("map-position").textContent = "Cell " + selected2;
+      }
+      if ([" ", "Enter"].includes(event.key)) {
+        event.preventDefault();
+        try {
+          paint(selected2);
+        } catch (error) {
+          ctx2.notify(error.message, true);
+        }
+      }
+    });
+    const brushes = () => document.querySelectorAll("[data-map-tile]").forEach((node) => {
+      var _a;
+      const index = Number(node.dataset.mapTile), pixels = ((_a = current2.find((c) => c.kind === "cell" && c.bitmap_id === tiles.id && c.cell_index === index)) == null ? void 0 : _a.after_pixels) || tiles.cells[index].pixels, context = node.getContext("2d"), image = context.createImageData(tiles.width, tiles.height);
+      pixels.forEach((v, i) => {
+        const c = colorFor(palette2, 0, v, current2);
+        image.data.set([c.r, c.g, c.b, 255], i * 4);
+      });
+      context.putImageData(image, 0, 0);
+    });
+    const previewStatus = () => {
+      const label = document.getElementById("map-preview-status");
+      if (label) label.textContent = current2.length ? "Preview updated · " + current2.length + " staged graphics changes · not built" : "Unchanged map preview";
+    };
+    canvas.addEventListener("map-refresh", () => {
+      var _a, _b;
+      if (pointer !== null || document.getElementById("map-preview") !== canvas || ((_b = (_a = ctx2.state.results) == null ? void 0 : _a["assets.inspect"]) == null ? void 0 : _b.document_id) !== doc.document_id) return;
+      try {
+        current2 = JSON.parse(ctx2.draft("asset-changes", "[]"));
+        const paint2 = ctx2.state.paint;
+        if ((paint2 == null ? void 0 : paint2.document_id) === doc.document_id) {
+          const bitmap = doc.bitmaps.find((b) => b.id === paint2.bitmap_id);
+          if (bitmap) current2 = mergeCellChanges(current2, [{ kind: "cell", bitmap_id: bitmap.id, cell_index: paint2.cell_index, before_pixels: bitmap.cells[paint2.cell_index].pixels, after_pixels: paint2.pixels }]);
+        }
+        draw2();
+        brushes();
+        previewStatus();
+      } catch (error) {
+        const label = document.getElementById("map-preview-status");
+        if (label) label.textContent = "Preview unavailable: " + error.message;
+      }
+    });
+    draw2();
+    brushes();
+    previewStatus();
+  }
+
+  // romancer/ui/asset_controls.js
+  function stage(ctx2, change) {
+    const changes = json("asset-changes"), key3 = (c) => [c.kind, c.bitmap_id, c.cell_index, c.palette_id, c.bank, c.index, c.tilemap_id, c.entry_index, c.font_id, c.glyph_id].join(":");
+    const filtered = changes.filter((c) => key3(c) !== key3(change));
+    filtered.push(change);
+    ctx2.setDraft("asset-changes", JSON.stringify(filtered, null, 2));
+    ctx2.state.assetAcknowledgements = [];
+    ctx2.state.pending = null;
+    return ctx2.render();
+  }
+  function stageCurrentPaint(ctx2, doc) {
+    const changes = json("asset-changes"), paint = ctx2.state.paint;
+    if (!paint || paint.document_id !== doc.document_id) return changes;
+    const bitmap = doc.bitmaps.find((row) => row.id === paint.bitmap_id), cell = bitmap == null ? void 0 : bitmap.cells[paint.cell_index];
+    if (!cell) return changes;
+    const merged2 = mergeCellChanges(changes, [{ kind: "cell", bitmap_id: bitmap.id, cell_index: paint.cell_index, before_pixels: cell.pixels, after_pixels: paint.pixels }]);
+    if (JSON.stringify(merged2) !== JSON.stringify(changes)) ctx2.setDraft("asset-changes", JSON.stringify(merged2, null, 2));
+    return merged2;
+  }
+  function activateCell(ctx2, doc, bitmapId, index) {
+    const changes = stageCurrentPaint(ctx2, doc), bitmap = doc.bitmaps.find((row) => row.id === bitmapId), cell = bitmap == null ? void 0 : bitmap.cells[index];
+    if (!cell) throw new Error("Choose a declared tile.");
+    const existing = changes.find((row) => row.kind === "cell" && row.bitmap_id === bitmapId && row.cell_index === index);
+    ctx2.state.assetBitmapId = bitmapId;
+    ctx2.state.assetPage = Math.floor(index / 64);
+    ctx2.state.paint = { document_id: doc.document_id, bitmap_id: bitmapId, cell_index: index, pixels: [...(existing == null ? void 0 : existing.after_pixels) || cell.pixels] };
+    ctx2.state.assetAcknowledgements = [];
+    ctx2.state.pending = null;
+    ctx2.setDraft("paint-buffer", JSON.stringify(ctx2.state.paint));
+  }
+  function assetTools(ctx2, doc, bitmap, palette2) {
+    var _a, _b, _c, _d, _e, _f;
+    if (!(doc == null ? void 0 : doc.ok) || !bitmap) return "";
+    const { state: state2 } = ctx2, map = doc.tilemaps.find((row) => row.id === state2.assetMapId) || doc.tilemaps[0], font = doc.fonts.find((row) => row.id === state2.assetFontId) || doc.fonts[0];
+    const count = Math.min(2 ** { "mono-row-msb-v1": 1, "tile8-paired2-msb-v1": 2, "tile8-planar2-msb-v1": 2, "tile8-rowplanar4-msb-v1": 4, "tile8-paired4-msb-v1": 4, "tile8-packed4-high-v1": 4, "tile8-packed4-low-v1": 4 }[bitmap.codec], (palette2 == null ? void 0 : palette2.colors_per_bank) || 256);
+    const pixels = () => {
+      var _a2;
+      return pixelBuffer(ctx2, doc, bitmap, ((_a2 = state2.paint) == null ? void 0 : _a2.cell_index) ?? 0);
+    };
+    const history3 = historyFor(ctx2, doc, bitmap.id, ((_a = state2.paint) == null ? void 0 : _a.cell_index) ?? 0, pixels());
+    const commit = (after) => {
+      var _a2;
+      state2.historyEditor = "paint-canvas";
+      const index = ((_a2 = state2.paint) == null ? void 0 : _a2.cell_index) ?? 0;
+      recordPixels(ctx2, doc, bitmap.id, index, pixels(), after);
+      setPixelBuffer(ctx2, doc, bitmap, index, after);
+      return ctx2.render();
+    };
+    const usage = state2.results["resources.references"], showUses = (usage == null ? void 0 : usage.document_id) === doc.document_id && usage.bitmap_id === bitmap.id && usage.cell_index === (((_b = state2.paint) == null ? void 0 : _b.cell_index) ?? 0);
+    const glyph = font == null ? void 0 : font.glyphs.find((row) => {
+      var _a2;
+      return row.id === ctx2.draft("font-glyph", (_a2 = font.glyphs[0]) == null ? void 0 : _a2.id);
+    });
+    ctx2.use({
+      "pixel-undo": () => {
+        var _a2;
+        setPixelBuffer(ctx2, doc, bitmap, ((_a2 = state2.paint) == null ? void 0 : _a2.cell_index) ?? 0, history3.undo());
+        return ctx2.render();
+      },
+      "pixel-redo": () => {
+        var _a2;
+        setPixelBuffer(ctx2, doc, bitmap, ((_a2 = state2.paint) == null ? void 0 : _a2.cell_index) ?? 0, history3.redo());
+        return ctx2.render();
+      },
+      "asset-transform": (node) => commit(transformPixels(pixels(), bitmap.width, bitmap.height, node.dataset.id, Number(read("paint-color")), count)),
+      "asset-copy": () => {
+        state2.tileClipboard = copyTile(pixels(), bitmap.width, bitmap.height, count);
+        ctx2.notify("Tile indices copied.");
+        return ctx2.render();
+      },
+      "asset-paste": () => commit(pasteTile(state2.tileClipboard, bitmap.width, bitmap.height, count)),
+      "asset-export-image": async () => {
+        const result = await ctx2.run("resources.export_image", { ...ctx2.sourceParams(), schema: json("asset-schema"), bitmap_id: bitmap.id, columns: Number(read("image-columns")), bank: Number(read("image-bank")) }, { render: false });
+        await ctx2.api.download(state2.project.project_id, result.export.export_id, "tiles.png");
+        await ctx2.render();
+      },
+      "asset-uses": () => {
+        var _a2;
+        return ctx2.run("resources.references", { ...ctx2.sourceParams(), schema: json("asset-schema"), bitmap_id: bitmap.id, cell_index: ((_a2 = state2.paint) == null ? void 0 : _a2.cell_index) ?? 0 });
+      },
+      "asset-use-open": (node) => {
+        const row = usage.uses[Number(node.dataset.id)];
+        if (row.kind === "tilemap") {
+          state2.assetMapId = row.id;
+          ctx2.setDraft("map-entry", String(row.entry_index));
+        } else {
+          state2.assetFontId = row.id;
+          ctx2.setDraft("font-glyph", row.glyph_id);
+        }
+        return ctx2.render();
+      },
+      "asset-map-group": (node) => {
+        state2.assetMapId = node.dataset.id;
+        ctx2.setDraft("map-entry", "0");
+        return ctx2.render();
+      },
+      "asset-font-group": (node) => {
+        state2.assetFontId = node.dataset.id;
+        return ctx2.render();
+      },
+      "asset-open-map-entry": () => {
+        const row = map == null ? void 0 : map.entries[Number(read("map-entry"))];
+        if (!row) throw new Error("Choose a declared map entry.");
+        for (const [id, value] of Object.entries({ "map-tile": row.values.tile_index, "map-bank": row.values.palette_bank, "map-flip-x": row.values.flip_x, "map-flip-y": row.values.flip_y })) ctx2.setDraft(id, String(value));
+        return ctx2.render();
+      },
+      "asset-open-glyph": () => {
+        const glyph2 = font == null ? void 0 : font.glyphs.find((row) => row.id === read("font-glyph"));
+        if (!glyph2) throw new Error("Choose a glyph.");
+        activateCell(ctx2, doc, glyph2.bitmap_id, glyph2.cell_index);
+        ctx2.setDraft("font-advance", String(glyph2.advance_pixels));
+        return ctx2.render();
+      },
+      "asset-zoom": (node) => {
+        state2.tileZoom = Number(node.dataset.id);
+        ctx2.render();
+      },
+      "asset-group": (node) => {
+        stageCurrentPaint(ctx2, doc);
+        state2.assetBitmapId = node.dataset.id;
+        state2.assetPage = 0;
+        state2.paint = null;
+        ctx2.setDraft("paint-buffer", "");
+        state2.pixelCursor = { x: 0, y: 0 };
+        return ctx2.render();
+      },
+      "asset-page": (node) => {
+        state2.assetPage = Math.max(0, (state2.assetPage || 0) + Number(node.dataset.id));
+        ctx2.render();
+      },
+      "asset-map-change": () => {
+        if (!map) throw new Error("Declare a tilemap first.");
+        const index = Number(read("map-entry")), entry = map.entries[index];
+        if (!entry) throw new Error("Choose a map entry.");
+        return stage(ctx2, { kind: "map", tilemap_id: map.id, entry_index: index, before: entry.values, after: { tile_index: Number(read("map-tile")), palette_bank: Number(read("map-bank")), flip_x: Number(read("map-flip-x")), flip_y: Number(read("map-flip-y")) } });
+      },
+      "asset-font-change": () => {
+        const glyph2 = font == null ? void 0 : font.glyphs.find((g) => g.id === read("font-glyph"));
+        if (!glyph2) throw new Error("Choose a glyph.");
+        return stage(ctx2, { kind: "advance", font_id: font.id, glyph_id: glyph2.id, before: glyph2.advance_pixels, after: Number(read("font-advance")) });
+      },
+      "asset-image-map": async () => {
+        var _a2;
+        const ticket = selectionKey(state2), file = document.getElementById("image-file").files[0];
+        if (!file || file.size > 512 * 1024) throw new Error("Choose a PNG up to512KiB.");
+        const bytes = new Uint8Array(await file.arrayBuffer());
+        let text = "";
+        for (const byte of bytes) text += String.fromCharCode(byte);
+        if (ticket !== selectionKey(state2)) throw Error("Source changed. Import again.");
+        const result = await ctx2.run("resources.image_map_selection", { ...ctx2.sourceParams(), schema: json("asset-schema"), bitmap_id: bitmap.id, bank: Number(read("image-bank")), png_base64: btoa(text), columns: Number(read("image-columns")), mode: read("image-mode") }, { render: false });
+        if (ticket !== selectionKey(state2)) throw Error("Source changed. Import again.");
+        for (const cell of bitmap.cells) {
+          const before = pixelBuffer(ctx2, doc, bitmap, cell.index), after = ((_a2 = result.changes.find((c) => c.cell_index === cell.index)) == null ? void 0 : _a2.after_pixels) || cell.pixels;
+          recordPixels(ctx2, doc, bitmap.id, cell.index, before, after);
+        }
+        const unrelated = json("asset-changes").filter((change) => change.kind !== "cell" || change.bitmap_id !== bitmap.id);
+        const merged2 = mergeCellChanges(unrelated, result.changes);
+        state2.results["resources.image_map"] = result;
+        state2.paint = null;
+        ctx2.setDraft("paint-buffer", "");
+        ctx2.setDraft("asset-changes", JSON.stringify(merged2, null, 2));
+        state2.assetAcknowledgements = [];
+        state2.pending = null;
+        await ctx2.render();
+      }
+    });
+    return `<section class="card asset-tools"><div class="card-heading"><h3>Editor tools</h3></div><div class="asset-tool-options"><div class="actions" aria-label="Bitmap group">${doc.bitmaps.map((b) => button(b.id, "asset-group", { id: b.id })).join("")}</div><div class="actions" aria-label="Tile zoom"><span class="subtle">Zoom</span>${[16, 24, 32, 48].map((n) => button(n + "×", "asset-zoom", { id: String(n) })).join("")}</div></div><div class="actions asset-transform-tools">${button("Undo pixels", "pixel-undo", { disabled: !history3.canUndo })}${button("Redo pixels", "pixel-redo", { disabled: !history3.canRedo })}${[["fill", "Fill tile"], ["clear", "Clear"], ["flip-x", "Flip horizontally"], ["flip-y", "Flip vertically"], ["rotate-cw", "Rotate right"], ["rotate-ccw", "Rotate left"]].map(([id, label]) => button(label, "asset-transform", { id })).join("")}${button("Copy tile", "asset-copy")}${button("Paste tile", "asset-paste", { disabled: !state2.tileClipboard })}${button("Find declared uses", "asset-uses")}</div><div class="asset-tool-status"><span class="subtle">Arrows move · Space paints</span><span id="pixel-position" class="mono">Pixel ${((_c = state2.pixelCursor) == null ? void 0 : _c.x) || 0}, ${((_d = state2.pixelCursor) == null ? void 0 : _d.y) || 0}</span></div></section>
+${showUses ? `<section class="card"><h3>Declared uses</h3>${usage.uses.length ? usage.uses.map((row, i) => `<div class="actions"><span>${esc(row.id)} · ${row.kind === "tilemap" ? "entry " + row.entry_index : "glyph " + esc(row.glyph_id)}</span>${button("Open", "asset-use-open", { id: String(i) })}</div>`).join("") : "<p>No uses in this declaration.</p>"}<p class="subtle">Undeclared uses remain unknown.</p></section>` : ""}
+${tilemapControls(ctx2, doc, map)}
+${font ? `<section class="card"><h3>Font metrics · ${esc(font.id)}</h3><div class="actions">${doc.fonts.length > 1 ? doc.fonts.map((row) => button(row.id, "asset-font-group", { id: row.id })).join("") : ""}</div>${select("font-glyph", "Glyph", font.glyphs.map((g) => [g.id, g.id + " · " + g.advance_pixels + " px"]), ctx2.draft("font-glyph", (_e = font.glyphs[0]) == null ? void 0 : _e.id))}${field("font-advance", "Advance in pixels", ctx2.draft("font-advance", ((_f = font.glyphs[0]) == null ? void 0 : _f.advance_pixels) || 8))}${button("Open glyph", "asset-open-glyph")}${button("Stage advance change", "asset-font-change", { disabled: (glyph == null ? void 0 : glyph.advance.kind) !== "u8" })}</section>` : ""}
+<details class="card"><summary>Import or export PNG</summary><label class="field"><span>Opaque PNG, up to512KiB</span><input id="image-file" type="file" accept="image/png"></label>${field("image-columns", "Tiles per row", ctx2.draft("image-columns", "1"))}${select("image-mode", "Color mapping", [["exact", "Exact palette colors"], ["nearest", "Nearest color — review conversion"]], ctx2.draft("image-mode", "exact"))}${field("image-bank", "Palette bank", ctx2.draft("image-bank", "0"), { type: "number", min: 0 })}${button("Preview mapped changes", "asset-image-map")}${button("Export stored PNG", "asset-export-image")}<p class="subtle">Create a build to include pending edits in an exported PNG.</p>${report(state2.results["resources.image_map"], "Image mapping")}</details>`;
+  }
+  function mountTools(ctx2, doc, bitmap, redraw) {
+    if (!bitmap) return;
+    const canvas = document.getElementById("paint-canvas");
+    if (canvas) {
+      canvas.style.width = bitmap.width * (ctx2.state.tileZoom || 24) + "px";
+      canvas.style.height = "auto";
+      canvas.setAttribute("role", "application");
+      canvas.setAttribute("aria-label", "Pixel editor: arrows move; Space paints selected index");
+      canvas.addEventListener("keydown", (event) => {
+        if (!["ArrowLeft", "ArrowRight", "ArrowUp", "ArrowDown", " ", "Enter"].includes(event.key)) return;
+        event.preventDefault();
+        const state2 = ctx2.state, cursor = state2.pixelCursor || { x: 0, y: 0 };
+        if (event.key === "ArrowLeft") cursor.x = Math.max(0, cursor.x - 1);
+        if (event.key === "ArrowRight") cursor.x = Math.min(bitmap.width - 1, cursor.x + 1);
+        if (event.key === "ArrowUp") cursor.y = Math.max(0, cursor.y - 1);
+        if (event.key === "ArrowDown") cursor.y = Math.min(bitmap.height - 1, cursor.y + 1);
+        state2.pixelCursor = cursor;
+        if ([" ", "Enter"].includes(event.key)) {
+          const color = Number(read("paint-color")), bits2 = { "mono-row-msb-v1": 1, "tile8-paired2-msb-v1": 2, "tile8-planar2-msb-v1": 2, "tile8-rowplanar4-msb-v1": 4, "tile8-paired4-msb-v1": 4, "tile8-packed4-high-v1": 4, "tile8-packed4-low-v1": 4 }[bitmap.codec];
+          if (!Number.isInteger(color) || color < 0 || color >= 2 ** bits2) {
+            ctx2.notify("Choose a valid palette index.", true);
+            return;
+          }
+          if (!state2.paint) state2.paint = { document_id: doc.document_id, bitmap_id: bitmap.id, cell_index: 0, pixels: [...pixelBuffer(ctx2, doc, bitmap, 0)] };
+          const before = [...state2.paint.pixels];
+          state2.paint.pixels[cursor.y * bitmap.width + cursor.x] = color;
+          recordPixels(ctx2, doc, bitmap.id, state2.paint.cell_index, before, state2.paint.pixels);
+          const activeHistory = historyFor(ctx2, doc, bitmap.id, state2.paint.cell_index, state2.paint.pixels), undo = document.querySelector('[data-action="pixel-undo"]'), redo = document.querySelector('[data-action="pixel-redo"]');
+          if (undo) undo.disabled = !activeHistory.canUndo;
+          if (redo) redo.disabled = !activeHistory.canRedo;
+          state2.assetAcknowledgements = [];
+          state2.pending = null;
+          ctx2.setDraft("paint-buffer", JSON.stringify(state2.paint));
+          redraw();
+        }
+        const label = document.getElementById("pixel-position");
+        if (label) label.textContent = "Pixel " + cursor.x + ", " + cursor.y;
+      });
+    }
+    mountPixelStrokes(ctx2, doc, bitmap, redraw);
+    const map = doc.tilemaps.find((row) => row.id === ctx2.state.assetMapId) || doc.tilemaps[0];
+    let changes = json("asset-changes");
+    const paint = ctx2.state.paint;
+    if ((paint == null ? void 0 : paint.document_id) === doc.document_id) {
+      const b = doc.bitmaps.find((r) => r.id === paint.bitmap_id);
+      changes = mergeCellChanges(changes, [{ kind: "cell", bitmap_id: b.id, cell_index: paint.cell_index, before_pixels: b.cells[paint.cell_index].pixels, after_pixels: paint.pixels }]);
+    }
+    mountTilemap(ctx2, doc, map, changes);
+  }
+
+  // romancer/ui/object_workbench.js
+  async function openObject(ctx2, id) {
+    const scope = selectionKey(ctx2.state), result = await ctx2.run("objects.open", { ...ctx2.sourceParams(), object_id: id }, { render: false });
+    if (scope !== selectionKey(ctx2.state)) return;
+    ctx2.state.connectedAssetSetup = { scope, result };
+    ctx2.state.researchOpen = { scope, kind: "assets" };
+    return ctx2.navigate("assets");
+  }
+  async function objectWorkbench(ctx2, doc, bitmap) {
+    var _a, _b, _c, _d, _e, _f, _g;
+    const { state: state2 } = ctx2, scope = selectionKey(state2), current2 = () => {
       var _a2;
       return scope === selectionKey(state2) && ((_a2 = ctx2.isCurrentRender) == null ? void 0 : _a2.call(ctx2)) !== false;
     };
-    const model = await ctx2.api.call("checks.status", params);
-    if (!current2() || model.source_sha256 !== a.sha256 || model.artifact_id !== a.artifact_id) return "";
-    state2.buildCheckView = { scope, page: state2.page, pending: (model.pending || []).some((j) => !terminal.has(j.status)) };
-    const cfg = model.config, artifacts = state2.project.sources.concat(state2.project.builds), target = ctx2.draft("check-target", a.kind === "build" ? a.artifact_id : ((_a = state2.project.builds.at(-1)) == null ? void 0 : _a.artifact_id) || a.artifact_id);
-    const packet = ((_b = state2.buildCheckReport) == null ? void 0 : _b.scope) === scope ? state2.buildCheckReport.result : null;
-    ctx2.use({
-      "check-save": async () => {
-        var _a2, _b2;
-        if (!current2()) return;
-        let steps2;
-        if (read("check-input-mode") === "custom") steps2 = JSON.parse(read("check-steps"));
-        else {
-          let remaining = Number(read("check-frames"));
-          if (!Number.isSafeInteger(remaining) || remaining < 1 || remaining > 2400) throw Error("Choose 1 to 2400 frames before capture.");
-          steps2 = [];
-          while (remaining) {
-            const count = Math.min(600, remaining);
-            steps2.push({ frames: count, buttons: [], port: 0 });
-            remaining -= count;
-          }
+    const hasSaved = ((_c = (_b = (_a = state2.artifact) == null ? void 0 : _a.object_layouts) == null ? void 0 : _b.objects) == null ? void 0 : _c.length) || ((_d = state2.objectWorkbench) == null ? void 0 : _d.scope) === scope;
+    const listing = hasSaved ? await ctx2.api.call("objects.list", ctx2.sourceParams()) : { objects: [] };
+    if (!current2()) return "";
+    let entry = ((_e = state2.objectWorkbench) == null ? void 0 : _e.scope) === scope && state2.objectWorkbench.document_id === (doc == null ? void 0 : doc.document_id) ? state2.objectWorkbench : null;
+    if (entry && !entry.result) {
+      entry.result = await ctx2.api.call("objects.get", { ...ctx2.sourceParams(), object_id: entry.object_id });
+      if (!current2()) return "";
+      const trace = entry.result.object.trace_id;
+      if (trace) {
+        try {
+          entry.trace = await ctx2.api.call("traces.get", { ...ctx2.sourceParams(), trace_id: trace });
+        } catch (error) {
+          entry.sceneIssue = "Saved scene is unavailable. The exact-revision layout remains available.";
         }
-        const region = ((_a2 = document.getElementById("check-region-enable")) == null ? void 0 : _a2.checked) ? Object.fromEntries(["x", "y", "width", "height"].map((k) => [k, Number(read("check-region-" + k))])) : null;
-        const config = { name: read("check-name").trim(), automatic: !!((_b2 = document.getElementById("check-auto")) == null ? void 0 : _b2.checked), mode: read("check-mode"), steps: steps2, region, route_ids: cfg.route_ids || [] };
-        await ctx2.run("checks.configure", { ...params, config }, { render: false });
-        if (current2()) return ctx2.render();
+      }
+    }
+    if (!current2()) return "";
+    const obj = (_f = entry == null ? void 0 : entry.result) == null ? void 0 : _f.object, layout = obj == null ? void 0 : obj.definition.layout;
+    ctx2.use({
+      "object-open": (node) => {
+        var _a2, _b2;
+        if (!current2()) throw Error("The selected ROM changed. Open this object from the current selection.");
+        const id = ((_a2 = node == null ? void 0 : node.dataset) == null ? void 0 : _a2.id) || ((_b2 = document.getElementById("object-choice")) == null ? void 0 : _b2.value);
+        if (!listing.objects.some((o) => o.object_id === id)) throw Error("Refresh saved objects first.");
+        return openObject(ctx2, id);
       },
-      "check-run": async () => {
+      "object-delete": async (node) => {
+        var _a2;
+        if (!current2()) throw Error("The selected ROM changed.");
+        const id = node.dataset.id, chosen = listing.objects.find((o) => o.object_id === id);
+        if (!chosen) throw Error("Refresh saved objects first.");
+        if (!confirm("Remove the saved layout “" + chosen.name + "”? ROM bytes and builds stay unchanged.")) return;
+        await ctx2.run("objects.delete", { ...ctx2.sourceParams(), object_id: id }, { render: false });
         if (!current2()) return;
-        const target_id = read("check-target");
-        const result = await ctx2.run("checks.run", { project_id: params.project_id, source_id: model.baseline_id, target_id }, { render: false });
-        if (!current2()) return;
-        state2.buildCheckReport = { scope, result };
+        if (((_a2 = state2.objectWorkbench) == null ? void 0 : _a2.object_id) === id) state2.objectWorkbench = null;
         return ctx2.render();
       },
-      "check-open": async (node) => {
-        if (!current2() || !model.results.some((r) => r.evidence_id === node.dataset.id)) throw Error("Refresh this source’s test results first.");
-        const result = await ctx2.api.call("checks.get", { ...params, evidence_id: node.dataset.id });
-        if (!current2()) return;
-        state2.buildCheckReport = { scope, result };
+      "object-source": (node) => {
+        if (!current2() || !entry || !bitmap) throw Error("The selected source changed.");
+        const index = Number(node.dataset.id);
+        if (!layout.indices.includes(index)) throw Error("Choose a source used by this object.");
+        activateCell(ctx2, doc, bitmap.id, index);
+        entry.selected = index;
         return ctx2.render();
-      },
-      "check-refresh": async () => {
-        if (!current2()) return;
-        await ctx2.refreshProject();
-        if (current2()) return ctx2.render();
-      },
-      "check-cancel": (node) => {
-        if (!current2() || !model.pending.some((j) => j.job_id === node.dataset.id)) throw Error("Refresh the active checks first.");
-        return ctx2.api.call("jobs.cancel", { job_id: node.dataset.id });
       }
     });
-    return '<section class="card" id="build-checks"><div class="card-heading"><h3>Build checks</h3>' + badge(model.configured ? "Configured" : "Ready to configure") + '</div><p>Run the original twice and the build once with the same inputs. Compare pictures, cartridge checks and save-state replay.</p><div id="checks-progress">' + (model.pending || []).map((j) => {
-      var _a2, _b2, _c;
-      return "<p>" + esc(j.status) + " · " + esc(((_a2 = artifacts.find((a2) => a2.artifact_id === j.target_id)) == null ? void 0 : _a2.name) || "Build") + " " + (!terminal.has(j.status) ? button("Cancel check", "check-cancel", { id: j.job_id }) : esc(((_b2 = j.outcome) == null ? void 0 : _b2.status) || ((_c = j.outcome) == null ? void 0 : _c.error) || "")) + "</p>";
-    }).join("") + '</div><div class="field-row">' + select("check-target", "Build to check", artifacts.map((r) => [r.artifact_id, r.name]), target) + button("Run checks", "check-run", { primary: true }) + button("Refresh results", "check-refresh") + "</div><details><summary>Automatic check setup</summary>" + field("check-name", "Test name", ctx2.draft("check-name", cfg.name)) + '<label><input id="check-auto" type="checkbox" ' + (cfg.automatic ? "checked" : "") + "> Check new descendant builds automatically after saving this setup</label>" + select("check-mode", "Picture comparison", [["review_changes", "Show changes for review"], ["unchanged", "Require identical selected pixels"]], ctx2.draft("check-mode", cfg.mode)) + field("check-frames", "Frames before capture", ctx2.draft("check-frames", String(cfg.steps.reduce((n, s) => n + s.frames, 0))), { type: "number", min: 1, max: 2400 }) + select("check-input-mode", "Inputs", [["simple", "Wait with no buttons"], ["custom", "Use custom input sequence below"]], ctx2.draft("check-input-mode", cfg.steps.some((s) => s.buttons.length) ? "custom" : "simple")) + "<details><summary>Advanced inputs and comparison region</summary>" + area("check-steps", "Custom input steps (frames, buttons, port)", ctx2.draft("check-steps", JSON.stringify(cfg.steps, null, 2)), 5) + '<label><input id="check-region-enable" type="checkbox" ' + (cfg.region ? "checked" : "") + '> Compare a fixed part of the screen</label><div class="field-row">' + ["x", "y", "width", "height"].map((k) => {
-      var _a2;
-      return field("check-region-" + k, k[0].toUpperCase() + k.slice(1), ctx2.draft("check-region-" + k, String(((_a2 = cfg.region) == null ? void 0 : _a2[k]) ?? (k === "width" || k === "height" ? 128 : 0))), { type: "number", min: k === "x" || k === "y" ? 0 : 1 });
-    }).join("") + "</div></details>" + button("Save test setup for this revision", "check-save") + '<p class="subtle">Up to 2400 frames. Setup follows builds descended from this revision. A flat or unstable original is inconclusive; visual changes need review unless identical pixels are required. Record longer assertions in Routes.</p></details>' + (model.results.length ? '<details open><summary>Recent results</summary><div class="actions">' + model.results.slice().reverse().map((r) => button(r.status + " · " + r.evidence_id.slice(0, 8), "check-open", { id: r.evidence_id })).join("") + "</div></details>" : "") + (packet ? checkReport(packet) : "") + "</section>";
-  }
-  function checkReport(r) {
-    return '<section class="notice"><h4>' + esc(r.name || "Build check") + " · " + esc(r.status) + "</h4><p>" + esc(r.reason || "") + "</p>" + (r.runtime_trusted === false ? '<p class="notice warm">Historical imported report. Run fresh checks for current execution evidence.</p>' : "") + (r.changed_pixels !== void 0 ? "<p>" + r.changed_pixels + " of " + r.total_pixels + " pixels changed.</p>" : "") + (r.visual ? '<div class="visual-comparison">' + [["original_png_base64", "Original"], ["build_png_base64", "Build"], ["difference_png_base64", "Difference"]].map(([key3, name]) => "<figure><figcaption>" + name + '</figcaption><img src="data:image/png;base64,' + esc(r.visual[key3]) + '" alt="' + name + ' check picture" loading="lazy"></figure>').join("") + "</div>" : "") + (r.runs ? "<p>" + r.runs.length + " fresh worker runs · " + r.runs.filter((s) => s.state_replay).length + " state replays verified · " + r.runs.filter((s) => s.worker_exit_code === 0).length + " clean exits</p>" : "") + '<p class="subtle">This covers the configured inputs and assertions. It does not certify a complete game.</p></section>';
-  }
-  function mountBuildChecks(ctx2) {
-    clearTimeout(ctx2.state.buildCheckTimer);
-    const view = ctx2.state.buildCheckView;
-    if (!(view == null ? void 0 : view.pending)) return;
-    const current2 = () => ctx2.state.buildCheckView === view && selectionKey(ctx2.state) === view.scope && ctx2.state.page === view.page && !!document.getElementById("build-checks");
-    const poll = async () => {
-      if (!current2()) return;
-      try {
-        const r = await ctx2.api.call("checks.status", ctx2.sourceParams());
-        if (!current2()) return;
-        if (!(r.pending || []).some((j) => !terminal.has(j.status))) {
-          await ctx2.refreshProject();
-          if (current2()) await ctx2.render();
-          return;
-        }
-        const node = document.getElementById("checks-progress");
-        if (node) node.textContent = r.pending.filter((j) => !terminal.has(j.status)).map((j) => j.message).join(" · ");
-      } catch (error) {
-        if (current2()) {
-          const node = document.getElementById("checks-progress");
-          if (node) node.textContent = error.message;
-          return;
-        }
+    const saved = listing.objects.length ? select("object-choice", "Saved object", listing.objects.map((o) => [o.object_id, o.name + " · " + o.columns + " × " + o.rows + " tiles"]), (entry == null ? void 0 : entry.object_id) || listing.objects[0].object_id) + button("Open object", "object-open") : "<p>Save verified parts as an object from a captured trace in Playtest.</p>";
+    if (!obj) return '<section class="card object-workbench"><h3>Saved objects</h3>' + saved + "</section>";
+    const uses = /* @__PURE__ */ new Map();
+    layout.indices.forEach((index, place) => {
+      if (index !== null) {
+        if (!uses.has(index)) uses.set(index, []);
+        uses.get(index).push(place);
       }
-      if (current2()) ctx2.state.buildCheckTimer = setTimeout(poll, 2e3);
+    });
+    return '<section class="card object-workbench"><div class="card-heading"><h3>' + esc(obj.name) + "</h3>" + button("Remove layout", "object-delete", { id: entry.object_id }) + "</div><details><summary>Saved objects</summary>" + saved + '</details><div class="object-scene-source"><figure><figcaption>Captured scene · select a source tile to highlight its uses</figcaption>' + (((_g = entry.trace) == null ? void 0 : _g.crop_png_base64) ? '<canvas id="object-scene" aria-label="Captured scene with selected tile uses" data-scene="' + esc(entry.trace.crop_png_base64) + '"></canvas>' : "<p>" + esc(entry.sceneIssue || "This imported layout has no local captured scene.") + "</p>") + '</figure><div><h4>Source tiles & uses</h4><div class="actions">' + [...uses].map(([index, places]) => button("Tile " + index + " · " + places.length + " use" + (places.length === 1 ? "" : "s"), "object-source", { id: String(index), primary: entry.selected === index })).join("") + "</div>" + [...uses].filter(([, p]) => p.length > 1).map(([i, p]) => '<p class="subtle">Shared tile ' + i + " updates " + p.length + " placements together.</p>").join("") + '<p class="subtle">' + (entry.result.source_dependency_verified ? "Source origins verified for the captured placements." : "Saved declaration; imported or historical proof is not fresh execution evidence.") + " " + (obj.definition.complete_parts ? "" : "Some source pixels remain unresolved. ") + "An object name is your label.</p></div></div></section>";
+  }
+  function mountObjectWorkbench(ctx2) {
+    const canvas = document.getElementById("object-scene"), entry = ctx2.state.objectWorkbench;
+    if (!canvas || !(entry == null ? void 0 : entry.trace)) return;
+    const scope = selectionKey(ctx2.state), image = new Image();
+    image.onload = () => {
+      if (!canvas.isConnected || scope !== selectionKey(ctx2.state) || ctx2.state.objectWorkbench !== entry) return;
+      canvas.width = image.naturalWidth;
+      canvas.height = image.naturalHeight;
+      const context = canvas.getContext("2d");
+      context.drawImage(image, 0, 0);
+      const region = entry.result.object.definition.scene_region, crop = entry.trace.region, layout = entry.result.object.definition.layout;
+      context.strokeStyle = "#ffd36a";
+      context.lineWidth = 1;
+      layout.indices.forEach((index, part) => {
+        if (index !== null && (entry.selected === void 0 || index === entry.selected)) context.strokeRect(region.x - crop.x + part % layout.columns * 8 + 0.5, region.y - crop.y + Math.floor(part / layout.columns) * 8 + 0.5, 7, 7);
+      });
     };
-    ctx2.state.buildCheckTimer = setTimeout(poll, 2e3);
+    image.src = "data:image/png;base64," + canvas.dataset.scene;
   }
 
   // romancer/ui/views/gameview.js
-  var categories2 = ["all", "known", "known_resource", "assets", "script", "tables", "record", "levels", "room", "actor", "sound", "note", "trace", "candidate", "verification", "verified_source"];
-  var names3 = { verification: "Source checks", verified_source: "Verified sources", known: "Known locations", known_resource: "Known editing layouts", assets: "Graphics", script: "Text", tables: "Tables", record: "Named records", levels: "Levels", room: "Rooms", actor: "Objects & actors", sound: "Sound", note: "Research", trace: "Gameplay traces", candidate: "Pixel matches", all: "Everything" };
-  var relation = (r) => ({ source_verification: "Source verification", verified_visual_source: "Verified visual source", contains_record: "Contains record", uses_tiles: "Uses tiles", uses_palette: "Uses palette", shares_storage: "Shares byte storage", pixel_match: "Pixel match", located_in: "Located in", contains_object: "Contains object", uses_terrain: "Uses terrain", uses_graphics: "Uses graphics", uses_script: "Uses script", uses_sound: "Uses sound", uses_table: "Uses table" })[r] || r.replaceAll("_", " ");
+  var categories2 = ["all", "known", "known_resource", "assets", "script", "tables", "record", "levels", "room", "actor", "sound", "note", "trace", "candidate", "verification", "verified_source", "object", "graphics_capture"];
+  var names3 = { object: "Saved objects", graphics_capture: "Native graphics captures", verification: "Source checks", verified_source: "Verified sources", known: "Known locations", known_resource: "Known editing layouts", assets: "Graphics", script: "Text", tables: "Tables", record: "Named records", levels: "Levels", room: "Rooms", actor: "Objects & actors", sound: "Sound", note: "Research", trace: "Gameplay traces", candidate: "Pixel matches", all: "Everything" };
+  var relation = (r) => ({ uses_verified_part: "Uses verified part", replayed_graphics_accesses: "Native replay accesses", source_verification: "Source verification", verified_visual_source: "Verified visual source", contains_record: "Contains record", uses_tiles: "Uses tiles", uses_palette: "Uses palette", shares_storage: "Shares byte storage", pixel_match: "Pixel match", located_in: "Located in", contains_object: "Contains object", uses_terrain: "Uses terrain", uses_graphics: "Uses graphics", uses_script: "Uses script", uses_sound: "Uses sound", uses_table: "Uses table" })[r] || r.replaceAll("_", " ");
   async function render6(ctx2) {
     var _a, _b, _c, _d;
     const missing = requireProject(ctx2);
@@ -3351,8 +4091,10 @@
     if (node) state2.connectedNode = { scope, id: node.id };
     ctx2.use({
       "gameview-find": () => {
+        if (!current2()) return;
         state2.connectedPage = 0;
-        return current2() ? ctx2.render() : void 0;
+        state2.connectedNode = null;
+        return ctx2.render();
       },
       "gameview-page": (el) => {
         if (!current2()) return;
@@ -3381,7 +4123,21 @@
         if (current2()) return ctx2.render();
       },
       "gameview-editor": async () => {
+        var _a2;
         if (!current2() || !(node == null ? void 0 : node.editor)) return;
+        if (node.kind === "object") return openObject(ctx2, node.locator.object_id);
+        if (node.kind === "graphics_capture") {
+          const result = await ctx2.api.call("graphics.accesses.get", { ...params, evidence_id: node.locator.evidence_id, offset: 0, limit: 100 });
+          if (!current2()) return;
+          state2.graphicsAccess = { scope, result, tiles: null };
+          const trace_id = (_a2 = result.investigation_link) == null ? void 0 : _a2.graphics_trace_id;
+          if (trace_id) {
+            const trace = await ctx2.api.call("traces.get", { ...params, trace_id });
+            if (!current2()) return;
+            state2.savedGameplayTrace = { scope, result: trace };
+          }
+          return ctx2.navigate("playtest");
+        }
         if (node.kind === "verified_source") return openVerifiedSource(ctx2, node, scope);
         if (node.kind === "verification") {
           const proof = await ctx2.api.call("traces.verification", { ...params, verification_id: node.locator.verification_id });
@@ -3415,7 +4171,7 @@
     });
     const checks = await buildChecks(ctx2);
     if (!current2()) return "";
-    return heading("", "Game view", "Follow a resource to its connected data, measured gameplay and editing tools.") + '<div class="field-row">' + field("gameview-query", "Find a resource", ctx2.draft("gameview-query", "")) + select("gameview-kind", "Show", categories2.map((k) => [k, names3[k]]), ctx2.draft("gameview-kind", "all")) + button("Find resources", "gameview-find") + "</div>" + model.issues.map((r) => '<p class="notice warm">' + esc(r.kind) + ": " + esc(r.message) + "</p>").join("") + (model.partial ? '<p class="notice warm">This view reached a resource budget. Filter or open a focused editor for additional data.</p>' : "") + '<div class="grid-two"><section class="card"><div class="card-heading"><h3>Resources</h3><span>' + model.total + ' matches</span></div><div class="game-node-list" tabindex="0" role="region" aria-label="Connected resource list">' + (model.nodes.map((n) => "<p>" + button(n.name, "gameview-select", { id: n.id, primary: n.id === chosen }) + '<br><span class="subtle">' + esc(names3[n.kind]) + " · " + (n.offset === null ? "Captured frame" : "0x" + n.offset.toString(16) + " · " + n.length + " bytes") + "</span></p>").join("") || "<p>No saved resources yet. Use Resources to declare a layout, or select a captured gameplay region in Playtest and save a trace.</p>") + '</div><div class="actions">' + button("Previous", "gameview-page", { id: "-1", disabled: !model.page }) + "<span>Page " + (model.page + 1) + "</span>" + button("Next", "gameview-page", { id: "1", disabled: (model.page + 1) * 50 >= model.total }) + '</div></section><section class="card"><h3>' + esc((node == null ? void 0 : node.name) || "Choose a resource") + "</h3>" + (error ? "<p>" + esc(error) + "</p>" : "") + (node ? "<p>" + esc({ causal_replay: "Source verified by controlled replay", verification_result: "Source check result", checked_revision: "Verified game revision", checked_source_history: "Known original in build history", checked_declaration: "Checked resource layout", native_frame: "Measured gameplay frame", historical_frame: "Historical imported frame", pixel_candidate: "Matching pixels · source needs confirmation", user_note: "Your research note" }[node.confidence] || node.confidence.replaceAll("_", " ")) + "</p>" + ((preview == null ? void 0 : preview.png_base64) ? '<figure><img class="game-resource-preview" src="data:image/png;base64,' + esc(preview.png_base64) + '" alt="Selected resource preview"><figcaption>' + esc(preview.caption || "") + "</figcaption></figure>" : "") + ((preview == null ? void 0 : preview.colors) ? '<div class="actions">' + preview.colors.map((c) => '<span class="game-color" title="RGB ' + c.r + ", " + c.g + ", " + c.b + '" data-color="' + c.r + "," + c.g + "," + c.b + '"></span>').join("") + "</div>" : "") + ((preview == null ? void 0 : preview.fields) ? "<dl>" + preview.fields.map((f) => "<dt>" + esc(f.name) + "</dt><dd>" + esc(f.value) + "</dd>").join("") + "</dl>" : "") + ((preview == null ? void 0 : preview.text) ? "<p>" + esc(preview.text) + "</p>" : "") + '<div class="actions">' + (node.offset !== null ? button("Inspect exact bytes", "gameview-bytes") : "") + (node.editor ? button(node.kind === "candidate" ? "Open chosen graphics candidate" : node.kind === "trace" ? "Open saved trace" : "Open editor", "gameview-editor", { primary: true, disabled: (preview == null ? void 0 : preview.runtime_trusted) === false }) : "") + "</div><h4>Connections</h4>" + (detail.connections_truncated ? '<p class="subtle">Showing 32 of ' + detail.connections_total + " connections. Open the focused editor for the complete resource list.</p>" : "") + (detail.connections.map((e) => {
+    return heading("", "Game view", "Follow a resource to its connected data, measured gameplay and editing tools.") + '<div class="field-row">' + field("gameview-query", "Find a resource", ctx2.draft("gameview-query", "")) + select("gameview-kind", "Show", categories2.map((k) => [k, names3[k]]), ctx2.draft("gameview-kind", "all")) + button("Find resources", "gameview-find") + "</div>" + model.issues.map((r) => '<p class="notice warm">' + esc(r.kind) + ": " + esc(r.message) + "</p>").join("") + (model.partial ? '<p class="notice warm">This view reached a resource budget. Filter or open a focused editor for additional data.</p>' : "") + '<div class="grid-two"><section class="card"><div class="card-heading"><h3>Resources</h3><span>' + model.total + ' matches</span></div><div class="game-node-list" tabindex="0" role="region" aria-label="Connected resource list">' + (model.nodes.map((n) => "<p>" + button(n.name, "gameview-select", { id: n.id, primary: n.id === chosen }) + '<br><span class="subtle">' + esc(names3[n.kind]) + " · " + (n.offset === null ? "Captured frame" : "0x" + n.offset.toString(16) + " · " + n.length + " bytes") + "</span></p>").join("") || "<p>No saved resources yet. Use Resources to declare a layout, or select a captured gameplay region in Playtest and save a trace.</p>") + '</div><div class="actions">' + button("Previous", "gameview-page", { id: "-1", disabled: !model.page }) + "<span>Page " + (model.page + 1) + "</span>" + button("Next", "gameview-page", { id: "1", disabled: (model.page + 1) * 50 >= model.total }) + '</div></section><section class="card"><h3>' + esc((node == null ? void 0 : node.name) || "Choose a resource") + "</h3>" + (error ? "<p>" + esc(error) + "</p>" : "") + (node ? "<p>" + esc({ native_accesses: "Measured native access capture", causal_replay: "Source verified by controlled replay", verification_result: "Source check result", checked_revision: "Verified game revision", checked_source_history: "Known original in build history", checked_declaration: "Checked resource layout", native_frame: "Measured gameplay frame", historical_frame: "Historical imported frame", pixel_candidate: "Matching pixels · source needs confirmation", user_note: "Your research note" }[node.confidence] || node.confidence.replaceAll("_", " ")) + "</p>" + ((preview == null ? void 0 : preview.png_base64) ? '<figure><img class="game-resource-preview" src="data:image/png;base64,' + esc(preview.png_base64) + '" alt="Selected resource preview"><figcaption>' + esc(preview.caption || "") + "</figcaption></figure>" : "") + ((preview == null ? void 0 : preview.colors) ? '<div class="actions">' + preview.colors.map((c) => '<span class="game-color" title="RGB ' + c.r + ", " + c.g + ", " + c.b + '" data-color="' + c.r + "," + c.g + "," + c.b + '"></span>').join("") + "</div>" : "") + ((preview == null ? void 0 : preview.fields) ? "<dl>" + preview.fields.map((f) => "<dt>" + esc(f.name) + "</dt><dd>" + esc(f.value) + "</dd>").join("") + "</dl>" : "") + ((preview == null ? void 0 : preview.text) ? "<p>" + esc(preview.text) + "</p>" : "") + '<div class="actions">' + (node.offset !== null ? button("Inspect exact bytes", "gameview-bytes") : "") + (node.editor ? button(node.kind === "candidate" ? "Open chosen graphics candidate" : node.kind === "trace" ? "Open saved trace" : "Open editor", "gameview-editor", { primary: true, disabled: (preview == null ? void 0 : preview.runtime_trusted) === false }) : "") + "</div><h4>Connections</h4>" + (detail.connections_truncated ? '<p class="subtle">Showing 32 of ' + detail.connections_total + " connections. Open the focused editor for the complete resource list.</p>" : "") + (detail.connections.map((e) => {
       const other = e.from === node.id ? e.to : e.from, n = detail.neighbors.find((n2) => n2.id === other);
       return n ? '<div class="notice"><span>' + esc(relation(e.relation)) + "</span> → " + button(n.name, "gameview-select", { id: n.id }) + (e.confidence === "user_declared" ? "<p>Your declared link · " + esc(e.note) + "</p>" + button("Remove link", "gameview-unlink", { id: e.link_id }) : "") + "</div>" : "";
     }).join("") || "<p>No checked or declared connection has been recorded for this resource yet.</p>") + "<details><summary>Add a declared relationship</summary>" + select("gameview-link-target", "Connected resource", model.nodes.filter((n) => n.id !== node.id).map((n) => [n.id, n.name]), "") + select("gameview-link-relation", "Relationship", ["uses_graphics", "uses_palette", "uses_script", "uses_sound", "uses_table", "reference"].map((v) => [v, v.replaceAll("_", " ")]), "reference") + field("gameview-link-note", "Evidence or note", ctx2.draft("gameview-link-note", "")) + button("Save declared link", "gameview-link", { disabled: model.nodes.filter((n) => n.id !== node.id).length === 0 }) + '<p>Author-declared metadata. This does not change ROM bytes or prove a runtime reference.</p></details><details><summary>Byte preview</summary><code class="game-byte-preview">' + esc(detail.hex_preview) + "</code></details>" : "") + '</section></div><details class="card"><summary>How to read the connections</summary><p>Checked declarations describe storage. A shared byte range is not proof of game behavior. Native frame traces preserve measured pixels; a pixel match is a candidate until the source transfer is observed. Repeated patterns can have several matching offsets.</p></details>' + checks;
@@ -4173,9 +4929,10 @@
     return ((_a = state2.artifact) == null ? void 0 : _a.system_id) || ((_b = state2.artifact) == null ? void 0 : _b.system_hint) || ((_c = compressedRoot(state2)) == null ? void 0 : _c.system_hint) || "nes";
   }
   function compressionControls(ctx2) {
-    var _a, _b, _c, _d;
+    var _a, _b, _c, _d, _e;
     const { state: state2 } = ctx2, artifact = state2.artifact;
     if (!artifact) return "";
+    const scope = selectionKey(state2), current2 = () => scope === selectionKey(state2);
     const root = compressedRoot(state2), metadata = root == null ? void 0 : root.compressed_parent;
     const result = ((_a = state2.results["compression.inspect"]) == null ? void 0 : _a.parent_sha256) === artifact.sha256 ? state2.results["compression.inspect"] : null;
     const extraction = state2.results["compression.extract"];
@@ -4185,6 +4942,17 @@
       return ((_a2 = compressedRoot(state2, row)) == null ? void 0 : _a2.artifact_id) === root.artifact_id;
     }) : [];
     const parameters = () => ({ ...ctx2.sourceParams(), offset: integer8("compression-offset"), allocation: integer8("compression-allocation"), codec: read("compression-codec") });
+    const reinsertion = () => {
+      if (!current2() || !metadata) throw Error("Select this decoded resource again.");
+      const edited_id = read("compression-edited");
+      if (!edited_id) throw Error("Create an edited decoded build first.");
+      return { ...ctx2.projectParams(), parent_id: metadata.parent_id, decoded_id: root.artifact_id, edited_id, offset: metadata.offset, allocation: metadata.allocation, codec: metadata.codec };
+    };
+    const moveSpec = () => {
+      var _a2, _b2, _c2;
+      return { source_offset: metadata.offset, source_length: (_a2 = state2.compressionPreview) == null ? void 0 : _a2.result.original_stored_size, target_offset: integer8("compressed-move-target"), target_capacity: integer8("compressed-move-capacity"), fill_byte: integer8("compressed-move-fill"), alignment: integer8("compressed-move-align"), bank_size: integer8("compressed-move-bank"), bank_origin: integer8("compressed-move-origin"), references: [{ offset: integer8("compressed-move-pointer"), width: integer8("compressed-move-width"), endian: read("compressed-move-order"), base: integer8("compressed-move-base"), target_delta: 0 }], references_complete: !!((_b2 = document.getElementById("compressed-move-complete")) == null ? void 0 : _b2.checked), destination_reserved: !!((_c2 = document.getElementById("compressed-move-reserved")) == null ? void 0 : _c2.checked), replacement_input_id: null };
+    };
+    const preview = ((_c = state2.compressionPreview) == null ? void 0 : _c.scope) === scope ? state2.compressionPreview : null;
     ctx2.use({
       "compression-inspect": () => ctx2.run("compression.inspect", parameters()),
       "compression-extract": () => ctx2.run("compression.extract", parameters()),
@@ -4192,25 +4960,57 @@
         await ctx2.setArtifact(node.dataset.id);
         await ctx2.navigate("resources");
       },
+      "compression-preview": async () => {
+        const args = reinsertion(), signature = JSON.stringify(args);
+        const result2 = await ctx2.run("compression.preview_reinsert", args, { render: false });
+        if (!current2()) return;
+        if (signature !== JSON.stringify(reinsertion())) throw Error("The selected edited resource changed. Preview it again.");
+        state2.compressionPreview = { scope, result: result2, signature };
+        return ctx2.render();
+      },
+      "compression-move": async () => {
+        const args = reinsertion();
+        if (!preview || preview.signature !== JSON.stringify(args)) throw Error("Preview the current recompression first.");
+        const spec = moveSpec(), signature = JSON.stringify({ args, spec });
+        const result2 = await ctx2.run("compression.plan_relocate", { ...args, spec }, { render: false });
+        if (!current2()) return;
+        if (signature !== JSON.stringify({ args: reinsertion(), spec: moveSpec() })) throw Error("The move declaration changed. Review it again.");
+        preview.moveSpec = spec;
+        state2.pending = { kind: "compression", artifact_id: artifact.artifact_id, plan_id: result2.plan_id, signature, relocation: true };
+        return ctx2.render();
+      },
       "compression-review": async () => {
-        if (!metadata) throw new Error("Select an owned extracted resource first.");
-        const edited_id = read("compression-edited");
-        if (!edited_id) throw new Error("Create an edited build of the decoded resource first.");
-        const plan = await ctx2.run("compression.plan_reinsert", { ...ctx2.projectParams(), parent_id: metadata.parent_id, decoded_id: root.artifact_id, edited_id, offset: metadata.offset, allocation: metadata.allocation, codec: metadata.codec }, { render: false });
-        state2.pending = { kind: "compression", artifact_id: artifact.artifact_id, plan_id: plan.plan_id };
+        const args = reinsertion(), signature = JSON.stringify(args);
+        const plan = await ctx2.run("compression.plan_reinsert", args, { render: false });
+        if (!current2()) return;
+        if (signature !== JSON.stringify(reinsertion())) throw Error("The edited resource changed. Review it again.");
+        state2.pending = { kind: "compression", artifact_id: artifact.artifact_id, plan_id: plan.plan_id, signature };
         await ctx2.render();
       },
       "compression-build": async () => {
         var _a2;
         if (((_a2 = state2.pending) == null ? void 0 : _a2.kind) !== "compression" || state2.pending.artifact_id !== artifact.artifact_id) throw new Error("Review reinsertion for this resource first.");
+        if (!current2()) throw Error("The selected resource changed.");
+        const actual = state2.pending.relocation ? JSON.stringify({ args: reinsertion(), spec: moveSpec() }) : JSON.stringify(reinsertion());
+        if (actual !== state2.pending.signature) throw Error("The selected build or move declaration changed. Review it again.");
         const built = await ctx2.run("build.apply", { ...ctx2.projectParams(), plan_id: state2.pending.plan_id }, { render: false });
+        if (!current2()) return;
         state2.pending = null;
+        state2.compressionPreview = null;
         await ctx2.setArtifact(built.artifact_id);
         ctx2.notify("Parent build created and selected. Open Playtest to check it.");
       }
     });
-    if (metadata) return `<section class="card"><div class="card-heading"><h3>Compressed resource</h3>${button("Compression help", "help-topic", { id: "compression" })}</div><p>${esc(metadata.codec)} at0x${metadata.offset.toString(16)} · ${size(metadata.allocation)} allocated.</p><p>Edit this decoded resource and create a build, then review reinsertion into its parent.</p><div class="actions">${button("Edit graphics", "navigate", { id: "assets" })}${button("Edit text", "navigate", { id: "scripts" })}${button("Edit tables", "navigate", { id: "tables" })}</div>${select("compression-edited", "Edited decoded build", builds.map((row) => [row.artifact_id, row.name]), artifact.kind === "build" ? artifact.artifact_id : (_c = builds.at(-1)) == null ? void 0 : _c.artifact_id)}<div class="actions">${button("Review reinsertion", "compression-review", { primary: true, disabled: !builds.length })}${((_d = state2.pending) == null ? void 0 : _d.kind) === "compression" ? button("Create parent build", "compression-build", { primary: true }) : ""}</div>${report(state2.results["compression.plan_reinsert"], "Recompression plan")}</section>`;
+    if (metadata) return `<section class="card"><div class="card-heading"><h3>Compressed resource</h3>${button("Compression help", "help-topic", { id: "compression" })}</div><p>${esc(metadata.codec)} at0x${metadata.offset.toString(16)} · ${size(metadata.allocation)} allocated.</p><p>Edit this decoded resource and create a build, then review reinsertion into its parent.</p><div class="actions">${button("Edit graphics", "navigate", { id: "assets" })}${button("Edit text", "navigate", { id: "scripts" })}${button("Edit tables", "navigate", { id: "tables" })}</div>${select("compression-edited", "Edited decoded build", builds.map((row) => [row.artifact_id, row.name]), artifact.kind === "build" ? artifact.artifact_id : (_d = builds.at(-1)) == null ? void 0 : _d.artifact_id)}<div class="actions">${button("Preview recompression", "compression-preview", { disabled: !builds.length, primary: true })}${button("Review reinsertion", "compression-review", { primary: true, disabled: !builds.length })}${((_e = state2.pending) == null ? void 0 : _e.kind) === "compression" ? button("Create parent build", "compression-build", { primary: true }) : ""}</div>${preview ? compressionCapacity(preview.result) + compressedMove(ctx2, preview.result) : ""}${report(state2.results["compression.plan_reinsert"], "Recompression plan")}${report(state2.results["compression.plan_relocate"], "Relocation plan")}</section>`;
     return `<details class="card" ${result || extracted ? "open" : ""}><summary>Compressed resources</summary><p>Confirm the codec and allocated space before extracting. Supported formats: GBA LZ10 and RLE.</p><div class="field-row">${field("compression-offset", "Stream offset", ctx2.draft("compression-offset", "0"))}${field("compression-allocation", "Confirmed allocation in bytes (up to48KiB)", ctx2.draft("compression-allocation", "1024"))}${select("compression-codec", "Codec", [["gba-lz10", "GBA LZ10"], ["gba-rle", "GBA RLE"]], ctx2.draft("compression-codec", "gba-lz10"))}</div><div class="actions">${button("Inspect stream", "compression-inspect")}${button("Extract decoded resource", "compression-extract", { primary: true })}${button("Compression help", "help-topic", { id: "compression" })}</div>${result ? `<p class="notice">${size(result.consumed)} stored → ${size(result.decoded_size)} decoded. Confirmed allocation: ${size(result.allocation)}.</p>` : ""}${extracted ? `<p>Decoded resource added to this project.</p>${button("Open decoded resource", "compression-open", { id: extracted.artifact_id, primary: true })}` : ""}</details>`;
+  }
+  function compressionCapacity(r) {
+    return '<div class="notice ' + (r.fits ? "" : "warm") + '"><strong>' + r.packed_size + " / " + r.allocation + " bytes</strong><p>" + (r.fits ? r.free_bytes + " bytes free." : r.overflow_bytes + " bytes over the confirmed allocation. Reduce the edit or review a reserved move.") + "</p><p>Independent decoder " + (r.independent_decode_verified ? "verified the edited data." : "has not verified this output.") + "</p></div>";
+  }
+  function compressedMove(ctx2, r) {
+    var _a, _b, _c, _d;
+    const system2 = resourceSystem(ctx2.state), bank = { nes: 8192, snes: 32768, gb: 16384, gbc: 16384 }[system2] || 0;
+    return '<details><summary>Move to reserved space · Advanced</summary><p>For a stream with one complete external linear reference. Declare a reserved destination and the pointer that already targets this stream. Games with additional consumers need every reference declared through the automation API.</p><div class="field-row">' + field("compressed-move-target", "Reserved destination offset", ctx2.draft("compressed-move-target", "0")) + field("compressed-move-capacity", "Reserved capacity", ctx2.draft("compressed-move-capacity", String(r.packed_size))) + field("compressed-move-fill", "Expected fill byte", ctx2.draft("compressed-move-fill", "255")) + select("compressed-move-align", "Alignment", [[1, "1"], [2, "2"], [4, "4"], [8, "8"], [16, "16"], [32, "32"]], ctx2.draft("compressed-move-align", "4")) + '</div><div class="field-row">' + field("compressed-move-pointer", "Pointer file offset", ctx2.draft("compressed-move-pointer", "0")) + select("compressed-move-width", "Pointer bytes", [[2, "2"], [3, "3"], [4, "4"]], ctx2.draft("compressed-move-width", "4")) + select("compressed-move-order", "Byte order", [["little", "Little"], ["big", "Big"]], ctx2.draft("compressed-move-order", system2 === "genesis" ? "big" : "little")) + field("compressed-move-base", "Pointer encoding adjustment", ctx2.draft("compressed-move-base", system2 === "gba" ? "0x08000000" : "0")) + '</div><div class="field-row">' + field("compressed-move-bank", "Declared bank bytes (0 for linear)", ctx2.draft("compressed-move-bank", String(bank))) + field("compressed-move-origin", "Bank file origin", ctx2.draft("compressed-move-origin", system2 === "nes" ? "16" : "0")) + '</div><label><input type="checkbox" id="compressed-move-complete" ' + (((_b = (_a = ctx2.state.compressionPreview) == null ? void 0 : _a.moveSpec) == null ? void 0 : _b.references_complete) ? "checked" : "") + '> This is the complete reference set for this move.</label><label><input type="checkbox" id="compressed-move-reserved" ' + (((_d = (_c = ctx2.state.compressionPreview) == null ? void 0 : _c.moveSpec) == null ? void 0 : _d.destination_reserved) ? "checked" : "") + "> I reserved this destination; matching fill does not prove free space.</label>" + button("Review compressed-resource move", "compression-move") + "</details>";
   }
 
   // romancer/ui/rom_health.js
@@ -4395,7 +5195,7 @@
         ctx2.render();
       }
     });
-    if (!a) return `${heading("Workspace", "Resources", "")}${empty("Import a source", "Choose a cartridge image.", button("Import source", "import", { primary: true }))}`;
+    if (!a) return `${heading("Workspace", "Resources", "")}${editCheckControls(ctx2)}${empty("Import a source", "Choose a cartridge image.", button("Import source", "import", { primary: true }))}`;
     const pending = ((_c = state2.pending) == null ? void 0 : _c.kind) === "bytes" && state2.pending.artifact_id === a.artifact_id;
     return `${heading("Resource investigator", "Resources", "Inspect the exact selected revision. Generic edits require explicit old bytes and preserve file size.", button("Import source", "import", { icon: "plus" }))}<div class="identity">${badge(a.kind, a.kind === "build" ? "good" : "neutral")}<strong>${esc(a.name)}</strong><span>${esc(a.system)} · ${size(a.size)}</span><code title="${a.sha256}">SHA-256 ${short(a.sha256)}…</code></div>${a.source_id ? `<section class="card"><h3>Continue editing this build</h3>${((_d = a.plan_annotations) == null ? void 0 : _d.kind) === "declared-data-relocation-v1" ? "<p>Data moved. Original fixed-offset declarations are not reused.</p>" + button("Inspect moved bytes", "resource-moved-open") + (((_f = (_e = state2.project.sources.concat(state2.project.builds).find((r) => r.artifact_id === a.source_id)) == null ? void 0 : _e.descriptors) == null ? void 0 : _f.tables) ? button("Open moved table layout", "resource-moved-table") : "") : button("Reuse parent resource setup", "definitions-reuse") + '<p class="subtle">Re-read declared offsets against this build.</p>'}</section>` : ""}${observed}<div class="investigation-grid">${hexEditor(ctx2, data)}${byteNotes}</div>${comparison}${documentedTables(ctx2)}${symbols}${research}${references}${sourceSupport(ctx2)}${relationships}${scanControls(ctx2)}<details class="card"><summary>ROM health & revision</summary>${romHealthPanel(ctx2)}${revisionControls(ctx2)}${cheatControls(ctx2)}</details><details class="card"><summary>Find resources</summary>${discoveryControls(ctx2)}</details>${compressionControls(ctx2)}${relocation}<details class="card"><summary>Declared resource catalog</summary>${catalogSection(ctx2, catalog)}</details><details class="card"><summary>System layout</summary>${systemSection(ctx2, assessment)}</details>${report(state2.results["bytes.plan"], "Proposed byte changes")}${report(state2.results["build.apply"], "Build result")}`;
   }
@@ -4892,7 +5692,7 @@
       },
       "menu-preview": () => loadMenuPreview(ctx2, document2)
     });
-    if (((_g = state2.candidateReview) == null ? void 0 : _g.artifact_id) === state2.artifact.artifact_id) return `${heading("", "Confirm text candidate", "")}<section class="card"><p>${esc(state2.candidateReview.reason)}</p><p>Confirm the format and allocation, then load the declaration.</p>${textDeclaration(ctx2)}${button("Cancel candidate", "candidate-cancel")}</section>`;
+    if (((_g = state2.candidateReview) == null ? void 0 : _g.artifact_id) === state2.artifact.artifact_id) return `${heading("", "Confirm text candidate", "")}${editCheckControls(ctx2)}<section class="card"><p>${esc(state2.candidateReview.reason)}</p><p>Confirm the format and allocation, then load the declaration.</p>${textDeclaration(ctx2)}${button("Cancel candidate", "candidate-cancel")}</section>`;
     const pending = ((_h = state2.pending) == null ? void 0 : _h.kind) === "script" && state2.pending.artifact_id === state2.artifact.artifact_id;
     return `${heading("Dialogue studio", "Text & layout", "Edit declared text segments while preserving control codes, pointers, and fixed allocations.", button("Export script", "script-export", { icon: "download", disabled: !(document2 == null ? void 0 : document2.ok) }))}<div class="identity"><strong>${esc(state2.artifact.name)}</strong><code>${short(state2.artifact.sha256)}</code>${badge((document2 == null ? void 0 : document2.write_supported) ? "EDITABLE FIXED SLOTS" : "SCHEMA REQUIRED", (document2 == null ? void 0 : document2.write_supported) ? "good" : "warm")}</div>${translationControls(ctx2, document2)}<div class="grid-two"><section class="card"><div class="card-heading"><h3>Text records</h3><span class="subtle">${((_i = document2 == null ? void 0 : document2.records) == null ? void 0 : _i.length) || 0} declared records</span></div>${field("script-search", "Search text", state2.scriptFilter || "")}${button("Search", "script-search")}<details class="config"><summary>Replace text</summary>${field("script-find", "Find", ctx2.draft("script-find", ""))}${field("script-replace", "Replace with", ctx2.draft("script-replace", ""))}${button("Stage replacements", "script-replace")}</details>${(document2 == null ? void 0 : document2.ok) ? document2.records.map((row, i) => ({ row, i })).filter(({ row }) => !state2.scriptFilter || row.segments.some((s) => s.text.toLowerCase().includes(state2.scriptFilter))).slice((state2.scriptPage || 0) * 20, (state2.scriptPage || 0) * 20 + 20).map(({ row, i }) => {
       var _a2, _b2;
@@ -5022,614 +5822,6 @@
     return `<div class="brush-swatches" role="group" aria-label="Sprite brush colors">${colors.map((color) => `<button type="button" data-action="sprite-brush" data-id="${color.index}" data-brush-index="${color.index}" aria-pressed="${color.index === Number(selected2)}" aria-label="Color index ${color.index} · ${color.origin}${color.colors.length > 1 ? " · varies across sprite parts" : ""}"><svg viewBox="0 0 32 24" width="32" height="24" aria-hidden="true">${color.colors.slice(0, 8).map((rgb, i, rows) => `<rect x="${i * 32 / rows.length}" width="${32 / rows.length}" height="24" fill="rgb(${rgb.join(",")})"/>`).join("")}</svg><span>${color.index}</span></button>`).join("")}</div><p class="subtle brush-color-source">${esc(label)}</p>`;
   }
 
-  // romancer/ui/pixel_history.js
-  var PixelHistory = class {
-    constructor(scope, pixels, limit = 64) {
-      this.scope = scope;
-      this.current = [...pixels];
-      this.limit = limit;
-      this.past = [];
-      this.future = [];
-      this.start = null;
-    }
-    get canUndo() {
-      return this.past.length > 0;
-    }
-    get canRedo() {
-      return this.future.length > 0;
-    }
-    begin(pixels) {
-      if (JSON.stringify(pixels) !== JSON.stringify(this.current)) {
-        this.past = [];
-        this.future = [];
-        this.current = [...pixels];
-      }
-      this.start = [...pixels];
-    }
-    commit(pixels) {
-      const before = this.start || this.current;
-      this.start = null;
-      if (JSON.stringify(before) === JSON.stringify(pixels)) return;
-      this.past.push([...before]);
-      if (this.past.length > this.limit) this.past.shift();
-      this.current = [...pixels];
-      this.future = [];
-    }
-    undo() {
-      if (this.canUndo) {
-        this.future.push([...this.current]);
-        this.current = this.past.pop();
-      }
-      return [...this.current];
-    }
-    redo() {
-      if (this.canRedo) {
-        this.past.push([...this.current]);
-        this.current = this.future.pop();
-      }
-      return [...this.current];
-    }
-  };
-  function historyFor(ctx2, doc, bitmap, index, pixels) {
-    const scope = selectionKey(ctx2.state) + ":" + doc.document_id;
-    if (ctx2.state.pixelHistoryScope !== scope || !(ctx2.state.pixelHistories instanceof Map)) {
-      ctx2.state.pixelHistories = /* @__PURE__ */ new Map();
-      ctx2.state.pixelHistoryScope = scope;
-    }
-    const key3 = bitmap + ":" + index;
-    let history3 = ctx2.state.pixelHistories.get(key3);
-    if (!history3) history3 = new PixelHistory(scope + ":" + key3, pixels);
-    ctx2.state.pixelHistories.delete(key3);
-    ctx2.state.pixelHistories.set(key3, history3);
-    while (ctx2.state.pixelHistories.size > 32) ctx2.state.pixelHistories.delete(ctx2.state.pixelHistories.keys().next().value);
-    return history3;
-  }
-  function recordPixels(ctx2, doc, bitmap, index, before, after) {
-    const history3 = historyFor(ctx2, doc, bitmap, index, before);
-    history3.begin(before);
-    history3.commit(after);
-    return history3;
-  }
-  function pixelBuffer(ctx2, doc, bitmap, index) {
-    var _a;
-    const paint = ctx2.state.paint;
-    if ((paint == null ? void 0 : paint.document_id) === doc.document_id && paint.bitmap_id === bitmap.id && paint.cell_index === index) return paint.pixels;
-    let changes = [];
-    try {
-      changes = JSON.parse(ctx2.draft("asset-changes", "[]"));
-    } catch {
-    }
-    return ((_a = changes.find((c) => c.kind === "cell" && c.bitmap_id === bitmap.id && c.cell_index === index)) == null ? void 0 : _a.after_pixels) || bitmap.cells[index].pixels;
-  }
-  function setPixelBuffer(ctx2, doc, bitmap, index, pixels, persist = true) {
-    ctx2.state.paint = { document_id: doc.document_id, bitmap_id: bitmap.id, cell_index: index, pixels: [...pixels] };
-    ctx2.state.assetAcknowledgements = [];
-    ctx2.state.pending = null;
-    if (persist) ctx2.setDraft("paint-buffer", JSON.stringify(ctx2.state.paint));
-  }
-  function mountPixelStrokes(ctx2, doc, bitmap, redraw) {
-    const canvas = document.getElementById("paint-canvas");
-    if (!canvas) return;
-    canvas.style.touchAction = "none";
-    let pointer = null, history3 = null, start = null;
-    const index = () => {
-      var _a;
-      return ((_a = ctx2.state.paint) == null ? void 0 : _a.cell_index) ?? 0;
-    };
-    const paint = (event) => {
-      const rect = canvas.getBoundingClientRect(), x = Math.floor((event.clientX - rect.left) / rect.width * bitmap.width), y = Math.floor((event.clientY - rect.top) / rect.height * bitmap.height);
-      if (x < 0 || y < 0 || x >= bitmap.width || y >= bitmap.height) return;
-      const color = Number(document.getElementById("paint-color").value), bits2 = { "mono-row-msb-v1": 1, "tile8-paired2-msb-v1": 2, "tile8-planar2-msb-v1": 2, "tile8-rowplanar4-msb-v1": 4, "tile8-paired4-msb-v1": 4, "tile8-packed4-high-v1": 4, "tile8-packed4-low-v1": 4 }[bitmap.codec];
-      if (!Number.isInteger(color) || color < 0 || color >= 2 ** bits2) throw Error("Choose a valid color index.");
-      const pixels = [...pixelBuffer(ctx2, doc, bitmap, index())];
-      pixels[y * bitmap.width + x] = color;
-      ctx2.state.pixelCursor = { x, y };
-      setPixelBuffer(ctx2, doc, bitmap, index(), pixels, false);
-      redraw();
-    };
-    canvas.addEventListener("pointerdown", (event) => {
-      if (event.button !== 0) return;
-      event.preventDefault();
-      canvas.focus();
-      pointer = event.pointerId;
-      canvas.setPointerCapture(pointer);
-      ctx2.state.pending = null;
-      ctx2.state.assetEditRevision = (ctx2.state.assetEditRevision || 0) + 1;
-      start = [...pixelBuffer(ctx2, doc, bitmap, index())];
-      history3 = historyFor(ctx2, doc, bitmap.id, index(), start);
-      history3.begin(start);
-      try {
-        paint(event);
-      } catch (error) {
-        ctx2.notify(error.message, true);
-      }
-    });
-    canvas.addEventListener("pointermove", (event) => {
-      if (pointer !== event.pointerId) return;
-      try {
-        paint(event);
-      } catch (error) {
-        ctx2.notify(error.message, true);
-      }
-    });
-    const finish = async (event) => {
-      if (pointer !== event.pointerId) return;
-      pointer = null;
-      history3.commit(pixelBuffer(ctx2, doc, bitmap, index()));
-      setPixelBuffer(ctx2, doc, bitmap, index(), pixelBuffer(ctx2, doc, bitmap, index()));
-      await ctx2.render();
-    };
-    canvas.addEventListener("pointerup", finish);
-    canvas.addEventListener("pointercancel", finish);
-  }
-
-  // romancer/ui/pixel_tools.js
-  function checkedPixels(pixels, width, height, colorCount) {
-    if (!Number.isInteger(width) || !Number.isInteger(height) || width < 1 || height < 1 || width > 32 || height > 32 || !Array.isArray(pixels) || pixels.length !== width * height) throw new Error("Tile dimensions do not match the pixel buffer.");
-    if (!Number.isInteger(colorCount) || colorCount < 2 || colorCount > 256 || pixels.some((value) => !Number.isInteger(value) || value < 0 || value >= colorCount)) throw new Error("A pixel index is outside the destination palette.");
-    return [...pixels];
-  }
-  function transformPixels(pixels, width, height, operation, color = 0, colorCount = 256) {
-    const source = checkedPixels(pixels, width, height, colorCount), output = [...source];
-    if (!["fill", "clear", "flip-x", "flip-y", "rotate-cw", "rotate-ccw"].includes(operation)) throw new Error("Choose a supported tile transform.");
-    if (operation === "fill") {
-      if (!Number.isInteger(color) || color < 0 || color >= colorCount) throw new Error("Choose a color index inside the palette.");
-      return output.fill(color);
-    }
-    if (operation === "clear") return output.fill(0);
-    if (operation.startsWith("rotate") && width !== height) throw new Error("90 degree rotation requires a square tile.");
-    for (let y = 0; y < height; y++) for (let x = 0; x < width; x++) {
-      const index = operation === "flip-x" ? y * width + (width - 1 - x) : operation === "flip-y" ? (height - 1 - y) * width + x : operation === "rotate-cw" ? (height - 1 - x) * width + y : x * width + (width - 1 - y);
-      output[y * width + x] = source[index];
-    }
-    return output;
-  }
-  function copyTile(pixels, width, height, colorCount) {
-    return { format: "romancer-tile-v1", width, height, pixels: checkedPixels(pixels, width, height, colorCount) };
-  }
-  function pasteTile(clipboard, width, height, colorCount) {
-    if (!clipboard || typeof clipboard !== "object" || Object.keys(clipboard).sort().join(",") !== "format,height,pixels,width" || clipboard.format !== "romancer-tile-v1") throw new Error("Copy a tile inside ROMancer first.");
-    if (clipboard.width !== width || clipboard.height !== height) throw new Error("Clipboard tile dimensions differ from this cell.");
-    return checkedPixels(clipboard.pixels, width, height, colorCount);
-  }
-  function mergeCellChanges(changes, incoming) {
-    if (!Array.isArray(changes) || !Array.isArray(incoming) || changes.length > 1024 || incoming.length > 1024) throw new Error("Review at most1024 asset changes at a time.");
-    const keys2 = /* @__PURE__ */ new Set();
-    for (const change of incoming) {
-      if (change.kind !== "cell" || typeof change.bitmap_id !== "string" || !Number.isSafeInteger(change.cell_index) || change.cell_index < 0 || !Array.isArray(change.before_pixels) || !Array.isArray(change.after_pixels) || change.before_pixels.length !== change.after_pixels.length || change.before_pixels.length > 1024) throw new Error("Invalid staged tile change.");
-      keys2.add(change.bitmap_id + ":" + change.cell_index);
-    }
-    const merged2 = [...changes.filter((change) => change.kind !== "cell" || !keys2.has(change.bitmap_id + ":" + change.cell_index)), ...incoming.filter((change) => JSON.stringify(change.before_pixels) !== JSON.stringify(change.after_pixels))];
-    if (merged2.length > 1024) throw new Error("Review at most1024 asset changes at a time.");
-    return JSON.parse(JSON.stringify(merged2));
-  }
-
-  // romancer/ui/tilemap_editor.js
-  function canvasCell(rect, x, y, width, height) {
-    if (rect.width <= 0 || rect.height <= 0 || x < rect.left || y < rect.top || x >= rect.left + rect.width || y >= rect.top + rect.height) return null;
-    return Math.floor((y - rect.top) / rect.height * height) * width + Math.floor((x - rect.left) / rect.width * width);
-  }
-  function paintMapCell(doc, map, changes, index, brush) {
-    if (Object.keys(brush).sort().join(",") !== "flip_x,flip_y,palette_bank,tile_index") throw Error("Provide tile, palette and both flip values.");
-    const bitmap = doc.bitmaps.find((r) => r.id === map.bitmap_id), palette2 = doc.palettes.find((r) => r.id === map.palette_id), entry = map.entries[index];
-    if (!entry) throw Error("Choose a declared map cell.");
-    for (const [key3, value] of Object.entries(brush)) {
-      if (!["tile_index", "palette_bank", "flip_x", "flip_y"].includes(key3) || !Number.isInteger(value) || value < 0) throw Error("Invalid map brush value.");
-      const field2 = map.fields[key3];
-      if (field2.kind === "constant" && value !== field2.value) throw Error(key3 + " is constant in this declaration.");
-      if (field2.kind === "bits") {
-        const shift = Math.log2(field2.mask & -field2.mask), max = field2.mask >>> shift;
-        if (value > max) throw Error(key3 + " exceeds its declared storage field.");
-      }
-    }
-    if (brush.tile_index >= bitmap.count) throw Error("Choose an existing tile.");
-    if (brush.palette_bank >= palette2.banks) throw Error("Choose an existing palette bank.");
-    if (brush.flip_x > 1 || brush.flip_y > 1) throw Error("Flips must be on or off.");
-    const result = changes.filter((c) => !(c.kind === "map" && c.tilemap_id === map.id && c.entry_index === index));
-    if (JSON.stringify(brush) !== JSON.stringify(entry.values)) result.push({ kind: "map", tilemap_id: map.id, entry_index: index, before: { ...entry.values }, after: { ...brush } });
-    if (result.length > 1024) throw Error("Review at most 1024 asset changes per build.");
-    return result;
-  }
-  function colorFor(palette2, bank, index, changes) {
-    const entry = palette2.entries[bank * palette2.colors_per_bank + index], change = changes.find((c) => c.kind === "palette" && c.palette_id === palette2.id && c.bank === bank && c.index === index);
-    if (!change) return entry.rgb;
-    const rgb = {};
-    for (const name of ["r", "g", "b"]) {
-      const mask = palette2.channels[name], maximum = mask >> Math.log2(mask & -mask);
-      rgb[name] = Math.round(change.after[name] * 255 / maximum);
-    }
-    return rgb;
-  }
-  function mapPixels(doc, map, changes) {
-    var _a, _b;
-    const tiles = doc.bitmaps.find((b) => b.id === map.bitmap_id), palette2 = doc.palettes.find((p) => p.id === map.palette_id), width = map.width * tiles.width, height = map.height * tiles.height;
-    if (width > 32768 || height > 32768 || width * height > 262144) throw Error("Declared map preview exceeds the canvas budget.");
-    const image = new Uint8ClampedArray(width * height * 4);
-    for (const entry of map.entries) {
-      const v = ((_a = changes.find((c) => c.kind === "map" && c.tilemap_id === map.id && c.entry_index === entry.index)) == null ? void 0 : _a.after) || entry.values, pixels = ((_b = changes.find((c) => c.kind === "cell" && c.bitmap_id === tiles.id && c.cell_index === v.tile_index)) == null ? void 0 : _b.after_pixels) || tiles.cells[v.tile_index].pixels;
-      for (let y = 0; y < tiles.height; y++) for (let x = 0; x < tiles.width; x++) {
-        const px = v.flip_x ? tiles.width - 1 - x : x, py = v.flip_y ? tiles.height - 1 - y : y, c = colorFor(palette2, v.palette_bank, pixels[py * tiles.width + px], changes), offset = ((Math.floor(entry.index / map.width) * tiles.height + y) * width + entry.index % map.width * tiles.width + x) * 4;
-        image.set([c.r, c.g, c.b, 255], offset);
-      }
-    }
-    return image;
-  }
-  function flipSelect(ctx2, map, key3, label) {
-    const field2 = map.fields[key3], id = "map-" + key3.replaceAll("_", "-");
-    return field2.kind === "constant" ? `<p>${esc(label)}: ${field2.value ? "On" : "Off"} (fixed)<input id="${id}" type="hidden" value="${field2.value}"></p>` : select(id, label, [["0", "Off"], ["1", "On"]], ctx2.draft(id, "0"));
-  }
-  function tilemapControls(ctx2, doc, map) {
-    var _a;
-    if (!map) return "";
-    const tiles = doc.bitmaps.find((r) => r.id === map.bitmap_id), palette2 = doc.palettes.find((r) => r.id === map.palette_id), page = Math.min(Math.floor((tiles.count - 1) / 64), ctx2.state.mapTilePage || 0);
-    ctx2.use({ "map-pick-tile": (node) => {
-      ctx2.setDraft("map-tile", node.dataset.id);
-      return ctx2.render();
-    }, "map-tiles-page": (node) => {
-      ctx2.state.mapTilePage = Math.max(0, page + Number(node.dataset.id));
-      return ctx2.render();
-    }, "map-use-pixel-tile": () => {
-      var _a2;
-      if (((_a2 = ctx2.state.paint) == null ? void 0 : _a2.bitmap_id) !== tiles.id) throw Error("Select a tile from this map’s bitmap first.");
-      ctx2.setDraft("map-tile", String(ctx2.state.paint.cell_index));
-      return ctx2.render();
-    } });
-    return `<section class="card" id="tilemap-editor"><h3>Tilemap · ${esc(map.id)}</h3><div class="actions">${doc.tilemaps.length > 1 ? doc.tilemaps.map((r) => button(r.id, "asset-map-group", { id: r.id })).join("") : ""}</div><p>Pick a tile, then paint map cells. Review asset changes to create a build.</p>
- <div class="preview-pair map-comparison"><div><span>Original</span><div class="hex-scroll"><canvas id="map-original" aria-label="Original tilemap"></canvas></div></div><div><span>Editing · paint here</span><div class="hex-scroll"><canvas id="map-preview" tabindex="0" aria-label="Tilemap editor: arrows move, Space paints the selected tile"></canvas></div></div></div><p id="map-position">Cell 0</p><p id="map-preview-status" class="preview-caption" role="status" aria-live="polite"></p>
- <div class="field-row">${field("map-tile", "Brush tile index", ctx2.draft("map-tile", String(map.fields.tile_index.kind === "constant" ? map.fields.tile_index.value : 0)), { readonly: map.fields.tile_index.kind === "constant" })}${field("map-bank", "Palette bank", ctx2.draft("map-bank", String(map.fields.palette_bank.kind === "constant" ? map.fields.palette_bank.value : 0)), { readonly: map.fields.palette_bank.kind === "constant" })}${flipSelect(ctx2, map, "flip_x", "Horizontal flip")}${flipSelect(ctx2, map, "flip_y", "Vertical flip")}</div>
- <div class="pixel-grid map-tile-picker">${tiles.cells.slice(page * 64, page * 64 + 64).map((c) => `<div class="pixel-card"><canvas width="${tiles.width}" height="${tiles.height}" data-map-tile="${c.index}" aria-label="Brush tile ${c.index}"></canvas>${button(String(c.index), "map-pick-tile", { id: String(c.index), disabled: map.fields.tile_index.kind === "constant" && c.index !== map.fields.tile_index.value })}</div>`).join("")}</div><div class="actions">${button("Previous tiles", "map-tiles-page", { id: "-1", disabled: !page })}${button("Next tiles", "map-tiles-page", { id: "1", disabled: (page + 1) * 64 >= tiles.count })}${button("Use selected pixel tile", "map-use-pixel-tile", { disabled: ((_a = ctx2.state.paint) == null ? void 0 : _a.bitmap_id) !== tiles.id })}</div><details><summary>Single-cell controls</summary>${field("map-entry", "Cell index", ctx2.draft("map-entry", "0"))}${button("Load map entry", "asset-open-map-entry")}${button("Stage map change", "asset-map-change")}</details></section>`;
-  }
-  function mountTilemap(ctx2, doc, map, changes) {
-    const canvas = document.getElementById("map-preview");
-    if (!map || !canvas) return;
-    const tiles = doc.bitmaps.find((b) => b.id === map.bitmap_id), palette2 = doc.palettes.find((p) => p.id === map.palette_id);
-    let current2 = changes, selected2 = 0, pointer = null;
-    const draw2 = () => {
-      canvas.width = map.width * tiles.width;
-      canvas.height = map.height * tiles.height;
-      canvas.style.imageRendering = "pixelated";
-      canvas.style.width = Math.min(1024, canvas.width * 3) + "px";
-      canvas.style.touchAction = "none";
-      const context = canvas.getContext("2d"), image = context.createImageData(canvas.width, canvas.height);
-      image.data.set(mapPixels(doc, map, current2));
-      context.putImageData(image, 0, 0);
-      rememberPreview(canvas, canvas.width, canvas.height, image.data);
-      const before = document.getElementById("map-original");
-      if (before) {
-        before.width = canvas.width;
-        before.height = canvas.height;
-        before.style.width = canvas.style.width;
-        const g = before.getContext("2d"), original = g.createImageData(canvas.width, canvas.height);
-        original.data.set(mapPixels(doc, map, []));
-        g.putImageData(original, 0, 0);
-        rememberPreview(before, canvas.width, canvas.height, original.data);
-      }
-    };
-    const persist = (save = true) => {
-      var _a;
-      if (save) ctx2.setDraft("asset-changes", JSON.stringify(current2, null, 2));
-      const node = document.getElementById("asset-changes");
-      if (node) node.value = JSON.stringify(current2, null, 2);
-      ctx2.state.pending = null;
-      ctx2.state.assetAcknowledgements = [];
-      (_a = document.querySelector('[data-action="asset-apply"]')) == null ? void 0 : _a.setAttribute("disabled", "");
-    };
-    const paint = (index, save = true) => {
-      const brush = { tile_index: Number(read("map-tile")), palette_bank: Number(read("map-bank")), flip_x: map.fields.flip_x.kind === "constant" ? map.fields.flip_x.value : Number(read("map-flip-x")), flip_y: map.fields.flip_y.kind === "constant" ? map.fields.flip_y.value : Number(read("map-flip-y")) };
-      current2 = paintMapCell(doc, map, current2, index, brush);
-      selected2 = index;
-      persist(save);
-      draw2();
-      previewStatus();
-      const label = document.getElementById("map-position");
-      if (label) label.textContent = "Cell " + selected2 + " · " + current2.filter((c) => c.kind === "map" && c.tilemap_id === map.id).length + " staged cell" + (current2.filter((c) => c.kind === "map" && c.tilemap_id === map.id).length === 1 ? "" : "s");
-    };
-    const eventPaint = (event) => {
-      const index = canvasCell(canvas.getBoundingClientRect(), event.clientX, event.clientY, map.width, map.height);
-      if (index !== null) paint(index, false);
-    };
-    canvas.addEventListener("pointerdown", (event) => {
-      if (event.button !== 0) return;
-      event.preventDefault();
-      canvas.focus();
-      pointer = event.pointerId;
-      canvas.setPointerCapture(pointer);
-      try {
-        eventPaint(event);
-      } catch (error) {
-        ctx2.notify(error.message, true);
-      }
-    });
-    canvas.addEventListener("pointermove", (event) => {
-      if (event.pointerId !== pointer) return;
-      try {
-        eventPaint(event);
-      } catch (error) {
-        ctx2.notify(error.message, true);
-      }
-    });
-    const finish = () => {
-      if (pointer !== null) {
-        pointer = null;
-        persist();
-      }
-    };
-    canvas.addEventListener("pointerup", finish);
-    canvas.addEventListener("pointercancel", finish);
-    canvas.addEventListener("keydown", (event) => {
-      const delta = { ArrowLeft: -1, ArrowRight: 1, ArrowUp: -map.width, ArrowDown: map.width }[event.key];
-      if (delta) {
-        event.preventDefault();
-        selected2 = Math.max(0, Math.min(map.entries.length - 1, selected2 + delta));
-        document.getElementById("map-position").textContent = "Cell " + selected2;
-      }
-      if ([" ", "Enter"].includes(event.key)) {
-        event.preventDefault();
-        try {
-          paint(selected2);
-        } catch (error) {
-          ctx2.notify(error.message, true);
-        }
-      }
-    });
-    const brushes = () => document.querySelectorAll("[data-map-tile]").forEach((node) => {
-      var _a;
-      const index = Number(node.dataset.mapTile), pixels = ((_a = current2.find((c) => c.kind === "cell" && c.bitmap_id === tiles.id && c.cell_index === index)) == null ? void 0 : _a.after_pixels) || tiles.cells[index].pixels, context = node.getContext("2d"), image = context.createImageData(tiles.width, tiles.height);
-      pixels.forEach((v, i) => {
-        const c = colorFor(palette2, 0, v, current2);
-        image.data.set([c.r, c.g, c.b, 255], i * 4);
-      });
-      context.putImageData(image, 0, 0);
-    });
-    const previewStatus = () => {
-      const label = document.getElementById("map-preview-status");
-      if (label) label.textContent = current2.length ? "Preview updated · " + current2.length + " staged graphics changes · not built" : "Unchanged map preview";
-    };
-    canvas.addEventListener("map-refresh", () => {
-      var _a, _b;
-      if (pointer !== null || document.getElementById("map-preview") !== canvas || ((_b = (_a = ctx2.state.results) == null ? void 0 : _a["assets.inspect"]) == null ? void 0 : _b.document_id) !== doc.document_id) return;
-      try {
-        current2 = JSON.parse(ctx2.draft("asset-changes", "[]"));
-        const paint2 = ctx2.state.paint;
-        if ((paint2 == null ? void 0 : paint2.document_id) === doc.document_id) {
-          const bitmap = doc.bitmaps.find((b) => b.id === paint2.bitmap_id);
-          if (bitmap) current2 = mergeCellChanges(current2, [{ kind: "cell", bitmap_id: bitmap.id, cell_index: paint2.cell_index, before_pixels: bitmap.cells[paint2.cell_index].pixels, after_pixels: paint2.pixels }]);
-        }
-        draw2();
-        brushes();
-        previewStatus();
-      } catch (error) {
-        const label = document.getElementById("map-preview-status");
-        if (label) label.textContent = "Preview unavailable: " + error.message;
-      }
-    });
-    draw2();
-    brushes();
-    previewStatus();
-  }
-
-  // romancer/ui/asset_controls.js
-  function stage(ctx2, change) {
-    const changes = json("asset-changes"), key3 = (c) => [c.kind, c.bitmap_id, c.cell_index, c.palette_id, c.bank, c.index, c.tilemap_id, c.entry_index, c.font_id, c.glyph_id].join(":");
-    const filtered = changes.filter((c) => key3(c) !== key3(change));
-    filtered.push(change);
-    ctx2.setDraft("asset-changes", JSON.stringify(filtered, null, 2));
-    ctx2.state.assetAcknowledgements = [];
-    ctx2.state.pending = null;
-    return ctx2.render();
-  }
-  function stageCurrentPaint(ctx2, doc) {
-    const changes = json("asset-changes"), paint = ctx2.state.paint;
-    if (!paint || paint.document_id !== doc.document_id) return changes;
-    const bitmap = doc.bitmaps.find((row) => row.id === paint.bitmap_id), cell = bitmap == null ? void 0 : bitmap.cells[paint.cell_index];
-    if (!cell) return changes;
-    const merged2 = mergeCellChanges(changes, [{ kind: "cell", bitmap_id: bitmap.id, cell_index: paint.cell_index, before_pixels: cell.pixels, after_pixels: paint.pixels }]);
-    if (JSON.stringify(merged2) !== JSON.stringify(changes)) ctx2.setDraft("asset-changes", JSON.stringify(merged2, null, 2));
-    return merged2;
-  }
-  function activateCell(ctx2, doc, bitmapId, index) {
-    const changes = stageCurrentPaint(ctx2, doc), bitmap = doc.bitmaps.find((row) => row.id === bitmapId), cell = bitmap == null ? void 0 : bitmap.cells[index];
-    if (!cell) throw new Error("Choose a declared tile.");
-    const existing = changes.find((row) => row.kind === "cell" && row.bitmap_id === bitmapId && row.cell_index === index);
-    ctx2.state.assetBitmapId = bitmapId;
-    ctx2.state.assetPage = Math.floor(index / 64);
-    ctx2.state.paint = { document_id: doc.document_id, bitmap_id: bitmapId, cell_index: index, pixels: [...(existing == null ? void 0 : existing.after_pixels) || cell.pixels] };
-    ctx2.state.assetAcknowledgements = [];
-    ctx2.state.pending = null;
-    ctx2.setDraft("paint-buffer", JSON.stringify(ctx2.state.paint));
-  }
-  function assetTools(ctx2, doc, bitmap, palette2) {
-    var _a, _b, _c, _d, _e, _f;
-    if (!(doc == null ? void 0 : doc.ok) || !bitmap) return "";
-    const { state: state2 } = ctx2, map = doc.tilemaps.find((row) => row.id === state2.assetMapId) || doc.tilemaps[0], font = doc.fonts.find((row) => row.id === state2.assetFontId) || doc.fonts[0];
-    const count = Math.min(2 ** { "mono-row-msb-v1": 1, "tile8-paired2-msb-v1": 2, "tile8-planar2-msb-v1": 2, "tile8-rowplanar4-msb-v1": 4, "tile8-paired4-msb-v1": 4, "tile8-packed4-high-v1": 4, "tile8-packed4-low-v1": 4 }[bitmap.codec], (palette2 == null ? void 0 : palette2.colors_per_bank) || 256);
-    const pixels = () => {
-      var _a2;
-      return pixelBuffer(ctx2, doc, bitmap, ((_a2 = state2.paint) == null ? void 0 : _a2.cell_index) ?? 0);
-    };
-    const history3 = historyFor(ctx2, doc, bitmap.id, ((_a = state2.paint) == null ? void 0 : _a.cell_index) ?? 0, pixels());
-    const commit = (after) => {
-      var _a2;
-      state2.historyEditor = "paint-canvas";
-      const index = ((_a2 = state2.paint) == null ? void 0 : _a2.cell_index) ?? 0;
-      recordPixels(ctx2, doc, bitmap.id, index, pixels(), after);
-      setPixelBuffer(ctx2, doc, bitmap, index, after);
-      return ctx2.render();
-    };
-    const usage = state2.results["resources.references"], showUses = (usage == null ? void 0 : usage.document_id) === doc.document_id && usage.bitmap_id === bitmap.id && usage.cell_index === (((_b = state2.paint) == null ? void 0 : _b.cell_index) ?? 0);
-    const glyph = font == null ? void 0 : font.glyphs.find((row) => {
-      var _a2;
-      return row.id === ctx2.draft("font-glyph", (_a2 = font.glyphs[0]) == null ? void 0 : _a2.id);
-    });
-    ctx2.use({
-      "pixel-undo": () => {
-        var _a2;
-        setPixelBuffer(ctx2, doc, bitmap, ((_a2 = state2.paint) == null ? void 0 : _a2.cell_index) ?? 0, history3.undo());
-        return ctx2.render();
-      },
-      "pixel-redo": () => {
-        var _a2;
-        setPixelBuffer(ctx2, doc, bitmap, ((_a2 = state2.paint) == null ? void 0 : _a2.cell_index) ?? 0, history3.redo());
-        return ctx2.render();
-      },
-      "asset-transform": (node) => commit(transformPixels(pixels(), bitmap.width, bitmap.height, node.dataset.id, Number(read("paint-color")), count)),
-      "asset-copy": () => {
-        state2.tileClipboard = copyTile(pixels(), bitmap.width, bitmap.height, count);
-        ctx2.notify("Tile indices copied.");
-        return ctx2.render();
-      },
-      "asset-paste": () => commit(pasteTile(state2.tileClipboard, bitmap.width, bitmap.height, count)),
-      "asset-export-image": async () => {
-        const result = await ctx2.run("resources.export_image", { ...ctx2.sourceParams(), schema: json("asset-schema"), bitmap_id: bitmap.id, columns: Number(read("image-columns")), bank: Number(read("image-bank")) }, { render: false });
-        await ctx2.api.download(state2.project.project_id, result.export.export_id, "tiles.png");
-        await ctx2.render();
-      },
-      "asset-uses": () => {
-        var _a2;
-        return ctx2.run("resources.references", { ...ctx2.sourceParams(), schema: json("asset-schema"), bitmap_id: bitmap.id, cell_index: ((_a2 = state2.paint) == null ? void 0 : _a2.cell_index) ?? 0 });
-      },
-      "asset-use-open": (node) => {
-        const row = usage.uses[Number(node.dataset.id)];
-        if (row.kind === "tilemap") {
-          state2.assetMapId = row.id;
-          ctx2.setDraft("map-entry", String(row.entry_index));
-        } else {
-          state2.assetFontId = row.id;
-          ctx2.setDraft("font-glyph", row.glyph_id);
-        }
-        return ctx2.render();
-      },
-      "asset-map-group": (node) => {
-        state2.assetMapId = node.dataset.id;
-        ctx2.setDraft("map-entry", "0");
-        return ctx2.render();
-      },
-      "asset-font-group": (node) => {
-        state2.assetFontId = node.dataset.id;
-        return ctx2.render();
-      },
-      "asset-open-map-entry": () => {
-        const row = map == null ? void 0 : map.entries[Number(read("map-entry"))];
-        if (!row) throw new Error("Choose a declared map entry.");
-        for (const [id, value] of Object.entries({ "map-tile": row.values.tile_index, "map-bank": row.values.palette_bank, "map-flip-x": row.values.flip_x, "map-flip-y": row.values.flip_y })) ctx2.setDraft(id, String(value));
-        return ctx2.render();
-      },
-      "asset-open-glyph": () => {
-        const glyph2 = font == null ? void 0 : font.glyphs.find((row) => row.id === read("font-glyph"));
-        if (!glyph2) throw new Error("Choose a glyph.");
-        activateCell(ctx2, doc, glyph2.bitmap_id, glyph2.cell_index);
-        ctx2.setDraft("font-advance", String(glyph2.advance_pixels));
-        return ctx2.render();
-      },
-      "asset-zoom": (node) => {
-        state2.tileZoom = Number(node.dataset.id);
-        ctx2.render();
-      },
-      "asset-group": (node) => {
-        stageCurrentPaint(ctx2, doc);
-        state2.assetBitmapId = node.dataset.id;
-        state2.assetPage = 0;
-        state2.paint = null;
-        ctx2.setDraft("paint-buffer", "");
-        state2.pixelCursor = { x: 0, y: 0 };
-        return ctx2.render();
-      },
-      "asset-page": (node) => {
-        state2.assetPage = Math.max(0, (state2.assetPage || 0) + Number(node.dataset.id));
-        ctx2.render();
-      },
-      "asset-map-change": () => {
-        if (!map) throw new Error("Declare a tilemap first.");
-        const index = Number(read("map-entry")), entry = map.entries[index];
-        if (!entry) throw new Error("Choose a map entry.");
-        return stage(ctx2, { kind: "map", tilemap_id: map.id, entry_index: index, before: entry.values, after: { tile_index: Number(read("map-tile")), palette_bank: Number(read("map-bank")), flip_x: Number(read("map-flip-x")), flip_y: Number(read("map-flip-y")) } });
-      },
-      "asset-font-change": () => {
-        const glyph2 = font == null ? void 0 : font.glyphs.find((g) => g.id === read("font-glyph"));
-        if (!glyph2) throw new Error("Choose a glyph.");
-        return stage(ctx2, { kind: "advance", font_id: font.id, glyph_id: glyph2.id, before: glyph2.advance_pixels, after: Number(read("font-advance")) });
-      },
-      "asset-image-map": async () => {
-        var _a2;
-        const ticket = selectionKey(state2), file = document.getElementById("image-file").files[0];
-        if (!file || file.size > 512 * 1024) throw new Error("Choose a PNG up to512KiB.");
-        const bytes = new Uint8Array(await file.arrayBuffer());
-        let text = "";
-        for (const byte of bytes) text += String.fromCharCode(byte);
-        if (ticket !== selectionKey(state2)) throw Error("Source changed. Import again.");
-        const result = await ctx2.run("resources.image_map_selection", { ...ctx2.sourceParams(), schema: json("asset-schema"), bitmap_id: bitmap.id, bank: Number(read("image-bank")), png_base64: btoa(text), columns: Number(read("image-columns")), mode: read("image-mode") }, { render: false });
-        if (ticket !== selectionKey(state2)) throw Error("Source changed. Import again.");
-        for (const cell of bitmap.cells) {
-          const before = pixelBuffer(ctx2, doc, bitmap, cell.index), after = ((_a2 = result.changes.find((c) => c.cell_index === cell.index)) == null ? void 0 : _a2.after_pixels) || cell.pixels;
-          recordPixels(ctx2, doc, bitmap.id, cell.index, before, after);
-        }
-        const unrelated = json("asset-changes").filter((change) => change.kind !== "cell" || change.bitmap_id !== bitmap.id);
-        const merged2 = mergeCellChanges(unrelated, result.changes);
-        state2.results["resources.image_map"] = result;
-        state2.paint = null;
-        ctx2.setDraft("paint-buffer", "");
-        ctx2.setDraft("asset-changes", JSON.stringify(merged2, null, 2));
-        state2.assetAcknowledgements = [];
-        state2.pending = null;
-        await ctx2.render();
-      }
-    });
-    return `<section class="card asset-tools"><div class="card-heading"><h3>Editor tools</h3></div><div class="asset-tool-options"><div class="actions" aria-label="Bitmap group">${doc.bitmaps.map((b) => button(b.id, "asset-group", { id: b.id })).join("")}</div><div class="actions" aria-label="Tile zoom"><span class="subtle">Zoom</span>${[16, 24, 32, 48].map((n) => button(n + "×", "asset-zoom", { id: String(n) })).join("")}</div></div><div class="actions asset-transform-tools">${button("Undo pixels", "pixel-undo", { disabled: !history3.canUndo })}${button("Redo pixels", "pixel-redo", { disabled: !history3.canRedo })}${[["fill", "Fill tile"], ["clear", "Clear"], ["flip-x", "Flip horizontally"], ["flip-y", "Flip vertically"], ["rotate-cw", "Rotate right"], ["rotate-ccw", "Rotate left"]].map(([id, label]) => button(label, "asset-transform", { id })).join("")}${button("Copy tile", "asset-copy")}${button("Paste tile", "asset-paste", { disabled: !state2.tileClipboard })}${button("Find declared uses", "asset-uses")}</div><div class="asset-tool-status"><span class="subtle">Arrows move · Space paints</span><span id="pixel-position" class="mono">Pixel ${((_c = state2.pixelCursor) == null ? void 0 : _c.x) || 0}, ${((_d = state2.pixelCursor) == null ? void 0 : _d.y) || 0}</span></div></section>
-${showUses ? `<section class="card"><h3>Declared uses</h3>${usage.uses.length ? usage.uses.map((row, i) => `<div class="actions"><span>${esc(row.id)} · ${row.kind === "tilemap" ? "entry " + row.entry_index : "glyph " + esc(row.glyph_id)}</span>${button("Open", "asset-use-open", { id: String(i) })}</div>`).join("") : "<p>No uses in this declaration.</p>"}<p class="subtle">Undeclared uses remain unknown.</p></section>` : ""}
-${tilemapControls(ctx2, doc, map)}
-${font ? `<section class="card"><h3>Font metrics · ${esc(font.id)}</h3><div class="actions">${doc.fonts.length > 1 ? doc.fonts.map((row) => button(row.id, "asset-font-group", { id: row.id })).join("") : ""}</div>${select("font-glyph", "Glyph", font.glyphs.map((g) => [g.id, g.id + " · " + g.advance_pixels + " px"]), ctx2.draft("font-glyph", (_e = font.glyphs[0]) == null ? void 0 : _e.id))}${field("font-advance", "Advance in pixels", ctx2.draft("font-advance", ((_f = font.glyphs[0]) == null ? void 0 : _f.advance_pixels) || 8))}${button("Open glyph", "asset-open-glyph")}${button("Stage advance change", "asset-font-change", { disabled: (glyph == null ? void 0 : glyph.advance.kind) !== "u8" })}</section>` : ""}
-<details class="card"><summary>Import or export PNG</summary><label class="field"><span>Opaque PNG, up to512KiB</span><input id="image-file" type="file" accept="image/png"></label>${field("image-columns", "Tiles per row", ctx2.draft("image-columns", "1"))}${select("image-mode", "Color mapping", [["exact", "Exact palette colors"], ["nearest", "Nearest color — review conversion"]], ctx2.draft("image-mode", "exact"))}${field("image-bank", "Palette bank", ctx2.draft("image-bank", "0"), { type: "number", min: 0 })}${button("Preview mapped changes", "asset-image-map")}${button("Export stored PNG", "asset-export-image")}<p class="subtle">Create a build to include pending edits in an exported PNG.</p>${report(state2.results["resources.image_map"], "Image mapping")}</details>`;
-  }
-  function mountTools(ctx2, doc, bitmap, redraw) {
-    if (!bitmap) return;
-    const canvas = document.getElementById("paint-canvas");
-    if (canvas) {
-      canvas.style.width = bitmap.width * (ctx2.state.tileZoom || 24) + "px";
-      canvas.style.height = "auto";
-      canvas.setAttribute("role", "application");
-      canvas.setAttribute("aria-label", "Pixel editor: arrows move; Space paints selected index");
-      canvas.addEventListener("keydown", (event) => {
-        if (!["ArrowLeft", "ArrowRight", "ArrowUp", "ArrowDown", " ", "Enter"].includes(event.key)) return;
-        event.preventDefault();
-        const state2 = ctx2.state, cursor = state2.pixelCursor || { x: 0, y: 0 };
-        if (event.key === "ArrowLeft") cursor.x = Math.max(0, cursor.x - 1);
-        if (event.key === "ArrowRight") cursor.x = Math.min(bitmap.width - 1, cursor.x + 1);
-        if (event.key === "ArrowUp") cursor.y = Math.max(0, cursor.y - 1);
-        if (event.key === "ArrowDown") cursor.y = Math.min(bitmap.height - 1, cursor.y + 1);
-        state2.pixelCursor = cursor;
-        if ([" ", "Enter"].includes(event.key)) {
-          const color = Number(read("paint-color")), bits2 = { "mono-row-msb-v1": 1, "tile8-paired2-msb-v1": 2, "tile8-planar2-msb-v1": 2, "tile8-rowplanar4-msb-v1": 4, "tile8-paired4-msb-v1": 4, "tile8-packed4-high-v1": 4, "tile8-packed4-low-v1": 4 }[bitmap.codec];
-          if (!Number.isInteger(color) || color < 0 || color >= 2 ** bits2) {
-            ctx2.notify("Choose a valid palette index.", true);
-            return;
-          }
-          if (!state2.paint) state2.paint = { document_id: doc.document_id, bitmap_id: bitmap.id, cell_index: 0, pixels: [...pixelBuffer(ctx2, doc, bitmap, 0)] };
-          const before = [...state2.paint.pixels];
-          state2.paint.pixels[cursor.y * bitmap.width + cursor.x] = color;
-          recordPixels(ctx2, doc, bitmap.id, state2.paint.cell_index, before, state2.paint.pixels);
-          const activeHistory = historyFor(ctx2, doc, bitmap.id, state2.paint.cell_index, state2.paint.pixels), undo = document.querySelector('[data-action="pixel-undo"]'), redo = document.querySelector('[data-action="pixel-redo"]');
-          if (undo) undo.disabled = !activeHistory.canUndo;
-          if (redo) redo.disabled = !activeHistory.canRedo;
-          state2.assetAcknowledgements = [];
-          state2.pending = null;
-          ctx2.setDraft("paint-buffer", JSON.stringify(state2.paint));
-          redraw();
-        }
-        const label = document.getElementById("pixel-position");
-        if (label) label.textContent = "Pixel " + cursor.x + ", " + cursor.y;
-      });
-    }
-    mountPixelStrokes(ctx2, doc, bitmap, redraw);
-    const map = doc.tilemaps.find((row) => row.id === ctx2.state.assetMapId) || doc.tilemaps[0];
-    let changes = json("asset-changes");
-    const paint = ctx2.state.paint;
-    if ((paint == null ? void 0 : paint.document_id) === doc.document_id) {
-      const b = doc.bitmaps.find((r) => r.id === paint.bitmap_id);
-      changes = mergeCellChanges(changes, [{ kind: "cell", bitmap_id: b.id, cell_index: paint.cell_index, before_pixels: b.cells[paint.cell_index].pixels, after_pixels: paint.pixels }]);
-    }
-    mountTilemap(ctx2, doc, map, changes);
-  }
-
   // romancer/ui/sprite_assembly.js
   function spritePreviewSize(width, height, zoom = "fit", available = 384) {
     const scale = ["8", "16", "32"].includes(String(zoom)) ? Number(zoom) : Math.max(1, Math.min(32, Math.floor(Math.min(Math.max(1, available) / width, 384 / height))));
@@ -5644,7 +5836,7 @@ ${font ? `<section class="card"><h3>Font metrics · ${esc(font.id)}</h3><div cla
     flips = flips ?? tiles.map(() => 0);
     if (!Array.isArray(flips) || flips.length !== tiles.length || flips.some((v) => !Number.isSafeInteger(v) || v < 0 || v > 3)) throw Error("Tile flips must be0,1(horizontal),2(vertical) or3.");
     if (colors !== null && (!Array.isArray(colors) || colors.length !== tiles.length || colors.some((group) => group !== null && (typeof group !== "object" || Array.isArray(group) || Object.entries(group).some(([k, c]) => !/^\d{1,2}$/.test(k) || Number(k) > 15 || !Array.isArray(c) || c.length !== 3 || c.some((v) => !Number.isInteger(v) || v < 0 || v > 255)))))) throw Error("Observed tile colors are invalid.");
-    return { first, columns: columns2, rows, order, tiles, indices: custom ? [...indices] : null, flips: [...flips], colors, provenance: provenance === "pixel_candidate" ? "pixel_candidate" : "declared_layout" };
+    return { first, columns: columns2, rows, order, tiles, indices: custom ? [...indices] : null, flips: [...flips], colors, provenance: ["pixel_candidate", "causal_replay", "checked_declaration"].includes(provenance) ? provenance : "declared_layout" };
   }
   function storedPixel(bitmap, layout, part, x, y) {
     var _a;
@@ -5715,12 +5907,14 @@ ${font ? `<section class="card"><h3>Font metrics · ${esc(font.id)}</h3><div cla
     ctx2.state.assetAcknowledgements = [];
   }
   function spriteAssembly(ctx2, doc, bitmap, palette2 = null) {
+    var _a;
     if (!(doc == null ? void 0 : doc.ok) || !bitmap) return "";
     const scope = selectionKey(ctx2.state), current2 = () => selectionKey(ctx2.state) === scope, layout = layoutFor(ctx2, doc, bitmap), image = layout && imageFor(ctx2, doc, bitmap, layout), undo = image && history2(ctx2, doc, bitmap, layout, image);
     const checkHistory = () => {
       if (JSON.stringify(imageFor(ctx2, doc, bitmap, layout).pixels) !== JSON.stringify(undo.current)) throw Error("Tiles changed in another editor. Start a fresh sprite stroke before undo or redo.");
     };
     const colors = brushColors(bitmap, editorPalette(ctx2, palette2), layout);
+    const connectedObject = !!layout && ((_a = ctx2.state.objectWorkbench) == null ? void 0 : _a.scope) === scope;
     ctx2.use({
       "sprite-brush": (node) => {
         if (!current2()) return;
@@ -5762,7 +5956,7 @@ ${font ? `<section class="card"><h3>Font metrics · ${esc(font.id)}</h3><div cla
         link.click();
       }
     });
-    return `<section class="card sprite-assembly"><div class="card-heading"><h3>Sprite assembly</h3>${layout ? button("Save edited PNG", "sprite-export") : ""}</div><p class="subtle">Arrange declared tiles, then paint the whole image. Shared tiles update everywhere in this editing layout.</p><div class="field-row">${field("sprite-first", "First tile", ctx2.draft("sprite-first", (layout == null ? void 0 : layout.first) ?? 0), { type: "number", min: 0 })}${field("sprite-columns", "Tiles across", ctx2.draft("sprite-columns", (layout == null ? void 0 : layout.columns) ?? Math.min(2, bitmap.count)), { type: "number", min: 1, max: 8 })}${field("sprite-rows", "Tiles down", ctx2.draft("sprite-rows", (layout == null ? void 0 : layout.rows) ?? Math.min(2, Math.floor(bitmap.count / 2) || 1)), { type: "number", min: 1, max: 8 })}${select("sprite-order", "Tile order", [["rows", "Across, then down"], ["columns", "Down, then across"]], ctx2.draft("sprite-order", (layout == null ? void 0 : layout.order) || "rows"))}</div><details><summary>Custom tile placement</summary>${field("sprite-map", "Tile map", ctx2.draft("sprite-map", (layout == null ? void 0 : layout.indices) ? layout.indices.map((v, i) => v === null ? "." : String(v) + (layout.flips[i] & 1 ? "h" : "") + (layout.flips[i] & 2 ? "v" : "")).join(", ") : ""))}<p>One tile per grid position; use h/v for flips and . for an unmapped part.</p></details>${button("Assemble tiles", "sprite-assemble", { primary: !layout })}${image ? `${layout.provenance === "pixel_candidate" ? '<p class="notice warm">Gameplay pixel candidates. Source use still needs native verification.</p>' : ""}${layout.colors ? '<p class="subtle">Gameplay colors are a preview; palette bytes are unchanged.</p>' : ""}<div id="sprite-brush-palette">${brushSwatches(colors, ctx2.draft("sprite-color", "1"))}</div><div class="toolbar">${field("sprite-color", "Brush index", ctx2.draft("sprite-color", "1"), { type: "number", min: 0, max: Math.max(0, colors.length - 1) })}${select("sprite-zoom", "Preview size", [["fit", "Fit"], ["8", "8×"], ["16", "16×"], ["32", "32×"]], ctx2.draft("sprite-zoom", "fit"))}<span id="sprite-zoom-label" class="subtle" role="status"></span></div><div class="preview-pair sprite-comparison"><div><span>Original</span><div class="sprite-preview"><canvas id="sprite-original" aria-label="Original assembled sprite"></canvas></div></div><div><span>Editing · paint here</span><div class="sprite-preview"><canvas id="sprite-canvas" width="${image.width}" height="${image.height}" tabindex="0" role="application" aria-label="Assembled sprite editor: arrows move, Space paints"></canvas></div></div></div><p id="sprite-difference-count" class="preview-caption" role="status" aria-live="polite"></p><div class="actions">${button("Undo sprite stroke", "sprite-undo", { disabled: !undo.canUndo })}${button("Redo sprite stroke", "sprite-redo", { disabled: !undo.canRedo })}<span class="subtle">${image.width} × ${image.height} pixels · ${layout.tiles.filter((index) => index !== null).length} tile${layout.tiles.filter((index) => index !== null).length === 1 ? "" : "s"}</span></div><p class="subtle">Drag across tile boundaries; review all changed tiles together with Review asset changes.</p><details><summary>Tile placement</summary><p>${layout.tiles.map((index, i) => esc(`(${i % layout.columns}, ${Math.floor(i / layout.columns)}) → tile ${index}`)).join(" · ")}</p><p>This source-bound layout is explicit. OAM, animation frames and game-specific metasprite tables still need their own declared mapping.</p></details>` : ""}</section>`;
+    return `<section class="card sprite-assembly"><div class="card-heading"><h3>${connectedObject ? "Whole-object editor" : "Sprite assembly"}</h3>${layout ? button("Save edited PNG", "sprite-export") : ""}</div><p class="subtle">${connectedObject ? "Paint the assembled image. Shared source tiles update together." : "Arrange declared tiles, then paint the whole image. Shared tiles update everywhere in this editing layout."}</p>${connectedObject ? '<details class="object-layout-advanced"><summary>Adjust object layout · Advanced</summary>' : ""}<div class="field-row">${field("sprite-first", "First tile", ctx2.draft("sprite-first", (layout == null ? void 0 : layout.first) ?? 0), { type: "number", min: 0 })}${field("sprite-columns", "Tiles across", ctx2.draft("sprite-columns", (layout == null ? void 0 : layout.columns) ?? Math.min(2, bitmap.count)), { type: "number", min: 1, max: 8 })}${field("sprite-rows", "Tiles down", ctx2.draft("sprite-rows", (layout == null ? void 0 : layout.rows) ?? Math.min(2, Math.floor(bitmap.count / 2) || 1)), { type: "number", min: 1, max: 8 })}${select("sprite-order", "Tile order", [["rows", "Across, then down"], ["columns", "Down, then across"]], ctx2.draft("sprite-order", (layout == null ? void 0 : layout.order) || "rows"))}</div><details><summary>Custom tile placement</summary>${field("sprite-map", "Tile map", ctx2.draft("sprite-map", (layout == null ? void 0 : layout.indices) ? layout.indices.map((v, i) => v === null ? "." : String(v) + (layout.flips[i] & 1 ? "h" : "") + (layout.flips[i] & 2 ? "v" : "")).join(", ") : ""))}<p>One tile per grid position; use h/v for flips and . for an unmapped part.</p></details>${button("Assemble tiles", "sprite-assemble", { primary: !layout })}${connectedObject ? "</details>" : ""}${image ? `${layout.provenance === "pixel_candidate" ? '<p class="notice warm">Gameplay pixel candidates. Source use still needs native verification.</p>' : ""}${layout.colors ? '<p class="subtle">Gameplay colors are a preview; palette bytes are unchanged.</p>' : ""}<div id="sprite-brush-palette">${brushSwatches(colors, ctx2.draft("sprite-color", "1"))}</div><div class="toolbar">${field("sprite-color", "Brush index", ctx2.draft("sprite-color", "1"), { type: "number", min: 0, max: Math.max(0, colors.length - 1) })}${select("sprite-zoom", "Preview size", [["fit", "Fit"], ["8", "8×"], ["16", "16×"], ["32", "32×"]], ctx2.draft("sprite-zoom", "fit"))}<span id="sprite-zoom-label" class="subtle" role="status"></span></div><div class="preview-pair sprite-comparison"><div><span>Original</span><div class="sprite-preview"><canvas id="sprite-original" aria-label="Original assembled sprite"></canvas></div></div><div><span>Editing · paint here</span><div class="sprite-preview"><canvas id="sprite-canvas" width="${image.width}" height="${image.height}" tabindex="0" role="application" aria-label="Assembled sprite editor: arrows move, Space paints"></canvas></div></div></div><p id="sprite-difference-count" class="preview-caption" role="status" aria-live="polite"></p><div class="actions">${button("Undo sprite stroke", "sprite-undo", { disabled: !undo.canUndo })}${button("Redo sprite stroke", "sprite-redo", { disabled: !undo.canRedo })}<span class="subtle">${image.width} × ${image.height} pixels · ${layout.tiles.filter((index) => index !== null).length} tile${layout.tiles.filter((index) => index !== null).length === 1 ? "" : "s"}</span></div><p class="subtle">Drag across tile boundaries; review all changed tiles together with Review asset changes.</p><details><summary>Tile placement</summary><p>${layout.tiles.map((index, i) => esc(`(${i % layout.columns}, ${Math.floor(i / layout.columns)}) → tile ${index}`)).join(" · ")}</p><p>This source-bound layout is explicit. OAM, animation frames and game-specific metasprite tables still need their own declared mapping.</p></details>` : ""}</section>`;
   }
   function mountSprite(ctx2, doc, bitmap, palette2) {
     var _a, _b, _c;
@@ -6056,6 +6250,7 @@ ${font ? `<section class="card"><h3>Font metrics · ${esc(font.id)}</h3><div cla
     if ((connected == null ? void 0 : connected.scope) === selectionKey(state2)) {
       state2.connectedAssetSetup = null;
       state2.results["assets.inspect"] = connected.result.inspection;
+      state2.objectWorkbench = connected.result.object_id ? { scope: selectionKey(state2), object_id: connected.result.object_id, document_id: connected.result.inspection.document_id } : null;
       state2.verifiedVisualSource = connected.result.source_dependency_verified ? { scope: selectionKey(state2), document_id: connected.result.inspection.document_id, verification_id: connected.result.verification_id } : null;
       const bitmap2 = connected.result.inspection.bitmaps[0], layout = { document_id: connected.result.inspection.document_id, bitmap_id: bitmap2.id, ...connected.result.layout };
       ctx2.setDraft("asset-schema", JSON.stringify(connected.result.schema, null, 2));
@@ -6184,7 +6379,7 @@ ${font ? `<section class="card"><h3>Font metrics · ${esc(font.id)}</h3><div cla
     });
     if (((_k = state2.candidateReview) == null ? void 0 : _k.artifact_id) === state2.artifact.artifact_id) return `${heading("", "Confirm graphics candidate", "")}<section class="card"><p>${esc(state2.candidateReview.reason)}</p><p>Confirm the format and allocation, then load the declaration.</p>${graphicsDeclaration(ctx2)}${button("Cancel candidate", "candidate-cancel")}</section>`;
     const pending = ((_l = state2.pending) == null ? void 0 : _l.kind) === "assets" && state2.pending.artifact_id === state2.artifact.artifact_id;
-    return `${heading("Asset workshop", "Graphics & fonts", "Inspect declared tiles, palettes, maps, and fonts. Shared consumers require explicit acknowledgment.")}<div class="identity"><strong>${esc(state2.artifact.name)}</strong><code>${short(state2.artifact.sha256)}</code>${badge((document2 == null ? void 0 : document2.write_supported) ? "Editable" : "Declaration needed", (document2 == null ? void 0 : document2.write_supported) ? "good" : "warm")}</div><div class="grid-two asset-workspace"><div class="asset-editors">${((_m = state2.verifiedVisualSource) == null ? void 0 : _m.scope) === selectionKey(state2) && state2.verifiedVisualSource.document_id === (document2 == null ? void 0 : document2.document_id) ? '<p class="notice">This editor was opened from authenticated causal source verification. The proof covers the captured placement and replay; later edits still need playtesting.</p>' : ""}${spriteAssembly(ctx2, document2, bitmap, palette2)}${animationStudio(ctx2, document2, bitmap)}${paletteEditor(ctx2, palette2)}${assetTools(ctx2, document2, bitmap, palette2)}<section class="card asset-collection"><div class="card-heading"><h3>Tile collection</h3><span class="subtle">${(bitmap == null ? void 0 : bitmap.count) || 0} cells · ${esc((bitmap == null ? void 0 : bitmap.codec) || "No codec loaded")}</span></div>${bitmap ? `<div class="pixel-grid">${bitmap.cells.slice((state2.assetPage || 0) * 64, (state2.assetPage || 0) * 64 + 64).map((cell) => `<div class="pixel-card"><canvas width="${bitmap.width}" height="${bitmap.height}" data-cell="${cell.index}" aria-label="Tile ${cell.index}"></canvas>${button("Edit tile " + cell.index, "asset-select-cell", { id: String(cell.index) })}</div>`).join("")}</div>` : empty("Load a declared asset descriptor", "Unknown compression and codecs remain read only.")}<div class="actions">${button("Previous page", "asset-page", { id: "-1", disabled: !(state2.assetPage > 0) })}${button("Next page", "asset-page", { id: "1", disabled: !bitmap || (state2.assetPage || 0) * 64 + 64 >= bitmap.count })}</div><div class="swatches" role="group" aria-label="Declared palette colors">${(palette2 == null ? void 0 : palette2.entries.slice(0, 64).map((entry, i) => `<span class="swatch" data-color-index="${i}" title="Color ${entry.index} (${entry.components.r}, ${entry.components.g}, ${entry.components.b})"></span>`).join("")) || ""}</div></section>${bitmap ? `<section class="card asset-pixel-editor"><div class="card-heading"><h3>Pixel editor · cell ${selected2}</h3><span id="pixel-edit-status">${JSON.stringify(pixelBuffer(ctx2, document2, bitmap, selected2)) !== JSON.stringify(bitmap.cells[selected2].pixels) ? badge("Staged", "warm") : badge("Unchanged")}</span></div><div class="preview-pair pixel-comparison"><div><span>Original tile</span><div class="pixel-card"><canvas id="paint-original" aria-label="Original selected tile"></canvas></div></div><div><span>Editing · paint here</span><div class="pixel-card"><canvas id="paint-canvas" width="${bitmap.width}" height="${bitmap.height}" tabindex="0" role="img" aria-label="Pixel editor: arrows move; Space paints selected index"></canvas><small>Drag to paint. Undo restores a complete stroke.</small></div></div></div><p id="pixel-preview-status" class="preview-caption" role="status" aria-live="polite"></p><div>${field("paint-color", "Palette index", ctx2.draft("paint-color", "1"), { type: "number", min: 0 })}<p class="subtle small">Grayscale shows stored indices when no palette is declared.</p>${button("Discard pending pixels", "asset-discard")}</div></section>` : ""}</div><section class="card"><h3>Graphics setup</h3>${graphicsDeclaration(ctx2)}${jsonEditor("asset-schema", "Advanced asset schema", ctx2.draft("asset-schema", JSON.stringify(fallback, null, 2)), false)}${button("Inspect assets", "asset-inspect", { icon: "assets" })}${jsonEditor("asset-changes", "Additional cell / palette / map / advance changes", ctx2.draft("asset-changes", "[]"), false)}<div class="actions">${button("Review graphics changes", "asset-plan", { primary: !pending, disabled: !(document2 == null ? void 0 : document2.write_supported) })}${pending ? button("Create graphics build", "asset-apply", { primary: true, icon: "check" }) : ""}</div>${((_o = (_n = state2.results["assets.plan"]) == null ? void 0 : _n.required_consumers) == null ? void 0 : _o.length) && !((_p = state2.results["assets.plan"]) == null ? void 0 : _p.ok) ? `<div class="notice warm">${state2.results["assets.plan"].required_consumers.length} declared consumers are affected. Read the report below before acknowledging them.</div>${button("Acknowledge listed consumers", "asset-acknowledge")}` : ""}</section></div>${report(state2.results["assets.plan"], "Asset plan & affected consumers")}${report(state2.results["structured.apply"], "Build result")}`;
+    return `${heading("Asset workshop", "Graphics & fonts", "Inspect declared tiles, palettes, maps, and fonts. Shared consumers require explicit acknowledgment.")}<div class="identity"><strong>${esc(state2.artifact.name)}</strong><code>${short(state2.artifact.sha256)}</code>${badge((document2 == null ? void 0 : document2.write_supported) ? "Editable" : "Declaration needed", (document2 == null ? void 0 : document2.write_supported) ? "good" : "warm")}</div><div class="grid-two asset-workspace"><div class="asset-editors">${((_m = state2.verifiedVisualSource) == null ? void 0 : _m.scope) === selectionKey(state2) && state2.verifiedVisualSource.document_id === (document2 == null ? void 0 : document2.document_id) ? '<p class="notice">This editor was opened from authenticated causal source verification. The proof covers the captured placement and replay; later edits still need playtesting.</p>' : ""}${await objectWorkbench(ctx2, document2, bitmap)}${spriteAssembly(ctx2, document2, bitmap, palette2)}${animationStudio(ctx2, document2, bitmap)}${paletteEditor(ctx2, palette2)}${assetTools(ctx2, document2, bitmap, palette2)}<section class="card asset-collection"><div class="card-heading"><h3>Tile collection</h3><span class="subtle">${(bitmap == null ? void 0 : bitmap.count) || 0} cells · ${esc((bitmap == null ? void 0 : bitmap.codec) || "No codec loaded")}</span></div>${bitmap ? `<div class="pixel-grid">${bitmap.cells.slice((state2.assetPage || 0) * 64, (state2.assetPage || 0) * 64 + 64).map((cell) => `<div class="pixel-card"><canvas width="${bitmap.width}" height="${bitmap.height}" data-cell="${cell.index}" aria-label="Tile ${cell.index}"></canvas>${button("Edit tile " + cell.index, "asset-select-cell", { id: String(cell.index) })}</div>`).join("")}</div>` : empty("Load a declared asset descriptor", "Unknown compression and codecs remain read only.")}<div class="actions">${button("Previous page", "asset-page", { id: "-1", disabled: !(state2.assetPage > 0) })}${button("Next page", "asset-page", { id: "1", disabled: !bitmap || (state2.assetPage || 0) * 64 + 64 >= bitmap.count })}</div><div class="swatches" role="group" aria-label="Declared palette colors">${(palette2 == null ? void 0 : palette2.entries.slice(0, 64).map((entry, i) => `<span class="swatch" data-color-index="${i}" title="Color ${entry.index} (${entry.components.r}, ${entry.components.g}, ${entry.components.b})"></span>`).join("")) || ""}</div></section>${bitmap ? `<section class="card asset-pixel-editor"><div class="card-heading"><h3>Pixel editor · cell ${selected2}</h3><span id="pixel-edit-status">${JSON.stringify(pixelBuffer(ctx2, document2, bitmap, selected2)) !== JSON.stringify(bitmap.cells[selected2].pixels) ? badge("Staged", "warm") : badge("Unchanged")}</span></div><div class="preview-pair pixel-comparison"><div><span>Original tile</span><div class="pixel-card"><canvas id="paint-original" aria-label="Original selected tile"></canvas></div></div><div><span>Editing · paint here</span><div class="pixel-card"><canvas id="paint-canvas" width="${bitmap.width}" height="${bitmap.height}" tabindex="0" role="img" aria-label="Pixel editor: arrows move; Space paints selected index"></canvas><small>Drag to paint. Undo restores a complete stroke.</small></div></div></div><p id="pixel-preview-status" class="preview-caption" role="status" aria-live="polite"></p><div>${field("paint-color", "Palette index", ctx2.draft("paint-color", "1"), { type: "number", min: 0 })}<p class="subtle small">Grayscale shows stored indices when no palette is declared.</p>${button("Discard pending pixels", "asset-discard")}</div></section>` : ""}</div><section class="card"><h3>Graphics setup</h3>${graphicsDeclaration(ctx2)}${jsonEditor("asset-schema", "Advanced asset schema", ctx2.draft("asset-schema", JSON.stringify(fallback, null, 2)), false)}${button("Inspect assets", "asset-inspect", { icon: "assets" })}${jsonEditor("asset-changes", "Additional cell / palette / map / advance changes", ctx2.draft("asset-changes", "[]"), false)}<div class="actions">${button("Review graphics changes", "asset-plan", { primary: !pending, disabled: !(document2 == null ? void 0 : document2.write_supported) })}${pending ? button("Create graphics build", "asset-apply", { primary: true, icon: "check" }) : ""}</div>${((_o = (_n = state2.results["assets.plan"]) == null ? void 0 : _n.required_consumers) == null ? void 0 : _o.length) && !((_p = state2.results["assets.plan"]) == null ? void 0 : _p.ok) ? `<div class="notice warm">${state2.results["assets.plan"].required_consumers.length} declared consumers are affected. Read the report below before acknowledging them.</div>${button("Acknowledge listed consumers", "asset-acknowledge")}` : ""}</section></div>${report(state2.results["assets.plan"], "Asset plan & affected consumers")}${report(state2.results["structured.apply"], "Build result")}${editCheckControls(ctx2)}`;
   }
   function documentNode(id) {
     return document.getElementById(id);
@@ -6233,6 +6428,7 @@ ${font ? `<section class="card"><h3>Font metrics · ${esc(font.id)}</h3><div cla
       drawPaint(ctx2, doc);
     };
     refresh();
+    mountObjectWorkbench(ctx2);
     mountTools(ctx2, doc, bitmap, () => drawPaint(ctx2, doc));
     mountSprite(ctx2, doc, bitmap, palette2);
     mountAnimation(ctx2, doc, bitmap, palette2);
@@ -6246,6 +6442,64 @@ ${font ? `<section class="card"><h3>Font metrics · ${esc(font.id)}</h3><div cla
     render: () => render10
   });
 
+  // romancer/ui/graphics_access.js
+  var codecs = { nes: "tile8-planar2-msb-v1", snes: "tile8-paired4-msb-v1", sms: "tile8-rowplanar4-msb-v1", gb: "tile8-paired2-msb-v1", gbc: "tile8-paired2-msb-v1", gba: "tile8-packed4-low-v1", genesis: "tile8-packed4-high-v1" };
+  var hex4 = (v) => Number.isSafeInteger(v) ? "0x" + v.toString(16) : "Not recorded";
+  function graphicsAccessControls(ctx2, trace) {
+    var _a, _b, _c, _d, _e;
+    const { state: state2 } = ctx2, scope = selectionKey(state2), params = { ...ctx2.sourceParams() }, current2 = () => {
+      var _a2;
+      return selectionKey(state2) === scope && ((_a2 = ctx2.isCurrentRender) == null ? void 0 : _a2.call(ctx2)) !== false;
+    };
+    let entry = state2.graphicsAccess;
+    if ((entry == null ? void 0 : entry.scope) !== scope) state2.graphicsAccess = entry = { scope, result: null, tiles: null };
+    const result = entry.result;
+    const accept = async (op, p) => {
+      if (!current2()) throw Error("The selected ROM changed.");
+      stopPlayback(state2);
+      const r = await ctx2.run(op, { ...params, ...p }, { render: false, refresh: false });
+      if (!current2()) return;
+      if (r.source_sha256 !== state2.artifact.sha256 || r.artifact_id !== state2.artifact.artifact_id) throw Error("Graphics capture source identity differs.");
+      entry.result = r;
+      entry.tiles = null;
+      ctx2.setDraft("graphics-access-id", r.evidence_id);
+      return ctx2.render();
+    };
+    ctx2.use({
+      "graphics-access-capture": () => accept("graphics.accesses.capture", { trace_id: trace == null ? void 0 : trace.trace_id, offset: Number(read("graphics-access-offset")), length: Number(read("graphics-access-length")), start_frame: Number(read("graphics-access-start")) }),
+      "graphics-access-open": () => accept("graphics.accesses.get", { evidence_id: read("graphics-access-id"), offset: 0, limit: 100 }),
+      "graphics-access-page": (node) => accept("graphics.accesses.get", { evidence_id: result.evidence_id, offset: Math.max(0, result.offset + Number(node.dataset.id) * 100), limit: 100 }),
+      "graphics-access-tiles": async () => {
+        if (!current2() || !result) throw Error("Open a graphics capture first.");
+        const r = await ctx2.api.call("graphics.accesses.tiles", { ...params, evidence_id: result.evidence_id, domain: read("graphics-memory-domain"), offset: Number(read("graphics-memory-offset")), count: 32, codec: read("graphics-memory-codec") });
+        if (!current2() || entry.result !== result) return;
+        if (r.ok === false) throw Error(r.error);
+        entry.tiles = r;
+        return ctx2.render();
+      }
+    });
+    return '<details class="card" id="graphics-accesses" ' + (result ? "open" : "") + '><summary>Native graphics accesses & video memory</summary><p>Replay this saved route in the native observer. Record ROM reads, video-memory writes, registers and the final scene.</p><div class="field-row">' + field("graphics-access-offset", "ROM span start", ctx2.draft("graphics-access-offset", String(((_b = (_a = trace == null ? void 0 : trace.matches) == null ? void 0 : _a[0]) == null ? void 0 : _b.offset) || 0))) + field("graphics-access-length", "ROM bytes to observe", ctx2.draft("graphics-access-length", String(((_d = (_c = trace == null ? void 0 : trace.matches) == null ? void 0 : _c[0]) == null ? void 0 : _d.length) || 32))) + field("graphics-access-start", "First frame to record", ctx2.draft("graphics-access-start", "0")) + "</div>" + button("Record native accesses", "graphics-access-capture", { primary: true, disabled: ((_e = trace == null ? void 0 : trace.replay) == null ? void 0 : _e.status) !== "READY" || state2.playing, reason: "Save a cold-start trace of up to 3600 frames and 64 input steps first." }) + "<details><summary>Open saved capture by ID</summary>" + field("graphics-access-id", "Capture ID", ctx2.draft("graphics-access-id", "")) + button("Open saved capture", "graphics-access-open") + "</details>" + (result ? graphicsAccessReport(result) + '<div class="actions">' + button("Previous events", "graphics-access-page", { id: "-1", disabled: !result.offset }) + button("Next events", "graphics-access-page", { id: "1", disabled: result.offset + result.limit >= result.total_events }) + "</div>" + (result.memory_domains.length ? '<details open><summary>Inspect recorded video memory</summary><div class="field-row">' + select("graphics-memory-domain", "Memory domain", result.memory_domains.map((d) => [d.name, d.name + " · " + d.size + " bytes"]), ctx2.draft("graphics-memory-domain", result.memory_domains[0].name)) + field("graphics-memory-offset", "Memory offset", ctx2.draft("graphics-memory-offset", "0")) + select("graphics-memory-codec", "Tile interpretation", [[codecs[state2.artifact.system_id], codecs[state2.artifact.system_id]], ...state2.artifact.system_id === "snes" ? [["tile8-paired2-msb-v1", "SNES 2bpp"]] : []], ctx2.draft("graphics-memory-codec", codecs[state2.artifact.system_id])) + "</div>" + button("Preview 32 recorded tiles", "graphics-access-tiles") + '<p class="subtle">Choose pattern/video memory, not OAM or palette memory. Grayscale shows stored indices; this view does not identify a ROM source.</p>' + (entry.tiles ? '<canvas id="graphics-memory-tiles" aria-label="Recorded video-memory tile indices"></canvas><p>' + hex4(entry.tiles.offset) + " · " + entry.tiles.cells.length + " tiles · end of capture</p>" : "") + "</details>" : "") : "") + "</details>";
+  }
+  function graphicsAccessReport(r) {
+    return '<section class="notice"><h4>Recorded access trail</h4>' + (r.scene ? '<figure><img class="game-resource-preview" src="data:image/png;base64,' + esc(r.scene.png_base64) + '" alt="Native observer end-of-capture scene"><figcaption>Separate native replay · final scene</figcaption></figure>' : "") + "<p>" + r.total_events + " stored events · showing " + r.offset + "–" + Math.min(r.offset + r.limit, r.total_events) + ". " + (r.omitted_events ? r.omitted_events + " events omitted at the capture budget." : "") + "</p>" + (r.runtime_trusted === false ? '<p class="notice warm">Historical imported capture. Record a fresh replay for current execution evidence.</p>' : "") + '<div class="table-wrap"><table><thead><tr><th>Kind</th><th>Domain / address</th><th>ROM offset</th><th>Value</th><th>Native operation</th></tr></thead><tbody>' + (r.events || []).map((e) => "<tr><td>" + esc(e.kind) + "</td><td>" + esc(e.domain || "CPU bus") + " " + hex4(e.physical_offset ?? e.address) + "</td><td>" + hex4(e.file_offset) + "</td><td>" + hex4(e.value) + "</td><td>" + esc(e.operation_kind || e.actor || "Not recorded") + "</td></tr>").join("") + "</tbody></table></div><p>Adjacent reads and writes do not establish dataflow. CPU context may precede the access. Use source verification to test literal ROM-to-picture dependencies.</p><details><summary>Captured register state</summary><pre>" + esc(JSON.stringify(r.graphics_state || {}, null, 2)) + "</pre></details></section>";
+  }
+  function mountGraphicsAccess(ctx2) {
+    const entry = ctx2.state.graphicsAccess, canvas = document.getElementById("graphics-memory-tiles");
+    if (!canvas || !(entry == null ? void 0 : entry.tiles)) return;
+    const cells = entry.tiles.cells;
+    canvas.width = 64;
+    canvas.height = Math.ceil(cells.length / 8) * 8;
+    const c = canvas.getContext("2d"), image = c.createImageData(canvas.width, canvas.height), max = /2-msb/.test(entry.tiles.codec) ? 3 : 15;
+    cells.forEach((cell, index) => cell.pixels.forEach((v, p) => {
+      const x = index % 8 * 8 + p % 8, y = Math.floor(index / 8) * 8 + Math.floor(p / 8), shade = Math.round(v / max * 255);
+      image.data.set([shade, shade, shade, 255], (y * canvas.width + x) * 4);
+    }));
+    c.putImageData(image, 0, 0);
+    canvas.style.width = "512px";
+    canvas.style.maxWidth = "100%";
+    canvas.style.imageRendering = "pixelated";
+  }
+
   // romancer/ui/source_verification.js
   var statusName = (s) => ({ VERIFIED_VISUAL_SOURCE: "Source verified", NOT_VERIFIED: "Source unresolved", INCONCLUSIVE: "Replay inconclusive" })[s] || s;
   function visualSourceControls(ctx2, trace) {
@@ -6256,6 +6510,34 @@ ${font ? `<section class="card"><h3>Font metrics · ${esc(font.id)}</h3><div cla
     };
     const packet = ((_a = state2.visualSourceProof) == null ? void 0 : _a.scope) === scope && state2.visualSourceProof.trace_id === trace.trace_id ? state2.visualSourceProof.result : null;
     const history3 = (packet == null ? void 0 : packet.saved_results) || trace.verification_history || [];
+    let selected2 = state2.objectPartSelection;
+    if (!selected2 || selected2.scope !== scope || selected2.trace_id !== trace.trace_id) selected2 = state2.objectPartSelection = { scope, trace_id: trace.trace_id, parts: [] };
+    ctx2.use({
+      "source-object-toggle": (node) => {
+        if (!current2()) throw Error("The selected ROM changed.");
+        const match = Number(node.dataset.id);
+        if (!packet || packet.runtime_trusted === false || !packet.verified_matches.some((m) => m.match_id === match)) throw Error("Choose a fresh verified part.");
+        const part = { verification_id: packet.verification_id, match_id: match };
+        selected2.parts = selected2.parts.filter((p) => p.verification_id !== part.verification_id || p.match_id !== match);
+        if (node.checked) {
+          if (selected2.parts.length >= 64) throw Error("An object supports at most 64 captured placements.");
+          selected2.parts.push(part);
+        }
+        return ctx2.render();
+      },
+      "source-object-clear": () => {
+        if (!current2()) return;
+        selected2.parts = [];
+        return ctx2.render();
+      },
+      "source-object-create": async () => {
+        if (!current2()) throw Error("The selected ROM changed.");
+        if (!selected2.parts.length) throw Error("Select at least one verified placement.");
+        const result = await ctx2.run("objects.create", { ...ctx2.sourceParams(), name: read("verified-object-name").trim(), parts: [...selected2.parts] }, { render: false });
+        if (!current2()) return;
+        return openObject(ctx2, result.object_id);
+      }
+    });
     const run2 = async (start) => {
       if (!current2()) return;
       stopPlayback(state2);
@@ -6287,12 +6569,12 @@ ${font ? `<section class="card"><h3>Font metrics · ${esc(font.id)}</h3><div cla
         return ctx2.navigate("assets");
       }
     });
-    return '<section id="source-verification" class="notice"><h4>Find verified ROM sources</h4><p>Replay coded pixel probes, two independent validation patterns and a restored-original control. A verified location must produce the exact predicted pixels.</p>' + button("Verify ROM sources", "source-verify", { primary: true, disabled: ((_b = trace.replay) == null ? void 0 : _b.status) !== "READY" || !((_c = trace.matches) == null ? void 0 : _c.length) || state2.playing, reason: "Requires a fresh cold start, a saved trace and literal matches." }) + (((_d = trace.replay) == null ? void 0 : _d.status) !== "READY" ? "<p>Start with a fresh cold start: close and load the game, reach the scene, then capture a new trace. State restores and battery-save starts cannot establish this replay.</p>" : '<p class="subtle">Tests up to eight source locations per request. Temporary ROMancer builds stay out of your build history; originals remain unchanged.</p>') + (history3.length ? '<details><summary>Saved source-test results</summary><div class="actions">' + history3.map((r, i) => button("Test " + (i + 1) + " · " + statusName(r.status), "source-proof-load", { id: r.verification_id })).join("") + "</div></details>" : "") + (packet ? sourceProofReport(packet) : trace.verification_summary ? "<p>Saved result: " + esc(statusName(trace.verification_summary.status)) + "</p>" + button("Open saved verification", "source-proof-load") : "") + "</section>";
+    return '<section id="source-verification" class="notice"><h4>Find verified ROM sources</h4><p>Replay coded pixel probes, two independent validation patterns and a restored-original control. A verified location must produce the exact predicted pixels.</p>' + button("Verify ROM sources", "source-verify", { primary: true, disabled: ((_b = trace.replay) == null ? void 0 : _b.status) !== "READY" || !((_c = trace.matches) == null ? void 0 : _c.length) || state2.playing, reason: "Requires a fresh cold start, a saved trace and literal matches." }) + (((_d = trace.replay) == null ? void 0 : _d.status) !== "READY" ? "<p>Start with a fresh cold start: close and load the game, reach the scene, then capture a new trace. State restores and battery-save starts cannot establish this replay.</p>" : '<p class="subtle">Tests up to eight source locations per request. Temporary ROMancer builds stay out of your build history; originals remain unchanged.</p>') + (history3.length ? '<details><summary>Saved source-test results</summary><div class="actions">' + history3.map((r, i) => button("Test " + (i + 1) + " · " + statusName(r.status), "source-proof-load", { id: r.verification_id })).join("") + "</div></details>" : "") + (packet ? sourceProofReport(packet, selected2) : trace.verification_summary ? "<p>Saved result: " + esc(statusName(trace.verification_summary.status)) + "</p>" + button("Open saved verification", "source-proof-load") : "") + (selected2.parts.length ? '<div class="source-object-create">' + field("verified-object-name", "Object name", ctx2.draft("verified-object-name", "Captured object")) + "<p>" + selected2.parts.length + " selected placements from this scene. Missing grid cells stay empty; shared tiles update together.</p>" + button("Open whole object", "source-object-create", { primary: true }) + button("Clear selected parts", "source-object-clear") + "</div>" : "") + "</section>";
   }
-  function sourceProofReport(r) {
+  function sourceProofReport(r, selected2 = { parts: [] }) {
     var _a;
     const good = r.status === "VERIFIED_VISUAL_SOURCE" && r.runtime_trusted !== false;
-    return '<div class="source-proof-result"><h4 data-result-status="' + esc(r.status) + '">' + esc(good ? "Verified visual source" : statusName(r.status)) + "</h4><p>" + esc(r.reason || "") + "</p>" + (r.runtime_trusted === false ? '<p class="notice warm">Historical imported proof. Run fresh verification before editing through this result.</p>' : "") + "<p>" + (r.original_reproduced_twice ? "Original reproduced twice. " : "") + (((_a = r.restored_control) == null ? void 0 : _a.frame_matches) ? "Restored-original control matched." : "") + "</p>" + (good ? select("verified-source-part", "Verified part", r.verified_matches.map((m) => [String(m.match_id), "0x" + m.offset.toString(16) + " · " + m.x + ", " + m.y + " · 8 × " + m.height]), String(r.verified_matches[0].match_id)) + button("Open verified part in graphics editor", "source-open", { primary: true }) : "") + r.verified_matches.slice(0, 4).map((m) => "<details open><summary>0x" + m.offset.toString(16) + " → " + m.x + ", " + m.y + "</summary>" + m.visual.map((v) => "<p>" + esc(v.name) + '</p><div class="visual-comparison">' + [["original_png_base64", "Original"], ["marker_png_base64", "Controlled marker"], ["difference_png_base64", "Difference"]].map(([k, label]) => "<figure><figcaption>" + label + '</figcaption><img class="game-resource-preview" src="data:image/png;base64,' + esc(v[k]) + '" alt="' + label + ' source-verification tile"></figure>').join("") + "</div>").join("") + "<p>" + m.unique_source_pixels + " of " + m.opaque_pixels + " opaque source pixels located · " + m.verified_pixels + " screen pixels confirmed · " + (m.complete_placement ? "complete opaque placement" : "partial mapping; other pixels remain unresolved") + "</p>" + (m.mask_png_base64 ? '<figure><figcaption>Proof mask · green verified, red unresolved</figcaption><img class="game-resource-preview" src="data:image/png;base64,' + esc(m.mask_png_base64) + '" alt="Source verification pixel proof mask"></figure>' : "") + '<details><summary>Recovered pixel origins</summary><div class="table-wrap"><table><thead><tr><th>Source pixel</th><th>Encoded byte lanes</th><th>Screen pixel</th></tr></thead><tbody>' + m.pixel_map.slice(0, 128).map((p) => "<tr><td>" + p.source_pixel % 8 + ", " + Math.floor(p.source_pixel / 8) + "</td><td>" + (p.encoded_bytes || []).map((b) => "0x" + b.offset.toString(16) + " / mask 0x" + b.mask.toString(16)).join(", ") + "</td><td>" + (m.x + p.screen_pixel % 8) + ", " + (m.y + Math.floor(p.screen_pixel / 8)) + "</td></tr>").join("") + "</tbody></table></div><p>Byte lanes come from the tested codec; native bus reads were not recorded.</p></details><p>Shared effects outside this placement: " + m.outside_placement_changed_pixels.join(", ") + " changed pixels.</p></details>").join("") + (r.coverage.next < r.coverage.total ? button("Test next source locations", "source-next") : "") + '<p class="subtle">Verified storage-to-picture dependency for this replay. Source pixel IDs were recovered by coded probes and independently validated. CPU, VRAM-bank and DMA transfers were not observed; compressed or transformed formats still need a supported decoder.</p></div>';
+    return '<div class="source-proof-result"><h4 data-result-status="' + esc(r.status) + '">' + esc(good ? "Verified visual source" : statusName(r.status)) + "</h4><p>" + esc(r.reason || "") + "</p>" + (r.runtime_trusted === false ? '<p class="notice warm">Historical imported proof. Run fresh verification before editing through this result.</p>' : "") + "<p>" + (r.original_reproduced_twice ? "Original reproduced twice. " : "") + (((_a = r.restored_control) == null ? void 0 : _a.frame_matches) ? "Restored-original control matched." : "") + "</p>" + (good ? '<fieldset class="verified-object-parts"><legend>Whole object · choose the parts that belong together</legend>' + r.verified_matches.map((m) => '<label><input type="checkbox" data-action="source-object-toggle" data-id="' + m.match_id + '" ' + (selected2.parts.some((p) => p.verification_id === r.verification_id && p.match_id === m.match_id) ? "checked" : "") + ">0x" + m.offset.toString(16) + " · " + m.x + ", " + m.y + " · 8 × " + m.height + "</label>").join("") + "</fieldset>" : "") + (good ? select("verified-source-part", "Verified part", r.verified_matches.map((m) => [String(m.match_id), "0x" + m.offset.toString(16) + " · " + m.x + ", " + m.y + " · 8 × " + m.height]), String(r.verified_matches[0].match_id)) + button("Open verified part in graphics editor", "source-open", { primary: true }) : "") + r.verified_matches.slice(0, 4).map((m) => "<details open><summary>0x" + m.offset.toString(16) + " → " + m.x + ", " + m.y + "</summary>" + m.visual.map((v) => "<p>" + esc(v.name) + '</p><div class="visual-comparison">' + [["original_png_base64", "Original"], ["marker_png_base64", "Controlled marker"], ["difference_png_base64", "Difference"]].map(([k, label]) => "<figure><figcaption>" + label + '</figcaption><img class="game-resource-preview" src="data:image/png;base64,' + esc(v[k]) + '" alt="' + label + ' source-verification tile"></figure>').join("") + "</div>").join("") + "<p>" + m.unique_source_pixels + " of " + m.opaque_pixels + " opaque source pixels located · " + m.verified_pixels + " screen pixels confirmed · " + (m.complete_placement ? "complete opaque placement" : "partial mapping; other pixels remain unresolved") + "</p>" + (m.mask_png_base64 ? '<figure><figcaption>Proof mask · green verified, red unresolved</figcaption><img class="game-resource-preview" src="data:image/png;base64,' + esc(m.mask_png_base64) + '" alt="Source verification pixel proof mask"></figure>' : "") + '<details><summary>Recovered pixel origins</summary><div class="table-wrap"><table><thead><tr><th>Source pixel</th><th>Encoded byte lanes</th><th>Screen pixel</th></tr></thead><tbody>' + m.pixel_map.slice(0, 128).map((p) => "<tr><td>" + p.source_pixel % 8 + ", " + Math.floor(p.source_pixel / 8) + "</td><td>" + (p.encoded_bytes || []).map((b) => "0x" + b.offset.toString(16) + " / mask 0x" + b.mask.toString(16)).join(", ") + "</td><td>" + (m.x + p.screen_pixel % 8) + ", " + (m.y + Math.floor(p.screen_pixel / 8)) + "</td></tr>").join("") + "</tbody></table></div><p>Byte lanes come from the tested codec; native bus reads were not recorded.</p></details><p>Shared effects outside this placement: " + m.outside_placement_changed_pixels.join(", ") + " changed pixels.</p></details>").join("") + (r.coverage.next < r.coverage.total ? button("Test next source locations", "source-next") : "") + '<p class="subtle">Verified storage-to-picture dependency for this replay. Source pixel IDs were recovered by coded probes and independently validated. CPU, VRAM-bank and DMA transfers were not observed; compressed or transformed formats still need a supported decoder.</p></div>';
   }
 
   // romancer/ui/trace_controls.js
@@ -6336,7 +6618,7 @@ ${font ? `<section class="card"><h3>Font metrics · ${esc(font.id)}</h3><div cla
         return ctx2.navigate("assets");
       }
     });
-    return '<section class="card" id="saved-gameplay-trace"><h3>Trace gameplay to ROM data</h3><p>Select a sprite or object in the captured frame above, then save its matching source locations in Game view.</p>' + field("trace-name", "Trace name", ctx2.draft("trace-name", "Gameplay selection")) + '<div class="field-row">' + field("trace-offset", "ROM start offset", ctx2.draft("trace-offset", "0")) + field("trace-length", "ROM bytes to request", ctx2.draft("trace-length", String(a.size))) + "</div>" + button("Trace selected object", "trace-save", { primary: true, disabled: !selected2 || !state2.runtime || state2.playing, reason: "Pause and select a current region at least 8 by 8 pixels." }) + '<p class="subtle">Each search reads up to 512 KiB using the system’s tested literal tile codec. Source transfers and animation ownership are not inferred.</p>' + (result ? '<div class="notice"><h4>' + esc(result.name) + '</h4><img class="game-resource-preview" src="data:image/png;base64,' + esc(result.crop_png_base64) + '" alt="Saved native gameplay region"><p>' + result.matches.length + " matching parts · " + result.coverage.bytes_scanned + " source bytes examined · " + (result.coverage.whole_source ? "whole source" : "partial range") + '</p><p>Matches are pixel evidence. Repeated graphics can have several source offsets.</p><div class="actions">' + button("Open saved trace in Game view", "trace-gameview") + (result.coverage.next_offset < a.size ? button("Search next ROM range", "trace-next", { disabled: !selected2 || state2.playing }) : "") + "</div>" + visualSourceControls(ctx2, result) + (groups.length ? '<div class="table-wrap"><table><thead><tr><th>Frame placement</th><th>Choose source</th></tr></thead><tbody>' + groups.map((g, i) => "<tr><td>" + g.x + ", " + g.y + " · 8 × " + g.height + "</td><td>" + select("trace-part-" + i, "Part " + (i + 1), [["", "Select an offset"], ...g.choices.map((m) => [String(m.index), "0x" + m.offset.toString(16) + (m.flip_x ? " · flip H" : "") + (m.flip_y ? " · flip V" : "")])], g.choices.length === 1 ? String(g.choices[0].index) : "") + "</td></tr>").join("") + "</tbody></table></div>" + button("Open chosen parts in graphics editor", "trace-open", { disabled: state2.playing || candidateGroups(result, partHeight).length > 16 }) : "<p>No literal match in this range. Try the next range or a different region. Compressed, transformed or RAM-generated graphics need a supported decoder or further native investigation.</p>") + "</div>" : "") + "</section>";
+    return '<section class="card" id="saved-gameplay-trace"><h3>Trace gameplay to ROM data</h3><p>Select a sprite or object in the captured frame above, then save its matching source locations in Game view.</p>' + field("trace-name", "Trace name", ctx2.draft("trace-name", "Gameplay selection")) + '<div class="field-row">' + field("trace-offset", "ROM start offset", ctx2.draft("trace-offset", "0")) + field("trace-length", "ROM bytes to request", ctx2.draft("trace-length", String(a.size))) + "</div>" + button("Trace selected object", "trace-save", { primary: true, disabled: !selected2 || !state2.runtime || state2.playing, reason: "Pause and select a current region at least 8 by 8 pixels." }) + '<p class="subtle">Each search reads up to 512 KiB using the system’s tested literal tile codec. Source transfers and animation ownership are not inferred.</p>' + (result ? '<div class="notice"><h4>' + esc(result.name) + '</h4><img class="game-resource-preview" src="data:image/png;base64,' + esc(result.crop_png_base64) + '" alt="Saved native gameplay region"><p>' + result.matches.length + " matching parts · " + result.coverage.bytes_scanned + " source bytes examined · " + (result.coverage.whole_source ? "whole source" : "partial range") + '</p><p>Matches are pixel evidence. Repeated graphics can have several source offsets.</p><div class="actions">' + button("Open saved trace in Game view", "trace-gameview") + (result.coverage.next_offset < a.size ? button("Search next ROM range", "trace-next", { disabled: !selected2 || state2.playing }) : "") + "</div>" + visualSourceControls(ctx2, result) + graphicsAccessControls(ctx2, result) + (groups.length ? '<div class="table-wrap"><table><thead><tr><th>Frame placement</th><th>Choose source</th></tr></thead><tbody>' + groups.map((g, i) => "<tr><td>" + g.x + ", " + g.y + " · 8 × " + g.height + "</td><td>" + select("trace-part-" + i, "Part " + (i + 1), [["", "Select an offset"], ...g.choices.map((m) => [String(m.index), "0x" + m.offset.toString(16) + (m.flip_x ? " · flip H" : "") + (m.flip_y ? " · flip V" : "")])], g.choices.length === 1 ? String(g.choices[0].index) : "") + "</td></tr>").join("") + "</tbody></table></div>" + button("Open chosen parts in graphics editor", "trace-open", { disabled: state2.playing || candidateGroups(result, partHeight).length > 16 }) : "<p>No literal match in this range. Try the next range or a different region. Compressed, transformed or RAM-generated graphics need a supported decoder or further native investigation.</p>") + "</div>" : "") + "</section>";
   }
 
   // romancer/ui/visual_controls.js
@@ -6834,6 +7116,7 @@ ${font ? `<section class="card"><h3>Font metrics · ${esc(font.id)}</h3><div cla
     return `${heading("", "Playtest", "", active ? button(state2.playtestExpanded ? "Show setup" : "Expand game", "runtime-view") + button("Close worker", "runtime-close", { icon: "close" }) : "")}<div class="identity">${badge(active ? "NATIVE WORKER LOADED" : state2.profileAvailable ? "READY TO LOAD" : "SETUP REQUIRED", active ? "good" : "warm")}<strong>${esc(((_s = state2.artifact) == null ? void 0 : _s.name) || "Selected source")}</strong><code>${short((_t = state2.artifact) == null ? void 0 : _t.sha256)}</code></div><div class="grid-two playtest-layout ${active && state2.playtestExpanded ? "playtest-expanded" : ""}"><section class="card"><div class="card-heading"><h3>Playtest screen</h3><span class="subtle" id="runtime-frame-label">${state2.frame ? `Frame ${state2.frame.index} · ${state2.frame.width} × ${state2.frame.height}` : "No measured frame yet"}</span></div>${stateControls}<div class="actions">${button("Inspect graphics", "graphics-show-region", { disabled: !state2.frame, icon: "assets" })}</div><div class="screen" id="runtime-controller" tabindex="0" aria-label="Game controller keyboard focus">${state2.frame || active ? '<canvas id="runtime-screen" aria-label="Measured emulator capture"></canvas>' : empty(state2.profileAvailable ? "Ready to playtest" : "Connect a compatible core", state2.profileAvailable ? "Load game to begin." : "Choose a core in System setup.")}</div><details class="manual-runtime"><summary>Controller & frame tools</summary>${controllerSetup}<div class="runtime-controls"><div><div class="field-row">${field("runtime-frames", "Frames to advance", ctx2.draft("runtime-frames", "60"), { type: "number", min: 1 })}${field("input-frames", "Frames per input", ctx2.draft("input-frames", "1"), { type: "number", min: 1 })}</div><div class="actions">${button("Advance frames", "runtime-advance", { primary: true, disabled: !active, icon: "playtest" })}${button("Capture", "runtime-capture", { disabled: !active })}${button("Reset", "runtime-reset", { disabled: !active })}${button(state2.liveMuted ? "Unmute" : "Mute", "runtime-mute", { disabled: !active })}${field("runtime-volume", "Volume (%)", ctx2.draft("runtime-volume", String(getSettings().volume)), { type: "number", min: 0, max: 100 })}${button("Set volume", "runtime-volume", { disabled: !active })}${button("Test sound", "runtime-sound-check")}${button("Check ROM", "runtime-check", { disabled: !state2.profile })}</div></div><div class="dpad" aria-label="Controller directions">${button("↑", "runtime-input", { id: "up", disabled: !active })}${button("←", "runtime-input", { id: "left", disabled: !active })}${button("→", "runtime-input", { id: "right", disabled: !active })}${button("↓", "runtime-input", { id: "down", disabled: !active })}</div></div><div class="actions">${["a", "b", "x", "y", "l", "r", "start", "select"].map((id) => button(id.toUpperCase(), "runtime-input", { id, disabled: !active })).join("")}</div><p class="subtle">Use your saved controller keys while the game has focus.</p></details></section><section class="card playtest-setup"><h3>System setup</h3>${setup2}${button("Load game", "runtime-load", { primary: !active, disabled: active || !state2.profile })}<details class="config"><summary>Advanced core setup</summary>${field("core-path", "Native libretro core", ctx2.draft("core-path", ((_u = state2.profile) == null ? void 0 : _u.core) || readPreference("romancer-core") || ""), { placeholder: state2.capabilities.platform === "Windows" ? "C:\\RetroArch\\cores\\snes9x_libretro.dll" : "/path/to/core_libretro.so", hint: `Choose a core built for ${state2.capabilities.platform}. A Linux .so cannot load in Windows Python.` })}<div class="actions">${button("Choose core", "core-choose", { icon: "folder" })}${button("Load selected source", "runtime-load", { primary: !active, disabled: active })}</div>${jsonEditor("core-options", "Advanced core options", ctx2.draft("core-options", JSON.stringify(((_v = state2.profile) == null ? void 0 : _v.options) || {}, null, 2)))}</details><div class="config"><h3>Audio</h3>${button("Drain audio", "runtime-audio", { disabled: !active })}</div>${((_w = state2.audio) == null ? void 0 : _w.observed) ? `<canvas id="pcm-wave" width="480" height="80" aria-label="Captured PCM waveform"></canvas><audio id="pcm-player" controls aria-label="Play captured audio"></audio>${button("Save captured WAV", "runtime-audio-export", { disabled: !state2.audio.complete })}` : ""}<details class="config"><summary>Audio capture test (advanced)</summary>${jsonEditor("audio-config", "Cold-boot audio capture configuration", ctx2.draft("audio-config", JSON.stringify({ schema_version: 1, load: {}, steps: [{ frames: 1, buttons: [], port: 0 }], timeout_seconds: 30 }, null, 2)))}${jsonEditor("audio-baseline", "Exact sample-duration baseline", ctx2.draft("audio-baseline", "{}"))}${button("Capture & export WAV", "audio-export")}<p class="subtle small">Audio duration is checked against samples and an explicit rational baseline, independently of video timing.</p></details></section></div>${((_x = state2.results["runtime.smoke_profile"]) == null ? void 0 : _x.source_sha256) === ((_y = state2.artifact) == null ? void 0 : _y.sha256) ? `<section class="card"><h3>ROM startup check</h3><p>${state2.results["runtime.smoke_profile"].frames_advanced} frames · ${state2.results["runtime.smoke_profile"].frame.width} × ${state2.results["runtime.smoke_profile"].frame.height} video · ${state2.results["runtime.smoke_profile"].audio.captured_frames} audio sample frames · worker closed</p><p class="subtle">Startup observations only. Regression checks need expected results.</p><div class="actions">${button("Record a test route", "navigate", { id: "routes" })}${button("Compare regression runs", "navigate", { id: "regression" })}</div></section>` : ""}${report(state2.results["runtime.smoke_profile"], "ROM check details")}${report(state2.results["runtime.load"], "Worker capabilities")}${report(state2.results["runtime.close"], "Worker closure")}${report(state2.results["runtime.save_state"] ? { ...state2.results["runtime.save_state"], state_base64: "[local snapshot payload hidden]" } : null, "State identity")}${report(state2.audio ? { ...state2.audio, pcm_s16le_base64: "[PCM payload hidden]" } : null, "Captured audio")}${report(state2.results["audio.capture"], "WAV export")}${state2.artifact ? saveManager(ctx2, saveListing) + checkpointControls(ctx2) + traceControls(ctx2) + graphicsInvestigation(ctx2) : ""}${evidence(ctx2)}`;
   }
   function mount7(ctx2) {
+    mountGraphicsAccess(ctx2);
     mountController(ctx2);
     mountCheckpoint(ctx2);
     mountAudio(ctx2.state.audio);
@@ -6864,7 +7147,7 @@ ${font ? `<section class="card"><h3>Font metrics · ${esc(font.id)}</h3><div cla
   });
 
   // romancer/ui/structural_lab.js
-  var hex4 = (v) => "0x" + v.toString(16);
+  var hex5 = (v) => "0x" + v.toString(16);
   var bound = (state2, r) => {
     var _a, _b;
     return (r == null ? void 0 : r.source_sha256) === ((_a = state2.artifact) == null ? void 0 : _a.sha256) && r.artifact_id === ((_b = state2.artifact) == null ? void 0 : _b.artifact_id);
@@ -6909,7 +7192,7 @@ ${font ? `<section class="card"><h3>Font metrics · ${esc(font.id)}</h3><div cla
         await ctx2.navigate("tables");
       }
     });
-    return `<section class="card structural-lab"><h2>Explore ROM structure</h2><p>Test repeated numeric layouts, inspect sample records, and open a neutral editor. These are hypotheses; game meaning and pointer use need behavioral evidence.</p><div class="field-row">${field("lab-offset", "Window file offset", ctx2.draft("lab-offset", "0"))}${field("lab-length", "Window bytes (up to 65536)", ctx2.draft("lab-length", "4096"))}</div>${button("Test this range", "lab-survey", { primary: true })}${result ? `<p>${result.coverage.positions_tested} layouts tested · start positions sampled every ${result.coverage.position_stride} bytes · ${result.total_candidates} surviving hypotheses${result.truncated ? " · result limit reached" : ""}</p><p class="notice">${esc(result.next_experiment)}</p>${select("lab-interpretation", "Open editor as", [["numeric", "Neutral numeric values"], ["linear-pointer", "An explicit linear-pointer hypothesis"]], ctx2.draft("lab-interpretation", "numeric"))}${result.candidates.length ? `<div class="table-wrap"><table><thead><tr><th>First record</th><th>Layout</th><th>Sample values and possible targets</th><th></th></tr></thead><tbody>${result.candidates.slice(0, 12).map((c) => `<tr><td><code>${hex4(c.offset)}</code></td><td>${c.count} records · ${c.stride} bytes/record<br>${c.width * 8} bit · ${esc(c.endian)}<br>Target hypothesis: stored − ${hex4(c.base)}</td><td>${c.samples.slice(0, 3).map((s) => `<div><code>${hex4(s.stored_value)} → ${hex4(s.target_offset)}</code>${s.target_preview ? " · " + esc(s.target_preview) : ""}</div>`).join("")}</td><td>${button("Open table editor", "lab-open", { id: c.candidate_id })}</td></tr>`).join("")}</tbody></table></div><p class="subtle">Showing ${Math.min(12, result.candidates.length)} of ${result.candidates.length} retained hypotheses. Use a smaller range to separate layouts. Opening an editor does not modify ROM bytes.</p>` : "<p>No repeated layout survived these tests. Try another range or use native access evidence to locate data.</p>"}` : ""}</section>`;
+    return `<section class="card structural-lab"><h2>Explore ROM structure</h2><p>Test repeated numeric layouts, inspect sample records, and open a neutral editor. These are hypotheses; game meaning and pointer use need behavioral evidence.</p><div class="field-row">${field("lab-offset", "Window file offset", ctx2.draft("lab-offset", "0"))}${field("lab-length", "Window bytes (up to 65536)", ctx2.draft("lab-length", "4096"))}</div>${button("Test this range", "lab-survey", { primary: true })}${result ? `<p>${result.coverage.positions_tested} layouts tested · start positions sampled every ${result.coverage.position_stride} bytes · ${result.total_candidates} surviving hypotheses${result.truncated ? " · result limit reached" : ""}</p><p class="notice">${esc(result.next_experiment)}</p>${select("lab-interpretation", "Open editor as", [["numeric", "Neutral numeric values"], ["linear-pointer", "An explicit linear-pointer hypothesis"]], ctx2.draft("lab-interpretation", "numeric"))}${result.candidates.length ? `<div class="table-wrap"><table><thead><tr><th>First record</th><th>Layout</th><th>Sample values and possible targets</th><th></th></tr></thead><tbody>${result.candidates.slice(0, 12).map((c) => `<tr><td><code>${hex5(c.offset)}</code></td><td>${c.count} records · ${c.stride} bytes/record<br>${c.width * 8} bit · ${esc(c.endian)}<br>Target hypothesis: stored − ${hex5(c.base)}</td><td>${c.samples.slice(0, 3).map((s) => `<div><code>${hex5(s.stored_value)} → ${hex5(s.target_offset)}</code>${s.target_preview ? " · " + esc(s.target_preview) : ""}</div>`).join("")}</td><td>${button("Open table editor", "lab-open", { id: c.candidate_id })}</td></tr>`).join("")}</tbody></table></div><p class="subtle">Showing ${Math.min(12, result.candidates.length)} of ${result.candidates.length} retained hypotheses. Use a smaller range to separate layouts. Opening an editor does not modify ROM bytes.</p>` : "<p>No repeated layout survived these tests. Try another range or use native access evidence to locate data.</p>"}` : ""}</section>`;
   }
 
   // romancer/ui/value_finder.js
@@ -6950,8 +7233,8 @@ ${font ? `<section class="card"><h3>Font metrics · ${esc(font.id)}</h3><div cla
       },
       "video-read": () => keep("video.inspect", { offset: finderTarget(read("video-offset")), length: finderTarget(read("video-length")), codec: read("video-codec") }, "valueVideo")
     });
-    const codecs2 = [["tile8-planar2-msb-v1", "NES planar 2-bit"], ["tile8-paired2-msb-v1", "Game Boy / paired 2-bit"], ["tile8-paired4-msb-v1", "SNES paired 4-bit"], ["tile8-packed4-high-v1", "Genesis packed 4-bit"], ["tile8-packed4-low-v1", "GBA packed 4-bit"]];
-    return `<section class="card"><h3>Find a changing value</h3><p>Search a bounded System RAM range. Play to change the value, pause, then narrow the results. RAM matches do not identify a ROM location.</p><div class="field-row">${field("finder-offset", "RAM region offset", ctx2.draft("finder-offset", "0"))}${field("finder-length", "Bytes (1–4096)", ctx2.draft("finder-length", "2048"))}${select("finder-width", "Integer width", [[1, "8 bit"], [2, "16 bit"], [4, "32 bit"]], ctx2.draft("finder-width", "1"))}${select("finder-endian", "Byte order", [["little", "Little endian"], ["big", "Big endian"]], ctx2.draft("finder-endian", state2.artifact.system_id === "genesis" ? "big" : "little"))}${select("finder-sign", "Sign", [["false", "Unsigned"], ["true", "Signed"]], ctx2.draft("finder-sign", "false"))}${field("finder-value", "Exact value (blank for unknown)", ctx2.draft("finder-value", ""))}</div><div class="actions">${button("Start RAM search", "finder-start", { disabled: !state2.runtime, primary: !result })}${select("finder-relation", "Keep values that", [["equal", "Equal exact value"], ["changed", "Changed"], ["unchanged", "Stayed the same"], ["increased", "Increased"], ["decreased", "Decreased"]], ctx2.draft("finder-relation", "changed"))}${button("Capture & narrow", "finder-narrow", { disabled: !result || !state2.runtime, primary: !!result })}${button("Open Playtest", "navigate", { id: "playtest" })}</div>${result ? `<p>${result.total} matches · showing ${result.matches.length} · observation ${result.sequence}</p><div class="table-wrap"><table><thead><tr><th>RAM offset</th><th>Previous</th><th>Current</th><th></th></tr></thead><tbody>${result.matches.map((m) => `<tr><td><code>0x${m.offset.toString(16)}</code></td><td>${esc(m.previous ?? "—")}</td><td>${esc(m.value)}</td><td>${button("Add watch", "finder-watch", { id: String(m.offset) })}</td></tr>`).join("")}</tbody></table></div>` : ""}</section><details class="card"><summary>Available video memory</summary><p>Read bytes exposed by the selected core and decode the chosen tested tile format. Indexed grayscale preview; palette, OAM and ROM ownership remain unknown.</p><div class="field-row">${field("video-offset", "Video RAM offset", ctx2.draft("video-offset", "0"))}${field("video-length", "Bytes (1–4096)", ctx2.draft("video-length", "256"))}${select("video-codec", "Tile format", codecs2, ctx2.draft("video-codec", ((_a = codecs2[["nes", "gb", "snes", "genesis", "gba"].indexOf(state2.artifact.system_id === "gbc" ? "gb" : state2.artifact.system_id)]) == null ? void 0 : _a[0]) || codecs2[0][0]))}</div>${button("Read video tiles", "video-read", { disabled: !state2.runtime })}${video ? `<p>${video.tiles.length} decoded tiles · showing ${Math.min(128, video.tiles.length)}</p><canvas id="video-tiles" aria-label="Measured video memory indexed tile preview"></canvas>` : ""}</details>`;
+    const codecs3 = [["tile8-planar2-msb-v1", "NES planar 2-bit"], ["tile8-paired2-msb-v1", "Game Boy / paired 2-bit"], ["tile8-paired4-msb-v1", "SNES paired 4-bit"], ["tile8-packed4-high-v1", "Genesis packed 4-bit"], ["tile8-packed4-low-v1", "GBA packed 4-bit"]];
+    return `<section class="card"><h3>Find a changing value</h3><p>Search a bounded System RAM range. Play to change the value, pause, then narrow the results. RAM matches do not identify a ROM location.</p><div class="field-row">${field("finder-offset", "RAM region offset", ctx2.draft("finder-offset", "0"))}${field("finder-length", "Bytes (1–4096)", ctx2.draft("finder-length", "2048"))}${select("finder-width", "Integer width", [[1, "8 bit"], [2, "16 bit"], [4, "32 bit"]], ctx2.draft("finder-width", "1"))}${select("finder-endian", "Byte order", [["little", "Little endian"], ["big", "Big endian"]], ctx2.draft("finder-endian", state2.artifact.system_id === "genesis" ? "big" : "little"))}${select("finder-sign", "Sign", [["false", "Unsigned"], ["true", "Signed"]], ctx2.draft("finder-sign", "false"))}${field("finder-value", "Exact value (blank for unknown)", ctx2.draft("finder-value", ""))}</div><div class="actions">${button("Start RAM search", "finder-start", { disabled: !state2.runtime, primary: !result })}${select("finder-relation", "Keep values that", [["equal", "Equal exact value"], ["changed", "Changed"], ["unchanged", "Stayed the same"], ["increased", "Increased"], ["decreased", "Decreased"]], ctx2.draft("finder-relation", "changed"))}${button("Capture & narrow", "finder-narrow", { disabled: !result || !state2.runtime, primary: !!result })}${button("Open Playtest", "navigate", { id: "playtest" })}</div>${result ? `<p>${result.total} matches · showing ${result.matches.length} · observation ${result.sequence}</p><div class="table-wrap"><table><thead><tr><th>RAM offset</th><th>Previous</th><th>Current</th><th></th></tr></thead><tbody>${result.matches.map((m) => `<tr><td><code>0x${m.offset.toString(16)}</code></td><td>${esc(m.previous ?? "—")}</td><td>${esc(m.value)}</td><td>${button("Add watch", "finder-watch", { id: String(m.offset) })}</td></tr>`).join("")}</tbody></table></div>` : ""}</section><details class="card"><summary>Available video memory</summary><p>Read bytes exposed by the selected core and decode the chosen tested tile format. Indexed grayscale preview; palette, OAM and ROM ownership remain unknown.</p><div class="field-row">${field("video-offset", "Video RAM offset", ctx2.draft("video-offset", "0"))}${field("video-length", "Bytes (1–4096)", ctx2.draft("video-length", "256"))}${select("video-codec", "Tile format", codecs3, ctx2.draft("video-codec", ((_a = codecs3[["nes", "gb", "snes", "genesis", "gba"].indexOf(state2.artifact.system_id === "gbc" ? "gb" : state2.artifact.system_id)]) == null ? void 0 : _a[0]) || codecs3[0][0]))}</div>${button("Read video tiles", "video-read", { disabled: !state2.runtime })}${video ? `<p>${video.tiles.length} decoded tiles · showing ${Math.min(128, video.tiles.length)}</p><canvas id="video-tiles" aria-label="Measured video memory indexed tile preview"></canvas>` : ""}</details>`;
   }
   function mountValueFinder(ctx2) {
     const result = ctx2.state.valueVideo, canvas = document.getElementById("video-tiles");
@@ -8176,7 +8459,7 @@ ${font ? `<section class="card"><h3>Font metrics · ${esc(font.id)}</h3><div cla
   }
 
   // romancer/ui/game_maps.js
-  var hex5 = (n) => "0x" + Number(n).toString(16).toUpperCase();
+  var hex6 = (n) => "0x" + Number(n).toString(16).toUpperCase();
   var clone = (value) => JSON.parse(JSON.stringify(value));
   var key2 = (c) => c.kind === "arrival" ? `arrival:${c.table}:${c.id}` : `${c.kind}:${c.offset}`;
   var number2 = (value, max = 63) => {
@@ -8532,15 +8815,15 @@ ${font ? `<section class="card"><h3>Font metrics · ${esc(font.id)}</h3><div cla
     if (doc.error) return browser + `<section class="card"><h3>Room unavailable</h3><p>${esc(doc.error)}</p></section>`;
     if (doc.map.status !== "decoded") return browser + `<section class="card"><h3>${esc(doc.room.label)}</h3><p class="notice">Terrain preview unavailable: ${esc(doc.map.reason)}</p><p>Conditional terrain needs an explicit game-state value. Unsupported circle paths remain unavailable. No state is assumed.</p>${definitions(doc)}</section>`;
     const model = view.model, chosen = currentTarget(view), editable = canEdit(view, chosen), pending = ((_d = view.pending) == null ? void 0 : _d.revision) === model.revision && view.pending.signature === JSON.stringify(model.values()) ? view.pending : null;
-    const options = [...doc.map.commands.filter((c) => "x" in c).map((c) => [targetKey("command", c), `${c.name || "Command"} ${hex5(c.offset)}${c.editable ? "" : " · read-only"}`]), ...doc.objects.map((n) => [targetKey("npc", n), objectName(doc.room, n) + (n.editable ? "" : " · conditional/read-only")]), ...doc.arrivals.map((a) => [targetKey("arrival", a), `Arrival ${a.table} ${hex5(a.id)}`])];
+    const options = [...doc.map.commands.filter((c) => "x" in c).map((c) => [targetKey("command", c), `${c.name || "Command"} ${hex6(c.offset)}${c.editable ? "" : " · read-only"}`]), ...doc.objects.map((n) => [targetKey("npc", n), objectName(doc.room, n) + (n.editable ? "" : " · conditional/read-only")]), ...doc.arrivals.map((a) => [targetKey("arrival", a), `Arrival ${a.table} ${hex6(a.id)}`])];
     const form = chosen ? `<aside class="card game-map-inspector"><h3>${chosen.kind === "npc" ? esc(objectName(doc.room, chosen.entity)) : chosen.kind === "arrival" ? "Arrival position" : "Existing terrain command"}</h3>${select("maps-target", "Selection", options, view.selection)}<div class="field-row">${field("maps-x", "X · 0–63", chosen.entity.x, { type: "number", min: 0, readonly: !editable })}${field("maps-y", "Y · 0–63", chosen.entity.y, { type: "number", min: 0, readonly: !editable })}${chosen.kind === "command" && "tile" in chosen.entity ? field("maps-tile", "Tile · 0–63", chosen.entity.tile, { type: "number", min: 0, readonly: !editable }) : ""}</div>${chosen.kind === "npc" ? `<p class="notice">NPCs are stored definitions. Their conditions may hide them in Playtest.${chosen.entity.event === 274 ? " Mother participates in the opening story. Moving her can affect the narrative; playtest the full conversation." : ""}</p>` : ""}${chosen.kind === "command" ? `<p>${chosen.entity.final_cells || 0} final terrain cells currently come from this command. Later commands can overwrite its drawing.</p><p>Edits preserve collision behavior, region bits and existing trigger bindings. Changes that fail these checks are refused.</p>` : ""}${chosen.kind === "arrival" ? "<p>Changes only the arrival position. Destination, facing and packed flags stay protected. Enter through its real door when playtesting.</p>" : ""}${button("Stage position / tile", "maps-stage", { disabled: !editable, reason: "This definition is read-only; writable scope is the initial shared atlas." })}</aside>` : "<p>Select an existing terrain command, NPC definition or arrival.</p>";
-    return browser + `<section class="card game-map-workbench"><h3>${header === 18539 ? "Opening bedroom / shared interiors" : esc(doc.room.label)}</h3><p>Terrain ${hex5(doc.room.map_pointer)} · shared by ${doc.room.shared_headers.map(hex5).join(", ")}. A terrain edit affects every listed definition.</p>${!doc.map.palette ? '<p class="notice">Color-index grayscale preview. This room’s live palette has not been verified.</p>' : ""}<div class="field-row">${select("maps-mode", "Canvas tool", [["inspect", "Inspect terrain command"], ["place", "Place selected definition"]], view.mode)}${button(view.overview ? "Return to readable crop" : "Show full overview", "maps-overview")}${button("Left", "maps-pan", { id: "-8,0" })}${button("Right", "maps-pan", { id: "8,0" })}${button("Up", "maps-pan", { id: "0,-6" })}${button("Down", "maps-pan", { id: "0,6" })}</div><div class="level-editor-layout game-map-layout"><div><div class="preview-pair game-map-previews"><div><span>Original for this edit · selected ROM</span><canvas id="maps-original" aria-label="Original decoded game terrain"></canvas></div><div><span>${(pending == null ? void 0 : pending.result.preview_map) ? "Reviewed terrain · exact planned bytes" : "Staged placement overlay"}</span><canvas id="maps-edit" tabindex="0" aria-label="Decoded game map: inspect or place selected definition"></canvas></div></div><p id="maps-position" role="status">Readable crop around (${view.center.join(", ")}). NPC and arrival markers are outlines, not character artwork.</p><p>${(pending == null ? void 0 : pending.result.preview_map) ? "The reviewed terrain comes from the server’s bounded decoder." : "Placement outlines show staged coordinates. Review computes exact terrain, including restored and overwritten cells."}</p></div>${form}</div><div class="actions">${button("Undo staged edit", "maps-undo", { disabled: !model.past.length })}${button("Redo staged edit", "maps-redo", { disabled: !model.future.length })}${button("Clear staged edits", "maps-clear", { disabled: !model.values().length })}${button("Review map changes", "maps-review", { disabled: !model.values().length, primary: !pending })}</div><p>${model.values().length} staged records. The selected ROM remains unchanged.</p>${pending ? review(pending.result) : ""}${definitions(doc)}</section>`;
+    return browser + `<section class="card game-map-workbench"><h3>${header === 18539 ? "Opening bedroom / shared interiors" : esc(doc.room.label)}</h3><p>Terrain ${hex6(doc.room.map_pointer)} · shared by ${doc.room.shared_headers.map(hex6).join(", ")}. A terrain edit affects every listed definition.</p>${!doc.map.palette ? '<p class="notice">Color-index grayscale preview. This room’s live palette has not been verified.</p>' : ""}<div class="field-row">${select("maps-mode", "Canvas tool", [["inspect", "Inspect terrain command"], ["place", "Place selected definition"]], view.mode)}${button(view.overview ? "Return to readable crop" : "Show full overview", "maps-overview")}${button("Left", "maps-pan", { id: "-8,0" })}${button("Right", "maps-pan", { id: "8,0" })}${button("Up", "maps-pan", { id: "0,-6" })}${button("Down", "maps-pan", { id: "0,6" })}</div><div class="level-editor-layout game-map-layout"><div><div class="preview-pair game-map-previews"><div><span>Original for this edit · selected ROM</span><canvas id="maps-original" aria-label="Original decoded game terrain"></canvas></div><div><span>${(pending == null ? void 0 : pending.result.preview_map) ? "Reviewed terrain · exact planned bytes" : "Staged placement overlay"}</span><canvas id="maps-edit" tabindex="0" aria-label="Decoded game map: inspect or place selected definition"></canvas></div></div><p id="maps-position" role="status">Readable crop around (${view.center.join(", ")}). NPC and arrival markers are outlines, not character artwork.</p><p>${(pending == null ? void 0 : pending.result.preview_map) ? "The reviewed terrain comes from the server’s bounded decoder." : "Placement outlines show staged coordinates. Review computes exact terrain, including restored and overwritten cells."}</p></div>${form}</div><div class="actions">${button("Undo staged edit", "maps-undo", { disabled: !model.past.length })}${button("Redo staged edit", "maps-redo", { disabled: !model.future.length })}${button("Clear staged edits", "maps-clear", { disabled: !model.values().length })}${button("Review map changes", "maps-review", { disabled: !model.values().length, primary: !pending })}</div><p>${model.values().length} staged records. The selected ROM remains unchanged.</p>${pending ? review(pending.result) : ""}${definitions(doc)}</section>`;
   }
   function definitions(doc) {
-    return `<details><summary>NPC conditions and interactions</summary><p>These records are conditional definitions, not a list of characters guaranteed to be visible now. Interaction destinations remain read-only.</p><table><thead><tr><th>NPC definition</th><th>Position</th><th>Condition</th></tr></thead><tbody>${doc.objects.map((n) => `<tr><td>${esc(objectName(doc.room, n))}</td><td>${n.x}, ${n.y}</td><td>${esc(n.state_status || "Live condition unobserved")}</td></tr>`).join("")}</tbody></table><table><thead><tr><th>Interaction</th><th>Destination</th></tr></thead><tbody>${doc.links.map((l) => `<tr><td>${l.index}</td><td>${l.transition.kind === "saved-return" ? "Saved return to the previous location" : l.destination ? `Room ${esc(hex5(l.destination.header))} · ${l.destination.x}, ${l.destination.y}` : `Event reference ${esc(hex5(l.word))} · not a direct room destination`}</td></tr>`).join("")}</tbody></table></details>`;
+    return `<details><summary>NPC conditions and interactions</summary><p>These records are conditional definitions, not a list of characters guaranteed to be visible now. Interaction destinations remain read-only.</p><table><thead><tr><th>NPC definition</th><th>Position</th><th>Condition</th></tr></thead><tbody>${doc.objects.map((n) => `<tr><td>${esc(objectName(doc.room, n))}</td><td>${n.x}, ${n.y}</td><td>${esc(n.state_status || "Live condition unobserved")}</td></tr>`).join("")}</tbody></table><table><thead><tr><th>Interaction</th><th>Destination</th></tr></thead><tbody>${doc.links.map((l) => `<tr><td>${l.index}</td><td>${l.transition.kind === "saved-return" ? "Saved return to the previous location" : l.destination ? `Room ${esc(hex6(l.destination.header))} · ${l.destination.x}, ${l.destination.y}` : `Event reference ${esc(hex6(l.word))} · not a direct room destination`}</td></tr>`).join("")}</tbody></table></details>`;
   }
   function review(plan) {
-    return `<section class="game-review"><h3>Review map changes</h3><p>${plan.edits.length} checked byte spans${plan.integrity_edit_count ? ` including ${plan.integrity_edit_count} integrity updates` : ""}. A separate build needs its own door and story playtests.</p><details><summary>Exact changed bytes</summary><table><thead><tr><th>Offset</th><th>Before</th><th>After</th></tr></thead><tbody>${plan.edits.map((e) => `<tr><td>${hex5(e.offset)}</td><td><code>${esc(e.before)}</code></td><td><code>${esc(e.after)}</code></td></tr>`).join("")}</tbody></table></details>${button("Create separate map build", "maps-build", { primary: true })}</section>`;
+    return `<section class="game-review"><h3>Review map changes</h3><p>${plan.edits.length} checked byte spans${plan.integrity_edit_count ? ` including ${plan.integrity_edit_count} integrity updates` : ""}. A separate build needs its own door and story playtests.</p><details><summary>Exact changed bytes</summary><table><thead><tr><th>Offset</th><th>Before</th><th>After</th></tr></thead><tbody>${plan.edits.map((e) => `<tr><td>${hex6(e.offset)}</td><td><code>${esc(e.before)}</code></td><td><code>${esc(e.after)}</code></td></tr>`).join("")}</tbody></table></details>${button("Create separate map build", "maps-build", { primary: true })}</section>`;
   }
   function mountGameMaps(ctx2) {
     var _a, _b, _c, _d;
@@ -8624,7 +8907,7 @@ ${font ? `<section class="card"><h3>Font metrics · ${esc(font.id)}</h3><div cla
   }
 
   // romancer/ui/views/levels.js
-  var codecs = { nes: "tile8-planar2-msb-v1", snes: "tile8-paired4-msb-v1", genesis: "tile8-packed4-high-v1", gb: "tile8-paired2-msb-v1", gbc: "tile8-paired2-msb-v1", gba: "tile8-packed4-low-v1" };
+  var codecs2 = { nes: "tile8-planar2-msb-v1", snes: "tile8-paired4-msb-v1", genesis: "tile8-packed4-high-v1", gb: "tile8-paired2-msb-v1", gbc: "tile8-paired2-msb-v1", gba: "tile8-packed4-low-v1" };
   var objectInteger = (id) => {
     const text = read(id).trim();
     if (!/^\d+$/.test(text)) throw Error("Enter a whole number for every object field.");
@@ -8809,10 +9092,10 @@ ${font ? `<section class="card"><h3>Font metrics · ${esc(font.id)}</h3><div cla
         ctx2.notify(unchanged ? "Separate level build created. Select it in Playtest." : "Separate level build created. Your newer edits are still staged.");
       }
     });
-    const setup2 = `<details class="card"><summary>Advanced level setup</summary><p>Level editing needs a layout definition for this ROM. Confirm tile grids, object fields, and room-reference mappings before using them. Names and roles alone do not establish game behavior.</p><details><summary>Single-room layout form</summary><div class="field-row">${field("level-name", "Room name", ctx2.draft("level-name", "Room"))}${field("level-width", "Blocks across", ctx2.draft("level-width", "16"), { type: "number", min: 1 })}${field("level-height", "Blocks down", ctx2.draft("level-height", "14"), { type: "number", min: 1 })}${select("level-entry", "Grid integer bytes", [[1, "8 bit"], [2, "16 bit"]], ctx2.draft("level-entry", "1"))}${select("level-endian", "Grid byte order", [["little", "Little endian"], ["big", "Big endian"]], ctx2.draft("level-endian", "little"))}</div><div class="field-row">${field("level-tiles-offset", "Tiles offset", ctx2.draft("level-tiles-offset", "0"))}${field("level-tiles-count", "Tile count", ctx2.draft("level-tiles-count", "16"))}${select("level-codec", "Tile format", Object.entries(codecs).map(([system2, codec]) => [codec, system2.toUpperCase()]), ctx2.draft("level-codec", codecs[state2.artifact.system_id] || codecs.nes))}${field("level-palette-offset", "Palette offset", ctx2.draft("level-palette-offset", "0"))}${select("level-palette-format", "Palette format", [["rgb888", "RGB888"], ["rgb555-le", "RGB555 little endian"], ["rgb555-be", "RGB555 big endian"]], ctx2.draft("level-palette-format", "rgb555-le"))}</div><div class="field-row">${field("level-blocks-offset", "Metatile table offset", ctx2.draft("level-blocks-offset", "0"))}${field("level-blocks-count", "Metatile count", ctx2.draft("level-blocks-count", "16"))}${field("level-block-width", "Tiles per block across", ctx2.draft("level-block-width", "2"))}${field("level-block-height", "Tiles per block down", ctx2.draft("level-block-height", "2"))}${field("level-terrain-offset", "Terrain grid offset", ctx2.draft("level-terrain-offset", "0"))}${field("level-collision-offset", "Collision grid offset (optional)", ctx2.draft("level-collision-offset", ""))}</div>${button("Check declared layout", "levels-declare")}</details>${jsonEditor("level-definition", "Verified layout definition", ctx2.draft("level-definition", JSON.stringify(definition, null, 2)))}<div class="actions">${button("Inspect layout", "levels-inspect")}${button("Save checked definition", "levels-save")}</div></details>`;
+    const setup2 = `<details class="card"><summary>Advanced level setup</summary><p>Level editing needs a layout definition for this ROM. Confirm tile grids, object fields, and room-reference mappings before using them. Names and roles alone do not establish game behavior.</p><details><summary>Single-room layout form</summary><div class="field-row">${field("level-name", "Room name", ctx2.draft("level-name", "Room"))}${field("level-width", "Blocks across", ctx2.draft("level-width", "16"), { type: "number", min: 1 })}${field("level-height", "Blocks down", ctx2.draft("level-height", "14"), { type: "number", min: 1 })}${select("level-entry", "Grid integer bytes", [[1, "8 bit"], [2, "16 bit"]], ctx2.draft("level-entry", "1"))}${select("level-endian", "Grid byte order", [["little", "Little endian"], ["big", "Big endian"]], ctx2.draft("level-endian", "little"))}</div><div class="field-row">${field("level-tiles-offset", "Tiles offset", ctx2.draft("level-tiles-offset", "0"))}${field("level-tiles-count", "Tile count", ctx2.draft("level-tiles-count", "16"))}${select("level-codec", "Tile format", Object.entries(codecs2).map(([system2, codec]) => [codec, system2.toUpperCase()]), ctx2.draft("level-codec", codecs2[state2.artifact.system_id] || codecs2.nes))}${field("level-palette-offset", "Palette offset", ctx2.draft("level-palette-offset", "0"))}${select("level-palette-format", "Palette format", [["rgb888", "RGB888"], ["rgb555-le", "RGB555 little endian"], ["rgb555-be", "RGB555 big endian"]], ctx2.draft("level-palette-format", "rgb555-le"))}</div><div class="field-row">${field("level-blocks-offset", "Metatile table offset", ctx2.draft("level-blocks-offset", "0"))}${field("level-blocks-count", "Metatile count", ctx2.draft("level-blocks-count", "16"))}${field("level-block-width", "Tiles per block across", ctx2.draft("level-block-width", "2"))}${field("level-block-height", "Tiles per block down", ctx2.draft("level-block-height", "2"))}${field("level-terrain-offset", "Terrain grid offset", ctx2.draft("level-terrain-offset", "0"))}${field("level-collision-offset", "Collision grid offset (optional)", ctx2.draft("level-collision-offset", ""))}</div>${button("Check declared layout", "levels-declare")}</details>${jsonEditor("level-definition", "Verified layout definition", ctx2.draft("level-definition", JSON.stringify(definition, null, 2)))}<div class="actions">${button("Inspect layout", "levels-inspect")}${button("Save checked definition", "levels-save")}</div></details>`;
     if (!(doc == null ? void 0 : doc.ok)) return heading("", "Levels", "") + empty("No supported level map for this ROM yet", "Inspect the ROM in Resources. A supported map definition is needed before its levels can be shown.", button("Investigate bytes", "navigate", { id: "resources", primary: true })) + setup2 + practiceControls();
     const objects = model.objects(room.id), namedObjects = objects.some((object, index) => !!objectMetadata(doc, room.id, index)), block = Number(ctx2.draft("level-block-index", "0")), uses = doc.uses[String(block)] || [], pending = ((_l = state2.pending) == null ? void 0 : _l.kind) === "levels" && state2.pending.document_id === doc.document_id;
-    return `${heading("", "Levels", "")}<div class="identity"><strong>${esc(state2.artifact.name)}</strong><span>${model.values().length} preview changes</span></div><section class="card">${state2.project.demo && ((_m = doc.definition) == null ? void 0 : _m.name) === "Hillside editor-layout workshop" ? '<p class="notice">Practice layout. These room links and object records do not run in Playtest; only Hillside terrain and music do.</p>' : ""}${roomNavigation(doc, model, room.id)}<div class="field-row level-toolbar">${select("level-room", "Room", doc.rooms.map((r) => [r.id, r.name]), room.id)}${select("level-layer", "Paint layer", [["terrain", "Terrain"], ...room.collision ? [["collision", "Collision values"]] : []], layer)}${select("level-tool", "Tool", [["paint", "Paint"], ["pick", "Pick from room"], ["fill", "Fill"], ["select", "Select rectangle"], ["paste", "Paste rectangle"], ...objects.some((o) => Number.isSafeInteger(o.x) && Number.isSafeInteger(o.y)) ? [["objects", "Move object"]] : []], ctx2.draft("level-tool", namedObjects ? "objects" : "paint"))}<details><summary>Advanced brush value</summary>${field("level-brush", "Brush value", ctx2.draft("level-brush", "1"), { type: "number", min: 0 })}</details>${select("level-overlay", "Overlay", [["none", "Terrain only"], ...room.collision ? [["collision", "Collision values"]] : [], ...objects.length ? [["objects", "Named objects"], ["records", "All records (Advanced)"]] : []], ctx2.draft("level-overlay", "objects"))}${select("level-zoom", "Zoom", [["fit", "Fit"], ["1", "1x"], ["2", "2x"], ["3", "3x"]], ctx2.draft("level-zoom", "fit"))}</div><div class="level-brush-panel"><strong>Terrain brushes</strong><p class="subtle">Choose a thumbnail to paint, or use Pick from room to sample an existing cell.</p>${levelBrushPalette(doc, model, ctx2.draft("level-brush", "1"))}</div><div class="level-editor-layout"><div class="level-room-editor"><div class="preview-pair room-comparison"><div><span>Original room</span><div class="hex-scroll"><canvas id="level-original" aria-label="Original declared room"></canvas></div></div><div><span>Editing · highlighted cells changed</span><div class="hex-scroll"><canvas id="level-canvas" tabindex="0" role="application" aria-label="Room editor: arrows select, Space paints"></canvas></div></div></div><p id="level-difference-count" class="preview-caption" role="status" aria-live="polite"></p><p id="level-position">Select an object or choose a terrain brush to begin.</p></div>${objectInspector(ctx2, doc, model, room.id)}</div><div class="actions">${button("Undo stroke", "levels-undo", { disabled: !model.past.length })}${button("Redo stroke", "levels-redo", { disabled: !model.future.length })}${button("Copy rectangle", "levels-copy")}${button("Review level changes", "levels-plan", { primary: !pending, disabled: !model.values().length })}${pending ? button("Create level build", "levels-build", { primary: true }) : ""}</div><p class="subtle">Review changes and create a build to save this in the ROM.</p></section><details class="card"><summary>Metatiles & shared uses</summary><div class="field-row">${field("level-block-index", "Metatile index", ctx2.draft("level-block-index", "0"))}${field("level-block-part", "Part index", ctx2.draft("level-block-part", "0"))}${field("level-block-tile", "Replacement tile index", ctx2.draft("level-block-tile", "1"))}</div>${button("Stage block change", "levels-block")}<p>Selected block is used in ${uses.length} declared cells. Changes affect every use.</p><p>${uses.slice(0, 32).map((u) => esc(u.room_id) + " cell " + u.cell).join(" · ")}</p></details>${setup2}${practiceControls()}${report(state2.results["levels.plan"], "Level review")}${report(state2.results["build.apply"], "Separate build")}`;
+    return `${heading("", "Levels", "")}${editCheckControls(ctx2)}<div class="identity"><strong>${esc(state2.artifact.name)}</strong><span>${model.values().length} preview changes</span></div><section class="card">${state2.project.demo && ((_m = doc.definition) == null ? void 0 : _m.name) === "Hillside editor-layout workshop" ? '<p class="notice">Practice layout. These room links and object records do not run in Playtest; only Hillside terrain and music do.</p>' : ""}${roomNavigation(doc, model, room.id)}<div class="field-row level-toolbar">${select("level-room", "Room", doc.rooms.map((r) => [r.id, r.name]), room.id)}${select("level-layer", "Paint layer", [["terrain", "Terrain"], ...room.collision ? [["collision", "Collision values"]] : []], layer)}${select("level-tool", "Tool", [["paint", "Paint"], ["pick", "Pick from room"], ["fill", "Fill"], ["select", "Select rectangle"], ["paste", "Paste rectangle"], ...objects.some((o) => Number.isSafeInteger(o.x) && Number.isSafeInteger(o.y)) ? [["objects", "Move object"]] : []], ctx2.draft("level-tool", namedObjects ? "objects" : "paint"))}<details><summary>Advanced brush value</summary>${field("level-brush", "Brush value", ctx2.draft("level-brush", "1"), { type: "number", min: 0 })}</details>${select("level-overlay", "Overlay", [["none", "Terrain only"], ...room.collision ? [["collision", "Collision values"]] : [], ...objects.length ? [["objects", "Named objects"], ["records", "All records (Advanced)"]] : []], ctx2.draft("level-overlay", "objects"))}${select("level-zoom", "Zoom", [["fit", "Fit"], ["1", "1x"], ["2", "2x"], ["3", "3x"]], ctx2.draft("level-zoom", "fit"))}</div><div class="level-brush-panel"><strong>Terrain brushes</strong><p class="subtle">Choose a thumbnail to paint, or use Pick from room to sample an existing cell.</p>${levelBrushPalette(doc, model, ctx2.draft("level-brush", "1"))}</div><div class="level-editor-layout"><div class="level-room-editor"><div class="preview-pair room-comparison"><div><span>Original room</span><div class="hex-scroll"><canvas id="level-original" aria-label="Original declared room"></canvas></div></div><div><span>Editing · highlighted cells changed</span><div class="hex-scroll"><canvas id="level-canvas" tabindex="0" role="application" aria-label="Room editor: arrows select, Space paints"></canvas></div></div></div><p id="level-difference-count" class="preview-caption" role="status" aria-live="polite"></p><p id="level-position">Select an object or choose a terrain brush to begin.</p></div>${objectInspector(ctx2, doc, model, room.id)}</div><div class="actions">${button("Undo stroke", "levels-undo", { disabled: !model.past.length })}${button("Redo stroke", "levels-redo", { disabled: !model.future.length })}${button("Copy rectangle", "levels-copy")}${button("Review level changes", "levels-plan", { primary: !pending, disabled: !model.values().length })}${pending ? button("Create level build", "levels-build", { primary: true }) : ""}</div><p class="subtle">Review changes and create a build to save this in the ROM.</p></section><details class="card"><summary>Metatiles & shared uses</summary><div class="field-row">${field("level-block-index", "Metatile index", ctx2.draft("level-block-index", "0"))}${field("level-block-part", "Part index", ctx2.draft("level-block-part", "0"))}${field("level-block-tile", "Replacement tile index", ctx2.draft("level-block-tile", "1"))}</div>${button("Stage block change", "levels-block")}<p>Selected block is used in ${uses.length} declared cells. Changes affect every use.</p><p>${uses.slice(0, 32).map((u) => esc(u.room_id) + " cell " + u.cell).join(" · ")}</p></details>${setup2}${practiceControls()}${report(state2.results["levels.plan"], "Level review")}${report(state2.results["build.apply"], "Separate build")}`;
   }
   function mount11(ctx2) {
     var _a, _b, _c, _d, _e, _f, _g;
@@ -9165,7 +9448,7 @@ ${font ? `<section class="card"><h3>Font metrics · ${esc(font.id)}</h3><div cla
     });
     const hardware = system2.hardware, driver = system2.driver, packet = visiblePreview(ctx2), previewRequest = ownsPreview(ctx2, state2.soundPreviewRequest) ? state2.soundPreviewRequest : null, pending = ((_d = state2.pending) == null ? void 0 : _d.kind) === "sound" && state2.pending.document_id === (doc == null ? void 0 : doc.document_id);
     const setup2 = `<details class="card" ${!doc ? "open" : ""}><summary>Supported sample setup</summary><p>Use a verified sample offset and allocation. A valid codec does not identify a sample's location, rate, loop or instrument.</p><div class="field-row">${field("sound-name", "Sample name", ctx2.draft("sound-name", "Sample"))}${field("sound-offset", "File offset", ctx2.draft("sound-offset", "0"))}${field("sound-length", "Allocated bytes", ctx2.draft("sound-length", "16"))}${select("sound-codec", "Sample format", Object.entries(codecNames), ctx2.draft("sound-codec", hardware.sample_formats[0]))}${field("sound-rate", "Preview sample rate (Hz)", ctx2.draft("sound-rate", "16000"))}${field("sound-initial", "DPCM initial level", ctx2.draft("sound-initial", "64"))}</div>${button("Check declared sample", "sound-declare")}${jsonEditor("sound-definition", "Source-bound sound definition", ctx2.draft("sound-definition", JSON.stringify((doc == null ? void 0 : doc.definition) || saved || {}, null, 2)))}<div class="actions">${button("Inspect definition", "sound-inspect")}${button("Save checked definition", "sound-save")}</div></details>`;
-    return `${heading("", "Music & sound", "")}<div class="identity"><strong>${esc(state2.artifact.name)}</strong><span>${changes.length} staged changes</span></div>${draftError ? `<p class="notice warm">${esc(draftError)} ${button("Discard saved audio edits", "sound-discard")}</p>` : ""}<div class="grid-two"><section class="card"><h3>${esc(hardware.name)}</h3><p>${hardware.channels.map(esc).join(" · ")}</p><p><strong>Music driver: ${esc(driver.name)}</strong></p><p>${esc(driver.status === "UNKNOWN" ? "Unknown driver: sequence editing unavailable." : driver.evidence)}</p><details><summary>Hardware and driver references</summary><p>${esc(hardware.notes)}</p>${[...hardware.references, ...driver.reference ? [driver.reference] : []].map((url) => `<p><a href="${esc(url)}" target="_blank" rel="noopener noreferrer">${esc(new URL(url).hostname)} reference</a></p>`).join("")}</details></section><section class="card"><h3>Native game audio</h3><p>Load this source in Playtest, reach the music or sound you want, then record its mixed output here.</p>${field("sound-frames", "Frames to record (1–300)", ctx2.draft("sound-frames", "120"), { type: "number", min: 1 })}${button("Record native preview", "sound-capture", { primary: !doc, disabled: !state2.runtime || state2.runtime.game_sha256 !== state2.artifact.sha256 })}${button("Open Playtest", "navigate", { id: "playtest" })}</section></div>${(previewRequest == null ? void 0 : previewRequest.status) === "loading" ? '<section class="card"><p class="preview-caption" role="status">Decoding original and edited audio…</p></section>' : (previewRequest == null ? void 0 : previewRequest.status) === "error" ? `<section class="card"><p class="error" role="status">Preview unavailable: ${esc(previewRequest.message)}</p></section>` : ""}${packet ? `<section class="card"><h3>Audio preview</h3>${packet.comparison ? `<div class="preview-pair"><div><span>Original</span><canvas id="original-waveform" width="720" height="140" style="display:block;width:100%;height:auto" aria-label="Original decoded audio waveform"></canvas></div><div><span>Edited</span><canvas id="edited-waveform" width="720" height="140" style="display:block;width:100%;height:auto" aria-label="Edited decoded audio waveform"></canvas></div></div><p class="preview-caption" role="status">${packet.comparison.changed ? "Preview updated · decoded audio changed · not built" : "Unchanged decoded audio preview"} · ${packet.kind === "sample" ? "Sample" : "Song reference"} · ${esc(packet.resource_id)}</p>` : ""}<audio id="sound-player" controls preload="metadata" aria-label="Sound preview play, pause and seek"></audio><div class="actions">${button("Toggle loop", "sound-loop")}${button("Save preview WAV", "sound-export-preview")}</div><p>${esc(packet.preview_scope)}${packet.truncated ? " Preview shortened to20seconds." : ""}</p><p>${packet.sample_frames} frames · ${packet.sample_rate}Hz${packet.channels ? " · " + packet.channels + " channels" : ""}</p></section>` : ""}${doc ? `<div class="grid-two"><section class="card"><h3>Samples</h3>${sample ? `${select("sound-sample", "Sample", doc.samples.map((s) => [s.id, s.name]), sample.id)}<span>Original sample</span><canvas id="sample-waveform" width="720" height="140" aria-label="Original decoded sample waveform"></canvas><p>${sample.sample_count} samples · ${sample.duration_seconds.toFixed(3)}s · ${esc(sample.codec)}</p><div class="field-row">${select("sound-operation", "Edit", [["gain", "Set gain"], ["reverse", "Reverse"], ["silence", "Silence target"], ["replace_wav", "Replace from WAV"]], ctx2.draft("sound-operation", "gain"))}${field("sound-gain", "Gain (%)", ctx2.draft("sound-gain", "100"))}</div><label class="field"><span>Replacement PCM WAV, up to2MiB</span><input type="file" id="sound-wav" accept=".wav,audio/wav"></label><div class="actions">${button("Stage sample edit", "sound-sample-stage")}${button("Preview sample & edits", "sound-sample-preview", { primary: true })}</div><p>${sample.encoding_lossy ? "Re-encoding is lossy; preview and native-test the resulting build." : "Edits preserve the declared byte allocation."}</p>` : "<p>No sample storage declared.</p>"}</section><section class="card"><h3>Music sequences</h3>${song ? `${select("sound-song", "Identified song", doc.songs.map((s) => [s.id, s.name]), song.id)}<p>${esc(song.driver_scope)}</p><div class="field-row">${field("sound-event", "Event index", ctx2.draft("sound-event", "0"))}${select("sound-note-field", "Field", [["note", "Note number"], ["duration", "Duration ticks"], ["volume", "Volume"]], ctx2.draft("sound-note-field", "note"))}${field("sound-note-value", "New value", ctx2.draft("sound-note-value", "64"))}</div>${button("Stage note edit", "sound-note-stage")}<div class="field-row">${field("sound-transpose", "Transpose semitones", ctx2.draft("sound-transpose", "0"))}</div>${button("Transpose song", "sound-transpose")}${button("Preview song & edits", "sound-song-preview", { primary: true })}<div class="table-wrap"><table><thead><tr><th>Event</th><th>Note</th><th>Ticks</th><th>Volume</th></tr></thead><tbody>${song.events.map((event, index) => `<tr><td>${index}</td>${["note", "duration", "volume"].map((field2) => {
+    return `${heading("", "Music & sound", "")}${editCheckControls(ctx2)}<div class="identity"><strong>${esc(state2.artifact.name)}</strong><span>${changes.length} staged changes</span></div>${draftError ? `<p class="notice warm">${esc(draftError)} ${button("Discard saved audio edits", "sound-discard")}</p>` : ""}<div class="grid-two"><section class="card"><h3>${esc(hardware.name)}</h3><p>${hardware.channels.map(esc).join(" · ")}</p><p><strong>Music driver: ${esc(driver.name)}</strong></p><p>${esc(driver.status === "UNKNOWN" ? "Unknown driver: sequence editing unavailable." : driver.evidence)}</p><details><summary>Hardware and driver references</summary><p>${esc(hardware.notes)}</p>${[...hardware.references, ...driver.reference ? [driver.reference] : []].map((url) => `<p><a href="${esc(url)}" target="_blank" rel="noopener noreferrer">${esc(new URL(url).hostname)} reference</a></p>`).join("")}</details></section><section class="card"><h3>Native game audio</h3><p>Load this source in Playtest, reach the music or sound you want, then record its mixed output here.</p>${field("sound-frames", "Frames to record (1–300)", ctx2.draft("sound-frames", "120"), { type: "number", min: 1 })}${button("Record native preview", "sound-capture", { primary: !doc, disabled: !state2.runtime || state2.runtime.game_sha256 !== state2.artifact.sha256 })}${button("Open Playtest", "navigate", { id: "playtest" })}</section></div>${(previewRequest == null ? void 0 : previewRequest.status) === "loading" ? '<section class="card"><p class="preview-caption" role="status">Decoding original and edited audio…</p></section>' : (previewRequest == null ? void 0 : previewRequest.status) === "error" ? `<section class="card"><p class="error" role="status">Preview unavailable: ${esc(previewRequest.message)}</p></section>` : ""}${packet ? `<section class="card"><h3>Audio preview</h3>${packet.comparison ? `<div class="preview-pair"><div><span>Original</span><canvas id="original-waveform" width="720" height="140" style="display:block;width:100%;height:auto" aria-label="Original decoded audio waveform"></canvas></div><div><span>Edited</span><canvas id="edited-waveform" width="720" height="140" style="display:block;width:100%;height:auto" aria-label="Edited decoded audio waveform"></canvas></div></div><p class="preview-caption" role="status">${packet.comparison.changed ? "Preview updated · decoded audio changed · not built" : "Unchanged decoded audio preview"} · ${packet.kind === "sample" ? "Sample" : "Song reference"} · ${esc(packet.resource_id)}</p>` : ""}<audio id="sound-player" controls preload="metadata" aria-label="Sound preview play, pause and seek"></audio><div class="actions">${button("Toggle loop", "sound-loop")}${button("Save preview WAV", "sound-export-preview")}</div><p>${esc(packet.preview_scope)}${packet.truncated ? " Preview shortened to20seconds." : ""}</p><p>${packet.sample_frames} frames · ${packet.sample_rate}Hz${packet.channels ? " · " + packet.channels + " channels" : ""}</p></section>` : ""}${doc ? `<div class="grid-two"><section class="card"><h3>Samples</h3>${sample ? `${select("sound-sample", "Sample", doc.samples.map((s) => [s.id, s.name]), sample.id)}<span>Original sample</span><canvas id="sample-waveform" width="720" height="140" aria-label="Original decoded sample waveform"></canvas><p>${sample.sample_count} samples · ${sample.duration_seconds.toFixed(3)}s · ${esc(sample.codec)}</p><div class="field-row">${select("sound-operation", "Edit", [["gain", "Set gain"], ["reverse", "Reverse"], ["silence", "Silence target"], ["replace_wav", "Replace from WAV"]], ctx2.draft("sound-operation", "gain"))}${field("sound-gain", "Gain (%)", ctx2.draft("sound-gain", "100"))}</div><label class="field"><span>Replacement PCM WAV, up to2MiB</span><input type="file" id="sound-wav" accept=".wav,audio/wav"></label><div class="actions">${button("Stage sample edit", "sound-sample-stage")}${button("Preview sample & edits", "sound-sample-preview", { primary: true })}</div><p>${sample.encoding_lossy ? "Re-encoding is lossy; preview and native-test the resulting build." : "Edits preserve the declared byte allocation."}</p>` : "<p>No sample storage declared.</p>"}</section><section class="card"><h3>Music sequences</h3>${song ? `${select("sound-song", "Identified song", doc.songs.map((s) => [s.id, s.name]), song.id)}<p>${esc(song.driver_scope)}</p><div class="field-row">${field("sound-event", "Event index", ctx2.draft("sound-event", "0"))}${select("sound-note-field", "Field", [["note", "Note number"], ["duration", "Duration ticks"], ["volume", "Volume"]], ctx2.draft("sound-note-field", "note"))}${field("sound-note-value", "New value", ctx2.draft("sound-note-value", "64"))}</div>${button("Stage note edit", "sound-note-stage")}<div class="field-row">${field("sound-transpose", "Transpose semitones", ctx2.draft("sound-transpose", "0"))}</div>${button("Transpose song", "sound-transpose")}${button("Preview song & edits", "sound-song-preview", { primary: true })}<div class="table-wrap"><table><thead><tr><th>Event</th><th>Note</th><th>Ticks</th><th>Volume</th></tr></thead><tbody>${song.events.map((event, index) => `<tr><td>${index}</td>${["note", "duration", "volume"].map((field2) => {
       var _a2;
       return `<td>${esc(((_a2 = changes.find((c) => c.kind === "note" && c.song_id === song.id && c.index === index && c.field === field2)) == null ? void 0 : _a2.value) ?? event[field2])}</td>`;
     }).join("")}</tr>`).join("")}</tbody></table></div>` : "<p>No supported sequence driver is identified. Native music recording and supported sample formats remain available.</p>"}</section></div><section class="card"><div class="actions">${button("Review sound changes", "sound-plan", { primary: !pending, disabled: !changes.length })}${pending ? button("Create sound build", "sound-build", { primary: true }) : ""}${button("Discard sound edits", "sound-discard", { disabled: !changes.length })}</div></section>` : ""}${setup2}${report(state2.results["sound.plan"], "Sound review")}`;

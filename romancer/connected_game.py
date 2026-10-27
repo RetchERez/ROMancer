@@ -118,6 +118,24 @@ def graph(row,path,cancelled=lambda:False,project=None):
             for m in r['verified_matches']:
                 source=add('verified_source','Verified tile at '+hex(m['offset'])+' / '+str(m['x'])+', '+str(m['y']),m['offset'],m['length'],'assets',{'verification_id':item['verification_id'],'match_id':m['match_id'],'trace_id':r['trace_id']},confidence)
                 connect(proof,source,'verified_visual_source')
+    from .object_workbench import objects_for
+    from .asset_codecs import cell_size
+    for obj in objects_for(row):
+        objdef=obj['definition'];cfg=objdef['config'];b=add('object',obj['name'],cfg['offset'],cfg['count']*cell_size(cfg['codec'],8,8),'assets',{'object_id':obj['id']},'checked_declaration')
+        for ref in obj['parts']:
+            source=next((n for n in nodes if n['kind']=='verified_source' and n['locator']['verification_id']==ref['verification_id'] and n['locator']['match_id']==ref['match_id']),None)
+            if source:connect(b,source,'uses_verified_part')
+    if project is not None:
+        from .graphics_access import capture_ids
+        from .workbench_evidence import load_evidence
+        for ident in capture_ids(row):
+            r=load_evidence(project,ident,'runtime');report=r['report']
+            if report.get('source_sha256')!=row['sha256'] or report.get('artifact_id')!=row['artifact_id']:raise ValueError('Graphics capture index belongs to another source.')
+            if report.get('graphics_snapshot'):
+                access=add('graphics_capture','Native graphics / '+ident[:8],None,0,'playtest',{'evidence_id':ident},'native_accesses' if r['runtime_trusted'] else 'historical_frame')
+                tid=report.get('investigation_link',{}).get('graphics_trace_id')
+                trace=next((n for n in nodes if n['kind']=='trace' and n['locator']['trace_id']==tid),None)
+                if trace:connect(trace,access,'replayed_graphics_accesses')
     try:
         for link in user_links(row):
             if link['from'] not in by_key or link['to'] not in by_key:issues.append({'kind':'link','message':'A declared link refers to a changed resource. Recreate it for the current layout.'});continue
@@ -171,7 +189,7 @@ class ConnectedGameTools:
         require_supported(row);return row,path,graph(row,path,c,project)
     def graph(self,p,c):
         label(p['query'],128,blank=True);number(p['page'],0,1024)
-        if p['kind'] not in ('all','known','known_resource','assets','script','tables','record','levels','room','actor','sound','note','trace','candidate','verification','verified_source'):raise ValueError('Choose an available resource category.')
+        if p['kind'] not in ('all','known','known_resource','assets','script','tables','record','levels','room','actor','sound','note','trace','candidate','verification','verified_source','object','graphics_capture'):raise ValueError('Choose an available resource category.')
         row,_,model=self._graph(p,c);query=p['query'].casefold();rows=[r for r in model['nodes'] if p['kind'] in ('all',r['kind']) and query in r['name'].casefold()];start=p['page']*50
         selected=rows[start:start+50];page_edges={}
         for node in selected:
@@ -203,6 +221,18 @@ class ConnectedGameTools:
             chosen=next((m for m in proof['verified_matches'] if m['match_id']==node['locator'].get('match_id')),proof['verified_matches'][0] if proof['verified_matches'] else None)
             preview={'runtime_trusted':proof['runtime_trusted'],'text':proof['reason'],'caption':'Authenticated causal source test. CPU/DMA transfers were not observed.','fields':[{'name':'Result','value':proof['status']}]}
             if chosen:preview.update(png_base64=chosen['visual'][0]['original_png_base64'],fields=preview['fields']+[{'name':'Verified opaque pixels','value':str(chosen['verified_pixels'])+' / '+str(chosen['opaque_pixels'])},{'name':'Complete opaque placement','value':str(chosen['complete_placement'])}])
+        if node['kind']=='object':
+            obj=self.api.objects.get({**p,'object_id':node['locator']['object_id']},c)
+            preview={'object_id':obj['object_id'],'text':'Saved multi-part layout. '+('Verified in its recorded replay.' if obj['source_dependency_verified'] else 'Author-checked declaration; fresh execution proof is unavailable.'),'source_dependency_verified':obj['source_dependency_verified']}
+            trace_id=obj['object'].get('trace_id')
+            if trace_id:
+                try:
+                    trace=self.api.traces.get({**p,'trace_id':trace_id},c)
+                    preview.update(png_base64=trace['crop_png_base64'],caption='Captured scene; selected object layout opens with source-tile uses.')
+                except (ValueError,OSError):preview['caption']='Captured scene unavailable; the saved exact-revision layout can still be opened.'
+        if node['kind']=='graphics_capture':
+            capture=self.api.graphics_access.get({**p,'evidence_id':node['locator']['evidence_id'],'offset':0,'limit':1},c)
+            preview={'evidence_id':capture['evidence_id'],'png_base64':capture.get('scene',{}).get('png_base64'),'caption':'Recorded native accesses and end-of-capture video memory; read/write adjacency is not dataflow.','runtime_trusted':capture['runtime_trusted'],'fields':[{'name':'Recorded events','value':capture['total_events']}]}
         raw=b''
         if node['offset'] is not None:
             with path.open('rb') as f:f.seek(node['offset']);raw=f.read(min(node['length'],128))

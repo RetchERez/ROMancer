@@ -96,7 +96,7 @@ class PublicReleaseTests(unittest.TestCase):
             # Generated bundle metadata hashes literal source bytes. Git's LF
             # normalization must not silently change those inputs on upload.
             for name in sorted(staged):
-                if name.endswith(('.py','.js','.mjs','.json','.css','.html','.txt','.yml')):
+                if name.endswith(('.py','.js','.mjs','.json','.css','.html','.txt','.yml','.patch')):
                     raw=(export/name).read_bytes()
                     expected=hashlib.sha1(b'blob '+str(len(raw)).encode()+b'\0'+raw).hexdigest()
                     self.assertEqual(git('rev-parse',':'+name).decode().strip(),expected,name)

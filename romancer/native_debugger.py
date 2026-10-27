@@ -1,5 +1,6 @@
 """Pinned, isolated, genuinely headless MesenCE capture; no mock bridge claims."""
 import hashlib
+import ctypes
 import json
 import os
 from pathlib import Path
@@ -25,8 +26,20 @@ MEMBERS={
  'libHarfBuzzSharp.dll':(1804872,'eb76238c9e8e41d44b5a5b18167c4c5b39ca5db4277af5dbe92d730f0fc14a7d'),
  'libSkiaSharp.dll':(9414216,'9a0d95e8caaa852c70d085af6a40a744242172ad9ea3fd6bc7599875a8a1dbcd'),
  'MesenNesDB.txt':(559276,'200e19903f1b2eeda1f59a7f3bcdacf388d0f8d228f6f842373477ddc2f5a3e1')}
+GRAPHICS_CORE=(7239680,'62e4c8a1b152e8d94adeb54335e1b0966c38c1f26db2ae4007b1a5e558077445')
 CPU={'nes':('nes','nesMemory'),'snes':('snes','snesMemory'),'gb':('gameboy','gameboyMemory'),
- 'gbc':('gameboy','gameboyMemory'),'gba':('gba','gbaMemory')}
+ 'gbc':('gameboy','gameboyMemory'),'gba':('gba','gbaMemory'),'sms':('sms','smsMemory')}
+
+
+def remove_owned_job(job,parent):
+    job=Path(job);parent=Path(parent)
+    if job.resolve().parent!=parent.resolve() or not re.fullmatch('[0-9a-f]{32}',job.name):raise ValueError('Native cleanup target escaped its owned sessions.')
+    for delay in (0,.05,.1,.2,.4,.8):
+        if delay:time.sleep(delay)
+        try:shutil.rmtree(job);return
+        except FileNotFoundError:return
+        except PermissionError:
+            if delay==.8:raise
 
 
 def backend_root(system=None):
@@ -37,19 +50,26 @@ def backend_root(system=None):
 
 
 def verify_backend(root,system=None):
+    from .bundled_debuggers import verify_installed
+    verify_installed(root)
     if system=='genesis':
         from .genesis_debugger import verify_backend as genesis_verify
         return genesis_verify(root)
     root=checked_path(Path(root))
+    patched=False
     for name,(size,digest) in MEMBERS.items():
         path=checked_path(root/name)
+        if name=='MesenCore.dll' and path.is_file() and path.stat().st_size==GRAPHICS_CORE[0]:
+            size,digest=GRAPHICS_CORE;patched=True
         if not path.is_file() or path.stat().st_size!=size or path.stat().st_nlink!=1:
             raise ValueError('Pinned native debugger is missing or changed: '+name)
         with path.open('rb') as stream:actual=hashlib.file_digest(stream,'sha256').hexdigest()
         if actual!=digest:raise ValueError('Pinned native debugger hash differs: '+name)
-    return {'backend':'MesenCE','version':VERSION,'source_commit':SOURCE_COMMIT,
-        'executable_sha256':MEMBERS['Mesen.exe'][1],'core_sha256':MEMBERS['MesenCore.dll'][1],
+    result={'backend':'MesenCE','version':VERSION,'source_commit':SOURCE_COMMIT,
+        'executable_sha256':MEMBERS['Mesen.exe'][1],'core_sha256':GRAPHICS_CORE[1] if patched else MEMBERS['MesenCore.dll'][1],
         'license':'GPL-3.0-or-later','upstream':UPSTREAM}
+    if patched:result.update(romancer_patch='physical-ppu-access-v2',physical_ppu_callbacks=True,native_access_details=True)
+    return result
 
 
 def backend_capabilities(system):
@@ -82,7 +102,9 @@ def make_script(system,config,nonce):
         (',domain="'+p['domain']+'"' if p.get('domain','cpu')!='cpu' else '')+'}' for p in v['probes']]
     replacements={'CPU':CPU[system][0],'MEMORY':CPU[system][1],'STEPS':'{'+','.join(steps)+'}',
         'PROBES':'{'+','.join(probes)+'}','NONCE':nonce,'SYSTEM':system,'FRAMES':str(v['frames']),'START_FRAME':str(v['start_frame']),
-        'EVENT_LIMIT':str(v['event_limit']),'INSTRUCTION_LIMIT':str(v['instruction_limit']),'MAX_ADDRESS':str(LIMITS[system])}
+        'EVENT_LIMIT':str(v['event_limit']),'INSTRUCTION_LIMIT':str(v['instruction_limit']),'MAX_ADDRESS':str(LIMITS[system]),'GRAPHICS_SNAPSHOT':'true' if v.get('graphics_snapshot') else 'false'}
+    from .graphics_snapshot import SNAPSHOT_DOMAINS
+    replacements['SNAPSHOT_DOMAINS']='{'+','.join('{name="'+name+'",size='+str(size)+'}' for name,size in SNAPSHOT_DOMAINS[system].items())+'}'
     script=(Path(__file__).with_name('debugger_capture.lua')).read_text(encoding='utf-8')
     for key,value in replacements.items():script=script.replace('@'+key+'@',value)
     if re.search('@[A-Z_]+@',script):raise ValueError('native adapter template is incomplete')
@@ -100,16 +122,25 @@ def capture_native(project,row,config,*,root=None,cancelled=lambda:False):
     if row['size']>64*1024**2:raise ValueError('native debugger source exceeds 64 MiB')
     parent=checked_path(Path(project)/'sessions'/'native-debugger');parent.mkdir(parents=True,exist_ok=True)
     job=parent/uuid.uuid4().hex;job.mkdir();assert job.resolve().parent==parent.resolve()
-    process=None
+    process=None;core_lock=None
     try:
         for name in MEMBERS:
             if cancelled():raise KeyboardInterrupt
             shutil.copyfile(root/name,job/name)
         verify_backend(job)
+        if backend.get('physical_ppu_callbacks'):
+            # The upstream self-contained launcher extracts its own embedded DLL.
+            # Keep our reviewed snapshot readable but deny replacement for the
+            # entire child lifetime; the launcher tolerates existing locked DLLs.
+            kernel=ctypes.WinDLL('kernel32',use_last_error=True)
+            kernel.CreateFileW.argtypes=[ctypes.c_wchar_p,ctypes.c_uint32,ctypes.c_uint32,ctypes.c_void_p,ctypes.c_uint32,ctypes.c_uint32,ctypes.c_void_p]
+            kernel.CreateFileW.restype=ctypes.c_void_p;kernel.CloseHandle.argtypes=[ctypes.c_void_p];kernel.CloseHandle.restype=ctypes.c_int
+            core_lock=kernel.CreateFileW(str(job/'MesenCore.dll'),0x80000000,1,None,3,0x80,None)
+            if core_lock in (None,ctypes.c_void_p(-1).value):core_lock=None;raise OSError('Could not hold the verified graphics observer core snapshot.')
         settings=portable_settings(system);(job/'settings.json').write_text(json.dumps(settings),encoding='utf-8')
         nonce=secrets.token_hex(16);script=make_script(system,config,nonce)
         (job/'capture.lua').write_text(script,encoding='utf-8',newline='\n')
-        suffix={'nes':'.nes','snes':'.sfc','gb':'.gb','gbc':'.gbc','gba':'.gba'}[system]
+        suffix={'nes':'.nes','snes':'.sfc','gb':'.gb','gbc':'.gbc','gba':'.gba','sms':'.sms'}[system]
         game=job/('input'+suffix);shutil.copyfile(source,game)
         _measure(game,row,cancelled=cancelled)
         if not (job/'settings.json').is_file():raise ValueError('isolated portable settings must exist before launching')
@@ -126,6 +157,7 @@ def capture_native(project,row,config,*,root=None,cancelled=lambda:False):
                     raise ValueError('native debugger output exceeded its byte budget')
                 time.sleep(.025)
         if process.returncode!=0:raise ValueError('native debugger did not finish its capture (exit '+str(process.returncode)+')')
+        if verify_backend(job)!=backend:raise ValueError('The executed debugger core identity changed.')
         trace=checked_path(job/'trace.tsv')
         if not trace.is_file() or trace.stat().st_size>2*1024**2 or trace.stat().st_nlink!=1:raise ValueError('native capture output is missing or invalid')
         raw=game.read_bytes();_measure(game,row,cancelled=cancelled)
@@ -138,7 +170,6 @@ def capture_native(project,row,config,*,root=None,cancelled=lambda:False):
             'worker_exit_code':process.returncode,'original_unchanged':True}
     finally:
         if process is not None and process.poll() is None:process.kill();process.wait(timeout=5)
+        if core_lock is not None:kernel.CloseHandle(core_lock)
         # Only this freshly created direct child may be recursively removed.
-        if job.resolve().parent!=parent.resolve() or not re.fullmatch('[0-9a-f]{32}',job.name):
-            raise ValueError('native debugger cleanup target escaped owned sessions')
-        shutil.rmtree(job)
+        remove_owned_job(job,parent)

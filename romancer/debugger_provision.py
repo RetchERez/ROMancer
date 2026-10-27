@@ -76,10 +76,10 @@ def cache_family(system):
 
 
 def preferred_root(workspace,system):
-    root=cache_root(workspace,system)
-    if root.exists():return root
     from .native_debugger import backend_root
-    return backend_root(system)
+    bundled=backend_root(system)
+    if bundled.exists():return bundled
+    return cache_root(workspace,system)
 
 
 def verify_prepared(root,system):

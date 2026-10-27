@@ -66,6 +66,37 @@ class NativeDebuggerTests(unittest.TestCase):
         self.assertTrue(settings['Debug']['ScriptWindow']['AllowIoOsAccess'])
         self.assertEqual(settings['Gameboy']['Model'],5)
 
+    def test_sms_physical_rom_and_video_memory_are_observed_without_cpu_address_guessing(self):
+        m=self.module();self.assertTrue(m.backend_capabilities('sms')['supported_system'])
+        cfg={'steps':[{'frames':4,'buttons':['one'],'port':0}],'probes':[{'kind':'read','domain':'smsPrgRom','start':0x100,'end':0x101},{'kind':'write','domain':'smsVideoRam','start':0,'end':31}],'event_limit':32,'instruction_limit':2000000,'timeout':10}
+        script=m.make_script('sms',cfg,'a'*32);self.assertIn('smsVideoRam',script)
+        raw=bytearray(32768);raw[0x7ff0:0x7ff8]=b'TMR SEGA';raw[0x7fff]=0x4c;raw[0x100]=42
+        text='BEGIN\t1\tnonce\tsms\nDOMAIN\tsmsPrgRom\t70\nDOMAIN\tsmsVideoRam\t71\nE\t1\tread\t256\t42\t0\t70\t256\t70\t0\t0\nE\t2\twrite\t0\t42\t3\t71\t0\t70\t3\t0\nEND\t4\t2\t0\t100\tframes\n'
+        r=m.parse_capture(text,'nonce','sms',bytes(raw),cfg);self.assertEqual(r['events'][0]['file_offset'],256);self.assertTrue(r['events'][0]['source_byte_agrees']);self.assertIsNone(r['events'][1]['file_offset']);self.assertEqual(r['events'][1]['domain'],'smsVideoRam');self.assertFalse(r['events'][1]['causation_proven'])
+
+    def test_native_operation_details_preserve_dma_and_callback_width_without_inventing_a_channel(self):
+        m=self.module();raw=bytearray(32768);raw[256]=42
+        cfg={**config(),'probes':[{'kind':'read','start':256,'end':256}]}
+        text='BEGIN\t1\tnonce\tgb\nDOMAIN\tgbPrgRom\t20\nE\t1\tread\t256\t42\t300\t20\t256\t20\t300\t0\nN\t1\tDmaRead\t1\t20\t256\nEND\t4\t1\t0\t100\tframes\n'
+        result=m.parse_capture(text,'nonce','gb',bytes(raw),cfg);e=result['events'][0];self.assertEqual(e['operation_kind'],'DmaRead');self.assertEqual(e['actor'],'dma');self.assertEqual(e['callback_value_bytes'],1);self.assertIsNone(e['access_width']);self.assertIsNone(e['dma_channel']);self.assertEqual(e['file_offset'],256)
+        with self.assertRaises(ValueError):m.parse_capture(text.replace('DmaRead','DmaWrite'),'nonce','gb',bytes(raw),cfg)
+
+    def test_owned_cleanup_retries_a_transient_loader_lock_and_refuses_other_directories(self):
+        from unittest.mock import patch
+        import shutil
+        from romancer.native_debugger import remove_owned_job
+        with tempfile.TemporaryDirectory() as folder:
+            parent=Path(folder);job=parent/('a'*32);job.mkdir();(job/'owned.txt').write_text('owned');real=shutil.rmtree;calls=[]
+            def transient(path):
+                calls.append(path)
+                if len(calls)==1:raise PermissionError('simulated Windows loader lock')
+                return real(path)
+            with patch('romancer.native_debugger.shutil.rmtree',side_effect=transient):remove_owned_job(job,parent)
+            self.assertFalse(job.exists());self.assertEqual(len(calls),2)
+            foreign=parent/'user-project';foreign.mkdir();(foreign/'keep').write_text('keep')
+            with self.assertRaises(ValueError):remove_owned_job(foreign,parent)
+            self.assertTrue((foreign/'keep').is_file())
+
     def test_missing_or_changed_backend_is_rejected_before_execution(self):
         m=self.module()
         with tempfile.TemporaryDirectory() as folder:

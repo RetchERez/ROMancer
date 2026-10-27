@@ -1,5 +1,6 @@
 """Source locations verified by isolated ROMancer marker builds and replay."""
-import tempfile,threading
+import tempfile,threading,shutil,time,os,re
+from contextlib import contextmanager
 from pathlib import Path
 from .assets import checked_path,digest
 from .runtime_session import validate_steps
@@ -9,6 +10,25 @@ from .visual_checks import _frame
 from .build_checks import run_sample as _sample
 from .workbench_evidence import load_evidence,store_evidence
 from . import workbench_projects as projects
+
+
+@contextmanager
+def source_test_directory(parent):
+    parent=checked_path(Path(parent));folder=Path(tempfile.mkdtemp(prefix='source-test-',dir=parent))
+    identity=folder.stat()
+    try:yield folder
+    finally:
+        for delay in (0,.05,.1,.2,.4,.8,1.6,3.2,6.4):
+            if delay:time.sleep(delay)
+            if folder.resolve().parent!=parent.resolve() or not re.fullmatch(r'source-test-[a-zA-Z0-9_-]+',folder.name):
+                raise ValueError('Source-test cleanup escaped its owned session directory.')
+            checked_path(folder)
+            if not folder.exists():break
+            if not os.path.samestat(identity,folder.stat()):raise ValueError('Source-test cleanup directory identity changed.')
+            try:shutil.rmtree(folder);break
+            except FileNotFoundError:break
+            except PermissionError:
+                if delay==6.4:raise
 
 
 def run_sample(project,row,configuration,steps,cancelled):
@@ -77,7 +97,7 @@ class VisualSourceTools:
     def _execute(self,project,row,path,trace,config,steps,groups,result,c):
         from .system_integrity import integrity_edits
         parent=checked_path(project/'sessions');parent.mkdir(exist_ok=True);pending=[];seen_verified=set();restored=None;identities=[]
-        with tempfile.TemporaryDirectory(prefix='source-test-',dir=parent) as temporary:
+        with source_test_directory(parent) as temporary:
             if Path(temporary).resolve().parent!=parent.resolve():raise ValueError('Temporary verification storage escaped its owned session folder.')
             probe_root=Path(projects.create_project(Path(temporary),'Temporary source verification')['path']);source=projects.register_source(probe_root,path,None,cancelled=c)
             first=run_sample(probe_root,source,config,steps,c);second=run_sample(probe_root,source,config,steps,c);_frame(first['frame']);_frame(second['frame']);identities.extend(r['execution_sha256'] for r in (first,second))
@@ -116,7 +136,7 @@ class VisualSourceTools:
                             seen_verified.add(key)
                             if len(pending)<16:
                                 for point in checked['pixel_map']:point['encoded_bytes']=encoding_lanes(m,point['source_pixel'])
-                                pending.append({'match_id':ident,'offset':m['offset'],'length':m['length'],'x':m['x'],'y':m['y'],'height':m['height'],**checked})
+                                pending.append({'match_id':ident,'width':8,'codec':m['codec'],'offset':m['offset'],'length':m['length'],'x':m['x'],'y':m['y'],'height':m['height'],**checked})
                             else:result['verified_placements_truncated']=True
                 if entry['status']!='VERIFIED_VISUAL_SOURCE':entry['reason']='Independent validation did not confirm every recovered pixel and spatial color control.'
             if restored is not None:

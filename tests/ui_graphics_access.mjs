@@ -1,0 +1,12 @@
+import assert from 'node:assert/strict';
+import {graphicsAccessControls,graphicsAccessReport} from '../romancer/ui/graphics_access.js';
+const actions={},calls=[],state={project:{project_id:'p'},artifact:{artifact_id:'a',sha256:'s',system_id:'nes'},results:{}};
+const ctx={state,draft:(_,v)=>v,setDraft:()=>{},render:async()=>{},use:r=>Object.assign(actions,r),sourceParams:()=>({project_id:'p',artifact_id:'a'}),api:{call:async(op,p)=>{calls.push([op,p]);return {ok:true,evidence_id:'e',artifact_id:'a',source_sha256:'s',events:[],memory_domains:[],total_events:201,offset:0,limit:100};}},run:async(op,p)=>{calls.push([op,p]);return ctx.api.call('get',p);}};
+const trace={trace_id:'t',matches:[{offset:4096,length:16}],replay:{status:'READY',frames:10}};
+let html=graphicsAccessControls(ctx,trace);assert.match(html,/Record native accesses/);assert(actions['graphics-access-capture']);
+globalThis.document={getElementById:id=>({value:{'graphics-access-offset':'4096','graphics-access-length':'16','graphics-access-start':'0'}[id]||''})};
+await actions['graphics-access-capture']();assert.equal(calls[0][0],'graphics.accesses.capture');assert.equal(calls[0][1].trace_id,'t');
+const report={events:[{kind:'read',file_offset:4096,physical_offset:0,domain:'nesChrRom',value:1,operation_kind:'PpuRenderingRead'}],total_events:201,offset:0,limit:100,memory_domains:[],causal_dataflow_proven:false,observation_counts_scope:'returned_event_page'};
+html=graphicsAccessReport(report);assert.match(html,/0x1000/);assert.match(html,/Read|read/);assert.match(html,/201/);assert.match(html,/do not establish dataflow/);
+graphicsAccessControls(ctx,trace);const old=actions['graphics-access-capture'];state.artifact={artifact_id:'b',sha256:'z'};await assert.rejects(old(),/changed/);
+console.log('Native graphics controls retain source identity, real accesses and explicit dataflow limits.');

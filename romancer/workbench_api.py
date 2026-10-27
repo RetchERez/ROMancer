@@ -98,6 +98,8 @@ class WorkbenchAPI:
             'systems.plan_edits':('project_id artifact_id edits',self._integrity_plan),
             'compression.inspect':('project_id artifact_id offset allocation codec',self._compression_inspect),
             'compression.extract':('project_id artifact_id offset allocation codec',self._compression_extract),
+            'compression.plan_relocate':('project_id parent_id decoded_id edited_id offset allocation codec spec',self._compression_relocate),
+            'compression.preview_reinsert':('project_id parent_id decoded_id edited_id offset allocation codec',self._compression_preview),
             'compression.plan_reinsert':('project_id parent_id decoded_id edited_id offset allocation codec',self._compression_reinsert),
             'tables.inspect':('project_id artifact_id definition page limit',self._tables_inspect),
             'tables.save_definition':('project_id artifact_id definition',self._tables_save),
@@ -218,6 +220,10 @@ class WorkbenchAPI:
         self.traces=GameplayTraceTools(self);self.routes.update(self.traces.routes())
         from .visual_source_tools import VisualSourceTools
         self.visual_sources=VisualSourceTools(self);self.routes.update(self.visual_sources.routes())
+        from .object_workbench import ObjectTools
+        self.objects=ObjectTools(self);self.routes.update(self.objects.routes())
+        from .graphics_access import GraphicsAccessTools
+        self.graphics_access=GraphicsAccessTools(self);self.routes.update(self.graphics_access.routes())
         from .build_checks import BuildCheckTools
         self.checks=BuildCheckTools(self);self.routes.update(self.checks.routes())
         from .popular_references import catalog as reference_catalog,inspect_template
@@ -402,7 +408,7 @@ class WorkbenchAPI:
             if operation not in self.routes:raise ValueError('unknown workbench operation')
             names,handler=self.routes[operation];fields(parameters,names)
             if cancelled():raise KeyboardInterrupt
-            if operation in ('rom.scan.run','graphics.observe','traces.capture','traces.verify','checks.run'):return handler(parameters,cancelled)
+            if operation in ('rom.scan.run','graphics.observe','traces.capture','traces.verify','checks.run','checks.from_trace','graphics.accesses.capture'):return handler(parameters,cancelled)
             if 'project_id' in parameters:
                 project_id=projects.identifier(parameters['project_id'])
                 with self.operation_locks_guard:lock=self.operation_locks.setdefault(project_id,threading.RLock())
@@ -638,6 +644,27 @@ class WorkbenchAPI:
                 projects.write_json(project/'project.json',value)
             return {'ok':True,'status':'EXTRACTED','artifact':projects.artifact(project,child['artifact_id']),'inspection':inspected}
         finally:temp.unlink(missing_ok=True)
+
+    def _compression_relocate(self,p,c):
+        from .resource_compression import prepare_reinsert
+        from .data_relocation import prepare_edits
+        from .workbench_files import read_bounded
+        project=self.project(p)
+        parent,edited,packed,summary=prepare_reinsert(project,p['parent_id'],p['decoded_id'],p['edited_id'],p['offset'],p['allocation'],p['codec'],cancelled=c)
+        spec=p['spec']
+        if type(spec) is not dict or spec.get('source_offset')!=p['offset'] or spec.get('source_length')!=summary['original_stored_size'] or spec.get('replacement_input_id') is not None:
+            raise ValueError('Relocation must move this confirmed stream, without an external replacement.')
+        if any(type(r) is not dict or r.get('target_delta')!=0 for r in spec.get('references',[])):
+            raise ValueError('Compressed streams require references to the stream start; interior pointers are unavailable.')
+        raw=read_bounded(Path(parent['path']),64*1024**2,parent,cancelled=c)
+        prepared=prepare_edits(raw,parent['system_id'],spec,packed,cancelled=c)
+        return {**self._integrity_plan({'project_id':p['project_id'],'artifact_id':parent['artifact_id'],'edits':prepared['edits']},c,
+            annotations={'kind':'declared-data-relocation-v1',**prepared['relocation'],'compression':summary}),
+            'relocation':prepared['relocation'],'compression':summary}
+
+    def _compression_preview(self,p,c):
+        from .resource_compression import preview_reinsert
+        return preview_reinsert(self.project(p),p['parent_id'],p['decoded_id'],p['edited_id'],p['offset'],p['allocation'],p['codec'],cancelled=c)
 
     def _compression_reinsert(self,p,c):
         from .resource_compression import plan_reinsert

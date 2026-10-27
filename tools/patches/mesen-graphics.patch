@@ -1,0 +1,130 @@
+--- a/Core/Debugger/ScriptingContext.cpp
++++ b/Core/Debugger/ScriptingContext.cpp
+@@ -252,10 +252,10 @@
+ }
+ 
+ template<typename T>
+-void ScriptingContext::CallMemoryCallback(AddressInfo relAddr, T& value, CallbackType type, CpuType cpuType)
++void ScriptingContext::CallMemoryCallback(AddressInfo relAddr, T& value, CallbackType type, CpuType cpuType, MemoryOperationType operation)
+ {
+ 	_allowSaveState = type == CallbackType::Exec && cpuType == _defaultCpuType;
+-	InternalCallMemoryCallback(relAddr, value, type, cpuType);
++	InternalCallMemoryCallback(relAddr, value, type, cpuType, operation);
+ 	_allowSaveState = false;
+ }
+ 
+@@ -346,7 +346,7 @@
+ }
+ 
+ template<typename T>
+-void ScriptingContext::InternalCallMemoryCallback(AddressInfo relAddr, T& value, CallbackType type, CpuType cpuType)
++void ScriptingContext::InternalCallMemoryCallback(AddressInfo relAddr, T& value, CallbackType type, CpuType cpuType, MemoryOperationType operation)
+ {
+ 	if(_callbacks[(int)type].empty()) {
+ 		return;
+@@ -366,7 +366,7 @@
+ 				continue;
+ 			}
+ 		} else {
+-			if(!IsAddressMatch(callback, _debugger->GetAbsoluteAddress(relAddr))) {
++			if(!IsAddressMatch(callback, DebugUtilities::IsRelativeMemory(relAddr.Type) ? _debugger->GetAbsoluteAddress(relAddr) : relAddr)) {
+ 				continue;
+ 			}
+ 		}
+@@ -380,7 +380,14 @@
+ 		lua_rawgeti(_lua, LUA_REGISTRYINDEX, callback.Reference);
+ 		lua_pushinteger(_lua, relAddr.Address);
+ 		lua_pushinteger(_lua, value);
+-		if(lua_pcall(_lua, 2, LUA_MULTRET, 0) != 0) {
++		AddressInfo absolute = DebugUtilities::IsRelativeMemory(relAddr.Type) ? _debugger->GetAbsoluteAddress(relAddr) : relAddr;
++		lua_newtable(_lua);
++		lua_pushinteger(_lua, (int)absolute.Type); lua_setfield(_lua, -2, "memoryType");
++		lua_pushinteger(_lua, absolute.Address); lua_setfield(_lua, -2, "physicalAddress");
++		lua_pushinteger(_lua, sizeof(T)); lua_setfield(_lua, -2, "valueBytes");
++		string operationName = string(magic_enum::enum_name(operation));
++		lua_pushstring(_lua, operationName.c_str()); lua_setfield(_lua, -2, "operation");
++		if(lua_pcall(_lua, 3, LUA_MULTRET, 0) != 0) {
+ 			ProcessLuaError();
+ 		} else {
+ 			int returnParamCount = lua_gettop(_lua) - top;
+@@ -414,6 +421,6 @@
+ 	return l.ReturnCount();
+ }
+ 
+-template void ScriptingContext::CallMemoryCallback<uint8_t>(AddressInfo relAddr, uint8_t& value, CallbackType type, CpuType cpuType);
+-template void ScriptingContext::CallMemoryCallback<uint16_t>(AddressInfo relAddr, uint16_t& value, CallbackType type, CpuType cpuType);
+-template void ScriptingContext::CallMemoryCallback<uint32_t>(AddressInfo relAddr, uint32_t& value, CallbackType type, CpuType cpuType);
++template void ScriptingContext::CallMemoryCallback<uint8_t>(AddressInfo relAddr, uint8_t& value, CallbackType type, CpuType cpuType, MemoryOperationType operation);
++template void ScriptingContext::CallMemoryCallback<uint16_t>(AddressInfo relAddr, uint16_t& value, CallbackType type, CpuType cpuType, MemoryOperationType operation);
++template void ScriptingContext::CallMemoryCallback<uint32_t>(AddressInfo relAddr, uint32_t& value, CallbackType type, CpuType cpuType, MemoryOperationType operation);
+--- a/Core/Debugger/ScriptingContext.h
++++ b/Core/Debugger/ScriptingContext.h
+@@ -5,6 +5,7 @@
+ #include "Utilities/Timer.h"
+ #include "Debugger/DebugTypes.h"
+ #include "Shared/EventType.h"
++#include "Shared/MemoryOperationType.h"
+ 
+ class Debugger;
+ struct lua_State;
+@@ -62,7 +63,7 @@
+ 	vector<MemoryCallback> _callbacks[3];
+ 	vector<int> _eventCallbacks[(int)EventType::LastValue + 1];
+ 
+-	template<typename T> void InternalCallMemoryCallback(AddressInfo relAddr, T& value, CallbackType type, CpuType cpuType);
++	template<typename T> void InternalCallMemoryCallback(AddressInfo relAddr, T& value, CallbackType type, CpuType cpuType, MemoryOperationType operation);
+ 
+ 	bool IsAddressMatch(MemoryCallback& callback, AddressInfo addr);
+ 
+@@ -80,7 +81,7 @@
+ 	void SetDrawSurface(ScriptDrawSurface surface) { _drawSurface = surface; }
+ 	ScriptDrawSurface GetDrawSurface() { return _drawSurface; }
+ 
+-	template<typename T> void CallMemoryCallback(AddressInfo relAddr, T& value, CallbackType type, CpuType cpuType);
++	template<typename T> void CallMemoryCallback(AddressInfo relAddr, T& value, CallbackType type, CpuType cpuType, MemoryOperationType operation);
+ 	int CallEventCallback(EventType type, CpuType cpuType);
+ 	bool CheckInitDone();
+ 	bool IsSaveStateAllowed();
+--- a/Core/Debugger/ScriptHost.h
++++ b/Core/Debugger/ScriptHost.h
+@@ -26,8 +26,8 @@
+ 	void ProcessEvent(EventType eventType, CpuType cpuType);
+ 
+ 	template<typename T>
+-	__forceinline void CallMemoryCallback(AddressInfo relAddr, T& value, CallbackType callbackType, CpuType cpuType)
++	__forceinline void CallMemoryCallback(AddressInfo relAddr, T& value, CallbackType callbackType, CpuType cpuType, MemoryOperationType operation)
+ 	{
+-		_context->CallMemoryCallback(relAddr, value, callbackType, cpuType);
++		_context->CallMemoryCallback(relAddr, value, callbackType, cpuType, operation);
+ 	}
+ };
+\ No newline at end of file
+--- a/Core/Debugger/ScriptManager.h
++++ b/Core/Debugger/ScriptManager.h
+@@ -46,7 +46,7 @@
+ 			case MemoryOperationType::PpuRenderingRead:
+ 			case MemoryOperationType::DummyRead:
+ 				for(unique_ptr<ScriptHost>& script : _scripts) {
+-					script->CallMemoryCallback(relAddr, value, CallbackType::Read, cpuType);
++					script->CallMemoryCallback(relAddr, value, CallbackType::Read, cpuType, type);
+ 				}
+ 				break;
+ 
+@@ -54,7 +54,7 @@
+ 			case MemoryOperationType::DummyWrite:
+ 			case MemoryOperationType::DmaWrite:
+ 				for(unique_ptr<ScriptHost>& script : _scripts) {
+-					script->CallMemoryCallback(relAddr, value, CallbackType::Write, cpuType);
++					script->CallMemoryCallback(relAddr, value, CallbackType::Write, cpuType, type);
+ 				}
+ 				break;
+ 
+@@ -62,7 +62,7 @@
+ 			case MemoryOperationType::ExecOperand:
+ 				if(processExec) {
+ 					for(unique_ptr<ScriptHost>& script : _scripts) {
+-						script->CallMemoryCallback(relAddr, value, CallbackType::Exec, cpuType);
++						script->CallMemoryCallback(relAddr, value, CallbackType::Exec, cpuType, type);
+ 					}
+ 				}
+ 				break;

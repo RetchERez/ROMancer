@@ -20,7 +20,7 @@ from romancer.core_pins import CORE_FILES,CORE_PINS
 MAKE_RECIPES={
     'nes':['make','-f','Makefile.libretro','platform=win','CC=gcc','CXX=g++','-j3'],
     'snes':['make','platform=win','PROFILE=balanced','CC=gcc','CXX=g++','LIBS=-static','-j3'],
-    'genesis':['make','-f','Makefile.libretro','CC=gcc','-j3'],
+    'genesis':['make','-f','Makefile.libretro','CC=gcc','OPT=-O2 -flto=4','-j4'],
     'gb':['make','-f','Makefile.libretro','platform=win','CC=gcc','CXX=g++','LDFLAGS=-static -lws2_32','-j3'],
 }
 MGBA_CONFIG=['cmake','-S','.','-B','build-romancer','-G','Ninja','-DCMAKE_BUILD_TYPE=Release',

@@ -8,3 +8,25 @@ const r={status:'NOT_VERIFIED',reason:'No exact marker response.',verified_match
 html=sourceProofReport({...r,status:'VERIFIED_VISUAL_SOURCE',verified_matches:[{match_id:3,offset:4096,x:8,y:16,height:8,visual:[],pixel_map:[],unique_source_pixels:32,verified_pixels:32,opaque_pixels:64,outside_placement_changed_pixels:[1,2]}],original_reproduced_twice:true,restored_control:{frame_matches:true},verification_id:'v'});assert.match(html,/Verified visual source/);assert.match(html,/Open verified part/);assert.match(html,/0x1000/);assert.match(html,/Shared|outside/);
 console.log('Source verification distinguishes fresh replay, unresolved results and authenticated verified editor handoff.');
 state.visualSourceProof={privatePixels:'release me'};state.verifiedVisualSource={verification_id:'v'};releaseProjectResources(state);assert.equal(state.visualSourceProof,null);assert.equal(state.verifiedVisualSource,null);
+
+const {selectionKey}=await import('../romancer/ui/tool_inputs.js');
+const calls=[];state.artifact={artifact_id:'a',sha256:'s'};
+ctx.run=async(op,p)=>{calls.push([op,p]);return {object_id:'whole',source_dependency_verified:true};};
+ctx.navigate=async()=>{};ctx.render=async()=>{};ctx.api={call:async()=>({})};
+const match={match_id:3,offset:4096,x:8,y:16,height:8,visual:[],pixel_map:[],unique_source_pixels:32,verified_pixels:32,opaque_pixels:64,outside_placement_changed_pixels:[]};
+const proof={...r,status:'VERIFIED_VISUAL_SOURCE',verification_id:'v1',verified_matches:[match],runtime_trusted:true};
+state.visualSourceProof={scope:selectionKey(state),trace_id:'t',result:proof};
+html=visualSourceControls(ctx,{trace_id:'t',matches:[{}],replay:{status:'READY'}});
+assert(actions['source-object-toggle'],'verified parts can be selected for a whole object');
+await actions['source-object-toggle']({dataset:{id:'3'},checked:true});
+state.visualSourceProof.result={...proof,verification_id:'v2',verified_matches:[{...match,match_id:4,x:16}]};
+html=visualSourceControls(ctx,{trace_id:'t',matches:[{}],replay:{status:'READY'}});
+await actions['source-object-toggle']({dataset:{id:'4'},checked:true});
+globalThis.document={getElementById:id=>({value:id==='verified-object-name'?'Enemy':'3'})};
+await actions['source-object-create']();
+const created=calls.find(([op])=>op==='objects.create')[1];
+assert.deepEqual(created.parts,[{verification_id:'v1',match_id:3},{verification_id:'v2',match_id:4}]);
+assert.equal(created.name,'Enemy');
+const old=actions['source-object-toggle'];state.artifact={artifact_id:'z',sha256:'z'};
+assert.throws(()=>old({dataset:{id:'4'},checked:true}),/changed/);
+console.log('Whole-object selection survives proof pagination and refuses stale source actions.');

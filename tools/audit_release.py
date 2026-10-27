@@ -22,7 +22,7 @@ SECRET=re.compile(rb'(?:gh[pousr]_[A-Za-z0-9]{30,}|github_pat_[A-Za-z0-9_]{40,}|
 LOCAL_USER=re.compile(rb'[A-Za-z]:[/\\]+Users[/\\]+(?!Public[/\\]|<)[^/\\\s"\']+',re.I)
 
 
-def _members(archive,*,limit):
+def _members(archive,*,limit,total_limit=256*1024**2):
     result={};seen=set();total=0
     for item in archive.infolist():
         name=safe_name(item.filename)
@@ -30,7 +30,7 @@ def _members(archive,*,limit):
         seen.add(name.casefold())
         if item.is_dir() or (item.external_attr>>16)&0o170000==0o120000:raise ValueError('non-file archive member')
         total+=item.file_size
-        if item.file_size>limit or total>256*1024**2 or len(seen)>10000:raise ValueError('archive exceeds audit budget')
+        if item.file_size>limit or total>total_limit or len(seen)>10000:raise ValueError('archive exceeds audit budget')
         result[name]=archive.read(item)
     return result
 
@@ -57,20 +57,23 @@ def audit_source(path):
     return {'ok':True,'kind':'source','license':'MIT','members':len(files),'sha256':hashlib.sha256(Path(path).read_bytes()).hexdigest()}
 
 
-def audit_windows(path,source,downloads,*,cores=None):
+def audit_windows(path,source,downloads,*,cores=None,observers=None):
     from tools.package_windows import PINS,runtime_members,generated_root_files
     from romancer import ROMANCER_VERSION,ROMANCER_RELEASE_NAME,ROMANCER_BUILD_LABEL
     with zipfile.ZipFile(source) as archive:source_files=_members(archive,limit=MAX_MEMBER_BYTES)
     _source_files(source_files)
-    with zipfile.ZipFile(path) as archive:files=_members(archive,limit=64*1024**2)
+    with zipfile.ZipFile(path) as archive:files=_members(archive,limit=384*1024**2,total_limit=1024*1024**2)
     if 'BUNDLE.json' not in files:raise ValueError('missing Windows manifest')
     manifest=json.loads(files['BUNDLE.json']);rows={}
     from romancer.bundled_cores import CORE_PINS,core_members
     engines=core_members(cores) if cores is not None else {}
+    from romancer.bundled_debuggers import observer_files
+    native=observer_files(observers) if observers is not None else {}
     identity={'schema_version':1,'product':'ROMancer','version':ROMANCER_VERSION,
               'release_name':ROMANCER_RELEASE_NAME,'build_label':ROMANCER_BUILD_LABEL,
               'credit':'By RetchEWretched','platform':'windows-amd64','runtime':PINS,
               'engines':{'included':bool(engines),'systems':CORE_PINS if engines else {}}}
+    if native:identity['observers']={'included':True,'families':['MesenCE 2.2.1 + physical-ppu-access-v2','MAME 0.289'],'source_included':True}
     if (type(manifest) is not dict or set(manifest)!=set(identity)|{'files'}
             or any(manifest.get(k)!=v or type(manifest.get(k)) is not type(v) for k,v in identity.items())
             or type(manifest.get('files')) is not list):raise ValueError('Windows manifest identity differs')
@@ -92,6 +95,7 @@ def audit_windows(path,source,downloads,*,cores=None):
     expected['python/python314._pth']=b'python314.zip\n.\nLib/site-packages\n../app\n'
     expected['LICENSE']=source_files['LICENSE'];expected.update(generated_root_files(readme=source_files['README.txt']))
     expected.update({'cores/'+name:raw for name,raw in engines.items()})
+    expected.update({'debuggers/'+name:p.read_bytes() for name,p in native.items()})
     if set(files)!=set(expected)|{'BUNDLE.json'}:raise ValueError('Windows package contains unexpected or missing files')
     for name,raw in expected.items():
         if files[name]!=raw:raise ValueError('Windows pinned/source bytes differ: '+name)
@@ -102,11 +106,11 @@ def audit_windows(path,source,downloads,*,cores=None):
 
 
 def main():
-    parser=argparse.ArgumentParser();parser.add_argument('--source',type=Path,required=True);parser.add_argument('--windows',type=Path);parser.add_argument('--downloads',type=Path);parser.add_argument('--cores',type=Path);args=parser.parse_args()
+    parser=argparse.ArgumentParser();parser.add_argument('--source',type=Path,required=True);parser.add_argument('--windows',type=Path);parser.add_argument('--downloads',type=Path);parser.add_argument('--observers',type=Path);parser.add_argument('--cores',type=Path);args=parser.parse_args()
     print(json.dumps(audit_source(args.source)))
     if args.windows:
         if not args.downloads:parser.error('--downloads is required to audit pinned Windows runtime bytes')
-        print(json.dumps(audit_windows(args.windows,args.source,args.downloads,cores=args.cores)))
+        print(json.dumps(audit_windows(args.windows,args.source,args.downloads,cores=args.cores,observers=args.observers)))
 
 
 if __name__=='__main__':main()

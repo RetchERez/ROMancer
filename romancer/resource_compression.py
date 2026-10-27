@@ -134,7 +134,7 @@ def inspect_compressed(path,sha,offset,allocation,codec,*,include_data=False,can
     return result
 
 
-def plan_reinsert(project,parent_id,decoded_id,edited_id,offset,allocation,codec,*,cancelled=lambda:False):
+def prepare_reinsert(project,parent_id,decoded_id,edited_id,offset,allocation,codec,*,cancelled=lambda:False):
     project=Path(project);parent=projects.artifact(project,parent_id);decoded=projects.artifact(project,decoded_id);edited=projects.artifact(project,edited_id)
     inspected=inspect_compressed(parent['path'],parent['sha256'],offset,allocation,codec,include_data=True,cancelled=cancelled)
     metadata=decoded.get('compressed_parent')
@@ -153,10 +153,23 @@ def plan_reinsert(project,parent_id,decoded_id,edited_id,offset,allocation,codec
     replacement=Path(edited['path']).read_bytes()
     if len(replacement)!=edited['size'] or hashlib.sha256(replacement).hexdigest()!=edited['sha256']:raise ValueError('captured edited bytes differ from the expected resource identity')
     packed=encode_stream(replacement,codec)
-    if len(packed)>allocation:raise ValueError('recompressed data does not fit the confirmed allocation; reduce the edit or use a separately supported relocation')
     if decode_stream(packed,codec)['data']!=replacement:raise ValueError('recompression round-trip differs from edited resource')
     from .compression_oracle import verify_encoded
     verification=verify_encoded(packed,codec,replacement,cancelled=cancelled)
+    projects._measure(parent['path'],parent,cancelled=cancelled);projects._measure(edited['path'],edited,cancelled=cancelled)
+    summary={'ok':True,'parent_sha256':parent['sha256'],'edited_sha256':edited['sha256'],'codec':codec,'decoded_size':len(replacement),'original_stored_size':inspected['consumed'],'packed_size':len(packed),'allocation':allocation,
+        'fits':len(packed)<=allocation,'free_bytes':max(0,allocation-len(packed)),'overflow_bytes':max(0,len(packed)-allocation),'independent_decode_verified':verification['verified'],'decode_verification':verification}
+    return parent,edited,packed,summary
+
+
+def preview_reinsert(project,parent_id,decoded_id,edited_id,offset,allocation,codec,*,cancelled=lambda:False):
+    return prepare_reinsert(project,parent_id,decoded_id,edited_id,offset,allocation,codec,cancelled=cancelled)[3]
+
+
+def plan_reinsert(project,parent_id,decoded_id,edited_id,offset,allocation,codec,*,cancelled=lambda:False):
+    parent,edited,packed,summary=prepare_reinsert(project,parent_id,decoded_id,edited_id,offset,allocation,codec,cancelled=cancelled)
+    verification=summary['decode_verification']
+    if not summary['fits']:raise ValueError('recompressed data does not fit the confirmed allocation; reduce the edit or use a separately supported relocation')
     with Path(parent['path']).open('rb') as stream:stream.seek(offset);before=stream.read(len(packed))
     edits=[]
     for position in range(0,len(packed),4096):

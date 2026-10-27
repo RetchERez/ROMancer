@@ -68,7 +68,7 @@ def run_sample(project,row,configuration,steps,cancelled,*,state_check=True):
 
 class BuildCheckTools:
     def __init__(self,api):self.api=api
-    def routes(self):return {'checks.configure':('project_id artifact_id config',self.configure),'checks.status':('project_id artifact_id',self.status),'checks.run':('project_id source_id target_id',self.run),'checks.get':('project_id artifact_id evidence_id',self.get)}
+    def routes(self):return {'checks.from_trace':('project_id source_id target_id trace_id',self.from_trace),'checks.configure':('project_id artifact_id config',self.configure),'checks.status':('project_id artifact_id',self.status),'checks.run':('project_id source_id target_id',self.run),'checks.get':('project_id artifact_id evidence_id',self.get)}
     def configure(self,p,c):
         project,row,path=self.api.source(p);from .release_scope import require_supported
         require_supported(row);config=validate_config(p['config'])
@@ -128,16 +128,47 @@ class BuildCheckTools:
         project,row,_=self.api.source(p);record=load_evidence(project,p['evidence_id'],'regression');r=record['report']
         if r.get('scope')!='automatic_build_check_v1' or row['sha256'] not in (r.get('source_sha256'),r.get('target_sha256')):raise ValueError('Choose a check for this source or build.')
         return {'ok':True,**r,'evidence_id':p['evidence_id'],'runtime_trusted':record['runtime_trusted']}
-    def run(self,p,c):
+    def from_trace(self,p,c):
+        from .replay_journal import execution_context
+        project=self.api.project(p);source=projects.artifact(project,p['source_id']);target=projects.artifact(project,p['target_id'])
+        if target.get('kind')!='build' or target['artifact_id']==source['artifact_id']:raise ValueError('Create a separate edited build before testing this edit.')
+        node=target;seen=set()
+        for _ in range(128):
+            if node['artifact_id']==source['artifact_id']:break
+            if node['artifact_id'] in seen or not node.get('source_id'):raise ValueError('Choose a build descended from the captured source.')
+            seen.add(node['artifact_id']);node=projects.artifact(project,node['source_id'])
+        else:raise ValueError('Build ancestry exceeds the replay-check budget.')
+        trace=self.api.traces.get({'project_id':p['project_id'],'artifact_id':source['artifact_id'],'trace_id':p['trace_id']},c)
+        replay=trace.get('replay',{})
+        if not trace['runtime_trusted'] or replay.get('status')!='READY':raise ValueError('Capture a fresh authenticated cold-start trace before testing an edit.')
+        config=validate_config({'name':'Captured edit check','automatic':False,'mode':'review_changes','steps':replay['steps'],'region':trace['region'],'route_ids':[]})
+        if sum(s['frames'] for s in config['steps'])!=replay['frames']:raise ValueError('Recorded replay frame count differs.')
+        current=self.api._profile_load_config(source['system_id'])
+        if execution_context(current)!=replay['context']:raise ValueError('The captured execution setup or core context changed. Capture a fresh trace.')
+        return self._run(p,c,config,trace)
+
+    def run(self,p,c):return self._run(p,c)
+
+    def _run(self,p,c,config=None,trace=None):
         project=self.api.project(p);source=projects.artifact(project,p['source_id']);target=projects.artifact(project,p['target_id']);from .release_scope import require_supported
         require_supported(source);require_supported(target)
         if source['system_id']!=target['system_id']:raise ValueError('Build tests require the same cartridge system.')
-        _,config=self.policy(project,source);config=config or validate_config(DEFAULT)
+        if config is None:
+            _,config=self.policy(project,source)
+        config=config or validate_config(DEFAULT)
         result={'ok':True,'scope':'automatic_build_check_v1','project_id':p['project_id'],'source_id':source['artifact_id'],'target_id':target['artifact_id'],'source_sha256':source['sha256'],'target_sha256':target['sha256'],'system_id':source['system_id'],'name':config['name'],'configuration':config,'configuration_sha256':digest(config),'status':'BLOCKED','gameplay_verified':False}
+        if trace is not None:result.update(trace_id=p['trace_id'],captured_frame_sha256=trace['frame']['sha256'])
         try:
-            checked=self.api._profile_load_config(source['system_id']);runs=[run_sample(project,row,checked,config['steps'],c) for row in (source,source,target)]
+            checked=self.api._profile_load_config(source['system_id'])
+            if trace is not None:
+                from .replay_journal import execution_context
+                if execution_context(checked)!=trace['replay']['context']:raise ValueError('Captured execution context changed before replay.')
+            runs=[run_sample(project,row,checked,config['steps'],c) for row in (source,source,target)]
             if len({r['execution_sha256'] for r in runs})!=1:raise ValueError('Core options or controller/system context changed between test runs.')
             result.update(compare_frames(*(r['frame'] for r in runs),config['region'],config['mode']))
+            if trace is not None and any(r['frame']['sha256']!=trace['frame']['sha256'] or r['frame']['index']!=trace['replay']['frames'] for r in runs[:2]):
+                result.update(status='INCONCLUSIVE',reason='The original did not reproduce the captured trace frame. Record a fresh cold-start trace.')
+
             result['runs']=[{k:v for k,v in r.items() if k!='frame'}|{'frame':{k:r['frame'][k] for k in ('index','width','height','sha256')}} for r in runs]
             from .rom_health import check_rom
             health=[check_rom(Path(row['path']),row['sha256'],'','file',cancelled=c) for row in (source,target)]
