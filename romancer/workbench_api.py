@@ -230,6 +230,8 @@ class WorkbenchAPI:
         self.relocation=RelocationTools(self);self.routes.update(self.relocation.routes())
         from .editing_readiness import EditingReadinessTools
         self.editing_readiness=EditingReadinessTools(self);self.routes.update(self.editing_readiness.routes())
+        from .draft_scene import DraftSceneTools
+        self.draft_scene=DraftSceneTools(self);self.routes.update(self.draft_scene.routes())
         for operation in tuple(self.routes):
             if operation.startswith('containers.') or operation in ('runtime.load_disc','route.run_disc','release.disc_set'):
                 del self.routes[operation]
@@ -407,7 +409,7 @@ class WorkbenchAPI:
             if operation not in self.routes:raise ValueError('unknown workbench operation')
             names,handler=self.routes[operation];fields(parameters,names)
             if cancelled():raise KeyboardInterrupt
-            if operation in ('rom.scan.run','graphics.observe','traces.capture','traces.verify','checks.run','checks.from_trace','graphics.accesses.capture'):return handler(parameters,cancelled)
+            if operation in ('rom.scan.run','graphics.observe','traces.capture','traces.verify','checks.run','checks.from_trace','graphics.accesses.capture','assets.preview_scene'):return handler(parameters,cancelled)
             if 'project_id' in parameters:
                 project_id=projects.identifier(parameters['project_id'])
                 with self.operation_locks_guard:lock=self.operation_locks.setdefault(project_id,threading.RLock())

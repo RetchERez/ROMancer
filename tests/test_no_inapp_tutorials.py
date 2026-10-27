@@ -4,6 +4,11 @@ from romancer.workbench_api import WorkbenchAPI
 from romancer.app_settings import validate_location
 
 class GuideOnlyTeachingTests(unittest.TestCase):
+    def test_original_studio_welcome_action_is_connected(self):
+        app=(Path(__file__).resolve().parents[1]/'romancer/ui/app.js').read_text(encoding='utf-8')
+        self.assertIn("'demo-studio':",app)
+        self.assertIn("run('project.studio'",app)
+
     def test_fresh_workspace_has_no_tutorial_or_guided_journey_operations(self):
         with tempfile.TemporaryDirectory() as temp:
             api=WorkbenchAPI(Path(temp)/'work')

@@ -9,10 +9,19 @@ class EditingReadinessTools:
         for kind,(title,page) in AREAS.items():
             if c():raise KeyboardInterrupt
             status='needs_investigation';reason='No checked editing definition is saved for this revision.';action='Find or declare a layout';scope='No game structure inferred'
-            if row.get('descriptors',{}).get(kind):
+            if kind in row.get('descriptors',{}) and row['descriptors'][kind] is not None:
                 try:
                     if type(row['descriptors'][kind]) is not dict:raise ValueError('The saved definition is malformed.')
-                    _definition(row,path,kind);status='ready';reason='Saved layout successfully inspected this exact source.';action='Open editor';scope='Checked layout; game meaning is author-declared'
+                    if kind=='assets':
+                        from .assets import inspect_assets
+                        checked=inspect_assets(path,row['descriptors'][kind])
+                    elif kind=='script':
+                        from .script import inspect_script
+                        checked=inspect_script(path,row['descriptors'][kind])
+                    else:_definition(row,path,kind);checked={'ok':True}
+                    if not checked.get('ok'):raise ValueError(str(checked.get('error','The layout cannot inspect this source.')))
+                    if checked.get('write_supported') is False:raise ValueError('Read-only layout: '+'; '.join(checked.get('read_only_reasons',[])[:3]))
+                    status='ready';reason='Saved layout successfully inspected this exact source.';action='Open editor';scope='Checked layout; game meaning is author-declared'
                     if kind=='assets' and not row['descriptors'][kind].get('palettes'):reason='Graphics layout inspected successfully. No editable palette is declared.'
                 except (ValueError,OSError,KeyError,TypeError) as error:
                     status='unsupported';reason='Saved definition cannot be used: '+str(error)[:200];action='Repair or replace the definition'

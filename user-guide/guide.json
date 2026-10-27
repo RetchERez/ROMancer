@@ -219,6 +219,10 @@
         {
           "title": "Find help without reading every page",
           "text": "Use Find help in the offline HTML guide to search tasks, tool names, glossary definitions and index aliases. Results link directly to a topic. The PDF retains its linked contents, glossary, index and ordinary Find command. A system match does not promise a decoded game-specific level or music format."
+        },
+        {
+          "title": "Readiness is per ROM and area",
+          "text": "Ready to edit requires a source-bound saved definition that passes inspection and permits writing. Needs investigation means no usable definition is saved yet. Unsupported definition means a malformed, stale or read-only layout needs correction. Follow the area's action. These labels cover graphics, text, stats, levels and sound; a working emulator does not establish an editable sound engine or level format."
         }
       ]
     },
@@ -248,7 +252,7 @@
         "term-draft",
         "term-build"
       ],
-      "image": "103-studio-sprite-staged",
+      "image": "206-workshop-edit-undo-redo",
       "caption": "The actual sprite editor shows the unchanged original beside a staged hero edit. Review and build are separate actions.",
       "extra_images": [
         {
@@ -322,7 +326,7 @@
       "steps": [
         "Open the HTML guide chapter <b>Watch the first-edit walkthrough</b> and use the video controls. The adjacent ROMancer-v1.0-Walkthrough.mp4 also opens in an ordinary local video player.",
         "Follow the original NES workshop: assemble a tile, select brush swatch 1, paint one pixel, compare Changes only with Side by side, then undo and redo the stroke.",
-        "Review graphics changes and optionally name the build. Choose Playtest build, Load game, Play and Pause. Save and load a state for that exact output.",
+        "Review graphics changes and optionally name the build. Choose Playtest saved build, Load game, Play and Pause. Save and load a state for that exact output.",
         "Export and download the readable First-sprite-edit.bps patch. Close and reopen the project, then check that its source and named build remain available.",
         "Make one more staged edit, wait for Saved, reload, and confirm its draft returns. Use the beginner acceptance checklist for your own independent trial."
       ],
@@ -357,7 +361,7 @@
         "Save existing work; choose the blank <b>Choose a project</b> entry if needed. On the empty Overview, click <b>NES workshop</b>.",
         "Open <b>Graphics &amp; fonts</b>. Keep First tile 0, Tiles across 1 and Tiles down 1; click <b>Assemble tiles</b>. Leave Preview size on Fit and click brush swatch <b>1</b>.",
         "Focus the <b>Editing</b> canvas. Press Right Arrow once, then Space. Expect <b>1 pixel differs</b>; the Original picture stays unchanged. Undo sprite stroke reverses the experiment.",
-        "Click <b>Review graphics changes</b>, read the byte summary, then <b>Create graphics build</b>. Name and notes are optional. Click <b>Playtest build</b> in the bottom bar to select that output and open Playtest.",
+        "Click <b>Review graphics changes</b>, read the byte summary, then <b>Create graphics build</b>. Name and notes are optional. Click <b>Playtest saved build</b> in the bottom bar to select that output and open Playtest.",
         "Choose <b>Load game</b>, then Play. Pause to inspect the result. The full Windows edition supplies the engine; the source edition may require core setup.",
         "Open <b>Export</b>. Choose the original revision and your asset build, then <b>Create verified patch</b>. Download the prepared BPS. Continue with Apply a downloaded patch to check a fresh reconstruction."
       ],
@@ -487,10 +491,10 @@
       "title": "Complete the beginner acceptance checklist",
       "part": "Basic",
       "kicker": "Independent hands-on usability trial",
-      "intro": "Check that you can finish a small edit comfortably, without outside assistance. Copy the unmarked checklist from README.txt into your own notes, or print it. Leave installed program files unchanged.",
+      "intro": "Ask someone unfamiliar with ROMancer to follow this guide alone. Use the unmarked user-guide/ACCEPTANCE.txt record. The automated agent exercise is separate; the independent human trial has not been completed.",
       "steps": [
         "Open the app and choose <b>Try the editing studio</b>. Open Graphics &amp; fonts, assemble its first four tiles as a 2 by 2 image and make one visible pixel change. Confirm that Original stays unchanged.",
-        "Undo and redo the stroke, review the change, and create a build. Identify the selected file as Original or Build before loading it in Playtest.",
+        "Undo and redo the stroke. Review and name a separate build. Choose Playtest saved build, load it, advance to the edited scene, then save and load a state. Export saved build must select that output and its correct original; create and verify the patch.",
         "Play and pause the build. Save and load a matching state, then export and download a verified BPS patch. Identify the original, build and patch as separate files.",
         "Close and reopen the project, then find the same source and build. On the original, stage one more edit, wait for Saved and reload. If a confirmation appears, continue only after saving. Confirm the draft and its staged-change status return.",
         "Read the labels and previews at your preferred window size and theme. Mark a box in your checklist copy complete only when you can explain the result without outside help. Skipped or confusing steps stay unchecked."
@@ -591,7 +595,7 @@
         "Watch the <b>Saving</b> or <b>Saved</b> status as you work. Ctrl+S requests draft saving. A saved draft still needs review and a build.",
         "Use the active editor's Undo and Redo controls. Pixel and room editors group a stroke; text fields retain ordinary text editing undo. The shortcut help explains the current context.",
         "Choose <b>Review changes</b> or the tool's equivalent. Read expected original bytes, proposed values, shared consumers and any integrity updates. Changing an input invalidates an older review.",
-        "Create the separate build, then click <b>Playtest build</b> in the bottom bar. It selects that output and opens Playtest; choose Load game. Older outputs remain in the top selector and Build history."
+        "Create the separate build. <b>Playtest saved build</b> in the bottom bar selects that output and opens Playtest; choose Load game. <b>Export saved build</b> selects that output and its ancestral original. A newer staged edit needs a new build."
       ],
       "result": "The source remains intact, the build has its own identity, and the selected Playtest file is the output you just created.",
       "note": "If saving fails, keep the window open and copy unsaved text before reloading. Undoing staged work does not erase a previously created build.",
@@ -602,7 +606,7 @@
         },
         {
           "title": "Returning to earlier work",
-          "text": "Playtest build appears for an output created in this session from the selected input. Newer staged edits still need another build. Overview &gt; Build history keeps all recorded versions. Give outputs meaningful names and keep private project backups."
+          "text": "Saved-build controls derive from the recorded project history and survive closing and reopening the app. They follow the selected build, or the latest direct build of the selected input; another ROM branch is excluded. Edit input restores that build's immediate input and saved editor. Navigating between Playtest and Export preserves a paused session when the selected build stays the same. A restart requires loading the game and its saved state again."
         },
         {
           "title": "Name the output before creating it",
@@ -619,41 +623,41 @@
         "term-plan",
         "term-build"
       ],
-      "image": "39-build-handoff",
+      "image": "202-export-correct-build",
+      "image_alt": "Export with the selected build and its matching original",
+      "caption": "Export saved build selects the recorded target and the original belonging to its branch.",
       "image_layout": "following-page",
-      "image_alt": "Playtest build in the bottom bar after an asset build",
-      "caption": "Playtest build selects the newly recorded output; it does not load newer staged edits.",
       "visual_page": {
-        "title": "From a reviewed build to Playtest",
-        "kicker": "Basic / actual application capture",
-        "intro": "Playtest build selects the recorded output and opens Playtest. Choose Load game to run it.",
+        "title": "Continue a saved build through test and export",
+        "kicker": "Basic / recorded workflow",
+        "intro": "Saved-build controls survive reopening. Export saved build selects that exact output and its ancestral original. New staged edits need a new build.",
         "panels": [
           {
-            "image": "39-build-handoff",
-            "title": "The recorded build stays separate from the original",
+            "image": "202-export-correct-build",
+            "title": "The exact original and target are selected",
             "x": 48,
             "top": 846,
             "width": 1100,
             "crop": [
               180,
-              120,
-              1390,
-              700
+              100,
+              1380,
+              650
             ]
           },
           {
-            "image": "39-build-handoff",
-            "title": "Choose Playtest build in the bottom bar",
+            "image": "204-recorded-workflow-after-reopen",
+            "title": "Saved-build actions remain available after reopening",
             "x": 48,
             "top": 225,
             "width": 1100,
             "crop": [
-              1000,
-              950,
-              600,
-              50
+              850,
+              1052,
+              940,
+              48
             ],
-            "caption": "This selects the newly created output and opens Playtest. Choose Load game to start it."
+            "caption": "Playtest saved build, Export saved build and Edit input are normal controls, without a lesson panel."
           }
         ]
       }
@@ -1526,7 +1530,13 @@
             ]
           }
         ]
-      }
+      },
+      "details": [
+        {
+          "title": "Draft preview versus testing a saved build",
+          "text": "Graphics & fonts can preview a staged draft before publishing a build. It requires a fresh trace from the exact original, a repeatable cold start, matching core/controller options and supported declared edits. The bound is 20 input steps, 2,400 frames, a 64 MiB source and 262,144 frame pixels. An unstable original yields Inconclusive and no edited picture. Record a shorter fresh capture or test a saved build instead. A changed frame is an observation, not proof of full-game correctness."
+        }
+      ]
     },
     {
       "id": "hex-editor",
@@ -1721,7 +1731,7 @@
         "Review graphics changes, create the build and inspect every scene known to share that palette. Verify the color in the actual game, not just the swatch."
       ],
       "result": "The proposed color is representable in the declared format; the build changes the intended palette bytes and the scene uses them as expected.",
-      "note": "Preview colors used to arrange a sprite are not necessarily stored palette edits. Transparency, banks and a game's dynamic palette changes can affect the observed result.",
+      "note": "Preview colors used to arrange a sprite are not necessarily stored palette edits. Transparency, banks and a game's dynamic palette changes can affect the observed result. A saved preview reopens only for matching source, schema, edits and trace evidence. Changing a pixel, map cell, palette or setup hides the older pictures. The separate object-placement composite is labeled simulated; it is not an emulated frame.",
       "details": [
         {
           "title": "Shared entries",
@@ -1734,6 +1744,10 @@
         {
           "title": "Master System Mode 4 colors",
           "text": "Choose Master System RGB222 for declared Mode 4 color bytes: one byte stores two bits per channel. Tilemap entries use the SMS index, flip and palette masks; priority and unused bits remain preserved. The reference color preview does not emulate analog display differences."
+        },
+        {
+          "title": "See the actual captured scene",
+          "text": "For a declared palette or pixel edit, expand Preview this draft in a captured scene. Choose a cold-start capture and Preview captured scene. ROMancer replays the original twice and a temporary checked draft once with the captured inputs and core settings. Original replay, Draft replay and Difference are emulator frames. No build is added to your project until you choose Create graphics build."
         }
       ],
       "related": [
@@ -1770,6 +1784,34 @@
           }
         ]
       }
+    },
+    {
+      "id": "native-draft-preview",
+      "title": "Preview a draft in its actual captured scene",
+      "part": "Basic",
+      "kicker": "Graphics / emulator-produced preview",
+      "intro": "See a palette or pixel change against the complete captured background before adding a project build. The example below uses our original GBA tile-pattern program.",
+      "steps": [
+        "In Playtest, load the original from a fresh cold start. Advance to a useful scene, select a region under Inspect graphics and save a gameplay trace. A historical or state-loaded capture cannot establish a cold replay.",
+        "Open Graphics &amp; fonts for that same original. Stage a declared palette or pixel change, then expand <b>Preview this draft in a captured scene</b>. Select the capture and choose <b>Preview captured scene</b>.",
+        "Compare <b>Original replay</b>, <b>Draft replay</b> and <b>Difference</b>. The original must reproduce twice. These are actual emulator frames from temporary checked copies; your paused session and project build history remain separate.",
+        "Return to another screen and reopen the editor: a validated matching preview returns. Change an edit and the old pictures disappear. Review and create the build to keep the result, then use Playtest saved build and Export saved build."
+      ],
+      "result": "The previewed draft SHA-256 matched the separately created build in the seven-system native checks. The guide image shows the color edit on the actual original-program frame.",
+      "note": "This check covers the captured inputs and settings. It does not establish every palette consumer, gameplay outcome or commercial sound engine. Object-placement composites remain explicitly simulated.",
+      "image": "200-native-palette-draft-preview",
+      "caption": "Actual ROMancer palette editing with original, draft and difference emulator frames. No image was painted over the emulator output.",
+      "related": [
+        "palettes",
+        "captured-edit-check",
+        "drafts",
+        "beginner-trial"
+      ],
+      "terms": [
+        "term-palette",
+        "term-build",
+        "term-evidence"
+      ]
     },
     {
       "id": "animation",
@@ -5014,7 +5056,7 @@
       ]
     },
     {
-      "term": "Playtest build",
+      "term": "Playtest saved build",
       "topics": [
         "drafts",
         "first-edit"
@@ -5470,12 +5512,21 @@
         "support-editing",
         "palettes-appearance"
       ]
+    },
+    {
+      "term": "Native draft preview",
+      "topics": [
+        "native-draft-preview",
+        "captured-edit-check",
+        "palettes"
+      ]
     }
   ],
   "compact_pdf": true,
   "compact_wide_topics": [
     "ai-worked-edit",
     "beginner-trial",
+    "captured-edit-check",
     "compression",
     "connections",
     "debug",
@@ -5485,6 +5536,7 @@
     "levels",
     "mcp",
     "native-graphics-trails",
+    "palettes",
     "rastan-blobs",
     "recipes",
     "regression",

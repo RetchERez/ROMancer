@@ -81,3 +81,7 @@ html[data-theme="light"] .nav-label,html[data-theme="light"] .app-footer{color:v
 .scene-pair{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:14px}.scene-pair img,.scene-pair canvas{width:100%;max-height:260px;object-fit:contain;image-rendering:pixelated;background:#080f12}.scene-composite{margin-top:12px}@media(max-width:800px){.scene-pair{grid-template-columns:1fr}}
 
 .readiness-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(175px,1fr));gap:14px}.readiness-grid>div{border:1px solid var(--line);border-radius:6px;padding:12px}.readiness-grid p{margin:8px 0}.readiness-state.ready{color:var(--accent);font-weight:700}.readiness-state.needs_investigation{font-weight:650}.readiness-state.unsupported{font-weight:700}
+
+.build-context{max-width:14rem;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+
+.draft-scene-pictures{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:12px}.draft-scene-pictures img{width:100%;max-height:240px;object-fit:contain;image-rendering:pixelated;background:var(--theme-menu)}.draft-scene-pictures figure{margin:0}@media(max-width:800px){.draft-scene-pictures{grid-template-columns:1fr}}

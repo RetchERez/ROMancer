@@ -11,4 +11,7 @@ await actions['graphics-access-capture']();assert.equal(calls[0][0],'graphics.ac
 const report={events:[{kind:'read',file_offset:4096,physical_offset:0,domain:'nesChrRom',value:1,operation_kind:'PpuRenderingRead'}],total_events:201,offset:0,limit:100,memory_domains:[],causal_dataflow_proven:false,observation_counts_scope:'returned_event_page'};
 html=graphicsAccessReport(report);assert.match(html,/0x1000/);assert.match(html,/Read|read/);assert.match(html,/201/);assert.match(html,/do not establish dataflow/);
 graphicsAccessControls(ctx,trace);const old=actions['graphics-access-capture'];state.artifact={artifact_id:'b',sha256:'z'};await assert.rejects(old(),/changed/);
+state.artifact={artifact_id:'a',sha256:'s',system_id:'nes'};
+state.graphicsAccess.result={...report,memory_domains:[{name:'nesPpuMemory',size:8192}]};
+html=graphicsAccessControls(ctx,trace);assert.match(html,/>NES tiles \(4 colors\)<\/option>/,'Human labels precede exact codec IDs.');
 console.log('Native graphics controls retain source identity, real accesses and explicit dataflow limits.');

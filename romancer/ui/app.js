@@ -1,10 +1,11 @@
+import {invalidateAssetSceneDraft} from './draft_scene.js';
 import {locationKey,locationSnapshot,restoreLocation,seedWorkspaceLocation,WorkspaceLocationWriter} from './workspace_resume.js';
 import {DEFAULT_SETTINGS,getSettings,hydrateSettings,loadSettings,settingsAppearance} from './app_settings.js';
 import {workspaceStatus,guardClose,hasStagedChanges} from './workspace_status.js';
 import {mountVisualComparisons} from './visual_comparison.js';
 import {mountBuildDetails,runNamedBuild} from './build_details.js';
 import {workspaceMatches,openSearchFile} from './workspace_search.js';
-import {createdBuild,playtestCreatedBuild} from './build_handoff.js';
+import {continuedBuild,playtestCreatedBuild,exportCreatedBuild,editBuildInput} from './build_handoff.js';
 import {setArtifactSelection} from './artifact_selection.js';
 import {SHORTCUTS,shortcutFor,historyAction,rememberEditor} from './shortcuts.js';
 import {disposeAudio} from './runtime_setup.js';
@@ -60,7 +61,7 @@ document.addEventListener('scroll',event=>{if(event.target.id!=='main')return;cl
 
 window.addEventListener('beforeunload',event=>guardClose(event,draftWrites,state));
 function clearDraftCache(){draftWrites.clear();draftRevisions.clear();loadedDrafts.clear();state.drafts={};state.historyEditor=null;lastDraft=null;}
-function saveDraft(id,value){if(!state.project||!state.artifact)return;const project_id=state.project.project_id,artifact_id=state.artifact.artifact_id,key=draftFieldKey(id),full=[project_id,artifact_id,key].join(':');state.drafts[full]=value;lastDraft={project_id,artifact_id,key,full};draftWrites.enqueue(full,async()=>{let record=draftRevisions.get(full);if(!record)record=await api.call('drafts.get',{project_id,artifact_id,key});try{record=await api.call('drafts.save',{project_id,artifact_id,key,revision:record.revision,value});}catch(error){try{const saved=await api.call('drafts.get',{project_id,artifact_id,key});if(JSON.stringify(saved.value)!==JSON.stringify(value))throw error;record=saved;}catch{throw error;}}draftRevisions.set(full,record);},error=>notify('Draft not saved: '+error.message,true));}
+function saveDraft(id,value){invalidateAssetSceneDraft(id);if(!state.project||!state.artifact)return;const project_id=state.project.project_id,artifact_id=state.artifact.artifact_id,key=draftFieldKey(id),full=[project_id,artifact_id,key].join(':');state.drafts[full]=value;lastDraft={project_id,artifact_id,key,full};draftWrites.enqueue(full,async()=>{let record=draftRevisions.get(full);if(!record)record=await api.call('drafts.get',{project_id,artifact_id,key});try{record=await api.call('drafts.save',{project_id,artifact_id,key,revision:record.revision,value});}catch(error){try{const saved=await api.call('drafts.get',{project_id,artifact_id,key});if(JSON.stringify(saved.value)!==JSON.stringify(value))throw error;record=saved;}catch{throw error;}}draftRevisions.set(full,record);},error=>notify('Draft not saved: '+error.message,true));}
 async function moveDraft(direction){await flushDrafts();if(!lastDraft)throw new Error('Edit a field first.');const {project_id,artifact_id,key,full}=lastDraft,record=draftRevisions.get(full);const result=await api.call('drafts.move',{project_id,artifact_id,key,revision:record.revision,direction});draftRevisions.set(full,result);state.drafts[full]=result.value;state.pending=null;if(key.endsWith(':paint-buffer')){state.paint=null;state.pixelHistories=null;state.pixelHistoryScope=null;}if(key.endsWith(':level-changes'))state.levelEditor=null;if(key.endsWith(':hex-changes')){state.hexDraft=null;state.hexReview=null;}await render();}
 const ctx={state,api,navigate,notify,render,refreshProject,openProject,modal,closeModal:()=>document.getElementById('modal').close(),
     draft:(id,fallback)=>state.drafts[draftKey(id)]??fallback,setDraft:saveDraft,
@@ -74,7 +75,7 @@ function notify(message,error=false){const toast=document.getElementById('toast'
 function modal(title,body){const node=document.getElementById('modal');node.innerHTML=`<div class="dialog-heading"><h2 id="modal-title">${esc(title)}</h2>${button('Close','close-modal',{icon:'close'})}</div>${body}`;if(!node.open)node.showModal();}
 async function refreshProject(){const id=state.project?.project_id;state.projects=(await api.call('projects.list')).projects;if(!id||state.project?.project_id!==id)return;const opened=await api.call('project.open',{project_id:id});if(state.project?.project_id!==id)return;state.project=opened;state.artifact=chooseArtifact(opened,state.artifact?.artifact_id);}
 
-function jobTray(){const built=createdBuild(state),job=state.job,active=job&&!['COMPLETED','FAILED','CANCELLED','INTERRUPTED'].includes(job.status);return `<div class="job-tray ${active?'working':''}"><div><span class="pulse"></span><strong>${active?'Working':job?.status==='FAILED'?'Action failed':job?.status==='CANCELLED'?'Cancelled':'Ready'}</strong><span> ${active?' — '+esc(job.message):''}</span></div><div id="workspace-state-host">${workspaceStatus(state,draftWrites.snapshot(),false)}</div>${active?button('Cancel job','cancel-job'):`<div class="actions">${built?button('Playtest build','playtest-created-build',{id:built.artifact_id,icon:'playtest',primary:true}):''}${button('Undo','draft-undo',{disabled:!historyAvailable(-1),reason:'No earlier edit in the active editor.'})}${button('Redo','draft-redo',{disabled:!historyAvailable(1),reason:'No edit to redo in the active editor.'})}</div>`}</div>`;}
+function jobTray(){const built=continuedBuild(state),job=state.job,active=job&&!['COMPLETED','FAILED','CANCELLED','INTERRUPTED'].includes(job.status);return `<div class="job-tray ${active?'working':''}"><div><span class="pulse"></span><strong>${active?'Working':job?.status==='FAILED'?'Action failed':job?.status==='CANCELLED'?'Cancelled':'Ready'}</strong><span> ${active?' — '+esc(job.message):''}</span></div><div id="workspace-state-host">${workspaceStatus(state,draftWrites.snapshot(),false)}</div>${active?button('Cancel job','cancel-job'):`<div class="actions">${built?'<span class="build-context" title="'+esc(built.name)+'">Saved build: '+esc(built.name)+'</span>'+button('Playtest saved build','playtest-created-build',{id:built.artifact_id,icon:'playtest',primary:true})+button('Export saved build','export-created-build',{id:built.artifact_id})+(state.artifact?.artifact_id===built.artifact_id?button('Edit input','edit-build-input',{id:built.artifact_id}):''):''}${button('Undo','draft-undo',{disabled:!historyAvailable(-1),reason:'No earlier edit in the active editor.'})}${button('Redo','draft-redo',{disabled:!historyAvailable(1),reason:'No edit to redo in the active editor.'})}</div>`}</div>`;}
 function updateJob(job){state.job=job;const tray=document.querySelector('.job-tray');if(tray)tray.outerHTML=jobTray();}
 async function run(operation,parameters,options={}){return runNamedBuild(ctx,operation,parameters,options,(op,params,opts)=>runScoped(ctx,op,params,opts,updateJob));}
 async function openProject(id){rememberLocation();stopPlayback(state);const ticket=selectionTicket(state);await flushDrafts();if(!selectionCurrent(state,ticket))return;if(state.runtime&&state.project){await api.call('runtime.close',{project_id:state.project.project_id});state.runtime=null;state.frame=null;state.snapshot=null;}state.profileFamily=null;state.profileLoadedFamily=null;state.scriptPage=0;state.catalogPage=0;state.catalogQuery='';const opened=await api.call('project.open',{project_id:id});if(!selectionCurrent(state,ticket))return;await flushDrafts();if(!selectionCurrent(state,ticket))return;clearDraftCache();releaseProjectResources(state);state.project=opened;state.artifact=chooseArtifact(state.project,readPreference('romancer-artifact:'+state.project.project_id));state.results={};state.pending=null;writePreference('romancer-project',id);state.page='overview';await refreshProject();resumeLocation();await render();}
@@ -85,6 +86,8 @@ function showSearch(){const query=document.getElementById('global-search').value
 
 function baseActions(){return {
  'playtest-created-build':node=>playtestCreatedBuild(ctx,node.dataset.id),
+ 'export-created-build':node=>exportCreatedBuild(ctx,node.dataset.id),
+ 'edit-build-input':node=>editBuildInput(ctx,node.dataset.id),
  'error-dismiss':()=>{state.lastError=null;document.getElementById('error-panel').innerHTML='';document.getElementById('toast').style.display='none';},
  'draft-retry':async()=>{await draftWrites.retry();updateWorkspaceStatus();notify('Draft saved.');},
  'draft-undo':()=>moveActiveHistory(-1),'draft-redo':()=>moveActiveHistory(1),'draft-save-now':saveNow,'shortcut-help':showShortcuts,
@@ -93,6 +96,7 @@ function baseActions(){return {
  'candidate-cancel':()=>{state.candidateReview=null;state.resourcePrefill=null;state.openDeclaration=null;return render();},
  'help-topic':node=>{state.helpTopic=node.dataset.id||({assets:'graphics',scripts:'text',resources:'discovery',release:'export',settings:'recovery',overview:'start',help:'start'}[state.page]||state.page);document.getElementById('modal').close();return navigate('help');},
  'workspace-search':showSearch,
+ 'demo-studio':async()=>{const result=await run('project.studio',{}, {render:false});await openProject(result.project_id);notify('Editing studio opened.');},
  'demo-system':async node=>{const result=await run('project.demo_system',{system_id:node.dataset.id},{render:false});await openProject(result.project_id);notify('Workshop opened.');},
  'demo-nes':async()=>{const result=await run('project.demo_nes',{}, {render:false});await openProject(result.project_id);notify('NES workshop opened.');},
  'demo':async()=>{const result=await run('project.demo',{}, {render:false});await openProject(result.project_id);notify('Harbor workshop opened.');},
@@ -141,4 +145,3 @@ document.addEventListener('dragleave',event=>{if(!event.relatedTarget)document.b
 document.addEventListener('drop',event=>{if(![...event.dataTransfer?.types||[]].includes('Files'))return;event.preventDefault();document.body.classList.remove('file-drag');try{state.droppedImportFile=droppedSource(event.dataTransfer.files);importDialog();}catch(error){notify(error.message,true);}});
 
 window.addEventListener('pagehide',()=>{clearTimeout(state.buildCheckTimer);clearTimeout(locationTimer);rememberLocation();state.visualComparison?.dispose();state.visualComparison=null;state.spritePreviewObserver?.disconnect();state.spritePreviewObserver=null;stopPlayback(state);disposeAudio();state.soundPlayer?.close();state.animationClock?.stop();});
-

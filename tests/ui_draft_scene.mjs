@@ -1,0 +1,21 @@
+import assert from 'node:assert/strict';
+import {draftScene,mountDraftScene,invalidateAssetSceneDraft} from '../romancer/ui/draft_scene.js';
+const doc={ok:true,document_id:'doc',write_supported:true},state={project:{project_id:'p'},artifact:{artifact_id:'a',sha256:'s',gameplay_traces:{source_sha256:'s',ids:['t']}},results:{'assets.inspect':doc}},actions={},calls=[];
+let snapshot={schema:{id:'schema'},edits:{schema_version:1,document_id:'doc',changes:[{kind:'palette',index:1,after:{r:2,g:3,b:4}}],acknowledged_consumers:[]}};
+const result={ok:true,source_sha256:'s',artifact_id:'a',plan_id:'plan',evidence_id:'e',trace_id:'t',status:'REVIEW',emulated_frame:true,changed_pixels:1,visual:{original_png_base64:'original',build_png_base64:'draft',difference_png_base64:'difference'}};
+const ctx={state,draft:(_,f)=>f,use:r=>Object.assign(actions,r),sourceParams:()=>({project_id:'p',artifact_id:'a'}),isCurrentRender:()=>true,render:async()=>{},navigate:async()=>{},api:{call:async(op,p)=>{calls.push([op,p]);return {ok:true,found:false};}},run:async(op,p)=>{calls.push([op,p]);return op==='assets.plan'?{ok:true,workbench_plan_id:'plan'}:result;}};
+let html=await draftScene(ctx,doc,()=>snapshot);assert.match(html,/Preview captured scene/);assert(!/tutorial|lesson/i.test(html));
+await actions['asset-scene-preview']();assert.deepEqual(calls.filter(([op])=>op!=='assets.preview_scene.find').map(([op])=>op),['assets.plan','assets.preview_scene']);assert.equal(state.pending.plan_id,'plan');
+html=await draftScene(ctx,doc,()=>snapshot);assert.match(html,/Emulated draft preview/);assert.match(html,/1 pixel changed/);assert.match(html,/No project build/);
+snapshot={...snapshot,edits:{...snapshot.edits,changes:[]}};html=await draftScene(ctx,doc,()=>snapshot);assert(!html.includes('Emulated draft preview'),'Changing or discarding the draft hides old measured frames.');
+state.assetScene=null;snapshot.edits.changes=[{kind:'palette',index:1}];ctx.api.call=async()=>({...result,found:true});
+html=await draftScene(ctx,doc,()=>snapshot);assert.match(html,/Emulated draft preview/,'A backend-validated saved preview restores after reopening.');assert.equal(state.pending.document_id,'doc');
+html=await draftScene(ctx,doc,()=>{throw Error('Malformed setup');});assert.match(html,/Malformed setup/,'An invalid draft cannot crash the rest of the graphics editor.');
+const old=actions['asset-scene-preview'];state.artifact={artifact_id:'other',sha256:'x'};await assert.rejects(old(),/changed/);
+const listeners={},picker={addEventListener:(event,handler)=>listeners[event]=handler},panel={};let renders=0;
+globalThis.document={getElementById:id=>id==='asset-scene-panel'?panel:id==='palette-picker'?picker:null};ctx.render=async()=>{renders++;};
+mountDraftScene(ctx);assert.equal(typeof listeners.change,'function','A committed palette choice refreshes scene-preview availability after staging.');listeners.change();assert.equal(renders,0);await new Promise(resolve=>queueMicrotask(resolve));assert.equal(renders,1);
+const measured={hidden:false};panel.querySelector=()=>measured;
+for(const id of ['paint-buffer','asset-changes','asset-schema']){measured.hidden=false;invalidateAssetSceneDraft(id);assert.equal(measured.hidden,true,'Any committed '+id+' edit hides older measured frames, including map/Enter/button changes.');}
+measured.hidden=false;invalidateAssetSceneDraft('release-title');assert.equal(measured.hidden,false);
+console.log('Native draft preview uses checked plans, distinguishes emulated frames, restores validated results and rejects every committed asset edit.');

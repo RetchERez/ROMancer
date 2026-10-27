@@ -2,6 +2,12 @@ import unittest
 from romancer.mcp_server import READ_OPERATIONS,WRITE_OPERATIONS,_investigation_properties
 
 class VisualSourceMCPTests(unittest.TestCase):
+    def test_native_draft_preview_is_opt_in_and_saved_preview_reads_are_typed(self):
+        self.assertIn('assets.preview_scene',WRITE_OPERATIONS)
+        self.assertNotIn('assets.preview_scene',READ_OPERATIONS)
+        for operation in ('assets.preview_scene.get','assets.preview_scene.find'):
+            self.assertIn(operation,READ_OPERATIONS)
+            properties=_investigation_properties(operation);self.assertEqual(properties['edits']['type'],'object');self.assertEqual(properties['trace_id']['maxLength'],32)
     def test_task_and_scene_services_have_bounded_typed_agent_inputs(self):
         self.assertIn('editing.readiness',READ_OPERATIONS);self.assertIn('objects.scene',READ_OPERATIONS)
         p=_investigation_properties('objects.scene');self.assertEqual(p['edits']['maxItems'],64);self.assertEqual(p['edits']['items']['properties']['pixels']['maxItems'],64)

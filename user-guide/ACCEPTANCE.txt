@@ -1,0 +1,23 @@
+Independent beginner usability trial - NOT YET PERFORMED
+
+Participant (not a developer): __________  Date: __________
+Build: __________  OS/display/theme: __________
+Use only the included guide; record any outside assistance.
+
+[ ] Install and open. Find the guide.
+[ ] Open Try the editing studio. Find editing readiness.
+[ ] Assemble the first four hero tiles as 2 by 2; paint one pixel.
+[ ] Original stays unchanged. Undo and redo the stroke.
+[ ] Review and name a separate build.
+[ ] Load the saved build in Playtest and see the edited scene.
+[ ] Save and load a state for that same build.
+[ ] Export selects the correct original and target. Verify the patch.
+[ ] Reopen a saved draft; distinguish draft from saved build.
+[ ] Explain the result without outside help.
+
+Unchecked, skipped or assisted steps are not passed.
+For each issue: step / expected / observed / unclear label / assistance.
+Result: [ ] Pass without assistance  [ ] Needs changes  [ ] Incomplete
+Notes: __________________________________________________________
+
+Automated agent tests do not complete this independent human record.

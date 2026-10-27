@@ -1,0 +1,13 @@
+import assert from 'node:assert/strict';
+import {exportCreatedBuild} from '../romancer/ui/build_handoff.js';
+import {render} from '../romancer/ui/views/release.js';
+const a={artifact_id:'a',sha256:'a',name:'Original A'},z={artifact_id:'z',sha256:'z',name:'Original Z'},b={artifact_id:'b',sha256:'b',name:'A build',source_id:'a',kind:'build'},c={artifact_id:'c',sha256:'c',name:'A second build',source_id:'b',kind:'build'},d={artifact_id:'d',sha256:'d',name:'Z build',source_id:'z',kind:'build'};
+const state={project:{project_id:'p',name:'Work',sources:[z,a],builds:[d,b,c],containers:[]},artifact:c,results:{}};
+const drafts={},ctx={state,draft:(k,f)=>drafts[k]??f,use:()=>{},projectParams:()=>({project_id:'p'}),api:{call:async()=>({exports:[]})}};
+let html=await render(ctx);assert.match(html,/id="release-source"[\s\S]*?<option value="a" selected>/);assert.match(html,/id="release-target"[\s\S]*?<option value="c" selected>/,'The selected branch is exported, not the first recorded build.');
+assert(!html.includes('Disc patch sets'),'Unavailable disc tooling is absent from this cartridge-only release.');
+drafts['release-target']='b';drafts['release-source']='a';html=await render(ctx);assert.match(html,/id="release-target"[\s\S]*?<option value="b" selected>/);
+drafts['release-target']='deleted';html=await render(ctx);assert.match(html,/id="release-target"><option value="" selected>/,'A stale saved target requires an explicit choice instead of silently choosing another build.');
+drafts['release-target']='b';drafts['release-source']='z';ctx.setDraft=(k,v)=>drafts[k]=v;ctx.navigate=async page=>{state.page=page;html=await render(ctx);};
+await exportCreatedBuild(ctx,'c');assert.equal(drafts['release-target'],'c','Explicit Export saved build replaces an older manual target.');assert.equal(drafts['release-source'],'a');
+console.log('Export defaults follow the selected build’s original; explicit handoff overrides old choices, ordinary navigation retains valid choices.');

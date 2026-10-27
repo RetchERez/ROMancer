@@ -195,7 +195,7 @@ engine to its two-button pad: A and B are buttons 1 and 2, and Start sends Pause
 
 GITHUB RELEASE PREPARATION
 
-Use the tag v1.0.0 for the public ROMancer v1.0 release. The numeric 1.0.37 build
+Use the tag v1.0.0 for the public ROMancer v1.0 release. The numeric 1.0.38 build
 identifier is internal installer/update identity. Lead the release description
 with ROMancer-v1.0-Setup.exe, then the portable Windows ZIP, offline guide and
 walkthrough. Provide the source, engine pack, component notices and SHA256SUMS.
@@ -721,3 +721,11 @@ disassemblies and hack documentation are references, not automatic edit authorit
 A binary patch describes differences, not the meaning of every changed byte.
 Reference facts are bound to matched originals; external hacks can relocate data.
 No research caches, commercial ROMs or upstream editor implementation are bundled.
+
+BUILD38 WORKFLOW AND PREVIEW UPDATE
+Per-ROM readiness requires writable definitions, including read-only codec checks.
+Saved-build Playtest/Export controls survive reopening and keep exact ancestry.
+Graphics can replay a checked temporary draft against a saved cold-start trace,
+with original/draft/difference emulator frames. It does not publish a project build.
+The guide explains bounds, stale results and simulated object-composite differences.
+Independent beginner acceptance remains pending; use user-guide/ACCEPTANCE.txt.

@@ -20,3 +20,14 @@ class EditingReadinessTests(unittest.TestCase):
     def test_malformed_saved_table_is_reported_without_breaking_overview(self):
         project=Path(self.demo['path']);value=projects.read_project(project);value['sources'][0]['descriptors']['tables']=['malformed'];projects.write_json(project/'project.json',value)
         r=self.call('editing.readiness',self.p);self.assertEqual(next(a for a in r['areas'] if a['kind']=='tables')['status'],'unsupported')
+
+    def test_successful_read_only_inspection_never_says_ready_to_edit(self):
+        project=Path(self.demo['path']);value=projects.read_project(project)
+        value['sources'][0]['descriptors']['assets']['bitmaps'][0]['codec']='not-understood'
+        projects.write_json(project/'project.json',value)
+        r=self.call('editing.readiness',self.p);area=next(a for a in r['areas'] if a['kind']=='assets')
+        self.assertEqual(area['status'],'unsupported');self.assertIn('read-only',area['reason'].lower())
+
+    def test_empty_declared_definition_is_invalid_instead_of_missing(self):
+        project=Path(self.demo['path']);value=projects.read_project(project);value['sources'][0]['descriptors']['levels']={};projects.write_json(project/'project.json',value)
+        r=self.call('editing.readiness',self.p);self.assertEqual(next(a for a in r['areas'] if a['kind']=='levels')['status'],'unsupported')

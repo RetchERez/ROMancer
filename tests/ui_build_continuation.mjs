@@ -1,0 +1,14 @@
+import assert from 'node:assert/strict';
+import {continuedBuild,originalForBuild,exportCreatedBuild,editBuildInput,playtestCreatedBuild} from '../romancer/ui/build_handoff.js';
+const a={artifact_id:'a',sha256:'a',kind:'source'},z={artifact_id:'z',sha256:'z',kind:'source'},b={artifact_id:'b',sha256:'b',source_id:'a',kind:'build'},c={artifact_id:'c',sha256:'c',source_id:'b',kind:'build'},d={artifact_id:'d',sha256:'d',source_id:'z',kind:'build'};
+const state={project:{project_id:'p',sources:[a,z],builds:[b,c,d]},artifact:a,results:{},navigationRevision:0};
+assert.equal(continuedBuild(state),b,'A reopened source continues its own recorded child, not another ROM’s latest build.');
+state.artifact=c;assert.equal(continuedBuild(state),c);assert.equal(originalForBuild(state.project,c),a);
+let pages=[],selections=[];const ctx={state,setArtifact:async(id,options)=>{selections.push([id,options]);state.artifact=[a,z,b,c,d].find(r=>r.artifact_id===id);if(options?.restore!==false)state.page='assets';return true;},navigate:async page=>{pages.push(page);state.page=page;}};
+await exportCreatedBuild(ctx,'c');assert.equal(pages.at(-1),'release');assert.equal(selections.length,0,'Opening Export for the already selected build preserves the paused runtime.');
+await playtestCreatedBuild(ctx,'c');assert.equal(selections.length,0,'Returning to the selected build does not close its paused playtest session.');
+await editBuildInput(ctx,'c');assert.equal(state.artifact,b);assert.equal(state.page,'assets','The input’s saved editor and drafts reopen.');
+state.artifact={...b,sha256:'changed'};assert.equal(continuedBuild(state),null);
+assert.equal(originalForBuild({...state.project,builds:[{...b,source_id:'c'},c]},c),null,'Cyclic ancestry never chooses an original.');
+state.artifact=a;state.results={};ctx.setArtifact=async()=>false;await assert.rejects(exportCreatedBuild(ctx,'b'),/selection|changed/i);
+console.log('Recorded build continuation survives session loss, preserves exact ancestry, restores editing input and guards canceled or stale selection.');
