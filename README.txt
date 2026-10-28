@@ -774,8 +774,8 @@ The guide includes illustrated procedures, glossary links and index entries for
 these tools. The independent beginner acceptance trial remains unperformed.
 
 BUILD 42 FORMAT AND WORKFLOW IMPROVEMENTS
-The default theme uses neutral charcoal panels, deeper menus/inputs and emerald
-controls. Visual editing and values stay visible; investigation and automation
+The default theme keeps the original ROMancer teal palette with deeper menus
+and input fields. Visual editing and values stay visible; investigation and automation
 are grouped under Advanced. Theme and interface size remain saved preferences.
 
 Local format packs can reuse understood layouts with exact-source matching or

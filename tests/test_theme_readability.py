@@ -6,9 +6,10 @@ def luminance(hex):
 def contrast(a,b):
     x,y=sorted([luminance(a),luminance(b)]);return (y+.05)/(x+.05)
 class ReadabilityTests(unittest.TestCase):
-    def test_romancer_neutral_surfaces_are_brighter_and_text_has_readable_contrast(self):
+    def test_romancer_original_palette_has_deeper_menus_and_readable_contrast(self):
         css=(Path(__file__).resolve().parents[1]/'romancer/ui/theme.css').read_text(encoding='utf-8');root=re.search(r':root\{([^}]+)',css)[1];colors=dict(re.findall(r'(--[\w-]+):(#[0-9a-f]{6})',root))
-        self.assertGreater(luminance(colors['--bg']),.02,'Default work area must be brighter than the old near-black surface.')
+        self.assertLess(luminance(colors['--theme-nav']),luminance(colors['--bg']))
+        self.assertLess(luminance(colors['--theme-menu']),luminance(colors['--panel']))
         background=colors['--bg'];channels=[int(background[i:i+2],16) for i in (1,3,5)];self.assertLess(max(channels)-min(channels),16,'Workspace surfaces should stay neutral; green is an accent.')
         self.assertGreater(luminance(colors['--panel']),luminance(colors['--bg']))
         for surface in ('--bg','--panel','--panel2','--theme-nav','--theme-menu'):

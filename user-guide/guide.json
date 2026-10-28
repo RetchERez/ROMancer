@@ -83,7 +83,7 @@
       "intro": "Settings control the working environment: appearance, startup behavior, automatic analysis and audio defaults. Apply the choices you want to keep before closing the application.",
       "steps": [
         "Open <b>Settings</b>. Review appearance and startup preferences. <b>100%</b> is the standard interface size; it uses the more compact layout previously shown at 75%. Choose another offered size when useful.",
-        "Choose <b>ROMancer (default)</b> for charcoal editor panels, deeper menus and emerald controls; <b>Dark</b> for graphite or <b>Light</b> for grey panels on a light background. <b>Keep Advanced tools expanded</b> controls the navigation group.",
+        "Choose <b>ROMancer (default)</b> for the original ROMancer teal palette and deeper menu/input surfaces; <b>Dark</b> for graphite or <b>Light</b> for grey panels on a light background. <b>Keep Advanced tools expanded</b> controls the navigation group.",
         "Review <b>Auto deep scan on ROM load</b>, enabled by default, and <b>Inspect gameplay graphics automatically</b>. Set <b>Remember my workspace</b> to reopen the last project, ROM, page and editing position. These preferences choose automatic work, not a new level of game-format verification.",
         "Set <b>Volume</b> from 0 to 100, <b>Start game audio muted</b> and <b>Loop audio previews</b>. Choose <b>Apply</b> to save and continue, or <b>OK</b> to save and close. <b>Cancel</b> discards unapplied changes. <b>Restore defaults</b> prepares the standard choices; use Apply or OK to keep that reset."
       ],
@@ -117,7 +117,7 @@
       "image": "249-readable-theme-and-advanced-settings",
       "image_layout": "following-page",
       "image_alt": "Actual ROMancer Settings showing Appearance, Automatic tasks, Audio and Workspace tools preferences",
-      "caption": "Current Settings, with the default charcoal-and-emerald appearance and Basic/Advanced navigation.",
+      "caption": "Current Settings, with the original ROMancer teal appearance and Basic/Advanced navigation.",
       "extra_images": [
         {
           "image": "251-light-settings-current",
