@@ -762,6 +762,36 @@
       }
     },
     {
+      "id": "editor-builder",
+      "title": "Turn understood bytes into a named editor",
+      "part": "Basic",
+      "kicker": "Resources / build an editor",
+      "intro": "Once you have located data and checked its storage layout, a form can turn it into a useful editor. You do not need to write JSON for ordinary numeric tables, tile graphics or ASCII text slots.",
+      "steps": [
+        "In <b>Resources</b>, inspect the relevant file bytes. Expand <b>Build an editor from these bytes</b>, choose Numbers & stats, Graphics tiles or Text slots, then choose the type.",
+        "For numbers, enter the first file offset, record count and bytes per record. Name each field, give its byte position within a record, and choose its stored number type and byte order. Update fields when changing the field count.",
+        "Choose <b>Preview editor</b>. Check the decoded values, tiles or text against your evidence. A regular-looking result is not proof that you found health, enemies or dialogue.",
+        "Choose <b>Save & open editor</b>. If a current definition would be replaced, acknowledge it first. If another window or operation changed the source research, preview again. Existing editor setup drafts may require their separate recovery choice.",
+        "Use the opened editor to stage changes, undo or redo them, review, create a separate build, playtest and export a verified patch. Saving a layout alone does not modify the ROM."
+      ],
+      "result": "A reusable exact-source definition opens in the appropriate editing tool, with the same decoded fields that you reviewed.",
+      "note": "In the current original Mossy Hollow studio, actor health and contact damage begin at file0x1D16, with two records16 bytes apart. Fields at byte0 and1 decode Health5/3 and Contact damage1/1. This is a workshop-specific example; do not transfer these offsets to another ROM. Health for that runtime stays1–9.",
+      "related": [
+        "research-notes",
+        "tables",
+        "sprites",
+        "text",
+        "checks"
+      ],
+      "terms": [
+        "term-offset",
+        "term-byte-order",
+        "term-evidence"
+      ],
+      "image": "231-visual-editor-builder-named-fields",
+      "caption": "Actual builder preview of the original studio actor records. The replacement checkbox protects the existing table definition."
+    },
+    {
       "id": "text",
       "title": "Change text without overrunning it",
       "kicker": "GENESIS / THE IMMORTAL",
@@ -1303,10 +1333,12 @@
         "Select an entry. Read its preview, decoded fields or text and its exact byte range. The confidence label distinguishes a checked layout, a known revision, your note and a measured frame.",
         "Follow a connection to inspect related storage. Uses tiles and Uses palette come from a saved declaration. Shares byte storage only means overlapping file ranges; it does not establish a game behavior.",
         "Choose Open editor to continue in the existing editor, or Inspect exact bytes to inspect its file location. Keep current draft preserves work when another setup is offered.",
-        "Rooms show the declared map and object outlines. Named records show decoded fields. A missing preview or connection means that format or relationship still needs a checked declaration or measured evidence."
+        "Rooms show the declared map and object outlines. Named records show decoded fields. A missing preview or connection means that format or relationship still needs a checked declaration or measured evidence.",
+        "Filter to Collision layers, Event scripts, Commands, Songs, Music events or Saved animations. Open the selected resource to reach its source-bound editor and the corresponding room, command or song.",
+        "Connect declared triggers, destinations, collision and animation resources with an evidence note when their relationship is established. These author links stay distinct from native execution evidence."
       ],
       "result": "Navigate between a visual resource, its declared dependencies and its exact storage without repeatedly entering offsets.",
-      "note": "An index of checked data is not a universal decompiler. Game-specific maps, music and scripts still need supported readers. A source change invalidates stale declarations and evidence.",
+      "note": "An index of checked data is not a universal decompiler. Game-specific maps, music and scripts still need supported readers. A source change invalidates stale declarations and evidence. Music-event indexing shows at most128 events per song; use Music & sound for the full decoded sequence. Byte overlap is shared storage, not ownership or causation.",
       "related": [
         "research-notes",
         "numbers"
@@ -1848,10 +1880,12 @@
         "Arrange the tiles for one frame in <b>Sprite assembly</b>. Open <b>Animation frames</b>, set <b>Frame duration (ms)</b> and choose <b>Add assembled frame</b>.",
         "Create the other explicit frame arrangements. Select a frame to inspect it, use <b>Edit selected frame</b> to revise its layout, or <b>Remove selected frame</b> to remove it from this preview.",
         "Use <b>Play animation</b> and <b>Pause animation</b> to review the proposed sequence. Read the shared-tile count before changing pixels.",
-        "Review the actual asset changes and build them. Playtest the real game animation to establish whether its own script uses the edited tiles in the intended order."
+        "Review the actual asset changes and build them. Playtest the real game animation to establish whether its own script uses the edited tiles in the intended order.",
+        "Expand <b>Save & reuse animation layouts</b>. Name the arrangement, preview it, check its shared tiles, then save the reviewed layout. Up to16 saved layouts are kept per source, each with1–32 frames and40–2,000ms declared frame durations.",
+        "Use <b>Load layout</b> to reopen its exact graphics document and frame arrangements. Loading replaces the arrangement draft; tile edits stay separate. Saved layouts appear in Game view and are included in exported research packs. Delete saved layout removes that saved arrangement, not ROM bytes."
       ],
       "result": "The preview cycles through the layouts you supplied and reflects staged tile/palette edits. The unchanged original remains available for comparison.",
-      "note": "Editing a tile reused across frames changes every preview frame that references it. A timing value in this preview is not proof of the game's stored animation timing.",
+      "note": "Editing a tile reused across frames changes every preview frame that references it. A timing value in this preview is not proof of the game's stored animation timing. Saved timing is author-declared. It does not rewrite the game’s animation table or prove which pose the engine will select. Edit a source tile to affect every frame using that tile, then build and playtest.",
       "details": [
         {
           "title": "What is saved",
@@ -1870,7 +1904,9 @@
       "terms": [
         "term-tile",
         "term-frame"
-      ]
+      ],
+      "image": "234-saved-two-pose-animation",
+      "caption": "Two original studio poses arranged, previewed and saved in the actual animation tools."
     },
     {
       "id": "tilemaps",
@@ -2064,7 +2100,7 @@
         "Use Undo stroke and Redo stroke. With Move object, drag a named label. When a starting sprite is declared, its preview moves too. Starting hitboxes shows declared rectangles. Pixel hitbox dimensions are separate from cell-based positions; use Update preview before reviewing.",
         "Choose <b>Review level changes</b>, inspect the exact changes, then <b>Create level build</b>. Visit the room and test walking, collision, boundaries and transitions."
       ],
-      "result": "Changed grid/object fields stay within the declared ranges. The game renders the room, moves through it and follows the intended transitions.",
+      "result": "The preview and checked changes stay within declared grid/object ranges. Test the built game to establish movement, collision, boundaries and transitions; the static preview alone does not certify them.",
       "note": "A visible wall is not automatically a collision wall. Labels, sprite assemblies and hitboxes come from a checked declaration; generic declarations do not prove gameplay behavior. If collision is not mapped, the editor says so. Only the implemented original runtime has the collision/combat behavior described in the linked practice procedure.",
       "details": [
         {
@@ -2437,6 +2473,10 @@
         {
           "title": "The same current tools",
           "text": "Read editing.readiness before choosing an editor. sound.system returns known music definitions read-only; select one song before sound.inspect to stay within the response budget. With explicit writes, sound.plan or levels.plan followed by build.apply uses the same checked services as the GUI. These paths reproduced the native-tested targets. Query system.operations and the MCP tool list for current schemas."
+        },
+        {
+          "title": "New investigation and editing operations",
+          "text": "debugger.follow summarizes authenticated full captures; definitions.preview/save uses source/research-bound review digests; references.survey reports exact numeric candidates; commands.inspect/plan protects opcode bytes; animations.list/get/preview/save/delete manages declared arrangements; sound.instrument reads checked M4A tone metadata. Read-only mode exposes inspections, not saving or plan operations. Writes retain explicit --allow-writes and allowed import roots."
         }
       ],
       "related": [
@@ -3007,10 +3047,11 @@
         "The full Windows package is ready to capture. In a source-only or smaller build, choose <b>Prepare debugger</b> if needed. Pinned tools are downloaded and checked once; no ROM is uploaded.",
         "Set a short route of frames and held buttons. It replays from power on in a separate debugger; Playtest and libretro save states are not resumed.",
         "Set the first recording frame and sample limit, then replay. Check route completion and truncation separately. Empty results may require another route or watch range.",
-        "Inspect access address, value, execution context and registers. A source button opens its recorded file location; Resources explains the association and links back."
+        "Inspect access address, value, execution context and registers. A source button opens its recorded file location; Resources explains the association and links back.",
+        "Choose <b>Explain this capture</b> to summarize the whole retained capture, not only its current page. Writer code and source reads are separate lists. Open a source read in Resources to inspect its bytes or build an editor from a confirmed layout."
       ],
-      "result": "Application-authenticated native evidence that humans and MCP clients can reopen and page through.",
-      "note": "MesenCE covers NES/SNES/GB/GBC/GBA/SMS; Genesis uses MAME. The full Windows package includes the reviewed observers and corresponding source. Source-only installations retain deliberate preparation of pinned upstream tools. Operation kinds are recorded where exposed; DMA channel, instruction width and game meaning are not inferred. Genesis has read/write watches and separate global instruction samples, with no execution-range watch or live break/continue.",
+      "result": "A durable native capture with mapped writer context, separate source-read locations, resource overlaps and a concrete next experiment. Historical and partial status remain visible.",
+      "note": "MesenCE covers NES/SNES/GB/GBC/GBA/SMS; Genesis uses MAME. The full Windows package includes the reviewed observers and corresponding source. Source-only installations retain deliberate preparation of pinned upstream tools. Operation kinds are recorded where exposed; DMA channel, instruction width and game meaning are not inferred. Genesis has read/write watches and separate global instruction samples, with no execution-range watch or live break/continue. A writer location is code, not automatically the ROM stat it used. Adjacent reads and writes do not prove data flow. The summary does not invent missing bank state or causation.",
       "related": [
         "universal-values",
         "debugger-setup",
@@ -3024,8 +3065,8 @@
         "term-mapping",
         "term-evidence"
       ],
-      "image": "27-native-access-capture",
-      "caption": "Actual capture of writes to the original experiment byte. Each row retains CPU context and a supported source link.",
+      "image": "230-native-writer-evidence-summary",
+      "caption": "Actual retained native evidence from the original studio: mapped writer code and separate source reads. PARTIAL remains visible because the bounded capture does not prove a complete dependency or read-to-write causal chain.",
       "extra_images": [
         {
           "image": "28-native-source-context",
@@ -3054,6 +3095,37 @@
           }
         ]
       }
+    },
+    {
+      "id": "command-operands",
+      "title": "Edit parameters in a known event format",
+      "part": "Advanced",
+      "kicker": "Investigation / events & commands",
+      "intro": "Events & commands decodes a supplied command grammar into named instructions and fixed integer parameters. It does not discover a scripting language or execute a script.",
+      "steps": [
+        "Open <b>Investigation > Events & commands</b>. A saved exact-source grammar opens automatically. Without one, supply a verified definition under the collapsed Advanced declaration section.",
+        "A definition has schema_version1, source_sha256, name, scripts and commands. Each script declares id, name, file offset and allocated length. Each opcode declares its name, fixed byte length, role and named operand fields.",
+        "Each operand declares offset within the command, bytes1–4, little/big endian, minimum, maximum and optional target_base. Byte0 is the opcode and cannot be edited. For a declared pointer operand, target file offset = stored value − target_base.",
+        "Choose <b>Inspect commands</b>. Unknown instructions, truncated operands, invalid values or a missing declared end leave that script read-only. At most32 scripts,256 command types,256 decoded commands per script and2,048 commands overall are handled.",
+        "Choose an event, command and parameter; choose <b>Choose command</b> to refresh the value controls. Stage the new value, inspect Before and After, then review and create a command build. Undo/redo operates on saved drafts; Discard removes the staged parameter list.",
+        "Preview and save a definition only after reviewing its structure. Game view connects the saved script and its commands. Declared target references can connect to existing resources, and author links can record triggers, destinations, collision or animation relationships."
+      ],
+      "result": "Only checked fixed operands change. The original opcode bytes, allocation and source remain intact. Playtest the affected event before sharing a patch.",
+      "note": "Roles are labels used by this editor. An end role stops decoding the declared allocation; it does not add a native stop instruction. The demonstrated Wario PAN definition covers one documented two-byte command and produces the same pan plan as the checked music editor. It is not a complete Wario scripting grammar.",
+      "related": [
+        "connected-game-view",
+        "native-accesses",
+        "research-packs",
+        "known-music",
+        "checks"
+      ],
+      "terms": [
+        "term-bytecode",
+        "term-operand",
+        "term-evidence"
+      ],
+      "image": "232-wario-command-parameter-review",
+      "caption": "Actual Wario opening PAN operand staged and reviewed in Events & commands. Its target was checked against the music editor and native audio."
     },
     {
       "id": "structural-experiments",
@@ -3387,10 +3459,11 @@
         "In the destination project select the matching ROM. Choose the JSON file and Review selected pack. A different ROM hash, size, system or invalid definition is refused.",
         "Read the definition and note counts and the replacement list. Explicitly acknowledge replacements before choosing Import reviewed research. Other notes remain.",
         "Import validates the whole pack again and commits metadata together. If the source, document or current research changed since review, review again. It never writes ROM bytes.",
-        "Use the Resource browser to open an imported layout. A different existing setup draft gets its own review and recovery copy; it is not silently discarded."
+        "Use the Resource browser to open an imported layout. A different existing setup draft gets its own review and recovery copy; it is not silently discarded.",
+        "Research-v3 packs also carry saved animation layouts and their exact graphics schemas. Imported arrangements stay author declarations and never become native proof. Command definitions use the same source-bound preview and replacement review as other declarations."
       ],
       "result": "The imported definitions inspect the destination source and the original notes remain searchable. Compare the source hash before and after; it must be identical.",
-      "note": "Packs are limited to 1 MiB and are not executable extensions. They contain neither emulator states nor game saves. They do not make a new game revision compatible. AI clients use research.inspect, research.note_get, research.preview and research.apply with the same guards. Object layouts retain flips and shared uses, but imported layouts deliberately lose local proof references and fresh runtime authority.",
+      "note": "Packs are limited to 1 MiB and are not executable extensions. They contain neither emulator states nor game saves. They do not make a new game revision compatible. AI clients use research.inspect, research.note_get, research.preview and research.apply with the same guards. Object layouts retain flips and shared uses, but imported layouts deliberately lose local proof references and fresh runtime authority. Inspect names, source references and screenshots before sharing. A research pack may contain byte guards or decoded research from your ROM; it is not automatically safe to publish merely because it is JSON.",
       "related": [
         "research-notes",
         "recipes",
@@ -3730,10 +3803,13 @@
         "Choose the edited decoded build, then Preview recompression. Read packed bytes, confirmed allocation, free bytes or overflow. A separate token parser independently checks the encoded data against the edited decoded bytes.",
         "If the output fits, choose Review reinsertion and Create parent build. Changing the selected child after review invalidates that plan. The source ROM remains unchanged.",
         "If it does not fit, reduce the edit or use Move to reserved space only when you understand its references. Declare the reserved destination, expected fill, capacity, alignment, bank origin/window and the existing linear pointer to the stream start.",
-        "The form supports one complete external reference. Confirm reservation and completeness only when established. The automation API supports up to 128 explicitly declared references. Review the move and create a separate parent build, then inspect the pointer and playtest the resource in its real scene."
+        "The form supports all complete external references. Confirm reservation and completeness only when established. The automation API supports up to 128 explicitly declared references. Review the move and create a separate parent build, then inspect the pointer and playtest the resource in its real scene.",
+        "In the reserved-move controls, enter the first reviewed pointer and any additional reviewed pointer offsets, one per line. These UI pointers share the selected width, byte order and encoding adjustment. Mixed encodings remain available through the automation schema.",
+        "Optionally expand <b>Look for pointer candidates</b>. Survey at most1MiB at a time for exact matches to the selected target/encoding/alignment. Add individual candidates only after checking their use. At most256 are retained;32 are shown per focused window. Narrow the window to review more.",
+        "Acknowledge the complete reference set and reserved destination, then review the move. A matching fill byte does not prove free space. Build and playtest the relocated result; the previous compressed stream is preserved."
       ],
-      "result": "Recompression gives concrete capacity numbers, and supported moves check actual before-bytes, destination fill, pointer representation, source identity and bank boundaries. The old stream remains available in the separate build.",
-      "note": "Fill bytes alone do not prove unused space, and numeric pointer matches do not prove completeness. Interior pointers into compressed streams, embedded references, position-dependent code and cross-bank moves remain unavailable. The API refuses an external replacement that could bypass the verified recompression.",
+      "result": "The original GBA compression workshop was native-tested: an edited tile was recompressed, moved, both program-consumed pointers updated, and the changed graphic rendered. The original replay reproduced and the patch independently reconstructed the build.",
+      "note": "Fill bytes alone do not prove unused space, and numeric pointer matches do not prove completeness. Interior pointers into compressed streams, embedded references, position-dependent code and cross-bank moves remain unavailable. The API refuses an external replacement that could bypass the verified recompression. A pointer survey tests numeric encodings only. Undeclared consumers, other banks, embedded pointers and references outside its window remain unproven. SMS moves require declared same-bank bounds and protect the boot and recognized header extents.",
       "related": [
         "compression",
         "data-relocation",
@@ -3742,9 +3818,9 @@
       "terms": [
         "term-reserved-move"
       ],
-      "image": "93-compression-capacity",
+      "image": "236-compressed-graphics-two-pointer-review",
       "image_layout": "following-page",
-      "caption": "Preview compressed size and review a reserved move",
+      "caption": "Actual review of a compressed graphics move with two explicitly selected references. Native playback separately verified the resulting image.",
       "visual_page": {
         "title": "Preview compressed size and review a reserved move",
         "kicker": "Actual ROMancer interface",
@@ -3828,12 +3904,14 @@
       "steps": [
         "Open <b>Music &amp; sound</b>. For Wario Land4, choose Opening cutscene, Wario’s Workout or Sound Room. Engine code, song headers, track pointers and protected sequence bytes must match their checked layouts.",
         "Click a note in the note view, or choose Event. For Opening cutscene, Track2 at tick114 has an explicit note50; change Note number to62 and choose Stage note edit. Yellow shows the changed pitch and an outline shows the original. Track numbers in the interface start at1.",
-        "Only explicit operands are editable: note0–127, note velocity0–127, channel volume0–127 and tempo value1–127. A tempo value is half the driver’s BPM. Inherited values and durations have no editable operand here. Shared patterns can change multiple notes at once.",
+        "Only explicit operands are editable: note0–127, note velocity0–127, channel volume0–127 and tempo value1–127 and explicit pan0–127. A tempo value is half the driver’s BPM. Inherited values and durations have no editable operand here. Shared patterns can change multiple notes at once.",
         "Use the play/pause controls to compare reference previews. The note sketch omits the game’s instruments, envelopes, ties and modulation. Review, create a sound build, then load that build in Playtest and record native audio.",
-        "The Opening cutscene note edit was cold-boot tested: original audio matched a second original run, while the built edit changed recorded audio. Level Select exceeds the current playback budget; Palm Tree Paradise also uses runtime memory conditions. Both are explicitly read-only."
+        "The Opening cutscene note edit was cold-boot tested: original audio matched a second original run, while the built edit changed recorded audio. Level Select exceeds the current playback budget; Palm Tree Paradise also uses runtime memory conditions. Both are explicitly read-only.",
+        "The v2 event view includes instrument-selection and pan commands. Instrument selection is protected; explicit pan is editable, with0 left,64 center and127 right. Existing v1 definitions remain readable and retain their original event indices.",
+        "Expand <b>Instruments used by this song</b>, choose a number and inspect it. Supported tone records show hardware type, key and envelope data; supported wave structures show their source range. Compound key-split/rhythm instruments and unsupported sample structures remain read-only and are not followed."
       ],
-      "result": "A checked one-byte note change produces a separate build and verified patch. The actual native audio differs while the original source hash stays unchanged.",
-      "note": "This is not a general M4A authoring or sample-bank editor. It does not insert tracks, rewrite commands, relocate music, change instruments or infer another game’s driver. Format research is pinned to lilDavid/warioland4 commit abb7800a8d8fa6d7f7f003627893e06bc2879329; ROMancer distributes its own reader and fingerprints, not game code or music.",
+      "result": "The checked opening-note example and opening-pan example each produce a separate build and independently verified patch. Native original audio repeated exactly; edited build audio differed.",
+      "note": "This is not a general M4A authoring or sample-bank editor. It does not insert tracks, rewrite commands, relocate music, change instruments or infer another game’s driver. Format research is pinned to lilDavid/warioland4 commit abb7800a8d8fa6d7f7f003627893e06bc2879329; ROMancer distributes its own reader and fingerprints, not game code or music. The instrument inspector does not edit the bank or assign game instrument names. A pan edit can leave the mono reference sketch unchanged because that sketch omits panning; native stereo recording is the check for the actual game.",
       "details": [
         {
           "title": "Research reference",
@@ -3851,8 +3929,8 @@
         "term-note-velocity",
         "term-build"
       ],
-      "image": "225-wario-decoded-note-edit-and-preview",
-      "caption": "Actual Wario Land4 sequence editing: a selected note changes from50 to62, with a staged note view and reference-audio preview."
+      "image": "233-wario-pan-and-instrument-inspection",
+      "caption": "Actual Wario pan staging and read-only instrument inspection. The reference sketch is separate from the measured native audio proof."
     }
   ],
   "glossary": [
@@ -3920,6 +3998,11 @@
       "id": "term-byte-order",
       "term": "Byte order",
       "definition": "The order of bytes in a multi-byte value. Little endian stores the least significant byte first; big endian stores it last."
+    },
+    {
+      "id": "term-bytecode",
+      "term": "Bytecode",
+      "definition": "A game engine’s stored instruction format. Its opcodes, argument widths, branches and termination must be established before it can be decoded or edited safely."
     },
     {
       "id": "term-candidate",
@@ -4042,6 +4125,11 @@
       "definition": "A video update or explicitly assembled animation view. A preview frame and a measured native game frame have different origins."
     },
     {
+      "id": "term-frame-arrangement",
+      "term": "Frame arrangement",
+      "definition": "A declared placement of source tiles, flips and colors for one animation pose. Saving it does not by itself alter the game’s animation script."
+    },
+    {
       "id": "term-gameplay-trace",
       "term": "Gameplay trace",
       "definition": "An authenticated native frame crop, source/core/frame identity, searched ROM range and literal pixel candidates. This is not automatically a CPU execution trace or proven source transfer."
@@ -4137,6 +4225,11 @@
       "definition": "A zero-based byte position in a file. It is distinct from an address in a console memory map."
     },
     {
+      "id": "term-operand",
+      "term": "Operand",
+      "definition": "A value or reference consumed by an instruction. Events & commands edits explicitly declared fixed-width operands while protecting opcode bytes."
+    },
+    {
       "id": "term-original",
       "term": "Original / source",
       "definition": "The source identity imported into the project. ROMancer works with owned copies and creates separate edited outputs."
@@ -4145,6 +4238,11 @@
       "id": "term-palette",
       "term": "Palette",
       "definition": "A set of colors addressed by pixel indices. Banks and shared entries can affect several sprites, backgrounds or scenes."
+    },
+    {
+      "id": "term-pan",
+      "term": "Pan",
+      "definition": "The position of a sound between left and right output. In the checked M4A pan command, raw64 is center;0 and127 approach the two extremes."
     },
     {
       "id": "term-patch",
@@ -4765,6 +4863,12 @@
       ]
     },
     {
+      "term": "Editor builder",
+      "topics": [
+        "editor-builder"
+      ]
+    },
+    {
       "term": "Editor setup recovery",
       "topics": [
         "research-notes"
@@ -4788,6 +4892,12 @@
       "topics": [
         "install",
         "play"
+      ]
+    },
+    {
+      "term": "Events and bytecode",
+      "topics": [
+        "command-operands"
       ]
     },
     {
@@ -5103,6 +5213,12 @@
       ]
     },
     {
+      "term": "Named operands",
+      "topics": [
+        "command-operands"
+      ]
+    },
+    {
       "term": "Native draft preview",
       "topics": [
         "native-draft-preview",
@@ -5160,6 +5276,12 @@
       ]
     },
     {
+      "term": "Pan and instruments",
+      "topics": [
+        "known-music"
+      ]
+    },
+    {
       "term": "Patch application",
       "topics": [
         "patches"
@@ -5209,6 +5331,12 @@
       "term": "PNG import",
       "topics": [
         "tilemaps"
+      ]
+    },
+    {
+      "term": "Pointer candidate survey",
+      "topics": [
+        "compressed-capacity"
       ]
     },
     {
@@ -5418,6 +5546,13 @@
       "topics": [
         "play",
         "saves"
+      ]
+    },
+    {
+      "term": "Saved animation layouts",
+      "topics": [
+        "animation",
+        "research-packs"
       ]
     },
     {
@@ -5665,6 +5800,12 @@
       ]
     },
     {
+      "term": "Writer code versus source data",
+      "topics": [
+        "native-accesses"
+      ]
+    },
+    {
       "term": "Wrong colors",
       "topics": [
         "support-editing",
@@ -5675,23 +5816,30 @@
   "compact_pdf": true,
   "compact_wide_topics": [
     "ai-worked-edit",
+    "animation",
     "beginner-trial",
     "captured-edit-check",
+    "command-operands",
+    "compressed-capacity",
     "compression",
+    "connected-game-view",
     "connections",
     "debug",
     "editing-studio",
+    "editor-builder",
     "everyday-controls",
     "investigation",
     "known-music",
     "levels",
     "mcp",
+    "native-accesses",
     "native-graphics-trails",
     "palettes",
     "rastan-blobs",
     "recipes",
     "regression",
     "release-checks",
+    "research-packs",
     "resources",
     "settings",
     "sound",

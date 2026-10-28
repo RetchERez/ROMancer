@@ -196,7 +196,7 @@ engine to its two-button pad: A and B are buttons 1 and 2, and Start sends Pause
 
 GITHUB RELEASE PREPARATION
 
-Use the tag v1.0.0 for the public ROMancer v1.0 release. The numeric 1.0.40 build
+Use the tag v1.0.0 for the public ROMancer v1.0 release. The numeric 1.0.41 build
 identifier is internal installer/update identity. Lead the release description
 with ROMancer-v1.0-Setup.exe, then the portable Windows ZIP, offline guide and
 walkthrough. Provide the source, engine pack, component notices and SHA256SUMS.
@@ -744,3 +744,31 @@ Save state: an emulator snapshot for one exact ROM/build and emulator setup.
 Ready to edit means the saved layout is usable; it does not decode every resource.
 Playtest: Load game, then Play; click the game screen for controller input.
 Unload game closes that session. Your project files and saved states remain.
+
+BUILD 41 WORKBENCH IMPROVEMENTS
+
+Investigation can summarize the complete retained authenticated capture into
+mapped writer code, separate source reads and useful next experiments. Partial
+or historical evidence keeps its limits; proximity does not prove causation.
+
+Resources has a preview-first editor builder for named tables, graphics and
+fixed-slot text. Advanced definitions also accept explicit level, sound and
+command grammars. Saving checks the exact source and current metadata; replacing
+a setup requires acknowledgement. It does not alter the ROM.
+
+Declared command operands have named controls, before/after review and guarded
+build plans. Unknown/truncated commands remain read-only. Game view connects
+scripts, collision usage, music events and saved animation arrangements. Saved
+frames and timings are author declarations, not automatic animation decoding.
+
+Compressed moves accept multiple explicit references, with a bounded numeric
+candidate survey. Candidates do not prove complete references or unused space.
+An original GBA example verifies two live pointers, relocation and native output.
+
+The checked Wario Land 4 M4A song catalog adds explicit pan edits and read-only
+instrument structure inspection. A native stereo comparison verifies the pan
+edit. The reference note sketch does not emulate instruments or stereo panning.
+Other games need their own checked formats; this is not a universal music driver.
+
+The guide includes illustrated procedures, glossary links and index entries for
+these tools. The independent beginner acceptance trial remains unperformed.

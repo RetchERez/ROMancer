@@ -34,7 +34,21 @@ class DebuggerTools:
             'debugger.prepare':('project_id artifact_id',self.prepare),
             'debugger.capture':('project_id artifact_id config',self.capture),
             'debugger.investigate':('project_id artifact_id investigation_id candidate_id replay',self.investigate),
+            'debugger.follow':('project_id artifact_id evidence_id',self.follow),
             'debugger.get':('project_id artifact_id evidence_id offset limit',self.get)}
+
+    def follow(self,p,c):
+        from .investigation_follow import follow_capture
+        from .research_tools import _resources
+        from .workbench_projects import _measure
+        project,row,path=self.api.source(p);record=load_evidence(project,p['evidence_id'],'runtime');report=record['report']
+        if report.get('kind')!='native-debugger-capture-v1' or report.get('source_sha256')!=row['sha256'] or report.get('artifact_id')!=row['artifact_id']:
+            raise ValueError('Choose an access capture for this exact selected source.')
+        resources,issues,total=_resources(row,path,c)
+        result=follow_capture(report,resources,row['size'],trusted=record['runtime_trusted'],cancelled=c)
+        _measure(path,row,cancelled=c)
+        return {**result,'source_sha256':row['sha256'],'artifact_id':row['artifact_id'],
+            'evidence_id':p['evidence_id'],'resource_issues':issues,'resource_index_partial':total>len(resources)}
 
     def capabilities(self,p,c):
         from .native_debugger import backend_capabilities,verify_backend

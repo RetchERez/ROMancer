@@ -82,12 +82,15 @@ def definition_document(path,sha,kind,definition):
     elif kind=='script':
         from .script import inspect_script
         checked=inspect_script(path,definition)
-    elif kind in ('levels','sound'):
+    elif kind in ('levels','sound','commands'):
         from .workbench_files import read_bounded
         raw=read_bounded(path,64*1024**2,source)
         if kind=='levels':
             from .level_design import inspect_level
             checked=inspect_level(raw,definition,sha)
+        elif kind=='commands':
+            from .command_editor import inspect_commands
+            checked=inspect_commands(raw,definition,sha)
         else:
             from .sound_studio import inspect_sound
             checked=inspect_sound(raw,definition,sha)

@@ -41,7 +41,7 @@ class StudioTools:
 
     def observe(self,p,c,region,offset,length):
         project,row,_=self.api.source(p)
-        if row.get('system_id') not in ('nes','snes','genesis','gb','gbc','gba'):raise ValueError('select a supported cartridge source')
+        if row.get('system_id') not in ('nes','snes','genesis','gb','gbc','gba','sms'):raise ValueError('select a supported cartridge source')
         if self.api.runtime.session_selection(project)!={'id':row['artifact_id'],'sha256':row['sha256']}:raise ValueError('load the selected source in Playtest first')
         packet=self.api._memory_snapshot({'project_id':p['project_id'],'region':region,'offset':offset,'length':length},c)
         if packet.get('game_sha256')!=row['sha256'] or any(packet.get(k)!=v for k,v in [('region',region),('offset',offset),('length',length)]):raise ValueError('memory observation source or range differs')
@@ -143,7 +143,7 @@ class StudioTools:
                     except ValueError:continue
                 if songs:
                     result.update(sequence_edit_supported=any(s['sequence_edit_supported'] for s in songs),known_definition={'schema_version':1,'source_sha256':row['sha256'],'samples':[],'songs':[s['definition'] for s in songs]})
-                    result['driver']={'status':'CHECKED_ENGINE_LAYOUT','id':DRIVER,'name':'Wario Land4 M4A','reference':REFERENCE,'evidence':'Immutable engine, selected song headers and pointers checked. Explicit notes, velocity, volume and tempo can be edited in fully decoded songs. Conditional or over-budget songs stay read-only.'}
+                    result['driver']={'status':'CHECKED_ENGINE_LAYOUT','id':DRIVER,'name':'Wario Land4 M4A','reference':REFERENCE,'evidence':'Immutable engine, selected song headers and pointers checked. Explicit notes, velocity, volume, tempo and pan can be edited in fully decoded songs. Conditional or over-budget songs stay read-only.'}
         definition=row.get('descriptors',{}).get('sound')
         if definition and definition.get('songs'):
             try:

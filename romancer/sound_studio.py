@@ -29,10 +29,10 @@ def inspect_sound(raw,definition,source_sha256):
         samples.append({**s,'sample_count':len(values),'duration_seconds':len(values)/s['sample_rate'],'peaks':peaks,'encoding_lossy':s['codec'] in ('nes-dpcm','gb-wave4','snes-brr'),'preview_scope':'Decoded mono sample; hardware filters, envelopes, loops and driver mixing are not emulated.'})
     for song in d['songs']:
         fields(song,'id name driver offset count stride tempo ticks_per_beat channels');identity(song)
-        if song['driver']=='wl4-m4a-v1':
+        if song['driver'] in ('wl4-m4a-v1','wl4-m4a-v2'):
             from .m4a_music import inspect_song
-            if d['samples'] or any(s['driver']!='wl4-m4a-v1' for s in d['songs']):raise ValueError('Keep identified M4A songs in a separate sound definition.')
-            decoded=inspect_song(raw,song['id'],source_sha256)
+            if d['samples'] or any(s['driver'] not in ('wl4-m4a-v1','wl4-m4a-v2') for s in d['songs']):raise ValueError('Keep identified M4A songs in a separate sound definition.')
+            decoded=inspect_song(raw,song['id'],source_sha256,driver=song['driver'])
             if song!=decoded['definition']:raise ValueError('M4A song layout differs from its checked header and decoded events.')
             roles=decoded.pop('roles');positions=sorted(roles)
             for at in positions:
@@ -85,7 +85,7 @@ def plan_sound(raw,definition,document_id,changes,source_sha256):
         elif c.get('kind')=='note':
             fields(c,'kind song_id index field value');song=next((s for s in doc['songs'] if s['id']==c['song_id']),None)
             if song is None:raise ValueError('unknown or unsupported music driver')
-            if song['driver']=='wl4-m4a-v1':
+            if song['driver'] in ('wl4-m4a-v1','wl4-m4a-v2'):
                 from .m4a_music import plan_song
                 planned=plan_song(raw,song['definition'],song['document_id'],[c],source_sha256)
                 edit=planned['edits'][0];at=edit['offset'];before=bytes.fromhex(edit['before']);after=bytes.fromhex(edit['after']);key=('music_byte',at)
@@ -119,9 +119,9 @@ def preview_sound(raw,definition,source_sha256,kind,resource_id,changes=None):
     if kind!='song':raise ValueError('choose a sample or an identified song')
     song=next((s for s in doc['songs'] if s['id']==resource_id),None)
     if song is None:raise ValueError('unknown music driver')
-    if song['driver']=='wl4-m4a-v1':
+    if song['driver'] in ('wl4-m4a-v1','wl4-m4a-v2'):
         from .m4a_music import inspect_song,reference_preview
-        return reference_preview(inspect_song(raw,song['id'],hashlib.sha256(raw).hexdigest()))
+        return reference_preview(inspect_song(raw,song['id'],hashlib.sha256(raw).hexdigest(),driver=song['driver']))
     rate=22050;values=[];total=0;limit=rate*20
     for i in range(song['count']):
         at=song['offset']+i*6;note=raw[at];duration=int.from_bytes(raw[at+1:at+3],'little');volume=raw[at+3]>>3

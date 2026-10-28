@@ -9,7 +9,9 @@ from .script_schema import canonical_bytes
 from .sound_codecs import wav_bytes
 
 REFERENCE='https://github.com/lilDavid/warioland4/tree/abb7800a8d8fa6d7f7f003627893e06bc2879329'
-DRIVER='wl4-m4a-v1'
+DRIVER='wl4-m4a-v2'
+LEGACY_DRIVER='wl4-m4a-v1'
+CONTROL_HASHES_V2={617:'2b521eea82c70f2d0f261014373ae75b958a3fc21cb35f327dd65d87b137d28a',618:'b08620bc19d555c5e9a6f6435f70b2d7355d6e7f05cfe53135065894f90cce9f',635:'4232000ce04fdb815fde7b1a15811cd7153ddedb292ddc0d5ebeea66a4e85809',639:'631b6c69d504b16a4107c6b81cb2212e78a55f9040f58eca21b7f9ca62c7da7b',651:'803a30a41fc3f4b75963942ac85c5bef610509df32898c8f5613f9540b7ac0ec'}
 FINGERPRINTS=((0x9540c,144,'281a78b9fc456c120773e66e6429a81cf8e461c37b6ae3ae7caedfd70e4e5efb'),(0x1540,388,'c161eede6cb0db8fef5c94f4190456e9d1bb3340d6ee1f59ed07d7c294e5acf3'),(0x1710,616,'01d066a726009c17f1e1db0e166afcefff674e6ff4e0f857fac18adc26d61edc'))
 # Individually checked table entries and header/track-pointer hashes, not a guessed catalog.
 CATALOG=(
@@ -24,9 +26,9 @@ CONTROL_HASHES={617:'58a26dc7e0237dc6fa7ab0a4fda0c2dbf9286c12f18bf4e5bc05d6da165
 def identified(raw):
     return type(raw) is bytes and len(raw)==8388608 and all(hashlib.sha256(raw[at:at+size]).hexdigest()==digest for at,size,digest in FINGERPRINTS)
 
-def decode_track(raw,start,low,high,*,instruction_limit=4096,tick_limit=3072):
+def decode_track(raw,start,low,high,*,instruction_limit=4096,tick_limit=3072,include_controls=False):
     """Bounded control-flow walk. Unsupported conditional behavior disables editing."""
-    pc=start;status=0;stack=[];repeat=0;tick=0;key=None;velocity=None;keyshift=0;channel_volume=127;tempo=150
+    pc=start;status=0;stack=[];repeat=0;tick=0;key=None;velocity=None;keyshift=0;channel_volume=127;tempo=150;instrument=None;pan=64
     events=[];roles={};issues=[];seen=set();termination='budget';steps=0
     def take(n,role):
         nonlocal pc
@@ -44,7 +46,7 @@ def decode_track(raw,start,low,high,*,instruction_limit=4096,tick_limit=3072):
     try:
         while steps<instruction_limit and tick<=tick_limit:
             if not low<=pc<high:raise ValueError('Track pointer leaves its checked sequence allocation.')
-            state=(pc,status,tuple(stack),repeat,key,velocity,keyshift,channel_volume,tempo)
+            state=(pc,status,tuple(stack),repeat,key,velocity,keyshift,channel_volume,tempo,instrument,pan)
             if state in seen:termination='loop';break
             seen.add(state);steps+=1;at=pc;opcode=raw[pc]
             if opcode>=0x80:
@@ -73,14 +75,20 @@ def decode_track(raw,start,low,high,*,instruction_limit=4096,tick_limit=3072):
                 continue
             if opcode==0xb9:raise ValueError('MEMACC depends on live memory; this song stays read-only.')
             if opcode in (0xba,0xbb,0xbc,0xbd,0xbe,0xbf,0xc0,0xc1,0xc2,0xc3,0xc4,0xc5,0xc8):
-                role='tempo' if opcode==0xbb else 'channel_volume' if opcode==0xbe else 'parameter'
+                role='tempo' if opcode==0xbb else 'channel_volume' if opcode==0xbe else 'pan' if opcode==0xbf and include_controls else 'parameter'
                 offset,value=take(1,role);value=value[0]
                 if opcode==0xbc:keyshift=value-256 if value>127 else value
+                if opcode==0xbd:instrument=value
+                if opcode==0xbf:
+                    if value>127:raise ValueError('Pan is outside its supported0–127 range.')
+                    pan=value
+                if include_controls and opcode in (0xbd,0xbf):
+                    events.append({'kind':'pan' if opcode==0xbf else 'instrument','tick':tick,'note':None,'duration':0,'volume':None,'pan':pan,'instrument':instrument,'editable_fields':['pan'] if opcode==0xbf else [],'edit_offsets':{'pan':offset} if opcode==0xbf else {},'offset':at})
                 if opcode in (0xbb,0xbe):
                     if value>127 or opcode==0xbb and value==0:raise ValueError('Tempo or volume is outside the supported editing range.')
                     if opcode==0xbb:tempo=value*2
                     else:channel_volume=value
-                    events.append({'kind':role,'tick':tick,'note':None,'duration':0,'volume':None,'channel_volume':value if opcode==0xbe else None,'tempo':value if opcode==0xbb else None,'tempo_bpm':tempo if opcode==0xbb else None,'editable_fields':[role],'edit_offsets':{role:offset},'offset':at})
+                    events.append({'kind':role,'instrument':instrument,'pan':pan,'tick':tick,'note':None,'duration':0,'volume':None,'channel_volume':value if opcode==0xbe else None,'tempo':value if opcode==0xbb else None,'tempo_bpm':tempo if opcode==0xbb else None,'editable_fields':[role],'edit_offsets':{role:offset},'offset':at})
                 continue
             if opcode==0xcc:take(2,'port_parameter');continue
             if opcode==0xcd:
@@ -103,14 +111,15 @@ def decode_track(raw,start,low,high,*,instruction_limit=4096,tick_limit=3072):
                     else:extra=value
                 duration=CLOCK[opcode-0xcf]+extra
                 if key is None or velocity is None:raise ValueError('A note inherits an uninitialized key or velocity; this song stays read-only.')
-                events.append({'kind':'note','tick':tick,'note':key,'duration':duration,'volume':velocity,'channel_volume':channel_volume,'key_shift':keyshift,'tempo':tempo,'tied':opcode==0xcf,'editable_fields':list(offsets),'edit_offsets':offsets,'offset':at})
+                events.append({'kind':'note','tick':tick,'note':key,'duration':duration,'volume':velocity,'channel_volume':channel_volume,'key_shift':keyshift,'tempo':tempo,'tied':opcode==0xcf,'instrument':instrument,'pan':pan,'editable_fields':list(offsets),'edit_offsets':offsets,'offset':at})
                 continue
             raise ValueError('Unmapped music opcode; this song stays read-only.')
         else:raise ValueError('Track exceeds its instruction or playback-tick budget.')
     except ValueError as error:issues.append(str(error))
     return {'events':events,'roles':roles,'issues':issues,'termination':termination,'instructions':steps,'ticks':tick}
 
-def inspect_song(raw,song_id,source_sha256):
+def inspect_song(raw,song_id,source_sha256,*,driver=DRIVER):
+    if driver not in (DRIVER,LEGACY_DRIVER):raise ValueError('Choose a supported checked M4A version.')
     if not identified(raw):raise ValueError('This M4A engine revision is not identified.')
     if hashlib.sha256(raw).hexdigest()!=source_sha256:raise ValueError('Music source differs.')
     row=next((r for r in CATALOG if str(r[0])==str(song_id)),None)
@@ -120,22 +129,22 @@ def inspect_song(raw,song_id,source_sha256):
     events=[];issues=[];roles={};tracks=[]
     for index in range(count):
         start=int.from_bytes(raw[header+8+index*4:header+12+index*4],'little')-0x08000000
-        track=decode_track(raw,start,0x999c0,0x283ef8);tracks.append({'index':index,'offset':start,'termination':track['termination'],'instructions':track['instructions'],'ticks':track['ticks']})
+        track=decode_track(raw,start,0x999c0,0x283ef8,include_controls=driver==DRIVER);tracks.append({'index':index,'offset':start,'termination':track['termination'],'instructions':track['instructions'],'ticks':track['ticks']})
         issues.extend('Track '+str(index+1)+': '+issue for issue in track['issues'])
         for offset,role in track['roles'].items():
             if offset in roles and roles[offset]!=role:issues.append('Tracks interpret a shared byte differently; editing is disabled.')
             roles[offset]=role
-        events.extend({**event,'channel':index,'instrument':None} for event in track['events'])
+        events.extend({**event,'channel':index} for event in track['events'])
     if len(events)>2048:raise ValueError('Decoded song exceeds its 2048-event display budget.')
-    control=hashlib.sha256(canonical_bytes([[offset,role,raw[offset]] for offset,role in sorted(roles.items()) if role not in ('note','volume','tempo','channel_volume')],max_bytes=1024**2)).hexdigest()
-    if control!=CONTROL_HASHES[ident]:issues.append('Sequence commands, pointers or protected parameters differ from the checked song. Editing is disabled.')
+    control=hashlib.sha256(canonical_bytes([[offset,role,raw[offset]] for offset,role in sorted(roles.items()) if role not in (('note','volume','tempo','channel_volume','pan') if driver==DRIVER else ('note','volume','tempo','channel_volume'))],max_bytes=1024**2)).hexdigest()
+    if control!=(CONTROL_HASHES_V2 if driver==DRIVER else CONTROL_HASHES).get(ident):issues.append('Sequence commands, pointers or protected parameters differ from the checked song. Editing is disabled.')
     events.sort(key=lambda event:(event['tick'],event['channel'],event['offset']))
-    definition={'id':str(ident),'name':name,'driver':DRIVER,'offset':header,'count':len(events),'stride':0,'tempo':0,'ticks_per_beat':24,'channels':count}
+    definition={'id':str(ident),'name':name,'driver':driver,'offset':header,'count':len(events),'stride':0,'tempo':0,'ticks_per_beat':24,'channels':count}
     signature=hashlib.sha256(canonical_bytes({'source':source_sha256,'song':definition},max_bytes=128*1024)).hexdigest()
-    return {**definition,'events':events,'tracks':tracks,'issues':list(dict.fromkeys(issues)),'sequence_edit_supported':not issues,'document_id':signature,'definition':definition,'source_sha256':source_sha256,'driver_scope':'Checked Wario Land4 M4A layout. Only explicit note, velocity, channel volume and tempo bytes can be edited; shared patterns affect every use.','reference':REFERENCE,'roles':roles}
+    return {**definition,'events':events,'tracks':tracks,'issues':list(dict.fromkeys(issues)),'sequence_edit_supported':not issues,'document_id':signature,'definition':definition,'source_sha256':source_sha256,'driver_scope':'Checked Wario Land4 M4A layout. Only explicit note, velocity, channel volume, tempo and supported pan values can be edited; shared patterns affect every use.','reference':REFERENCE,'roles':roles,'protected_control_sha256':control}
 
 def plan_song(raw,definition,document_id,changes,source_sha256):
-    song=inspect_song(raw,definition.get('id'),source_sha256)
+    song=inspect_song(raw,definition.get('id'),source_sha256,driver=definition.get('driver',DRIVER))
     if definition!=song['definition'] or document_id!=song['document_id']:raise ValueError('Music review is stale or its layout differs.')
     if not song['sequence_edit_supported']:raise ValueError('This sequence is read-only: '+'; '.join(song['issues']))
     if type(changes) is not list or not 1<=len(changes)<=256:raise ValueError('Review1 to256 explicit music values.')
@@ -169,4 +178,4 @@ def reference_preview(song):
         frequency=440*2**((event['note']+event['key_shift']-69)/12);gain=event['volume']/127*event['channel_volume']/127*2200/max(1,song['channels']**.5)
         for i in range(start,end):values[i]+=math.sin(2*math.pi*(i-start)*frequency/rate)*gain
         used=max(used,end)
-    return wav_bytes([max(-32768,min(32767,round(value))) for value in values[:max(1,used)]],rate),{'kind':'song','sample_rate':rate,'sample_frames':max(1,used),'truncated':True,'preview_scope':'Reference note sketch, up to20seconds. Instruments, ties, envelopes, pitch modulation and exact tempo changes are not emulated. Record native audio to hear the game.'}
+    return wav_bytes([max(-32768,min(32767,round(value))) for value in values[:max(1,used)]],rate),{'kind':'song','sample_rate':rate,'sample_frames':max(1,used),'truncated':True,'preview_scope':'Reference note sketch, up to20seconds. Instruments, panning, ties, envelopes, pitch modulation and exact tempo changes are not emulated. Record native audio to hear the game.'}

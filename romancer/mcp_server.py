@@ -34,7 +34,21 @@ runtime.checkpoint runtime.restore runtime.save_state runtime.load_state profile
 recipes.from_plan recipes.preview recipes.import recipes.export jobs.cancel
 values.start values.narrow investigations.start investigations.capture debugger.prepare debugger.capture debugger.investigate relocation.plan watches.save video.inspect compression.extract compression.plan_reinsert
 definitions.export definitions.import'''.split())
+READ_OPERATIONS=READ_OPERATIONS|{'debugger.follow','definitions.preview','references.survey','commands.inspect','animations.list','animations.get','animations.preview','sound.instrument'}
+WRITE_OPERATIONS=WRITE_OPERATIONS|{'definitions.save','commands.plan','animations.save','animations.delete'}
 DESCRIPTIONS={
+ 'sound.instrument':'Read the tone structure selected by an instrument actually used in a checked M4A song. Shows supported hardware/sample/envelope fields; compound or unsupported structures remain read-only and are not followed.',
+ 'animations.list':'List exact-source saved sprite animation arrangements. Frame timings are author declarations, not decoded engine timing.',
+ 'animations.get':'Read a checked saved animation, its graphics schema, explicit tile placements/flips/colors and timing. Imported layouts never gain native authority.',
+ 'animations.preview':'Validate1–32 animation frames against the current saved graphics document, list shared tiles and return a metadata-bound review digest. No save or ROM edit.',
+ 'animations.save':'Save the exact previewed animation arrangement under a source-bound identity. Does not change a game animation script or ROM bytes. Research packs can share the layout.',
+ 'animations.delete':'Remove one saved animation arrangement from the selected source. ROM bytes and editor drafts are unchanged.',
+ 'commands.inspect':'Decode bounded scripts using an explicitly declared opcode grammar. Unknown/truncated commands or missing end disable operand editing. Names/roles are declarations, not proven runtime behavior.',
+ 'commands.plan':'Review fixed-width named bytecode operands with source/document/before-value guards. Opcodes, allocations and undeclared fields cannot be changed. Builds still require playtesting.',
+ 'references.survey':'Find exact numeric pointer candidates for an explicit target, encoding, alignment and at most1MiB window. Reports coverage and truncation. Does not establish actual dereferences, complete references or free space.',
+ 'definitions.preview':'Preview a named table, graphics or text form, or a full checked level/sound declaration. Uses actual decoders without saving. Returns a review digest bound to current source metadata; declarations do not prove gameplay meaning.',
+ 'definitions.save':'Save the exact previewed editor layout with its review digest. Rejects stale metadata or changed forms; replacing an existing declaration requires explicit acknowledgement. ROM bytes are unchanged.',
+ 'debugger.follow':'Summarize all retained authenticated access events into mapped writer code, separate source reads, resource overlaps and next experiments. No read-to-write causation is inferred; historical and partial evidence remain explicit.',
  'objects.create':'Save a whole-object layout from explicitly selected fresh verified parts belonging to one exact frame and execution context. Recovers flips from measured pixel origins; shared tiles and holes remain explicit.',
  'graphics.accesses.list':'List source-bound native graphics capture IDs without raw memory.',
  'graphics.accesses.tiles':'Decode at most64 complete tiles from recorded video memory with an explicitly chosen tested codec. Stored indices only; no ROM source or palette is inferred.',
@@ -132,9 +146,22 @@ def _investigation_properties(operation):
     def obj(properties):return {'type':'object','properties':properties,'required':list(properties),'additionalProperties':False}
     def array(items,maximum,minimum=0):return {'type':'array','items':items,'minItems':minimum,'maxItems':maximum}
     source={'project_id':string(),'artifact_id':string()}
-    if operation=='gameview.graph':return {**source,'query':string(128),'kind':enum(['all','known','known_resource','assets','script','tables','record','levels','room','actor','sound','note','trace','candidate','verification','verified_source','object','graphics_capture']),'page':integer(0,1024)}
+    if operation=='sound.instrument':return {**source,'song_id':string(64),'instrument':integer(0,255)}
+    if operation=='animations.list':return source
+    if operation in ('animations.get','animations.delete'):return {**source,'animation_id':string(32)}
+    if operation in ('animations.preview','animations.save'):
+        props={**source,'name':string(80),'bitmap_id':string(80),'document_id':string(64),'frames':array({'type':'object','description':'columns/rows1–8, indices (null holes allowed), flips0–3, duration40–2000ms, optional first/order/colors. Exact validation is authoritative.'},32,1)}
+        return {**props,'review_id':string(64)} if operation=='animations.save' else props
+    if operation in ('commands.inspect','commands.plan'):
+        props={**source,'definition':{'type':'object','description':'Source-bound schema_version/name/scripts/commands grammar. Each opcode declares fixed length, role and integer operands; see guide.'}}
+        return {**props,'document_id':string(64),'changes':array(obj({'script_id':string(64),'command_index':integer(0,255),'field':string(64),'before':integer(0,0xffffffff),'after':integer(0,0xffffffff)}),256,1)} if operation=='commands.plan' else props
+    if operation=='references.survey':return {**source,'target_offset':integer(),'width':integer(2,4),'endian':enum(['little','big']),'base':integer(-0xffffffff,0xffffffff),'offset':integer(),'length':integer(1,1024**2),'alignment':{'type':'integer','enum':[1,2,4]}}
+    if operation in ('definitions.preview','definitions.save'):
+        props={**source,'kind':enum(['tables','assets','script','levels','sound','commands']),'config':{'type':'object','description':'Typed editor configuration. Tables use schema_version/name/offset/count/stride/fields; graphics/text use the existing system declaration form. Full levels/sound definitions also accepted. Exact inspector validation is authoritative.'}}
+        return {**props,'review_id':string(64),'replace':{'type':'boolean'}} if operation=='definitions.save' else props
+    if operation=='gameview.graph':return {**source,'query':string(128),'kind':enum(['all','known','known_resource','assets','script','tables','record','levels','room','actor','sound','song','music_event','collision','commands','command','animation','note','trace','candidate','verification','verified_source','object','graphics_capture']),'page':integer(0,1024)}
     if operation=='gameview.detail':return {**source,'node_id':string(32)}
-    if operation=='gameview.link':return {**source,'from_id':string(32),'to_id':string(32),'relation':enum(['uses_graphics','uses_palette','uses_script','uses_sound','uses_table','reference']),'note':string(256)}
+    if operation=='gameview.link':return {**source,'from_id':string(32),'to_id':string(32),'relation':enum(['uses_graphics','uses_palette','uses_script','uses_sound','uses_table','uses_collision','uses_animation','triggers','destination','reference']),'note':string(256)}
     if operation=='gameview.unlink':return {**source,'link_id':string(32)}
     if operation=='traces.capture':return {**source,'name':string(80),'frame_sha256':string(64),'region':obj({'x':integer(0,2047),'y':integer(0,2047),'width':integer(8,256),'height':integer(8,256)}),'offset':integer(),'length':integer(1)}
     if operation=='traces.get':return {**source,'trace_id':string(32)}
@@ -173,7 +200,7 @@ def _investigation_properties(operation):
     if operation=='documented.open':return {**source,'candidate_id':string(64)}
     if operation=='references.catalog':return {'query':string(128),'system_filter':enum(['all','nes','snes','genesis','sms','gb','gbc','gba'])}
     if operation=='references.template':return {**source,'template_id':enum(['pokemon-red-blue','pokemon-crystal','pokemon-gba']),'offset':integer(),'count':integer(1,65536),'stride':integer(1,65536)}
-    if operation=='research.inspect':return {**source,'query':string(128),'kind':enum(['all','notes','assets','script','tables','levels','sound']),'page':integer(0,4096)}
+    if operation=='research.inspect':return {**source,'query':string(128),'kind':enum(['all','notes','assets','script','tables','levels','sound','commands']),'page':integer(0,4096)}
     if operation=='research.note_get':return {**source,'note_id':string(32)}
     if operation=='research.note_delete':return {**source,'revision':string(64),'note_id':string(32)}
     if operation=='research.note_save':
@@ -204,6 +231,7 @@ def _investigation_properties(operation):
     if operation=='investigations.get':return {**source,'investigation_id':string(64)}
     if operation=='investigations.probe':return {**source,'investigation_id':string(64),'candidate_id':string(64)}
     if operation in ('debugger.capabilities','debugger.prepare'):return source
+    if operation=='debugger.follow':return {**source,'evidence_id':string(64)}
     if operation=='debugger.get':return {**source,'evidence_id':string(64),'offset':integer(0,2000),'limit':integer(1,100)}
     if operation in ('debugger.capture','debugger.investigate'):
         step=obj({'frames':integer(1,3600),'buttons':array(enum(['a','b','c','x','y','l','r','select','start','up','down','left','right','one','two','pause']),12),'port':integer(0,0)})
@@ -235,7 +263,7 @@ def _investigation_properties(operation):
             variants.append({'type':'object','properties':{'kind':enum([kind]),**properties},
                 'required':['kind',*required],'additionalProperties':False})
         return {**source,'header':integer(0x4800,0x6f7f),'changes':array({'oneOf':variants},64,1)}
-    codecs=enum(['gba-lz10','gba-rle']);kinds=enum(['script','assets','tables','levels','sound'])
+    codecs=enum(['gba-lz10','gba-rle']);kinds=enum(['script','assets','tables','levels','sound','commands'])
     if operation=='systems.address':
         variants=[]
         for ids,extra in [(['nrom'],{'prg_offset':integer(16,528),'prg_size':integer(16384,32768)}),

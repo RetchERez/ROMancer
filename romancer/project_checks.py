@@ -30,7 +30,7 @@ def validate_project(project,*,cancelled=lambda:False):
             location=where+' / '+kind
             try:
                 if type(schema) is not dict:raise ValueError('Invalid descriptor')
-                bound=(schema.get('profile',{}).get('accepted_sha256',[]) if kind=='script' else [schema.get('source_sha256')] if kind=='tables' else [schema.get('source',{}).get('sha256')])
+                bound=(schema.get('profile',{}).get('accepted_sha256',[]) if kind=='script' else [schema.get('source_sha256')] if kind in ('tables','levels','sound','commands','watches') else [schema.get('source',{}).get('sha256')])
                 if row['sha256'] not in bound:issue('STALE_DEFINITION','error',row,location,'Reinspect this exact revision and redeclare or explicitly reuse its resource setup.');continue
                 if kind in ('assets','font'):
                     from .assets import inspect_assets
@@ -55,6 +55,23 @@ def validate_project(project,*,cancelled=lambda:False):
                                 if field['pointer_base'] is None:continue
                                 cell=_read(stream,definition,index,field,source['size'])
                                 if cell['pointer_resolution']=='unresolved':issue('INVALID_POINTER','error',row,f"{location} / row {index} / {field['name']}",'Correct the declared pointer base or stored value; target lies outside this file.',cell['offset'])
+                elif kind in ('levels','sound','commands'):
+                    from .workbench_files import read_bounded
+                    raw=read_bounded(path,64*1024**2,row,cancelled=cancelled)
+                    if kind=='levels':
+                        from .level_design import inspect_level
+                        result=inspect_level(raw,schema,row['sha256'])
+                    elif kind=='sound':
+                        from .sound_studio import inspect_sound
+                        result=inspect_sound(raw,schema,row['sha256'])
+                    else:
+                        from .command_editor import inspect_commands
+                        result=inspect_commands(raw,schema,row['sha256'],cancelled=cancelled)
+                        if any(s['issues'] for s in result['scripts']):raise ValueError('A script cannot be fully decoded.')
+                    ranges.extend((r['offset'],r['offset']+r['length'],kind+'/'+r['name']) for r in result['ranges'])
+                elif kind=='watches':
+                    from .memory_watches import validate_watches
+                    validate_watches(schema['watches'])
                 else:issue('UNKNOWN_SCOPE','warning',row,location,'Use a supported declaration to validate this resource kind.')
             except (ValueError,OSError,KeyError,TypeError):issue('INVALID_DEFINITION','error',row,location,'Check the declaration ranges, references, format and expected bytes against this revision.')
         previous=[]

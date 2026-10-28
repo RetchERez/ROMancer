@@ -207,6 +207,16 @@ class WorkbenchAPI:
         self.structures=StructureTools(self);self.routes.update(self.structures.routes())
         from .research_tools import ResearchTools
         self.research=ResearchTools(self);self.routes.update(self.research.routes())
+        from .definition_builder import DefinitionBuilder
+        self.definition_builder=DefinitionBuilder(self);self.routes.update(self.definition_builder.routes())
+        from .command_editor import CommandTools
+        self.commands=CommandTools(self);self.routes.update(self.commands.routes())
+        from .animation_layouts import AnimationTools
+        self.animations=AnimationTools(self);self.routes.update(self.animations.routes())
+        from .m4a_instruments import InstrumentTools
+        self.instruments=InstrumentTools(self);self.routes.update(self.instruments.routes())
+        from .reference_survey import ReferenceSurveyTools
+        self.reference_survey=ReferenceSurveyTools(self);self.routes.update(self.reference_survey.routes())
         from .documented_tables import DocumentedTableTools
         self.documented=DocumentedTableTools(self);self.routes.update(self.documented.routes())
         from .source_symbols import SymbolTools

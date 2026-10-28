@@ -238,6 +238,19 @@ APPROVED_FILES = APPROVED_FILES | frozenset(['user-guide/screenshots/205-origina
 
 APPROVED_FILES = APPROVED_FILES | frozenset(['user-guide/screenshots/210-two-clear-starting-choices.png', 'user-guide/screenshots/211-what-can-i-edit.png', 'user-guide/screenshots/212-clear-draft-preview.png', 'user-guide/screenshots/213-paused-game-save-state.png', 'user-guide/screenshots/214-explicit-original-build-export.png'])
 
+APPROVED_FILES = APPROVED_FILES | frozenset({
+    'romancer/investigation_follow.py','romancer/definition_builder.py','romancer/reference_survey.py',
+    'romancer/command_editor.py','romancer/connected_details.py','romancer/animation_layouts.py','romancer/m4a_instruments.py',
+    'romancer/ui/investigation_follow.js','romancer/ui/definition_builder.js','romancer/ui/compression_references.js',
+    'romancer/ui/command_editor.js','romancer/ui/saved_animations.js','romancer/ui/music_instruments.js',
+    'tests/test_investigation_follow.py','tests/test_definition_builder.py','tests/test_reference_survey.py',
+    'tests/test_command_editor.py','tests/test_animation_layouts.py','tests/test_m4a_controls.py','tests/test_project_studio_validation.py',
+    'tests/ui_investigation_follow.mjs','tests/ui_definition_builder.mjs','tests/ui_compression_references.mjs',
+    'tests/ui_command_editor.mjs','tests/ui_saved_animations.mjs','tests/ui_music_instruments.mjs',
+})
+
+APPROVED_FILES = APPROVED_FILES | frozenset(['user-guide/screenshots/230-native-writer-evidence-summary.png', 'user-guide/screenshots/231-visual-editor-builder-named-fields.png', 'user-guide/screenshots/232-wario-command-parameter-review.png', 'user-guide/screenshots/233-wario-pan-and-instrument-inspection.png', 'user-guide/screenshots/234-saved-two-pose-animation.png', 'user-guide/screenshots/235-connected-saved-animation.png', 'user-guide/screenshots/236-compressed-graphics-two-pointer-review.png', 'user-guide/screenshots/237-compact-compression-review.png', 'user-guide/screenshots/238-compact-command-editor.png'])
+
 def _identity(info):
     return (info.st_dev, info.st_ino, info.st_size, info.st_mtime_ns)
 

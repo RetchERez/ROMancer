@@ -5,7 +5,8 @@ from .research_tools import _resources,_definition,notes_for
 from . import workbench_projects as projects
 
 MAX_NODES=32768  # Complete index of individually bounded source categories; page after filtering.
-RELATIONS=('uses_graphics','uses_palette','uses_script','uses_sound','uses_table','reference')
+RELATIONS=('uses_graphics','uses_palette','uses_script','uses_sound','uses_table','uses_collision','uses_animation','triggers','destination','reference')
+CATEGORIES=('all','known','known_resource','assets','script','tables','record','levels','room','actor','sound','song','music_event','collision','commands','command','animation','note','trace','candidate','verification','verified_source','object','graphics_capture')
 
 
 def user_links(row):
@@ -54,7 +55,7 @@ def graph(row,path,cancelled=lambda:False,project=None):
     for r in resources:
         if cancelled():raise KeyboardInterrupt
         add(r['kind'],r['name'],r['offset'],r['length'],r['editor'])
-    for kind in ('assets','tables','levels','sound'):
+    for kind in ('assets','tables','levels','sound','commands'):
         if not row.get('descriptors',{}).get(kind) or any(i['kind']==kind for i in issues):continue
         try:definitions[kind]=_definition(row,path,kind)
         except (ValueError,KeyError,TypeError):continue
@@ -95,6 +96,14 @@ def graph(row,path,cancelled=lambda:False,project=None):
                 for index,obj in enumerate(room['objects'][:64]):
                     child=add('actor',metadata.get(index,{}).get('name','Object '+str(index)),object_def['offset']+index*object_def['stride'],object_def['stride'],'levels',{'room_id':room['id'],'object':index})
                     connect(parent,child,'contains_object')
+    from .connected_details import extend_graph
+    extra_partial=extend_graph(row,path,definitions,nodes,add,connect,cancelled)
+    from .animation_layouts import animations_for
+    for animation in animations_for(row,path):
+        bitmap=next(b for b in animation['schema']['bitmaps'] if b['id']==animation['bitmap_id'])
+        n=add('animation',animation['name'],bitmap['offset'],bitmap['length'],'assets',{'animation_id':animation['id']})
+        for other in nodes[:]:
+            if other['kind']=='assets' and other['offset']==bitmap['offset']:connect(n,other,'uses_graphics')
     for note in notes_for(row):add('note',note['title'],note['offset'],note['length'],'resources',{'note_id':note['id']},'user_note')
     if project is not None:
         from .gameplay_traces import saved_traces
@@ -142,7 +151,7 @@ def graph(row,path,cancelled=lambda:False,project=None):
             edges.append({'from':link['from'],'to':link['to'],'relation':link['relation'],'confidence':'user_declared','link_id':link['id'],'note':link['note']})
     except (ValueError,KeyError,TypeError):issues.append({'kind':'link','message':'Declared links could not be validated for this source.'})
     projects._measure(path,row,cancelled=cancelled)
-    return {'nodes':nodes,'edges':edges,'issues':issues,'partial':total>len(resources) or (d is not None and not catalog and d['count']>256),'game_semantics_inferred':False}
+    return {'nodes':nodes,'edges':edges,'issues':issues,'partial':extra_partial or total>len(resources) or (d is not None and not catalog and d['count']>256),'game_semantics_inferred':False}
 
 
 def neighbors(model,node):
@@ -189,7 +198,7 @@ class ConnectedGameTools:
         require_supported(row);return row,path,graph(row,path,c,project)
     def graph(self,p,c):
         label(p['query'],128,blank=True);number(p['page'],0,1024)
-        if p['kind'] not in ('all','known','known_resource','assets','script','tables','record','levels','room','actor','sound','note','trace','candidate','verification','verified_source','object','graphics_capture'):raise ValueError('Choose an available resource category.')
+        if p['kind'] not in CATEGORIES:raise ValueError('Choose an available resource category.')
         row,_,model=self._graph(p,c);query=p['query'].casefold();rows=[r for r in model['nodes'] if p['kind'] in ('all',r['kind']) and query in r['name'].casefold()];start=p['page']*50
         selected=rows[start:start+50];page_edges={}
         for node in selected:
@@ -200,6 +209,9 @@ class ConnectedGameTools:
         projects.identifier(p['node_id']);row,path,model=self._graph(p,c);node=next((r for r in model['nodes'] if r['id']==p['node_id']),None)
         if node is None:raise ValueError('This resource changed or is unavailable. Refresh the Game view.')
         all_related=neighbors(model,node);related=all_related[:32];ids={e['from'] for e in related}|{e['to'] for e in related};preview={}
+        if node['kind'] in ('commands','command','collision','song','music_event','animation'):
+            from .connected_details import detail_preview
+            preview=detail_preview(row,path,node,c)
         if node['kind']=='record':
             from .data_tables import inspect_table
             d=_definition(row,path,'tables');doc=inspect_table(path,row['sha256'],d,node['locator']['row'],1)

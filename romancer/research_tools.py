@@ -6,7 +6,7 @@ from .asset_schema import fields,label,number
 from .script_schema import canonical_bytes
 from . import workbench_projects as projects
 
-KINDS=('assets','script','tables','levels','sound')
+KINDS=('assets','script','tables','levels','sound','commands')
 CATEGORIES=('graphics','text','numbers','level','sound','code','other')
 PACK_LIMIT=1024**2
 
@@ -38,7 +38,7 @@ def notes_for(row):
 
 
 def revision(row):
-    raw=canonical_bytes({'descriptors':row.get('descriptors',{}),'notes':notes_for(row),'objects':row.get('object_layouts')},max_bytes=projects.MAX_STORE)
+    raw=canonical_bytes({'descriptors':row.get('descriptors',{}),'notes':notes_for(row),'objects':row.get('object_layouts'),'animations':row.get('animation_layouts')},max_bytes=projects.MAX_STORE)
     return hashlib.sha256(raw).hexdigest()
 
 
@@ -65,7 +65,7 @@ def _resources(row,path,cancelled,maximum=4096):
     def add(kind,name,offset,length):
         nonlocal total
         number(offset,0,row['size']-1);number(length,1,row['size']-offset);total+=1
-        if len(resources)<maximum:resources.append({'name':str(name)[:160],'kind':kind,'offset':offset,'length':length,'editor':{'script':'scripts','tables':'tables','assets':'assets','levels':'levels','sound':'sound'}[kind]})
+        if len(resources)<maximum:resources.append({'name':str(name)[:160],'kind':kind,'offset':offset,'length':length,'editor':{'script':'scripts','tables':'tables','assets':'assets','levels':'levels','sound':'sound','commands':'debug'}[kind]})
     for kind in KINDS:
         if cancelled():raise KeyboardInterrupt
         if not row.get('descriptors',{}).get(kind):continue
@@ -85,6 +85,9 @@ def _resources(row,path,cancelled,maximum=4096):
                 if kind=='levels':
                     from .level_design import inspect_level
                     spans=inspect_level(raw,d,row['sha256'])['ranges']
+                elif kind=='commands':
+                    from .command_editor import inspect_commands
+                    spans=inspect_commands(raw,d,row['sha256'],cancelled=cancelled)['ranges']
                 else:
                     from .sound_studio import inspect_sound
                     spans=inspect_sound(raw,d,row['sha256'])['ranges']
@@ -165,13 +168,16 @@ class ResearchTools:
         from .object_workbench import portable_objects
         objects=portable_objects(row)
         if objects:document.update(format='romancer-research-v2',objects=objects)
+        from .animation_layouts import animations_for
+        animations=animations_for(row,path)
+        if animations:document.update(format='romancer-research-v3',objects=objects,animations=animations)
         canonical_bytes(document,max_bytes=PACK_LIMIT);projects._measure(path,row,cancelled=c)
         return self.api._export_declaration(project,document,c)
 
     def _review(self,row,path,document,c):
         from .workflow_recipes import definition_document
-        document=json.loads(canonical_bytes(document,max_bytes=PACK_LIMIT));fields(document,'format source definitions notes'+(' objects' if document.get('format')=='romancer-research-v2' else ''))
-        if document['format'] not in ('romancer-research-v1','romancer-research-v2'):raise ValueError('Choose a ROMancer research pack.')
+        document=json.loads(canonical_bytes(document,max_bytes=PACK_LIMIT));fields(document,'format source definitions notes'+(' objects' if document.get('format') in ('romancer-research-v2','romancer-research-v3') else '')+(' animations' if document.get('format')=='romancer-research-v3' else ''))
+        if document['format'] not in ('romancer-research-v1','romancer-research-v2','romancer-research-v3'):raise ValueError('Choose a ROMancer research pack.')
         fields(document['source'],'sha256 size system_id')
         if document['source']!={'sha256':row['sha256'],'size':row['size'],'system_id':row.get('system_id')}:raise ValueError('Research pack requires the exact matching ROM revision and system.')
         defs=document['definitions']
@@ -185,6 +191,8 @@ class ResearchTools:
         incoming=_notes(document['notes'],row['size']);old={n['id']:n for n in notes_for(row)}
         from .object_workbench import review_objects
         objects,object_replacements=review_objects(row,document.get('objects',[]));replacements.extend(object_replacements)
+        from .animation_layouts import review_animations
+        animations=review_animations(row,path,document.get('animations',[]))
         for n in incoming:
             if n['id'] in old and old[n['id']]!=n:replacements.append('note: '+n['title'])
             old[n['id']]=n
@@ -194,7 +202,7 @@ class ResearchTools:
         projects._measure(path,row,cancelled=c)
         return normalized,list(old.values()),{'ok':True,'artifact_id':row['artifact_id'],'source_sha256':row['sha256'],
                  'review_id':review_id,'definitions':list(checked),'notes':[{k:n[k] for k in ('id','title','offset','length','category')} for n in incoming[:50]],'notes_truncated':len(incoming)>50,'replacements':replacements,
-                 'note_count':len(incoming),'merged_note_count':len(old),'object_count':len(document.get('objects',[])),'merged_object_count':len(objects),'write_authorized':False,'game_semantics_verified':False,
+                 'note_count':len(incoming),'merged_note_count':len(old),'object_count':len(document.get('objects',[])),'merged_object_count':len(objects),'animation_count':len(document.get('animations',[])),'merged_animation_count':len(animations),'write_authorized':False,'game_semantics_verified':False,
                  'scope':'Checked declarations and user research only. No ROM bytes are changed.'}
 
     def preview(self,p,c):
@@ -217,6 +225,9 @@ class ResearchTools:
             if 'objects' in document:
                 from .object_workbench import review_objects
                 objects,_=review_objects(owned,document['objects']);owned['object_layouts']={'source_sha256':row['sha256'],'objects':objects}
+            if 'animations' in document:
+                from .animation_layouts import review_animations
+                animations=review_animations(owned,path,document['animations']);owned['animation_layouts']={'source_sha256':row['sha256'],'animations':animations}
             if c():raise KeyboardInterrupt
             projects._measure(path,row,cancelled=c);projects.write_json(project/'project.json',store)
         return {**self._public(owned),'status':'IMPORTED','definitions':review['definitions']}

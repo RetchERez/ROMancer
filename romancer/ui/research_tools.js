@@ -1,6 +1,6 @@
 import {esc,button,field,area,select,read} from './common.js';
 import {selectionKey,fileInput} from './tool_inputs.js';
-const names=[['all','Everything'],['assets','Graphics'],['script','Text'],['tables','Numbers'],['levels','Levels'],['sound','Sound'],['notes','My notes']];
+const names=[['all','Everything'],['assets','Graphics'],['script','Text'],['tables','Numbers'],['levels','Levels'],['sound','Sound'],['commands','Event scripts'],['notes','My notes']];
 const categories=['graphics','text','numbers','level','sound','code','other'];
 const integer=id=>{const text=read(id).trim(),value=Number(text);if(!text||!Number.isSafeInteger(value)||value<0)throw Error('Enter a nonnegative offset or byte length.');return value;};
 export function researchNoteHelp(notes=[]){return notes.length?'<h4>User research</h4>'+notes.map(n=>'<dl><dt>'+esc(n.title)+'</dt><dd>'+esc(n.text)+'<br>Reference: '+esc(n.reference||'None supplied')+'</dd></dl>').join('')+'<p class="subtle">User notes are not automatically verified game behavior.</p>':'';}
@@ -8,14 +8,14 @@ export function useResearchSetup(ctx,kind){
  const {state}=ctx,scope=selectionKey(state),packet=state.researchOpen,restore=state.researchRestore;
  if(restore?.scope===scope&&restore.kind===kind){state.researchRestore=null;for(const [key,value] of Object.entries(restore.fields))ctx.setDraft(key,value);delete state.results[kind+'.inspect'];state.pending=null;return '';}
  if(packet?.scope!==scope||packet.kind!==kind)return '';
- const d=state.artifact.descriptors?.[kind];if(!d){state.researchOpen=null;return '';}
+ const d=packet.definition??state.artifact.descriptors?.[kind];if(!d){state.researchOpen=null;return '';}
  const keys={assets:'asset-schema',script:'script-schema',levels:'level-definition',sound:'sound-definition'};
  const wanted=kind==='tables'?{'table-name':d.definition.name,'table-offset':String(d.definition.offset),'table-count':String(d.definition.count),'table-stride':String(d.definition.stride),'table-fields':JSON.stringify(d.definition.fields)}:{[keys[kind]]:JSON.stringify(d,null,2)};
  const prior=Object.fromEntries(Object.keys(wanted).map(key=>[key,ctx.draft(key,null)]));
  const page=state.page,ownsSetup=()=>selectionKey(state)===scope&&state.page===page&&state.researchOpen===packet&&ctx.isCurrentRender?.()!==false&&Object.entries(prior).every(([key,value])=>ctx.draft(key,null)===value);
  const differs=Object.keys(wanted).some(key=>prior[key]!==null&&String(prior[key])!==wanted[key]);
  if(differs&&!packet.confirmed){
-  ctx.use({'research-keep-setup':()=>{if(!ownsSetup())return;state.researchOpen=null;for(const key of ['connectedAssetSetup','connectedTableJump','connectedLevelJump'])if(state[key]?.scope===scope)state[key]=null;return ctx.render();},
+  ctx.use({'research-keep-setup':()=>{if(!ownsSetup())return;state.researchOpen=null;for(const key of ['connectedAssetSetup','connectedAnimation','connectedTableJump','connectedLevelJump'])if(state[key]?.scope===scope)state[key]=null;return ctx.render();},
    'research-load-setup':async()=>{if(!ownsSetup())throw Error('The editor changed. Review its setup again.');let backups=[];try{backups=JSON.parse(ctx.draft('research-previous-setup','[]'));}catch{}
     if(!Array.isArray(backups))backups=[];const next=[...backups.slice(-3),{kind,sha256:state.artifact.sha256,at:new Date().toISOString(),fields:prior}];
     const value=JSON.stringify(next);if(new TextEncoder().encode(value).length>60000)throw Error('The current setup is too large for a recovery copy. Export your work before replacing it.');

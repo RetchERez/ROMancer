@@ -1,0 +1,14 @@
+import assert from 'node:assert/strict';
+import {parseReferenceOffsets,compressionReferences} from '../romancer/ui/compression_references.js';
+assert.deepEqual(parseReferenceOffsets('0x200','0x204\n520'),[512,516,520]);
+assert.throws(()=>parseReferenceOffsets('512','512'),/duplicate/i);assert.throws(()=>parseReferenceOffsets('',''),/one|reference/i);
+assert.throws(()=>parseReferenceOffsets('true',''),/offset/i);
+const actions={},values={'compressed-ref-start':'0','compressed-ref-length':'32768','compressed-move-width':'4','compressed-move-order':'little','compressed-move-base':'0x8000000','compressed-ref-align':'4','compressed-move-more':''},drafts={};
+globalThis.document={getElementById:id=>({value:values[id]??''})};
+const state={project:{project_id:'p'},artifact:{artifact_id:'decoded',sha256:'s'}},parent={artifact_id:'parent',sha256:'p',size:32768};
+const result={ok:true,source_sha256:'p',artifact_id:'parent',target_offset:4096,candidates:[{offset:512}],total_matches:1,tested_positions:8192,tested_range:{offset:0,length:32768},truncated:false};
+const ctx={state,use:r=>Object.assign(actions,r),draft:(k,d)=>drafts[k]??d,setDraft:(k,v)=>{drafts[k]=v;values[k]=v;},sourceParams:()=>({project_id:'p',artifact_id:'decoded'}),run:async(op,p)=>{assert.equal(op,'references.survey');assert.equal(p.artifact_id,'parent');return result;},render:async()=>{}};
+compressionReferences(ctx,parent,4096);await actions['compressed-ref-survey']();
+assert.match(compressionReferences(ctx,parent,4096),/numeric matches/i);await actions['compressed-ref-add']({dataset:{id:'512'}});assert.equal(values['compressed-move-more'],'0x200');
+await assert.rejects(async()=>actions['compressed-ref-add']({dataset:{id:'999'}}),/candidate/i);
+console.log('Compressed moves support explicit multiple pointers and bounded unchecked candidates.');

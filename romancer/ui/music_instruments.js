@@ -1,0 +1,10 @@
+import {selectionKey} from './tool_inputs.js';
+import {esc,button,select,read} from './common.js';
+export function instrumentDetails(ctx,song){
+ if(!['wl4-m4a-v1','wl4-m4a-v2'].includes(song?.driver))return '';
+ const ids=[...new Set(song.events.map(e=>e.instrument).filter(Number.isSafeInteger))].sort((a,b)=>a-b);if(!ids.length)return '';
+ const {state}=ctx,page=state.page,scope=selectionKey(state),params={...ctx.sourceParams()},current=()=>selectionKey(state)===scope&&state.page===page;
+ const r=state.soundInstrument?.scope===scope&&state.soundInstrument.result.song_id===song.id?state.soundInstrument.result:null;
+ ctx.use({'music-instrument-inspect':async()=>{const value=read('music-instrument').trim(),id=Number(value);if(!current()||!value||!ids.includes(id))throw Error('Choose an instrument used by this decoded song.');const result=await ctx.run('sound.instrument',{...params,song_id:song.id,instrument:id},{render:false,refresh:false});if(!current())return;if(!result.ok||result.source_sha256!==state.artifact.sha256||result.artifact_id!==state.artifact.artifact_id)throw Error(result.error||'Instrument source changed.');state.soundInstrument={scope,result};return ctx.render();}});
+ return `<details class="music-instruments" ${r?'open':''}><summary>Instruments used by this song</summary><div class="actions">${select('music-instrument','Instrument number',ids.map(i=>[i,'Instrument '+i]),ctx.draft('music-instrument',String(ids[0])))}${button('Inspect instrument','music-instrument-inspect')}</div>${r?`<h4>${esc(r.type_name)} · ${r.instrument}</h4><p>Read-only · ${esc(r.status)} · file0x${r.offset.toString(16)}</p><dl><dt>Base key</dt><dd>${r.key}</dd>${r.envelope?Object.entries(r.envelope).map(([k,v])=>`<dt>${esc(k)}</dt><dd>${v}</dd>`).join(''):''}${r.wave?`<dt>Wave data</dt><dd>${esc(r.wave.format)} · file0x${r.wave.offset.toString(16)} · ${r.wave.length} bytes</dd>`:''}</dl>${r.reason?`<p class="notice">${esc(r.reason)}</p>`:''}<p>${esc(r.scope)}</p>`:''}</details>`;
+}

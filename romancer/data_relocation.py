@@ -31,12 +31,14 @@ def prepare_edits(raw,system,spec,replacement=None,*,cancelled=lambda:False):
         if region is None:raise ValueError('The cartridge payload layout is unresolved.')
         low,extent=region
         if min(start,target)<low or max(start+length,target+capacity)>low+extent:raise ValueError('This move must stay inside the identified CPU ROM payload.')
-    elif system in ('gb','gbc','gba','genesis'):
-        minimum={'gb':0x150,'gbc':0x150,'gba':0xc0,'genesis':0x200}[system]
+    elif system in ('gb','gbc','gba','genesis','sms'):
+        minimum={'gb':0x150,'gbc':0x150,'gba':0xc0,'genesis':0x200,'sms':0x100}[system]
         if min(start,target)<minimum:raise ValueError('Data relocation cannot use this cartridge boot/header extent.')
     else:raise ValueError('Choose a supported cartridge system.')
     bank=number(spec['bank_size'],0,65536);origin=number(spec['bank_origin'],0,len(raw)-1)
-    if system in ('nes','snes','gb','gbc') and not bank:raise ValueError('Banked systems require an explicit same-bank constraint.')
+    if system in ('nes','snes','gb','gbc','sms') and not bank:raise ValueError('Banked systems require an explicit same-bank constraint.')
+    protected=[(0,0x100)]+[(at,at+16) for at in (0x1ff0,0x3ff0,0x7ff0) if raw[at:at+8]==b'TMR SEGA'] if system=='sms' else []
+    if any(a<end and begin<b for a,b in protected for begin,end in ((start,start+length),(target,target+capacity))):raise ValueError('Data relocation overlaps protected SMS boot or header bytes.')
     if bank:
         if bank not in (8192,16384,32768,65536) or min(start,target)<origin:raise ValueError('Choose a supported declared bank window and origin.')
         banks={(point-origin)//bank for point in (start,start+length-1,target,target+capacity-1)}
@@ -52,6 +54,7 @@ def prepare_edits(raw,system,spec,replacement=None,*,cancelled=lambda:False):
         if cancelled():raise KeyboardInterrupt
         fields(ref,'offset width endian base target_delta')
         width=number(ref['width'],2,4);offset=number(ref['offset'],0,len(raw)-width)
+        if any(offset<b and a<offset+width for a,b in protected):raise ValueError('References overlap protected SMS boot or header bytes.')
         delta=number(ref['target_delta'],0,min(length,len(payload))-1);base=number(ref['base'],-0xffffffff,0xffffffff)
         if ref['endian'] not in ('little','big'):raise ValueError('Choose a supported reference byte order.')
         if any(offset<b and a<offset+width for a,b in [(start,start+length),(target,target+capacity),*occupied]):

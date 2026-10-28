@@ -35,7 +35,7 @@ class InvestigationMCPTests(unittest.TestCase):
         self.assertEqual(schemas['romancer_compression_inspect']['allocation']['maximum'],49152)
         self.assertEqual(schemas['romancer_compression_inspect']['codec']['enum'],['gba-lz10','gba-rle'])
         self.assertEqual(schemas['romancer_definitions_import']['document']['type'],'object')
-        self.assertEqual(schemas['romancer_definitions_export']['kind']['enum'],['script','assets','tables','levels','sound'])
+        self.assertEqual(schemas['romancer_definitions_export']['kind']['enum'],['script','assets','tables','levels','sound','commands'])
         self.assertTrue(tools['romancer_compression_inspect']['annotations']['readOnlyHint']);self.assertFalse(tools['romancer_values_start']['annotations']['readOnlyHint'])
 
     def test_removed_system_mapping_is_not_advertised_and_cannot_bypass_release_scope(self):

@@ -496,7 +496,7 @@
     const prefix = state2.project.project_id + ":" + state2.artifact.artifact_id + ":";
     for (const [key3, value] of Object.entries(state2.drafts || {})) {
       if (!key3.startsWith(prefix)) continue;
-      if (/:(?:asset-changes|table-changes|level-changes|sound-changes)$/.test(key3)) {
+      if (/:(?:asset-changes|table-changes|level-changes|sound-changes|command-changes)$/.test(key3)) {
         try {
           const data = JSON.parse(value);
           if (changed(Array.isArray(data) ? data : data == null ? void 0 : data.changes)) return true;
@@ -913,7 +913,7 @@
     (_b = state2.soundPlayer) == null ? void 0 : _b.close();
     state2.soundPlayer = null;
     state2.soundPreview = null;
-    for (const key3 of ["visualSourceProof", "verifiedVisualSource", "savedGameplayTrace", "connectedNode", "connectedTraceFocus", "connectedAssetSetup", "connectedTableJump", "connectedLevelJump", "buildCheckView", "buildCheckReport", "tablePreview", "dataRelocation", "nativeSourceContext", "structuralLab", "structuralPrefill", "tableProposal", "nativeTrace", "nativeProbe", "investigationSeries", "gameMapsView", "gameMapEditor", "levelEditor", "levelClipboard", "levelRect", "paint", "pixelHistories", "pixelHistoryScope", "spriteHistory", "hexDraft", "hexReview", "hexSearch", "hexNumbers", "hexExplanation", "hexBookmarks", "hexComparison", "historyComparison", "translationSheet", "translationReview"]) state2[key3] = null;
+    for (const key3 of ["openAnimationAfterMount", "definitionReview", "commandDefinitionReview", "commandFocus", "animationSaveReview", "connectedAnimation", "connectedSoundJump", "compressedReferenceSurvey", "soundInstrument", "visualSourceProof", "verifiedVisualSource", "savedGameplayTrace", "connectedNode", "connectedTraceFocus", "connectedAssetSetup", "connectedTableJump", "connectedLevelJump", "buildCheckView", "buildCheckReport", "tablePreview", "dataRelocation", "nativeSourceContext", "structuralLab", "structuralPrefill", "tableProposal", "nativeTrace", "nativeProbe", "investigationSeries", "gameMapsView", "gameMapEditor", "levelEditor", "levelClipboard", "levelRect", "paint", "pixelHistories", "pixelHistoryScope", "spriteHistory", "hexDraft", "hexReview", "hexSearch", "hexNumbers", "hexExplanation", "hexBookmarks", "hexComparison", "historyComparison", "translationSheet", "translationReview"]) state2[key3] = null;
     state2.drafts = {};
     state2.romScans = {};
     state2.graphicsInvestigations = {};
@@ -2055,7 +2055,7 @@
   }
 
   // romancer/ui/research_tools.js
-  var names = [["all", "Everything"], ["assets", "Graphics"], ["script", "Text"], ["tables", "Numbers"], ["levels", "Levels"], ["sound", "Sound"], ["notes", "My notes"]];
+  var names = [["all", "Everything"], ["assets", "Graphics"], ["script", "Text"], ["tables", "Numbers"], ["levels", "Levels"], ["sound", "Sound"], ["commands", "Event scripts"], ["notes", "My notes"]];
   var categories = ["graphics", "text", "numbers", "level", "sound", "code", "other"];
   var integer2 = (id) => {
     const text = read(id).trim(), value = Number(text);
@@ -2076,7 +2076,7 @@
       return "";
     }
     if ((packet == null ? void 0 : packet.scope) !== scope || packet.kind !== kind) return "";
-    const d = (_a = state2.artifact.descriptors) == null ? void 0 : _a[kind];
+    const d = packet.definition ?? ((_a = state2.artifact.descriptors) == null ? void 0 : _a[kind]);
     if (!d) {
       state2.researchOpen = null;
       return "";
@@ -2095,7 +2095,7 @@
           var _a2;
           if (!ownsSetup()) return;
           state2.researchOpen = null;
-          for (const key3 of ["connectedAssetSetup", "connectedTableJump", "connectedLevelJump"]) if (((_a2 = state2[key3]) == null ? void 0 : _a2.scope) === scope) state2[key3] = null;
+          for (const key3 of ["connectedAssetSetup", "connectedAnimation", "connectedTableJump", "connectedLevelJump"]) if (((_a2 = state2[key3]) == null ? void 0 : _a2.scope) === scope) state2[key3] = null;
           return ctx2.render();
         },
         "research-load-setup": async () => {
@@ -2352,9 +2352,9 @@
       return [c, Math.round(value / maximum * 255)];
     }));
   }
-  function quantizeColor(hex7, channels) {
-    if (typeof hex7 !== "string" || !/^#[a-f0-9]{6}$/i.test(hex7)) throw Error("Choose a valid RGB color.");
-    return Object.fromEntries(["r", "g", "b"].map((c, i) => [c, Math.round(parseInt(hex7.slice(1 + i * 2, 3 + i * 2), 16) / 255 * channelMaximum(channels[c]))]));
+  function quantizeColor(hex8, channels) {
+    if (typeof hex8 !== "string" || !/^#[a-f0-9]{6}$/i.test(hex8)) throw Error("Choose a valid RGB color.");
+    return Object.fromEntries(["r", "g", "b"].map((c, i) => [c, Math.round(parseInt(hex8.slice(1 + i * 2, 3 + i * 2), 16) / 255 * channelMaximum(channels[c]))]));
   }
   function editedPalette(palette2, changes) {
     if (!palette2) return palette2;
@@ -3350,6 +3350,25 @@
     render: () => render5
   });
 
+  // romancer/ui/brush_colors.js
+  var bits = { "mono-row-msb-v1": 1, "tile8-paired2-msb-v1": 2, "tile8-planar2-msb-v1": 2, "tile8-rowplanar4-msb-v1": 4, "tile8-paired4-msb-v1": 4, "tile8-packed4-high-v1": 4, "tile8-packed4-low-v1": 4 };
+  var valid = (rgb) => Array.isArray(rgb) && rgb.length === 3 && rgb.every((v) => Number.isInteger(v) && v >= 0 && v <= 255);
+  function brushColors(bitmap, palette2, layout) {
+    const count = bits[bitmap == null ? void 0 : bitmap.codec] ? Math.min(2 ** bits[bitmap.codec], (palette2 == null ? void 0 : palette2.colors_per_bank) || 256) : 0;
+    return Array.from({ length: count }, (_, index) => {
+      const entry = palette2 == null ? void 0 : palette2.entries.find((e) => e.bank === 0 && e.index === index), declared2 = entry && [entry.rgb.r, entry.rgb.g, entry.rgb.b];
+      if (valid(declared2)) return { index, rgb: declared2, colors: [declared2], origin: "declared" };
+      const observed = [...new Map(((layout == null ? void 0 : layout.colors) || []).map((part) => part == null ? void 0 : part[index]).filter(valid).map((rgb2) => [rgb2.join(","), rgb2])).values()];
+      if (observed.length) return { index, rgb: observed[0], colors: observed, origin: "observed" };
+      const shade = Math.round(18 + index / Math.max(1, count - 1) * 216), rgb = [shade, shade, shade];
+      return { index, rgb, colors: [rgb], origin: "grayscale" };
+    });
+  }
+  function brushSwatches(colors, selected2) {
+    const kinds = new Set(colors.map((c) => c.origin)), label = kinds.size === 1 && kinds.has("declared") ? "Declared palette colors" : kinds.size === 1 && kinds.has("grayscale") ? "Grayscale preview · actual game palette unknown" : kinds.has("grayscale") ? "Declared/observed colors where available · grayscale for unknown entries" : "Observed/declared preview colors";
+    return `<div class="brush-swatches" role="group" aria-label="Sprite brush colors">${colors.map((color) => `<button type="button" data-action="sprite-brush" data-id="${color.index}" data-brush-index="${color.index}" aria-pressed="${color.index === Number(selected2)}" aria-label="Color index ${color.index} · ${color.origin}${color.colors.length > 1 ? " · varies across sprite parts" : ""}"><svg viewBox="0 0 32 24" width="32" height="24" aria-hidden="true">${color.colors.slice(0, 8).map((rgb, i, rows) => `<rect x="${i * 32 / rows.length}" width="${32 / rows.length}" height="24" fill="rgb(${rgb.join(",")})"/>`).join("")}</svg><span>${color.index}</span></button>`).join("")}</div><p class="subtle brush-color-source">${esc(label)}</p>`;
+  }
+
   // romancer/ui/pixel_history.js
   var PixelHistory = class {
     constructor(scope, pixels, limit = 64) {
@@ -3958,1906 +3977,6 @@ ${font ? `<section class="card"><h3>Font metrics · ${esc(font.id)}</h3><div cla
     mountTilemap(ctx2, doc, map, changes);
   }
 
-  // romancer/ui/object_workbench.js
-  async function openObject(ctx2, id) {
-    const scope = selectionKey(ctx2.state), result = await ctx2.run("objects.open", { ...ctx2.sourceParams(), object_id: id }, { render: false });
-    if (scope !== selectionKey(ctx2.state)) return;
-    ctx2.state.connectedAssetSetup = { scope, result };
-    ctx2.state.researchOpen = { scope, kind: "assets" };
-    return ctx2.navigate("assets");
-  }
-  async function objectWorkbench(ctx2, doc, bitmap) {
-    var _a, _b, _c, _d, _e, _f, _g, _h;
-    const { state: state2 } = ctx2, scope = selectionKey(state2), current2 = () => {
-      var _a2;
-      return scope === selectionKey(state2) && ((_a2 = ctx2.isCurrentRender) == null ? void 0 : _a2.call(ctx2)) !== false;
-    };
-    const hasSaved = ((_c = (_b = (_a = state2.artifact) == null ? void 0 : _a.object_layouts) == null ? void 0 : _b.objects) == null ? void 0 : _c.length) || ((_d = state2.objectWorkbench) == null ? void 0 : _d.scope) === scope;
-    const listing = hasSaved ? await ctx2.api.call("objects.list", ctx2.sourceParams()) : { objects: [] };
-    if (!current2()) return "";
-    let entry = ((_e = state2.objectWorkbench) == null ? void 0 : _e.scope) === scope && state2.objectWorkbench.document_id === (doc == null ? void 0 : doc.document_id) ? state2.objectWorkbench : null;
-    if (entry && !entry.result) {
-      entry.result = await ctx2.api.call("objects.get", { ...ctx2.sourceParams(), object_id: entry.object_id });
-      if (!current2()) return "";
-      const trace = entry.result.object.trace_id;
-      if (trace) {
-        try {
-          entry.trace = await ctx2.api.call("traces.get", { ...ctx2.sourceParams(), trace_id: trace });
-        } catch (error) {
-          entry.sceneIssue = "Saved scene is unavailable. The exact-revision layout remains available.";
-        }
-      }
-    }
-    if (!current2()) return "";
-    const obj = (_f = entry == null ? void 0 : entry.result) == null ? void 0 : _f.object, layout = obj == null ? void 0 : obj.definition.layout;
-    if (obj && ((_g = entry.trace) == null ? void 0 : _g.scene) && entry.result.source_dependency_verified && bitmap) {
-      try {
-        const edits = [...new Set(layout.indices.filter((i) => i !== null))].map((index) => ({ cell_index: index, pixels: pixelBuffer(ctx2, doc, bitmap, index) })).filter((edit) => JSON.stringify(edit.pixels) !== JSON.stringify(bitmap.cells[edit.cell_index].pixels));
-        entry.preview = await ctx2.api.call("objects.scene", { ...ctx2.sourceParams(), object_id: entry.object_id, edits });
-        if (!current2()) return "";
-        if (entry.preview.ok === false) throw Error(entry.preview.error);
-        entry.previewError = null;
-      } catch (error) {
-        entry.preview = null;
-        entry.previewError = error.message;
-      }
-    }
-    ctx2.use({
-      "object-open": (node) => {
-        var _a2, _b2;
-        if (!current2()) throw Error("The selected ROM changed. Open this object from the current selection.");
-        const id = ((_a2 = node == null ? void 0 : node.dataset) == null ? void 0 : _a2.id) || ((_b2 = document.getElementById("object-choice")) == null ? void 0 : _b2.value);
-        if (!listing.objects.some((o) => o.object_id === id)) throw Error("Refresh saved objects first.");
-        return openObject(ctx2, id);
-      },
-      "object-delete": async (node) => {
-        var _a2;
-        if (!current2()) throw Error("The selected ROM changed.");
-        const id = node.dataset.id, chosen = listing.objects.find((o) => o.object_id === id);
-        if (!chosen) throw Error("Refresh saved objects first.");
-        if (!confirm("Remove the saved layout “" + chosen.name + "”? ROM bytes and builds stay unchanged.")) return;
-        await ctx2.run("objects.delete", { ...ctx2.sourceParams(), object_id: id }, { render: false });
-        if (!current2()) return;
-        if (((_a2 = state2.objectWorkbench) == null ? void 0 : _a2.object_id) === id) state2.objectWorkbench = null;
-        return ctx2.render();
-      },
-      "object-source": (node) => {
-        if (!current2() || !entry || !bitmap) throw Error("The selected source changed.");
-        const index = Number(node.dataset.id);
-        if (!layout.indices.includes(index)) throw Error("Choose a source used by this object.");
-        activateCell(ctx2, doc, bitmap.id, index);
-        entry.selected = index;
-        return ctx2.render();
-      }
-    });
-    const scene = (entry == null ? void 0 : entry.preview) ? '<details class="scene-composite"><summary>Full-scene preview · ' + entry.preview.changed_pixels + ' pixels changed · simulated</summary><div class="scene-pair"><figure><figcaption>Captured frame</figcaption><img src="data:image/png;base64,' + esc(entry.preview.original_png_base64) + '" alt="Full captured scene"></figure><figure><figcaption>Staged composite · test the build for real gameplay</figcaption><canvas id="object-scene-full" data-preview="' + esc(entry.preview.preview_png_base64) + '" aria-label="Simulated full-scene preview"></canvas></figure></div><p class="subtle">Saved placements only; other uses may change. Captured colors do not establish palette ownership. Background behind transparency, priority and animation need playtesting.</p></details>' : obj ? '<p class="subtle">' + esc((entry == null ? void 0 : entry.previewError) || "Capture a new full-scene trace to preview this object in context.") + "</p>" : "";
-    const saved = listing.objects.length ? select("object-choice", "Saved object", listing.objects.map((o) => [o.object_id, o.name + " · " + o.columns + " × " + o.rows + " tiles"]), (entry == null ? void 0 : entry.object_id) || listing.objects[0].object_id) + button("Open object", "object-open") : "<p>Save verified parts as an object from a captured trace in Playtest.</p>";
-    if (!obj) return '<section class="card object-workbench"><h3>Saved objects</h3>' + saved + "</section>";
-    const uses = /* @__PURE__ */ new Map();
-    layout.indices.forEach((index, place) => {
-      if (index !== null) {
-        if (!uses.has(index)) uses.set(index, []);
-        uses.get(index).push(place);
-      }
-    });
-    return '<section class="card object-workbench"><div class="card-heading"><h3>' + esc(obj.name) + "</h3>" + button("Remove layout", "object-delete", { id: entry.object_id }) + "</div><details><summary>Saved objects</summary>" + saved + '</details><div class="object-scene-source"><figure><figcaption>Captured scene · select a source tile to highlight its uses</figcaption>' + (((_h = entry.trace) == null ? void 0 : _h.crop_png_base64) ? '<canvas id="object-scene" aria-label="Captured scene with selected tile uses" data-scene="' + esc(entry.trace.crop_png_base64) + '"></canvas>' : "<p>" + esc(entry.sceneIssue || "This imported layout has no local captured scene.") + "</p>") + '</figure><div><h4>Source tiles & uses</h4><div class="actions">' + [...uses].map(([index, places]) => button("Tile " + index + " · " + places.length + " use" + (places.length === 1 ? "" : "s"), "object-source", { id: String(index), primary: entry.selected === index })).join("") + "</div>" + [...uses].filter(([, p]) => p.length > 1).map(([i, p]) => '<p class="subtle">Shared tile ' + i + " updates " + p.length + " placements together.</p>").join("") + '<p class="subtle">' + (entry.result.source_dependency_verified ? "Source origins verified for the captured placements." : "Saved declaration; imported or historical proof is not fresh execution evidence.") + " " + (obj.definition.complete_parts ? "" : "Some source pixels remain unresolved. ") + "An object name is your label.</p></div></div>" + scene + "</section>";
-  }
-  function mountObjectWorkbench(ctx2) {
-    var _a;
-    const full = document.getElementById("object-scene-full"), model = (_a = ctx2.state.objectWorkbench) == null ? void 0 : _a.preview;
-    if (full && model) {
-      const scope2 = selectionKey(ctx2.state), img = new Image();
-      img.onload = () => {
-        if (!full.isConnected || scope2 !== selectionKey(ctx2.state)) return;
-        full.width = img.naturalWidth;
-        full.height = img.naturalHeight;
-        const draw2 = full.getContext("2d");
-        draw2.drawImage(img, 0, 0);
-        const r = model.scene_region;
-        draw2.strokeStyle = "#ffd36a";
-        draw2.lineWidth = 1;
-        draw2.strokeRect(r.x - 0.5, r.y - 0.5, r.width + 1, r.height + 1);
-      };
-      img.src = "data:image/png;base64," + full.dataset.preview;
-    }
-    const canvas = document.getElementById("object-scene"), entry = ctx2.state.objectWorkbench;
-    if (!canvas || !(entry == null ? void 0 : entry.trace)) return;
-    const scope = selectionKey(ctx2.state), image = new Image();
-    image.onload = () => {
-      if (!canvas.isConnected || scope !== selectionKey(ctx2.state) || ctx2.state.objectWorkbench !== entry) return;
-      canvas.width = image.naturalWidth;
-      canvas.height = image.naturalHeight;
-      const context = canvas.getContext("2d");
-      context.drawImage(image, 0, 0);
-      const region = entry.result.object.definition.scene_region, crop = entry.trace.region, layout = entry.result.object.definition.layout;
-      context.strokeStyle = "#ffd36a";
-      context.lineWidth = 1;
-      layout.indices.forEach((index, part) => {
-        if (index !== null && (entry.selected === void 0 || index === entry.selected)) context.strokeRect(region.x - crop.x + part % layout.columns * 8 + 0.5, region.y - crop.y + Math.floor(part / layout.columns) * 8 + 0.5, 7, 7);
-      });
-    };
-    image.src = "data:image/png;base64," + canvas.dataset.scene;
-  }
-
-  // romancer/ui/views/gameview.js
-  var categories2 = ["all", "known", "known_resource", "assets", "script", "tables", "record", "levels", "room", "actor", "sound", "note", "trace", "candidate", "verification", "verified_source", "object", "graphics_capture"];
-  var names3 = { object: "Saved objects", graphics_capture: "Native graphics captures", verification: "Source checks", verified_source: "Verified sources", known: "Known locations", known_resource: "Known editing layouts", assets: "Graphics", script: "Text", tables: "Tables", record: "Named records", levels: "Levels", room: "Rooms", actor: "Objects & actors", sound: "Sound", note: "Research", trace: "Gameplay traces", candidate: "Pixel matches", all: "Everything" };
-  var relation = (r) => ({ uses_verified_part: "Uses verified part", replayed_graphics_accesses: "Native replay accesses", source_verification: "Source verification", verified_visual_source: "Verified visual source", contains_record: "Contains record", uses_tiles: "Uses tiles", uses_palette: "Uses palette", shares_storage: "Shares byte storage", pixel_match: "Pixel match", located_in: "Located in", contains_object: "Contains object", uses_terrain: "Uses terrain", uses_graphics: "Uses graphics", uses_script: "Uses script", uses_sound: "Uses sound", uses_table: "Uses table" })[r] || r.replaceAll("_", " ");
-  async function render5(ctx2) {
-    var _a, _b, _c, _d;
-    const missing2 = requireProject(ctx2);
-    if (missing2) return missing2;
-    const { state: state2 } = ctx2, a = state2.artifact;
-    if (!a) return empty("Choose a ROM", "Import a ROM or open a workshop to connect its resources.");
-    const scope = selectionKey(state2), params = { ...ctx2.sourceParams() }, current2 = () => {
-      var _a2;
-      return scope === selectionKey(state2) && ((_a2 = ctx2.isCurrentRender) == null ? void 0 : _a2.call(ctx2)) !== false;
-    };
-    const traceFocus = ((_a = state2.connectedTraceFocus) == null ? void 0 : _a.scope) === scope ? state2.connectedTraceFocus : null;
-    if (traceFocus) {
-      ctx2.setDraft("gameview-kind", "trace");
-      ctx2.setDraft("gameview-query", "");
-      state2.connectedPage = 0;
-      state2.connectedTraceFocus = null;
-      state2.connectedNode = null;
-    }
-    const model = await ctx2.api.call("gameview.graph", { ...params, query: ctx2.draft("gameview-query", ""), kind: ctx2.draft("gameview-kind", "all"), page: state2.connectedPage || 0 });
-    if (!current2() || model.source_sha256 !== a.sha256 || model.artifact_id !== a.artifact_id) return "";
-    const chosen = ((traceFocus == null ? void 0 : traceFocus.trace_id) ? (_b = model.nodes.find((n) => {
-      var _a2;
-      return ((_a2 = n.locator) == null ? void 0 : _a2.trace_id) === traceFocus.trace_id;
-    })) == null ? void 0 : _b.id : null) || (((_c = state2.connectedNode) == null ? void 0 : _c.scope) === scope ? state2.connectedNode.id : (_d = model.nodes[0]) == null ? void 0 : _d.id);
-    let detail = null, error = "";
-    if (chosen) {
-      try {
-        detail = await ctx2.api.call("gameview.detail", { ...params, node_id: chosen });
-      } catch (e) {
-        error = e.message;
-      }
-    }
-    if (!current2()) return "";
-    if (detail && (detail.source_sha256 !== a.sha256 || detail.artifact_id !== a.artifact_id)) return "";
-    const node = detail == null ? void 0 : detail.node, preview = detail == null ? void 0 : detail.preview;
-    if (node) state2.connectedNode = { scope, id: node.id };
-    ctx2.use({
-      "gameview-find": () => {
-        if (!current2()) return;
-        state2.connectedPage = 0;
-        state2.connectedNode = null;
-        return ctx2.render();
-      },
-      "gameview-page": (el) => {
-        if (!current2()) return;
-        state2.connectedPage = Math.max(0, (state2.connectedPage || 0) + Number(el.dataset.id));
-        return ctx2.render();
-      },
-      "gameview-select": (el) => {
-        if (!current2()) return;
-        if (!model.nodes.concat((detail == null ? void 0 : detail.neighbors) || []).some((n) => n.id === el.dataset.id)) throw Error("Refresh the current resources.");
-        state2.connectedNode = { scope, id: el.dataset.id };
-        return ctx2.render();
-      },
-      "gameview-bytes": () => {
-        if (!current2() || (node == null ? void 0 : node.offset) === null) return;
-        state2.resourceJump = node.offset;
-        return ctx2.navigate("resources");
-      },
-      "gameview-link": async () => {
-        if (!current2() || !node) return;
-        await ctx2.run("gameview.link", { ...params, from_id: node.id, to_id: read("gameview-link-target"), relation: read("gameview-link-relation"), note: read("gameview-link-note") }, { render: false });
-        if (current2()) return ctx2.render();
-      },
-      "gameview-unlink": async (el) => {
-        if (!current2() || !detail.connections.some((e) => e.link_id === el.dataset.id)) throw Error("Refresh this connection first.");
-        await ctx2.run("gameview.unlink", { ...params, link_id: el.dataset.id }, { render: false });
-        if (current2()) return ctx2.render();
-      },
-      "gameview-editor": async () => {
-        var _a2;
-        if (!current2() || !(node == null ? void 0 : node.editor)) return;
-        if (node.kind === "object") return openObject(ctx2, node.locator.object_id);
-        if (node.kind === "graphics_capture") {
-          const result = await ctx2.api.call("graphics.accesses.get", { ...params, evidence_id: node.locator.evidence_id, offset: 0, limit: 100 });
-          if (!current2()) return;
-          state2.graphicsAccess = { scope, result, tiles: null };
-          const trace_id = (_a2 = result.investigation_link) == null ? void 0 : _a2.graphics_trace_id;
-          if (trace_id) {
-            const trace = await ctx2.api.call("traces.get", { ...params, trace_id });
-            if (!current2()) return;
-            state2.savedGameplayTrace = { scope, result: trace };
-          }
-          return ctx2.navigate("playtest");
-        }
-        if (node.kind === "verified_source") return openVerifiedSource(ctx2, node, scope);
-        if (node.kind === "verification") {
-          const proof = await ctx2.api.call("traces.verification", { ...params, verification_id: node.locator.verification_id });
-          const trace = await ctx2.api.call("traces.get", { ...params, trace_id: node.locator.trace_id });
-          if (!current2()) return;
-          state2.savedGameplayTrace = { scope, result: trace };
-          state2.visualSourceProof = { scope, trace_id: trace.trace_id, result: proof };
-          return ctx2.navigate("playtest");
-        }
-        if (node.kind === "candidate") return openTraceCandidate(ctx2, node, scope);
-        if (node.kind === "known_resource") {
-          const r = await ctx2.run("games.configure", { ...params, resource_id: node.locator.resource_id }, { render: false });
-          if (!current2()) return;
-          const kind2 = r.resource_kind === "assets" ? "assets" : "tables";
-          state2.researchOpen = { scope, kind: kind2 };
-          if (kind2 === "assets") state2.connectedAssetSetup = { scope, result: { ...r, layout: r.sprite_layout } };
-          return ctx2.navigate(kind2);
-        }
-        if (node.kind === "trace") {
-          const r = await ctx2.api.call("traces.get", { ...params, trace_id: node.locator.trace_id });
-          if (!current2()) return;
-          state2.savedGameplayTrace = { scope, result: r };
-          return ctx2.navigate("playtest");
-        }
-        const kind = { assets: "assets", scripts: "script", tables: "tables", levels: "levels", sound: "sound" }[node.editor];
-        if (kind) state2.researchOpen = { scope, kind };
-        if (node.kind === "record") state2.connectedTableJump = { scope, row: node.locator.row };
-        if (node.kind === "room" || node.kind === "actor") state2.connectedLevelJump = { scope, room: node.locator.room_id };
-        return ctx2.navigate(node.editor);
-      }
-    });
-    const checks = await buildChecks(ctx2);
-    if (!current2()) return "";
-    return heading("", "Game view", "Follow a resource to its connected data, measured gameplay and editing tools.") + '<div class="field-row">' + field("gameview-query", "Find a resource", ctx2.draft("gameview-query", "")) + select("gameview-kind", "Show", categories2.map((k) => [k, names3[k]]), ctx2.draft("gameview-kind", "all")) + button("Find resources", "gameview-find") + "</div>" + model.issues.map((r) => '<p class="notice warm">' + esc(r.kind) + ": " + esc(r.message) + "</p>").join("") + (model.partial ? '<p class="notice warm">This view reached a resource budget. Filter or open a focused editor for additional data.</p>' : "") + '<div class="grid-two"><section class="card"><div class="card-heading"><h3>Resources</h3><span>' + model.total + ' matches</span></div><div class="game-node-list" tabindex="0" role="region" aria-label="Connected resource list">' + (model.nodes.map((n) => "<p>" + button(n.name, "gameview-select", { id: n.id, primary: n.id === chosen }) + '<br><span class="subtle">' + esc(names3[n.kind]) + " · " + (n.offset === null ? "Captured frame" : "0x" + n.offset.toString(16) + " · " + n.length + " bytes") + "</span></p>").join("") || "<p>No saved resources yet. Use Resources to declare a layout, or select a captured gameplay region in Playtest and save a trace.</p>") + '</div><div class="actions">' + button("Previous", "gameview-page", { id: "-1", disabled: !model.page }) + "<span>Page " + (model.page + 1) + "</span>" + button("Next", "gameview-page", { id: "1", disabled: (model.page + 1) * 50 >= model.total }) + '</div></section><section class="card"><h3>' + esc((node == null ? void 0 : node.name) || "Choose a resource") + "</h3>" + (error ? "<p>" + esc(error) + "</p>" : "") + (node ? "<p>" + esc({ native_accesses: "Measured native access capture", causal_replay: "Source verified by controlled replay", verification_result: "Source check result", checked_revision: "Verified game revision", checked_source_history: "Known original in build history", checked_declaration: "Checked resource layout", native_frame: "Measured gameplay frame", historical_frame: "Historical imported frame", pixel_candidate: "Matching pixels · source needs confirmation", user_note: "Your research note" }[node.confidence] || node.confidence.replaceAll("_", " ")) + "</p>" + ((preview == null ? void 0 : preview.png_base64) ? '<figure><img class="game-resource-preview" src="data:image/png;base64,' + esc(preview.png_base64) + '" alt="Selected resource preview"><figcaption>' + esc(preview.caption || "") + "</figcaption></figure>" : "") + ((preview == null ? void 0 : preview.colors) ? '<div class="actions">' + preview.colors.map((c) => '<span class="game-color" title="RGB ' + c.r + ", " + c.g + ", " + c.b + '" data-color="' + c.r + "," + c.g + "," + c.b + '"></span>').join("") + "</div>" : "") + ((preview == null ? void 0 : preview.fields) ? "<dl>" + preview.fields.map((f) => "<dt>" + esc(f.name) + "</dt><dd>" + esc(f.value) + "</dd>").join("") + "</dl>" : "") + ((preview == null ? void 0 : preview.text) ? "<p>" + esc(preview.text) + "</p>" : "") + '<div class="actions">' + (node.offset !== null ? button("Inspect exact bytes", "gameview-bytes") : "") + (node.editor ? button(node.kind === "candidate" ? "Open chosen graphics candidate" : node.kind === "trace" ? "Open saved trace" : "Open editor", "gameview-editor", { primary: true, disabled: (preview == null ? void 0 : preview.runtime_trusted) === false }) : "") + "</div><h4>Connections</h4>" + (detail.connections_truncated ? '<p class="subtle">Showing 32 of ' + detail.connections_total + " connections. Open the focused editor for the complete resource list.</p>" : "") + (detail.connections.map((e) => {
-      const other = e.from === node.id ? e.to : e.from, n = detail.neighbors.find((n2) => n2.id === other);
-      return n ? '<div class="notice"><span>' + esc(relation(e.relation)) + "</span> → " + button(n.name, "gameview-select", { id: n.id }) + (e.confidence === "user_declared" ? "<p>Your declared link · " + esc(e.note) + "</p>" + button("Remove link", "gameview-unlink", { id: e.link_id }) : "") + "</div>" : "";
-    }).join("") || "<p>No checked or declared connection has been recorded for this resource yet.</p>") + "<details><summary>Add a declared relationship</summary>" + select("gameview-link-target", "Connected resource", model.nodes.filter((n) => n.id !== node.id).map((n) => [n.id, n.name]), "") + select("gameview-link-relation", "Relationship", ["uses_graphics", "uses_palette", "uses_script", "uses_sound", "uses_table", "reference"].map((v) => [v, v.replaceAll("_", " ")]), "reference") + field("gameview-link-note", "Evidence or note", ctx2.draft("gameview-link-note", "")) + button("Save declared link", "gameview-link", { disabled: model.nodes.filter((n) => n.id !== node.id).length === 0 }) + '<p>Author-declared metadata. This does not change ROM bytes or prove a runtime reference.</p></details><details><summary>Byte preview</summary><code class="game-byte-preview">' + esc(detail.hex_preview) + "</code></details>" : "") + '</section></div><details class="card"><summary>How to read the connections</summary><p>Checked declarations describe storage. A shared byte range is not proof of game behavior. Native frame traces preserve measured pixels; a pixel match is a candidate until the source transfer is observed. Repeated patterns can have several matching offsets.</p></details>' + checks;
-  }
-  async function openTraceCandidate(ctx2, node, scope) {
-    const result = await ctx2.run("traces.open", { ...ctx2.sourceParams(), trace_id: node.locator.trace_id, matches: [node.locator.match] }, { render: false });
-    if (scope !== selectionKey(ctx2.state)) return;
-    ctx2.state.connectedAssetSetup = { scope, result };
-    ctx2.state.researchOpen = { scope, kind: "assets" };
-    await ctx2.navigate("assets");
-  }
-  function mount3(ctx2) {
-    mountBuildChecks(ctx2);
-    for (const node of document.querySelectorAll(".game-color")) node.style.backgroundColor = "rgb(" + node.dataset.color + ")";
-  }
-  async function openVerifiedSource(ctx2, node, scope) {
-    const result = await ctx2.run("traces.open_verified", { ...ctx2.sourceParams(), verification_id: node.locator.verification_id, matches: [node.locator.match_id] }, { render: false });
-    if (scope !== selectionKey(ctx2.state)) return;
-    ctx2.state.connectedAssetSetup = { scope, result };
-    ctx2.state.researchOpen = { scope, kind: "assets" };
-    return ctx2.navigate("assets");
-  }
-
-  // romancer/ui/views/resources.js
-  var resources_exports = {};
-  __export(resources_exports, {
-    mount: () => mount4,
-    render: () => render6
-  });
-
-  // romancer/ui/source_symbols.js
-  async function sourceSymbols(ctx2) {
-    var _a, _b;
-    const { state: state2 } = ctx2, a = state2.artifact;
-    if (!["gb", "gbc", "gba"].includes(a == null ? void 0 : a.system_id)) return "";
-    const scope = selectionKey(state2), params = { ...ctx2.sourceParams() }, current2 = () => {
-      var _a2;
-      return scope === selectionKey(state2) && ((_a2 = ctx2.isCurrentRender) == null ? void 0 : _a2.call(ctx2)) !== false;
-    };
-    const model = await ctx2.api.call("symbols.search", { ...params, query: ctx2.draft("symbol-query", ""), page: state2.symbolPage || 0 });
-    if (!current2()) return "";
-    if (model.source_sha256 !== a.sha256 || model.artifact_id !== a.artifact_id) return "";
-    const packet = ((_a = state2.symbolReview) == null ? void 0 : _a.scope) === scope ? state2.symbolReview : null;
-    ctx2.use({
-      "symbol-preview": async () => {
-        var _a2;
-        if (!current2()) return;
-        const file = (_a2 = document.getElementById("symbol-file")) == null ? void 0 : _a2.files[0];
-        if (!file) throw Error("Choose a symbol file.");
-        const format = read("symbol-format");
-        state2.symbolReview = null;
-        const item = await ctx2.api.uploadInput(state2.project.project_id, file, "symbols");
-        if (!current2()) return;
-        const review2 = await ctx2.run("symbols.preview", { ...params, input_id: item.input_id, format }, { render: false });
-        if (!current2()) return;
-        state2.symbolReview = { scope, input_id: item.input_id, format, review: review2 };
-        return ctx2.render();
-      },
-      "symbol-import": async () => {
-        var _a2, _b2;
-        if (!current2() || !((_a2 = packet == null ? void 0 : packet.review) == null ? void 0 : _a2.review_id)) throw Error("Review this source’s symbols first.");
-        const acknowledged = !!((_b2 = document.getElementById("symbol-ack")) == null ? void 0 : _b2.checked);
-        await ctx2.run("symbols.import", { ...params, input_id: packet.input_id, format: packet.format, review_id: packet.review.review_id, acknowledged }, { render: false });
-        if (!current2()) return;
-        state2.symbolReview = null;
-        state2.symbolPage = 0;
-        return ctx2.render();
-      },
-      "symbol-search": () => {
-        state2.symbolPage = 0;
-        return ctx2.render();
-      },
-      "symbol-page": (node) => {
-        state2.symbolPage = Math.max(0, (state2.symbolPage || 0) + Number(node.dataset.id));
-        return ctx2.render();
-      },
-      "symbol-bytes": (node) => {
-        if (!current2()) return;
-        const offset = Number(node.dataset.id);
-        if (!model.symbols.some((r) => r.file_offset === offset)) throw Error("Reload the symbol list.");
-        state2.resourceJump = offset;
-        return ctx2.navigate("resources");
-      }
-    });
-    const rows = ((_b = packet == null ? void 0 : packet.review) == null ? void 0 : _b.symbols) || model.symbols;
-    return '<details class="card" id="source-symbols"><summary>Named addresses from a symbol file</summary><p>Import names from your matching game build. ROM labels open their bytes; RAM labels show their CPU address.</p>' + fileInput("symbol-file", "Symbol listing", ".sym,.txt,.nm") + select("symbol-format", "Format", a.system_id === "gba" ? [["gnu-nm", "GNU nm (address type name)"]] : [["rgbds", "RGBDS .sym"]], a.system_id === "gba" ? "gnu-nm" : "rgbds") + button("Review symbol file", "symbol-preview") + (packet ? '<p class="notice">' + esc(packet.review.note) + " " + packet.review.total + " entries; " + packet.review.ignored_lines + ' ignored lines.</p><label><input id="symbol-ack" type="checkbox"> This symbol file belongs to this exact ROM build.</label>' + button("Import reviewed names", "symbol-import") : "") + field("symbol-query", "Find a symbol", ctx2.draft("symbol-query", "")) + button("Find name", "symbol-search") + rows.map((r) => '<div class="notice"><strong>' + esc(r.name) + "</strong> · " + (r.bank === null ? "" : r.bank.toString(16) + ":") + "0x" + r.address.toString(16) + "<p>" + esc(r.reason) + "</p>" + (!packet && r.file_offset !== null ? button("Inspect bytes at 0x" + r.file_offset.toString(16), "symbol-bytes", { id: String(r.file_offset) }) : "") + "</div>").join("") + (!packet && model.configured ? '<div class="button-row">' + button("Previous", "symbol-page", { id: "-1", disabled: !model.page }) + "<span>" + model.total + " matches · page " + (model.page + 1) + "</span>" + button("Next", "symbol-page", { id: "1", disabled: (model.page + 1) * 50 >= model.total }) + "</div>" : "") + "</details>";
-  }
-
-  // romancer/ui/execution_trace.js
-  var hex2 = (v) => Number.isSafeInteger(v) ? "0x" + v.toString(16) : "Unknown";
-  var identity = (state2, r) => {
-    var _a, _b;
-    return (r == null ? void 0 : r.source_sha256) === ((_a = state2.artifact) == null ? void 0 : _a.sha256) && r.artifact_id === ((_b = state2.artifact) == null ? void 0 : _b.artifact_id);
-  };
-  function integer5(id, min, max) {
-    const text = read(id), v = Number(text);
-    if (!text.trim() || !Number.isSafeInteger(v) || v < min || v > max) throw Error("Enter a whole number from " + min + " to " + max + ".");
-    return v;
-  }
-  async function executionTrace(ctx2) {
-    var _a, _b, _c, _d, _e, _f, _g;
-    const { state: state2 } = ctx2, scope = selectionKey(state2), params = { ...ctx2.sourceParams() };
-    let entry = state2.nativeTrace;
-    if ((entry == null ? void 0 : entry.scope) !== scope) state2.nativeTrace = entry = { scope, generation: 0, result: null, steps: [{}] };
-    const current2 = () => selectionKey(state2) === scope && state2.nativeTrace === entry;
-    const proposal = ((_a = state2.nativeProbe) == null ? void 0 : _a.scope) === scope && identity(state2, state2.nativeProbe.result) ? state2.nativeProbe.result : null;
-    if (!entry.checked) {
-      entry.checked = true;
-      try {
-        const r = await ctx2.api.call("debugger.capabilities", params);
-        if (current2()) {
-          if ((r == null ? void 0 : r.ok) === false || !identity(state2, r)) throw Error(r.error || "Backend identity differs.");
-          entry.capabilities = r;
-        }
-      } catch (error) {
-        if (current2()) entry.error = error.message;
-      }
-    }
-    const remembered = ctx2.draft("native-trace-id", "");
-    if (!entry.loaded && remembered) {
-      entry.loaded = true;
-      const generation = ++entry.generation;
-      try {
-        const r = await ctx2.api.call("debugger.get", { ...params, evidence_id: remembered, offset: 0, limit: 100 });
-        if (current2() && entry.generation === generation) {
-          if ((r == null ? void 0 : r.ok) === false || !identity(state2, r)) throw Error(r.error || "Capture belongs to another source.");
-          entry.result = r;
-        }
-      } catch (error) {
-        if (current2() && entry.generation === generation) entry.error = error.message;
-      }
-    }
-    const result = identity(state2, entry.result) ? entry.result : null, available = ((_b = entry.capabilities) == null ? void 0 : _b.available) === true;
-    const reason = ((_c = entry.capabilities) == null ? void 0 : _c.reason) || entry.error || "The native debugger is unavailable for this source or host.";
-    const steps2 = () => entry.steps.map((_, i) => ({ frames: integer5("trace-frames-" + i, 1, 3600), buttons: read("trace-buttons-" + i).split(/[\s,]+/).filter(Boolean), port: 0 }));
-    const accept = async (operation, parameters) => {
-      if (!current2()) throw Error("The selected source changed. Open its native capture again.");
-      const generation = ++entry.generation;
-      entry.error = null;
-      const r = await ctx2.run(operation, { ...params, ...parameters }, { render: false, refresh: false });
-      if (!current2() || entry.generation !== generation) return;
-      if ((r == null ? void 0 : r.ok) === false || !identity(state2, r)) throw Error(r.error || "Native capture belongs to another source.");
-      entry.result = r;
-      entry.loaded = true;
-      ctx2.setDraft("native-trace-id", r.evidence_id);
-      await ctx2.render();
-    };
-    ctx2.use({
-      "trace-capture": () => {
-        if (!current2()) throw Error("The selected source changed.");
-        if (!available) throw Error(reason);
-        const replay = { steps: steps2(), start_frame: integer5("trace-start", 0, 3599), event_limit: integer5("trace-limit", 1, 2e3), instruction_limit: 2e7, timeout: 30 };
-        if (proposal) return accept("debugger.investigate", { investigation_id: proposal.investigation_id, candidate_id: proposal.candidate.candidate_id, replay });
-        const start = integer5("trace-address", 0, 268435455), length = integer5("trace-length", 1, 4096);
-        return accept("debugger.capture", { config: { ...replay, probes: [{ kind: read("trace-kind"), start, end: start + length - 1 }] } });
-      },
-      "trace-add-step": async () => {
-        if (!current2()) throw Error("The source changed.");
-        if (entry.steps.length >= 64) throw Error("Use at most 64 input steps.");
-        entry.steps = steps2();
-        entry.steps.push({});
-        await ctx2.render();
-      },
-      "trace-remove-step": async () => {
-        if (!current2()) throw Error("The source changed.");
-        if (entry.steps.length > 1) {
-          entry.steps = steps2();
-          entry.steps.pop();
-          await ctx2.render();
-        }
-      },
-      "trace-manual": () => {
-        if (!current2()) throw Error("The source changed.");
-        state2.nativeProbe = null;
-        return ctx2.render();
-      },
-      "trace-recheck": () => {
-        if (!current2()) throw Error("The source changed.");
-        entry.checked = false;
-        return ctx2.render();
-      },
-      "trace-prepare": async () => {
-        var _a2, _b2;
-        if (!current2()) throw Error("The selected source changed.");
-        if (!((_b2 = (_a2 = entry.capabilities) == null ? void 0 : _a2.download) == null ? void 0 : _b2.preparable)) throw Error("No pinned preparation is available for this source and host.");
-        const r = await ctx2.run("debugger.prepare", params, { render: false, refresh: false });
-        if (!current2()) return;
-        if ((r == null ? void 0 : r.ok) === false || !identity(state2, r)) throw Error(r.error || "Preparation result belongs to another source.");
-        entry.checked = false;
-        entry.error = null;
-        await ctx2.render();
-      },
-      "trace-page": (node) => {
-        if (!current2() || !result) throw Error("Open a capture first.");
-        return accept("debugger.get", { evidence_id: result.evidence_id, offset: Math.max(0, result.offset + Number(node.dataset.id) * 100), limit: 100 });
-      },
-      "trace-open": (node) => {
-        if (!current2() || !result) throw Error("Open a capture for the selected source first.");
-        const offset = Number(node.dataset.id);
-        if (!Number.isSafeInteger(offset) || offset < 0 || offset >= state2.artifact.size || !result.events.some((e) => {
-          var _a2, _b2;
-          return e.file_offset === offset || ((_a2 = e.execution_context) == null ? void 0 : _a2.file_offset) === offset || ((_b2 = e.execution_context) == null ? void 0 : _b2.source_candidate_offset) === offset;
-        })) throw Error("Choose a captured source location.");
-        const event = result.events.find((e) => {
-          var _a2, _b2;
-          return e.file_offset === offset || ((_a2 = e.execution_context) == null ? void 0 : _a2.file_offset) === offset || ((_b2 = e.execution_context) == null ? void 0 : _b2.source_candidate_offset) === offset;
-        });
-        state2.nativeSourceContext = { scope, evidence_id: result.evidence_id, offset: result.offset, event_id: event.id, source_offset: offset };
-        state2.resourceJump = offset;
-        return ctx2.navigate("resources");
-      }
-    });
-    const open = (offset) => Number.isSafeInteger(offset) ? button(hex2(offset), "trace-open", { id: String(offset) }) : "Unresolved";
-    const watched = proposal ? `<div class="notice"><strong>Investigating RAM ${hex2(proposal.candidate.offset)} · ${proposal.candidate.width} bytes</strong><p>Physical watch derived from the observed core buffer, including banked RAM.</p>${button("Use a manual address instead", "trace-manual")}</div>` : `<details><summary>Manual CPU address watch</summary><div class="field-row">${select("trace-kind", "Access type", [["write", "Writes"], ["read", "Reads"], ...state2.artifact.system_id === "genesis" ? [] : [["exec", "Execution"]]], ctx2.draft("trace-kind", "write"))}${field("trace-address", "CPU start address", ctx2.draft("trace-address", "0x100"))}${field("trace-length", "Address bytes", ctx2.draft("trace-length", "1"))}</div></details>`;
-    const route = `<h3>Replay input</h3><div class="table-wrap"><table><thead><tr><th>Step</th><th>Frames</th><th>Buttons held</th></tr></thead><tbody>${entry.steps.map((step, i) => {
-      var _a2;
-      return `<tr><td>${i + 1}</td><td>${field("trace-frames-" + i, "Frames", ctx2.draft("trace-frames-" + i, String(step.frames ?? 120)))}</td><td>${field("trace-buttons-" + i, "Buttons (blank for none)", ctx2.draft("trace-buttons-" + i, ((_a2 = step.buttons) == null ? void 0 : _a2.join(" ")) || ""), { placeholder: "For example start or a right" })}</td></tr>`;
-    }).join("")}</tbody></table></div><div class="actions">${button("Add input step", "trace-add-step", { disabled: entry.steps.length >= 64 })}${button("Remove last step", "trace-remove-step", { disabled: entry.steps.length <= 1 })}</div><div class="field-row">${field("trace-start", "Start recording after frame", ctx2.draft("trace-start", "0"))}${field("trace-limit", "Maximum sampled events", ctx2.draft("trace-limit", "200"))}</div>`;
-    const evidence2 = !result ? "" : `<h3>Captured evidence · ${esc(result.total_events)} events</h3><p>${esc(((_d = result.backend) == null ? void 0 : _d.backend) || "Native debugger")} ${esc(((_e = result.backend) == null ? void 0 : _e.version) || "")} · ${result.runtime_trusted ? "Authenticated capture" : "Historical capture"}</p>${result.status === "BUDGET_EXCEEDED" || result.omitted_events ? `<p class="notice warm">Partial capture: an event or instruction limit was reached. ${esc(result.omitted_events ?? 0)} events were omitted. Narrow the watch or recording window.</p>` : ""}<p>${result.route_complete ? "Replay reached its requested end." : "Replay did not reach its requested end."}</p>${result.events.length ? `<div class="table-wrap"><table><thead><tr><th>Event</th><th>CPU address</th><th>Value</th><th>Execution context</th><th>Context in source</th><th>Access in source</th></tr></thead><tbody>${result.events.map((e) => {
-      var _a2, _b2, _c2;
-      return `<tr><td>${esc(e.id)} · ${esc(e.kind)}</td><td><code>${hex2(e.address)}</code></td><td><code>${hex2(e.value)}</code></td><td><code>${hex2((_a2 = e.execution_context) == null ? void 0 : _a2.pc)}</code>${e.registers ? `<details><summary>Registers</summary><pre>${esc(Object.entries(e.registers).map(([k, v]) => k + " = " + hex2(v)).join("\n"))}</pre></details>` : ""}</td><td>${Number.isSafeInteger((_b2 = e.execution_context) == null ? void 0 : _b2.source_candidate_offset) ? button("Possible " + hex2(e.execution_context.source_candidate_offset), "trace-open", { id: String(e.execution_context.source_candidate_offset) }) + "<small>Unique byte-pattern candidate; mapper unresolved.</small>" : open((_c2 = e.execution_context) == null ? void 0 : _c2.file_offset)}</td><td>${open(e.file_offset)}</td></tr>`;
-    }).join("")}</tbody></table></div>` : "<p>No matching access was sampled. Check the route, start frame and watch range. An empty capture does not prove that the location is unused.</p>"}<div class="actions">${button("Previous events", "trace-page", { id: "-1", disabled: result.offset === 0 })}<span>${result.total_events ? result.offset + 1 : 0}–${Math.min(result.offset + result.events.length, result.total_events)} of ${result.total_events}</span>${button("Next events", "trace-page", { id: "1", disabled: result.offset + 100 >= Math.max(result.total_events, result.total_instruction_samples || 0) })}</div>`;
-    const instructions = !((_f = result == null ? void 0 : result.instruction_samples) == null ? void 0 : _f.length) ? "" : `<details><summary>Native instruction samples · ${esc(result.total_instruction_samples)}</summary><p>Ordered within this instruction sample only. The memory-access sequence has separate ordering.</p><div class="table-wrap"><table><thead><tr><th>Sample</th><th>CPU PC</th><th>Disassembly</th></tr></thead><tbody>${result.instruction_samples.map((row) => `<tr><td>${esc(row.id)}</td><td><code>${hex2(row.pc)}</code></td><td><code>${esc(row.assembly)}</code></td></tr>`).join("")}</tbody></table></div></details>`;
-    const budget = state2.artifact.system_id === "genesis" ? "At most 3,600 frames and 30 seconds. Global instruction sampling is separate from read/write watches and stops after at most 2,000 records; it does not count every instruction executed during the rest of the replay." : "At most 3,600 frames, 20 million instruction callbacks and 30 seconds.";
-    const download = (_g = entry.capabilities) == null ? void 0 : _g.download, preparation = !available && (download == null ? void 0 : download.preparable) ? `<div class="notice"><p>Prepare the official debugger once · ${(download.download_bytes / 1048576).toFixed(1)} MiB download. Later captures work offline. No ROM data is uploaded.</p><p>External tool license: ${esc(download.license)} · <a href="${esc(download.source_url)}" target="_blank" rel="noopener noreferrer">Upstream source and notices</a></p>${button("Prepare debugger", "trace-prepare", { primary: true })}</div>` : "";
-    return `<section class="card native-execution-trace" id="native-accesses"><div class="card-heading"><h2>Trace actual accesses</h2>${button("Check debugger", "trace-recheck")}</div><p>Replay from power on with normal controller input. Record accesses and their execution context, then inspect mapped source bytes. This is a separate session; it does not resume Playtest.</p>${!available ? `<p class="notice warm">${esc(reason)}</p>` : ""}${entry.error ? `<p class="notice warm">${esc(entry.error)}</p>` : ""}${preparation}${watched}${route}${button(proposal ? "Replay & investigate this value" : "Replay & capture accesses", "trace-capture", { primary: true, disabled: !available, reason })}<p class="subtle">${budget} Context is a lead; DMA ownership and the meaning of a value remain unproven.</p>${evidence2}${instructions}</section>`;
-  }
-  async function observedSourceContext(ctx2) {
-    var _a, _b;
-    const { state: state2 } = ctx2, scope = selectionKey(state2), entry = state2.nativeSourceContext;
-    if (!entry || entry.scope !== scope) return "";
-    const current2 = () => selectionKey(state2) === scope && state2.nativeSourceContext === entry;
-    if (!entry.result) {
-      try {
-        const r2 = await ctx2.api.call("debugger.get", { ...ctx2.sourceParams(), evidence_id: entry.evidence_id, offset: entry.offset, limit: 100 });
-        if (!current2()) return "";
-        if ((r2 == null ? void 0 : r2.ok) === false || !identity(state2, r2)) throw Error(r2.error || "Capture belongs to another source.");
-        entry.result = r2;
-      } catch (error) {
-        if (!current2()) return "";
-        return `<p class="notice warm">Access evidence could not be reopened: ${esc(error.message)}</p>`;
-      }
-    }
-    const r = entry.result, event = r.events.find((e) => e.id === entry.event_id), context = event == null ? void 0 : event.execution_context;
-    if (!event || ![event.file_offset, context == null ? void 0 : context.file_offset, context == null ? void 0 : context.source_candidate_offset].includes(entry.source_offset)) return "";
-    ctx2.use({
-      "source-capture-back": () => {
-        if (!current2()) throw Error("The selected source changed.");
-        return ctx2.navigate("debug");
-      },
-      "source-capture-dismiss": () => {
-        if (!current2()) return;
-        state2.nativeSourceContext = null;
-        return ctx2.render();
-      }
-    });
-    const candidate = (context == null ? void 0 : context.source_candidate_offset) === entry.source_offset && (context == null ? void 0 : context.file_offset) !== entry.source_offset;
-    return `<section class="card observed-source-context"><div class="card-heading"><h3>Why these bytes are open</h3>${button("Dismiss", "source-capture-dismiss")}</div><p>${r.runtime_trusted ? "Authenticated native capture" : "Historical capture"} · ${esc(((_a = r.backend) == null ? void 0 : _a.backend) || "Debugger")} ${esc(((_b = r.backend) == null ? void 0 : _b.version) || "")} · event ${event.id}</p><p>Observed <strong>${esc(event.kind)}</strong> at CPU address <code>${hex2(event.address)}</code>, value <code>${hex2(event.value)}</code>. Execution context: <code>${hex2(context == null ? void 0 : context.pc)}</code>.</p><p>${candidate ? "This source location is a unique byte-pattern candidate. Active mapper state was not established." : "This source location was mapped in the captured native event."} Game meaning and causal ownership remain separate questions.</p>${button("Back to captured evidence", "source-capture-back")}</section>`;
-  }
-
-  // romancer/ui/data_relocation.js
-  function integer6(id) {
-    const text = read(id), value = Number(text);
-    if (!text.trim() || !Number.isSafeInteger(value)) throw Error("Enter a whole number for " + id + ".");
-    return value;
-  }
-  var hex3 = (value) => "0x" + value.toString(16);
-  async function relocationControls(ctx2) {
-    var _a, _b, _c, _d, _e, _f;
-    const { state: state2 } = ctx2, scope = selectionKey(state2), params = { ...ctx2.sourceParams() };
-    let entry = state2.dataRelocation;
-    if ((entry == null ? void 0 : entry.scope) !== scope) state2.dataRelocation = entry = { scope, references: [{}], generation: 0, plan: null, replacement: null };
-    const current2 = () => selectionKey(state2) === scope && state2.dataRelocation === entry;
-    const bankDefault = { nes: 8192, snes: 32768, gb: 16384, gbc: 16384 }[state2.artifact.system_id] || 0;
-    const assessment = state2.artifact.system_assessment;
-    const prg = ((_a = assessment == null ? void 0 : assessment.source) == null ? void 0 : _a.sha256) === state2.artifact.sha256 ? (_b = assessment.candidates) == null ? void 0 : _b.filter((c) => c.layout_valid).flatMap((c) => c.regions || []).find((r) => r.id === "prg-rom") : null;
-    const originDefault = state2.artifact.system_id === "nes" ? (prg == null ? void 0 : prg.offset) ?? 16 : 0;
-    const baseDefault = state2.artifact.system_id === "nes" ? 32768 - originDefault : state2.artifact.system_id === "gba" ? 134217728 : 0;
-    const references = () => entry.references.map((_, i) => ({
-      offset: integer6("reloc-ref-offset-" + i),
-      width: integer6("reloc-ref-width-" + i),
-      endian: read("reloc-ref-endian-" + i),
-      base: integer6("reloc-ref-base-" + i),
-      target_delta: integer6("reloc-ref-delta-" + i)
-    }));
-    const spec = () => {
-      var _a2;
-      return {
-        source_offset: integer6("reloc-source"),
-        source_length: integer6("reloc-length"),
-        target_offset: integer6("reloc-target"),
-        target_capacity: integer6("reloc-capacity"),
-        fill_byte: integer6("reloc-fill"),
-        alignment: integer6("reloc-alignment"),
-        bank_size: integer6("reloc-bank"),
-        bank_origin: integer6("reloc-origin"),
-        references: references(),
-        references_complete: document.getElementById("reloc-references-complete").checked,
-        destination_reserved: document.getElementById("reloc-destination-reserved").checked,
-        replacement_input_id: ((_a2 = entry.replacement) == null ? void 0 : _a2.input_id) || null
-      };
-    };
-    const invalidate = () => {
-      if (entry.plan && state2.pending === entry.plan) state2.pending = null;
-      entry.plan = null;
-    };
-    ctx2.use({
-      "reloc-add-reference": () => {
-        if (!current2()) throw Error("The source changed.");
-        if (entry.references.length >= 128) throw Error("Use at most 128 references.");
-        entry.references = references();
-        entry.references.push({});
-        invalidate();
-        return ctx2.render();
-      },
-      "reloc-remove-reference": () => {
-        if (!current2()) throw Error("The source changed.");
-        if (entry.references.length > 1) {
-          entry.references = references().slice(0, -1);
-          invalidate();
-          return ctx2.render();
-        }
-      },
-      "reloc-upload": async () => {
-        if (!current2()) throw Error("The source changed.");
-        const file = document.getElementById("reloc-file").files[0];
-        if (!file || !file.size || file.size > 48 * 1024) throw Error("Choose edited data up to 48 KiB.");
-        const generation = ++entry.generation;
-        const result = await ctx2.api.uploadInput(params.project_id, file, "resource");
-        if (!current2() || entry.generation !== generation) return;
-        entry.replacement = result;
-        invalidate();
-        await ctx2.render();
-      },
-      "reloc-copy-original": () => {
-        if (!current2()) throw Error("The source changed.");
-        ++entry.generation;
-        entry.replacement = null;
-        invalidate();
-        return ctx2.render();
-      },
-      "reloc-review": async () => {
-        if (!current2()) throw Error("The selected source changed.");
-        const declaration = spec(), signature = JSON.stringify(declaration), generation = ++entry.generation;
-        invalidate();
-        const result = await ctx2.run("relocation.plan", { ...params, spec: declaration }, { render: false, refresh: false });
-        if (!current2() || entry.generation !== generation) return;
-        if ((result == null ? void 0 : result.ok) === false || result.source_sha256 !== state2.artifact.sha256 || result.artifact_id !== state2.artifact.artifact_id) throw Error(result.error || "Relocation plan belongs to another source.");
-        if (JSON.stringify(spec()) !== signature) {
-          ctx2.notify("The declaration changed during review. Review it again.");
-          return;
-        }
-        entry.references = declaration.references;
-        entry.lastSpec = declaration;
-        state2.pending = entry.plan = { kind: "relocation", plan_id: result.plan_id, artifact_id: params.artifact_id, spec: declaration, report: result };
-        await ctx2.render();
-      },
-      "reloc-build": async () => {
-        if (!current2() || !entry.plan || state2.pending !== entry.plan) throw Error("Review this source relocation first.");
-        if (JSON.stringify(spec()) !== JSON.stringify(entry.plan.spec)) {
-          invalidate();
-          throw Error("The declaration changed. Review it again before building.");
-        }
-        const pending2 = entry.plan, result = await ctx2.run("build.apply", { project_id: params.project_id, plan_id: pending2.plan_id }, { render: false });
-        if (!current2()) return;
-        entry.built = { artifact_id: result.artifact_id, sha256: result.sha256, offset: pending2.report.relocation.target_offset };
-        if (entry.plan === pending2) {
-          let latest;
-          try {
-            latest = spec();
-          } catch {
-            latest = null;
-          }
-          const changed2 = !latest || JSON.stringify(latest) !== JSON.stringify(pending2.spec);
-          if (latest) {
-            entry.references = latest.references;
-            entry.lastSpec = latest;
-          } else entry.lastSpec = { ...entry.lastSpec, references_complete: document.getElementById("reloc-references-complete").checked, destination_reserved: document.getElementById("reloc-destination-reserved").checked };
-          invalidate();
-          await ctx2.render();
-          ctx2.notify(changed2 ? "Build created. Your newer declaration remains." : "Separate relocated build created. Playtest it before exporting.");
-        }
-      },
-      "reloc-inspect-build": async () => {
-        var _a2, _b2;
-        if (!current2() || !entry.built) throw Error("Create the reviewed relocated build first.");
-        const built = entry.built;
-        await ctx2.setArtifact(built.artifact_id);
-        if (((_a2 = state2.artifact) == null ? void 0 : _a2.artifact_id) !== built.artifact_id || ((_b2 = state2.artifact) == null ? void 0 : _b2.sha256) !== built.sha256) throw Error("The selection changed. Open the relocated build again.");
-        state2.resourceJump = built.offset;
-        await ctx2.navigate("resources");
-      }
-    });
-    const report2 = (_d = (_c = entry.plan) == null ? void 0 : _c.report) == null ? void 0 : _d.relocation, pending = entry.plan && state2.pending === entry.plan;
-    return `<details class="card data-relocation"><summary>Move declared data · Advanced</summary><p>Move or grow data inside this cartridge and update explicitly declared linear references. The original extent is preserved. This does not move position-dependent code or discover every consumer.</p><div class="field-row">${field("reloc-source", "Original data offset", ctx2.draft("reloc-source", "0"))}${field("reloc-length", "Original allocation bytes", ctx2.draft("reloc-length", "16"))}${field("reloc-target", "Reserved destination offset", ctx2.draft("reloc-target", "0"))}${field("reloc-capacity", "Reserved destination bytes", ctx2.draft("reloc-capacity", "64"))}</div><div class="field-row">${field("reloc-fill", "Expected destination fill byte", ctx2.draft("reloc-fill", "255"))}${select("reloc-alignment", "Declared alignment", [[1, "1 byte"], [2, "2 bytes"], [4, "4 bytes"], [8, "8 bytes"], [16, "16 bytes"], [32, "32 bytes"]], ctx2.draft("reloc-alignment", "1"))}${select("reloc-bank", "Declared bank bytes", [[0, "Linear (GBA / Genesis)"], [8192, "8192"], [16384, "16384"], [32768, "32768"], [65536, "65536"]], ctx2.draft("reloc-bank", String(bankDefault)))}${field("reloc-origin", "Bank file origin", ctx2.draft("reloc-origin", String(originDefault)))}</div><p>Replacement: <strong>${entry.replacement ? esc(entry.replacement.name) + " · " + entry.replacement.size + " bytes" : "Copy the original allocation"}</strong></p><div class="field-row"><label class="field">Edited data file (optional, up to 48 KiB)<input type="file" id="reloc-file"></label><div class="actions">${button("Use edited data file", "reloc-upload")}${button("Copy original data instead", "reloc-copy-original")}</div></div>${entry.built ? button("Inspect moved data in the new build", "reloc-inspect-build") : ""}<h3>External linear references</h3><p>Stored pointer = destination file offset + interior offset + encoding adjustment. Before-bytes must already match the original location. Bank constraints are your declarations; an active mapper is not inferred.</p><div class="table-wrap"><table><thead><tr><th>Pointer file offset</th><th>Bytes</th><th>Order</th><th>Encoding adjustment</th><th>Interior offset</th></tr></thead><tbody>${entry.references.map((ref, i) => `<tr><td>${field("reloc-ref-offset-" + i, "Pointer file offset", ctx2.draft("reloc-ref-offset-" + i, String(ref.offset ?? 0)))}</td><td>${select("reloc-ref-width-" + i, "Pointer bytes", [[2, "2"], [3, "3"], [4, "4"]], ctx2.draft("reloc-ref-width-" + i, String(ref.width ?? (state2.artifact.system_id === "gba" ? 4 : 2))))}</td><td>${select("reloc-ref-endian-" + i, "Byte order", [["little", "Little"], ["big", "Big"]], ctx2.draft("reloc-ref-endian-" + i, ref.endian || (state2.artifact.system_id === "genesis" ? "big" : "little")))}</td><td>${field("reloc-ref-base-" + i, "Encoding adjustment", ctx2.draft("reloc-ref-base-" + i, String(ref.base ?? baseDefault)))}</td><td>${field("reloc-ref-delta-" + i, "Interior offset", ctx2.draft("reloc-ref-delta-" + i, String(ref.target_delta ?? 0)))}</td></tr>`).join("")}</tbody></table></div><div class="actions">${button("Add reference", "reloc-add-reference", { disabled: entry.references.length >= 128 })}${button("Remove last reference", "reloc-remove-reference", { disabled: entry.references.length <= 1 })}</div><label class="settings-check"><input type="checkbox" id="reloc-references-complete" ${((_e = entry.lastSpec) == null ? void 0 : _e.references_complete) ? "checked" : ""}><span>I have declared every external reference required by this move.</span></label><label class="settings-check"><input type="checkbox" id="reloc-destination-reserved" ${((_f = entry.lastSpec) == null ? void 0 : _f.destination_reserved) ? "checked" : ""}><span>I have reserved this destination. Matching fill bytes alone do not prove unused space.</span></label><div class="actions">${button("Review data move", "reloc-review", { primary: !pending })}${pending ? button("Create separate build", "reloc-build", { primary: true }) : ""}</div>${report2 ? `<div class="notice"><p>${report2.payload_size} bytes proposed at ${hex3(report2.target_offset)}. ${report2.pointer_updates.length} declared references checked. The original data remains at ${hex3(report2.source_offset)}.</p><p>Reference completeness and reservation are author declarations. Native gameplay verification is still required.</p></div><div class="table-wrap"><table><thead><tr><th>Reference offset</th><th>Before</th><th>After</th></tr></thead><tbody>${report2.pointer_updates.slice(0, 16).map((r) => `<tr><td>${hex3(r.offset)}</td><td>${hex3(r.before)}</td><td>${hex3(r.after)}</td></tr>`).join("")}</tbody></table></div>` : ""}</details>`;
-  }
-
-  // romancer/ui/hex_editor.js
-  var HexDraft = class {
-    constructor(state2, data) {
-      this.scope = selectionKey(state2);
-      this.original = /* @__PURE__ */ new Map();
-      this.changes = /* @__PURE__ */ new Map();
-      this.load(data);
-      this.selected = data.offset;
-    }
-    load(data) {
-      this.data = data;
-      if (!Number.isSafeInteger(this.selected) || this.selected < data.offset || this.selected >= data.offset + data.length) this.selected = data.offset;
-      const bytes = data.hex.match(/../g) || [];
-      for (const offset of this.original.keys()) if (!this.changes.has(offset)) this.original.delete(offset);
-      bytes.forEach((b, i) => this.original.set(data.offset + i, b));
-    }
-    set(offset, value) {
-      if (offset < this.data.offset || offset >= this.data.offset + this.data.length || !this.original.has(offset)) throw Error("Choose a visible byte.");
-      if (!/^[\da-f]{2}$/i.test(value)) throw Error("Enter two hex digits per byte.");
-      value = value.toLowerCase();
-      if (value === this.original.get(offset)) this.changes.delete(offset);
-      else this.changes.set(offset, value);
-    }
-    edits(state2) {
-      if (this.scope !== selectionKey(state2)) throw Error("The selection changed. Review bytes for the selected ROM.");
-      return [...this.changes].sort(([a], [b]) => a - b).map(([offset, after]) => ({ offset, before: this.original.get(offset), after }));
-    }
-  };
-  var integer7 = (value) => {
-    const n = Number(value);
-    if (!Number.isSafeInteger(n) || n < 0) throw Error("Enter a nonnegative decimal or 0x hex offset.");
-    return n;
-  };
-  function serializeHexDraft(state2, draft) {
-    return JSON.stringify({ artifact_id: state2.artifact.artifact_id, sha256: state2.artifact.sha256, edits: draft.edits(state2).map((e) => [e.offset, e.before, e.after]) });
-  }
-  function restoreHexDraft(state2, data, stored2) {
-    const draft = new HexDraft(state2, data);
-    if (!stored2) return draft;
-    const value = JSON.parse(stored2);
-    if (value.artifact_id !== state2.artifact.artifact_id || value.sha256 !== state2.artifact.sha256) throw Error("Saved byte edits belong to a different source.");
-    if (!Array.isArray(value.edits) || value.edits.length > 16e3) throw Error("Saved byte draft exceeds the editing budget.");
-    const seen = /* @__PURE__ */ new Set();
-    for (const item of value.edits) {
-      if (!Array.isArray(item) || item.length !== 3) throw Error("Invalid saved byte edit.");
-      const [offset, before, after] = item;
-      if (!Number.isSafeInteger(offset) || offset < 0 || offset >= state2.artifact.size || typeof before !== "string" || typeof after !== "string" || !/^[\da-f]{2}$/i.test(before) || !/^[\da-f]{2}$/i.test(after) || seen.has(offset)) throw Error("Invalid saved byte edit.");
-      seen.add(offset);
-      if (draft.original.has(offset) && draft.original.get(offset) !== before.toLowerCase()) throw Error("Saved original byte no longer matches this source.");
-      if (before.toLowerCase() !== after.toLowerCase()) {
-        draft.original.set(offset, before.toLowerCase());
-        draft.changes.set(offset, after.toLowerCase());
-      }
-    }
-    return draft;
-  }
-  function hexEditor(ctx2, data) {
-    var _a, _b, _c, _d, _e, _f, _g, _h, _i;
-    const { state: state2 } = ctx2;
-    if (data.artifact_id !== ((_a = state2.artifact) == null ? void 0 : _a.artifact_id) || data.sha256 !== ((_b = state2.artifact) == null ? void 0 : _b.sha256)) throw Error("The selected ROM changed. Load bytes for the current selection.");
-    const ticket = selectionKey(state2);
-    let draftError = "";
-    if (((_c = state2.hexDraft) == null ? void 0 : _c.scope) !== ticket) {
-      try {
-        state2.hexDraft = restoreHexDraft(state2, data, ctx2.draft("hex-changes", null));
-      } catch (error) {
-        draftError = error.message;
-        state2.hexDraft = null;
-      }
-    } else state2.hexDraft.load(data);
-    if (draftError) {
-      ctx2.use({ "hex-discard-invalid": () => {
-        ctx2.setDraft("hex-changes", null);
-        state2.hexDraft = null;
-        return ctx2.render();
-      } });
-      return `<section class="card"><h3>Saved byte edits need attention</h3><p class="notice warm">${esc(draftError)}</p><p>Your ROM is unchanged. Discard this saved draft to reopen the editor.</p>${button("Discard invalid byte draft", "hex-discard-invalid")}</section>`;
-    }
-    if (Number.isSafeInteger(state2.resumeHexSelection) && state2.resumeHexSelection >= data.offset && state2.resumeHexSelection < data.offset + data.length) {
-      state2.hexDraft.selected = state2.resumeHexSelection;
-      delete state2.resumeHexSelection;
-    }
-    const draft = state2.hexDraft, current2 = () => selectionKey(state2) === ticket;
-    const scoped = async (op, p) => {
-      const result = await ctx2.run(op, { ...ctx2.sourceParams(), ...p }, { render: false });
-      if (!current2()) throw Error("The selected ROM changed. Repeat this action.");
-      return result;
-    };
-    const go = async (offset) => {
-      const result = await scoped("resource.inspect", { offset: Math.min(integer7(offset), Math.max(0, state2.artifact.size - 1)), length: 256 });
-      state2.results["resource.inspect"] = result;
-      draft.selected = result.offset;
-      ctx2.setDraft("hex-offset", String(result.offset));
-      await ctx2.render();
-    };
-    ctx2.use({
-      "hex-go": () => go(read("hex-offset")),
-      "hex-page": (node) => go(Math.max(0, data.offset + Number(node.dataset.id))),
-      "hex-jump": (node) => go(node.dataset.id),
-      "hex-clear": () => {
-        state2.hexDraft = new HexDraft(state2, data);
-        ctx2.setDraft("hex-changes", serializeHexDraft(state2, state2.hexDraft));
-        state2.hexReview = null;
-        return ctx2.render();
-      },
-      "hex-search": async () => {
-        state2.hexSearch = { scope: ticket, result: await scoped("hex.search", { kind: read("hex-search-kind"), query: read("hex-search-query"), start: integer7(read("hex-search-start")), endian: read("hex-endian"), width: Number(read("hex-width")), signed: read("hex-signed") === "true" }) };
-        await ctx2.render();
-      },
-      "hex-search-more": async () => {
-        var _a2, _b2;
-        const next = (_b2 = (_a2 = state2.hexSearch) == null ? void 0 : _a2.result) == null ? void 0 : _b2.next_start;
-        if (next === null || next === void 0) return;
-        ctx2.setDraft("hex-search-start", String(next));
-        await ctx2.render();
-      },
-      "hex-explain": async () => {
-        state2.hexExplanation = { scope: ticket, result: await scoped("resources.explain", { offset: draft.selected }) };
-        return ctx2.render();
-      },
-      "hex-numbers": async () => {
-        state2.hexNumbers = { scope: ticket, result: await scoped("hex.numbers", { offset: draft.selected }) };
-        await ctx2.render();
-      },
-      "hex-bookmarks": async () => {
-        state2.hexBookmarks = { scope: ticket, result: await scoped("hex.bookmarks", {}) };
-        await ctx2.render();
-      },
-      "hex-bookmark": async () => {
-        state2.hexBookmarks = { scope: ticket, result: await scoped("hex.bookmark", { offset: draft.selected, name: read("hex-bookmark-name"), remove: false }) };
-        await ctx2.render();
-      },
-      "hex-unbookmark": async (node) => {
-        state2.hexBookmarks = { scope: ticket, result: await scoped("hex.bookmark", { offset: Number(node.dataset.id), name: "", remove: true }) };
-        await ctx2.render();
-      },
-      "hex-review": async () => {
-        if (document.querySelector("#hex-editor input:invalid")) throw Error("Finish the byte with two hex digits first.");
-        const edits = draft.edits(state2);
-        if (!edits.length) throw Error("Change one or more byte cells first.");
-        const signature = JSON.stringify(edits), source = state2.artifact;
-        const plan = await scoped(source.system_id ? "systems.plan_edits" : "bytes.plan", { edits });
-        if (JSON.stringify(draft.edits(state2)) !== signature) throw Error("Bytes changed during review. Review them again.");
-        state2.hexReview = { scope: ticket, signature, plan };
-        await ctx2.render();
-      },
-      "hex-apply": async () => {
-        const reviewed2 = state2.hexReview;
-        if ((reviewed2 == null ? void 0 : reviewed2.scope) !== ticket || reviewed2.signature !== JSON.stringify(draft.edits(state2))) throw Error("Review the current byte edits first.");
-        const built = await ctx2.run("build.apply", { ...ctx2.projectParams(), plan_id: reviewed2.plan.plan_id }, { render: false });
-        if (!current2()) return;
-        if (state2.hexReview !== reviewed2 || JSON.stringify(draft.edits(state2)) !== reviewed2.signature) {
-          ctx2.notify("Build created. Your newer byte edits are still staged.");
-          return;
-        }
-        state2.hexReview = null;
-        ctx2.setDraft("hex-changes", JSON.stringify({ artifact_id: state2.artifact.artifact_id, sha256: state2.artifact.sha256, edits: [] }));
-        state2.hexDraft = null;
-        await ctx2.refreshProject();
-        await ctx2.setArtifact(built.artifact_id);
-        ctx2.notify("Separate build created.");
-        await ctx2.navigate("overview");
-      }
-    });
-    const bytes = data.hex.match(/../g) || [], search = ((_d = state2.hexSearch) == null ? void 0 : _d.scope) === ticket ? state2.hexSearch.result : null, numbers = ((_e = state2.hexNumbers) == null ? void 0 : _e.scope) === ticket && state2.hexNumbers.result.offset === draft.selected ? state2.hexNumbers.result : null, marks = ((_f = state2.hexBookmarks) == null ? void 0 : _f.scope) === ticket ? state2.hexBookmarks.result : null;
-    const reviewed = ((_g = state2.hexReview) == null ? void 0 : _g.scope) === ticket && state2.hexReview.signature === JSON.stringify(draft.edits(state2));
-    return `<section class="card" id="hex-editor"><div class="card-heading"><h3>Hex editor</h3>${badge(`${draft.changes.size} staged bytes`)}</div>
- <div class="toolbar">${field("hex-offset", "Offset", ctx2.draft("hex-offset", data.offset))}${button("Go", "hex-go")}${button("Previous page", "hex-page", { id: "-256", disabled: data.offset === 0 })}${button("Next page", "hex-page", { id: "256", disabled: data.offset + data.length >= state2.artifact.size })}</div>
- <div class="hex-scroll"><div class="hex-edit-grid" aria-label="Editable hex bytes">${Array.from({ length: Math.ceil(bytes.length / 16) }, (_, row) => {
-      var _a2;
-      return `<div class="hex-edit-row"><code>${(data.offset + row * 16).toString(16).padStart(8, "0")}</code><div class="hex-edit-cells">${bytes.slice(row * 16, row * 16 + 16).map((b, i) => {
-        const offset = data.offset + row * 16 + i;
-        return `<input aria-label="Byte 0x${offset.toString(16)}" data-hex-offset="${offset}" value="${draft.changes.get(offset) || b}" maxlength="2" size="2" spellcheck="false" class="hex-cell ${draft.changes.has(offset) ? "changed" : ""}">`;
-      }).join("")}</div><code>${esc(((_a2 = data.text) == null ? void 0 : _a2.slice(row * 16, row * 16 + 16)) || "")}</code></div>`;
-    }).join("")}</div></div>
- <p class="subtle">Edit a byte, then review. Your source stays unchanged. Arrow keys move between bytes.</p><div class="actions">${button("Review byte edits", "hex-review", { primary: true, disabled: !draft.changes.size })}${button("Create separate build", "hex-apply", { disabled: !reviewed })}${button("Discard byte edits", "hex-clear", { disabled: !draft.changes.size })}</div>
- ${reviewed ? `<div class="notice">${state2.hexReview.plan.changed_bytes} bytes in the reviewed plan, including supported checksum repairs.</div>` : ""}
- <details><summary>Search bytes, text or numbers</summary><div class="field-row">${select("hex-search-kind", "Search for", [["hex", "Hex pattern (?? wildcard)"], ["text", "UTF-8 text"], ["number", "Integer"]], ctx2.draft("hex-search-kind", "hex"))}${field("hex-search-query", "Pattern or value", ctx2.draft("hex-search-query", ""))}${field("hex-search-start", "Start offset", ctx2.draft("hex-search-start", "0"))}</div><div class="field-row">${select("hex-endian", "Byte order", [["little", "Little endian"], ["big", "Big endian"]], ctx2.draft("hex-endian", "little"))}${select("hex-width", "Number width", [[1, "8-bit"], [2, "16-bit"], [4, "32-bit"]], ctx2.draft("hex-width", "2"))}${select("hex-signed", "Number sign", [["false", "Unsigned"], ["true", "Signed"]], ctx2.draft("hex-signed", "false"))}</div>${button("Search selected file", "hex-search")}
- ${search ? `<p>${search.offsets.length} matches · ${search.complete ? "Reached end of file" : `Scanned through 0x${search.scanned_to.toString(16)}`}</p><div class="actions">${search.offsets.slice(0, 1e3).map((o) => button("0x" + o.toString(16), "hex-jump", { id: String(o) })).join("")}</div>${search.complete ? "" : button("Set next search position", "hex-search-more")}` : ""}</details>
- <details><summary>Number inspector & bookmarks</summary><p>Selected offset: <code id="hex-selected">0x${draft.selected.toString(16)}</code></p>${button("Explain selected bytes", "hex-explain")}${button("Inspect selected number", "hex-numbers")}<div id="hex-explanation">${((_h = state2.hexExplanation) == null ? void 0 : _h.scope) === ticket && state2.hexExplanation.result.offset === draft.selected ? researchNoteHelp(state2.hexExplanation.result.research_notes) : ""}${((_i = state2.hexExplanation) == null ? void 0 : _i.scope) === ticket && state2.hexExplanation.result.offset === draft.selected ? `<p>${esc(state2.hexExplanation.result.note)}</p>${state2.hexExplanation.result.interpretations.map((row) => `<dl><dt>${esc(row.name)} · declared</dt><dd>File offset 0x${row.offset.toString(16)} · ${row.length} bytes${row.type ? " · " + esc(row.type) + " " + esc(row.endian) + " · value " + esc(row.value) + " · numeric range " + row.minimum + "–" + row.maximum : ""}${row.description ? "<br>" + esc(row.description) : ""}</dd></dl>`).join("")}` : ""}</div><div id="hex-number-result">${numbers ? `<dl>${Object.entries(numbers.values).map(([k, v]) => `<dt>${esc(k)}</dt><dd>${esc(v)}</dd>`).join("")}</dl>` : ""}</div>${field("hex-bookmark-name", "Bookmark name", ctx2.draft("hex-bookmark-name", ""))}<div class="actions">${button("Bookmark selected byte", "hex-bookmark")}${button("Load bookmarks", "hex-bookmarks")}</div>${((marks == null ? void 0 : marks.bookmarks) || []).map((r) => `<div class="actions">${button(`${r.name} · 0x${r.offset.toString(16)}`, "hex-jump", { id: String(r.offset) })}${button("Remove", "hex-unbookmark", { id: String(r.offset) })}</div>`).join("")}</details></section>`;
-  }
-  async function hexComparison(ctx2, data) {
-    const saved = ctx2.state.hexComparison, a = ctx2.state.artifact, p = ctx2.state.project, scope = selectionKey(ctx2.state);
-    if (!saved || saved.project_id !== p.project_id || saved.right_id !== a.artifact_id || saved.right_sha256 !== a.sha256) return "";
-    const left = p.sources.concat(p.builds).find((r) => r.artifact_id === saved.left_id);
-    if (!left || left.sha256 !== saved.left_sha256) return "";
-    const maximum = Math.max(left.size, a.size), offset = saved.offset ?? data.offset;
-    if (!Number.isSafeInteger(offset) || offset < 0 || offset > maximum) return "";
-    const length = Math.max(1, Math.min(256, maximum - offset));
-    const readSide = (row) => ctx2.api.call("resource.inspect", { project_id: p.project_id, artifact_id: row.artifact_id, offset: Math.min(offset, row.size), length });
-    const [original, selected2] = await Promise.all([readSide(left), readSide(a)]);
-    if (selectionKey(ctx2.state) !== scope || ctx2.state.hexComparison !== saved) return "";
-    if (original.artifact_id !== left.artifact_id || original.sha256 !== left.sha256 || selected2.artifact_id !== a.artifact_id || selected2.sha256 !== a.sha256) throw Error("The compared source changed. Compare these files again.");
-    ctx2.use({ "hex-diff-page": async (node) => {
-      if (selectionKey(ctx2.state) !== scope || ctx2.state.hexComparison !== saved) throw Error("The selected comparison changed. Compare these files again.");
-      const delta = Number(node.dataset.id);
-      if (![-256, 256].includes(delta)) throw Error("Invalid comparison page.");
-      saved.offset = Math.max(0, Math.min(Math.max(0, maximum - 1), offset + delta));
-      await ctx2.render();
-    }, "hex-diff-follow": async () => {
-      if (selectionKey(ctx2.state) !== scope || ctx2.state.hexComparison !== saved) throw Error("The selected comparison changed.");
-      delete saved.offset;
-      await ctx2.render();
-    } });
-    const x = original.hex.match(/../g) || [], y = selected2.hex.match(/../g) || [], span = Math.max(x.length, y.length);
-    const cells = (values, other, index) => Array.from({ length: Math.min(16, span - index) }, (_, j) => {
-      const value = values[index + j];
-      return value === void 0 ? '<span aria-label="No byte in file">—</span>' : value !== other[index + j] ? `<mark>${value}</mark>` : value;
-    }).join(" ");
-    return `<details class="card hex-comparison" open><summary>Compare at 0x${offset.toString(16)}</summary><p>${esc(left.name)} → ${esc(a.name)}</p><p>Changed bytes are highlighted. — means this file has no byte at that offset.</p><div class="actions">${button("Previous comparison page", "hex-diff-page", { id: "-256", disabled: offset === 0 })}${button("Next comparison page", "hex-diff-page", { id: "256", disabled: offset + span >= maximum })}${button("Follow hex editor", "hex-diff-follow")}</div><div class="hex-scroll"><table><thead><tr><th>Offset</th><th>Earlier bytes</th><th>Selected bytes</th></tr></thead><tbody>${Array.from({ length: Math.ceil(span / 16) }, (_, i) => `<tr><td><code>${(offset + i * 16).toString(16)}</code></td><td><code>${cells(x, y, i * 16)}</code></td><td><code>${cells(y, x, i * 16)}</code></td></tr>`).join("")}</tbody></table></div></details>`;
-  }
-  function mountHexEditor(ctx2) {
-    const root = document.getElementById("hex-editor");
-    if (!root) return;
-    const draft = ctx2.state.hexDraft;
-    root.querySelectorAll("[data-hex-offset]").forEach((node) => {
-      node.addEventListener("focus", () => {
-        var _a, _b, _c, _d, _e, _f;
-        if (draft.scope !== selectionKey(ctx2.state)) return;
-        draft.selected = Number(node.dataset.hexOffset);
-        if (((_a = ctx2.state.hexExplanation) == null ? void 0 : _a.result.offset) !== draft.selected) {
-          ctx2.state.hexExplanation = null;
-          (_c = (_b = root.querySelector("#hex-explanation")) == null ? void 0 : _b.replaceChildren) == null ? void 0 : _c.call(_b);
-        }
-        if (((_d = ctx2.state.hexNumbers) == null ? void 0 : _d.result.offset) !== draft.selected) {
-          ctx2.state.hexNumbers = null;
-          (_f = (_e = root.querySelector("#hex-number-result")) == null ? void 0 : _e.replaceChildren) == null ? void 0 : _f.call(_e);
-        }
-        const label = root.querySelector("#hex-selected");
-        if (label) label.textContent = "0x" + draft.selected.toString(16);
-        node.select();
-      });
-      node.addEventListener("input", () => {
-        ctx2.state.hexReview = null;
-        setUnavailable(root.querySelector('[data-action="hex-apply"]'), true);
-        try {
-          draft.set(Number(node.dataset.hexOffset), node.value);
-          ctx2.setDraft("hex-changes", serializeHexDraft(ctx2.state, draft));
-          node.setCustomValidity("");
-          node.classList.toggle("changed", draft.changes.has(Number(node.dataset.hexOffset)));
-          setUnavailable(root.querySelector('[data-action="hex-review"]'), !draft.changes.size);
-          setUnavailable(root.querySelector('[data-action="hex-clear"]'), !draft.changes.size);
-        } catch (error) {
-          node.setCustomValidity(error.message);
-        }
-      });
-      node.addEventListener("blur", () => {
-        if (!node.checkValidity()) {
-          node.reportValidity();
-          node.value = draft.changes.get(Number(node.dataset.hexOffset)) || draft.original.get(Number(node.dataset.hexOffset));
-          node.setCustomValidity("");
-        }
-      });
-      node.addEventListener("keydown", (event) => {
-        const delta = { ArrowLeft: -1, ArrowRight: 1, ArrowUp: -16, ArrowDown: 16 }[event.key];
-        if (delta) {
-          const next = root.querySelector(`[data-hex-offset="${Number(node.dataset.hexOffset) + delta}"]`);
-          if (next) {
-            event.preventDefault();
-            next.focus();
-          }
-        }
-      });
-    });
-  }
-
-  // romancer/ui/revision_controls.js
-  function revisionResult(state2) {
-    const saved = state2.revisionLookup;
-    return (saved == null ? void 0 : saved.scope) === selectionKey(state2) ? saved.result : null;
-  }
-  async function identifyRevision(ctx2, scope, expected_id) {
-    var _a;
-    const ticket = selectionKey(ctx2.state), request2 = (ctx2.state.revisionRequest || 0) + 1;
-    ctx2.state.revisionRequest = request2;
-    const result = await ctx2.run("revision.lookup", { ...((_a = ctx2.sourceParams) == null ? void 0 : _a.call(ctx2)) || { project_id: ctx2.state.project.project_id, artifact_id: ctx2.state.artifact.artifact_id }, scope, expected_id }, { render: false });
-    if (ticket !== selectionKey(ctx2.state) || request2 !== ctx2.state.revisionRequest) throw Error("The selection changed. Identify the selected ROM again.");
-    ctx2.state.revisionLookup = { scope: ticket, result };
-    return result;
-  }
-  function revisionControls(ctx2) {
-    var _a, _b, _c;
-    const { state: state2 } = ctx2, project = (_a = state2.project) == null ? void 0 : _a.project_id, result = revisionResult(state2), info = ((_b = state2.revisionInfo) == null ? void 0 : _b.project_id) === project ? state2.revisionInfo : null, list = ((_c = state2.revisionList) == null ? void 0 : _c.project_id) === project ? state2.revisionList : null;
-    ctx2.use({
-      "revision-info": async () => {
-        var _a2;
-        const r = await ctx2.run("revision.info", { project_id: project }, { render: false });
-        if (((_a2 = state2.project) == null ? void 0 : _a2.project_id) === project) {
-          state2.revisionInfo = r;
-          await ctx2.render();
-        }
-      },
-      "revision-import": async () => {
-        var _a2, _b2, _c2;
-        const file = (_a2 = document.getElementById("revision-file")) == null ? void 0 : _a2.files[0];
-        if (!file) throw Error("Choose a local catalog first.");
-        const scope = read("revision-scope");
-        const input = await ctx2.api.uploadInput(project, file, "catalog");
-        if (((_b2 = state2.project) == null ? void 0 : _b2.project_id) !== project) throw Error("The project changed. Import into the selected project again.");
-        const r = await ctx2.run("revision.import", { project_id: project, input_id: input.input_id, scope }, { render: false });
-        if (((_c2 = state2.project) == null ? void 0 : _c2.project_id) === project) {
-          state2.revisionInfo = r;
-          state2.revisionList = null;
-          state2.revisionLookup = null;
-          state2.romScans = {};
-          ctx2.notify(`${r.count} revision references available.`);
-          await ctx2.render();
-        }
-      },
-      "revision-identify": async () => {
-        await identifyRevision(ctx2, read("revision-scope"), "");
-        await ctx2.render();
-      },
-      "revision-search": async () => {
-        var _a2;
-        const r = await ctx2.run("revision.list", { project_id: project, query: read("revision-query") }, { render: false });
-        if (((_a2 = state2.project) == null ? void 0 : _a2.project_id) === project) {
-          state2.revisionList = r;
-          await ctx2.render();
-        }
-      },
-      "revision-compare": async () => {
-        var _a2;
-        const id = read("revision-expected"), entry = (_a2 = list == null ? void 0 : list.entries) == null ? void 0 : _a2.find((r) => r.id === id);
-        if (!entry) throw Error("Search for and choose a reference first.");
-        await identifyRevision(ctx2, entry.scope, id);
-        await ctx2.render();
-      }
-    });
-    const message = result ? { MATCHED: "Exact revision matched", UNKNOWN: "No catalog match", MISMATCHED: "Selected reference differs", AMBIGUOUS: "Multiple references match" }[result.status] || result.status : "";
-    return `<details class="card"><summary>Identify ROM revision${info ? ` · ${info.count} references` : ""}</summary><p>Compare checksums with a catalog you supply. Unknown files remain unidentified.</p>
- ${select("revision-scope", "Checksum scope", [["file", "Whole file"], ["payload", "Cartridge payload (supported layouts)"]], ctx2.draft("revision-scope", "file"))}
- ${fileInput("revision-file", "Local JSON, CSV, TSV or XML DAT catalog", ".json,.csv,.tsv,.dat,.xml")}<div class="actions">${button("Import catalog", "revision-import")}${button("Check catalog size", "revision-info")}${button("Identify selected ROM", "revision-identify", { disabled: !state2.artifact, primary: true })}</div>
- ${result ? `<div class="notice">${badge(message, result.status === "MATCHED" ? "good" : result.status === "MISMATCHED" ? "warm" : "neutral")}<p>${result.matches.map((r) => esc(r.name)).join("<br>")}</p><p>${esc(result.scope === "file" ? "Whole file" : "Cartridge payload")} · CRC32 <code>${esc(result.hashes.crc32)}</code></p>${result.status === "MISMATCHED" ? "<p>Choose the correct revision or check the checksum scope before applying a patch.</p>" : ""}</div>` : ""}
- <details><summary>Compare a specific reference</summary>${field("revision-query", "Reference name", ctx2.draft("revision-query", ""))}${button("Find references", "revision-search")}${list ? `${select("revision-expected", "Expected reference", list.entries.map((r) => [r.id, `${r.name} · ${r.scope}`]), ctx2.draft("revision-expected", ""))}${list.truncated ? "<p>Narrow your search to see more references.</p>" : ""}${button("Compare selected reference", "revision-compare", { disabled: !list.entries.length || !state2.artifact })}` : ""}</details></details>`;
-  }
-
-  // romancer/ui/compression_controls.js
-  function integer8(id) {
-    const text = read(id).trim(), value = Number(text);
-    if (!text || !Number.isSafeInteger(value)) throw new Error("Enter a whole number for " + id + ".");
-    return value;
-  }
-  function compressedRoot(state2, artifact = state2.artifact) {
-    var _a, _b;
-    const rows = new Map([...((_a = state2.project) == null ? void 0 : _a.sources) || [], ...((_b = state2.project) == null ? void 0 : _b.builds) || []].map((row) => [row.artifact_id, row]));
-    const seen = /* @__PURE__ */ new Set();
-    for (let i = 0; artifact && i < 128; i++) {
-      if (artifact.compressed_parent) return artifact;
-      if (seen.has(artifact.artifact_id)) return null;
-      seen.add(artifact.artifact_id);
-      artifact = rows.get(artifact.source_id);
-    }
-    return null;
-  }
-  function resourceSystem(state2) {
-    var _a, _b, _c;
-    return ((_a = state2.artifact) == null ? void 0 : _a.system_id) || ((_b = state2.artifact) == null ? void 0 : _b.system_hint) || ((_c = compressedRoot(state2)) == null ? void 0 : _c.system_hint) || "nes";
-  }
-  function compressionControls(ctx2) {
-    var _a, _b, _c, _d, _e;
-    const { state: state2 } = ctx2, artifact = state2.artifact;
-    if (!artifact) return "";
-    const scope = selectionKey(state2), current2 = () => scope === selectionKey(state2);
-    const root = compressedRoot(state2), metadata = root == null ? void 0 : root.compressed_parent;
-    const result = ((_a = state2.results["compression.inspect"]) == null ? void 0 : _a.parent_sha256) === artifact.sha256 ? state2.results["compression.inspect"] : null;
-    const extraction = state2.results["compression.extract"];
-    const extracted = extraction && ((_b = extraction.inspection) == null ? void 0 : _b.parent_sha256) === artifact.sha256 ? extraction.artifact : null;
-    const builds = metadata ? state2.project.builds.filter((row) => {
-      var _a2;
-      return ((_a2 = compressedRoot(state2, row)) == null ? void 0 : _a2.artifact_id) === root.artifact_id;
-    }) : [];
-    const parameters = () => ({ ...ctx2.sourceParams(), offset: integer8("compression-offset"), allocation: integer8("compression-allocation"), codec: read("compression-codec") });
-    const reinsertion = () => {
-      if (!current2() || !metadata) throw Error("Select this decoded resource again.");
-      const edited_id = read("compression-edited");
-      if (!edited_id) throw Error("Create an edited decoded build first.");
-      return { ...ctx2.projectParams(), parent_id: metadata.parent_id, decoded_id: root.artifact_id, edited_id, offset: metadata.offset, allocation: metadata.allocation, codec: metadata.codec };
-    };
-    const moveSpec = () => {
-      var _a2, _b2, _c2;
-      return { source_offset: metadata.offset, source_length: (_a2 = state2.compressionPreview) == null ? void 0 : _a2.result.original_stored_size, target_offset: integer8("compressed-move-target"), target_capacity: integer8("compressed-move-capacity"), fill_byte: integer8("compressed-move-fill"), alignment: integer8("compressed-move-align"), bank_size: integer8("compressed-move-bank"), bank_origin: integer8("compressed-move-origin"), references: [{ offset: integer8("compressed-move-pointer"), width: integer8("compressed-move-width"), endian: read("compressed-move-order"), base: integer8("compressed-move-base"), target_delta: 0 }], references_complete: !!((_b2 = document.getElementById("compressed-move-complete")) == null ? void 0 : _b2.checked), destination_reserved: !!((_c2 = document.getElementById("compressed-move-reserved")) == null ? void 0 : _c2.checked), replacement_input_id: null };
-    };
-    const preview = ((_c = state2.compressionPreview) == null ? void 0 : _c.scope) === scope ? state2.compressionPreview : null;
-    ctx2.use({
-      "compression-inspect": () => ctx2.run("compression.inspect", parameters()),
-      "compression-extract": () => ctx2.run("compression.extract", parameters()),
-      "compression-open": async (node) => {
-        await ctx2.setArtifact(node.dataset.id);
-        await ctx2.navigate("resources");
-      },
-      "compression-preview": async () => {
-        const args = reinsertion(), signature = JSON.stringify(args);
-        const result2 = await ctx2.run("compression.preview_reinsert", args, { render: false });
-        if (!current2()) return;
-        if (signature !== JSON.stringify(reinsertion())) throw Error("The selected edited resource changed. Preview it again.");
-        state2.compressionPreview = { scope, result: result2, signature };
-        return ctx2.render();
-      },
-      "compression-move": async () => {
-        const args = reinsertion();
-        if (!preview || preview.signature !== JSON.stringify(args)) throw Error("Preview the current recompression first.");
-        const spec = moveSpec(), signature = JSON.stringify({ args, spec });
-        const result2 = await ctx2.run("compression.plan_relocate", { ...args, spec }, { render: false });
-        if (!current2()) return;
-        if (signature !== JSON.stringify({ args: reinsertion(), spec: moveSpec() })) throw Error("The move declaration changed. Review it again.");
-        preview.moveSpec = spec;
-        state2.pending = { kind: "compression", artifact_id: artifact.artifact_id, plan_id: result2.plan_id, signature, relocation: true };
-        return ctx2.render();
-      },
-      "compression-review": async () => {
-        const args = reinsertion(), signature = JSON.stringify(args);
-        const plan = await ctx2.run("compression.plan_reinsert", args, { render: false });
-        if (!current2()) return;
-        if (signature !== JSON.stringify(reinsertion())) throw Error("The edited resource changed. Review it again.");
-        state2.pending = { kind: "compression", artifact_id: artifact.artifact_id, plan_id: plan.plan_id, signature };
-        await ctx2.render();
-      },
-      "compression-build": async () => {
-        var _a2;
-        if (((_a2 = state2.pending) == null ? void 0 : _a2.kind) !== "compression" || state2.pending.artifact_id !== artifact.artifact_id) throw new Error("Review reinsertion for this resource first.");
-        if (!current2()) throw Error("The selected resource changed.");
-        const actual = state2.pending.relocation ? JSON.stringify({ args: reinsertion(), spec: moveSpec() }) : JSON.stringify(reinsertion());
-        if (actual !== state2.pending.signature) throw Error("The selected build or move declaration changed. Review it again.");
-        const built = await ctx2.run("build.apply", { ...ctx2.projectParams(), plan_id: state2.pending.plan_id }, { render: false });
-        if (!current2()) return;
-        state2.pending = null;
-        state2.compressionPreview = null;
-        await ctx2.setArtifact(built.artifact_id);
-        ctx2.notify("Parent build created and selected. Open Playtest to check it.");
-      }
-    });
-    if (metadata) return `<section class="card"><div class="card-heading"><h3>Compressed resource</h3>${button("Compression help", "help-topic", { id: "compression" })}</div><p>${esc(metadata.codec)} at0x${metadata.offset.toString(16)} · ${size(metadata.allocation)} allocated.</p><p>Edit this decoded resource and create a build, then review reinsertion into its parent.</p><div class="actions">${button("Edit graphics", "navigate", { id: "assets" })}${button("Edit text", "navigate", { id: "scripts" })}${button("Edit tables", "navigate", { id: "tables" })}</div>${select("compression-edited", "Edited decoded build", builds.map((row) => [row.artifact_id, row.name]), artifact.kind === "build" ? artifact.artifact_id : (_d = builds.at(-1)) == null ? void 0 : _d.artifact_id)}<div class="actions">${button("Preview recompression", "compression-preview", { disabled: !builds.length, primary: true })}${button("Review reinsertion", "compression-review", { primary: true, disabled: !builds.length })}${((_e = state2.pending) == null ? void 0 : _e.kind) === "compression" ? button("Create parent build", "compression-build", { primary: true }) : ""}</div>${preview ? compressionCapacity(preview.result) + compressedMove(ctx2, preview.result) : ""}${report(state2.results["compression.plan_reinsert"], "Recompression plan")}${report(state2.results["compression.plan_relocate"], "Relocation plan")}</section>`;
-    return `<details class="card" ${result || extracted ? "open" : ""}><summary>Compressed resources</summary><p>Confirm the codec and allocated space before extracting. Supported formats: GBA LZ10 and RLE.</p><div class="field-row">${field("compression-offset", "Stream offset", ctx2.draft("compression-offset", "0"))}${field("compression-allocation", "Confirmed allocation in bytes (up to48KiB)", ctx2.draft("compression-allocation", "1024"))}${select("compression-codec", "Codec", [["gba-lz10", "GBA LZ10"], ["gba-rle", "GBA RLE"]], ctx2.draft("compression-codec", "gba-lz10"))}</div><div class="actions">${button("Inspect stream", "compression-inspect")}${button("Extract decoded resource", "compression-extract", { primary: true })}${button("Compression help", "help-topic", { id: "compression" })}</div>${result ? `<p class="notice">${size(result.consumed)} stored → ${size(result.decoded_size)} decoded. Confirmed allocation: ${size(result.allocation)}.</p>` : ""}${extracted ? `<p>Decoded resource added to this project.</p>${button("Open decoded resource", "compression-open", { id: extracted.artifact_id, primary: true })}` : ""}</details>`;
-  }
-  function compressionCapacity(r) {
-    return '<div class="notice ' + (r.fits ? "" : "warm") + '"><strong>' + r.packed_size + " / " + r.allocation + " bytes</strong><p>" + (r.fits ? r.free_bytes + " bytes free." : r.overflow_bytes + " bytes over the confirmed allocation. Reduce the edit or review a reserved move.") + "</p><p>Independent decoder " + (r.independent_decode_verified ? "verified the edited data." : "has not verified this output.") + "</p></div>";
-  }
-  function compressedMove(ctx2, r) {
-    var _a, _b, _c, _d;
-    const system2 = resourceSystem(ctx2.state), bank = { nes: 8192, snes: 32768, gb: 16384, gbc: 16384 }[system2] || 0;
-    return '<details><summary>Move to reserved space · Advanced</summary><p>For a stream with one complete external linear reference. Declare a reserved destination and the pointer that already targets this stream. Games with additional consumers need every reference declared through the automation API.</p><div class="field-row">' + field("compressed-move-target", "Reserved destination offset", ctx2.draft("compressed-move-target", "0")) + field("compressed-move-capacity", "Reserved capacity", ctx2.draft("compressed-move-capacity", String(r.packed_size))) + field("compressed-move-fill", "Expected fill byte", ctx2.draft("compressed-move-fill", "255")) + select("compressed-move-align", "Alignment", [[1, "1"], [2, "2"], [4, "4"], [8, "8"], [16, "16"], [32, "32"]], ctx2.draft("compressed-move-align", "4")) + '</div><div class="field-row">' + field("compressed-move-pointer", "Pointer file offset", ctx2.draft("compressed-move-pointer", "0")) + select("compressed-move-width", "Pointer bytes", [[2, "2"], [3, "3"], [4, "4"]], ctx2.draft("compressed-move-width", "4")) + select("compressed-move-order", "Byte order", [["little", "Little"], ["big", "Big"]], ctx2.draft("compressed-move-order", system2 === "genesis" ? "big" : "little")) + field("compressed-move-base", "Pointer encoding adjustment", ctx2.draft("compressed-move-base", system2 === "gba" ? "0x08000000" : "0")) + '</div><div class="field-row">' + field("compressed-move-bank", "Declared bank bytes (0 for linear)", ctx2.draft("compressed-move-bank", String(bank))) + field("compressed-move-origin", "Bank file origin", ctx2.draft("compressed-move-origin", system2 === "nes" ? "16" : "0")) + '</div><label><input type="checkbox" id="compressed-move-complete" ' + (((_b = (_a = ctx2.state.compressionPreview) == null ? void 0 : _a.moveSpec) == null ? void 0 : _b.references_complete) ? "checked" : "") + '> This is the complete reference set for this move.</label><label><input type="checkbox" id="compressed-move-reserved" ' + (((_d = (_c = ctx2.state.compressionPreview) == null ? void 0 : _c.moveSpec) == null ? void 0 : _d.destination_reserved) ? "checked" : "") + "> I reserved this destination; matching fill does not prove free space.</label>" + button("Review compressed-resource move", "compression-move") + "</details>";
-  }
-
-  // romancer/ui/rom_health.js
-  function romHealthPanel(ctx2) {
-    var _a, _b, _c;
-    const { state: state2 } = ctx2, result = state2.results["rom.check"], r = (result == null ? void 0 : result.artifact_id) === ((_a = state2.artifact) == null ? void 0 : _a.artifact_id) && ((_b = result == null ? void 0 : result.source) == null ? void 0 : _b.sha256) === ((_c = state2.artifact) == null ? void 0 : _c.sha256) ? result : null, c = r == null ? void 0 : r.crc_comparison;
-    const tone = checkTone;
-    return `<section class="card rom-health"><div class="card-heading"><h2>ROM health</h2>${r ? badge(r.status === "ISSUES_FOUND" ? "Issues found" : r.status === "WARNINGS_FOUND" ? "Needs attention" : "Checks finished", r.status === "ISSUES_FOUND" ? "danger" : r.status === "WARNINGS_FOUND" ? "warm" : "neutral") : ""}</div><div class="toolbar">${field("rom-expected-crc", "Expected CRC32 (optional)", ctx2.draft("rom-expected-crc", ""), { placeholder: "Eight hex digits", hint: "Use the reference supplied with your patch or dump." })}${select("rom-crc-scope", "CRC32 comparison covers", [["file", "Whole file"], ["payload", "Cartridge payload"]], ctx2.draft("rom-crc-scope", "file"))}${button("Check ROM", "rom-check", { primary: true, icon: "shield" })}</div>${r ? `<div class="identity"><strong>File CRC32</strong><code>${esc(r.crc32)}</code><span>${esc((c == null ? void 0 : c.scope) === "payload" ? "Reference compares cartridge payload" : "Reference compares whole file")}</span></div><div class="notice ${(c == null ? void 0 : c.status) === "FAIL" ? "danger" : ""}"><strong>${(c == null ? void 0 : c.status) === "FAIL" ? "CRC32 mismatch" : (c == null ? void 0 : c.status) === "PASS" ? "Reference CRC32 matches" : "No reference supplied"}</strong>${(c == null ? void 0 : c.expected) ? ` · Expected <code>${esc(c.expected)}</code> · Measured <code>${esc(c.measured)}</code>` : " · The file fingerprint was measured; no dump match was checked."}</div><div class="table-wrap"><table><thead><tr><th>Check</th><th>Result</th><th>Details</th></tr></thead><tbody>${(r.checks || []).map((check) => `<tr><td>${esc(check.name)}</td><td>${badge(checkLabel(check.status), tone(check.status))}</td><td>${esc(check.detail)}${check.stored !== void 0 ? ` Stored <code>${esc(check.stored)}</code>${check.computed !== void 0 ? `; computed <code>${esc(check.computed)}</code>` : check.expected !== void 0 ? `; expected <code>${esc(check.expected)}</code>` : ""}.` : ""}</td></tr>`).join("")}</tbody></table></div><p class="subtle">These checks do not establish authenticity or successful gameplay.</p><details><summary>Full health report</summary><pre>${esc(JSON.stringify(r, null, 2))}</pre></details>` : '<p class="subtle">Checks cartridge layout and supported internal checksums. A reference is needed to detect a CRC32 mismatch.</p>'}</section>`;
-  }
-
-  // romancer/ui/discovery_controls.js
-  var systems2 = [["nes", "NES"], ["snes", "SNES"], ["genesis", "GEN"], ["gb", "Game Boy"], ["gbc", "Game Boy Color"], ["gba", "GBA"], ["sms", "Master System"]];
-  function integer9(id) {
-    const text = read(id).trim(), value = Number(text);
-    if (!text || !Number.isSafeInteger(value)) throw new Error("Enter a whole number for " + id + ".");
-    return value;
-  }
-  function discoveryControls(ctx2) {
-    var _a;
-    const { state: state2 } = ctx2, artifact = state2.artifact;
-    if (!artifact) return "";
-    const result = ((_a = state2.results["resources.discover"]) == null ? void 0 : _a.source_sha256) === artifact.sha256 ? state2.results["resources.discover"] : null;
-    ctx2.use({
-      "discover-scan": async () => {
-        const kind = read("discover-kind");
-        state2.discoveryPage = 0;
-        const kinds = kind === "all" ? ["text", "graphics", "compression"] : [kind];
-        const target = kind === "pointers" ? { offset: integer9("discover-target"), width: integer9("discover-width"), endian: read("discover-endian"), base: integer9("discover-base") } : null;
-        return ctx2.run("resources.discover", { ...ctx2.sourceParams(), config: { system_id: read("discover-system"), start: integer9("discover-start"), length: integer9("discover-length"), kinds, target } });
-      },
-      "discover-compressed": async (node) => {
-        const row = result == null ? void 0 : result.candidates.find((row2) => row2.candidate_id === node.dataset.id);
-        if ((row == null ? void 0 : row.kind) !== "compression") throw new Error("Scan this compressed source again.");
-        ctx2.setDraft("compression-offset", String(row.offset));
-        ctx2.setDraft("compression-allocation", String(row.length));
-        ctx2.setDraft("compression-codec", row.format);
-        await ctx2.run("compression.inspect", { ...ctx2.sourceParams(), offset: row.offset, allocation: row.length, codec: row.format });
-      },
-      "discover-page": (node) => {
-        state2.discoveryPage = Math.max(0, (state2.discoveryPage || 0) + Number(node.dataset.id));
-        return ctx2.render();
-      },
-      "discover-inspect": (node) => {
-        const row = result == null ? void 0 : result.candidates.find((row2) => row2.candidate_id === node.dataset.id);
-        if (!row) throw new Error("Scan this source revision again.");
-        return ctx2.run("resource.inspect", { ...ctx2.sourceParams(), offset: row.offset, length: Math.min(row.length, 256) });
-      },
-      "discover-declare": async (node) => {
-        const row = result == null ? void 0 : result.candidates.find((row2) => row2.candidate_id === node.dataset.id);
-        if (!(row == null ? void 0 : row.config)) throw new Error("This candidate needs a supported resource declaration.");
-        const prefix = row.kind === "text" ? "text" : "gfx";
-        state2.candidateReview = { artifact_id: artifact.artifact_id, kind: row.kind, reason: row.reason };
-        state2.resourcePrefill = { artifact_id: artifact.artifact_id, prefix, config: row.config };
-        delete state2.results["script.inspect"];
-        delete state2.results["assets.inspect"];
-        state2.pending = null;
-        state2.paint = null;
-        await ctx2.navigate(row.kind === "text" ? "scripts" : "assets");
-      }
-    });
-    const page = state2.discoveryPage || 0, rows = (result == null ? void 0 : result.candidates.slice(page * 20, page * 20 + 20)) || [];
-    return `<section class="card"><div class="card-heading"><h3>Find resources</h3>${button("Discovery help", "help-topic", { id: "discovery" })}</div><div class="field-row">${select("discover-system", "System", systems2, ctx2.draft("discover-system", resourceSystem(state2)))}${select("discover-kind", "Look for", [["all", "Text, graphics and known compression"], ["text", "Printable text"], ["graphics", "Graphics candidates"], ["compression", "Known compressed streams"], ["pointers", "Explicit pointer references"]], ctx2.draft("discover-kind", "all"))}${field("discover-start", "Start offset", ctx2.draft("discover-start", "0"))}${field("discover-length", "Bytes to scan (up to16MiB)", ctx2.draft("discover-length", String(Math.min(1024 * 1024, artifact.size))))}</div><details class="config"><summary>Pointer search settings</summary><div class="field-row">${field("discover-target", "Target file offset", ctx2.draft("discover-target", "0"))}${select("discover-width", "Pointer bytes", [["2", "2"], ["3", "3"], ["4", "4"]], ctx2.draft("discover-width", "2"))}${select("discover-endian", "Byte order", [["little", "Little endian"], ["big", "Big endian"]], ctx2.draft("discover-endian", "little"))}${field("discover-base", "Stored value = file offset + base", ctx2.draft("discover-base", "0"))}</div></details>${button("Scan selected range", "discover-scan", { primary: true, icon: "search" })}${result ? `<p class="notice">${result.candidates.length} candidates in${size(result.scanned_length)}. ${result.partial ? "Partial scan. " : ""}${result.next_offset !== null ? "Next range starts at0x" + result.next_offset.toString(16) + ". " : ""}${result.results_truncated ? "Result limit reached; narrow the range. " : ""}Graphics use sampled blocks. Confirm formats before editing.</p>${rows.length ? `<div class="table-wrap"><table><thead><tr><th>Resource</th><th>Preview</th><th>Reason</th><th></th></tr></thead><tbody>${rows.map((row) => `<tr><td>${esc(row.kind)}<br><code>0x${row.offset.toString(16)}</code><br>${esc(row.confidence)}</td><td>${esc(row.preview)}</td><td>${esc(row.reason)}</td><td><div class="actions">${button("Inspect bytes", "discover-inspect", { id: row.candidate_id })}${row.kind === "compression" ? button("Inspect stream", "discover-compressed", { id: row.candidate_id }) : row.config ? button("Review declaration", "discover-declare", { id: row.candidate_id }) : ""}</div></td></tr>`).join("")}</tbody></table></div><div class="actions">${button("Previous candidates", "discover-page", { id: "-1", disabled: page === 0 })}<span>Page ${page + 1}</span>${button("Next candidates", "discover-page", { id: "1", disabled: (page + 1) * 20 >= result.candidates.length })}</div>` : "<p>No candidates in this range. Try a different range or declare a known resource.</p>"}` : ""}</section>`;
-  }
-
-  // romancer/ui/views/resources.js
-  async function render6(ctx2) {
-    var _a, _b, _c, _d, _e, _f;
-    const { state: state2 } = ctx2, missing2 = requireProject(ctx2);
-    if (missing2) return missing2;
-    const a = state2.artifact, ticket = selectionKey(state2), generation = (state2.resourceRenderGeneration || 0) + 1;
-    state2.resourceRenderGeneration = generation;
-    const current2 = () => ticket === selectionKey(state2) && generation === state2.resourceRenderGeneration && (!ctx2.isCurrentRender || ctx2.isCurrentRender()), params = a ? { ...ctx2.sourceParams() } : null;
-    if (!current2()) return "";
-    const jump = state2.resourceJump;
-    let data = state2.results["resource.inspect"], catalog, comparison = "", byteNotes = "";
-    if (a) {
-      if (jump !== void 0 && jump !== null || (data == null ? void 0 : data.artifact_id) !== a.artifact_id || (data == null ? void 0 : data.sha256) !== a.sha256) {
-        data = await ctx2.api.call("resource.inspect", { ...params, offset: jump == null ? 0 : Math.min(parseInteger(jump), Math.max(0, a.size - 1)), length: 256 });
-        if (!current2()) return "";
-      }
-      catalog = await ctx2.api.call("catalog.list", { ...params, query: state2.catalogQuery || "", page: state2.catalogPage || 0, limit: 50 });
-      if (!current2()) return "";
-      comparison = await hexComparison(ctx2, data);
-      if (!current2()) return "";
-      byteNotes = await gameByteNotes(ctx2, data);
-      if (!current2()) return "";
-      state2.results["resource.inspect"] = data;
-      if (jump !== void 0 && jump !== null) {
-        ctx2.setDraft("hex-offset", String(data.offset));
-        state2.resourceJump = null;
-      }
-    }
-    const research = a ? await researchTools(ctx2) : "";
-    if (!current2()) return "";
-    const symbols = a ? await sourceSymbols(ctx2) : "";
-    if (!current2()) return "";
-    const references = await popularReferences(ctx2);
-    if (!current2()) return "";
-    const observed = a ? await observedSourceContext(ctx2) : "";
-    if (!current2()) return "";
-    const relocation = a ? await relocationControls(ctx2) : "";
-    if (!current2()) return "";
-    const relationships = a ? await resourceRelationships(ctx2) : "";
-    if (!current2()) return "";
-    let assessment = state2.results["systems.identify"];
-    if ((assessment == null ? void 0 : assessment.artifact_id) !== (a == null ? void 0 : a.artifact_id)) assessment = a && ((_b = (_a = a.system_assessment) == null ? void 0 : _a.source) == null ? void 0 : _b.sha256) === a.sha256 ? a.system_assessment : null;
-    ctx2.use({
-      "rom-check": () => ctx2.run("rom.check", { ...ctx2.sourceParams(), expected_crc32: read("rom-expected-crc").trim(), crc_scope: read("rom-crc-scope") }),
-      "catalog-index": () => ctx2.run("catalog.index", ctx2.sourceParams()),
-      "catalog-search": () => {
-        state2.catalogPage = 0;
-        state2.catalogQuery = read("catalog-query");
-        return ctx2.render();
-      },
-      "catalog-page": (node) => {
-        state2.catalogPage = Math.max(0, (state2.catalogPage || 0) + Number(node.dataset.id));
-        return ctx2.render();
-      },
-      "catalog-open": (node) => ctx2.run("resource.inspect", { ...ctx2.sourceParams(), offset: Number(node.dataset.id), length: Math.min(256, Number(node.dataset.name)) }),
-      "definitions-reuse": async () => {
-        await ctx2.run("resources.reuse_definitions", ctx2.sourceParams(), { render: false });
-        for (const key3 of ["assets.inspect", "script.inspect", "tables.inspect", "levels.inspect", "sound.inspect"]) delete state2.results[key3];
-        await ctx2.render();
-        ctx2.notify("Resource setup rechecked against this build.");
-      },
-      "resource-moved-open": () => {
-        var _a2;
-        if (!current2()) throw Error("The source changed.");
-        const offset = (_a2 = a.plan_annotations) == null ? void 0 : _a2.target_offset;
-        if (!Number.isSafeInteger(offset) || offset < 0 || offset >= a.size) throw Error("Relocation metadata is incomplete. Inspect this build manually.");
-        state2.resourceJump = offset;
-        return ctx2.render();
-      },
-      "resource-moved-table": async () => {
-        if (!current2()) throw Error("The source changed.");
-        const result = await ctx2.run("relocation.table_definition", params, { render: false, refresh: false });
-        if (!current2()) return;
-        if (result.source_sha256 !== a.sha256 || result.artifact_id !== a.artifact_id) throw Error("The moved table belongs to another source.");
-        state2.tableProposal = { scope: ticket, result };
-        return ctx2.navigate("tables");
-      },
-      "system-identify": () => ctx2.run("systems.identify", ctx2.sourceParams()),
-      "system-chr-open": async () => {
-        const result = await ctx2.run("systems.nes_chr", { ...ctx2.sourceParams(), first_tile: parseInteger(read("chr-first")), count: parseInteger(read("chr-count")) }, { render: false });
-        if (!result.ok) throw new Error(result.error || "CHR page is unavailable.");
-        state2.pending = null;
-        state2.paint = null;
-        delete state2.results["assets.inspect"];
-        delete state2.results["assets.plan"];
-        for (const key3 of Object.keys(state2.drafts)) if (key3.endsWith(":assets:asset-schema") || key3.endsWith(":assets:asset-changes")) delete state2.drafts[key3];
-        await ctx2.navigate("assets");
-      },
-      "resource-region": (node) => ctx2.run("resource.inspect", { ...ctx2.sourceParams(), offset: Number(node.dataset.id), length: 256 }),
-      "resource-read": async () => {
-        const offset = parseInteger(read("hex-offset"));
-        await ctx2.run("resource.inspect", { ...ctx2.sourceParams(), offset, length: 256 });
-      },
-      "hex-next": async () => {
-        var _a2;
-        const old = ((_a2 = state2.results["resource.inspect"]) == null ? void 0 : _a2.offset) || 0;
-        state2.drafts[[state2.project.project_id, a.artifact_id, state2.page, "hex-offset"].join(":")] = String(Math.min(a.size - 1, old + 256));
-        await ctx2.run("resource.inspect", { ...ctx2.sourceParams(), offset: Math.min(a.size - 1, old + 256), length: 256 });
-      },
-      "bytes-plan": async () => {
-        const offset = parseInteger(read("edit-offset"));
-        const before = read("edit-before").replace(/\s/g, "").toLowerCase(), after = read("edit-after").replace(/\s/g, "").toLowerCase();
-        const result = await ctx2.run((assessment == null ? void 0 : assessment.system_id) ? "systems.plan_edits" : "bytes.plan", { ...ctx2.sourceParams(), edits: [{ offset, before, after }] }, { render: false });
-        state2.results["bytes.plan"] = result;
-        state2.pending = { kind: "bytes", plan_id: result.plan_id, artifact_id: a.artifact_id, project_id: state2.project.project_id };
-        await ctx2.render();
-      },
-      "bytes-apply": async () => {
-        if (!state2.pending || state2.pending.artifact_id !== a.artifact_id) throw new Error("Review a fresh plan for the selected source first.");
-        const result = await ctx2.run("build.apply", { ...ctx2.projectParams(), plan_id: state2.pending.plan_id }, { render: false });
-        state2.pending = null;
-        await ctx2.render();
-        ctx2.notify("Separate build created; the source is unchanged.");
-      },
-      "bytes-discard": () => {
-        state2.pending = null;
-        delete state2.results["bytes.plan"];
-        ctx2.render();
-      }
-    });
-    if (!a) return `${heading("Workspace", "Resources", "")}${editCheckControls(ctx2)}${empty("Import a source", "Choose a cartridge image.", button("Import source", "import", { primary: true }))}`;
-    const pending = ((_c = state2.pending) == null ? void 0 : _c.kind) === "bytes" && state2.pending.artifact_id === a.artifact_id;
-    return `${heading("Resource investigator", "Resources", "Inspect the exact selected revision. Generic edits require explicit old bytes and preserve file size.", button("Import source", "import", { icon: "plus" }))}<div class="identity">${badge(a.kind, a.kind === "build" ? "good" : "neutral")}<strong>${esc(a.name)}</strong><span>${esc(a.system)} · ${size(a.size)}</span><code title="${a.sha256}">SHA-256 ${short(a.sha256)}…</code></div>${a.source_id ? `<section class="card"><h3>Continue editing this build</h3>${((_d = a.plan_annotations) == null ? void 0 : _d.kind) === "declared-data-relocation-v1" ? "<p>Data moved. Original fixed-offset declarations are not reused.</p>" + button("Inspect moved bytes", "resource-moved-open") + (((_f = (_e = state2.project.sources.concat(state2.project.builds).find((r) => r.artifact_id === a.source_id)) == null ? void 0 : _e.descriptors) == null ? void 0 : _f.tables) ? button("Open moved table layout", "resource-moved-table") : "") : button("Reuse parent resource setup", "definitions-reuse") + '<p class="subtle">Re-read declared offsets against this build.</p>'}</section>` : ""}${observed}<div class="investigation-grid">${hexEditor(ctx2, data)}${byteNotes}</div>${comparison}${documentedTables(ctx2)}${symbols}${research}${references}${sourceSupport(ctx2)}${relationships}${scanControls(ctx2)}<details class="card"><summary>ROM health & revision</summary>${romHealthPanel(ctx2)}${revisionControls(ctx2)}${cheatControls(ctx2)}</details><details class="card"><summary>Find resources</summary>${discoveryControls(ctx2)}</details>${compressionControls(ctx2)}${relocation}<details class="card"><summary>Declared resource catalog</summary>${catalogSection(ctx2, catalog)}</details><details class="card"><summary>System layout</summary>${systemSection(ctx2, assessment)}</details>${report(state2.results["bytes.plan"], "Proposed byte changes")}${report(state2.results["build.apply"], "Build result")}`;
-  }
-  function parseInteger(value) {
-    const n = Number(value);
-    if (!Number.isSafeInteger(n) || n < 0) throw new Error("Enter a nonnegative decimal or 0x hexadecimal offset.");
-    return n;
-  }
-  function systemSection(ctx2, assessment) {
-    var _a, _b;
-    const chr = (_a = assessment == null ? void 0 : assessment.regions) == null ? void 0 : _a.find((r) => r.id === "chr-rom");
-    return `<section class="card"><div class="card-heading"><h3>System investigation</h3>${badge((assessment == null ? void 0 : assessment.status) || "NOT INVESTIGATED", (assessment == null ? void 0 : assessment.status) === "IDENTIFIED" ? "good" : "warm")}</div><p class="subtle">Detected system: <strong>${esc((assessment == null ? void 0 : assessment.system_id) || "Unresolved")}</strong>. </p>${button("Identify selected source", "system-identify", { icon: "search" })}${((_b = assessment == null ? void 0 : assessment.regions) == null ? void 0 : _b.length) ? `<div class="table-wrap"><table><thead><tr><th>Region</th><th>Kind</th><th>Offset</th><th>Length</th><th></th></tr></thead><tbody>${assessment.regions.map((r) => `<tr><td>${esc(r.id)}</td><td>${esc(r.kind)}</td><td><code>0x${r.offset.toString(16)}</code></td><td>${size(r.length)}</td><td>${button("Inspect bytes", "resource-region", { id: String(r.offset) })}</td></tr>`).join("")}</tbody></table></div>` : ""}${chr ? `<div class="notice">${Math.floor(chr.length / 16)} CHR tiles. Opening a page clears the current pixel proposal.</div><div class="field-row">${field("chr-first", "First CHR tile", ctx2.draft("chr-first", "0"), { type: "number", min: 0 })}${field("chr-count", "Tiles on page", ctx2.draft("chr-count", Math.min(16, Math.floor(chr.length / 16))), { type: "number", min: 1 })}</div>${button("Open CHR page", "system-chr-open", { primary: true, icon: "assets" })}` : ""}${report(assessment, "System assessment details")}</section>`;
-  }
-  function catalogSection(ctx2, catalog) {
-    return `<section class="card"><div class="card-heading"><h3>Resource catalog</h3><span>${catalog.total} entries</span></div><div class="toolbar">${field("catalog-query", "Find resources", ctx2.state.catalogQuery || "")}${button("Search resources", "catalog-search")}${button("Index declared resources", "catalog-index")}</div>${catalog.resources.length ? `<div class="table-wrap"><table><thead><tr><th>Resource</th><th>Kind</th><th>Offset</th><th>Bytes</th><th></th></tr></thead><tbody>${catalog.resources.map((r) => `<tr><td>${esc(r.name)}</td><td>${esc(r.kind)}</td><td>0x${r.offset.toString(16)}</td><td>${size(r.length)}</td><td>${button("Inspect", "catalog-open", { id: String(r.offset), name: String(r.length) })}</td></tr>`).join("")}</tbody></table></div><div class="actions">${button("Previous resources", "catalog-page", { id: "-1", disabled: !catalog.page })}<span>Page ${catalog.page + 1}</span>${button("Next resources", "catalog-page", { id: "1", disabled: (catalog.page + 1) * catalog.limit >= catalog.total })}</div>` : '<p class="subtle">Index your declared text and graphics to browse them here.</p>'}</section>`;
-  }
-  function mount4(ctx2) {
-    mountHexEditor(ctx2);
-  }
-
-  // romancer/ui/views/scripts.js
-  var scripts_exports = {};
-  __export(scripts_exports, {
-    mount: () => mount5,
-    render: () => render7
-  });
-
-  // romancer/ui/menu_preview.js
-  var integer10 = (value, min, max, label) => {
-    if (!Number.isSafeInteger(value) || value < min || value > max) throw Error("Invalid declared " + label + ".");
-    return value;
-  };
-  function setup(ctx2) {
-    var _a, _b, _c, _d;
-    const schemaFallback = JSON.stringify(((_b = (_a = ctx2.state.artifact) == null ? void 0 : _a.descriptors) == null ? void 0 : _b.script) || ((_d = (_c = ctx2.state.project) == null ? void 0 : _c.descriptors) == null ? void 0 : _d.script) || {}), menuFallback = JSON.stringify({ profile: {}, cases: {}, font_artifact_id: "", font_schema: {} }), read2 = (id) => {
-      var _a2;
-      return ((_a2 = document.getElementById(id)) == null ? void 0 : _a2.value) ?? ctx2.draft(id, id === "script-schema" ? schemaFallback : menuFallback);
-    };
-    const schema = read2("script-schema"), config = read2("menu-config");
-    if (schema.length > 1024 ** 2 || config.length > 1024 ** 2) throw Error("Menu declaration exceeds its preview budget.");
-    return { schema: JSON.parse(schema), config: JSON.parse(config) };
-  }
-  function names4(ctx2, doc) {
-    return doc.records.map((record, index) => ({ record, texts: record.segments.map((segment) => {
-      var _a;
-      return ((_a = document.getElementById(`script-segment-${index}-${segment.index}`)) == null ? void 0 : _a.value) ?? ctx2.draft(`script-segment-${index}-${segment.index}`, segment.text);
-    }) }));
-  }
-  var textSignature = (ctx2, doc) => JSON.stringify(names4(ctx2, doc).map((row) => [row.record.id, row.texts]));
-  function current(ctx2, owned) {
-    var _a;
-    const { state: state2 } = ctx2, doc = state2.results["script.inspect"];
-    if (!owned || state2.menuVisual !== owned || owned.scope !== selectionKey(state2) || owned.document_id !== (doc == null ? void 0 : doc.document_id) || doc.source_sha256 !== ((_a = state2.artifact) == null ? void 0 : _a.sha256) || state2.page && state2.page !== "scripts") return false;
-    try {
-      return JSON.stringify(setup(ctx2)) === owned.signature;
-    } catch {
-      return false;
-    }
-  }
-  function fontData(metrics) {
-    var _a, _b;
-    if (!Array.isArray(metrics.glyphs) || !metrics.glyphs.length || metrics.glyphs.length > 256) throw Error("Measured font glyphs are unavailable.");
-    const result = /* @__PURE__ */ new Map();
-    let budget = 0;
-    for (const glyph of metrics.glyphs) {
-      const bitmap = glyph.bitmap || {}, width = integer10(bitmap.width, 1, 32, "glyph width"), height = integer10(bitmap.height, 1, 32, "glyph height"), stride = integer10(bitmap.row_stride, 1, 4, "glyph row stride");
-      if (stride !== Math.ceil(width / 8) || typeof bitmap.raw_hex !== "string" || bitmap.raw_hex.length !== stride * height * 2 || !/^[a-f0-9]+$/i.test(bitmap.raw_hex) || result.has(glyph.id)) throw Error("Measured glyph bitmap data is unavailable or ambiguous.");
-      const raw = Uint8Array.from(bitmap.raw_hex.match(/../g), (value) => parseInt(value, 16)), mask = (1 << (8 - width % 8) % 8) - 1;
-      for (let y = 0; y < height; y++) if (raw[(y + 1) * stride - 1] & mask) throw Error("Measured glyph has unsupported padding bits.");
-      integer10((_a = glyph.bearing) == null ? void 0 : _a.x, -64, 64, "glyph bearing");
-      integer10((_b = glyph.bearing) == null ? void 0 : _b.y, -64, 64, "glyph bearing");
-      integer10(glyph.advance_pixels, 0, 128, "glyph advance");
-      budget += raw.length;
-      if (budget > 65536) throw Error("Measured font bitmap budget exceeded.");
-      result.set(glyph.id, { ...glyph, width, height, stride, raw });
-    }
-    return result;
-  }
-  function mappingFor(preview, font) {
-    if (!Array.isArray(preview.glyph_map) || preview.glyph_map.length > 256) throw Error("Declared menu glyph mapping is unavailable.");
-    const result = /* @__PURE__ */ new Map();
-    for (const row of preview.glyph_map) {
-      if (typeof row.scalar !== "string" || Array.from(row.scalar).length !== 1 || result.has(row.scalar) || !font.has(row.glyph_id)) throw Error("Declared menu mapping names an unavailable glyph.");
-      result.set(row.scalar, row.glyph_id);
-    }
-    return result;
-  }
-  function validate(preview, metrics, doc, config) {
-    var _a, _b, _c, _d, _e, _f;
-    if (preview.error) throw Error(preview.error.message || preview.error);
-    if (!metrics.ok || metrics.status !== "MEASURED") throw Error(((_a = metrics.error) == null ? void 0 : _a.message) || "Declared font measurements are unavailable.");
-    if (((_b = config.font_schema) == null ? void 0 : _b.codec) !== "mono-row-msb-v1") throw Error("This font storage format has no declared bitmap preview.");
-    if (preview.source_sha256 !== doc.source_sha256 || preview.document_id !== doc.document_id || preview.schema_sha256 !== doc.schema_sha256 || ((_c = preview.script) == null ? void 0 : _c.document_id) !== doc.document_id) throw Error("Menu layout belongs to different source text.");
-    if (preview.font_sha256 !== metrics.source_sha256 || metrics.source_sha256 !== ((_d = config.font_schema.source) == null ? void 0 : _d.sha256) || preview.font_schema_sha256 !== metrics.font_schema_sha256 || preview.metrics_id !== metrics.metrics_id) throw Error("Menu placements and font measurements have different identities.");
-    const viewport = (_e = preview.profile) == null ? void 0 : _e.viewport, width = integer10(viewport == null ? void 0 : viewport.width, 1, 1024, "viewport width"), height = integer10(viewport == null ? void 0 : viewport.height, 1, 1024, "viewport height");
-    integer10(preview.profile.line_height_px, 1, 64, "line height");
-    if (!Array.isArray(preview.cases) || !preview.cases.length || preview.cases.length > 32 || width * height * preview.cases.length > 8 * 1024 ** 2) throw Error("Declared cases exceed the menu canvas budget.");
-    let cells = 0, placements = 0;
-    for (const row of preview.cases) {
-      if (!Array.isArray(row.cells)) throw Error("Declared menu case cells are unavailable.");
-      cells += row.cells.length;
-      for (const cell of row.cells) placements += ((_f = cell.placements) == null ? void 0 : _f.length) || 0;
-    }
-    if (cells > 1024 || placements > 2048) throw Error("Declared menu placement budget exceeded.");
-    const font = fontData(metrics);
-    return { font, mapping: mappingFor(preview, font), width, height };
-  }
-  async function loadMenuPreview(ctx2, doc) {
-    var _a;
-    if (!(doc == null ? void 0 : doc.ok) || ((_a = ctx2.state.results["script.inspect"]) == null ? void 0 : _a.document_id) !== doc.document_id) throw Error("Inspect declared source text before previewing its menu.");
-    const selected2 = setup(ctx2), { config, schema } = selected2, { state: state2 } = ctx2, generation = (state2.menuPreviewGeneration || 0) + 1;
-    state2.menuPreviewGeneration = generation;
-    const owned = { scope: selectionKey(state2), document_id: doc.document_id, signature: JSON.stringify(selected2), text_signature: textSignature(ctx2, doc), generation, status: "loading" };
-    state2.menuVisual = owned;
-    delete state2.results["menu.preview"];
-    await ctx2.render();
-    const requestCurrent = () => current(ctx2, owned) && owned.text_signature === textSignature(ctx2, doc) && state2.menuPreviewGeneration === generation;
-    try {
-      if (!requestCurrent()) return;
-      const [preview, metrics] = await Promise.all([
-        ctx2.api.call("menu.preview", { ...ctx2.sourceParams(), schema, profile: config.profile, cases: config.cases, font_artifact_id: config.font_artifact_id, font_schema: config.font_schema }),
-        ctx2.api.call("font.measure", { project_id: state2.project.project_id, artifact_id: config.font_artifact_id, schema: config.font_schema })
-      ]);
-      if (!requestCurrent()) {
-        if (state2.menuVisual === owned) state2.menuVisual = null;
-        return;
-      }
-      const prepared = validate(preview, metrics, doc, config);
-      Object.assign(owned, { status: "ready", preview, metrics, prepared });
-      state2.results["menu.preview"] = preview;
-    } catch (error) {
-      if (!requestCurrent()) return;
-      Object.assign(owned, { status: "error", message: error.message });
-    }
-    if (current(ctx2, owned)) await ctx2.render();
-  }
-  function placementsFor(cell, edited, drafts, prepared) {
-    var _a, _b, _c;
-    if (!Array.isArray(cell.placements)) throw Error(((_b = (_a = cell.diagnostics) == null ? void 0 : _a[0]) == null ? void 0 : _b.message) || "Declared cell glyph placements are unavailable.");
-    if (!edited || cell.kind !== "name") return { placements: cell.placements, advance: cell.advance_px };
-    const row = drafts.get(cell.record_id), record = row == null ? void 0 : row.record;
-    if (!record || ((_c = record.read_only_reasons) == null ? void 0 : _c.length) || record.segments.length !== 1 || record.tokens.some((token2) => !["text", "terminator", "padding"].includes(token2.kind))) throw Error("Name preview requires one complete control-free text segment.");
-    const text = row.texts[0], scalars = Array.from(text);
-    if (scalars.length > 128) throw Error("Name preview exceeds 128 display characters.");
-    if (text === cell.text) return { placements: cell.placements, advance: cell.advance_px };
-    const run2 = scalars.map((scalar) => {
-      const id = prepared.mapping.get(scalar), glyph = prepared.font.get(id);
-      if (!glyph) throw Error("No declared glyph for " + JSON.stringify(scalar) + ".");
-      return glyph;
-    });
-    const advance = run2.reduce((sum, glyph) => sum + glyph.advance_pixels, 0), bounds2 = cell.box_bounds;
-    let x = cell.align === "right" ? bounds2[2] - advance : bounds2[0];
-    return { advance, placements: run2.map((glyph) => {
-      const value = { glyph_id: glyph.id, x, y: bounds2[1] };
-      x += glyph.advance_pixels;
-      return value;
-    }) };
-  }
-  function rasterCase(owned, row, drafts, edited) {
-    const { width, height, font } = owned.prepared, pixels = new Uint8ClampedArray(width * height * 4), warnings = /* @__PURE__ */ new Set();
-    for (let i = 0; i < pixels.length; i += 4) pixels.set([16, 33, 39, 255], i);
-    for (const cell of row.cells) {
-      const bounds2 = cell.box_bounds;
-      if (!Array.isArray(bounds2) || bounds2.length !== 4) throw Error("Declared cell bounds are unavailable.");
-      for (const value of bounds2) integer10(value, -131072, 131072, "cell bounds");
-      const { placements, advance } = placementsFor(cell, edited, drafts, owned.prepared);
-      if (Number.isSafeInteger(advance) && advance > bounds2[2] - bounds2[0]) warnings.add("Text advance exceeds a declared box.");
-      if (owned.preview.profile.line_height_px > bounds2[3] - bounds2[1]) warnings.add("Declared line height exceeds its box.");
-      for (const placement of placements) {
-        const glyph = font.get(placement.glyph_id);
-        if (!glyph) throw Error("A placed glyph is missing from the measured font.");
-        const left = integer10(placement.x, -131072, 131072, "glyph position") + glyph.bearing.x, top = integer10(placement.y, -131072, 131072, "glyph position") + glyph.bearing.y;
-        for (let y = 0; y < glyph.height; y++) for (let x = 0; x < glyph.width; x++) if (glyph.raw[y * glyph.stride + (x >> 3)] & 128 >> x % 8) {
-          const px = left + x, py = top + y;
-          if (px < bounds2[0] || px >= bounds2[2] || py < bounds2[1] || py >= bounds2[3]) warnings.add("Glyph ink exceeds a declared box.");
-          if (px < 0 || py < 0 || px >= width || py >= height) {
-            warnings.add("Glyph ink exceeds the declared viewport.");
-            continue;
-          }
-          pixels.set([230, 241, 235, 255], (py * width + px) * 4);
-        }
-      }
-    }
-    return { width, height, pixels, warnings: [...warnings] };
-  }
-  function menuPreviewReport(ctx2) {
-    const owned = ctx2.state.menuVisual;
-    return current(ctx2, owned) && owned.status === "ready" ? owned.preview : null;
-  }
-  function menuPreviewPanel(ctx2) {
-    const owned = ctx2.state.menuVisual;
-    if (!current(ctx2, owned)) return "";
-    if (owned.status === "loading") return '<section class="card"><p class="preview-caption" role="status">Measuring declared menu glyphs and layout…</p></section>';
-    if (owned.status === "error") return `<section class="card"><p class="error" role="status">Menu preview unavailable: ${esc(owned.message)}</p></section>`;
-    const { width, height } = owned.prepared, canvas = (kind, i) => `<canvas id="menu-${kind}-${i}" width="${width}" height="${height}" aria-label="${kind === "original" ? "Original" : "Editing"} declared menu case ${i + 1}" style="display:block;width:${Math.min(768, width * 3)}px;max-width:100%;height:auto;image-rendering:pixelated"></canvas>`;
-    return `<section class="card" id="menu-visual-preview"><h3>Declared font &amp; layout preview</h3><p class="preview-caption">Monochrome declared glyphs and boxes; not a captured game scene. Native font use and rendering remain unverified.</p><p>Edit a name above to update its declared menu cases. Control codes stay preserved.</p>${owned.preview.cases.map((row, i) => `<section><h4>Case ${esc(row.id)}${row.selected_entry == null ? "" : " · selected " + esc(row.selected_entry)}</h4><div class="preview-pair"><div><span>Original</span>${canvas("original", i)}</div><div><span>Editing</span>${canvas("edited", i)}</div></div><p id="menu-case-status-${i}" class="preview-caption" role="status" aria-live="polite"></p></section>`).join("")}</section>`;
-  }
-  function mountMenuPreview(ctx2, doc) {
-    var _a;
-    const owned = ctx2.state.menuVisual, root = document.getElementById("menu-visual-preview");
-    if (!root || !current(ctx2, owned) || owned.status !== "ready") return;
-    const draw2 = () => {
-      if (!current(ctx2, owned)) {
-        root.innerHTML = '<p class="error" role="status">Menu preview unavailable: source or declarations changed. Preview menu again.</p>';
-        return;
-      }
-      const drafts = new Map(names4(ctx2, doc).map((row) => [row.record.id, row]));
-      for (const [i, row] of owned.preview.cases.entries()) {
-        let before = null, after = null;
-        const errors = [];
-        for (const [kind, edited] of [["original", false], ["edited", true]]) {
-          const canvas = document.getElementById(`menu-${kind}-${i}`);
-          if (!canvas) continue;
-          try {
-            const image = rasterCase(owned, row, drafts, edited), c = canvas.getContext("2d"), data = c.createImageData(image.width, image.height);
-            canvas.width = image.width;
-            canvas.height = image.height;
-            data.data.set(image.pixels);
-            c.putImageData(data, 0, 0);
-            rememberPreview(canvas, image.width, image.height, data.data);
-            canvas.hidden = false;
-            if (edited) after = image;
-            else before = image;
-          } catch (error) {
-            canvas.hidden = true;
-            canvas.width = 1;
-            canvas.height = 1;
-            errors.push((edited ? "Editing" : "Original") + " preview unavailable: " + error.message);
-          }
-        }
-        const status = document.getElementById("menu-case-status-" + i);
-        if (status) {
-          let changed2 = 0;
-          if (before && after) {
-            for (let n = 0; n < before.pixels.length; n += 4) if ([0, 1, 2].some((c) => before.pixels[n + c] !== after.pixels[n + c])) changed2++;
-          }
-          status.textContent = errors.length ? errors.join(" ") : (changed2 ? "Preview updated · " + changed2 + " declared pixels differ · not built." : "Unchanged declared menu preview.") + " " + [.../* @__PURE__ */ new Set([...(before == null ? void 0 : before.warnings) || [], ...(after == null ? void 0 : after.warnings) || []])].join(" ");
-          status.className = errors.length ? "error" : "preview-caption";
-        }
-      }
-    };
-    for (const [index, record] of doc.records.entries()) for (const segment of record.segments) {
-      const node = document.getElementById(`script-segment-${index}-${segment.index}`);
-      node == null ? void 0 : node.addEventListener("input", draw2);
-      node == null ? void 0 : node.addEventListener("change", draw2);
-    }
-    for (const id of ["menu-config", "script-schema"]) (_a = document.getElementById(id)) == null ? void 0 : _a.addEventListener("input", () => {
-      if (!current(ctx2, owned)) {
-        draw2();
-        if (ctx2.state.menuVisual === owned) ctx2.state.menuVisual = null;
-      }
-    });
-    draw2();
-  }
-
-  // romancer/ui/translation_controls.js
-  function translationPreview(state2, model) {
-    const saved = state2.translationSheet;
-    return (saved == null ? void 0 : saved.scope) === selectionKey(state2) && saved.preview.document_id === (model == null ? void 0 : model.document_id) && saved.preview.schema_sha256 === (model == null ? void 0 : model.schema_sha256) ? saved.preview : null;
-  }
-  function translationControls(ctx2, model) {
-    const { state: state2 } = ctx2, ticket = selectionKey(state2), preview = translationPreview(state2, model), enabled = (model == null ? void 0 : model.ok) && model.write_supported;
-    const schema = () => json("script-schema"), current2 = () => selectionKey(state2) === ticket;
-    ctx2.use({
-      "translation-export": async () => {
-        const format = read("translation-format"), params = ctx2.sourceParams(), result = await ctx2.run("translation.export", { ...params, schema: schema(), format }, { render: false });
-        if (current2()) await ctx2.api.download(params.project_id, result.export.export_id, "translation." + format);
-      },
-      "translation-preview": async () => {
-        const file = document.getElementById("translation-file").files[0];
-        if (!file) throw Error("Choose the edited CSV or TSV sheet.");
-        const selectedSchema = schema(), signature = JSON.stringify(selectedSchema), format = read("translation-format"), params = ctx2.sourceParams(), request2 = (state2.translationRequest || 0) + 1;
-        state2.translationRequest = request2;
-        const input = await ctx2.api.uploadInput(params.project_id, file, "translation");
-        if (!current2() || state2.translationRequest !== request2) throw Error("Selection changed. Preview this sheet again.");
-        const result = await ctx2.run("translation.preview", { ...params, schema: selectedSchema, input_id: input.input_id, format }, { render: false });
-        if (!current2() || state2.translationRequest !== request2 || JSON.stringify(schema()) !== signature) throw Error("Source, file or text setup changed. Preview again.");
-        state2.translationSheet = { scope: ticket, preview: result, schema: selectedSchema };
-        await ctx2.render();
-      },
-      "translation-review": async () => {
-        const saved = state2.translationSheet, result = translationPreview(state2, model);
-        if (!(result == null ? void 0 : result.valid) || !result.changed_segments) throw Error("Preview a valid sheet with changes first.");
-        if (JSON.stringify(schema()) !== JSON.stringify(saved.schema)) throw Error("Text setup changed. Preview the sheet again.");
-        const request2 = state2.translationRequest, plan = await ctx2.run("script.plan", { ...ctx2.sourceParams(), schema: saved.schema, edits: result.edits }, { render: false });
-        if (!current2() || request2 !== state2.translationRequest) return;
-        saved.plan = plan;
-        await ctx2.render();
-      },
-      "translation-apply": async () => {
-        const saved = state2.translationSheet, result = translationPreview(state2, model);
-        if (!(saved == null ? void 0 : saved.plan) || !(result == null ? void 0 : result.valid) || JSON.stringify(schema()) !== JSON.stringify(saved.schema)) throw Error("Review a fresh translation plan first.");
-        const built = await ctx2.run("structured.apply", { ...ctx2.projectParams(), plan_id: saved.plan.workbench_plan_id }, { render: false });
-        if (!current2()) return;
-        state2.translationSheet = null;
-        await ctx2.refreshProject();
-        await ctx2.setArtifact(built.artifact_id);
-        ctx2.notify("Translated build created. Original controls and source preserved.");
-        await ctx2.navigate("overview");
-      }
-    });
-    return `<details class="card" id="translation-tools"><summary>Translation spreadsheet</summary><p>Export, edit only the translation column, then import to check every change.</p>${select("translation-format", "Sheet format", [["csv", "CSV"], ["tsv", "TSV"]], ctx2.draft("translation-format", "csv"))}${button("Download text sheet", "translation-export", { disabled: !enabled })}${fileInput("translation-file", "Edited sheet", ".csv,.tsv")}${button("Check imported translations", "translation-preview", { disabled: !enabled })}
- ${!enabled ? "<p>Declare and inspect editable text first.</p>" : ""}${preview ? `<div class="notice">${badge(preview.status.replaceAll("_", " ").toLowerCase(), preview.valid ? "good" : "warm")} · ${preview.changed_segments} changed segments</div>
- ${preview.issues.map((r) => `<p class="error">${esc(r.record_id || "Sheet")}: ${esc(r.message)}</p>`).join("")}
- <div class="table-wrap"><table><thead><tr><th>Record</th><th>Original</th><th>Translation</th><th>Bytes / capacity</th></tr></thead><tbody>${preview.previews.map((r) => `<tr><td>${esc(r.record_id)}</td><td>${r.before.map(esc).join(" | ")}</td><td>${r.after.map(esc).join(" | ")}${r.text_truncated ? "…" : ""}</td><td>${r.used_bytes} / ${r.capacity}</td></tr>`).join("")}</tbody></table></div>
- <div class="actions">${button("Review translation plan", "translation-review", { disabled: !preview.valid || !preview.changed_segments, primary: true })}${button("Create translated build", "translation-apply", { disabled: !state2.translationSheet.plan })}</div>${state2.translationSheet.plan ? "<p>Plan reviewed. Creating the build preserves the original file.</p>" : ""}` : ""}</details>`;
-  }
-  function mountTranslation(ctx2) {
-    var _a;
-    const root = document.getElementById("translation-tools");
-    if (!root) return;
-    for (const id of ["translation-file", "translation-format", "script-schema"]) (_a = document.getElementById(id)) == null ? void 0 : _a.addEventListener("change", () => {
-      ctx2.state.translationRequest = (ctx2.state.translationRequest || 0) + 1;
-      ctx2.state.translationSheet = null;
-      root.querySelectorAll('[data-action="translation-apply"],[data-action="translation-review"]').forEach((n) => n.disabled = true);
-    });
-  }
-
-  // romancer/ui/declarations.js
-  var systems3 = [["nes", "NES"], ["snes", "SNES"], ["genesis", "Genesis"], ["gb", "Game Boy"], ["gbc", "Game Boy Color"], ["gba", "GBA"], ["sms", "Master System"]];
-  var integer11 = (id) => {
-    const text = read(id).trim(), value = Number(text);
-    if (!text || !Number.isSafeInteger(value)) throw new Error("Enter a whole number for " + id + ".");
-    return value;
-  };
-  var optional = (id) => read(id).trim() ? integer11(id) : null;
-  function system(ctx2, prefix) {
-    return select(prefix + "-system", "System", systems3, ctx2.draft(prefix + "-system", resourceSystem(ctx2.state)));
-  }
-  function number(ctx2, id, title, value) {
-    return field(id, title, ctx2.draft(id, value));
-  }
-  async function declared(ctx2, kind, config) {
-    const result = await ctx2.run("resources.declare_" + kind, { ...ctx2.sourceParams(), config }, { render: false });
-    ctx2.state.candidateReview = null;
-    ctx2.state.openDeclaration = null;
-    ctx2.state.results[kind + ".inspect"] = result.inspection;
-    ctx2.setDraft(kind === "script" ? "script-schema" : "asset-schema", JSON.stringify(result.schema, null, 2));
-    if (kind === "assets") {
-      ctx2.state.paint = null;
-      ctx2.setDraft("paint-buffer", "");
-      ctx2.setDraft("asset-changes", "[]");
-    }
-    await ctx2.render();
-  }
-  function textDeclaration(ctx2) {
-    prefill(ctx2, "text");
-    ctx2.use({ "declare-text": () => {
-      const controls = read("text-controls").split("\n").filter((s) => s.trim()).map((line) => {
-        const [id, opcode, args, role] = line.split(",").map((s) => s.trim());
-        return { id, opcode: parseInt(opcode, 16), argument_length: Number(args), position_independent: true, layout_role: role };
-      });
-      return declared(ctx2, "script", { system_id: read("text-system"), offset: integer11("text-offset"), capacity: integer11("text-capacity"), count: integer11("text-count"), stride: integer11("text-stride"), pointer_offset: optional("text-pointer"), pointer_width: integer11("text-pointer-width"), pointer_endian: read("text-endian"), pointer_base: integer11("text-base"), terminator: integer11("text-terminator"), padding: integer11("text-padding"), encoding: read("text-encoding"), table: read("text-table"), controls });
-    } });
-    return `<details class="config" ${ctx2.state.openDeclaration === "text" ? "open" : ""}><summary>Declare text slots</summary>${system(ctx2, "text")}<div class="field-row">${number(ctx2, "text-offset", "First text offset", "0")}${number(ctx2, "text-capacity", "Bytes per slot", "64")}${number(ctx2, "text-count", "Slot count", "1")}${number(ctx2, "text-stride", "Slot stride", "64")}${number(ctx2, "text-pointer", "Pointer table offset (optional)", "")}${number(ctx2, "text-pointer-width", "Pointer bytes", "2")}${number(ctx2, "text-base", "Add to stored pointer for file offset", "0")}${select("text-endian", "Pointer byte order", [["little", "Little endian"], ["big", "Big endian"]], ctx2.draft("text-endian", "little"))}${number(ctx2, "text-terminator", "Terminator byte", "0")}${number(ctx2, "text-padding", "Padding byte", "255")}</div>${select("text-encoding", "Encoding", [["ascii", "ASCII"], ["table", "Custom single-byte table"]], ctx2.draft("text-encoding", "ascii"))}${area("text-table", "Custom table (HH=character)", ctx2.draft("text-table", ""), 3)}${area("text-controls", "Controls (name, hex opcode, argument bytes, line/page/pause/opaque)", ctx2.draft("text-controls", ""), 2)}<p class="subtle">Text pointer formula: file offset = stored value + adjustment. For a GBA ROM window beginning at 0x08000000, use -134217728. This differs from the subtraction base in Data tables.</p>${button("Load text declaration", "declare-text")}</details>`;
-  }
-  function graphicsDeclaration(ctx2) {
-    prefill(ctx2, "gfx");
-    ctx2.use({ "declare-graphics": () => {
-      const config = { system_id: read("gfx-system"), offset: integer11("gfx-offset"), count: integer11("gfx-count"), codec: read("gfx-codec"), width: integer11("gfx-width"), height: integer11("gfx-height"), palette_offset: optional("gfx-palette"), palette_banks: integer11("gfx-banks"), palette_format: read("gfx-palette-format"), map_offset: optional("gfx-map"), map_width: integer11("gfx-map-width"), map_height: integer11("gfx-map-height"), font_chars: read("gfx-chars"), advance_offset: optional("gfx-advance"), advance_pixels: integer11("gfx-advance-pixels") };
-      return declared(ctx2, "assets", config);
-    } });
-    return `<details class="config" ${ctx2.state.openDeclaration === "gfx" ? "open" : ""}><summary>Declare graphics or font</summary>${system(ctx2, "gfx")}${select("gfx-codec", "Storage layout", [["", "System tile template"], ["mono-row-msb-v1", "Mono font rows"], ["tile8-planar2-msb-v1", "NES 2bpp separate planes"], ["tile8-paired2-msb-v1", "Game Boy 2bpp paired planes"], ["tile8-rowplanar4-msb-v1", "SMS 4bpp row planes"], ["tile8-paired4-msb-v1", "4bpp paired planes"], ["tile8-packed4-high-v1", "4bpp high nibble first"], ["tile8-packed4-low-v1", "4bpp low nibble first"]], ctx2.draft("gfx-codec", ""))}<div class="field-row">${number(ctx2, "gfx-offset", "Bitmap offset", "0")}${number(ctx2, "gfx-count", "Tile or glyph count", "1")}${number(ctx2, "gfx-width", "Cell width", "8")}${number(ctx2, "gfx-height", "Cell height", "8")}${number(ctx2, "gfx-palette", "Palette offset (optional)", "")}${number(ctx2, "gfx-banks", "Palette banks", "1")}${select("gfx-palette-format", "Palette layout", [["rgb555-le", "RGB555 little endian"], ["rgb555-be", "RGB555 big endian"], ["genesis", "Genesis RGB333"], ["sms-rgb222", "Master System RGB222"]], ctx2.draft("gfx-palette-format", ctx2.state.artifact.system_id === "genesis" ? "genesis" : ctx2.state.artifact.system_id === "sms" ? "sms-rgb222" : "rgb555-le"))}${number(ctx2, "gfx-map", "Tilemap offset (optional)", "")}${number(ctx2, "gfx-map-width", "Map columns", "1")}${number(ctx2, "gfx-map-height", "Map rows", "1")}</div>${field("gfx-chars", "Font characters in cell order (optional)", ctx2.draft("gfx-chars", ""))}<div class="field-row">${number(ctx2, "gfx-advance", "Stored advance table offset (optional)", "")}${number(ctx2, "gfx-advance-pixels", "Fixed advance in pixels", "8")}</div>${button("Load graphics declaration", "declare-graphics")}</details>`;
-  }
-  function layoutDeclaration(ctx2) {
-    var _a;
-    const rows = [...ctx2.state.project.sources, ...ctx2.state.project.builds].filter((r) => {
-      var _a2;
-      return (_a2 = r.descriptors) == null ? void 0 : _a2.font;
-    });
-    ctx2.use({ "configure-menu": async () => {
-      const result = await ctx2.run("resources.menu_form", { ...ctx2.sourceParams(), font_artifact_id: read("layout-font"), width: integer11("layout-width"), height: integer11("layout-height"), line_height: integer11("layout-line-height") }, { render: false });
-      ctx2.setDraft("menu-config", JSON.stringify({ font_artifact_id: result.font_artifact_id, font_schema: result.font_schema, profile: result.profile, cases: result.cases, request: {} }, null, 2));
-      await ctx2.render();
-    }, "configure-layout": async () => {
-      const result = await ctx2.run("resources.layout_form", { ...ctx2.sourceParams(), font_artifact_id: read("layout-font"), width: integer11("layout-width"), height: integer11("layout-height"), line_height: integer11("layout-line-height") }, { render: false });
-      ctx2.setDraft("layout-config", JSON.stringify({ font_artifact_id: result.font_artifact_id, font_schema: result.font_schema, policy: result.policy, request: result.request }, null, 2));
-      await ctx2.render();
-    } });
-    return `<details class="config"><summary>Configure text layout</summary>${select("layout-font", "Declared font", rows.map((r) => [r.artifact_id, r.name]), ctx2.draft("layout-font", (_a = rows[0]) == null ? void 0 : _a.artifact_id))}<div class="field-row">${number(ctx2, "layout-width", "Box width in pixels", "240")}${number(ctx2, "layout-height", "Box height in pixels", "64")}${number(ctx2, "layout-line-height", "Line height", "8")}</div><div class="actions">${button("Use layout settings", "configure-layout", { disabled: !rows.length })}${button("Create menu preview setup", "configure-menu", { disabled: !rows.length })}</div></details>`;
-  }
-  function prefill(ctx2, prefix) {
-    var _a;
-    const candidate = ctx2.state.resourcePrefill;
-    if (!candidate || candidate.artifact_id !== ((_a = ctx2.state.artifact) == null ? void 0 : _a.artifact_id) || candidate.prefix !== prefix) return;
-    const map = prefix === "text" ? { system_id: "system", offset: "offset", capacity: "capacity", count: "count", stride: "stride", pointer_offset: "pointer", encoding: "encoding", terminator: "terminator", padding: "padding" } : { system_id: "system", offset: "offset", count: "count", codec: "codec" };
-    ctx2.state.resourcePrefill = null;
-    ctx2.state.openDeclaration = prefix;
-    for (const [key3, suffix] of Object.entries(map)) if (key3 in candidate.config) ctx2.setDraft(prefix + "-" + suffix, candidate.config[key3] === null ? "" : String(candidate.config[key3]));
-  }
-
-  // romancer/ui/views/scripts.js
-  async function render7(ctx2) {
-    var _a, _b, _c, _d, _e, _f, _g, _h, _i;
-    const setupReview = useResearchSetup(ctx2, "script");
-    if (setupReview) return setupReview;
-    const { state: state2 } = ctx2, missing2 = requireProject(ctx2);
-    if (missing2) return missing2;
-    if (!state2.artifact) return empty("Import a resource", "Select a source with a declared fixed-slot script schema.");
-    const fallback = ((_a = state2.candidateReview) == null ? void 0 : _a.artifact_id) === state2.artifact.artifact_id ? {} : ((_b = state2.artifact.descriptors) == null ? void 0 : _b.script) || ((_c = state2.project.descriptors) == null ? void 0 : _c.script) || {};
-    const schemaText = ctx2.draft("script-schema", JSON.stringify(fallback, null, 2));
-    let document2 = ((_d = state2.candidateReview) == null ? void 0 : _d.artifact_id) === state2.artifact.artifact_id ? null : state2.results["script.inspect"];
-    if ((document2 == null ? void 0 : document2.source_sha256) !== state2.artifact.sha256) document2 = null;
-    if (!document2 && ((_f = (_e = fallback.profile) == null ? void 0 : _e.accepted_sha256) == null ? void 0 : _f.includes(state2.artifact.sha256))) {
-      document2 = await ctx2.api.call("script.inspect", { ...ctx2.sourceParams(), schema: fallback });
-      state2.results["script.inspect"] = document2;
-    }
-    ctx2.use({
-      "script-page": (node) => {
-        state2.scriptPage = Math.max(0, (state2.scriptPage || 0) + Number(node.dataset.id));
-        return ctx2.render();
-      },
-      "script-search": () => {
-        state2.scriptPage = 0;
-        state2.scriptFilter = read("script-search").toLowerCase();
-        ctx2.render();
-      },
-      "script-replace": () => {
-        const find = read("script-find"), replace = read("script-replace");
-        if (!find) throw new Error("Enter text to find.");
-        document2.records.forEach((row, i) => row.segments.forEach((segment) => {
-          const id = `script-segment-${i}-${segment.index}`, node = window.document.getElementById(id), value = node ? node.value : ctx2.draft(id, segment.text);
-          if (value.includes(find)) ctx2.setDraft(id, value.split(find).join(replace));
-        }));
-        state2.pending = null;
-        ctx2.render();
-      },
-      "script-inspect": () => ctx2.run("script.inspect", { ...ctx2.sourceParams(), schema: json("script-schema") }),
-      "script-plan": async () => {
-        var _a2;
-        if (!(document2 == null ? void 0 : document2.ok)) throw Error("Inspect the selected script schema first.");
-        const collect = () => {
-          const changes2 = [];
-          document2.records.forEach((row, i) => row.segments.forEach((segment) => {
-            const id = `script-segment-${i}-${segment.index}`, node = window.document.getElementById(id), value = node ? node.value : ctx2.draft(id, segment.text);
-            if (value !== segment.text) changes2.push({ record_id: row.id, segment: segment.index, text: value });
-          }));
-          return changes2;
-        };
-        const changes = collect();
-        if (!changes.length) throw Error("Change a text segment before reviewing.");
-        const schema = json("script-schema"), signature = JSON.stringify({ schema, changes }), edits = { schema_version: 1, document_id: document2.document_id, source_sha256: document2.source_sha256, schema_sha256: document2.schema_sha256, changes };
-        const result = await ctx2.run("script.plan", { ...ctx2.sourceParams(), schema, edits }, { render: false });
-        if (((_a2 = state2.results["script.inspect"]) == null ? void 0 : _a2.document_id) !== document2.document_id || JSON.stringify({ schema: json("script-schema"), changes: collect() }) !== signature) {
-          ctx2.notify("Text changed during review. Review it again.");
-          return;
-        }
-        state2.pending = { kind: "script", plan_id: result.workbench_plan_id, artifact_id: state2.artifact.artifact_id, document_id: document2.document_id, signature };
-        await ctx2.render();
-      },
-      "script-apply": async () => {
-        var _a2, _b2;
-        if (((_a2 = state2.pending) == null ? void 0 : _a2.kind) !== "script" || state2.pending.artifact_id !== state2.artifact.artifact_id || state2.pending.document_id !== (document2 == null ? void 0 : document2.document_id) || ((_b2 = state2.results["script.inspect"]) == null ? void 0 : _b2.document_id) !== (document2 == null ? void 0 : document2.document_id)) throw Error("Review the current text changes first.");
-        const reviewed = state2.pending;
-        await ctx2.run("structured.apply", { ...ctx2.projectParams(), plan_id: reviewed.plan_id }, { render: false });
-        if (state2.pending !== reviewed) {
-          ctx2.notify("Dialogue build created. Your newer text edits are still staged.");
-          return;
-        }
-        state2.pending = null;
-        await ctx2.render();
-        ctx2.notify("Dialogue build created. Controls and original bytes were checked.");
-      },
-      "script-discard": () => {
-        state2.pending = null;
-        for (const key3 of Object.keys(state2.drafts)) if (key3.includes("script-segment-")) delete state2.drafts[key3];
-        delete state2.results["script.plan"];
-        ctx2.render();
-      },
-      "script-export": async () => {
-        if (!(document2 == null ? void 0 : document2.ok)) throw new Error("Inspect a script before exporting it.");
-        const result = await ctx2.run("docs.script_from_resource", { ...ctx2.sourceParams(), schema: json("script-schema"), format: "html" });
-        await ctx2.api.download(state2.project.project_id, result.export.export_id, "script.html");
-      },
-      "font-measure": () => {
-        const config = json("layout-config");
-        return ctx2.run("font.measure", { ...ctx2.projectParams(), artifact_id: config.font_artifact_id, schema: config.font_schema });
-      },
-      "layout-check": () => {
-        const config = json("layout-config");
-        return ctx2.run("layout.check", { ...ctx2.sourceParams(), schema: json("script-schema"), font_artifact_id: config.font_artifact_id, font_schema: config.font_schema, policy: config.policy });
-      },
-      "layout-plan": () => {
-        const config = json("layout-config");
-        return ctx2.run("layout.plan", { ...ctx2.sourceParams(), schema: json("script-schema"), font_artifact_id: config.font_artifact_id, font_schema: config.font_schema, policy: config.policy, request: config.request });
-      },
-      "menu-inspect": () => {
-        const config = json("menu-config");
-        return ctx2.run("menu.inspect", { ...ctx2.sourceParams(), schema: json("script-schema"), profile: config.profile });
-      },
-      "menu-compare": () => {
-        const config = json("menu-config");
-        return ctx2.run("menu.compare", { ...ctx2.sourceParams(), schema: json("script-schema"), profile: config.profile, cases: config.cases, font_artifact_id: config.font_artifact_id, font_schema: config.font_schema, request: config.request });
-      },
-      "menu-preview": () => loadMenuPreview(ctx2, document2)
-    });
-    if (((_g = state2.candidateReview) == null ? void 0 : _g.artifact_id) === state2.artifact.artifact_id) return `${heading("", "Confirm text candidate", "")}${editCheckControls(ctx2)}<section class="card"><p>${esc(state2.candidateReview.reason)}</p><p>Confirm the format and allocation, then load the declaration.</p>${textDeclaration(ctx2)}${button("Cancel candidate", "candidate-cancel")}</section>`;
-    const pending = ((_h = state2.pending) == null ? void 0 : _h.kind) === "script" && state2.pending.artifact_id === state2.artifact.artifact_id;
-    return `${heading("Dialogue studio", "Text & layout", "Edit declared text segments while preserving control codes, pointers, and fixed allocations.", button("Export script", "script-export", { icon: "download", disabled: !(document2 == null ? void 0 : document2.ok) }))}<div class="identity"><strong>${esc(state2.artifact.name)}</strong><code>${short(state2.artifact.sha256)}</code>${badge((document2 == null ? void 0 : document2.write_supported) ? "EDITABLE FIXED SLOTS" : "SCHEMA REQUIRED", (document2 == null ? void 0 : document2.write_supported) ? "good" : "warm")}</div>${translationControls(ctx2, document2)}<div class="grid-two"><section class="card"><div class="card-heading"><h3>Text records</h3><span class="subtle">${((_i = document2 == null ? void 0 : document2.records) == null ? void 0 : _i.length) || 0} declared records</span></div>${field("script-search", "Search text", state2.scriptFilter || "")}${button("Search", "script-search")}<details class="config"><summary>Replace text</summary>${field("script-find", "Find", ctx2.draft("script-find", ""))}${field("script-replace", "Replace with", ctx2.draft("script-replace", ""))}${button("Stage replacements", "script-replace")}</details>${(document2 == null ? void 0 : document2.ok) ? document2.records.map((row, i) => ({ row, i })).filter(({ row }) => !state2.scriptFilter || row.segments.some((s) => s.text.toLowerCase().includes(state2.scriptFilter))).slice((state2.scriptPage || 0) * 20, (state2.scriptPage || 0) * 20 + 20).map(({ row, i }) => {
-      var _a2, _b2;
-      return `<article class="script-line"><div class="line-meta"><strong>${esc(((_a2 = row.annotations) == null ? void 0 : _a2.label) || row.id)}</strong><span>${row.used_bytes ?? "?"} / ${row.capacity} bytes · offset ${row.offset}</span></div><p class="preview-caption">System-font comparison · game font requires a declared layout or playtest</p>${row.segments.map((segment) => `<div class="preview-pair script-comparison"><div><span>Original segment ${segment.index + 1}</span><div class="text-window">${esc(segment.text)}</div></div><div>${area(`script-segment-${i}-${segment.index}`, "Edited segment " + (segment.index + 1), ctx2.draft(`script-segment-${i}-${segment.index}`, segment.text), 3)}</div></div>`).join("")}<div id="script-capacity-${i}">${capacitySummary(textCapacity(row, row.segments.map((segment) => ctx2.draft(`script-segment-${i}-${segment.index}`, segment.text)), document2.encoding_glyphs))}</div>${row.tokens.some((t) => t.kind === "control") ? `<div class="notice">Preserved controls: ${row.tokens.filter((t) => t.kind === "control").map((t) => esc(t.control_id)).join(", ")}</div>` : ""}${((_b2 = row.read_only_reasons) == null ? void 0 : _b2.map((r) => `<p class="error small">${esc(r)}</p>`).join("")) || ""}</article>`;
-    }).join("") : empty("Load a revision-bound script schema", "Unknown encodings remain read only. The original demonstration includes an editable schema.")}<div class="actions">${button("Previous records", "script-page", { id: "-1", disabled: !(state2.scriptPage > 0) })}${button("Next records", "script-page", { id: "1", disabled: !document2 || ((state2.scriptPage || 0) + 1) * 20 >= document2.records.filter((row) => !state2.scriptFilter || row.segments.some((s) => s.text.toLowerCase().includes(state2.scriptFilter))).length })}</div><div class="actions">${button("Review text changes", "script-plan", { primary: !pending, icon: "arrow", disabled: !(document2 == null ? void 0 : document2.write_supported) })}${pending ? button("Create dialogue build", "script-apply", { primary: true, icon: "check" }) + button("Discard changes", "script-discard") : ""}</div></section><div>${menuPreviewPanel(ctx2)}<section class="card"><h3>Text setup</h3>${textDeclaration(ctx2)}${layoutDeclaration(ctx2)}${jsonEditor("script-schema", "Advanced script schema", schemaText, false)}${button("Inspect script", "script-inspect", { icon: "scripts" })}${jsonEditor("layout-config", "Advanced layout configuration", ctx2.draft("layout-config", JSON.stringify({ font_artifact_id: "", font_schema: {}, policy: {}, request: {} }, null, 2)))}<div class="actions">${button("Measure font", "font-measure")}${button("Check layout", "layout-check")}${button("Plan layout", "layout-plan")}</div>${jsonEditor("menu-config", "Menu display configuration", ctx2.draft("menu-config", JSON.stringify({ profile: {}, cases: {}, font_artifact_id: "", font_schema: {} }, null, 2)))}<div class="actions">${button("Inspect menu", "menu-inspect")}${button("Preview menu", "menu-preview")}${button("Compare native menu captures", "menu-compare")}</div></section></div></div>${report(state2.results["script.plan"], "Proposed dialogue changes")}${report(state2.results["structured.apply"], "Structured build")}${report(state2.results["font.measure"], "Measured font")}${report(state2.results["layout.check"], "Layout check")}${report(state2.results["layout.plan"], "Layout proposal")}${report(state2.results["menu.inspect"], "Declared menu")}${report(menuPreviewReport(ctx2), "Declared menu report")}${report(state2.results["menu.compare"], "Native menu comparison")}`;
-  }
-  function mount5(ctx2) {
-    mountTranslation(ctx2);
-    const doc = ctx2.state.results["script.inspect"];
-    if (!(doc == null ? void 0 : doc.ok)) return;
-    mountMenuPreview(ctx2, doc);
-    const scope = selectionKey(ctx2.state);
-    for (const [i, row] of doc.records.entries()) {
-      const target = document.getElementById("script-capacity-" + i);
-      if (!target) continue;
-      const nodes = row.segments.map((segment) => document.getElementById(`script-segment-${i}-${segment.index}`));
-      const draw2 = () => {
-        var _a;
-        if (selectionKey(ctx2.state) !== scope || ((_a = ctx2.state.results["script.inspect"]) == null ? void 0 : _a.document_id) !== doc.document_id) return;
-        const values = nodes.map((node, j) => (node == null ? void 0 : node.value) ?? row.segments[j].text);
-        target.innerHTML = '<p class="preview-caption" role="status">' + (values.some((text, j) => text !== row.segments[j].text) ? "Preview updated · text staged" : "Unchanged text preview") + "</p>" + capacitySummary(textCapacity(row, values, doc.encoding_glyphs));
-      };
-      for (const node of nodes) node == null ? void 0 : node.addEventListener("input", draw2);
-      draw2();
-    }
-  }
-
-  // romancer/ui/views/assets.js
-  var assets_exports = {};
-  __export(assets_exports, {
-    literalColorCount: () => literalColorCount,
-    literalRGB: () => literalRGB,
-    mount: () => mount6,
-    render: () => render8
-  });
-
-  // romancer/ui/graphics_formats.js
-  var names5 = { "mono-row-msb-v1": "Monochrome rows (2 colors)", "tile8-planar2-msb-v1": "NES tiles (4 colors)", "tile8-paired2-msb-v1": "Game Boy tiles (4 colors)", "tile8-paired4-msb-v1": "SNES tiles (16 colors)", "tile8-rowplanar4-msb-v1": "Master System tiles (16 colors)", "tile8-packed4-high-v1": "Genesis tiles (16 colors)", "tile8-packed4-low-v1": "Game Boy Advance tiles (16 colors)" };
-  function formatLabel(codec, system2 = "") {
-    return codec === "tile8-paired2-msb-v1" && system2 === "snes" ? "SNES tiles (4 colors)" : names5[codec] || "Unsupported tile layout";
-  }
-
-  // romancer/ui/palette_editor.js
-  function paletteEditor(ctx2, palette2) {
-    if (!palette2) return "";
-    let after = palette2, error = "";
-    try {
-      after = editedPalette(palette2, JSON.parse(ctx2.draft("asset-changes", "[]")));
-    } catch (e) {
-      error = e.message;
-    }
-    let index = Number(ctx2.draft("palette-index", "1"));
-    if (!Number.isInteger(index) || index < 0 || index >= palette2.entries.length) index = 0;
-    const entry = after.entries[index];
-    return `<section class="card"><h3>Palette colors</h3><div id="palette-comparison">${paletteComparison(palette2, after)}</div><div class="palette-picker-row">${select("palette-index", "Palette entry", palette2.entries.map((e, i) => [i, "Bank " + e.bank + " · color " + e.index]), index)}<label class="field"><span>Choose color · entry ${index}</span><input id="palette-picker" type="color" value="${rgbHex(entry.rgb)}" aria-label="Choose palette color"></label></div><p id="palette-preview-status" class="${error ? "error" : "preview-caption"}" role="status" aria-live="polite">${esc(error || "Color picker changes are staged. Review and build to save them.")}</p><details><summary>Color storage values</summary><div class="field-row">${["r", "g", "b"].map((c, i) => field("palette-" + c, ["Red", "Green", "Blue"][i] + " (0–" + channelMaximum(palette2.channels[c]) + ")", ctx2.draft("palette-" + c, entry.components[c]), { type: "number", min: 0 })).join("")}</div>${button("Stage storage values", "asset-palette-change")}</details></section>`;
-  }
-  function mountPaletteEditor(ctx2, doc, palette2, redraw) {
-    const picker = document.getElementById("palette-picker");
-    if (!picker || !palette2) return;
-    const selector = document.getElementById("palette-index"), selectedIndex = Number(selector == null ? void 0 : selector.value);
-    const scope = selectionKey(ctx2.state), current2 = () => {
-      var _a;
-      return scope === selectionKey(ctx2.state) && ((_a = ctx2.state.results["assets.inspect"]) == null ? void 0 : _a.document_id) === doc.document_id && document.getElementById("palette-picker") === picker;
-    };
-    const stage3 = () => {
-      if (!current2()) return;
-      try {
-        const index = Number(selector == null ? void 0 : selector.value), entry = palette2.entries[index];
-        if (!Number.isInteger(index) || !entry || index !== selectedIndex) throw Error("Reload the selected palette entry before editing its color.");
-        const components = quantizeColor(picker.value, palette2.channels), changes = JSON.parse(ctx2.draft("asset-changes", "[]"));
-        editedPalette(palette2, changes);
-        const next = changes.filter((c) => !(c.kind === "palette" && c.palette_id === palette2.id && c.index === entry.index && c.bank === entry.bank));
-        if (["r", "g", "b"].some((c) => components[c] !== entry.components[c])) next.push({ kind: "palette", palette_id: palette2.id, index: entry.index, bank: entry.bank, before: { ...entry.components }, after: components });
-        const after = editedPalette(palette2, next), encoded = JSON.stringify(next, null, 2);
-        ctx2.setDraft("asset-changes", encoded);
-        const raw = document.getElementById("asset-changes");
-        if (raw) raw.value = encoded;
-        for (const c of ["r", "g", "b"]) {
-          ctx2.setDraft("palette-" + c, String(components[c]));
-          const field2 = document.getElementById("palette-" + c);
-          if (field2) field2.value = String(components[c]);
-        }
-        ctx2.state.pending = null;
-        ctx2.state.assetAcknowledgements = [];
-        ctx2.state.assetEditRevision = (ctx2.state.assetEditRevision || 0) + 1;
-        const comparison = document.getElementById("palette-comparison");
-        if (comparison) comparison.innerHTML = paletteComparison(palette2, after);
-        redraw();
-        const status = document.getElementById("palette-preview-status");
-        if (status) status.textContent = "Preview updated · color staged. Review and build to save it.";
-        return true;
-      } catch (error) {
-        const status = document.getElementById("palette-preview-status");
-        if (status) status.textContent = "Preview unavailable: " + error.message;
-        return false;
-      }
-    };
-    picker.addEventListener("input", stage3);
-    picker.addEventListener("change", () => {
-      if (stage3() && current2()) ctx2.notify("Palette preview updated. Changes are staged.");
-    });
-    selector == null ? void 0 : selector.addEventListener("change", async () => {
-      if (!current2()) return;
-      try {
-        const entry = editedPalette(palette2, JSON.parse(ctx2.draft("asset-changes", "[]"))).entries[Number(selector.value)];
-        if (!entry) return;
-        ctx2.setDraft("palette-index", selector.value);
-        for (const c of ["r", "g", "b"]) ctx2.setDraft("palette-" + c, String(entry.components[c]));
-        await ctx2.render();
-      } catch (error) {
-        const status = document.getElementById("palette-preview-status");
-        if (status) status.textContent = "Preview unavailable: " + error.message;
-      }
-    });
-  }
-
-  // romancer/ui/brush_colors.js
-  var bits = { "mono-row-msb-v1": 1, "tile8-paired2-msb-v1": 2, "tile8-planar2-msb-v1": 2, "tile8-rowplanar4-msb-v1": 4, "tile8-paired4-msb-v1": 4, "tile8-packed4-high-v1": 4, "tile8-packed4-low-v1": 4 };
-  var valid = (rgb) => Array.isArray(rgb) && rgb.length === 3 && rgb.every((v) => Number.isInteger(v) && v >= 0 && v <= 255);
-  function brushColors(bitmap, palette2, layout) {
-    const count = bits[bitmap == null ? void 0 : bitmap.codec] ? Math.min(2 ** bits[bitmap.codec], (palette2 == null ? void 0 : palette2.colors_per_bank) || 256) : 0;
-    return Array.from({ length: count }, (_, index) => {
-      const entry = palette2 == null ? void 0 : palette2.entries.find((e) => e.bank === 0 && e.index === index), declared2 = entry && [entry.rgb.r, entry.rgb.g, entry.rgb.b];
-      if (valid(declared2)) return { index, rgb: declared2, colors: [declared2], origin: "declared" };
-      const observed = [...new Map(((layout == null ? void 0 : layout.colors) || []).map((part) => part == null ? void 0 : part[index]).filter(valid).map((rgb2) => [rgb2.join(","), rgb2])).values()];
-      if (observed.length) return { index, rgb: observed[0], colors: observed, origin: "observed" };
-      const shade = Math.round(18 + index / Math.max(1, count - 1) * 216), rgb = [shade, shade, shade];
-      return { index, rgb, colors: [rgb], origin: "grayscale" };
-    });
-  }
-  function brushSwatches(colors, selected2) {
-    const kinds = new Set(colors.map((c) => c.origin)), label = kinds.size === 1 && kinds.has("declared") ? "Declared palette colors" : kinds.size === 1 && kinds.has("grayscale") ? "Grayscale preview · actual game palette unknown" : kinds.has("grayscale") ? "Declared/observed colors where available · grayscale for unknown entries" : "Observed/declared preview colors";
-    return `<div class="brush-swatches" role="group" aria-label="Sprite brush colors">${colors.map((color) => `<button type="button" data-action="sprite-brush" data-id="${color.index}" data-brush-index="${color.index}" aria-pressed="${color.index === Number(selected2)}" aria-label="Color index ${color.index} · ${color.origin}${color.colors.length > 1 ? " · varies across sprite parts" : ""}"><svg viewBox="0 0 32 24" width="32" height="24" aria-hidden="true">${color.colors.slice(0, 8).map((rgb, i, rows) => `<rect x="${i * 32 / rows.length}" width="${32 / rows.length}" height="24" fill="rgb(${rgb.join(",")})"/>`).join("")}</svg><span>${color.index}</span></button>`).join("")}</div><p class="subtle brush-color-source">${esc(label)}</p>`;
-  }
-
   // romancer/ui/sprite_assembly.js
   function spritePreviewSize(width, height, zoom = "fit", available = 384) {
     const scale = ["8", "16", "32"].includes(String(zoom)) ? Number(zoom) : Math.max(1, Math.min(32, Math.floor(Math.min(Math.max(1, available) / width, 384 / height))));
@@ -6230,9 +4349,16 @@ ${font ? `<section class="card"><h3>Font metrics · ${esc(font.id)}</h3><div cla
     return `<details class="card"><summary>Animation frames</summary><p>Arrange each frame in Sprite assembly, then add it here. These explicit layouts do not identify the game's animation script.</p>${error ? `<p class="notice warm">${esc(error)}</p>${button("Discard invalid animation", "animation-clear")}` : ""}<div class="actions">${field("animation-duration", "Frame duration (ms)", ctx2.draft("animation-duration", "120"))}${button("Add assembled frame", "animation-add")}</div>${frames.length ? `<div class="actions">${frames.map((_, i) => button("Frame " + (i + 1), "animation-select", { id: String(i), primary: i === selected2 })).join("")}</div><div class="sprite-preview"><canvas id="animation-canvas" aria-label="Declared animation frame preview"></canvas></div><p id="animation-position">Frame ${selected2 + 1} of ${frames.length}</p><div class="actions">${button(state2.animationPlaying ? "Pause animation" : "Play animation", "animation-play", { primary: true })}${button("Edit selected frame", "animation-edit")}${button("Remove selected frame", "animation-remove")}</div><p>${reused.length} tiles are shared between frames; editing them changes every frame that uses them.</p>` : ""}</details>`;
   }
   function mountAnimation(ctx2, doc, bitmap, palette2) {
+    var _a;
     const canvas = document.getElementById("animation-canvas");
     if (!canvas) return;
-    const scope = selectionKey(ctx2.state), frames = readAnimation(doc, bitmap, ctx2.draft("animation-frames", "null"));
+    const scope = selectionKey(ctx2.state);
+    if (((_a = ctx2.state.openAnimationAfterMount) == null ? void 0 : _a.scope) === scope && ctx2.state.openAnimationAfterMount.document_id === doc.document_id) {
+      const details = canvas.closest("details");
+      if (details) details.open = true;
+      ctx2.state.openAnimationAfterMount = null;
+    }
+    const frames = readAnimation(doc, bitmap, ctx2.draft("animation-frames", "null"));
     const clock = ctx2.state.animationClock = new AnimationClock();
     const draw2 = (index) => {
       if (selectionKey(ctx2.state) !== scope || ctx2.state.page !== "assets") {
@@ -6246,12 +4372,12 @@ ${font ? `<section class="card"><h3>Font metrics · ${esc(font.id)}</h3><div cla
       canvas.height = image.height;
       const c = canvas.getContext("2d"), pixels = c.createImageData(image.width, image.height);
       image.pixels.forEach((value, i) => {
-        var _a, _b, _c;
-        const part = Math.floor(Math.floor(i / image.width) / bitmap.height) * frames[index].columns + Math.floor(i % image.width / bitmap.width), observed = (_b = (_a = frames[index].colors) == null ? void 0 : _a[part]) == null ? void 0 : _b[value], color = (_c = colors == null ? void 0 : colors.entries.find((e) => e.index === value && e.bank === 0)) == null ? void 0 : _c.rgb, shade = Math.round(18 + value / Math.max(1, count - 1) * 216);
+        var _a2, _b, _c;
+        const part = Math.floor(Math.floor(i / image.width) / bitmap.height) * frames[index].columns + Math.floor(i % image.width / bitmap.width), observed = (_b = (_a2 = frames[index].colors) == null ? void 0 : _a2[part]) == null ? void 0 : _b[value], color = (_c = colors == null ? void 0 : colors.entries.find((e) => e.index === value && e.bank === 0)) == null ? void 0 : _c.rgb, shade = Math.round(18 + value / Math.max(1, count - 1) * 216);
         pixels.data.set([(color == null ? void 0 : color.r) ?? (observed == null ? void 0 : observed[0]) ?? shade, (color == null ? void 0 : color.g) ?? (observed == null ? void 0 : observed[1]) ?? shade, (color == null ? void 0 : color.b) ?? (observed == null ? void 0 : observed[2]) ?? shade, 255], i * 4);
       });
       c.putImageData(pixels, 0, 0);
-      canvas.style.width = Math.min(512, image.width * 4) + "px";
+      canvas.style.width = Math.min(512, Math.max(160, image.width * 12)) + "px";
       canvas.style.maxWidth = "100%";
       canvas.style.imageRendering = "pixelated";
       ctx2.state.animationIndex = index;
@@ -6262,6 +4388,2099 @@ ${font ? `<section class="card"><h3>Font metrics · ${esc(font.id)}</h3><div cla
     const first = Math.min(frames.length - 1, ctx2.state.animationIndex || 0);
     if (ctx2.state.animationPlaying) clock.start(frames, draw2, first);
     else draw2(first);
+  }
+
+  // romancer/ui/saved_animations.js
+  async function openSavedAnimation(ctx2, id) {
+    const page = ctx2.state.page, scope = selectionKey(ctx2.state), params = { ...ctx2.sourceParams() }, result = await ctx2.api.call("animations.get", { ...params, animation_id: id });
+    if (scope !== selectionKey(ctx2.state) || ctx2.state.page !== page) return;
+    if (!result.ok || result.source_sha256 !== ctx2.state.artifact.sha256 || result.artifact_id !== ctx2.state.artifact.artifact_id) throw Error(result.error || "Animation source changed.");
+    const a = result.animation, inspection = await ctx2.api.call("assets.inspect", { ...params, schema: a.schema });
+    if (scope !== selectionKey(ctx2.state) || ctx2.state.page !== page) return;
+    if (!inspection.ok || inspection.document_id !== a.document_id) throw Error("The saved animation graphics document changed.");
+    ctx2.state.researchOpen = { scope, kind: "assets", definition: a.schema };
+    ctx2.state.connectedAssetSetup = { scope, result: { schema: a.schema, inspection, bitmap_id: a.bitmap_id, layout: a.frames[0] } };
+    ctx2.state.connectedAnimation = { scope, bitmap_id: a.bitmap_id, frames: a.frames, document_id: a.document_id };
+    return ctx2.navigate("assets");
+  }
+  async function savedAnimationControls(ctx2, doc, bitmap) {
+    var _a;
+    if (!(doc == null ? void 0 : doc.ok) || !bitmap) return "";
+    const page = ctx2.state.page, scope = selectionKey(ctx2.state), params = { ...ctx2.sourceParams() }, current2 = () => {
+      var _a2;
+      return selectionKey(ctx2.state) === scope && ((_a2 = ctx2.isCurrentRender) == null ? void 0 : _a2.call(ctx2)) !== false;
+    };
+    let list;
+    try {
+      list = await ctx2.api.call("animations.list", params);
+    } catch (e) {
+      if (!current2()) return "";
+      return `<section class="card"><p>Saved animations unavailable: ${esc(e.message)}</p></section>`;
+    }
+    if (!current2()) return "";
+    if (!(list == null ? void 0 : list.ok) || list.source_sha256 !== ctx2.state.artifact.sha256 || list.artifact_id !== ctx2.state.artifact.artifact_id) return "";
+    const args = () => ({ ...params, name: read("animation-save-name"), bitmap_id: bitmap.id, document_id: doc.document_id, frames: readAnimation(doc, bitmap, ctx2.draft("animation-frames", "null")) });
+    const review2 = ((_a = ctx2.state.animationSaveReview) == null ? void 0 : _a.scope) === scope ? ctx2.state.animationSaveReview : null;
+    ctx2.use({
+      "animation-preview-save": async () => {
+        const p = args(), signature = JSON.stringify(p);
+        if (!current2()) throw Error("The source changed.");
+        const result = await ctx2.run("animations.preview", p, { render: false });
+        if (!current2()) return;
+        if (signature !== JSON.stringify(args())) throw Error("The animation changed. Preview it again.");
+        ctx2.state.animationSaveReview = { scope, signature, result };
+        return ctx2.render();
+      },
+      "animation-save-reviewed": async () => {
+        const p = args();
+        if (!current2() || !review2 || review2.signature !== JSON.stringify(p)) throw Error("Preview the current animation before saving.");
+        await ctx2.run("animations.save", { ...p, review_id: review2.result.review_id }, { render: false });
+        if (current2()) {
+          ctx2.state.animationSaveReview = null;
+          ctx2.notify("Animation arrangement saved. Game timing remains unchanged.");
+          return ctx2.render();
+        }
+      },
+      "animation-load-saved": (node) => {
+        if (!current2() || !list.animations.some((a) => a.animation_id === node.dataset.id)) throw Error("Choose a current saved animation.");
+        return openSavedAnimation(ctx2, node.dataset.id);
+      },
+      "animation-delete-saved": async (node) => {
+        if (!current2() || !list.animations.some((a) => a.animation_id === node.dataset.id)) throw Error("Choose a current saved animation.");
+        await ctx2.run("animations.delete", { ...params, animation_id: node.dataset.id }, { render: false });
+        if (current2()) return ctx2.render();
+      }
+    });
+    return `<details class="card" ${review2 ? "open" : ""}><summary>Save & reuse animation layouts</summary><p>Save the frames arranged above for this ROM revision. Research packs include saved layouts. Loading replaces the current arrangement draft; tile edits stay separate.</p><div class="actions">${field("animation-save-name", "Animation name", ctx2.draft("animation-save-name", "Sprite animation"))}${button("Preview saved layout", "animation-preview-save")}</div>${review2 ? `<p>${review2.result.animation.frames.length} frames · ${review2.result.shared_tiles.length} shared tiles. Timing is author-declared.</p>${button("Save reviewed animation", "animation-save-reviewed", { primary: true })}` : ""}${list.animations.map((a) => `<div class="actions"><span>${esc(a.name)} · ${a.frames} frames</span>${button("Load layout", "animation-load-saved", { id: a.animation_id })}${button("Delete saved layout", "animation-delete-saved", { id: a.animation_id })}</div>`).join("")}</details>`;
+  }
+
+  // romancer/ui/object_workbench.js
+  async function openObject(ctx2, id) {
+    const scope = selectionKey(ctx2.state), result = await ctx2.run("objects.open", { ...ctx2.sourceParams(), object_id: id }, { render: false });
+    if (scope !== selectionKey(ctx2.state)) return;
+    ctx2.state.connectedAssetSetup = { scope, result };
+    ctx2.state.researchOpen = { scope, kind: "assets" };
+    return ctx2.navigate("assets");
+  }
+  async function objectWorkbench(ctx2, doc, bitmap) {
+    var _a, _b, _c, _d, _e, _f, _g, _h;
+    const { state: state2 } = ctx2, scope = selectionKey(state2), current2 = () => {
+      var _a2;
+      return scope === selectionKey(state2) && ((_a2 = ctx2.isCurrentRender) == null ? void 0 : _a2.call(ctx2)) !== false;
+    };
+    const hasSaved = ((_c = (_b = (_a = state2.artifact) == null ? void 0 : _a.object_layouts) == null ? void 0 : _b.objects) == null ? void 0 : _c.length) || ((_d = state2.objectWorkbench) == null ? void 0 : _d.scope) === scope;
+    const listing = hasSaved ? await ctx2.api.call("objects.list", ctx2.sourceParams()) : { objects: [] };
+    if (!current2()) return "";
+    let entry = ((_e = state2.objectWorkbench) == null ? void 0 : _e.scope) === scope && state2.objectWorkbench.document_id === (doc == null ? void 0 : doc.document_id) ? state2.objectWorkbench : null;
+    if (entry && !entry.result) {
+      entry.result = await ctx2.api.call("objects.get", { ...ctx2.sourceParams(), object_id: entry.object_id });
+      if (!current2()) return "";
+      const trace = entry.result.object.trace_id;
+      if (trace) {
+        try {
+          entry.trace = await ctx2.api.call("traces.get", { ...ctx2.sourceParams(), trace_id: trace });
+        } catch (error) {
+          entry.sceneIssue = "Saved scene is unavailable. The exact-revision layout remains available.";
+        }
+      }
+    }
+    if (!current2()) return "";
+    const obj = (_f = entry == null ? void 0 : entry.result) == null ? void 0 : _f.object, layout = obj == null ? void 0 : obj.definition.layout;
+    if (obj && ((_g = entry.trace) == null ? void 0 : _g.scene) && entry.result.source_dependency_verified && bitmap) {
+      try {
+        const edits = [...new Set(layout.indices.filter((i) => i !== null))].map((index) => ({ cell_index: index, pixels: pixelBuffer(ctx2, doc, bitmap, index) })).filter((edit) => JSON.stringify(edit.pixels) !== JSON.stringify(bitmap.cells[edit.cell_index].pixels));
+        entry.preview = await ctx2.api.call("objects.scene", { ...ctx2.sourceParams(), object_id: entry.object_id, edits });
+        if (!current2()) return "";
+        if (entry.preview.ok === false) throw Error(entry.preview.error);
+        entry.previewError = null;
+      } catch (error) {
+        entry.preview = null;
+        entry.previewError = error.message;
+      }
+    }
+    ctx2.use({
+      "object-open": (node) => {
+        var _a2, _b2;
+        if (!current2()) throw Error("The selected ROM changed. Open this object from the current selection.");
+        const id = ((_a2 = node == null ? void 0 : node.dataset) == null ? void 0 : _a2.id) || ((_b2 = document.getElementById("object-choice")) == null ? void 0 : _b2.value);
+        if (!listing.objects.some((o) => o.object_id === id)) throw Error("Refresh saved objects first.");
+        return openObject(ctx2, id);
+      },
+      "object-delete": async (node) => {
+        var _a2;
+        if (!current2()) throw Error("The selected ROM changed.");
+        const id = node.dataset.id, chosen = listing.objects.find((o) => o.object_id === id);
+        if (!chosen) throw Error("Refresh saved objects first.");
+        if (!confirm("Remove the saved layout “" + chosen.name + "”? ROM bytes and builds stay unchanged.")) return;
+        await ctx2.run("objects.delete", { ...ctx2.sourceParams(), object_id: id }, { render: false });
+        if (!current2()) return;
+        if (((_a2 = state2.objectWorkbench) == null ? void 0 : _a2.object_id) === id) state2.objectWorkbench = null;
+        return ctx2.render();
+      },
+      "object-source": (node) => {
+        if (!current2() || !entry || !bitmap) throw Error("The selected source changed.");
+        const index = Number(node.dataset.id);
+        if (!layout.indices.includes(index)) throw Error("Choose a source used by this object.");
+        activateCell(ctx2, doc, bitmap.id, index);
+        entry.selected = index;
+        return ctx2.render();
+      }
+    });
+    const scene = (entry == null ? void 0 : entry.preview) ? '<details class="scene-composite"><summary>Full-scene preview · ' + entry.preview.changed_pixels + ' pixels changed · simulated</summary><div class="scene-pair"><figure><figcaption>Captured frame</figcaption><img src="data:image/png;base64,' + esc(entry.preview.original_png_base64) + '" alt="Full captured scene"></figure><figure><figcaption>Staged composite · test the build for real gameplay</figcaption><canvas id="object-scene-full" data-preview="' + esc(entry.preview.preview_png_base64) + '" aria-label="Simulated full-scene preview"></canvas></figure></div><p class="subtle">Saved placements only; other uses may change. Captured colors do not establish palette ownership. Background behind transparency, priority and animation need playtesting.</p></details>' : obj ? '<p class="subtle">' + esc((entry == null ? void 0 : entry.previewError) || "Capture a new full-scene trace to preview this object in context.") + "</p>" : "";
+    const saved = listing.objects.length ? select("object-choice", "Saved object", listing.objects.map((o) => [o.object_id, o.name + " · " + o.columns + " × " + o.rows + " tiles"]), (entry == null ? void 0 : entry.object_id) || listing.objects[0].object_id) + button("Open object", "object-open") : "<p>Save verified parts as an object from a captured trace in Playtest.</p>";
+    if (!obj) return '<section class="card object-workbench"><h3>Saved objects</h3>' + saved + "</section>";
+    const uses = /* @__PURE__ */ new Map();
+    layout.indices.forEach((index, place) => {
+      if (index !== null) {
+        if (!uses.has(index)) uses.set(index, []);
+        uses.get(index).push(place);
+      }
+    });
+    return '<section class="card object-workbench"><div class="card-heading"><h3>' + esc(obj.name) + "</h3>" + button("Remove layout", "object-delete", { id: entry.object_id }) + "</div><details><summary>Saved objects</summary>" + saved + '</details><div class="object-scene-source"><figure><figcaption>Captured scene · select a source tile to highlight its uses</figcaption>' + (((_h = entry.trace) == null ? void 0 : _h.crop_png_base64) ? '<canvas id="object-scene" aria-label="Captured scene with selected tile uses" data-scene="' + esc(entry.trace.crop_png_base64) + '"></canvas>' : "<p>" + esc(entry.sceneIssue || "This imported layout has no local captured scene.") + "</p>") + '</figure><div><h4>Source tiles & uses</h4><div class="actions">' + [...uses].map(([index, places]) => button("Tile " + index + " · " + places.length + " use" + (places.length === 1 ? "" : "s"), "object-source", { id: String(index), primary: entry.selected === index })).join("") + "</div>" + [...uses].filter(([, p]) => p.length > 1).map(([i, p]) => '<p class="subtle">Shared tile ' + i + " updates " + p.length + " placements together.</p>").join("") + '<p class="subtle">' + (entry.result.source_dependency_verified ? "Source origins verified for the captured placements." : "Saved declaration; imported or historical proof is not fresh execution evidence.") + " " + (obj.definition.complete_parts ? "" : "Some source pixels remain unresolved. ") + "An object name is your label.</p></div></div>" + scene + "</section>";
+  }
+  function mountObjectWorkbench(ctx2) {
+    var _a;
+    const full = document.getElementById("object-scene-full"), model = (_a = ctx2.state.objectWorkbench) == null ? void 0 : _a.preview;
+    if (full && model) {
+      const scope2 = selectionKey(ctx2.state), img = new Image();
+      img.onload = () => {
+        if (!full.isConnected || scope2 !== selectionKey(ctx2.state)) return;
+        full.width = img.naturalWidth;
+        full.height = img.naturalHeight;
+        const draw2 = full.getContext("2d");
+        draw2.drawImage(img, 0, 0);
+        const r = model.scene_region;
+        draw2.strokeStyle = "#ffd36a";
+        draw2.lineWidth = 1;
+        draw2.strokeRect(r.x - 0.5, r.y - 0.5, r.width + 1, r.height + 1);
+      };
+      img.src = "data:image/png;base64," + full.dataset.preview;
+    }
+    const canvas = document.getElementById("object-scene"), entry = ctx2.state.objectWorkbench;
+    if (!canvas || !(entry == null ? void 0 : entry.trace)) return;
+    const scope = selectionKey(ctx2.state), image = new Image();
+    image.onload = () => {
+      if (!canvas.isConnected || scope !== selectionKey(ctx2.state) || ctx2.state.objectWorkbench !== entry) return;
+      canvas.width = image.naturalWidth;
+      canvas.height = image.naturalHeight;
+      const context = canvas.getContext("2d");
+      context.drawImage(image, 0, 0);
+      const region = entry.result.object.definition.scene_region, crop = entry.trace.region, layout = entry.result.object.definition.layout;
+      context.strokeStyle = "#ffd36a";
+      context.lineWidth = 1;
+      layout.indices.forEach((index, part) => {
+        if (index !== null && (entry.selected === void 0 || index === entry.selected)) context.strokeRect(region.x - crop.x + part % layout.columns * 8 + 0.5, region.y - crop.y + Math.floor(part / layout.columns) * 8 + 0.5, 7, 7);
+      });
+    };
+    image.src = "data:image/png;base64," + canvas.dataset.scene;
+  }
+
+  // romancer/ui/views/gameview.js
+  var categories2 = ["all", "known", "known_resource", "assets", "script", "tables", "record", "levels", "room", "actor", "sound", "song", "music_event", "collision", "commands", "command", "animation", "note", "trace", "candidate", "verification", "verified_source", "object", "graphics_capture"];
+  var names3 = { animation: "Saved animations", commands: "Event scripts", command: "Commands", collision: "Collision layers", song: "Songs", music_event: "Music events", object: "Saved objects", graphics_capture: "Native graphics captures", verification: "Source checks", verified_source: "Verified sources", known: "Known locations", known_resource: "Known editing layouts", assets: "Graphics", script: "Text", tables: "Tables", record: "Named records", levels: "Levels", room: "Rooms", actor: "Objects & actors", sound: "Sound", note: "Research", trace: "Gameplay traces", candidate: "Pixel matches", all: "Everything" };
+  var relation = (r) => ({ uses_verified_part: "Uses verified part", replayed_graphics_accesses: "Native replay accesses", source_verification: "Source verification", verified_visual_source: "Verified visual source", contains_record: "Contains record", uses_tiles: "Uses tiles", uses_palette: "Uses palette", shares_storage: "Shares byte storage", pixel_match: "Pixel match", located_in: "Located in", contains_object: "Contains object", uses_terrain: "Uses terrain", uses_graphics: "Uses graphics", uses_script: "Uses script", uses_sound: "Uses sound", uses_table: "Uses table" })[r] || r.replaceAll("_", " ");
+  async function render5(ctx2) {
+    var _a, _b, _c, _d;
+    const missing2 = requireProject(ctx2);
+    if (missing2) return missing2;
+    const { state: state2 } = ctx2, a = state2.artifact;
+    if (!a) return empty("Choose a ROM", "Import a ROM or open a workshop to connect its resources.");
+    const scope = selectionKey(state2), params = { ...ctx2.sourceParams() }, current2 = () => {
+      var _a2;
+      return scope === selectionKey(state2) && ((_a2 = ctx2.isCurrentRender) == null ? void 0 : _a2.call(ctx2)) !== false;
+    };
+    const traceFocus = ((_a = state2.connectedTraceFocus) == null ? void 0 : _a.scope) === scope ? state2.connectedTraceFocus : null;
+    if (traceFocus) {
+      ctx2.setDraft("gameview-kind", "trace");
+      ctx2.setDraft("gameview-query", "");
+      state2.connectedPage = 0;
+      state2.connectedTraceFocus = null;
+      state2.connectedNode = null;
+    }
+    const model = await ctx2.api.call("gameview.graph", { ...params, query: ctx2.draft("gameview-query", ""), kind: ctx2.draft("gameview-kind", "all"), page: state2.connectedPage || 0 });
+    if (!current2() || model.source_sha256 !== a.sha256 || model.artifact_id !== a.artifact_id) return "";
+    const chosen = ((traceFocus == null ? void 0 : traceFocus.trace_id) ? (_b = model.nodes.find((n) => {
+      var _a2;
+      return ((_a2 = n.locator) == null ? void 0 : _a2.trace_id) === traceFocus.trace_id;
+    })) == null ? void 0 : _b.id : null) || (((_c = state2.connectedNode) == null ? void 0 : _c.scope) === scope ? state2.connectedNode.id : (_d = model.nodes[0]) == null ? void 0 : _d.id);
+    let detail = null, error = "";
+    if (chosen) {
+      try {
+        detail = await ctx2.api.call("gameview.detail", { ...params, node_id: chosen });
+      } catch (e) {
+        error = e.message;
+      }
+    }
+    if (!current2()) return "";
+    if (detail && (detail.source_sha256 !== a.sha256 || detail.artifact_id !== a.artifact_id)) return "";
+    const node = detail == null ? void 0 : detail.node, preview2 = detail == null ? void 0 : detail.preview;
+    if (node) state2.connectedNode = { scope, id: node.id };
+    ctx2.use({
+      "gameview-find": () => {
+        if (!current2()) return;
+        state2.connectedPage = 0;
+        state2.connectedNode = null;
+        return ctx2.render();
+      },
+      "gameview-page": (el) => {
+        if (!current2()) return;
+        state2.connectedPage = Math.max(0, (state2.connectedPage || 0) + Number(el.dataset.id));
+        return ctx2.render();
+      },
+      "gameview-select": (el) => {
+        if (!current2()) return;
+        if (!model.nodes.concat((detail == null ? void 0 : detail.neighbors) || []).some((n) => n.id === el.dataset.id)) throw Error("Refresh the current resources.");
+        state2.connectedNode = { scope, id: el.dataset.id };
+        return ctx2.render();
+      },
+      "gameview-bytes": () => {
+        if (!current2() || (node == null ? void 0 : node.offset) === null) return;
+        state2.resourceJump = node.offset;
+        return ctx2.navigate("resources");
+      },
+      "gameview-link": async () => {
+        if (!current2() || !node) return;
+        await ctx2.run("gameview.link", { ...params, from_id: node.id, to_id: read("gameview-link-target"), relation: read("gameview-link-relation"), note: read("gameview-link-note") }, { render: false });
+        if (current2()) return ctx2.render();
+      },
+      "gameview-unlink": async (el) => {
+        if (!current2() || !detail.connections.some((e) => e.link_id === el.dataset.id)) throw Error("Refresh this connection first.");
+        await ctx2.run("gameview.unlink", { ...params, link_id: el.dataset.id }, { render: false });
+        if (current2()) return ctx2.render();
+      },
+      "gameview-editor": async () => {
+        var _a2;
+        if (!current2() || !(node == null ? void 0 : node.editor)) return;
+        if (node.kind === "animation") return openSavedAnimation(ctx2, node.locator.animation_id);
+        if (node.kind === "object") return openObject(ctx2, node.locator.object_id);
+        if (node.kind === "graphics_capture") {
+          const result = await ctx2.api.call("graphics.accesses.get", { ...params, evidence_id: node.locator.evidence_id, offset: 0, limit: 100 });
+          if (!current2()) return;
+          state2.graphicsAccess = { scope, result, tiles: null };
+          const trace_id = (_a2 = result.investigation_link) == null ? void 0 : _a2.graphics_trace_id;
+          if (trace_id) {
+            const trace = await ctx2.api.call("traces.get", { ...params, trace_id });
+            if (!current2()) return;
+            state2.savedGameplayTrace = { scope, result: trace };
+          }
+          return ctx2.navigate("playtest");
+        }
+        if (node.kind === "verified_source") return openVerifiedSource(ctx2, node, scope);
+        if (node.kind === "verification") {
+          const proof = await ctx2.api.call("traces.verification", { ...params, verification_id: node.locator.verification_id });
+          const trace = await ctx2.api.call("traces.get", { ...params, trace_id: node.locator.trace_id });
+          if (!current2()) return;
+          state2.savedGameplayTrace = { scope, result: trace };
+          state2.visualSourceProof = { scope, trace_id: trace.trace_id, result: proof };
+          return ctx2.navigate("playtest");
+        }
+        if (node.kind === "candidate") return openTraceCandidate(ctx2, node, scope);
+        if (node.kind === "known_resource") {
+          const r = await ctx2.run("games.configure", { ...params, resource_id: node.locator.resource_id }, { render: false });
+          if (!current2()) return;
+          const kind2 = r.resource_kind === "assets" ? "assets" : "tables";
+          state2.researchOpen = { scope, kind: kind2 };
+          if (kind2 === "assets") state2.connectedAssetSetup = { scope, result: { ...r, layout: r.sprite_layout } };
+          return ctx2.navigate(kind2);
+        }
+        if (node.kind === "trace") {
+          const r = await ctx2.api.call("traces.get", { ...params, trace_id: node.locator.trace_id });
+          if (!current2()) return;
+          state2.savedGameplayTrace = { scope, result: r };
+          return ctx2.navigate("playtest");
+        }
+        const kind = { assets: "assets", scripts: "script", tables: "tables", levels: "levels", sound: "sound" }[node.editor];
+        if (kind) state2.researchOpen = { scope, kind };
+        if (node.kind === "record") state2.connectedTableJump = { scope, row: node.locator.row };
+        if (["room", "actor", "collision"].includes(node.kind)) state2.connectedLevelJump = { scope, room: node.locator.room_id, collision: node.kind === "collision" };
+        if (["commands", "command"].includes(node.kind)) state2.commandFocus = { scope, ...node.locator };
+        if (["song", "music_event"].includes(node.kind)) state2.connectedSoundJump = { scope, ...node.locator };
+        return ctx2.navigate(node.editor);
+      }
+    });
+    const checks = await buildChecks(ctx2);
+    if (!current2()) return "";
+    return heading("", "Game view", "Follow a resource to its connected data, measured gameplay and editing tools.") + '<div class="field-row">' + field("gameview-query", "Find a resource", ctx2.draft("gameview-query", "")) + select("gameview-kind", "Show", categories2.map((k) => [k, names3[k]]), ctx2.draft("gameview-kind", "all")) + button("Find resources", "gameview-find") + "</div>" + model.issues.map((r) => '<p class="notice warm">' + esc(r.kind) + ": " + esc(r.message) + "</p>").join("") + (model.partial ? '<p class="notice warm">This view reached a resource budget. Filter or open a focused editor for additional data.</p>' : "") + '<div class="grid-two"><section class="card"><div class="card-heading"><h3>Resources</h3><span>' + model.total + ' matches</span></div><div class="game-node-list" tabindex="0" role="region" aria-label="Connected resource list">' + (model.nodes.map((n) => "<p>" + button(n.name, "gameview-select", { id: n.id, primary: n.id === chosen }) + '<br><span class="subtle">' + esc(names3[n.kind]) + " · " + (n.offset === null ? "Captured frame" : "0x" + n.offset.toString(16) + " · " + n.length + " bytes") + "</span></p>").join("") || "<p>No saved resources yet. Use Resources to declare a layout, or select a captured gameplay region in Playtest and save a trace.</p>") + '</div><div class="actions">' + button("Previous", "gameview-page", { id: "-1", disabled: !model.page }) + "<span>Page " + (model.page + 1) + "</span>" + button("Next", "gameview-page", { id: "1", disabled: (model.page + 1) * 50 >= model.total }) + '</div></section><section class="card"><h3>' + esc((node == null ? void 0 : node.name) || "Choose a resource") + "</h3>" + (error ? "<p>" + esc(error) + "</p>" : "") + (node ? "<p>" + esc({ native_accesses: "Measured native access capture", causal_replay: "Source verified by controlled replay", verification_result: "Source check result", checked_revision: "Verified game revision", checked_source_history: "Known original in build history", checked_declaration: "Checked resource layout", native_frame: "Measured gameplay frame", historical_frame: "Historical imported frame", pixel_candidate: "Matching pixels · source needs confirmation", user_note: "Your research note" }[node.confidence] || node.confidence.replaceAll("_", " ")) + "</p>" + ((preview2 == null ? void 0 : preview2.png_base64) ? '<figure><img class="game-resource-preview" src="data:image/png;base64,' + esc(preview2.png_base64) + '" alt="Selected resource preview"><figcaption>' + esc(preview2.caption || "") + "</figcaption></figure>" : "") + ((preview2 == null ? void 0 : preview2.colors) ? '<div class="actions">' + preview2.colors.map((c) => '<span class="game-color" title="RGB ' + c.r + ", " + c.g + ", " + c.b + '" data-color="' + c.r + "," + c.g + "," + c.b + '"></span>').join("") + "</div>" : "") + ((preview2 == null ? void 0 : preview2.fields) ? "<dl>" + preview2.fields.map((f) => "<dt>" + esc(f.name) + "</dt><dd>" + esc(f.value) + "</dd>").join("") + "</dl>" : "") + ((preview2 == null ? void 0 : preview2.text) ? "<p>" + esc(preview2.text) + "</p>" : "") + '<div class="actions">' + (node.offset !== null ? button("Inspect exact bytes", "gameview-bytes") : "") + (node.editor ? button(node.kind === "candidate" ? "Open chosen graphics candidate" : node.kind === "trace" ? "Open saved trace" : "Open editor", "gameview-editor", { primary: true, disabled: (preview2 == null ? void 0 : preview2.runtime_trusted) === false }) : "") + "</div><h4>Connections</h4>" + (detail.connections_truncated ? '<p class="subtle">Showing 32 of ' + detail.connections_total + " connections. Open the focused editor for the complete resource list.</p>" : "") + (detail.connections.map((e) => {
+      const other = e.from === node.id ? e.to : e.from, n = detail.neighbors.find((n2) => n2.id === other);
+      return n ? '<div class="notice"><span>' + esc(relation(e.relation)) + "</span> → " + button(n.name, "gameview-select", { id: n.id }) + (e.confidence === "user_declared" ? "<p>Your declared link · " + esc(e.note) + "</p>" + button("Remove link", "gameview-unlink", { id: e.link_id }) : "") + "</div>" : "";
+    }).join("") || "<p>No checked or declared connection has been recorded for this resource yet.</p>") + "<details><summary>Add a declared relationship</summary>" + select("gameview-link-target", "Connected resource", model.nodes.filter((n) => n.id !== node.id).map((n) => [n.id, n.name]), "") + select("gameview-link-relation", "Relationship", ["uses_graphics", "uses_palette", "uses_script", "uses_sound", "uses_table", "uses_collision", "uses_animation", "triggers", "destination", "reference"].map((v) => [v, v.replaceAll("_", " ")]), "reference") + field("gameview-link-note", "Evidence or note", ctx2.draft("gameview-link-note", "")) + button("Save declared link", "gameview-link", { disabled: model.nodes.filter((n) => n.id !== node.id).length === 0 }) + '<p>Author-declared metadata. This does not change ROM bytes or prove a runtime reference.</p></details><details><summary>Byte preview</summary><code class="game-byte-preview">' + esc(detail.hex_preview) + "</code></details>" : "") + '</section></div><details class="card"><summary>How to read the connections</summary><p>Checked declarations describe storage. A shared byte range is not proof of game behavior. Native frame traces preserve measured pixels; a pixel match is a candidate until the source transfer is observed. Repeated patterns can have several matching offsets.</p></details>' + checks;
+  }
+  async function openTraceCandidate(ctx2, node, scope) {
+    const result = await ctx2.run("traces.open", { ...ctx2.sourceParams(), trace_id: node.locator.trace_id, matches: [node.locator.match] }, { render: false });
+    if (scope !== selectionKey(ctx2.state)) return;
+    ctx2.state.connectedAssetSetup = { scope, result };
+    ctx2.state.researchOpen = { scope, kind: "assets" };
+    await ctx2.navigate("assets");
+  }
+  function mount3(ctx2) {
+    mountBuildChecks(ctx2);
+    for (const node of document.querySelectorAll(".game-color")) node.style.backgroundColor = "rgb(" + node.dataset.color + ")";
+  }
+  async function openVerifiedSource(ctx2, node, scope) {
+    const result = await ctx2.run("traces.open_verified", { ...ctx2.sourceParams(), verification_id: node.locator.verification_id, matches: [node.locator.match_id] }, { render: false });
+    if (scope !== selectionKey(ctx2.state)) return;
+    ctx2.state.connectedAssetSetup = { scope, result };
+    ctx2.state.researchOpen = { scope, kind: "assets" };
+    return ctx2.navigate("assets");
+  }
+
+  // romancer/ui/views/resources.js
+  var resources_exports = {};
+  __export(resources_exports, {
+    mount: () => mount4,
+    render: () => render6
+  });
+
+  // romancer/ui/compression_references.js
+  function parseReferenceOffsets(first, more) {
+    const values = [first.trim(), ...more.trim().split(/[\s,]+/)].filter(Boolean).map((s) => {
+      if (!/^(?:0x[0-9a-f]+|\d+)$/i.test(s)) throw Error("Each pointer offset must be decimal or 0x hexadecimal.");
+      const n = Number(s);
+      if (!Number.isSafeInteger(n) || n < 0 || n >= 64 * 1024 ** 2) throw Error("Pointer offset is outside its supported range.");
+      return n;
+    });
+    if (!values.length || values.length > 128) throw Error("Declare one to128 references.");
+    if (new Set(values).size !== values.length) throw Error("Remove duplicate reference offsets.");
+    return values;
+  }
+  function compressionReferences(ctx2, parent, target) {
+    const { state: state2 } = ctx2, page = state2.page, scope = selectionKey(state2), current2 = () => selectionKey(state2) === scope && state2.page === page, entry = state2.compressedReferenceSurvey;
+    const integer14 = (id) => {
+      const s = read(id).trim(), n = Number(s);
+      if (!s || !Number.isSafeInteger(n)) throw Error("Enter a whole number for " + id + ".");
+      return n;
+    };
+    const params = () => ({ project_id: ctx2.sourceParams().project_id, artifact_id: parent.artifact_id, target_offset: target, width: integer14("compressed-move-width"), endian: read("compressed-move-order"), base: integer14("compressed-move-base"), offset: integer14("compressed-ref-start"), length: integer14("compressed-ref-length"), alignment: integer14("compressed-ref-align") });
+    const result = (entry == null ? void 0 : entry.scope) === scope && entry.result.artifact_id === parent.artifact_id && entry.result.source_sha256 === parent.sha256 && entry.result.target_offset === target ? entry.result : null;
+    ctx2.use({
+      "compressed-ref-survey": async () => {
+        if (!current2()) throw Error("The source changed.");
+        const p = params(), signature = JSON.stringify(p), r = await ctx2.run("references.survey", p, { render: false, refresh: false });
+        if (!current2()) return;
+        if (signature !== JSON.stringify(params())) throw Error("The pointer encoding changed. Survey it again.");
+        if (!r.ok || r.source_sha256 !== parent.sha256 || r.artifact_id !== parent.artifact_id) throw Error(r.error || "Parent source changed.");
+        state2.compressedReferenceSurvey = { scope, result: r, signature };
+        return ctx2.render();
+      },
+      "compressed-ref-add": (node) => {
+        const offset = Number(node.dataset.id);
+        if (!current2() || !result || entry.signature !== JSON.stringify(params()) || !result.candidates.some((r) => r.offset === offset)) throw Error("Survey this pointer encoding again and choose a candidate.");
+        const old = read("compressed-move-more").trim(), next = (old ? old + "\n" : "") + "0x" + offset.toString(16);
+        parseReferenceOffsets("", next);
+        ctx2.setDraft("compressed-move-more", next);
+        return ctx2.render();
+      }
+    });
+    return `${area("compressed-move-more", "Additional reviewed pointer offsets (one per line)", ctx2.draft("compressed-move-more", ""), 3)}<details><summary>Look for pointer candidates</summary><p>Exact numeric matches only. Add a candidate after checking its use; the survey cannot establish a complete reference set.</p><div class="field-row">${field("compressed-ref-start", "Survey start", ctx2.draft("compressed-ref-start", "0"))}${field("compressed-ref-length", "Survey bytes (up to1MiB)", ctx2.draft("compressed-ref-length", String(Math.min(parent.size, 1024 ** 2))))}${select("compressed-ref-align", "Pointer alignment", [[1, "1 byte"], [2, "2 bytes"], [4, "4 bytes"]], ctx2.draft("compressed-ref-align", "1"))}</div>${button("Find numeric matches", "compressed-ref-survey")}${result ? `<p>${result.total_matches} numeric matches · ${result.tested_positions} positions tested${result.truncated ? " · first256 retained" : ""}.</p><div class="actions">${result.candidates.slice(0, 32).map((r) => button("Add0x" + r.offset.toString(16), "compressed-ref-add", { id: String(r.offset) })).join("")}</div>${result.candidates.length > 32 ? "<p>First32 candidates shown. Narrow the survey window to review the rest.</p>" : ""}` : ""}</details>`;
+  }
+
+  // romancer/ui/compression_controls.js
+  function integer5(id) {
+    const text = read(id).trim(), value = Number(text);
+    if (!text || !Number.isSafeInteger(value)) throw new Error("Enter a whole number for " + id + ".");
+    return value;
+  }
+  function compressedRoot(state2, artifact = state2.artifact) {
+    var _a, _b;
+    const rows = new Map([...((_a = state2.project) == null ? void 0 : _a.sources) || [], ...((_b = state2.project) == null ? void 0 : _b.builds) || []].map((row) => [row.artifact_id, row]));
+    const seen = /* @__PURE__ */ new Set();
+    for (let i = 0; artifact && i < 128; i++) {
+      if (artifact.compressed_parent) return artifact;
+      if (seen.has(artifact.artifact_id)) return null;
+      seen.add(artifact.artifact_id);
+      artifact = rows.get(artifact.source_id);
+    }
+    return null;
+  }
+  function resourceSystem(state2) {
+    var _a, _b, _c;
+    return ((_a = state2.artifact) == null ? void 0 : _a.system_id) || ((_b = state2.artifact) == null ? void 0 : _b.system_hint) || ((_c = compressedRoot(state2)) == null ? void 0 : _c.system_hint) || "nes";
+  }
+  function compressionControls(ctx2) {
+    var _a, _b, _c, _d, _e;
+    const { state: state2 } = ctx2, artifact = state2.artifact;
+    if (!artifact) return "";
+    const scope = selectionKey(state2), current2 = () => scope === selectionKey(state2);
+    const root = compressedRoot(state2), metadata = root == null ? void 0 : root.compressed_parent;
+    const result = ((_a = state2.results["compression.inspect"]) == null ? void 0 : _a.parent_sha256) === artifact.sha256 ? state2.results["compression.inspect"] : null;
+    const extraction = state2.results["compression.extract"];
+    const extracted = extraction && ((_b = extraction.inspection) == null ? void 0 : _b.parent_sha256) === artifact.sha256 ? extraction.artifact : null;
+    const builds = metadata ? state2.project.builds.filter((row) => {
+      var _a2;
+      return ((_a2 = compressedRoot(state2, row)) == null ? void 0 : _a2.artifact_id) === root.artifact_id;
+    }) : [];
+    const parameters = () => ({ ...ctx2.sourceParams(), offset: integer5("compression-offset"), allocation: integer5("compression-allocation"), codec: read("compression-codec") });
+    const reinsertion = () => {
+      if (!current2() || !metadata) throw Error("Select this decoded resource again.");
+      const edited_id = read("compression-edited");
+      if (!edited_id) throw Error("Create an edited decoded build first.");
+      return { ...ctx2.projectParams(), parent_id: metadata.parent_id, decoded_id: root.artifact_id, edited_id, offset: metadata.offset, allocation: metadata.allocation, codec: metadata.codec };
+    };
+    const moveSpec = () => {
+      var _a2, _b2, _c2;
+      return { source_offset: metadata.offset, source_length: (_a2 = state2.compressionPreview) == null ? void 0 : _a2.result.original_stored_size, target_offset: integer5("compressed-move-target"), target_capacity: integer5("compressed-move-capacity"), fill_byte: integer5("compressed-move-fill"), alignment: integer5("compressed-move-align"), bank_size: integer5("compressed-move-bank"), bank_origin: integer5("compressed-move-origin"), references: parseReferenceOffsets(read("compressed-move-pointer"), read("compressed-move-more")).map((offset) => ({ offset, width: integer5("compressed-move-width"), endian: read("compressed-move-order"), base: integer5("compressed-move-base"), target_delta: 0 })), references_complete: !!((_b2 = document.getElementById("compressed-move-complete")) == null ? void 0 : _b2.checked), destination_reserved: !!((_c2 = document.getElementById("compressed-move-reserved")) == null ? void 0 : _c2.checked), replacement_input_id: null };
+    };
+    const preview2 = ((_c = state2.compressionPreview) == null ? void 0 : _c.scope) === scope ? state2.compressionPreview : null;
+    ctx2.use({
+      "compression-inspect": () => ctx2.run("compression.inspect", parameters()),
+      "compression-extract": () => ctx2.run("compression.extract", parameters()),
+      "compression-open": async (node) => {
+        await ctx2.setArtifact(node.dataset.id);
+        await ctx2.navigate("resources");
+      },
+      "compression-preview": async () => {
+        const args = reinsertion(), signature = JSON.stringify(args);
+        const result2 = await ctx2.run("compression.preview_reinsert", args, { render: false });
+        if (!current2()) return;
+        if (signature !== JSON.stringify(reinsertion())) throw Error("The selected edited resource changed. Preview it again.");
+        state2.compressionPreview = { scope, result: result2, signature };
+        return ctx2.render();
+      },
+      "compression-move": async () => {
+        const args = reinsertion();
+        if (!preview2 || preview2.signature !== JSON.stringify(args)) throw Error("Preview the current recompression first.");
+        const spec = moveSpec(), signature = JSON.stringify({ args, spec });
+        const result2 = await ctx2.run("compression.plan_relocate", { ...args, spec }, { render: false });
+        if (!current2()) return;
+        if (signature !== JSON.stringify({ args: reinsertion(), spec: moveSpec() })) throw Error("The move declaration changed. Review it again.");
+        preview2.moveSpec = spec;
+        state2.pending = { kind: "compression", artifact_id: artifact.artifact_id, plan_id: result2.plan_id, signature, relocation: true };
+        return ctx2.render();
+      },
+      "compression-review": async () => {
+        const args = reinsertion(), signature = JSON.stringify(args);
+        const plan = await ctx2.run("compression.plan_reinsert", args, { render: false });
+        if (!current2()) return;
+        if (signature !== JSON.stringify(reinsertion())) throw Error("The edited resource changed. Review it again.");
+        state2.pending = { kind: "compression", artifact_id: artifact.artifact_id, plan_id: plan.plan_id, signature };
+        await ctx2.render();
+      },
+      "compression-build": async () => {
+        var _a2;
+        if (((_a2 = state2.pending) == null ? void 0 : _a2.kind) !== "compression" || state2.pending.artifact_id !== artifact.artifact_id) throw new Error("Review reinsertion for this resource first.");
+        if (!current2()) throw Error("The selected resource changed.");
+        const actual = state2.pending.relocation ? JSON.stringify({ args: reinsertion(), spec: moveSpec() }) : JSON.stringify(reinsertion());
+        if (actual !== state2.pending.signature) throw Error("The selected build or move declaration changed. Review it again.");
+        const built = await ctx2.run("build.apply", { ...ctx2.projectParams(), plan_id: state2.pending.plan_id }, { render: false });
+        if (!current2()) return;
+        state2.pending = null;
+        state2.compressionPreview = null;
+        await ctx2.setArtifact(built.artifact_id);
+        ctx2.notify("Parent build created and selected. Open Playtest to check it.");
+      }
+    });
+    if (metadata) return `<section class="card"><div class="card-heading"><h3>Compressed resource</h3>${button("Compression help", "help-topic", { id: "compression" })}</div><p>${esc(metadata.codec)} at0x${metadata.offset.toString(16)} · ${size(metadata.allocation)} allocated.</p><p>Edit this decoded resource and create a build, then review reinsertion into its parent.</p><div class="actions">${button("Edit graphics", "navigate", { id: "assets" })}${button("Edit text", "navigate", { id: "scripts" })}${button("Edit tables", "navigate", { id: "tables" })}</div>${select("compression-edited", "Edited decoded build", builds.map((row) => [row.artifact_id, row.name]), artifact.kind === "build" ? artifact.artifact_id : (_d = builds.at(-1)) == null ? void 0 : _d.artifact_id)}<div class="actions">${button("Preview recompression", "compression-preview", { disabled: !builds.length, primary: true })}${button("Review reinsertion", "compression-review", { primary: true, disabled: !builds.length })}${((_e = state2.pending) == null ? void 0 : _e.kind) === "compression" ? button("Create parent build", "compression-build", { primary: true }) : ""}</div>${preview2 ? compressionCapacity(preview2.result) + compressedMove(ctx2, preview2.result) : ""}${report(state2.results["compression.plan_reinsert"], "Recompression plan")}${report(state2.results["compression.plan_relocate"], "Relocation plan")}</section>`;
+    return `<details class="card" ${result || extracted ? "open" : ""}><summary>Compressed resources</summary><p>Confirm the codec and allocated space before extracting. Supported formats: GBA LZ10 and RLE.</p><div class="field-row">${field("compression-offset", "Stream offset", ctx2.draft("compression-offset", "0"))}${field("compression-allocation", "Confirmed allocation in bytes (up to48KiB)", ctx2.draft("compression-allocation", "1024"))}${select("compression-codec", "Codec", [["gba-lz10", "GBA LZ10"], ["gba-rle", "GBA RLE"]], ctx2.draft("compression-codec", "gba-lz10"))}</div><div class="actions">${button("Inspect stream", "compression-inspect")}${button("Extract decoded resource", "compression-extract", { primary: true })}${button("Compression help", "help-topic", { id: "compression" })}</div>${result ? `<p class="notice">${size(result.consumed)} stored → ${size(result.decoded_size)} decoded. Confirmed allocation: ${size(result.allocation)}.</p>` : ""}${extracted ? `<p>Decoded resource added to this project.</p>${button("Open decoded resource", "compression-open", { id: extracted.artifact_id, primary: true })}` : ""}</details>`;
+  }
+  function compressionCapacity(r) {
+    return '<div class="notice ' + (r.fits ? "" : "warm") + '"><strong>' + r.packed_size + " / " + r.allocation + " bytes</strong><p>" + (r.fits ? r.free_bytes + " bytes free." : r.overflow_bytes + " bytes over the confirmed allocation. Reduce the edit or review a reserved move.") + "</p><p>Independent decoder " + (r.independent_decode_verified ? "verified the edited data." : "has not verified this output.") + "</p></div>";
+  }
+  function compressedMove(ctx2, r) {
+    var _a, _b, _c, _d;
+    const system2 = resourceSystem(ctx2.state), bank = { nes: 8192, snes: 32768, gb: 16384, gbc: 16384, sms: 16384 }[system2] || 0;
+    return '<details><summary>Move to reserved space · Advanced</summary><p>Declare a reserved destination and every external linear reference to this stream. All listed pointers use the encoding below. Mixed encodings can be declared through the automation API.</p><div class="field-row">' + field("compressed-move-target", "Reserved destination offset", ctx2.draft("compressed-move-target", "0")) + field("compressed-move-capacity", "Reserved capacity", ctx2.draft("compressed-move-capacity", String(r.packed_size))) + field("compressed-move-fill", "Expected fill byte", ctx2.draft("compressed-move-fill", "255")) + select("compressed-move-align", "Alignment", [[1, "1"], [2, "2"], [4, "4"], [8, "8"], [16, "16"], [32, "32"]], ctx2.draft("compressed-move-align", "4")) + '</div><div class="field-row">' + field("compressed-move-pointer", "Pointer file offset", ctx2.draft("compressed-move-pointer", "0")) + select("compressed-move-width", "Pointer bytes", [[2, "2"], [3, "3"], [4, "4"]], ctx2.draft("compressed-move-width", "4")) + select("compressed-move-order", "Byte order", [["little", "Little"], ["big", "Big"]], ctx2.draft("compressed-move-order", system2 === "genesis" ? "big" : "little")) + field("compressed-move-base", "Pointer encoding adjustment", ctx2.draft("compressed-move-base", system2 === "gba" ? "0x08000000" : "0")) + '</div><div class="field-row">' + field("compressed-move-bank", "Declared bank bytes (0 for linear)", ctx2.draft("compressed-move-bank", String(bank))) + field("compressed-move-origin", "Bank file origin", ctx2.draft("compressed-move-origin", system2 === "nes" ? "16" : "0")) + "</div>" + compressionReferences(ctx2, ctx2.state.project.sources.concat(ctx2.state.project.builds).find((a) => a.artifact_id === compressedRoot(ctx2.state).compressed_parent.parent_id), compressedRoot(ctx2.state).compressed_parent.offset) + '<label><input type="checkbox" id="compressed-move-complete" ' + (((_b = (_a = ctx2.state.compressionPreview) == null ? void 0 : _a.moveSpec) == null ? void 0 : _b.references_complete) ? "checked" : "") + '> This is the complete reference set for this move.</label><label><input type="checkbox" id="compressed-move-reserved" ' + (((_d = (_c = ctx2.state.compressionPreview) == null ? void 0 : _c.moveSpec) == null ? void 0 : _d.destination_reserved) ? "checked" : "") + "> I reserved this destination; matching fill does not prove free space.</label>" + button("Review compressed-resource move", "compression-move") + "</details>";
+  }
+
+  // romancer/ui/definition_builder.js
+  var num = (id, min = 0, max = 64 * 1024 ** 2) => {
+    const s = read("builder-" + id).trim(), n = Number(s);
+    if (!s || !Number.isSafeInteger(n) || n < min || n > max) throw Error("Enter a whole number from " + min + " to " + max + " for " + id + ".");
+    return n;
+  };
+  function builderConfig(ctx2) {
+    const kind = read("builder-kind"), offset = num("offset"), count = num("count", 1, 256);
+    if (kind === "tables") return { kind, config: { schema_version: 1, name: read("builder-name"), offset, count, stride: num("stride", 1, 65536), fields: Array.from({ length: num("fields", 1, 16) }, (_, i) => ({ name: read("builder-field-name-" + i), offset: num("field-at-" + i, 0, 65535), type: read("builder-field-type-" + i), endian: read("builder-field-endian-" + i), pointer_base: null })) } };
+    const base = { system_id: resourceSystem(ctx2.state), offset, count };
+    if (kind === "assets") return { kind, config: base };
+    if (kind === "script") return { kind, config: { ...base, capacity: num("capacity", 1, 512), stride: num("stride", 1), encoding: "ascii", terminator: num("terminator", 0, 255), padding: num("padding", 0, 255) } };
+    throw Error("Choose an editor type.");
+  }
+  function preview(doc, kind) {
+    if (kind === "tables") return `<div class="table-wrap"><table><thead><tr><th>Record</th>${doc.definition.fields.map((f) => `<th>${esc(f.name)}</th>`).join("")}</tr></thead><tbody>${doc.rows.map((r) => `<tr><td>${r.index}</td>${r.cells.map((c) => `<td>${esc(c.value)}</td>`).join("")}</tr>`).join("")}</tbody></table></div>`;
+    if (kind === "script") return `<ul>${doc.records.slice(0, 8).map((r) => `<li>${esc(r.id)}: ${r.segments.map((s) => esc(s.text)).join(" / ")} · ${r.capacity} bytes</li>`).join("")}</ul>`;
+    const cells = doc.bitmaps[0].cells.slice(0, 16), cols = Math.min(8, cells.length), max = Math.max(1, ...cells.flatMap((c) => c.pixels));
+    return `<svg role="img" aria-label="Decoded tiles in index shades" viewBox="0 0 ${cols * 8} ${Math.ceil(cells.length / cols) * 8}" width="${cols * 40}" style="max-width:100%;image-rendering:pixelated">${cells.flatMap((c, i) => c.pixels.map((p, n) => `<rect x="${i % cols * 8 + n % 8}" y="${Math.floor(i / cols) * 8 + Math.floor(n / 8)}" width="1" height="1" fill="rgb(${Array(3).fill(Math.round(24 + p / max * 210)).join(",")})"/>`)).join("")}</svg><p>First ${cells.length} tiles in index shades. Open Graphics for palettes and sprite assembly.</p>`;
+  }
+  function definitionBuilder(ctx2) {
+    var _a, _b;
+    const { state: state2 } = ctx2;
+    if (!state2.artifact) return "";
+    const page = state2.page, scope = selectionKey(state2), params = { ...ctx2.sourceParams() }, current2 = () => selectionKey(state2) === scope && state2.page === page;
+    const kind = ctx2.draft("builder-kind", "tables"), entry = ((_a = state2.definitionReview) == null ? void 0 : _a.scope) === scope ? state2.definitionReview : null;
+    const input = (id, name, value) => field("builder-" + id, name, ctx2.draft("builder-" + id, String(value)));
+    const count = Math.max(1, Math.min(16, Number(ctx2.draft("builder-fields", "2")) || 2));
+    ctx2.use({
+      "builder-type": () => {
+        ctx2.setDraft("builder-kind", read("builder-kind"));
+        state2.definitionReview = null;
+        return ctx2.render();
+      },
+      "builder-field-count": () => {
+        ctx2.setDraft("builder-fields", String(num("fields", 1, 16)));
+        state2.definitionReview = null;
+        return ctx2.render();
+      },
+      "builder-preview": async () => {
+        if (!current2()) throw Error("The selected source changed.");
+        const config = builderConfig(ctx2), signature = JSON.stringify(config);
+        const result = await ctx2.run("definitions.preview", { ...params, ...config }, { render: false });
+        if (!current2()) return;
+        if (signature !== JSON.stringify(builderConfig(ctx2))) throw Error("The form changed. Preview it again.");
+        if (!result.ok || result.source_sha256 !== state2.artifact.sha256 || result.artifact_id !== state2.artifact.artifact_id) throw Error(result.error || "Preview source changed.");
+        state2.definitionReview = { scope, signature, result };
+        return ctx2.render();
+      },
+      "builder-save": async () => {
+        var _a2;
+        if (!current2() || !entry || entry.signature !== JSON.stringify(builderConfig(ctx2))) throw Error("The form changed. Preview the current layout first.");
+        const config = builderConfig(ctx2), result = await ctx2.run("definitions.save", { ...params, ...config, review_id: entry.result.review_id, replace: !!((_a2 = document.getElementById("builder-replace")) == null ? void 0 : _a2.checked) }, { render: false });
+        if (!current2()) return;
+        if (!result.ok) throw Error(result.error || "Definition was not saved.");
+        state2.definitionReview = null;
+        state2.researchOpen = { scope, kind: config.kind };
+        state2.results[config.kind + ".inspect"] = result.inspection;
+        if (config.kind === "tables") {
+          ctx2.setDraft("table-definition", JSON.stringify(result.definition));
+          state2.tableProposal = { scope, result: { ok: true, source_sha256: result.source_sha256, artifact_id: result.artifact_id, definition: result.definition, inspection: result.inspection } };
+        } else ctx2.setDraft(config.kind === "assets" ? "asset-schema" : "script-schema", JSON.stringify(result.definition));
+        ctx2.notify("Editor layout saved. Original ROM unchanged.");
+        return ctx2.navigate(config.kind === "script" ? "scripts" : config.kind);
+      }
+    });
+    const rows = kind === "tables" ? `<div class="field-row">${input("name", "Table name", "My data")}${input("stride", "Bytes per record", 4)}</div><div class="actions">${input("fields", "Named fields", count)}${button("Update fields", "builder-field-count")}</div><div class="table-wrap"><table><thead><tr><th>Name</th><th>Byte within record</th><th>Number type</th><th>Byte order</th></tr></thead><tbody>${Array.from({ length: count }, (_, i) => `<tr><td>${input("field-name-" + i, "Field " + (i + 1), i ? "Value " + (i + 1) : "Value")}</td><td>${input("field-at-" + i, "Field " + (i + 1) + " byte", i)}</td><td>${select("builder-field-type-" + i, "Field " + (i + 1) + " type", ["u8", "s8", "u16", "s16", "u24", "s24", "u32", "s32"].map((t) => [t, t]), ctx2.draft("builder-field-type-" + i, "u8"))}</td><td>${select("builder-field-endian-" + i, "Field " + (i + 1) + " order", [["little", "Little endian"], ["big", "Big endian"]], ctx2.draft("builder-field-endian-" + i, "little"))}</td></tr>`).join("")}</tbody></table></div>` : kind === "script" ? `<div class="field-row">${input("capacity", "Bytes per slot", 32)}${input("stride", "Bytes between slots", 32)}${input("terminator", "End byte", 0)}${input("padding", "Padding byte", 255)}</div><p>ASCII slots. Custom alphabets and controls are available in Text & layout.</p>` : "<p>Uses the system’s standard 8×8 tile format. Graphics has additional declarations and palette controls.</p>";
+    return `<details class="card definition-builder" ${entry ? "open" : ""}><summary>Build an editor from these bytes</summary><p>Name the fields or choose a known storage layout. Preview before saving; a plausible layout does not prove its game meaning.</p><div class="actions">${select("builder-kind", "Editor type", [["tables", "Numbers & stats"], ["assets", "Graphics tiles"], ["script", "Text slots"]], kind)}${button("Choose type", "builder-type")}</div><div class="field-row">${input("offset", "First file offset", ((_b = state2.results["resource.inspect"]) == null ? void 0 : _b.offset) || 0)}${input("count", kind === "tables" ? "Record count" : kind === "assets" ? "Tile count" : "Slot count", kind === "assets" ? 16 : 1)}</div>${rows}${button("Preview editor", "builder-preview", { primary: true })}${entry ? `<section class="card"><h3>Check the decoded result</h3>${preview(entry.result.inspection, entry.result.kind)}${entry.result.replacements.length ? `<label><input type="checkbox" id="builder-replace"> Replace ${esc(entry.result.replacements.join(", "))}.</label>` : ""}<p>Saving stores this exact-source layout. ROM bytes stay unchanged.</p>${button("Save & open editor", "builder-save", { primary: true })}</section>` : ""}</details>`;
+  }
+
+  // romancer/ui/source_symbols.js
+  async function sourceSymbols(ctx2) {
+    var _a, _b;
+    const { state: state2 } = ctx2, a = state2.artifact;
+    if (!["gb", "gbc", "gba"].includes(a == null ? void 0 : a.system_id)) return "";
+    const scope = selectionKey(state2), params = { ...ctx2.sourceParams() }, current2 = () => {
+      var _a2;
+      return scope === selectionKey(state2) && ((_a2 = ctx2.isCurrentRender) == null ? void 0 : _a2.call(ctx2)) !== false;
+    };
+    const model = await ctx2.api.call("symbols.search", { ...params, query: ctx2.draft("symbol-query", ""), page: state2.symbolPage || 0 });
+    if (!current2()) return "";
+    if (model.source_sha256 !== a.sha256 || model.artifact_id !== a.artifact_id) return "";
+    const packet = ((_a = state2.symbolReview) == null ? void 0 : _a.scope) === scope ? state2.symbolReview : null;
+    ctx2.use({
+      "symbol-preview": async () => {
+        var _a2;
+        if (!current2()) return;
+        const file = (_a2 = document.getElementById("symbol-file")) == null ? void 0 : _a2.files[0];
+        if (!file) throw Error("Choose a symbol file.");
+        const format = read("symbol-format");
+        state2.symbolReview = null;
+        const item = await ctx2.api.uploadInput(state2.project.project_id, file, "symbols");
+        if (!current2()) return;
+        const review2 = await ctx2.run("symbols.preview", { ...params, input_id: item.input_id, format }, { render: false });
+        if (!current2()) return;
+        state2.symbolReview = { scope, input_id: item.input_id, format, review: review2 };
+        return ctx2.render();
+      },
+      "symbol-import": async () => {
+        var _a2, _b2;
+        if (!current2() || !((_a2 = packet == null ? void 0 : packet.review) == null ? void 0 : _a2.review_id)) throw Error("Review this source’s symbols first.");
+        const acknowledged = !!((_b2 = document.getElementById("symbol-ack")) == null ? void 0 : _b2.checked);
+        await ctx2.run("symbols.import", { ...params, input_id: packet.input_id, format: packet.format, review_id: packet.review.review_id, acknowledged }, { render: false });
+        if (!current2()) return;
+        state2.symbolReview = null;
+        state2.symbolPage = 0;
+        return ctx2.render();
+      },
+      "symbol-search": () => {
+        state2.symbolPage = 0;
+        return ctx2.render();
+      },
+      "symbol-page": (node) => {
+        state2.symbolPage = Math.max(0, (state2.symbolPage || 0) + Number(node.dataset.id));
+        return ctx2.render();
+      },
+      "symbol-bytes": (node) => {
+        if (!current2()) return;
+        const offset = Number(node.dataset.id);
+        if (!model.symbols.some((r) => r.file_offset === offset)) throw Error("Reload the symbol list.");
+        state2.resourceJump = offset;
+        return ctx2.navigate("resources");
+      }
+    });
+    const rows = ((_b = packet == null ? void 0 : packet.review) == null ? void 0 : _b.symbols) || model.symbols;
+    return '<details class="card" id="source-symbols"><summary>Named addresses from a symbol file</summary><p>Import names from your matching game build. ROM labels open their bytes; RAM labels show their CPU address.</p>' + fileInput("symbol-file", "Symbol listing", ".sym,.txt,.nm") + select("symbol-format", "Format", a.system_id === "gba" ? [["gnu-nm", "GNU nm (address type name)"]] : [["rgbds", "RGBDS .sym"]], a.system_id === "gba" ? "gnu-nm" : "rgbds") + button("Review symbol file", "symbol-preview") + (packet ? '<p class="notice">' + esc(packet.review.note) + " " + packet.review.total + " entries; " + packet.review.ignored_lines + ' ignored lines.</p><label><input id="symbol-ack" type="checkbox"> This symbol file belongs to this exact ROM build.</label>' + button("Import reviewed names", "symbol-import") : "") + field("symbol-query", "Find a symbol", ctx2.draft("symbol-query", "")) + button("Find name", "symbol-search") + rows.map((r) => '<div class="notice"><strong>' + esc(r.name) + "</strong> · " + (r.bank === null ? "" : r.bank.toString(16) + ":") + "0x" + r.address.toString(16) + "<p>" + esc(r.reason) + "</p>" + (!packet && r.file_offset !== null ? button("Inspect bytes at 0x" + r.file_offset.toString(16), "symbol-bytes", { id: String(r.file_offset) }) : "") + "</div>").join("") + (!packet && model.configured ? '<div class="button-row">' + button("Previous", "symbol-page", { id: "-1", disabled: !model.page }) + "<span>" + model.total + " matches · page " + (model.page + 1) + "</span>" + button("Next", "symbol-page", { id: "1", disabled: (model.page + 1) * 50 >= model.total }) + "</div>" : "") + "</details>";
+  }
+
+  // romancer/ui/investigation_follow.js
+  var hex2 = (v) => "0x" + v.toString(16);
+  function investigationFollow(ctx2, capture, entry) {
+    var _a, _b, _c;
+    if (!capture) return "";
+    const { state: state2 } = ctx2, page = state2.page, scope = selectionKey(state2), params = { ...ctx2.sourceParams() }, id = capture.evidence_id;
+    const current2 = () => selectionKey(state2) === scope && state2.page === page && capture.evidence_id === id;
+    const r = ((_a = entry.follow) == null ? void 0 : _a.evidence_id) === id && ((_b = entry.follow) == null ? void 0 : _b.source_sha256) === state2.artifact.sha256 && ((_c = entry.follow) == null ? void 0 : _c.artifact_id) === state2.artifact.artifact_id ? entry.follow : null;
+    ctx2.use({
+      "follow-explain": async () => {
+        if (!current2()) throw Error("Select this capture again.");
+        const result = await ctx2.run("debugger.follow", { ...params, evidence_id: id }, { render: false });
+        if (!current2()) return;
+        if (!result.ok || result.source_sha256 !== state2.artifact.sha256 || result.artifact_id !== state2.artifact.artifact_id) throw Error(result.error || "Capture source changed.");
+        entry.follow = result;
+        return ctx2.render();
+      },
+      "follow-open": (node) => {
+        const offset = Number(node.dataset.id);
+        if (!current2() || !r || !r.writers.concat(r.source_reads).some((row) => row.file_offset === offset)) throw Error("Choose a captured mapped location.");
+        state2.resourceJump = offset;
+        return ctx2.navigate("resources");
+      }
+    });
+    const table = (rows, key3) => {
+      const cells = (items) => items.map((row) => `<tr><td>${button(hex2(row.file_offset), "follow-open", { id: String(row.file_offset) })}</td><td>${row[key3]}</td><td>${row.resources.map((v) => esc(v.name)).join(", ") || "No saved definition"}</td></tr>`).join("");
+      const grid = (items) => `<div class="table-wrap"><table><thead><tr><th>Source location</th><th>Sampled accesses</th><th>Declared resource</th></tr></thead><tbody>${cells(items)}</tbody></table></div>`;
+      return rows.length ? grid(rows.slice(0, 6)) + (rows.length > 6 ? `<details><summary>More mapped locations (${rows.length - 6})</summary>${grid(rows.slice(6))}</details>` : "") : "<p>No mapped locations in this capture.</p>";
+    };
+    return `<div class="capture-explanation">${button("Explain this capture", "follow-explain")}${r ? `<h3>What this capture tells us</h3><p>${esc(r.status)} · ${r.coverage.access_events} retained access events${r.coverage.partial ? " · partial capture" : ""}</p><div class="grid-even"><section><h4>Writer code</h4><p>Instructions active during writes. These locations are code, not editable stats.</p>${table(r.writers, "sampled_writes")}</section><section><h4>Source reads</h4><p>Bytes read from the ROM. Open a location to inspect or define its layout.</p>${table(r.source_reads, "sampled_reads")}</section></div><p>${esc(r.scope)}</p><ul>${r.next_steps.map((s) => `<li>${esc(s)}</li>`).join("")}</ul>${r.coverage.summary_truncated || false ? "<p>The summary budget retains up to128 locations per group. Narrow the watch to investigate omitted locations.</p>" : ""}` : ""}</div>`;
+  }
+
+  // romancer/ui/execution_trace.js
+  var hex3 = (v) => Number.isSafeInteger(v) ? "0x" + v.toString(16) : "Unknown";
+  var identity = (state2, r) => {
+    var _a, _b;
+    return (r == null ? void 0 : r.source_sha256) === ((_a = state2.artifact) == null ? void 0 : _a.sha256) && r.artifact_id === ((_b = state2.artifact) == null ? void 0 : _b.artifact_id);
+  };
+  function integer6(id, min, max) {
+    const text = read(id), v = Number(text);
+    if (!text.trim() || !Number.isSafeInteger(v) || v < min || v > max) throw Error("Enter a whole number from " + min + " to " + max + ".");
+    return v;
+  }
+  async function executionTrace(ctx2) {
+    var _a, _b, _c, _d, _e, _f, _g;
+    const { state: state2 } = ctx2, scope = selectionKey(state2), params = { ...ctx2.sourceParams() };
+    let entry = state2.nativeTrace;
+    if ((entry == null ? void 0 : entry.scope) !== scope) state2.nativeTrace = entry = { scope, generation: 0, result: null, steps: [{}] };
+    const current2 = () => selectionKey(state2) === scope && state2.nativeTrace === entry;
+    const proposal = ((_a = state2.nativeProbe) == null ? void 0 : _a.scope) === scope && identity(state2, state2.nativeProbe.result) ? state2.nativeProbe.result : null;
+    if (!entry.checked) {
+      entry.checked = true;
+      try {
+        const r = await ctx2.api.call("debugger.capabilities", params);
+        if (current2()) {
+          if ((r == null ? void 0 : r.ok) === false || !identity(state2, r)) throw Error(r.error || "Backend identity differs.");
+          entry.capabilities = r;
+        }
+      } catch (error) {
+        if (current2()) entry.error = error.message;
+      }
+    }
+    const remembered = ctx2.draft("native-trace-id", "");
+    if (!entry.loaded && remembered) {
+      entry.loaded = true;
+      const generation = ++entry.generation;
+      try {
+        const r = await ctx2.api.call("debugger.get", { ...params, evidence_id: remembered, offset: 0, limit: 100 });
+        if (current2() && entry.generation === generation) {
+          if ((r == null ? void 0 : r.ok) === false || !identity(state2, r)) throw Error(r.error || "Capture belongs to another source.");
+          entry.result = r;
+        }
+      } catch (error) {
+        if (current2() && entry.generation === generation) entry.error = error.message;
+      }
+    }
+    const result = identity(state2, entry.result) ? entry.result : null, available = ((_b = entry.capabilities) == null ? void 0 : _b.available) === true;
+    const reason = ((_c = entry.capabilities) == null ? void 0 : _c.reason) || entry.error || "The native debugger is unavailable for this source or host.";
+    const steps2 = () => entry.steps.map((_, i) => ({ frames: integer6("trace-frames-" + i, 1, 3600), buttons: read("trace-buttons-" + i).split(/[\s,]+/).filter(Boolean), port: 0 }));
+    const accept = async (operation, parameters) => {
+      if (!current2()) throw Error("The selected source changed. Open its native capture again.");
+      const generation = ++entry.generation;
+      entry.error = null;
+      const r = await ctx2.run(operation, { ...params, ...parameters }, { render: false, refresh: false });
+      if (!current2() || entry.generation !== generation) return;
+      if ((r == null ? void 0 : r.ok) === false || !identity(state2, r)) throw Error(r.error || "Native capture belongs to another source.");
+      entry.result = r;
+      entry.loaded = true;
+      ctx2.setDraft("native-trace-id", r.evidence_id);
+      await ctx2.render();
+    };
+    ctx2.use({
+      "trace-capture": () => {
+        if (!current2()) throw Error("The selected source changed.");
+        if (!available) throw Error(reason);
+        const replay = { steps: steps2(), start_frame: integer6("trace-start", 0, 3599), event_limit: integer6("trace-limit", 1, 2e3), instruction_limit: 2e7, timeout: 30 };
+        if (proposal) return accept("debugger.investigate", { investigation_id: proposal.investigation_id, candidate_id: proposal.candidate.candidate_id, replay });
+        const start = integer6("trace-address", 0, 268435455), length = integer6("trace-length", 1, 4096);
+        return accept("debugger.capture", { config: { ...replay, probes: [{ kind: read("trace-kind"), start, end: start + length - 1 }] } });
+      },
+      "trace-add-step": async () => {
+        if (!current2()) throw Error("The source changed.");
+        if (entry.steps.length >= 64) throw Error("Use at most 64 input steps.");
+        entry.steps = steps2();
+        entry.steps.push({});
+        await ctx2.render();
+      },
+      "trace-remove-step": async () => {
+        if (!current2()) throw Error("The source changed.");
+        if (entry.steps.length > 1) {
+          entry.steps = steps2();
+          entry.steps.pop();
+          await ctx2.render();
+        }
+      },
+      "trace-manual": () => {
+        if (!current2()) throw Error("The source changed.");
+        state2.nativeProbe = null;
+        return ctx2.render();
+      },
+      "trace-recheck": () => {
+        if (!current2()) throw Error("The source changed.");
+        entry.checked = false;
+        return ctx2.render();
+      },
+      "trace-prepare": async () => {
+        var _a2, _b2;
+        if (!current2()) throw Error("The selected source changed.");
+        if (!((_b2 = (_a2 = entry.capabilities) == null ? void 0 : _a2.download) == null ? void 0 : _b2.preparable)) throw Error("No pinned preparation is available for this source and host.");
+        const r = await ctx2.run("debugger.prepare", params, { render: false, refresh: false });
+        if (!current2()) return;
+        if ((r == null ? void 0 : r.ok) === false || !identity(state2, r)) throw Error(r.error || "Preparation result belongs to another source.");
+        entry.checked = false;
+        entry.error = null;
+        await ctx2.render();
+      },
+      "trace-page": (node) => {
+        if (!current2() || !result) throw Error("Open a capture first.");
+        return accept("debugger.get", { evidence_id: result.evidence_id, offset: Math.max(0, result.offset + Number(node.dataset.id) * 100), limit: 100 });
+      },
+      "trace-open": (node) => {
+        if (!current2() || !result) throw Error("Open a capture for the selected source first.");
+        const offset = Number(node.dataset.id);
+        if (!Number.isSafeInteger(offset) || offset < 0 || offset >= state2.artifact.size || !result.events.some((e) => {
+          var _a2, _b2;
+          return e.file_offset === offset || ((_a2 = e.execution_context) == null ? void 0 : _a2.file_offset) === offset || ((_b2 = e.execution_context) == null ? void 0 : _b2.source_candidate_offset) === offset;
+        })) throw Error("Choose a captured source location.");
+        const event = result.events.find((e) => {
+          var _a2, _b2;
+          return e.file_offset === offset || ((_a2 = e.execution_context) == null ? void 0 : _a2.file_offset) === offset || ((_b2 = e.execution_context) == null ? void 0 : _b2.source_candidate_offset) === offset;
+        });
+        state2.nativeSourceContext = { scope, evidence_id: result.evidence_id, offset: result.offset, event_id: event.id, source_offset: offset };
+        state2.resourceJump = offset;
+        return ctx2.navigate("resources");
+      }
+    });
+    const open = (offset) => Number.isSafeInteger(offset) ? button(hex3(offset), "trace-open", { id: String(offset) }) : "Unresolved";
+    const watched = proposal ? `<div class="notice"><strong>Investigating RAM ${hex3(proposal.candidate.offset)} · ${proposal.candidate.width} bytes</strong><p>Physical watch derived from the observed core buffer, including banked RAM.</p>${button("Use a manual address instead", "trace-manual")}</div>` : `<details><summary>Manual CPU address watch</summary><div class="field-row">${select("trace-kind", "Access type", [["write", "Writes"], ["read", "Reads"], ...state2.artifact.system_id === "genesis" ? [] : [["exec", "Execution"]]], ctx2.draft("trace-kind", "write"))}${field("trace-address", "CPU start address", ctx2.draft("trace-address", "0x100"))}${field("trace-length", "Address bytes", ctx2.draft("trace-length", "1"))}</div></details>`;
+    const route = `<h3>Replay input</h3><div class="table-wrap"><table><thead><tr><th>Step</th><th>Frames</th><th>Buttons held</th></tr></thead><tbody>${entry.steps.map((step, i) => {
+      var _a2;
+      return `<tr><td>${i + 1}</td><td>${field("trace-frames-" + i, "Frames", ctx2.draft("trace-frames-" + i, String(step.frames ?? 120)))}</td><td>${field("trace-buttons-" + i, "Buttons (blank for none)", ctx2.draft("trace-buttons-" + i, ((_a2 = step.buttons) == null ? void 0 : _a2.join(" ")) || ""), { placeholder: "For example start or a right" })}</td></tr>`;
+    }).join("")}</tbody></table></div><div class="actions">${button("Add input step", "trace-add-step", { disabled: entry.steps.length >= 64 })}${button("Remove last step", "trace-remove-step", { disabled: entry.steps.length <= 1 })}</div><div class="field-row">${field("trace-start", "Start recording after frame", ctx2.draft("trace-start", "0"))}${field("trace-limit", "Maximum sampled events", ctx2.draft("trace-limit", "200"))}</div>`;
+    const evidence2 = !result ? "" : `<h3>Captured evidence · ${esc(result.total_events)} events</h3><p>${esc(((_d = result.backend) == null ? void 0 : _d.backend) || "Native debugger")} ${esc(((_e = result.backend) == null ? void 0 : _e.version) || "")} · ${result.runtime_trusted ? "Authenticated capture" : "Historical capture"}</p>${result.status === "BUDGET_EXCEEDED" || result.omitted_events ? `<p class="notice warm">Partial capture: an event or instruction limit was reached. ${esc(result.omitted_events ?? 0)} events were omitted. Narrow the watch or recording window.</p>` : ""}<p>${result.route_complete ? "Replay reached its requested end." : "Replay did not reach its requested end."}</p>${result.events.length ? `<div class="table-wrap"><table><thead><tr><th>Event</th><th>CPU address</th><th>Value</th><th>Execution context</th><th>Context in source</th><th>Access in source</th></tr></thead><tbody>${result.events.map((e) => {
+      var _a2, _b2, _c2;
+      return `<tr><td>${esc(e.id)} · ${esc(e.kind)}</td><td><code>${hex3(e.address)}</code></td><td><code>${hex3(e.value)}</code></td><td><code>${hex3((_a2 = e.execution_context) == null ? void 0 : _a2.pc)}</code>${e.registers ? `<details><summary>Registers</summary><pre>${esc(Object.entries(e.registers).map(([k, v]) => k + " = " + hex3(v)).join("\n"))}</pre></details>` : ""}</td><td>${Number.isSafeInteger((_b2 = e.execution_context) == null ? void 0 : _b2.source_candidate_offset) ? button("Possible " + hex3(e.execution_context.source_candidate_offset), "trace-open", { id: String(e.execution_context.source_candidate_offset) }) + "<small>Unique byte-pattern candidate; mapper unresolved.</small>" : open((_c2 = e.execution_context) == null ? void 0 : _c2.file_offset)}</td><td>${open(e.file_offset)}</td></tr>`;
+    }).join("")}</tbody></table></div>` : "<p>No matching access was sampled. Check the route, start frame and watch range. An empty capture does not prove that the location is unused.</p>"}<div class="actions">${button("Previous events", "trace-page", { id: "-1", disabled: result.offset === 0 })}<span>${result.total_events ? result.offset + 1 : 0}–${Math.min(result.offset + result.events.length, result.total_events)} of ${result.total_events}</span>${button("Next events", "trace-page", { id: "1", disabled: result.offset + 100 >= Math.max(result.total_events, result.total_instruction_samples || 0) })}</div>`;
+    const instructions = !((_f = result == null ? void 0 : result.instruction_samples) == null ? void 0 : _f.length) ? "" : `<details><summary>Native instruction samples · ${esc(result.total_instruction_samples)}</summary><p>Ordered within this instruction sample only. The memory-access sequence has separate ordering.</p><div class="table-wrap"><table><thead><tr><th>Sample</th><th>CPU PC</th><th>Disassembly</th></tr></thead><tbody>${result.instruction_samples.map((row) => `<tr><td>${esc(row.id)}</td><td><code>${hex3(row.pc)}</code></td><td><code>${esc(row.assembly)}</code></td></tr>`).join("")}</tbody></table></div></details>`;
+    const budget = state2.artifact.system_id === "genesis" ? "At most 3,600 frames and 30 seconds. Global instruction sampling is separate from read/write watches and stops after at most 2,000 records; it does not count every instruction executed during the rest of the replay." : "At most 3,600 frames, 20 million instruction callbacks and 30 seconds.";
+    const download = (_g = entry.capabilities) == null ? void 0 : _g.download, preparation = !available && (download == null ? void 0 : download.preparable) ? `<div class="notice"><p>Prepare the official debugger once · ${(download.download_bytes / 1048576).toFixed(1)} MiB download. Later captures work offline. No ROM data is uploaded.</p><p>External tool license: ${esc(download.license)} · <a href="${esc(download.source_url)}" target="_blank" rel="noopener noreferrer">Upstream source and notices</a></p>${button("Prepare debugger", "trace-prepare", { primary: true })}</div>` : "";
+    return `<section class="card native-execution-trace" id="native-accesses"><div class="card-heading"><h2>Trace actual accesses</h2>${button("Check debugger", "trace-recheck")}</div><p>Replay from power on with normal controller input. Record accesses and their execution context, then inspect mapped source bytes. This is a separate session; it does not resume Playtest.</p>${!available ? `<p class="notice warm">${esc(reason)}</p>` : ""}${entry.error ? `<p class="notice warm">${esc(entry.error)}</p>` : ""}${preparation}${watched}${route}${button(proposal ? "Replay & investigate this value" : "Replay & capture accesses", "trace-capture", { primary: true, disabled: !available, reason })}<p class="subtle">${budget} Context is a lead; DMA ownership and the meaning of a value remain unproven.</p>${evidence2}${investigationFollow(ctx2, result, entry)}${instructions}</section>`;
+  }
+  async function observedSourceContext(ctx2) {
+    var _a, _b;
+    const { state: state2 } = ctx2, scope = selectionKey(state2), entry = state2.nativeSourceContext;
+    if (!entry || entry.scope !== scope) return "";
+    const current2 = () => selectionKey(state2) === scope && state2.nativeSourceContext === entry;
+    if (!entry.result) {
+      try {
+        const r2 = await ctx2.api.call("debugger.get", { ...ctx2.sourceParams(), evidence_id: entry.evidence_id, offset: entry.offset, limit: 100 });
+        if (!current2()) return "";
+        if ((r2 == null ? void 0 : r2.ok) === false || !identity(state2, r2)) throw Error(r2.error || "Capture belongs to another source.");
+        entry.result = r2;
+      } catch (error) {
+        if (!current2()) return "";
+        return `<p class="notice warm">Access evidence could not be reopened: ${esc(error.message)}</p>`;
+      }
+    }
+    const r = entry.result, event = r.events.find((e) => e.id === entry.event_id), context = event == null ? void 0 : event.execution_context;
+    if (!event || ![event.file_offset, context == null ? void 0 : context.file_offset, context == null ? void 0 : context.source_candidate_offset].includes(entry.source_offset)) return "";
+    ctx2.use({
+      "source-capture-back": () => {
+        if (!current2()) throw Error("The selected source changed.");
+        return ctx2.navigate("debug");
+      },
+      "source-capture-dismiss": () => {
+        if (!current2()) return;
+        state2.nativeSourceContext = null;
+        return ctx2.render();
+      }
+    });
+    const candidate = (context == null ? void 0 : context.source_candidate_offset) === entry.source_offset && (context == null ? void 0 : context.file_offset) !== entry.source_offset;
+    return `<section class="card observed-source-context"><div class="card-heading"><h3>Why these bytes are open</h3>${button("Dismiss", "source-capture-dismiss")}</div><p>${r.runtime_trusted ? "Authenticated native capture" : "Historical capture"} · ${esc(((_a = r.backend) == null ? void 0 : _a.backend) || "Debugger")} ${esc(((_b = r.backend) == null ? void 0 : _b.version) || "")} · event ${event.id}</p><p>Observed <strong>${esc(event.kind)}</strong> at CPU address <code>${hex3(event.address)}</code>, value <code>${hex3(event.value)}</code>. Execution context: <code>${hex3(context == null ? void 0 : context.pc)}</code>.</p><p>${candidate ? "This source location is a unique byte-pattern candidate. Active mapper state was not established." : "This source location was mapped in the captured native event."} Game meaning and causal ownership remain separate questions.</p>${button("Back to captured evidence", "source-capture-back")}</section>`;
+  }
+
+  // romancer/ui/data_relocation.js
+  function integer7(id) {
+    const text = read(id), value = Number(text);
+    if (!text.trim() || !Number.isSafeInteger(value)) throw Error("Enter a whole number for " + id + ".");
+    return value;
+  }
+  var hex4 = (value) => "0x" + value.toString(16);
+  async function relocationControls(ctx2) {
+    var _a, _b, _c, _d, _e, _f;
+    const { state: state2 } = ctx2, scope = selectionKey(state2), params = { ...ctx2.sourceParams() };
+    let entry = state2.dataRelocation;
+    if ((entry == null ? void 0 : entry.scope) !== scope) state2.dataRelocation = entry = { scope, references: [{}], generation: 0, plan: null, replacement: null };
+    const current2 = () => selectionKey(state2) === scope && state2.dataRelocation === entry;
+    const bankDefault = { nes: 8192, snes: 32768, gb: 16384, gbc: 16384 }[state2.artifact.system_id] || 0;
+    const assessment = state2.artifact.system_assessment;
+    const prg = ((_a = assessment == null ? void 0 : assessment.source) == null ? void 0 : _a.sha256) === state2.artifact.sha256 ? (_b = assessment.candidates) == null ? void 0 : _b.filter((c) => c.layout_valid).flatMap((c) => c.regions || []).find((r) => r.id === "prg-rom") : null;
+    const originDefault = state2.artifact.system_id === "nes" ? (prg == null ? void 0 : prg.offset) ?? 16 : 0;
+    const baseDefault = state2.artifact.system_id === "nes" ? 32768 - originDefault : state2.artifact.system_id === "gba" ? 134217728 : 0;
+    const references = () => entry.references.map((_, i) => ({
+      offset: integer7("reloc-ref-offset-" + i),
+      width: integer7("reloc-ref-width-" + i),
+      endian: read("reloc-ref-endian-" + i),
+      base: integer7("reloc-ref-base-" + i),
+      target_delta: integer7("reloc-ref-delta-" + i)
+    }));
+    const spec = () => {
+      var _a2;
+      return {
+        source_offset: integer7("reloc-source"),
+        source_length: integer7("reloc-length"),
+        target_offset: integer7("reloc-target"),
+        target_capacity: integer7("reloc-capacity"),
+        fill_byte: integer7("reloc-fill"),
+        alignment: integer7("reloc-alignment"),
+        bank_size: integer7("reloc-bank"),
+        bank_origin: integer7("reloc-origin"),
+        references: references(),
+        references_complete: document.getElementById("reloc-references-complete").checked,
+        destination_reserved: document.getElementById("reloc-destination-reserved").checked,
+        replacement_input_id: ((_a2 = entry.replacement) == null ? void 0 : _a2.input_id) || null
+      };
+    };
+    const invalidate = () => {
+      if (entry.plan && state2.pending === entry.plan) state2.pending = null;
+      entry.plan = null;
+    };
+    ctx2.use({
+      "reloc-add-reference": () => {
+        if (!current2()) throw Error("The source changed.");
+        if (entry.references.length >= 128) throw Error("Use at most 128 references.");
+        entry.references = references();
+        entry.references.push({});
+        invalidate();
+        return ctx2.render();
+      },
+      "reloc-remove-reference": () => {
+        if (!current2()) throw Error("The source changed.");
+        if (entry.references.length > 1) {
+          entry.references = references().slice(0, -1);
+          invalidate();
+          return ctx2.render();
+        }
+      },
+      "reloc-upload": async () => {
+        if (!current2()) throw Error("The source changed.");
+        const file = document.getElementById("reloc-file").files[0];
+        if (!file || !file.size || file.size > 48 * 1024) throw Error("Choose edited data up to 48 KiB.");
+        const generation = ++entry.generation;
+        const result = await ctx2.api.uploadInput(params.project_id, file, "resource");
+        if (!current2() || entry.generation !== generation) return;
+        entry.replacement = result;
+        invalidate();
+        await ctx2.render();
+      },
+      "reloc-copy-original": () => {
+        if (!current2()) throw Error("The source changed.");
+        ++entry.generation;
+        entry.replacement = null;
+        invalidate();
+        return ctx2.render();
+      },
+      "reloc-review": async () => {
+        if (!current2()) throw Error("The selected source changed.");
+        const declaration = spec(), signature = JSON.stringify(declaration), generation = ++entry.generation;
+        invalidate();
+        const result = await ctx2.run("relocation.plan", { ...params, spec: declaration }, { render: false, refresh: false });
+        if (!current2() || entry.generation !== generation) return;
+        if ((result == null ? void 0 : result.ok) === false || result.source_sha256 !== state2.artifact.sha256 || result.artifact_id !== state2.artifact.artifact_id) throw Error(result.error || "Relocation plan belongs to another source.");
+        if (JSON.stringify(spec()) !== signature) {
+          ctx2.notify("The declaration changed during review. Review it again.");
+          return;
+        }
+        entry.references = declaration.references;
+        entry.lastSpec = declaration;
+        state2.pending = entry.plan = { kind: "relocation", plan_id: result.plan_id, artifact_id: params.artifact_id, spec: declaration, report: result };
+        await ctx2.render();
+      },
+      "reloc-build": async () => {
+        if (!current2() || !entry.plan || state2.pending !== entry.plan) throw Error("Review this source relocation first.");
+        if (JSON.stringify(spec()) !== JSON.stringify(entry.plan.spec)) {
+          invalidate();
+          throw Error("The declaration changed. Review it again before building.");
+        }
+        const pending2 = entry.plan, result = await ctx2.run("build.apply", { project_id: params.project_id, plan_id: pending2.plan_id }, { render: false });
+        if (!current2()) return;
+        entry.built = { artifact_id: result.artifact_id, sha256: result.sha256, offset: pending2.report.relocation.target_offset };
+        if (entry.plan === pending2) {
+          let latest;
+          try {
+            latest = spec();
+          } catch {
+            latest = null;
+          }
+          const changed2 = !latest || JSON.stringify(latest) !== JSON.stringify(pending2.spec);
+          if (latest) {
+            entry.references = latest.references;
+            entry.lastSpec = latest;
+          } else entry.lastSpec = { ...entry.lastSpec, references_complete: document.getElementById("reloc-references-complete").checked, destination_reserved: document.getElementById("reloc-destination-reserved").checked };
+          invalidate();
+          await ctx2.render();
+          ctx2.notify(changed2 ? "Build created. Your newer declaration remains." : "Separate relocated build created. Playtest it before exporting.");
+        }
+      },
+      "reloc-inspect-build": async () => {
+        var _a2, _b2;
+        if (!current2() || !entry.built) throw Error("Create the reviewed relocated build first.");
+        const built = entry.built;
+        await ctx2.setArtifact(built.artifact_id);
+        if (((_a2 = state2.artifact) == null ? void 0 : _a2.artifact_id) !== built.artifact_id || ((_b2 = state2.artifact) == null ? void 0 : _b2.sha256) !== built.sha256) throw Error("The selection changed. Open the relocated build again.");
+        state2.resourceJump = built.offset;
+        await ctx2.navigate("resources");
+      }
+    });
+    const report2 = (_d = (_c = entry.plan) == null ? void 0 : _c.report) == null ? void 0 : _d.relocation, pending = entry.plan && state2.pending === entry.plan;
+    return `<details class="card data-relocation"><summary>Move declared data · Advanced</summary><p>Move or grow data inside this cartridge and update explicitly declared linear references. The original extent is preserved. This does not move position-dependent code or discover every consumer.</p><div class="field-row">${field("reloc-source", "Original data offset", ctx2.draft("reloc-source", "0"))}${field("reloc-length", "Original allocation bytes", ctx2.draft("reloc-length", "16"))}${field("reloc-target", "Reserved destination offset", ctx2.draft("reloc-target", "0"))}${field("reloc-capacity", "Reserved destination bytes", ctx2.draft("reloc-capacity", "64"))}</div><div class="field-row">${field("reloc-fill", "Expected destination fill byte", ctx2.draft("reloc-fill", "255"))}${select("reloc-alignment", "Declared alignment", [[1, "1 byte"], [2, "2 bytes"], [4, "4 bytes"], [8, "8 bytes"], [16, "16 bytes"], [32, "32 bytes"]], ctx2.draft("reloc-alignment", "1"))}${select("reloc-bank", "Declared bank bytes", [[0, "Linear (GBA / Genesis)"], [8192, "8192"], [16384, "16384"], [32768, "32768"], [65536, "65536"]], ctx2.draft("reloc-bank", String(bankDefault)))}${field("reloc-origin", "Bank file origin", ctx2.draft("reloc-origin", String(originDefault)))}</div><p>Replacement: <strong>${entry.replacement ? esc(entry.replacement.name) + " · " + entry.replacement.size + " bytes" : "Copy the original allocation"}</strong></p><div class="field-row"><label class="field">Edited data file (optional, up to 48 KiB)<input type="file" id="reloc-file"></label><div class="actions">${button("Use edited data file", "reloc-upload")}${button("Copy original data instead", "reloc-copy-original")}</div></div>${entry.built ? button("Inspect moved data in the new build", "reloc-inspect-build") : ""}<h3>External linear references</h3><p>Stored pointer = destination file offset + interior offset + encoding adjustment. Before-bytes must already match the original location. Bank constraints are your declarations; an active mapper is not inferred.</p><div class="table-wrap"><table><thead><tr><th>Pointer file offset</th><th>Bytes</th><th>Order</th><th>Encoding adjustment</th><th>Interior offset</th></tr></thead><tbody>${entry.references.map((ref, i) => `<tr><td>${field("reloc-ref-offset-" + i, "Pointer file offset", ctx2.draft("reloc-ref-offset-" + i, String(ref.offset ?? 0)))}</td><td>${select("reloc-ref-width-" + i, "Pointer bytes", [[2, "2"], [3, "3"], [4, "4"]], ctx2.draft("reloc-ref-width-" + i, String(ref.width ?? (state2.artifact.system_id === "gba" ? 4 : 2))))}</td><td>${select("reloc-ref-endian-" + i, "Byte order", [["little", "Little"], ["big", "Big"]], ctx2.draft("reloc-ref-endian-" + i, ref.endian || (state2.artifact.system_id === "genesis" ? "big" : "little")))}</td><td>${field("reloc-ref-base-" + i, "Encoding adjustment", ctx2.draft("reloc-ref-base-" + i, String(ref.base ?? baseDefault)))}</td><td>${field("reloc-ref-delta-" + i, "Interior offset", ctx2.draft("reloc-ref-delta-" + i, String(ref.target_delta ?? 0)))}</td></tr>`).join("")}</tbody></table></div><div class="actions">${button("Add reference", "reloc-add-reference", { disabled: entry.references.length >= 128 })}${button("Remove last reference", "reloc-remove-reference", { disabled: entry.references.length <= 1 })}</div><label class="settings-check"><input type="checkbox" id="reloc-references-complete" ${((_e = entry.lastSpec) == null ? void 0 : _e.references_complete) ? "checked" : ""}><span>I have declared every external reference required by this move.</span></label><label class="settings-check"><input type="checkbox" id="reloc-destination-reserved" ${((_f = entry.lastSpec) == null ? void 0 : _f.destination_reserved) ? "checked" : ""}><span>I have reserved this destination. Matching fill bytes alone do not prove unused space.</span></label><div class="actions">${button("Review data move", "reloc-review", { primary: !pending })}${pending ? button("Create separate build", "reloc-build", { primary: true }) : ""}</div>${report2 ? `<div class="notice"><p>${report2.payload_size} bytes proposed at ${hex4(report2.target_offset)}. ${report2.pointer_updates.length} declared references checked. The original data remains at ${hex4(report2.source_offset)}.</p><p>Reference completeness and reservation are author declarations. Native gameplay verification is still required.</p></div><div class="table-wrap"><table><thead><tr><th>Reference offset</th><th>Before</th><th>After</th></tr></thead><tbody>${report2.pointer_updates.slice(0, 16).map((r) => `<tr><td>${hex4(r.offset)}</td><td>${hex4(r.before)}</td><td>${hex4(r.after)}</td></tr>`).join("")}</tbody></table></div>` : ""}</details>`;
+  }
+
+  // romancer/ui/hex_editor.js
+  var HexDraft = class {
+    constructor(state2, data) {
+      this.scope = selectionKey(state2);
+      this.original = /* @__PURE__ */ new Map();
+      this.changes = /* @__PURE__ */ new Map();
+      this.load(data);
+      this.selected = data.offset;
+    }
+    load(data) {
+      this.data = data;
+      if (!Number.isSafeInteger(this.selected) || this.selected < data.offset || this.selected >= data.offset + data.length) this.selected = data.offset;
+      const bytes = data.hex.match(/../g) || [];
+      for (const offset of this.original.keys()) if (!this.changes.has(offset)) this.original.delete(offset);
+      bytes.forEach((b, i) => this.original.set(data.offset + i, b));
+    }
+    set(offset, value) {
+      if (offset < this.data.offset || offset >= this.data.offset + this.data.length || !this.original.has(offset)) throw Error("Choose a visible byte.");
+      if (!/^[\da-f]{2}$/i.test(value)) throw Error("Enter two hex digits per byte.");
+      value = value.toLowerCase();
+      if (value === this.original.get(offset)) this.changes.delete(offset);
+      else this.changes.set(offset, value);
+    }
+    edits(state2) {
+      if (this.scope !== selectionKey(state2)) throw Error("The selection changed. Review bytes for the selected ROM.");
+      return [...this.changes].sort(([a], [b]) => a - b).map(([offset, after]) => ({ offset, before: this.original.get(offset), after }));
+    }
+  };
+  var integer8 = (value) => {
+    const n = Number(value);
+    if (!Number.isSafeInteger(n) || n < 0) throw Error("Enter a nonnegative decimal or 0x hex offset.");
+    return n;
+  };
+  function serializeHexDraft(state2, draft) {
+    return JSON.stringify({ artifact_id: state2.artifact.artifact_id, sha256: state2.artifact.sha256, edits: draft.edits(state2).map((e) => [e.offset, e.before, e.after]) });
+  }
+  function restoreHexDraft(state2, data, stored2) {
+    const draft = new HexDraft(state2, data);
+    if (!stored2) return draft;
+    const value = JSON.parse(stored2);
+    if (value.artifact_id !== state2.artifact.artifact_id || value.sha256 !== state2.artifact.sha256) throw Error("Saved byte edits belong to a different source.");
+    if (!Array.isArray(value.edits) || value.edits.length > 16e3) throw Error("Saved byte draft exceeds the editing budget.");
+    const seen = /* @__PURE__ */ new Set();
+    for (const item of value.edits) {
+      if (!Array.isArray(item) || item.length !== 3) throw Error("Invalid saved byte edit.");
+      const [offset, before, after] = item;
+      if (!Number.isSafeInteger(offset) || offset < 0 || offset >= state2.artifact.size || typeof before !== "string" || typeof after !== "string" || !/^[\da-f]{2}$/i.test(before) || !/^[\da-f]{2}$/i.test(after) || seen.has(offset)) throw Error("Invalid saved byte edit.");
+      seen.add(offset);
+      if (draft.original.has(offset) && draft.original.get(offset) !== before.toLowerCase()) throw Error("Saved original byte no longer matches this source.");
+      if (before.toLowerCase() !== after.toLowerCase()) {
+        draft.original.set(offset, before.toLowerCase());
+        draft.changes.set(offset, after.toLowerCase());
+      }
+    }
+    return draft;
+  }
+  function hexEditor(ctx2, data) {
+    var _a, _b, _c, _d, _e, _f, _g, _h, _i;
+    const { state: state2 } = ctx2;
+    if (data.artifact_id !== ((_a = state2.artifact) == null ? void 0 : _a.artifact_id) || data.sha256 !== ((_b = state2.artifact) == null ? void 0 : _b.sha256)) throw Error("The selected ROM changed. Load bytes for the current selection.");
+    const ticket = selectionKey(state2);
+    let draftError = "";
+    if (((_c = state2.hexDraft) == null ? void 0 : _c.scope) !== ticket) {
+      try {
+        state2.hexDraft = restoreHexDraft(state2, data, ctx2.draft("hex-changes", null));
+      } catch (error) {
+        draftError = error.message;
+        state2.hexDraft = null;
+      }
+    } else state2.hexDraft.load(data);
+    if (draftError) {
+      ctx2.use({ "hex-discard-invalid": () => {
+        ctx2.setDraft("hex-changes", null);
+        state2.hexDraft = null;
+        return ctx2.render();
+      } });
+      return `<section class="card"><h3>Saved byte edits need attention</h3><p class="notice warm">${esc(draftError)}</p><p>Your ROM is unchanged. Discard this saved draft to reopen the editor.</p>${button("Discard invalid byte draft", "hex-discard-invalid")}</section>`;
+    }
+    if (Number.isSafeInteger(state2.resumeHexSelection) && state2.resumeHexSelection >= data.offset && state2.resumeHexSelection < data.offset + data.length) {
+      state2.hexDraft.selected = state2.resumeHexSelection;
+      delete state2.resumeHexSelection;
+    }
+    const draft = state2.hexDraft, current2 = () => selectionKey(state2) === ticket;
+    const scoped = async (op, p) => {
+      const result = await ctx2.run(op, { ...ctx2.sourceParams(), ...p }, { render: false });
+      if (!current2()) throw Error("The selected ROM changed. Repeat this action.");
+      return result;
+    };
+    const go = async (offset) => {
+      const result = await scoped("resource.inspect", { offset: Math.min(integer8(offset), Math.max(0, state2.artifact.size - 1)), length: 256 });
+      state2.results["resource.inspect"] = result;
+      draft.selected = result.offset;
+      ctx2.setDraft("hex-offset", String(result.offset));
+      await ctx2.render();
+    };
+    ctx2.use({
+      "hex-go": () => go(read("hex-offset")),
+      "hex-page": (node) => go(Math.max(0, data.offset + Number(node.dataset.id))),
+      "hex-jump": (node) => go(node.dataset.id),
+      "hex-clear": () => {
+        state2.hexDraft = new HexDraft(state2, data);
+        ctx2.setDraft("hex-changes", serializeHexDraft(state2, state2.hexDraft));
+        state2.hexReview = null;
+        return ctx2.render();
+      },
+      "hex-search": async () => {
+        state2.hexSearch = { scope: ticket, result: await scoped("hex.search", { kind: read("hex-search-kind"), query: read("hex-search-query"), start: integer8(read("hex-search-start")), endian: read("hex-endian"), width: Number(read("hex-width")), signed: read("hex-signed") === "true" }) };
+        await ctx2.render();
+      },
+      "hex-search-more": async () => {
+        var _a2, _b2;
+        const next = (_b2 = (_a2 = state2.hexSearch) == null ? void 0 : _a2.result) == null ? void 0 : _b2.next_start;
+        if (next === null || next === void 0) return;
+        ctx2.setDraft("hex-search-start", String(next));
+        await ctx2.render();
+      },
+      "hex-explain": async () => {
+        state2.hexExplanation = { scope: ticket, result: await scoped("resources.explain", { offset: draft.selected }) };
+        return ctx2.render();
+      },
+      "hex-numbers": async () => {
+        state2.hexNumbers = { scope: ticket, result: await scoped("hex.numbers", { offset: draft.selected }) };
+        await ctx2.render();
+      },
+      "hex-bookmarks": async () => {
+        state2.hexBookmarks = { scope: ticket, result: await scoped("hex.bookmarks", {}) };
+        await ctx2.render();
+      },
+      "hex-bookmark": async () => {
+        state2.hexBookmarks = { scope: ticket, result: await scoped("hex.bookmark", { offset: draft.selected, name: read("hex-bookmark-name"), remove: false }) };
+        await ctx2.render();
+      },
+      "hex-unbookmark": async (node) => {
+        state2.hexBookmarks = { scope: ticket, result: await scoped("hex.bookmark", { offset: Number(node.dataset.id), name: "", remove: true }) };
+        await ctx2.render();
+      },
+      "hex-review": async () => {
+        if (document.querySelector("#hex-editor input:invalid")) throw Error("Finish the byte with two hex digits first.");
+        const edits = draft.edits(state2);
+        if (!edits.length) throw Error("Change one or more byte cells first.");
+        const signature = JSON.stringify(edits), source = state2.artifact;
+        const plan = await scoped(source.system_id ? "systems.plan_edits" : "bytes.plan", { edits });
+        if (JSON.stringify(draft.edits(state2)) !== signature) throw Error("Bytes changed during review. Review them again.");
+        state2.hexReview = { scope: ticket, signature, plan };
+        await ctx2.render();
+      },
+      "hex-apply": async () => {
+        const reviewed2 = state2.hexReview;
+        if ((reviewed2 == null ? void 0 : reviewed2.scope) !== ticket || reviewed2.signature !== JSON.stringify(draft.edits(state2))) throw Error("Review the current byte edits first.");
+        const built = await ctx2.run("build.apply", { ...ctx2.projectParams(), plan_id: reviewed2.plan.plan_id }, { render: false });
+        if (!current2()) return;
+        if (state2.hexReview !== reviewed2 || JSON.stringify(draft.edits(state2)) !== reviewed2.signature) {
+          ctx2.notify("Build created. Your newer byte edits are still staged.");
+          return;
+        }
+        state2.hexReview = null;
+        ctx2.setDraft("hex-changes", JSON.stringify({ artifact_id: state2.artifact.artifact_id, sha256: state2.artifact.sha256, edits: [] }));
+        state2.hexDraft = null;
+        await ctx2.refreshProject();
+        await ctx2.setArtifact(built.artifact_id);
+        ctx2.notify("Separate build created.");
+        await ctx2.navigate("overview");
+      }
+    });
+    const bytes = data.hex.match(/../g) || [], search = ((_d = state2.hexSearch) == null ? void 0 : _d.scope) === ticket ? state2.hexSearch.result : null, numbers = ((_e = state2.hexNumbers) == null ? void 0 : _e.scope) === ticket && state2.hexNumbers.result.offset === draft.selected ? state2.hexNumbers.result : null, marks = ((_f = state2.hexBookmarks) == null ? void 0 : _f.scope) === ticket ? state2.hexBookmarks.result : null;
+    const reviewed = ((_g = state2.hexReview) == null ? void 0 : _g.scope) === ticket && state2.hexReview.signature === JSON.stringify(draft.edits(state2));
+    return `<section class="card" id="hex-editor"><div class="card-heading"><h3>Hex editor</h3>${badge(`${draft.changes.size} staged bytes`)}</div>
+ <div class="toolbar">${field("hex-offset", "Offset", ctx2.draft("hex-offset", data.offset))}${button("Go", "hex-go")}${button("Previous page", "hex-page", { id: "-256", disabled: data.offset === 0 })}${button("Next page", "hex-page", { id: "256", disabled: data.offset + data.length >= state2.artifact.size })}</div>
+ <div class="hex-scroll"><div class="hex-edit-grid" aria-label="Editable hex bytes">${Array.from({ length: Math.ceil(bytes.length / 16) }, (_, row) => {
+      var _a2;
+      return `<div class="hex-edit-row"><code>${(data.offset + row * 16).toString(16).padStart(8, "0")}</code><div class="hex-edit-cells">${bytes.slice(row * 16, row * 16 + 16).map((b, i) => {
+        const offset = data.offset + row * 16 + i;
+        return `<input aria-label="Byte 0x${offset.toString(16)}" data-hex-offset="${offset}" value="${draft.changes.get(offset) || b}" maxlength="2" size="2" spellcheck="false" class="hex-cell ${draft.changes.has(offset) ? "changed" : ""}">`;
+      }).join("")}</div><code>${esc(((_a2 = data.text) == null ? void 0 : _a2.slice(row * 16, row * 16 + 16)) || "")}</code></div>`;
+    }).join("")}</div></div>
+ <p class="subtle">Edit a byte, then review. Your source stays unchanged. Arrow keys move between bytes.</p><div class="actions">${button("Review byte edits", "hex-review", { primary: true, disabled: !draft.changes.size })}${button("Create separate build", "hex-apply", { disabled: !reviewed })}${button("Discard byte edits", "hex-clear", { disabled: !draft.changes.size })}</div>
+ ${reviewed ? `<div class="notice">${state2.hexReview.plan.changed_bytes} bytes in the reviewed plan, including supported checksum repairs.</div>` : ""}
+ <details><summary>Search bytes, text or numbers</summary><div class="field-row">${select("hex-search-kind", "Search for", [["hex", "Hex pattern (?? wildcard)"], ["text", "UTF-8 text"], ["number", "Integer"]], ctx2.draft("hex-search-kind", "hex"))}${field("hex-search-query", "Pattern or value", ctx2.draft("hex-search-query", ""))}${field("hex-search-start", "Start offset", ctx2.draft("hex-search-start", "0"))}</div><div class="field-row">${select("hex-endian", "Byte order", [["little", "Little endian"], ["big", "Big endian"]], ctx2.draft("hex-endian", "little"))}${select("hex-width", "Number width", [[1, "8-bit"], [2, "16-bit"], [4, "32-bit"]], ctx2.draft("hex-width", "2"))}${select("hex-signed", "Number sign", [["false", "Unsigned"], ["true", "Signed"]], ctx2.draft("hex-signed", "false"))}</div>${button("Search selected file", "hex-search")}
+ ${search ? `<p>${search.offsets.length} matches · ${search.complete ? "Reached end of file" : `Scanned through 0x${search.scanned_to.toString(16)}`}</p><div class="actions">${search.offsets.slice(0, 1e3).map((o) => button("0x" + o.toString(16), "hex-jump", { id: String(o) })).join("")}</div>${search.complete ? "" : button("Set next search position", "hex-search-more")}` : ""}</details>
+ <details><summary>Number inspector & bookmarks</summary><p>Selected offset: <code id="hex-selected">0x${draft.selected.toString(16)}</code></p>${button("Explain selected bytes", "hex-explain")}${button("Inspect selected number", "hex-numbers")}<div id="hex-explanation">${((_h = state2.hexExplanation) == null ? void 0 : _h.scope) === ticket && state2.hexExplanation.result.offset === draft.selected ? researchNoteHelp(state2.hexExplanation.result.research_notes) : ""}${((_i = state2.hexExplanation) == null ? void 0 : _i.scope) === ticket && state2.hexExplanation.result.offset === draft.selected ? `<p>${esc(state2.hexExplanation.result.note)}</p>${state2.hexExplanation.result.interpretations.map((row) => `<dl><dt>${esc(row.name)} · declared</dt><dd>File offset 0x${row.offset.toString(16)} · ${row.length} bytes${row.type ? " · " + esc(row.type) + " " + esc(row.endian) + " · value " + esc(row.value) + " · numeric range " + row.minimum + "–" + row.maximum : ""}${row.description ? "<br>" + esc(row.description) : ""}</dd></dl>`).join("")}` : ""}</div><div id="hex-number-result">${numbers ? `<dl>${Object.entries(numbers.values).map(([k, v]) => `<dt>${esc(k)}</dt><dd>${esc(v)}</dd>`).join("")}</dl>` : ""}</div>${field("hex-bookmark-name", "Bookmark name", ctx2.draft("hex-bookmark-name", ""))}<div class="actions">${button("Bookmark selected byte", "hex-bookmark")}${button("Load bookmarks", "hex-bookmarks")}</div>${((marks == null ? void 0 : marks.bookmarks) || []).map((r) => `<div class="actions">${button(`${r.name} · 0x${r.offset.toString(16)}`, "hex-jump", { id: String(r.offset) })}${button("Remove", "hex-unbookmark", { id: String(r.offset) })}</div>`).join("")}</details></section>`;
+  }
+  async function hexComparison(ctx2, data) {
+    const saved = ctx2.state.hexComparison, a = ctx2.state.artifact, p = ctx2.state.project, scope = selectionKey(ctx2.state);
+    if (!saved || saved.project_id !== p.project_id || saved.right_id !== a.artifact_id || saved.right_sha256 !== a.sha256) return "";
+    const left = p.sources.concat(p.builds).find((r) => r.artifact_id === saved.left_id);
+    if (!left || left.sha256 !== saved.left_sha256) return "";
+    const maximum = Math.max(left.size, a.size), offset = saved.offset ?? data.offset;
+    if (!Number.isSafeInteger(offset) || offset < 0 || offset > maximum) return "";
+    const length = Math.max(1, Math.min(256, maximum - offset));
+    const readSide = (row) => ctx2.api.call("resource.inspect", { project_id: p.project_id, artifact_id: row.artifact_id, offset: Math.min(offset, row.size), length });
+    const [original, selected2] = await Promise.all([readSide(left), readSide(a)]);
+    if (selectionKey(ctx2.state) !== scope || ctx2.state.hexComparison !== saved) return "";
+    if (original.artifact_id !== left.artifact_id || original.sha256 !== left.sha256 || selected2.artifact_id !== a.artifact_id || selected2.sha256 !== a.sha256) throw Error("The compared source changed. Compare these files again.");
+    ctx2.use({ "hex-diff-page": async (node) => {
+      if (selectionKey(ctx2.state) !== scope || ctx2.state.hexComparison !== saved) throw Error("The selected comparison changed. Compare these files again.");
+      const delta = Number(node.dataset.id);
+      if (![-256, 256].includes(delta)) throw Error("Invalid comparison page.");
+      saved.offset = Math.max(0, Math.min(Math.max(0, maximum - 1), offset + delta));
+      await ctx2.render();
+    }, "hex-diff-follow": async () => {
+      if (selectionKey(ctx2.state) !== scope || ctx2.state.hexComparison !== saved) throw Error("The selected comparison changed.");
+      delete saved.offset;
+      await ctx2.render();
+    } });
+    const x = original.hex.match(/../g) || [], y = selected2.hex.match(/../g) || [], span = Math.max(x.length, y.length);
+    const cells = (values, other, index) => Array.from({ length: Math.min(16, span - index) }, (_, j) => {
+      const value = values[index + j];
+      return value === void 0 ? '<span aria-label="No byte in file">—</span>' : value !== other[index + j] ? `<mark>${value}</mark>` : value;
+    }).join(" ");
+    return `<details class="card hex-comparison" open><summary>Compare at 0x${offset.toString(16)}</summary><p>${esc(left.name)} → ${esc(a.name)}</p><p>Changed bytes are highlighted. — means this file has no byte at that offset.</p><div class="actions">${button("Previous comparison page", "hex-diff-page", { id: "-256", disabled: offset === 0 })}${button("Next comparison page", "hex-diff-page", { id: "256", disabled: offset + span >= maximum })}${button("Follow hex editor", "hex-diff-follow")}</div><div class="hex-scroll"><table><thead><tr><th>Offset</th><th>Earlier bytes</th><th>Selected bytes</th></tr></thead><tbody>${Array.from({ length: Math.ceil(span / 16) }, (_, i) => `<tr><td><code>${(offset + i * 16).toString(16)}</code></td><td><code>${cells(x, y, i * 16)}</code></td><td><code>${cells(y, x, i * 16)}</code></td></tr>`).join("")}</tbody></table></div></details>`;
+  }
+  function mountHexEditor(ctx2) {
+    const root = document.getElementById("hex-editor");
+    if (!root) return;
+    const draft = ctx2.state.hexDraft;
+    root.querySelectorAll("[data-hex-offset]").forEach((node) => {
+      node.addEventListener("focus", () => {
+        var _a, _b, _c, _d, _e, _f;
+        if (draft.scope !== selectionKey(ctx2.state)) return;
+        draft.selected = Number(node.dataset.hexOffset);
+        if (((_a = ctx2.state.hexExplanation) == null ? void 0 : _a.result.offset) !== draft.selected) {
+          ctx2.state.hexExplanation = null;
+          (_c = (_b = root.querySelector("#hex-explanation")) == null ? void 0 : _b.replaceChildren) == null ? void 0 : _c.call(_b);
+        }
+        if (((_d = ctx2.state.hexNumbers) == null ? void 0 : _d.result.offset) !== draft.selected) {
+          ctx2.state.hexNumbers = null;
+          (_f = (_e = root.querySelector("#hex-number-result")) == null ? void 0 : _e.replaceChildren) == null ? void 0 : _f.call(_e);
+        }
+        const label = root.querySelector("#hex-selected");
+        if (label) label.textContent = "0x" + draft.selected.toString(16);
+        node.select();
+      });
+      node.addEventListener("input", () => {
+        ctx2.state.hexReview = null;
+        setUnavailable(root.querySelector('[data-action="hex-apply"]'), true);
+        try {
+          draft.set(Number(node.dataset.hexOffset), node.value);
+          ctx2.setDraft("hex-changes", serializeHexDraft(ctx2.state, draft));
+          node.setCustomValidity("");
+          node.classList.toggle("changed", draft.changes.has(Number(node.dataset.hexOffset)));
+          setUnavailable(root.querySelector('[data-action="hex-review"]'), !draft.changes.size);
+          setUnavailable(root.querySelector('[data-action="hex-clear"]'), !draft.changes.size);
+        } catch (error) {
+          node.setCustomValidity(error.message);
+        }
+      });
+      node.addEventListener("blur", () => {
+        if (!node.checkValidity()) {
+          node.reportValidity();
+          node.value = draft.changes.get(Number(node.dataset.hexOffset)) || draft.original.get(Number(node.dataset.hexOffset));
+          node.setCustomValidity("");
+        }
+      });
+      node.addEventListener("keydown", (event) => {
+        const delta = { ArrowLeft: -1, ArrowRight: 1, ArrowUp: -16, ArrowDown: 16 }[event.key];
+        if (delta) {
+          const next = root.querySelector(`[data-hex-offset="${Number(node.dataset.hexOffset) + delta}"]`);
+          if (next) {
+            event.preventDefault();
+            next.focus();
+          }
+        }
+      });
+    });
+  }
+
+  // romancer/ui/revision_controls.js
+  function revisionResult(state2) {
+    const saved = state2.revisionLookup;
+    return (saved == null ? void 0 : saved.scope) === selectionKey(state2) ? saved.result : null;
+  }
+  async function identifyRevision(ctx2, scope, expected_id) {
+    var _a;
+    const ticket = selectionKey(ctx2.state), request2 = (ctx2.state.revisionRequest || 0) + 1;
+    ctx2.state.revisionRequest = request2;
+    const result = await ctx2.run("revision.lookup", { ...((_a = ctx2.sourceParams) == null ? void 0 : _a.call(ctx2)) || { project_id: ctx2.state.project.project_id, artifact_id: ctx2.state.artifact.artifact_id }, scope, expected_id }, { render: false });
+    if (ticket !== selectionKey(ctx2.state) || request2 !== ctx2.state.revisionRequest) throw Error("The selection changed. Identify the selected ROM again.");
+    ctx2.state.revisionLookup = { scope: ticket, result };
+    return result;
+  }
+  function revisionControls(ctx2) {
+    var _a, _b, _c;
+    const { state: state2 } = ctx2, project = (_a = state2.project) == null ? void 0 : _a.project_id, result = revisionResult(state2), info = ((_b = state2.revisionInfo) == null ? void 0 : _b.project_id) === project ? state2.revisionInfo : null, list = ((_c = state2.revisionList) == null ? void 0 : _c.project_id) === project ? state2.revisionList : null;
+    ctx2.use({
+      "revision-info": async () => {
+        var _a2;
+        const r = await ctx2.run("revision.info", { project_id: project }, { render: false });
+        if (((_a2 = state2.project) == null ? void 0 : _a2.project_id) === project) {
+          state2.revisionInfo = r;
+          await ctx2.render();
+        }
+      },
+      "revision-import": async () => {
+        var _a2, _b2, _c2;
+        const file = (_a2 = document.getElementById("revision-file")) == null ? void 0 : _a2.files[0];
+        if (!file) throw Error("Choose a local catalog first.");
+        const scope = read("revision-scope");
+        const input = await ctx2.api.uploadInput(project, file, "catalog");
+        if (((_b2 = state2.project) == null ? void 0 : _b2.project_id) !== project) throw Error("The project changed. Import into the selected project again.");
+        const r = await ctx2.run("revision.import", { project_id: project, input_id: input.input_id, scope }, { render: false });
+        if (((_c2 = state2.project) == null ? void 0 : _c2.project_id) === project) {
+          state2.revisionInfo = r;
+          state2.revisionList = null;
+          state2.revisionLookup = null;
+          state2.romScans = {};
+          ctx2.notify(`${r.count} revision references available.`);
+          await ctx2.render();
+        }
+      },
+      "revision-identify": async () => {
+        await identifyRevision(ctx2, read("revision-scope"), "");
+        await ctx2.render();
+      },
+      "revision-search": async () => {
+        var _a2;
+        const r = await ctx2.run("revision.list", { project_id: project, query: read("revision-query") }, { render: false });
+        if (((_a2 = state2.project) == null ? void 0 : _a2.project_id) === project) {
+          state2.revisionList = r;
+          await ctx2.render();
+        }
+      },
+      "revision-compare": async () => {
+        var _a2;
+        const id = read("revision-expected"), entry = (_a2 = list == null ? void 0 : list.entries) == null ? void 0 : _a2.find((r) => r.id === id);
+        if (!entry) throw Error("Search for and choose a reference first.");
+        await identifyRevision(ctx2, entry.scope, id);
+        await ctx2.render();
+      }
+    });
+    const message = result ? { MATCHED: "Exact revision matched", UNKNOWN: "No catalog match", MISMATCHED: "Selected reference differs", AMBIGUOUS: "Multiple references match" }[result.status] || result.status : "";
+    return `<details class="card"><summary>Identify ROM revision${info ? ` · ${info.count} references` : ""}</summary><p>Compare checksums with a catalog you supply. Unknown files remain unidentified.</p>
+ ${select("revision-scope", "Checksum scope", [["file", "Whole file"], ["payload", "Cartridge payload (supported layouts)"]], ctx2.draft("revision-scope", "file"))}
+ ${fileInput("revision-file", "Local JSON, CSV, TSV or XML DAT catalog", ".json,.csv,.tsv,.dat,.xml")}<div class="actions">${button("Import catalog", "revision-import")}${button("Check catalog size", "revision-info")}${button("Identify selected ROM", "revision-identify", { disabled: !state2.artifact, primary: true })}</div>
+ ${result ? `<div class="notice">${badge(message, result.status === "MATCHED" ? "good" : result.status === "MISMATCHED" ? "warm" : "neutral")}<p>${result.matches.map((r) => esc(r.name)).join("<br>")}</p><p>${esc(result.scope === "file" ? "Whole file" : "Cartridge payload")} · CRC32 <code>${esc(result.hashes.crc32)}</code></p>${result.status === "MISMATCHED" ? "<p>Choose the correct revision or check the checksum scope before applying a patch.</p>" : ""}</div>` : ""}
+ <details><summary>Compare a specific reference</summary>${field("revision-query", "Reference name", ctx2.draft("revision-query", ""))}${button("Find references", "revision-search")}${list ? `${select("revision-expected", "Expected reference", list.entries.map((r) => [r.id, `${r.name} · ${r.scope}`]), ctx2.draft("revision-expected", ""))}${list.truncated ? "<p>Narrow your search to see more references.</p>" : ""}${button("Compare selected reference", "revision-compare", { disabled: !list.entries.length || !state2.artifact })}` : ""}</details></details>`;
+  }
+
+  // romancer/ui/rom_health.js
+  function romHealthPanel(ctx2) {
+    var _a, _b, _c;
+    const { state: state2 } = ctx2, result = state2.results["rom.check"], r = (result == null ? void 0 : result.artifact_id) === ((_a = state2.artifact) == null ? void 0 : _a.artifact_id) && ((_b = result == null ? void 0 : result.source) == null ? void 0 : _b.sha256) === ((_c = state2.artifact) == null ? void 0 : _c.sha256) ? result : null, c = r == null ? void 0 : r.crc_comparison;
+    const tone = checkTone;
+    return `<section class="card rom-health"><div class="card-heading"><h2>ROM health</h2>${r ? badge(r.status === "ISSUES_FOUND" ? "Issues found" : r.status === "WARNINGS_FOUND" ? "Needs attention" : "Checks finished", r.status === "ISSUES_FOUND" ? "danger" : r.status === "WARNINGS_FOUND" ? "warm" : "neutral") : ""}</div><div class="toolbar">${field("rom-expected-crc", "Expected CRC32 (optional)", ctx2.draft("rom-expected-crc", ""), { placeholder: "Eight hex digits", hint: "Use the reference supplied with your patch or dump." })}${select("rom-crc-scope", "CRC32 comparison covers", [["file", "Whole file"], ["payload", "Cartridge payload"]], ctx2.draft("rom-crc-scope", "file"))}${button("Check ROM", "rom-check", { primary: true, icon: "shield" })}</div>${r ? `<div class="identity"><strong>File CRC32</strong><code>${esc(r.crc32)}</code><span>${esc((c == null ? void 0 : c.scope) === "payload" ? "Reference compares cartridge payload" : "Reference compares whole file")}</span></div><div class="notice ${(c == null ? void 0 : c.status) === "FAIL" ? "danger" : ""}"><strong>${(c == null ? void 0 : c.status) === "FAIL" ? "CRC32 mismatch" : (c == null ? void 0 : c.status) === "PASS" ? "Reference CRC32 matches" : "No reference supplied"}</strong>${(c == null ? void 0 : c.expected) ? ` · Expected <code>${esc(c.expected)}</code> · Measured <code>${esc(c.measured)}</code>` : " · The file fingerprint was measured; no dump match was checked."}</div><div class="table-wrap"><table><thead><tr><th>Check</th><th>Result</th><th>Details</th></tr></thead><tbody>${(r.checks || []).map((check) => `<tr><td>${esc(check.name)}</td><td>${badge(checkLabel(check.status), tone(check.status))}</td><td>${esc(check.detail)}${check.stored !== void 0 ? ` Stored <code>${esc(check.stored)}</code>${check.computed !== void 0 ? `; computed <code>${esc(check.computed)}</code>` : check.expected !== void 0 ? `; expected <code>${esc(check.expected)}</code>` : ""}.` : ""}</td></tr>`).join("")}</tbody></table></div><p class="subtle">These checks do not establish authenticity or successful gameplay.</p><details><summary>Full health report</summary><pre>${esc(JSON.stringify(r, null, 2))}</pre></details>` : '<p class="subtle">Checks cartridge layout and supported internal checksums. A reference is needed to detect a CRC32 mismatch.</p>'}</section>`;
+  }
+
+  // romancer/ui/discovery_controls.js
+  var systems2 = [["nes", "NES"], ["snes", "SNES"], ["genesis", "GEN"], ["gb", "Game Boy"], ["gbc", "Game Boy Color"], ["gba", "GBA"], ["sms", "Master System"]];
+  function integer9(id) {
+    const text = read(id).trim(), value = Number(text);
+    if (!text || !Number.isSafeInteger(value)) throw new Error("Enter a whole number for " + id + ".");
+    return value;
+  }
+  function discoveryControls(ctx2) {
+    var _a;
+    const { state: state2 } = ctx2, artifact = state2.artifact;
+    if (!artifact) return "";
+    const result = ((_a = state2.results["resources.discover"]) == null ? void 0 : _a.source_sha256) === artifact.sha256 ? state2.results["resources.discover"] : null;
+    ctx2.use({
+      "discover-scan": async () => {
+        const kind = read("discover-kind");
+        state2.discoveryPage = 0;
+        const kinds = kind === "all" ? ["text", "graphics", "compression"] : [kind];
+        const target = kind === "pointers" ? { offset: integer9("discover-target"), width: integer9("discover-width"), endian: read("discover-endian"), base: integer9("discover-base") } : null;
+        return ctx2.run("resources.discover", { ...ctx2.sourceParams(), config: { system_id: read("discover-system"), start: integer9("discover-start"), length: integer9("discover-length"), kinds, target } });
+      },
+      "discover-compressed": async (node) => {
+        const row = result == null ? void 0 : result.candidates.find((row2) => row2.candidate_id === node.dataset.id);
+        if ((row == null ? void 0 : row.kind) !== "compression") throw new Error("Scan this compressed source again.");
+        ctx2.setDraft("compression-offset", String(row.offset));
+        ctx2.setDraft("compression-allocation", String(row.length));
+        ctx2.setDraft("compression-codec", row.format);
+        await ctx2.run("compression.inspect", { ...ctx2.sourceParams(), offset: row.offset, allocation: row.length, codec: row.format });
+      },
+      "discover-page": (node) => {
+        state2.discoveryPage = Math.max(0, (state2.discoveryPage || 0) + Number(node.dataset.id));
+        return ctx2.render();
+      },
+      "discover-inspect": (node) => {
+        const row = result == null ? void 0 : result.candidates.find((row2) => row2.candidate_id === node.dataset.id);
+        if (!row) throw new Error("Scan this source revision again.");
+        return ctx2.run("resource.inspect", { ...ctx2.sourceParams(), offset: row.offset, length: Math.min(row.length, 256) });
+      },
+      "discover-declare": async (node) => {
+        const row = result == null ? void 0 : result.candidates.find((row2) => row2.candidate_id === node.dataset.id);
+        if (!(row == null ? void 0 : row.config)) throw new Error("This candidate needs a supported resource declaration.");
+        const prefix = row.kind === "text" ? "text" : "gfx";
+        state2.candidateReview = { artifact_id: artifact.artifact_id, kind: row.kind, reason: row.reason };
+        state2.resourcePrefill = { artifact_id: artifact.artifact_id, prefix, config: row.config };
+        delete state2.results["script.inspect"];
+        delete state2.results["assets.inspect"];
+        state2.pending = null;
+        state2.paint = null;
+        await ctx2.navigate(row.kind === "text" ? "scripts" : "assets");
+      }
+    });
+    const page = state2.discoveryPage || 0, rows = (result == null ? void 0 : result.candidates.slice(page * 20, page * 20 + 20)) || [];
+    return `<section class="card"><div class="card-heading"><h3>Find resources</h3>${button("Discovery help", "help-topic", { id: "discovery" })}</div><div class="field-row">${select("discover-system", "System", systems2, ctx2.draft("discover-system", resourceSystem(state2)))}${select("discover-kind", "Look for", [["all", "Text, graphics and known compression"], ["text", "Printable text"], ["graphics", "Graphics candidates"], ["compression", "Known compressed streams"], ["pointers", "Explicit pointer references"]], ctx2.draft("discover-kind", "all"))}${field("discover-start", "Start offset", ctx2.draft("discover-start", "0"))}${field("discover-length", "Bytes to scan (up to16MiB)", ctx2.draft("discover-length", String(Math.min(1024 * 1024, artifact.size))))}</div><details class="config"><summary>Pointer search settings</summary><div class="field-row">${field("discover-target", "Target file offset", ctx2.draft("discover-target", "0"))}${select("discover-width", "Pointer bytes", [["2", "2"], ["3", "3"], ["4", "4"]], ctx2.draft("discover-width", "2"))}${select("discover-endian", "Byte order", [["little", "Little endian"], ["big", "Big endian"]], ctx2.draft("discover-endian", "little"))}${field("discover-base", "Stored value = file offset + base", ctx2.draft("discover-base", "0"))}</div></details>${button("Scan selected range", "discover-scan", { primary: true, icon: "search" })}${result ? `<p class="notice">${result.candidates.length} candidates in${size(result.scanned_length)}. ${result.partial ? "Partial scan. " : ""}${result.next_offset !== null ? "Next range starts at0x" + result.next_offset.toString(16) + ". " : ""}${result.results_truncated ? "Result limit reached; narrow the range. " : ""}Graphics use sampled blocks. Confirm formats before editing.</p>${rows.length ? `<div class="table-wrap"><table><thead><tr><th>Resource</th><th>Preview</th><th>Reason</th><th></th></tr></thead><tbody>${rows.map((row) => `<tr><td>${esc(row.kind)}<br><code>0x${row.offset.toString(16)}</code><br>${esc(row.confidence)}</td><td>${esc(row.preview)}</td><td>${esc(row.reason)}</td><td><div class="actions">${button("Inspect bytes", "discover-inspect", { id: row.candidate_id })}${row.kind === "compression" ? button("Inspect stream", "discover-compressed", { id: row.candidate_id }) : row.config ? button("Review declaration", "discover-declare", { id: row.candidate_id }) : ""}</div></td></tr>`).join("")}</tbody></table></div><div class="actions">${button("Previous candidates", "discover-page", { id: "-1", disabled: page === 0 })}<span>Page ${page + 1}</span>${button("Next candidates", "discover-page", { id: "1", disabled: (page + 1) * 20 >= result.candidates.length })}</div>` : "<p>No candidates in this range. Try a different range or declare a known resource.</p>"}` : ""}</section>`;
+  }
+
+  // romancer/ui/views/resources.js
+  async function render6(ctx2) {
+    var _a, _b, _c, _d, _e, _f;
+    const { state: state2 } = ctx2, missing2 = requireProject(ctx2);
+    if (missing2) return missing2;
+    const a = state2.artifact, ticket = selectionKey(state2), generation = (state2.resourceRenderGeneration || 0) + 1;
+    state2.resourceRenderGeneration = generation;
+    const current2 = () => ticket === selectionKey(state2) && generation === state2.resourceRenderGeneration && (!ctx2.isCurrentRender || ctx2.isCurrentRender()), params = a ? { ...ctx2.sourceParams() } : null;
+    if (!current2()) return "";
+    const jump = state2.resourceJump;
+    let data = state2.results["resource.inspect"], catalog, comparison = "", byteNotes = "";
+    if (a) {
+      if (jump !== void 0 && jump !== null || (data == null ? void 0 : data.artifact_id) !== a.artifact_id || (data == null ? void 0 : data.sha256) !== a.sha256) {
+        data = await ctx2.api.call("resource.inspect", { ...params, offset: jump == null ? 0 : Math.min(parseInteger(jump), Math.max(0, a.size - 1)), length: 256 });
+        if (!current2()) return "";
+      }
+      catalog = await ctx2.api.call("catalog.list", { ...params, query: state2.catalogQuery || "", page: state2.catalogPage || 0, limit: 50 });
+      if (!current2()) return "";
+      comparison = await hexComparison(ctx2, data);
+      if (!current2()) return "";
+      byteNotes = await gameByteNotes(ctx2, data);
+      if (!current2()) return "";
+      state2.results["resource.inspect"] = data;
+      if (jump !== void 0 && jump !== null) {
+        ctx2.setDraft("hex-offset", String(data.offset));
+        state2.resourceJump = null;
+      }
+    }
+    const research = a ? await researchTools(ctx2) : "";
+    if (!current2()) return "";
+    const symbols = a ? await sourceSymbols(ctx2) : "";
+    if (!current2()) return "";
+    const references = await popularReferences(ctx2);
+    if (!current2()) return "";
+    const observed = a ? await observedSourceContext(ctx2) : "";
+    if (!current2()) return "";
+    const relocation = a ? await relocationControls(ctx2) : "";
+    if (!current2()) return "";
+    const relationships = a ? await resourceRelationships(ctx2) : "";
+    if (!current2()) return "";
+    let assessment = state2.results["systems.identify"];
+    if ((assessment == null ? void 0 : assessment.artifact_id) !== (a == null ? void 0 : a.artifact_id)) assessment = a && ((_b = (_a = a.system_assessment) == null ? void 0 : _a.source) == null ? void 0 : _b.sha256) === a.sha256 ? a.system_assessment : null;
+    ctx2.use({
+      "rom-check": () => ctx2.run("rom.check", { ...ctx2.sourceParams(), expected_crc32: read("rom-expected-crc").trim(), crc_scope: read("rom-crc-scope") }),
+      "catalog-index": () => ctx2.run("catalog.index", ctx2.sourceParams()),
+      "catalog-search": () => {
+        state2.catalogPage = 0;
+        state2.catalogQuery = read("catalog-query");
+        return ctx2.render();
+      },
+      "catalog-page": (node) => {
+        state2.catalogPage = Math.max(0, (state2.catalogPage || 0) + Number(node.dataset.id));
+        return ctx2.render();
+      },
+      "catalog-open": (node) => ctx2.run("resource.inspect", { ...ctx2.sourceParams(), offset: Number(node.dataset.id), length: Math.min(256, Number(node.dataset.name)) }),
+      "definitions-reuse": async () => {
+        await ctx2.run("resources.reuse_definitions", ctx2.sourceParams(), { render: false });
+        for (const key3 of ["assets.inspect", "script.inspect", "tables.inspect", "levels.inspect", "sound.inspect"]) delete state2.results[key3];
+        await ctx2.render();
+        ctx2.notify("Resource setup rechecked against this build.");
+      },
+      "resource-moved-open": () => {
+        var _a2;
+        if (!current2()) throw Error("The source changed.");
+        const offset = (_a2 = a.plan_annotations) == null ? void 0 : _a2.target_offset;
+        if (!Number.isSafeInteger(offset) || offset < 0 || offset >= a.size) throw Error("Relocation metadata is incomplete. Inspect this build manually.");
+        state2.resourceJump = offset;
+        return ctx2.render();
+      },
+      "resource-moved-table": async () => {
+        if (!current2()) throw Error("The source changed.");
+        const result = await ctx2.run("relocation.table_definition", params, { render: false, refresh: false });
+        if (!current2()) return;
+        if (result.source_sha256 !== a.sha256 || result.artifact_id !== a.artifact_id) throw Error("The moved table belongs to another source.");
+        state2.tableProposal = { scope: ticket, result };
+        return ctx2.navigate("tables");
+      },
+      "system-identify": () => ctx2.run("systems.identify", ctx2.sourceParams()),
+      "system-chr-open": async () => {
+        const result = await ctx2.run("systems.nes_chr", { ...ctx2.sourceParams(), first_tile: parseInteger(read("chr-first")), count: parseInteger(read("chr-count")) }, { render: false });
+        if (!result.ok) throw new Error(result.error || "CHR page is unavailable.");
+        state2.pending = null;
+        state2.paint = null;
+        delete state2.results["assets.inspect"];
+        delete state2.results["assets.plan"];
+        for (const key3 of Object.keys(state2.drafts)) if (key3.endsWith(":assets:asset-schema") || key3.endsWith(":assets:asset-changes")) delete state2.drafts[key3];
+        await ctx2.navigate("assets");
+      },
+      "resource-region": (node) => ctx2.run("resource.inspect", { ...ctx2.sourceParams(), offset: Number(node.dataset.id), length: 256 }),
+      "resource-read": async () => {
+        const offset = parseInteger(read("hex-offset"));
+        await ctx2.run("resource.inspect", { ...ctx2.sourceParams(), offset, length: 256 });
+      },
+      "hex-next": async () => {
+        var _a2;
+        const old = ((_a2 = state2.results["resource.inspect"]) == null ? void 0 : _a2.offset) || 0;
+        state2.drafts[[state2.project.project_id, a.artifact_id, state2.page, "hex-offset"].join(":")] = String(Math.min(a.size - 1, old + 256));
+        await ctx2.run("resource.inspect", { ...ctx2.sourceParams(), offset: Math.min(a.size - 1, old + 256), length: 256 });
+      },
+      "bytes-plan": async () => {
+        const offset = parseInteger(read("edit-offset"));
+        const before = read("edit-before").replace(/\s/g, "").toLowerCase(), after = read("edit-after").replace(/\s/g, "").toLowerCase();
+        const result = await ctx2.run((assessment == null ? void 0 : assessment.system_id) ? "systems.plan_edits" : "bytes.plan", { ...ctx2.sourceParams(), edits: [{ offset, before, after }] }, { render: false });
+        state2.results["bytes.plan"] = result;
+        state2.pending = { kind: "bytes", plan_id: result.plan_id, artifact_id: a.artifact_id, project_id: state2.project.project_id };
+        await ctx2.render();
+      },
+      "bytes-apply": async () => {
+        if (!state2.pending || state2.pending.artifact_id !== a.artifact_id) throw new Error("Review a fresh plan for the selected source first.");
+        const result = await ctx2.run("build.apply", { ...ctx2.projectParams(), plan_id: state2.pending.plan_id }, { render: false });
+        state2.pending = null;
+        await ctx2.render();
+        ctx2.notify("Separate build created; the source is unchanged.");
+      },
+      "bytes-discard": () => {
+        state2.pending = null;
+        delete state2.results["bytes.plan"];
+        ctx2.render();
+      }
+    });
+    if (!a) return `${heading("Workspace", "Resources", "")}${editCheckControls(ctx2)}${empty("Import a source", "Choose a cartridge image.", button("Import source", "import", { primary: true }))}`;
+    const pending = ((_c = state2.pending) == null ? void 0 : _c.kind) === "bytes" && state2.pending.artifact_id === a.artifact_id;
+    return `${heading("Resource investigator", "Resources", "Inspect the exact selected revision. Generic edits require explicit old bytes and preserve file size.", button("Import source", "import", { icon: "plus" }))}<div class="identity">${badge(a.kind, a.kind === "build" ? "good" : "neutral")}<strong>${esc(a.name)}</strong><span>${esc(a.system)} · ${size(a.size)}</span><code title="${a.sha256}">SHA-256 ${short(a.sha256)}…</code></div>${a.source_id ? `<section class="card"><h3>Continue editing this build</h3>${((_d = a.plan_annotations) == null ? void 0 : _d.kind) === "declared-data-relocation-v1" ? "<p>Data moved. Original fixed-offset declarations are not reused.</p>" + button("Inspect moved bytes", "resource-moved-open") + (((_f = (_e = state2.project.sources.concat(state2.project.builds).find((r) => r.artifact_id === a.source_id)) == null ? void 0 : _e.descriptors) == null ? void 0 : _f.tables) ? button("Open moved table layout", "resource-moved-table") : "") : button("Reuse parent resource setup", "definitions-reuse") + '<p class="subtle">Re-read declared offsets against this build.</p>'}</section>` : ""}${observed}<div class="investigation-grid">${hexEditor(ctx2, data)}${byteNotes}</div>${comparison}${definitionBuilder(ctx2)}${documentedTables(ctx2)}${symbols}${research}${references}${sourceSupport(ctx2)}${relationships}${scanControls(ctx2)}<details class="card"><summary>ROM health & revision</summary>${romHealthPanel(ctx2)}${revisionControls(ctx2)}${cheatControls(ctx2)}</details><details class="card"><summary>Find resources</summary>${discoveryControls(ctx2)}</details>${compressionControls(ctx2)}${relocation}<details class="card"><summary>Declared resource catalog</summary>${catalogSection(ctx2, catalog)}</details><details class="card"><summary>System layout</summary>${systemSection(ctx2, assessment)}</details>${report(state2.results["bytes.plan"], "Proposed byte changes")}${report(state2.results["build.apply"], "Build result")}`;
+  }
+  function parseInteger(value) {
+    const n = Number(value);
+    if (!Number.isSafeInteger(n) || n < 0) throw new Error("Enter a nonnegative decimal or 0x hexadecimal offset.");
+    return n;
+  }
+  function systemSection(ctx2, assessment) {
+    var _a, _b;
+    const chr = (_a = assessment == null ? void 0 : assessment.regions) == null ? void 0 : _a.find((r) => r.id === "chr-rom");
+    return `<section class="card"><div class="card-heading"><h3>System investigation</h3>${badge((assessment == null ? void 0 : assessment.status) || "NOT INVESTIGATED", (assessment == null ? void 0 : assessment.status) === "IDENTIFIED" ? "good" : "warm")}</div><p class="subtle">Detected system: <strong>${esc((assessment == null ? void 0 : assessment.system_id) || "Unresolved")}</strong>. </p>${button("Identify selected source", "system-identify", { icon: "search" })}${((_b = assessment == null ? void 0 : assessment.regions) == null ? void 0 : _b.length) ? `<div class="table-wrap"><table><thead><tr><th>Region</th><th>Kind</th><th>Offset</th><th>Length</th><th></th></tr></thead><tbody>${assessment.regions.map((r) => `<tr><td>${esc(r.id)}</td><td>${esc(r.kind)}</td><td><code>0x${r.offset.toString(16)}</code></td><td>${size(r.length)}</td><td>${button("Inspect bytes", "resource-region", { id: String(r.offset) })}</td></tr>`).join("")}</tbody></table></div>` : ""}${chr ? `<div class="notice">${Math.floor(chr.length / 16)} CHR tiles. Opening a page clears the current pixel proposal.</div><div class="field-row">${field("chr-first", "First CHR tile", ctx2.draft("chr-first", "0"), { type: "number", min: 0 })}${field("chr-count", "Tiles on page", ctx2.draft("chr-count", Math.min(16, Math.floor(chr.length / 16))), { type: "number", min: 1 })}</div>${button("Open CHR page", "system-chr-open", { primary: true, icon: "assets" })}` : ""}${report(assessment, "System assessment details")}</section>`;
+  }
+  function catalogSection(ctx2, catalog) {
+    return `<section class="card"><div class="card-heading"><h3>Resource catalog</h3><span>${catalog.total} entries</span></div><div class="toolbar">${field("catalog-query", "Find resources", ctx2.state.catalogQuery || "")}${button("Search resources", "catalog-search")}${button("Index declared resources", "catalog-index")}</div>${catalog.resources.length ? `<div class="table-wrap"><table><thead><tr><th>Resource</th><th>Kind</th><th>Offset</th><th>Bytes</th><th></th></tr></thead><tbody>${catalog.resources.map((r) => `<tr><td>${esc(r.name)}</td><td>${esc(r.kind)}</td><td>0x${r.offset.toString(16)}</td><td>${size(r.length)}</td><td>${button("Inspect", "catalog-open", { id: String(r.offset), name: String(r.length) })}</td></tr>`).join("")}</tbody></table></div><div class="actions">${button("Previous resources", "catalog-page", { id: "-1", disabled: !catalog.page })}<span>Page ${catalog.page + 1}</span>${button("Next resources", "catalog-page", { id: "1", disabled: (catalog.page + 1) * catalog.limit >= catalog.total })}</div>` : '<p class="subtle">Index your declared text and graphics to browse them here.</p>'}</section>`;
+  }
+  function mount4(ctx2) {
+    mountHexEditor(ctx2);
+  }
+
+  // romancer/ui/views/scripts.js
+  var scripts_exports = {};
+  __export(scripts_exports, {
+    mount: () => mount5,
+    render: () => render7
+  });
+
+  // romancer/ui/menu_preview.js
+  var integer10 = (value, min, max, label) => {
+    if (!Number.isSafeInteger(value) || value < min || value > max) throw Error("Invalid declared " + label + ".");
+    return value;
+  };
+  function setup(ctx2) {
+    var _a, _b, _c, _d;
+    const schemaFallback = JSON.stringify(((_b = (_a = ctx2.state.artifact) == null ? void 0 : _a.descriptors) == null ? void 0 : _b.script) || ((_d = (_c = ctx2.state.project) == null ? void 0 : _c.descriptors) == null ? void 0 : _d.script) || {}), menuFallback = JSON.stringify({ profile: {}, cases: {}, font_artifact_id: "", font_schema: {} }), read2 = (id) => {
+      var _a2;
+      return ((_a2 = document.getElementById(id)) == null ? void 0 : _a2.value) ?? ctx2.draft(id, id === "script-schema" ? schemaFallback : menuFallback);
+    };
+    const schema = read2("script-schema"), config = read2("menu-config");
+    if (schema.length > 1024 ** 2 || config.length > 1024 ** 2) throw Error("Menu declaration exceeds its preview budget.");
+    return { schema: JSON.parse(schema), config: JSON.parse(config) };
+  }
+  function names4(ctx2, doc) {
+    return doc.records.map((record, index) => ({ record, texts: record.segments.map((segment) => {
+      var _a;
+      return ((_a = document.getElementById(`script-segment-${index}-${segment.index}`)) == null ? void 0 : _a.value) ?? ctx2.draft(`script-segment-${index}-${segment.index}`, segment.text);
+    }) }));
+  }
+  var textSignature = (ctx2, doc) => JSON.stringify(names4(ctx2, doc).map((row) => [row.record.id, row.texts]));
+  function current(ctx2, owned) {
+    var _a;
+    const { state: state2 } = ctx2, doc = state2.results["script.inspect"];
+    if (!owned || state2.menuVisual !== owned || owned.scope !== selectionKey(state2) || owned.document_id !== (doc == null ? void 0 : doc.document_id) || doc.source_sha256 !== ((_a = state2.artifact) == null ? void 0 : _a.sha256) || state2.page && state2.page !== "scripts") return false;
+    try {
+      return JSON.stringify(setup(ctx2)) === owned.signature;
+    } catch {
+      return false;
+    }
+  }
+  function fontData(metrics) {
+    var _a, _b;
+    if (!Array.isArray(metrics.glyphs) || !metrics.glyphs.length || metrics.glyphs.length > 256) throw Error("Measured font glyphs are unavailable.");
+    const result = /* @__PURE__ */ new Map();
+    let budget = 0;
+    for (const glyph of metrics.glyphs) {
+      const bitmap = glyph.bitmap || {}, width = integer10(bitmap.width, 1, 32, "glyph width"), height = integer10(bitmap.height, 1, 32, "glyph height"), stride = integer10(bitmap.row_stride, 1, 4, "glyph row stride");
+      if (stride !== Math.ceil(width / 8) || typeof bitmap.raw_hex !== "string" || bitmap.raw_hex.length !== stride * height * 2 || !/^[a-f0-9]+$/i.test(bitmap.raw_hex) || result.has(glyph.id)) throw Error("Measured glyph bitmap data is unavailable or ambiguous.");
+      const raw = Uint8Array.from(bitmap.raw_hex.match(/../g), (value) => parseInt(value, 16)), mask = (1 << (8 - width % 8) % 8) - 1;
+      for (let y = 0; y < height; y++) if (raw[(y + 1) * stride - 1] & mask) throw Error("Measured glyph has unsupported padding bits.");
+      integer10((_a = glyph.bearing) == null ? void 0 : _a.x, -64, 64, "glyph bearing");
+      integer10((_b = glyph.bearing) == null ? void 0 : _b.y, -64, 64, "glyph bearing");
+      integer10(glyph.advance_pixels, 0, 128, "glyph advance");
+      budget += raw.length;
+      if (budget > 65536) throw Error("Measured font bitmap budget exceeded.");
+      result.set(glyph.id, { ...glyph, width, height, stride, raw });
+    }
+    return result;
+  }
+  function mappingFor(preview2, font) {
+    if (!Array.isArray(preview2.glyph_map) || preview2.glyph_map.length > 256) throw Error("Declared menu glyph mapping is unavailable.");
+    const result = /* @__PURE__ */ new Map();
+    for (const row of preview2.glyph_map) {
+      if (typeof row.scalar !== "string" || Array.from(row.scalar).length !== 1 || result.has(row.scalar) || !font.has(row.glyph_id)) throw Error("Declared menu mapping names an unavailable glyph.");
+      result.set(row.scalar, row.glyph_id);
+    }
+    return result;
+  }
+  function validate(preview2, metrics, doc, config) {
+    var _a, _b, _c, _d, _e, _f;
+    if (preview2.error) throw Error(preview2.error.message || preview2.error);
+    if (!metrics.ok || metrics.status !== "MEASURED") throw Error(((_a = metrics.error) == null ? void 0 : _a.message) || "Declared font measurements are unavailable.");
+    if (((_b = config.font_schema) == null ? void 0 : _b.codec) !== "mono-row-msb-v1") throw Error("This font storage format has no declared bitmap preview.");
+    if (preview2.source_sha256 !== doc.source_sha256 || preview2.document_id !== doc.document_id || preview2.schema_sha256 !== doc.schema_sha256 || ((_c = preview2.script) == null ? void 0 : _c.document_id) !== doc.document_id) throw Error("Menu layout belongs to different source text.");
+    if (preview2.font_sha256 !== metrics.source_sha256 || metrics.source_sha256 !== ((_d = config.font_schema.source) == null ? void 0 : _d.sha256) || preview2.font_schema_sha256 !== metrics.font_schema_sha256 || preview2.metrics_id !== metrics.metrics_id) throw Error("Menu placements and font measurements have different identities.");
+    const viewport = (_e = preview2.profile) == null ? void 0 : _e.viewport, width = integer10(viewport == null ? void 0 : viewport.width, 1, 1024, "viewport width"), height = integer10(viewport == null ? void 0 : viewport.height, 1, 1024, "viewport height");
+    integer10(preview2.profile.line_height_px, 1, 64, "line height");
+    if (!Array.isArray(preview2.cases) || !preview2.cases.length || preview2.cases.length > 32 || width * height * preview2.cases.length > 8 * 1024 ** 2) throw Error("Declared cases exceed the menu canvas budget.");
+    let cells = 0, placements = 0;
+    for (const row of preview2.cases) {
+      if (!Array.isArray(row.cells)) throw Error("Declared menu case cells are unavailable.");
+      cells += row.cells.length;
+      for (const cell of row.cells) placements += ((_f = cell.placements) == null ? void 0 : _f.length) || 0;
+    }
+    if (cells > 1024 || placements > 2048) throw Error("Declared menu placement budget exceeded.");
+    const font = fontData(metrics);
+    return { font, mapping: mappingFor(preview2, font), width, height };
+  }
+  async function loadMenuPreview(ctx2, doc) {
+    var _a;
+    if (!(doc == null ? void 0 : doc.ok) || ((_a = ctx2.state.results["script.inspect"]) == null ? void 0 : _a.document_id) !== doc.document_id) throw Error("Inspect declared source text before previewing its menu.");
+    const selected2 = setup(ctx2), { config, schema } = selected2, { state: state2 } = ctx2, generation = (state2.menuPreviewGeneration || 0) + 1;
+    state2.menuPreviewGeneration = generation;
+    const owned = { scope: selectionKey(state2), document_id: doc.document_id, signature: JSON.stringify(selected2), text_signature: textSignature(ctx2, doc), generation, status: "loading" };
+    state2.menuVisual = owned;
+    delete state2.results["menu.preview"];
+    await ctx2.render();
+    const requestCurrent = () => current(ctx2, owned) && owned.text_signature === textSignature(ctx2, doc) && state2.menuPreviewGeneration === generation;
+    try {
+      if (!requestCurrent()) return;
+      const [preview2, metrics] = await Promise.all([
+        ctx2.api.call("menu.preview", { ...ctx2.sourceParams(), schema, profile: config.profile, cases: config.cases, font_artifact_id: config.font_artifact_id, font_schema: config.font_schema }),
+        ctx2.api.call("font.measure", { project_id: state2.project.project_id, artifact_id: config.font_artifact_id, schema: config.font_schema })
+      ]);
+      if (!requestCurrent()) {
+        if (state2.menuVisual === owned) state2.menuVisual = null;
+        return;
+      }
+      const prepared = validate(preview2, metrics, doc, config);
+      Object.assign(owned, { status: "ready", preview: preview2, metrics, prepared });
+      state2.results["menu.preview"] = preview2;
+    } catch (error) {
+      if (!requestCurrent()) return;
+      Object.assign(owned, { status: "error", message: error.message });
+    }
+    if (current(ctx2, owned)) await ctx2.render();
+  }
+  function placementsFor(cell, edited, drafts, prepared) {
+    var _a, _b, _c;
+    if (!Array.isArray(cell.placements)) throw Error(((_b = (_a = cell.diagnostics) == null ? void 0 : _a[0]) == null ? void 0 : _b.message) || "Declared cell glyph placements are unavailable.");
+    if (!edited || cell.kind !== "name") return { placements: cell.placements, advance: cell.advance_px };
+    const row = drafts.get(cell.record_id), record = row == null ? void 0 : row.record;
+    if (!record || ((_c = record.read_only_reasons) == null ? void 0 : _c.length) || record.segments.length !== 1 || record.tokens.some((token2) => !["text", "terminator", "padding"].includes(token2.kind))) throw Error("Name preview requires one complete control-free text segment.");
+    const text = row.texts[0], scalars = Array.from(text);
+    if (scalars.length > 128) throw Error("Name preview exceeds 128 display characters.");
+    if (text === cell.text) return { placements: cell.placements, advance: cell.advance_px };
+    const run2 = scalars.map((scalar) => {
+      const id = prepared.mapping.get(scalar), glyph = prepared.font.get(id);
+      if (!glyph) throw Error("No declared glyph for " + JSON.stringify(scalar) + ".");
+      return glyph;
+    });
+    const advance = run2.reduce((sum, glyph) => sum + glyph.advance_pixels, 0), bounds2 = cell.box_bounds;
+    let x = cell.align === "right" ? bounds2[2] - advance : bounds2[0];
+    return { advance, placements: run2.map((glyph) => {
+      const value = { glyph_id: glyph.id, x, y: bounds2[1] };
+      x += glyph.advance_pixels;
+      return value;
+    }) };
+  }
+  function rasterCase(owned, row, drafts, edited) {
+    const { width, height, font } = owned.prepared, pixels = new Uint8ClampedArray(width * height * 4), warnings = /* @__PURE__ */ new Set();
+    for (let i = 0; i < pixels.length; i += 4) pixels.set([16, 33, 39, 255], i);
+    for (const cell of row.cells) {
+      const bounds2 = cell.box_bounds;
+      if (!Array.isArray(bounds2) || bounds2.length !== 4) throw Error("Declared cell bounds are unavailable.");
+      for (const value of bounds2) integer10(value, -131072, 131072, "cell bounds");
+      const { placements, advance } = placementsFor(cell, edited, drafts, owned.prepared);
+      if (Number.isSafeInteger(advance) && advance > bounds2[2] - bounds2[0]) warnings.add("Text advance exceeds a declared box.");
+      if (owned.preview.profile.line_height_px > bounds2[3] - bounds2[1]) warnings.add("Declared line height exceeds its box.");
+      for (const placement of placements) {
+        const glyph = font.get(placement.glyph_id);
+        if (!glyph) throw Error("A placed glyph is missing from the measured font.");
+        const left = integer10(placement.x, -131072, 131072, "glyph position") + glyph.bearing.x, top = integer10(placement.y, -131072, 131072, "glyph position") + glyph.bearing.y;
+        for (let y = 0; y < glyph.height; y++) for (let x = 0; x < glyph.width; x++) if (glyph.raw[y * glyph.stride + (x >> 3)] & 128 >> x % 8) {
+          const px = left + x, py = top + y;
+          if (px < bounds2[0] || px >= bounds2[2] || py < bounds2[1] || py >= bounds2[3]) warnings.add("Glyph ink exceeds a declared box.");
+          if (px < 0 || py < 0 || px >= width || py >= height) {
+            warnings.add("Glyph ink exceeds the declared viewport.");
+            continue;
+          }
+          pixels.set([230, 241, 235, 255], (py * width + px) * 4);
+        }
+      }
+    }
+    return { width, height, pixels, warnings: [...warnings] };
+  }
+  function menuPreviewReport(ctx2) {
+    const owned = ctx2.state.menuVisual;
+    return current(ctx2, owned) && owned.status === "ready" ? owned.preview : null;
+  }
+  function menuPreviewPanel(ctx2) {
+    const owned = ctx2.state.menuVisual;
+    if (!current(ctx2, owned)) return "";
+    if (owned.status === "loading") return '<section class="card"><p class="preview-caption" role="status">Measuring declared menu glyphs and layout…</p></section>';
+    if (owned.status === "error") return `<section class="card"><p class="error" role="status">Menu preview unavailable: ${esc(owned.message)}</p></section>`;
+    const { width, height } = owned.prepared, canvas = (kind, i) => `<canvas id="menu-${kind}-${i}" width="${width}" height="${height}" aria-label="${kind === "original" ? "Original" : "Editing"} declared menu case ${i + 1}" style="display:block;width:${Math.min(768, width * 3)}px;max-width:100%;height:auto;image-rendering:pixelated"></canvas>`;
+    return `<section class="card" id="menu-visual-preview"><h3>Declared font &amp; layout preview</h3><p class="preview-caption">Monochrome declared glyphs and boxes; not a captured game scene. Native font use and rendering remain unverified.</p><p>Edit a name above to update its declared menu cases. Control codes stay preserved.</p>${owned.preview.cases.map((row, i) => `<section><h4>Case ${esc(row.id)}${row.selected_entry == null ? "" : " · selected " + esc(row.selected_entry)}</h4><div class="preview-pair"><div><span>Original</span>${canvas("original", i)}</div><div><span>Editing</span>${canvas("edited", i)}</div></div><p id="menu-case-status-${i}" class="preview-caption" role="status" aria-live="polite"></p></section>`).join("")}</section>`;
+  }
+  function mountMenuPreview(ctx2, doc) {
+    var _a;
+    const owned = ctx2.state.menuVisual, root = document.getElementById("menu-visual-preview");
+    if (!root || !current(ctx2, owned) || owned.status !== "ready") return;
+    const draw2 = () => {
+      if (!current(ctx2, owned)) {
+        root.innerHTML = '<p class="error" role="status">Menu preview unavailable: source or declarations changed. Preview menu again.</p>';
+        return;
+      }
+      const drafts = new Map(names4(ctx2, doc).map((row) => [row.record.id, row]));
+      for (const [i, row] of owned.preview.cases.entries()) {
+        let before = null, after = null;
+        const errors = [];
+        for (const [kind, edited] of [["original", false], ["edited", true]]) {
+          const canvas = document.getElementById(`menu-${kind}-${i}`);
+          if (!canvas) continue;
+          try {
+            const image = rasterCase(owned, row, drafts, edited), c = canvas.getContext("2d"), data = c.createImageData(image.width, image.height);
+            canvas.width = image.width;
+            canvas.height = image.height;
+            data.data.set(image.pixels);
+            c.putImageData(data, 0, 0);
+            rememberPreview(canvas, image.width, image.height, data.data);
+            canvas.hidden = false;
+            if (edited) after = image;
+            else before = image;
+          } catch (error) {
+            canvas.hidden = true;
+            canvas.width = 1;
+            canvas.height = 1;
+            errors.push((edited ? "Editing" : "Original") + " preview unavailable: " + error.message);
+          }
+        }
+        const status = document.getElementById("menu-case-status-" + i);
+        if (status) {
+          let changed2 = 0;
+          if (before && after) {
+            for (let n = 0; n < before.pixels.length; n += 4) if ([0, 1, 2].some((c) => before.pixels[n + c] !== after.pixels[n + c])) changed2++;
+          }
+          status.textContent = errors.length ? errors.join(" ") : (changed2 ? "Preview updated · " + changed2 + " declared pixels differ · not built." : "Unchanged declared menu preview.") + " " + [.../* @__PURE__ */ new Set([...(before == null ? void 0 : before.warnings) || [], ...(after == null ? void 0 : after.warnings) || []])].join(" ");
+          status.className = errors.length ? "error" : "preview-caption";
+        }
+      }
+    };
+    for (const [index, record] of doc.records.entries()) for (const segment of record.segments) {
+      const node = document.getElementById(`script-segment-${index}-${segment.index}`);
+      node == null ? void 0 : node.addEventListener("input", draw2);
+      node == null ? void 0 : node.addEventListener("change", draw2);
+    }
+    for (const id of ["menu-config", "script-schema"]) (_a = document.getElementById(id)) == null ? void 0 : _a.addEventListener("input", () => {
+      if (!current(ctx2, owned)) {
+        draw2();
+        if (ctx2.state.menuVisual === owned) ctx2.state.menuVisual = null;
+      }
+    });
+    draw2();
+  }
+
+  // romancer/ui/translation_controls.js
+  function translationPreview(state2, model) {
+    const saved = state2.translationSheet;
+    return (saved == null ? void 0 : saved.scope) === selectionKey(state2) && saved.preview.document_id === (model == null ? void 0 : model.document_id) && saved.preview.schema_sha256 === (model == null ? void 0 : model.schema_sha256) ? saved.preview : null;
+  }
+  function translationControls(ctx2, model) {
+    const { state: state2 } = ctx2, ticket = selectionKey(state2), preview2 = translationPreview(state2, model), enabled = (model == null ? void 0 : model.ok) && model.write_supported;
+    const schema = () => json("script-schema"), current2 = () => selectionKey(state2) === ticket;
+    ctx2.use({
+      "translation-export": async () => {
+        const format = read("translation-format"), params = ctx2.sourceParams(), result = await ctx2.run("translation.export", { ...params, schema: schema(), format }, { render: false });
+        if (current2()) await ctx2.api.download(params.project_id, result.export.export_id, "translation." + format);
+      },
+      "translation-preview": async () => {
+        const file = document.getElementById("translation-file").files[0];
+        if (!file) throw Error("Choose the edited CSV or TSV sheet.");
+        const selectedSchema = schema(), signature = JSON.stringify(selectedSchema), format = read("translation-format"), params = ctx2.sourceParams(), request2 = (state2.translationRequest || 0) + 1;
+        state2.translationRequest = request2;
+        const input = await ctx2.api.uploadInput(params.project_id, file, "translation");
+        if (!current2() || state2.translationRequest !== request2) throw Error("Selection changed. Preview this sheet again.");
+        const result = await ctx2.run("translation.preview", { ...params, schema: selectedSchema, input_id: input.input_id, format }, { render: false });
+        if (!current2() || state2.translationRequest !== request2 || JSON.stringify(schema()) !== signature) throw Error("Source, file or text setup changed. Preview again.");
+        state2.translationSheet = { scope: ticket, preview: result, schema: selectedSchema };
+        await ctx2.render();
+      },
+      "translation-review": async () => {
+        const saved = state2.translationSheet, result = translationPreview(state2, model);
+        if (!(result == null ? void 0 : result.valid) || !result.changed_segments) throw Error("Preview a valid sheet with changes first.");
+        if (JSON.stringify(schema()) !== JSON.stringify(saved.schema)) throw Error("Text setup changed. Preview the sheet again.");
+        const request2 = state2.translationRequest, plan = await ctx2.run("script.plan", { ...ctx2.sourceParams(), schema: saved.schema, edits: result.edits }, { render: false });
+        if (!current2() || request2 !== state2.translationRequest) return;
+        saved.plan = plan;
+        await ctx2.render();
+      },
+      "translation-apply": async () => {
+        const saved = state2.translationSheet, result = translationPreview(state2, model);
+        if (!(saved == null ? void 0 : saved.plan) || !(result == null ? void 0 : result.valid) || JSON.stringify(schema()) !== JSON.stringify(saved.schema)) throw Error("Review a fresh translation plan first.");
+        const built = await ctx2.run("structured.apply", { ...ctx2.projectParams(), plan_id: saved.plan.workbench_plan_id }, { render: false });
+        if (!current2()) return;
+        state2.translationSheet = null;
+        await ctx2.refreshProject();
+        await ctx2.setArtifact(built.artifact_id);
+        ctx2.notify("Translated build created. Original controls and source preserved.");
+        await ctx2.navigate("overview");
+      }
+    });
+    return `<details class="card" id="translation-tools"><summary>Translation spreadsheet</summary><p>Export, edit only the translation column, then import to check every change.</p>${select("translation-format", "Sheet format", [["csv", "CSV"], ["tsv", "TSV"]], ctx2.draft("translation-format", "csv"))}${button("Download text sheet", "translation-export", { disabled: !enabled })}${fileInput("translation-file", "Edited sheet", ".csv,.tsv")}${button("Check imported translations", "translation-preview", { disabled: !enabled })}
+ ${!enabled ? "<p>Declare and inspect editable text first.</p>" : ""}${preview2 ? `<div class="notice">${badge(preview2.status.replaceAll("_", " ").toLowerCase(), preview2.valid ? "good" : "warm")} · ${preview2.changed_segments} changed segments</div>
+ ${preview2.issues.map((r) => `<p class="error">${esc(r.record_id || "Sheet")}: ${esc(r.message)}</p>`).join("")}
+ <div class="table-wrap"><table><thead><tr><th>Record</th><th>Original</th><th>Translation</th><th>Bytes / capacity</th></tr></thead><tbody>${preview2.previews.map((r) => `<tr><td>${esc(r.record_id)}</td><td>${r.before.map(esc).join(" | ")}</td><td>${r.after.map(esc).join(" | ")}${r.text_truncated ? "…" : ""}</td><td>${r.used_bytes} / ${r.capacity}</td></tr>`).join("")}</tbody></table></div>
+ <div class="actions">${button("Review translation plan", "translation-review", { disabled: !preview2.valid || !preview2.changed_segments, primary: true })}${button("Create translated build", "translation-apply", { disabled: !state2.translationSheet.plan })}</div>${state2.translationSheet.plan ? "<p>Plan reviewed. Creating the build preserves the original file.</p>" : ""}` : ""}</details>`;
+  }
+  function mountTranslation(ctx2) {
+    var _a;
+    const root = document.getElementById("translation-tools");
+    if (!root) return;
+    for (const id of ["translation-file", "translation-format", "script-schema"]) (_a = document.getElementById(id)) == null ? void 0 : _a.addEventListener("change", () => {
+      ctx2.state.translationRequest = (ctx2.state.translationRequest || 0) + 1;
+      ctx2.state.translationSheet = null;
+      root.querySelectorAll('[data-action="translation-apply"],[data-action="translation-review"]').forEach((n) => n.disabled = true);
+    });
+  }
+
+  // romancer/ui/declarations.js
+  var systems3 = [["nes", "NES"], ["snes", "SNES"], ["genesis", "Genesis"], ["gb", "Game Boy"], ["gbc", "Game Boy Color"], ["gba", "GBA"], ["sms", "Master System"]];
+  var integer11 = (id) => {
+    const text = read(id).trim(), value = Number(text);
+    if (!text || !Number.isSafeInteger(value)) throw new Error("Enter a whole number for " + id + ".");
+    return value;
+  };
+  var optional = (id) => read(id).trim() ? integer11(id) : null;
+  function system(ctx2, prefix) {
+    return select(prefix + "-system", "System", systems3, ctx2.draft(prefix + "-system", resourceSystem(ctx2.state)));
+  }
+  function number(ctx2, id, title, value) {
+    return field(id, title, ctx2.draft(id, value));
+  }
+  async function declared(ctx2, kind, config) {
+    const result = await ctx2.run("resources.declare_" + kind, { ...ctx2.sourceParams(), config }, { render: false });
+    ctx2.state.candidateReview = null;
+    ctx2.state.openDeclaration = null;
+    ctx2.state.results[kind + ".inspect"] = result.inspection;
+    ctx2.setDraft(kind === "script" ? "script-schema" : "asset-schema", JSON.stringify(result.schema, null, 2));
+    if (kind === "assets") {
+      ctx2.state.paint = null;
+      ctx2.setDraft("paint-buffer", "");
+      ctx2.setDraft("asset-changes", "[]");
+    }
+    await ctx2.render();
+  }
+  function textDeclaration(ctx2) {
+    prefill(ctx2, "text");
+    ctx2.use({ "declare-text": () => {
+      const controls = read("text-controls").split("\n").filter((s) => s.trim()).map((line) => {
+        const [id, opcode, args, role] = line.split(",").map((s) => s.trim());
+        return { id, opcode: parseInt(opcode, 16), argument_length: Number(args), position_independent: true, layout_role: role };
+      });
+      return declared(ctx2, "script", { system_id: read("text-system"), offset: integer11("text-offset"), capacity: integer11("text-capacity"), count: integer11("text-count"), stride: integer11("text-stride"), pointer_offset: optional("text-pointer"), pointer_width: integer11("text-pointer-width"), pointer_endian: read("text-endian"), pointer_base: integer11("text-base"), terminator: integer11("text-terminator"), padding: integer11("text-padding"), encoding: read("text-encoding"), table: read("text-table"), controls });
+    } });
+    return `<details class="config" ${ctx2.state.openDeclaration === "text" ? "open" : ""}><summary>Declare text slots</summary>${system(ctx2, "text")}<div class="field-row">${number(ctx2, "text-offset", "First text offset", "0")}${number(ctx2, "text-capacity", "Bytes per slot", "64")}${number(ctx2, "text-count", "Slot count", "1")}${number(ctx2, "text-stride", "Slot stride", "64")}${number(ctx2, "text-pointer", "Pointer table offset (optional)", "")}${number(ctx2, "text-pointer-width", "Pointer bytes", "2")}${number(ctx2, "text-base", "Add to stored pointer for file offset", "0")}${select("text-endian", "Pointer byte order", [["little", "Little endian"], ["big", "Big endian"]], ctx2.draft("text-endian", "little"))}${number(ctx2, "text-terminator", "Terminator byte", "0")}${number(ctx2, "text-padding", "Padding byte", "255")}</div>${select("text-encoding", "Encoding", [["ascii", "ASCII"], ["table", "Custom single-byte table"]], ctx2.draft("text-encoding", "ascii"))}${area("text-table", "Custom table (HH=character)", ctx2.draft("text-table", ""), 3)}${area("text-controls", "Controls (name, hex opcode, argument bytes, line/page/pause/opaque)", ctx2.draft("text-controls", ""), 2)}<p class="subtle">Text pointer formula: file offset = stored value + adjustment. For a GBA ROM window beginning at 0x08000000, use -134217728. This differs from the subtraction base in Data tables.</p>${button("Load text declaration", "declare-text")}</details>`;
+  }
+  function graphicsDeclaration(ctx2) {
+    prefill(ctx2, "gfx");
+    ctx2.use({ "declare-graphics": () => {
+      const config = { system_id: read("gfx-system"), offset: integer11("gfx-offset"), count: integer11("gfx-count"), codec: read("gfx-codec"), width: integer11("gfx-width"), height: integer11("gfx-height"), palette_offset: optional("gfx-palette"), palette_banks: integer11("gfx-banks"), palette_format: read("gfx-palette-format"), map_offset: optional("gfx-map"), map_width: integer11("gfx-map-width"), map_height: integer11("gfx-map-height"), font_chars: read("gfx-chars"), advance_offset: optional("gfx-advance"), advance_pixels: integer11("gfx-advance-pixels") };
+      return declared(ctx2, "assets", config);
+    } });
+    return `<details class="config" ${ctx2.state.openDeclaration === "gfx" ? "open" : ""}><summary>Declare graphics or font</summary>${system(ctx2, "gfx")}${select("gfx-codec", "Storage layout", [["", "System tile template"], ["mono-row-msb-v1", "Mono font rows"], ["tile8-planar2-msb-v1", "NES 2bpp separate planes"], ["tile8-paired2-msb-v1", "Game Boy 2bpp paired planes"], ["tile8-rowplanar4-msb-v1", "SMS 4bpp row planes"], ["tile8-paired4-msb-v1", "4bpp paired planes"], ["tile8-packed4-high-v1", "4bpp high nibble first"], ["tile8-packed4-low-v1", "4bpp low nibble first"]], ctx2.draft("gfx-codec", ""))}<div class="field-row">${number(ctx2, "gfx-offset", "Bitmap offset", "0")}${number(ctx2, "gfx-count", "Tile or glyph count", "1")}${number(ctx2, "gfx-width", "Cell width", "8")}${number(ctx2, "gfx-height", "Cell height", "8")}${number(ctx2, "gfx-palette", "Palette offset (optional)", "")}${number(ctx2, "gfx-banks", "Palette banks", "1")}${select("gfx-palette-format", "Palette layout", [["rgb555-le", "RGB555 little endian"], ["rgb555-be", "RGB555 big endian"], ["genesis", "Genesis RGB333"], ["sms-rgb222", "Master System RGB222"]], ctx2.draft("gfx-palette-format", ctx2.state.artifact.system_id === "genesis" ? "genesis" : ctx2.state.artifact.system_id === "sms" ? "sms-rgb222" : "rgb555-le"))}${number(ctx2, "gfx-map", "Tilemap offset (optional)", "")}${number(ctx2, "gfx-map-width", "Map columns", "1")}${number(ctx2, "gfx-map-height", "Map rows", "1")}</div>${field("gfx-chars", "Font characters in cell order (optional)", ctx2.draft("gfx-chars", ""))}<div class="field-row">${number(ctx2, "gfx-advance", "Stored advance table offset (optional)", "")}${number(ctx2, "gfx-advance-pixels", "Fixed advance in pixels", "8")}</div>${button("Load graphics declaration", "declare-graphics")}</details>`;
+  }
+  function layoutDeclaration(ctx2) {
+    var _a;
+    const rows = [...ctx2.state.project.sources, ...ctx2.state.project.builds].filter((r) => {
+      var _a2;
+      return (_a2 = r.descriptors) == null ? void 0 : _a2.font;
+    });
+    ctx2.use({ "configure-menu": async () => {
+      const result = await ctx2.run("resources.menu_form", { ...ctx2.sourceParams(), font_artifact_id: read("layout-font"), width: integer11("layout-width"), height: integer11("layout-height"), line_height: integer11("layout-line-height") }, { render: false });
+      ctx2.setDraft("menu-config", JSON.stringify({ font_artifact_id: result.font_artifact_id, font_schema: result.font_schema, profile: result.profile, cases: result.cases, request: {} }, null, 2));
+      await ctx2.render();
+    }, "configure-layout": async () => {
+      const result = await ctx2.run("resources.layout_form", { ...ctx2.sourceParams(), font_artifact_id: read("layout-font"), width: integer11("layout-width"), height: integer11("layout-height"), line_height: integer11("layout-line-height") }, { render: false });
+      ctx2.setDraft("layout-config", JSON.stringify({ font_artifact_id: result.font_artifact_id, font_schema: result.font_schema, policy: result.policy, request: result.request }, null, 2));
+      await ctx2.render();
+    } });
+    return `<details class="config"><summary>Configure text layout</summary>${select("layout-font", "Declared font", rows.map((r) => [r.artifact_id, r.name]), ctx2.draft("layout-font", (_a = rows[0]) == null ? void 0 : _a.artifact_id))}<div class="field-row">${number(ctx2, "layout-width", "Box width in pixels", "240")}${number(ctx2, "layout-height", "Box height in pixels", "64")}${number(ctx2, "layout-line-height", "Line height", "8")}</div><div class="actions">${button("Use layout settings", "configure-layout", { disabled: !rows.length })}${button("Create menu preview setup", "configure-menu", { disabled: !rows.length })}</div></details>`;
+  }
+  function prefill(ctx2, prefix) {
+    var _a;
+    const candidate = ctx2.state.resourcePrefill;
+    if (!candidate || candidate.artifact_id !== ((_a = ctx2.state.artifact) == null ? void 0 : _a.artifact_id) || candidate.prefix !== prefix) return;
+    const map = prefix === "text" ? { system_id: "system", offset: "offset", capacity: "capacity", count: "count", stride: "stride", pointer_offset: "pointer", encoding: "encoding", terminator: "terminator", padding: "padding" } : { system_id: "system", offset: "offset", count: "count", codec: "codec" };
+    ctx2.state.resourcePrefill = null;
+    ctx2.state.openDeclaration = prefix;
+    for (const [key3, suffix] of Object.entries(map)) if (key3 in candidate.config) ctx2.setDraft(prefix + "-" + suffix, candidate.config[key3] === null ? "" : String(candidate.config[key3]));
+  }
+
+  // romancer/ui/views/scripts.js
+  async function render7(ctx2) {
+    var _a, _b, _c, _d, _e, _f, _g, _h, _i;
+    const setupReview = useResearchSetup(ctx2, "script");
+    if (setupReview) return setupReview;
+    const { state: state2 } = ctx2, missing2 = requireProject(ctx2);
+    if (missing2) return missing2;
+    if (!state2.artifact) return empty("Import a resource", "Select a source with a declared fixed-slot script schema.");
+    const fallback = ((_a = state2.candidateReview) == null ? void 0 : _a.artifact_id) === state2.artifact.artifact_id ? {} : ((_b = state2.artifact.descriptors) == null ? void 0 : _b.script) || ((_c = state2.project.descriptors) == null ? void 0 : _c.script) || {};
+    const schemaText = ctx2.draft("script-schema", JSON.stringify(fallback, null, 2));
+    let document2 = ((_d = state2.candidateReview) == null ? void 0 : _d.artifact_id) === state2.artifact.artifact_id ? null : state2.results["script.inspect"];
+    if ((document2 == null ? void 0 : document2.source_sha256) !== state2.artifact.sha256) document2 = null;
+    if (!document2 && ((_f = (_e = fallback.profile) == null ? void 0 : _e.accepted_sha256) == null ? void 0 : _f.includes(state2.artifact.sha256))) {
+      document2 = await ctx2.api.call("script.inspect", { ...ctx2.sourceParams(), schema: fallback });
+      state2.results["script.inspect"] = document2;
+    }
+    ctx2.use({
+      "script-page": (node) => {
+        state2.scriptPage = Math.max(0, (state2.scriptPage || 0) + Number(node.dataset.id));
+        return ctx2.render();
+      },
+      "script-search": () => {
+        state2.scriptPage = 0;
+        state2.scriptFilter = read("script-search").toLowerCase();
+        ctx2.render();
+      },
+      "script-replace": () => {
+        const find = read("script-find"), replace = read("script-replace");
+        if (!find) throw new Error("Enter text to find.");
+        document2.records.forEach((row, i) => row.segments.forEach((segment) => {
+          const id = `script-segment-${i}-${segment.index}`, node = window.document.getElementById(id), value = node ? node.value : ctx2.draft(id, segment.text);
+          if (value.includes(find)) ctx2.setDraft(id, value.split(find).join(replace));
+        }));
+        state2.pending = null;
+        ctx2.render();
+      },
+      "script-inspect": () => ctx2.run("script.inspect", { ...ctx2.sourceParams(), schema: json("script-schema") }),
+      "script-plan": async () => {
+        var _a2;
+        if (!(document2 == null ? void 0 : document2.ok)) throw Error("Inspect the selected script schema first.");
+        const collect = () => {
+          const changes2 = [];
+          document2.records.forEach((row, i) => row.segments.forEach((segment) => {
+            const id = `script-segment-${i}-${segment.index}`, node = window.document.getElementById(id), value = node ? node.value : ctx2.draft(id, segment.text);
+            if (value !== segment.text) changes2.push({ record_id: row.id, segment: segment.index, text: value });
+          }));
+          return changes2;
+        };
+        const changes = collect();
+        if (!changes.length) throw Error("Change a text segment before reviewing.");
+        const schema = json("script-schema"), signature = JSON.stringify({ schema, changes }), edits = { schema_version: 1, document_id: document2.document_id, source_sha256: document2.source_sha256, schema_sha256: document2.schema_sha256, changes };
+        const result = await ctx2.run("script.plan", { ...ctx2.sourceParams(), schema, edits }, { render: false });
+        if (((_a2 = state2.results["script.inspect"]) == null ? void 0 : _a2.document_id) !== document2.document_id || JSON.stringify({ schema: json("script-schema"), changes: collect() }) !== signature) {
+          ctx2.notify("Text changed during review. Review it again.");
+          return;
+        }
+        state2.pending = { kind: "script", plan_id: result.workbench_plan_id, artifact_id: state2.artifact.artifact_id, document_id: document2.document_id, signature };
+        await ctx2.render();
+      },
+      "script-apply": async () => {
+        var _a2, _b2;
+        if (((_a2 = state2.pending) == null ? void 0 : _a2.kind) !== "script" || state2.pending.artifact_id !== state2.artifact.artifact_id || state2.pending.document_id !== (document2 == null ? void 0 : document2.document_id) || ((_b2 = state2.results["script.inspect"]) == null ? void 0 : _b2.document_id) !== (document2 == null ? void 0 : document2.document_id)) throw Error("Review the current text changes first.");
+        const reviewed = state2.pending;
+        await ctx2.run("structured.apply", { ...ctx2.projectParams(), plan_id: reviewed.plan_id }, { render: false });
+        if (state2.pending !== reviewed) {
+          ctx2.notify("Dialogue build created. Your newer text edits are still staged.");
+          return;
+        }
+        state2.pending = null;
+        await ctx2.render();
+        ctx2.notify("Dialogue build created. Controls and original bytes were checked.");
+      },
+      "script-discard": () => {
+        state2.pending = null;
+        for (const key3 of Object.keys(state2.drafts)) if (key3.includes("script-segment-")) delete state2.drafts[key3];
+        delete state2.results["script.plan"];
+        ctx2.render();
+      },
+      "script-export": async () => {
+        if (!(document2 == null ? void 0 : document2.ok)) throw new Error("Inspect a script before exporting it.");
+        const result = await ctx2.run("docs.script_from_resource", { ...ctx2.sourceParams(), schema: json("script-schema"), format: "html" });
+        await ctx2.api.download(state2.project.project_id, result.export.export_id, "script.html");
+      },
+      "font-measure": () => {
+        const config = json("layout-config");
+        return ctx2.run("font.measure", { ...ctx2.projectParams(), artifact_id: config.font_artifact_id, schema: config.font_schema });
+      },
+      "layout-check": () => {
+        const config = json("layout-config");
+        return ctx2.run("layout.check", { ...ctx2.sourceParams(), schema: json("script-schema"), font_artifact_id: config.font_artifact_id, font_schema: config.font_schema, policy: config.policy });
+      },
+      "layout-plan": () => {
+        const config = json("layout-config");
+        return ctx2.run("layout.plan", { ...ctx2.sourceParams(), schema: json("script-schema"), font_artifact_id: config.font_artifact_id, font_schema: config.font_schema, policy: config.policy, request: config.request });
+      },
+      "menu-inspect": () => {
+        const config = json("menu-config");
+        return ctx2.run("menu.inspect", { ...ctx2.sourceParams(), schema: json("script-schema"), profile: config.profile });
+      },
+      "menu-compare": () => {
+        const config = json("menu-config");
+        return ctx2.run("menu.compare", { ...ctx2.sourceParams(), schema: json("script-schema"), profile: config.profile, cases: config.cases, font_artifact_id: config.font_artifact_id, font_schema: config.font_schema, request: config.request });
+      },
+      "menu-preview": () => loadMenuPreview(ctx2, document2)
+    });
+    if (((_g = state2.candidateReview) == null ? void 0 : _g.artifact_id) === state2.artifact.artifact_id) return `${heading("", "Confirm text candidate", "")}${editCheckControls(ctx2)}<section class="card"><p>${esc(state2.candidateReview.reason)}</p><p>Confirm the format and allocation, then load the declaration.</p>${textDeclaration(ctx2)}${button("Cancel candidate", "candidate-cancel")}</section>`;
+    const pending = ((_h = state2.pending) == null ? void 0 : _h.kind) === "script" && state2.pending.artifact_id === state2.artifact.artifact_id;
+    return `${heading("Dialogue studio", "Text & layout", "Edit declared text segments while preserving control codes, pointers, and fixed allocations.", button("Export script", "script-export", { icon: "download", disabled: !(document2 == null ? void 0 : document2.ok) }))}<div class="identity"><strong>${esc(state2.artifact.name)}</strong><code>${short(state2.artifact.sha256)}</code>${badge((document2 == null ? void 0 : document2.write_supported) ? "EDITABLE FIXED SLOTS" : "SCHEMA REQUIRED", (document2 == null ? void 0 : document2.write_supported) ? "good" : "warm")}</div>${translationControls(ctx2, document2)}<div class="grid-two"><section class="card"><div class="card-heading"><h3>Text records</h3><span class="subtle">${((_i = document2 == null ? void 0 : document2.records) == null ? void 0 : _i.length) || 0} declared records</span></div>${field("script-search", "Search text", state2.scriptFilter || "")}${button("Search", "script-search")}<details class="config"><summary>Replace text</summary>${field("script-find", "Find", ctx2.draft("script-find", ""))}${field("script-replace", "Replace with", ctx2.draft("script-replace", ""))}${button("Stage replacements", "script-replace")}</details>${(document2 == null ? void 0 : document2.ok) ? document2.records.map((row, i) => ({ row, i })).filter(({ row }) => !state2.scriptFilter || row.segments.some((s) => s.text.toLowerCase().includes(state2.scriptFilter))).slice((state2.scriptPage || 0) * 20, (state2.scriptPage || 0) * 20 + 20).map(({ row, i }) => {
+      var _a2, _b2;
+      return `<article class="script-line"><div class="line-meta"><strong>${esc(((_a2 = row.annotations) == null ? void 0 : _a2.label) || row.id)}</strong><span>${row.used_bytes ?? "?"} / ${row.capacity} bytes · offset ${row.offset}</span></div><p class="preview-caption">System-font comparison · game font requires a declared layout or playtest</p>${row.segments.map((segment) => `<div class="preview-pair script-comparison"><div><span>Original segment ${segment.index + 1}</span><div class="text-window">${esc(segment.text)}</div></div><div>${area(`script-segment-${i}-${segment.index}`, "Edited segment " + (segment.index + 1), ctx2.draft(`script-segment-${i}-${segment.index}`, segment.text), 3)}</div></div>`).join("")}<div id="script-capacity-${i}">${capacitySummary(textCapacity(row, row.segments.map((segment) => ctx2.draft(`script-segment-${i}-${segment.index}`, segment.text)), document2.encoding_glyphs))}</div>${row.tokens.some((t) => t.kind === "control") ? `<div class="notice">Preserved controls: ${row.tokens.filter((t) => t.kind === "control").map((t) => esc(t.control_id)).join(", ")}</div>` : ""}${((_b2 = row.read_only_reasons) == null ? void 0 : _b2.map((r) => `<p class="error small">${esc(r)}</p>`).join("")) || ""}</article>`;
+    }).join("") : empty("Load a revision-bound script schema", "Unknown encodings remain read only. The original demonstration includes an editable schema.")}<div class="actions">${button("Previous records", "script-page", { id: "-1", disabled: !(state2.scriptPage > 0) })}${button("Next records", "script-page", { id: "1", disabled: !document2 || ((state2.scriptPage || 0) + 1) * 20 >= document2.records.filter((row) => !state2.scriptFilter || row.segments.some((s) => s.text.toLowerCase().includes(state2.scriptFilter))).length })}</div><div class="actions">${button("Review text changes", "script-plan", { primary: !pending, icon: "arrow", disabled: !(document2 == null ? void 0 : document2.write_supported) })}${pending ? button("Create dialogue build", "script-apply", { primary: true, icon: "check" }) + button("Discard changes", "script-discard") : ""}</div></section><div>${menuPreviewPanel(ctx2)}<section class="card"><h3>Text setup</h3>${textDeclaration(ctx2)}${layoutDeclaration(ctx2)}${jsonEditor("script-schema", "Advanced script schema", schemaText, false)}${button("Inspect script", "script-inspect", { icon: "scripts" })}${jsonEditor("layout-config", "Advanced layout configuration", ctx2.draft("layout-config", JSON.stringify({ font_artifact_id: "", font_schema: {}, policy: {}, request: {} }, null, 2)))}<div class="actions">${button("Measure font", "font-measure")}${button("Check layout", "layout-check")}${button("Plan layout", "layout-plan")}</div>${jsonEditor("menu-config", "Menu display configuration", ctx2.draft("menu-config", JSON.stringify({ profile: {}, cases: {}, font_artifact_id: "", font_schema: {} }, null, 2)))}<div class="actions">${button("Inspect menu", "menu-inspect")}${button("Preview menu", "menu-preview")}${button("Compare native menu captures", "menu-compare")}</div></section></div></div>${report(state2.results["script.plan"], "Proposed dialogue changes")}${report(state2.results["structured.apply"], "Structured build")}${report(state2.results["font.measure"], "Measured font")}${report(state2.results["layout.check"], "Layout check")}${report(state2.results["layout.plan"], "Layout proposal")}${report(state2.results["menu.inspect"], "Declared menu")}${report(menuPreviewReport(ctx2), "Declared menu report")}${report(state2.results["menu.compare"], "Native menu comparison")}`;
+  }
+  function mount5(ctx2) {
+    mountTranslation(ctx2);
+    const doc = ctx2.state.results["script.inspect"];
+    if (!(doc == null ? void 0 : doc.ok)) return;
+    mountMenuPreview(ctx2, doc);
+    const scope = selectionKey(ctx2.state);
+    for (const [i, row] of doc.records.entries()) {
+      const target = document.getElementById("script-capacity-" + i);
+      if (!target) continue;
+      const nodes = row.segments.map((segment) => document.getElementById(`script-segment-${i}-${segment.index}`));
+      const draw2 = () => {
+        var _a;
+        if (selectionKey(ctx2.state) !== scope || ((_a = ctx2.state.results["script.inspect"]) == null ? void 0 : _a.document_id) !== doc.document_id) return;
+        const values = nodes.map((node, j) => (node == null ? void 0 : node.value) ?? row.segments[j].text);
+        target.innerHTML = '<p class="preview-caption" role="status">' + (values.some((text, j) => text !== row.segments[j].text) ? "Preview updated · text staged" : "Unchanged text preview") + "</p>" + capacitySummary(textCapacity(row, values, doc.encoding_glyphs));
+      };
+      for (const node of nodes) node == null ? void 0 : node.addEventListener("input", draw2);
+      draw2();
+    }
+  }
+
+  // romancer/ui/views/assets.js
+  var assets_exports = {};
+  __export(assets_exports, {
+    literalColorCount: () => literalColorCount,
+    literalRGB: () => literalRGB,
+    mount: () => mount6,
+    render: () => render8
+  });
+
+  // romancer/ui/graphics_formats.js
+  var names5 = { "mono-row-msb-v1": "Monochrome rows (2 colors)", "tile8-planar2-msb-v1": "NES tiles (4 colors)", "tile8-paired2-msb-v1": "Game Boy tiles (4 colors)", "tile8-paired4-msb-v1": "SNES tiles (16 colors)", "tile8-rowplanar4-msb-v1": "Master System tiles (16 colors)", "tile8-packed4-high-v1": "Genesis tiles (16 colors)", "tile8-packed4-low-v1": "Game Boy Advance tiles (16 colors)" };
+  function formatLabel(codec, system2 = "") {
+    return codec === "tile8-paired2-msb-v1" && system2 === "snes" ? "SNES tiles (4 colors)" : names5[codec] || "Unsupported tile layout";
+  }
+
+  // romancer/ui/palette_editor.js
+  function paletteEditor(ctx2, palette2) {
+    if (!palette2) return "";
+    let after = palette2, error = "";
+    try {
+      after = editedPalette(palette2, JSON.parse(ctx2.draft("asset-changes", "[]")));
+    } catch (e) {
+      error = e.message;
+    }
+    let index = Number(ctx2.draft("palette-index", "1"));
+    if (!Number.isInteger(index) || index < 0 || index >= palette2.entries.length) index = 0;
+    const entry = after.entries[index];
+    return `<section class="card"><h3>Palette colors</h3><div id="palette-comparison">${paletteComparison(palette2, after)}</div><div class="palette-picker-row">${select("palette-index", "Palette entry", palette2.entries.map((e, i) => [i, "Bank " + e.bank + " · color " + e.index]), index)}<label class="field"><span>Choose color · entry ${index}</span><input id="palette-picker" type="color" value="${rgbHex(entry.rgb)}" aria-label="Choose palette color"></label></div><p id="palette-preview-status" class="${error ? "error" : "preview-caption"}" role="status" aria-live="polite">${esc(error || "Color picker changes are staged. Review and build to save them.")}</p><details><summary>Color storage values</summary><div class="field-row">${["r", "g", "b"].map((c, i) => field("palette-" + c, ["Red", "Green", "Blue"][i] + " (0–" + channelMaximum(palette2.channels[c]) + ")", ctx2.draft("palette-" + c, entry.components[c]), { type: "number", min: 0 })).join("")}</div>${button("Stage storage values", "asset-palette-change")}</details></section>`;
+  }
+  function mountPaletteEditor(ctx2, doc, palette2, redraw) {
+    const picker = document.getElementById("palette-picker");
+    if (!picker || !palette2) return;
+    const selector = document.getElementById("palette-index"), selectedIndex = Number(selector == null ? void 0 : selector.value);
+    const scope = selectionKey(ctx2.state), current2 = () => {
+      var _a;
+      return scope === selectionKey(ctx2.state) && ((_a = ctx2.state.results["assets.inspect"]) == null ? void 0 : _a.document_id) === doc.document_id && document.getElementById("palette-picker") === picker;
+    };
+    const stage3 = () => {
+      if (!current2()) return;
+      try {
+        const index = Number(selector == null ? void 0 : selector.value), entry = palette2.entries[index];
+        if (!Number.isInteger(index) || !entry || index !== selectedIndex) throw Error("Reload the selected palette entry before editing its color.");
+        const components = quantizeColor(picker.value, palette2.channels), changes = JSON.parse(ctx2.draft("asset-changes", "[]"));
+        editedPalette(palette2, changes);
+        const next = changes.filter((c) => !(c.kind === "palette" && c.palette_id === palette2.id && c.index === entry.index && c.bank === entry.bank));
+        if (["r", "g", "b"].some((c) => components[c] !== entry.components[c])) next.push({ kind: "palette", palette_id: palette2.id, index: entry.index, bank: entry.bank, before: { ...entry.components }, after: components });
+        const after = editedPalette(palette2, next), encoded = JSON.stringify(next, null, 2);
+        ctx2.setDraft("asset-changes", encoded);
+        const raw = document.getElementById("asset-changes");
+        if (raw) raw.value = encoded;
+        for (const c of ["r", "g", "b"]) {
+          ctx2.setDraft("palette-" + c, String(components[c]));
+          const field2 = document.getElementById("palette-" + c);
+          if (field2) field2.value = String(components[c]);
+        }
+        ctx2.state.pending = null;
+        ctx2.state.assetAcknowledgements = [];
+        ctx2.state.assetEditRevision = (ctx2.state.assetEditRevision || 0) + 1;
+        const comparison = document.getElementById("palette-comparison");
+        if (comparison) comparison.innerHTML = paletteComparison(palette2, after);
+        redraw();
+        const status = document.getElementById("palette-preview-status");
+        if (status) status.textContent = "Preview updated · color staged. Review and build to save it.";
+        return true;
+      } catch (error) {
+        const status = document.getElementById("palette-preview-status");
+        if (status) status.textContent = "Preview unavailable: " + error.message;
+        return false;
+      }
+    };
+    picker.addEventListener("input", stage3);
+    picker.addEventListener("change", () => {
+      if (stage3() && current2()) ctx2.notify("Palette preview updated. Changes are staged.");
+    });
+    selector == null ? void 0 : selector.addEventListener("change", async () => {
+      if (!current2()) return;
+      try {
+        const entry = editedPalette(palette2, JSON.parse(ctx2.draft("asset-changes", "[]"))).entries[Number(selector.value)];
+        if (!entry) return;
+        ctx2.setDraft("palette-index", selector.value);
+        for (const c of ["r", "g", "b"]) ctx2.setDraft("palette-" + c, String(entry.components[c]));
+        await ctx2.render();
+      } catch (error) {
+        const status = document.getElementById("palette-preview-status");
+        if (status) status.textContent = "Preview unavailable: " + error.message;
+      }
+    });
   }
 
   // romancer/ui/views/assets.js
@@ -6276,7 +6495,22 @@ ${font ? `<section class="card"><h3>Font metrics · ${esc(font.id)}</h3><div cla
     return { r: shade, g: shade, b: shade };
   }
   async function render8(ctx2) {
-    var _a, _b, _c, _d, _e, _f, _g, _h, _i, _j, _k, _l, _m, _n, _o, _p;
+    var _a, _b, _c, _d, _e, _f, _g, _h, _i, _j, _k, _l, _m, _n, _o, _p, _q;
+    if (((_a = ctx2.state.connectedAnimation) == null ? void 0 : _a.scope) === selectionKey(ctx2.state)) {
+      const prior = ctx2.state.results["assets.inspect"];
+      let paint = ctx2.state.paint;
+      if (!paint) {
+        try {
+          paint = JSON.parse(ctx2.draft("paint-buffer", "null"));
+        } catch {
+        }
+      }
+      const bitmap2 = prior == null ? void 0 : prior.bitmaps.find((b) => b.id === (paint == null ? void 0 : paint.bitmap_id)), cell = bitmap2 == null ? void 0 : bitmap2.cells[paint == null ? void 0 : paint.cell_index];
+      if ((paint == null ? void 0 : paint.document_id) === (prior == null ? void 0 : prior.document_id) && cell && Array.isArray(paint.pixels) && paint.pixels.length === cell.pixels.length) {
+        const changes = JSON.parse(ctx2.draft("asset-changes", "[]"));
+        ctx2.setDraft("asset-changes", JSON.stringify(mergeCellChanges(changes, [{ kind: "cell", bitmap_id: bitmap2.id, cell_index: paint.cell_index, before_pixels: cell.pixels, after_pixels: paint.pixels }])));
+      }
+    }
     const setupReview = useResearchSetup(ctx2, "assets");
     if (setupReview) return setupReview;
     const { state: state2 } = ctx2, missing2 = requireProject(ctx2);
@@ -6288,7 +6522,10 @@ ${font ? `<section class="card"><h3>Font metrics · ${esc(font.id)}</h3><div cla
       state2.results["assets.inspect"] = connected.result.inspection;
       state2.objectWorkbench = connected.result.object_id ? { scope: selectionKey(state2), object_id: connected.result.object_id, document_id: connected.result.inspection.document_id } : null;
       state2.verifiedVisualSource = connected.result.source_dependency_verified ? { scope: selectionKey(state2), document_id: connected.result.inspection.document_id, verification_id: connected.result.verification_id } : null;
-      const bitmap2 = connected.result.inspection.bitmaps[0], layout = { document_id: connected.result.inspection.document_id, bitmap_id: bitmap2.id, ...connected.result.layout };
+      const bitmap2 = connected.result.inspection.bitmaps.find((b) => b.id === connected.result.bitmap_id) || connected.result.inspection.bitmaps[0];
+      state2.assetBitmapId = bitmap2.id;
+      state2.assetPage = 0;
+      const layout = { document_id: connected.result.inspection.document_id, bitmap_id: bitmap2.id, ...connected.result.layout };
       ctx2.setDraft("asset-schema", JSON.stringify(connected.result.schema, null, 2));
       ctx2.setDraft("sprite-layout", JSON.stringify(layout));
       ctx2.setDraft("sprite-first", "0");
@@ -6298,15 +6535,23 @@ ${font ? `<section class="card"><h3>Font metrics · ${esc(font.id)}</h3><div cla
       ctx2.setDraft("sprite-map", layout.indices.map((v, i) => v === null ? "." : String(v) + (layout.flips[i] & 1 ? "h" : "") + (layout.flips[i] & 2 ? "v" : "")).join(", "));
       state2.spriteHistory = null;
     }
-    const fallback = ((_a = state2.candidateReview) == null ? void 0 : _a.artifact_id) === state2.artifact.artifact_id ? {} : ((_b = state2.artifact.descriptors) == null ? void 0 : _b.assets) || ((_c = state2.project.descriptors) == null ? void 0 : _c.assets) || {};
-    let document2 = ((_d = state2.candidateReview) == null ? void 0 : _d.artifact_id) === state2.artifact.artifact_id ? null : state2.results["assets.inspect"];
+    const fallback = ((_b = state2.candidateReview) == null ? void 0 : _b.artifact_id) === state2.artifact.artifact_id ? {} : ((_c = state2.artifact.descriptors) == null ? void 0 : _c.assets) || ((_d = state2.project.descriptors) == null ? void 0 : _d.assets) || {};
+    let document2 = ((_e = state2.candidateReview) == null ? void 0 : _e.artifact_id) === state2.artifact.artifact_id ? null : state2.results["assets.inspect"];
     if ((document2 == null ? void 0 : document2.source_sha256) !== state2.artifact.sha256) document2 = null;
-    if (!document2 && ((_e = fallback.source) == null ? void 0 : _e.sha256) === state2.artifact.sha256) {
+    if (!document2 && ((_f = fallback.source) == null ? void 0 : _f.sha256) === state2.artifact.sha256) {
       document2 = await ctx2.api.call("assets.inspect", { ...ctx2.sourceParams(), schema: fallback });
       state2.results["assets.inspect"] = document2;
     }
+    const animation = state2.connectedAnimation;
+    if ((animation == null ? void 0 : animation.scope) === selectionKey(state2) && animation.document_id === (document2 == null ? void 0 : document2.document_id)) {
+      ctx2.setDraft("animation-frames", JSON.stringify({ document_id: animation.document_id, bitmap_id: animation.bitmap_id, frames: animation.frames }));
+      state2.connectedAnimation = null;
+      state2.openAnimationAfterMount = { scope: selectionKey(state2), document_id: document2.document_id };
+      state2.paint = null;
+      ctx2.setDraft("paint-buffer", "");
+    }
     const key3 = document2 == null ? void 0 : document2.document_id;
-    if (((_f = state2.paint) == null ? void 0 : _f.document_id) !== key3) state2.paint = null;
+    if (((_g = state2.paint) == null ? void 0 : _g.document_id) !== key3) state2.paint = null;
     if ((document2 == null ? void 0 : document2.ok) && !state2.paint) {
       try {
         const saved = JSON.parse(ctx2.draft("paint-buffer", "null")), savedBitmap = document2.bitmaps.find((b) => b.id === (saved == null ? void 0 : saved.bitmap_id));
@@ -6317,9 +6562,9 @@ ${font ? `<section class="card"><h3>Font metrics · ${esc(font.id)}</h3><div cla
       } catch {
       }
     }
-    const bitmap = ((_g = document2 == null ? void 0 : document2.bitmaps) == null ? void 0 : _g.find((b) => b.id === state2.assetBitmapId)) || ((_h = document2 == null ? void 0 : document2.bitmaps) == null ? void 0 : _h[0]), palette2 = (_i = document2 == null ? void 0 : document2.palettes) == null ? void 0 : _i.find((p) => p.id === (bitmap == null ? void 0 : bitmap.palette_id));
+    const bitmap = ((_h = document2 == null ? void 0 : document2.bitmaps) == null ? void 0 : _h.find((b) => b.id === state2.assetBitmapId)) || ((_i = document2 == null ? void 0 : document2.bitmaps) == null ? void 0 : _i[0]), palette2 = (_j = document2 == null ? void 0 : document2.palettes) == null ? void 0 : _j.find((p) => p.id === (bitmap == null ? void 0 : bitmap.palette_id));
     state2.assetPage = Math.min(Math.max(0, Number.isSafeInteger(state2.assetPage) ? state2.assetPage : 0), Math.max(0, Math.ceil(((bitmap == null ? void 0 : bitmap.count) || 0) / 64) - 1));
-    const selected2 = ((_j = state2.paint) == null ? void 0 : _j.cell_index) ?? 0;
+    const selected2 = ((_k = state2.paint) == null ? void 0 : _k.cell_index) ?? 0;
     const request2 = () => {
       if (!(document2 == null ? void 0 : document2.ok)) throw new Error("Inspect a valid asset descriptor first.");
       const changes = mergeCellChanges(json("asset-changes"), state2.paint ? [{ kind: "cell", bitmap_id: bitmap.id, cell_index: selected2, before_pixels: bitmap.cells[selected2].pixels, after_pixels: state2.paint.pixels }] : []);
@@ -6413,13 +6658,13 @@ ${font ? `<section class="card"><h3>Font metrics · ${esc(font.id)}</h3><div cla
         ctx2.render();
       }
     });
-    if (((_k = state2.candidateReview) == null ? void 0 : _k.artifact_id) === state2.artifact.artifact_id) return `${heading("", "Confirm graphics candidate", "")}<section class="card"><p>${esc(state2.candidateReview.reason)}</p><p>Confirm the format and allocation, then load the declaration.</p>${graphicsDeclaration(ctx2)}${button("Cancel candidate", "candidate-cancel")}</section>`;
+    if (((_l = state2.candidateReview) == null ? void 0 : _l.artifact_id) === state2.artifact.artifact_id) return `${heading("", "Confirm graphics candidate", "")}<section class="card"><p>${esc(state2.candidateReview.reason)}</p><p>Confirm the format and allocation, then load the declaration.</p>${graphicsDeclaration(ctx2)}${button("Cancel candidate", "candidate-cancel")}</section>`;
     const scene = await draftScene(ctx2, document2, () => {
       var _a2;
       return { schema: JSON.parse(ctx2.draft("asset-schema", JSON.stringify(fallback))), edits: { schema_version: 1, document_id: document2.document_id, changes: mergeCellChanges(JSON.parse(ctx2.draft("asset-changes", "[]")), ((_a2 = state2.paint) == null ? void 0 : _a2.document_id) === document2.document_id ? [{ kind: "cell", bitmap_id: state2.paint.bitmap_id, cell_index: state2.paint.cell_index, before_pixels: document2.bitmaps.find((b) => b.id === state2.paint.bitmap_id).cells[state2.paint.cell_index].pixels, after_pixels: state2.paint.pixels }] : []), acknowledged_consumers: state2.assetAcknowledgements || [] } };
     });
-    const pending = ((_l = state2.pending) == null ? void 0 : _l.kind) === "assets" && state2.pending.artifact_id === state2.artifact.artifact_id;
-    return `${heading("Asset workshop", "Graphics & fonts", "Inspect declared tiles, palettes, maps, and fonts. Shared consumers require explicit acknowledgment.")}<div class="identity"><strong>${esc(state2.artifact.name)}</strong><code>${short(state2.artifact.sha256)}</code>${badge((document2 == null ? void 0 : document2.write_supported) ? "Editable" : "Declaration needed", (document2 == null ? void 0 : document2.write_supported) ? "good" : "warm")}</div><div class="grid-two asset-workspace"><div class="asset-editors">${((_m = state2.verifiedVisualSource) == null ? void 0 : _m.scope) === selectionKey(state2) && state2.verifiedVisualSource.document_id === (document2 == null ? void 0 : document2.document_id) ? '<p class="notice">This editor was opened from authenticated causal source verification. The proof covers the captured placement and replay; later edits still need playtesting.</p>' : ""}${await objectWorkbench(ctx2, document2, bitmap)}${spriteAssembly(ctx2, document2, bitmap, palette2)}${animationStudio(ctx2, document2, bitmap)}${paletteEditor(ctx2, palette2)}${scene}${assetTools(ctx2, document2, bitmap, palette2)}<section class="card asset-collection"><div class="card-heading"><h3>Tile collection</h3><span class="subtle">${(bitmap == null ? void 0 : bitmap.count) || 0} cells · ${esc(bitmap ? formatLabel(bitmap.codec, state2.artifact.system_id) : "No tile layout loaded")}</span></div>${bitmap ? `<div class="pixel-grid">${bitmap.cells.slice((state2.assetPage || 0) * 64, (state2.assetPage || 0) * 64 + 64).map((cell) => `<div class="pixel-card"><canvas width="${bitmap.width}" height="${bitmap.height}" data-cell="${cell.index}" aria-label="Tile ${cell.index}"></canvas>${button("Edit tile " + cell.index, "asset-select-cell", { id: String(cell.index) })}</div>`).join("")}</div>` : empty("Load a declared asset descriptor", "Unknown compression and codecs remain read only.")}<div class="actions">${button("Previous page", "asset-page", { id: "-1", disabled: !(state2.assetPage > 0) })}${button("Next page", "asset-page", { id: "1", disabled: !bitmap || (state2.assetPage || 0) * 64 + 64 >= bitmap.count })}</div><div class="swatches" role="group" aria-label="Declared palette colors">${(palette2 == null ? void 0 : palette2.entries.slice(0, 64).map((entry, i) => `<span class="swatch" data-color-index="${i}" title="Color ${entry.index} (${entry.components.r}, ${entry.components.g}, ${entry.components.b})"></span>`).join("")) || ""}</div></section>${bitmap ? `<section class="card asset-pixel-editor"><div class="card-heading"><h3>Pixel editor · cell ${selected2}</h3><span id="pixel-edit-status">${JSON.stringify(pixelBuffer(ctx2, document2, bitmap, selected2)) !== JSON.stringify(bitmap.cells[selected2].pixels) ? badge("Staged", "warm") : badge("Unchanged")}</span></div><div class="preview-pair pixel-comparison"><div><span>Original tile</span><div class="pixel-card"><canvas id="paint-original" aria-label="Original selected tile"></canvas></div></div><div><span>Editing · paint here</span><div class="pixel-card"><canvas id="paint-canvas" width="${bitmap.width}" height="${bitmap.height}" tabindex="0" role="img" aria-label="Pixel editor: arrows move; Space paints selected index"></canvas><small>Drag to paint. Undo restores a complete stroke.</small></div></div></div><p id="pixel-preview-status" class="preview-caption" role="status" aria-live="polite"></p><div>${field("paint-color", "Palette index", ctx2.draft("paint-color", "1"), { type: "number", min: 0 })}<p class="subtle small">Grayscale shows stored indices when no palette is declared.</p>${button("Discard pending pixels", "asset-discard")}</div></section>` : ""}</div><section class="card"><h3>Graphics setup</h3>${graphicsDeclaration(ctx2)}${jsonEditor("asset-schema", "Advanced asset schema", ctx2.draft("asset-schema", JSON.stringify(fallback, null, 2)), false)}${button("Inspect assets", "asset-inspect", { icon: "assets" })}${jsonEditor("asset-changes", "Additional cell / palette / map / advance changes", ctx2.draft("asset-changes", "[]"), false)}<div class="actions">${button("Review graphics changes", "asset-plan", { primary: !pending, disabled: !(document2 == null ? void 0 : document2.write_supported) })}${pending ? button("Create graphics build", "asset-apply", { primary: true, icon: "check" }) : ""}</div>${((_o = (_n = state2.results["assets.plan"]) == null ? void 0 : _n.required_consumers) == null ? void 0 : _o.length) && !((_p = state2.results["assets.plan"]) == null ? void 0 : _p.ok) ? `<div class="notice warm">${state2.results["assets.plan"].required_consumers.length} declared consumers are affected. Read the report below before acknowledging them.</div>${button("Acknowledge listed consumers", "asset-acknowledge")}` : ""}</section></div>${report(state2.results["assets.plan"], "Asset plan & affected consumers")}${report(state2.results["structured.apply"], "Build result")}${editCheckControls(ctx2)}`;
+    const pending = ((_m = state2.pending) == null ? void 0 : _m.kind) === "assets" && state2.pending.artifact_id === state2.artifact.artifact_id;
+    return `${heading("Asset workshop", "Graphics & fonts", "Inspect declared tiles, palettes, maps, and fonts. Shared consumers require explicit acknowledgment.")}<div class="identity"><strong>${esc(state2.artifact.name)}</strong><code>${short(state2.artifact.sha256)}</code>${badge((document2 == null ? void 0 : document2.write_supported) ? "Editable" : "Declaration needed", (document2 == null ? void 0 : document2.write_supported) ? "good" : "warm")}</div><div class="grid-two asset-workspace"><div class="asset-editors">${((_n = state2.verifiedVisualSource) == null ? void 0 : _n.scope) === selectionKey(state2) && state2.verifiedVisualSource.document_id === (document2 == null ? void 0 : document2.document_id) ? '<p class="notice">This editor was opened from authenticated causal source verification. The proof covers the captured placement and replay; later edits still need playtesting.</p>' : ""}${await objectWorkbench(ctx2, document2, bitmap)}${spriteAssembly(ctx2, document2, bitmap, palette2)}${animationStudio(ctx2, document2, bitmap)}${await savedAnimationControls(ctx2, document2, bitmap)}${paletteEditor(ctx2, palette2)}${scene}${assetTools(ctx2, document2, bitmap, palette2)}<section class="card asset-collection"><div class="card-heading"><h3>Tile collection</h3><span class="subtle">${(bitmap == null ? void 0 : bitmap.count) || 0} cells · ${esc(bitmap ? formatLabel(bitmap.codec, state2.artifact.system_id) : "No tile layout loaded")}</span></div>${bitmap ? `<div class="pixel-grid">${bitmap.cells.slice((state2.assetPage || 0) * 64, (state2.assetPage || 0) * 64 + 64).map((cell) => `<div class="pixel-card"><canvas width="${bitmap.width}" height="${bitmap.height}" data-cell="${cell.index}" aria-label="Tile ${cell.index}"></canvas>${button("Edit tile " + cell.index, "asset-select-cell", { id: String(cell.index) })}</div>`).join("")}</div>` : empty("Load a declared asset descriptor", "Unknown compression and codecs remain read only.")}<div class="actions">${button("Previous page", "asset-page", { id: "-1", disabled: !(state2.assetPage > 0) })}${button("Next page", "asset-page", { id: "1", disabled: !bitmap || (state2.assetPage || 0) * 64 + 64 >= bitmap.count })}</div><div class="swatches" role="group" aria-label="Declared palette colors">${(palette2 == null ? void 0 : palette2.entries.slice(0, 64).map((entry, i) => `<span class="swatch" data-color-index="${i}" title="Color ${entry.index} (${entry.components.r}, ${entry.components.g}, ${entry.components.b})"></span>`).join("")) || ""}</div></section>${bitmap ? `<section class="card asset-pixel-editor"><div class="card-heading"><h3>Pixel editor · cell ${selected2}</h3><span id="pixel-edit-status">${JSON.stringify(pixelBuffer(ctx2, document2, bitmap, selected2)) !== JSON.stringify(bitmap.cells[selected2].pixels) ? badge("Staged", "warm") : badge("Unchanged")}</span></div><div class="preview-pair pixel-comparison"><div><span>Original tile</span><div class="pixel-card"><canvas id="paint-original" aria-label="Original selected tile"></canvas></div></div><div><span>Editing · paint here</span><div class="pixel-card"><canvas id="paint-canvas" width="${bitmap.width}" height="${bitmap.height}" tabindex="0" role="img" aria-label="Pixel editor: arrows move; Space paints selected index"></canvas><small>Drag to paint. Undo restores a complete stroke.</small></div></div></div><p id="pixel-preview-status" class="preview-caption" role="status" aria-live="polite"></p><div>${field("paint-color", "Palette index", ctx2.draft("paint-color", "1"), { type: "number", min: 0 })}<p class="subtle small">Grayscale shows stored indices when no palette is declared.</p>${button("Discard pending pixels", "asset-discard")}</div></section>` : ""}</div><section class="card"><h3>Graphics setup</h3>${graphicsDeclaration(ctx2)}${jsonEditor("asset-schema", "Advanced asset schema", ctx2.draft("asset-schema", JSON.stringify(fallback, null, 2)), false)}${button("Inspect assets", "asset-inspect", { icon: "assets" })}${jsonEditor("asset-changes", "Additional cell / palette / map / advance changes", ctx2.draft("asset-changes", "[]"), false)}<div class="actions">${button("Review graphics changes", "asset-plan", { primary: !pending, disabled: !(document2 == null ? void 0 : document2.write_supported) })}${pending ? button("Create graphics build", "asset-apply", { primary: true, icon: "check" }) : ""}</div>${((_p = (_o = state2.results["assets.plan"]) == null ? void 0 : _o.required_consumers) == null ? void 0 : _p.length) && !((_q = state2.results["assets.plan"]) == null ? void 0 : _q.ok) ? `<div class="notice warm">${state2.results["assets.plan"].required_consumers.length} declared consumers are affected. Read the report below before acknowledging them.</div>${button("Acknowledge listed consumers", "asset-acknowledge")}` : ""}</section></div>${report(state2.results["assets.plan"], "Asset plan & affected consumers")}${report(state2.results["structured.apply"], "Build result")}${editCheckControls(ctx2)}`;
   }
   function documentNode(id) {
     return document.getElementById(id);
@@ -6488,7 +6733,7 @@ ${font ? `<section class="card"><h3>Font metrics · ${esc(font.id)}</h3><div cla
   function domainLabel(name) {
     return { nesChrRom: "Pattern graphics in ROM", nesChrRam: "Pattern graphics memory", nesPpuMemory: "Pattern and background memory", nesSpriteRam: "Sprite placement memory", nesPaletteRam: "Palette memory", nesNametableRam: "Background tile map", snesPrgRom: "Program and graphics in ROM", snesVideoRam: "Tile and background memory", snesSpriteRam: "Sprite placement memory", snesCgRam: "Palette memory", gbPrgRom: "Program and graphics in ROM", gbVideoRam: "Tile and background memory", gbSpriteRam: "Sprite placement memory", gbBgPaletteRam: "Background palette memory", gbObjPaletteRam: "Sprite palette memory", gbaPrgRom: "Program and graphics in ROM", gbaVideoRam: "Tile and background memory", gbaSpriteRam: "Sprite placement memory", gbaPaletteRam: "Palette memory", smsPrgRom: "Program and graphics in ROM", smsVideoRam: "Tile and background memory", smsPaletteRam: "Palette memory", genesisVideoRam: "Tile and background memory", genesisColorRam: "Palette memory", genesisVScrollRam: "Vertical scroll memory", genesisWorkRam: "Working RAM", cpu: "CPU bus" }[name] || "Recorded memory";
   }
-  var hex4 = (v) => Number.isSafeInteger(v) ? "0x" + v.toString(16) : "Not recorded";
+  var hex5 = (v) => Number.isSafeInteger(v) ? "0x" + v.toString(16) : "Not recorded";
   function graphicsAccessControls(ctx2, trace) {
     var _a, _b, _c, _d, _e;
     const { state: state2 } = ctx2, scope = selectionKey(state2), params = { ...ctx2.sourceParams() }, current2 = () => {
@@ -6522,10 +6767,10 @@ ${font ? `<section class="card"><h3>Font metrics · ${esc(font.id)}</h3><div cla
         return ctx2.render();
       }
     });
-    return '<details class="card" id="graphics-accesses" ' + (result ? "open" : "") + '><summary>Native graphics accesses & video memory</summary><p>Replay this saved route in the native observer. Record ROM reads, video-memory writes, registers and the final scene.</p><div class="field-row">' + field("graphics-access-offset", "ROM span start", ctx2.draft("graphics-access-offset", String(((_b = (_a = trace == null ? void 0 : trace.matches) == null ? void 0 : _a[0]) == null ? void 0 : _b.offset) || 0))) + field("graphics-access-length", "ROM bytes to observe", ctx2.draft("graphics-access-length", String(((_d = (_c = trace == null ? void 0 : trace.matches) == null ? void 0 : _c[0]) == null ? void 0 : _d.length) || 32))) + field("graphics-access-start", "First frame to record", ctx2.draft("graphics-access-start", "0")) + "</div>" + button("Record native accesses", "graphics-access-capture", { primary: true, disabled: ((_e = trace == null ? void 0 : trace.replay) == null ? void 0 : _e.status) !== "READY" || state2.playing, reason: "Save a cold-start trace of up to 3600 frames and 64 input steps first." }) + "<details><summary>Open saved capture by ID</summary>" + field("graphics-access-id", "Capture ID", ctx2.draft("graphics-access-id", "")) + button("Open saved capture", "graphics-access-open") + "</details>" + (result ? graphicsAccessReport(result) + '<div class="actions">' + button("Previous events", "graphics-access-page", { id: "-1", disabled: !result.offset }) + button("Next events", "graphics-access-page", { id: "1", disabled: result.offset + result.limit >= result.total_events }) + "</div>" + (result.memory_domains.length ? '<details open><summary>Inspect recorded video memory</summary><div class="field-row">' + select("graphics-memory-domain", "Memory domain", result.memory_domains.map((d) => [d.name, domainLabel(d.name) + " · " + d.size + " bytes"]), ctx2.draft("graphics-memory-domain", result.memory_domains[0].name)) + field("graphics-memory-offset", "Memory offset", ctx2.draft("graphics-memory-offset", "0")) + select("graphics-memory-codec", "Tile interpretation", [[codecs[state2.artifact.system_id], formatLabel(codecs[state2.artifact.system_id], state2.artifact.system_id)], ...state2.artifact.system_id === "snes" ? [["tile8-paired2-msb-v1", "SNES tiles (4 colors)"]] : []], ctx2.draft("graphics-memory-codec", codecs[state2.artifact.system_id])) + "</div>" + button("Preview 32 recorded tiles", "graphics-access-tiles") + '<p class="subtle">Choose pattern/video memory, not OAM or palette memory. Grayscale shows stored indices; this view does not identify a ROM source.</p>' + (entry.tiles ? '<canvas id="graphics-memory-tiles" aria-label="Recorded video-memory tile indices"></canvas><p>' + hex4(entry.tiles.offset) + " · " + entry.tiles.cells.length + " tiles · end of capture</p>" : "") + "</details>" : "") : "") + "</details>";
+    return '<details class="card" id="graphics-accesses" ' + (result ? "open" : "") + '><summary>Native graphics accesses & video memory</summary><p>Replay this saved route in the native observer. Record ROM reads, video-memory writes, registers and the final scene.</p><div class="field-row">' + field("graphics-access-offset", "ROM span start", ctx2.draft("graphics-access-offset", String(((_b = (_a = trace == null ? void 0 : trace.matches) == null ? void 0 : _a[0]) == null ? void 0 : _b.offset) || 0))) + field("graphics-access-length", "ROM bytes to observe", ctx2.draft("graphics-access-length", String(((_d = (_c = trace == null ? void 0 : trace.matches) == null ? void 0 : _c[0]) == null ? void 0 : _d.length) || 32))) + field("graphics-access-start", "First frame to record", ctx2.draft("graphics-access-start", "0")) + "</div>" + button("Record native accesses", "graphics-access-capture", { primary: true, disabled: ((_e = trace == null ? void 0 : trace.replay) == null ? void 0 : _e.status) !== "READY" || state2.playing, reason: "Save a cold-start trace of up to 3600 frames and 64 input steps first." }) + "<details><summary>Open saved capture by ID</summary>" + field("graphics-access-id", "Capture ID", ctx2.draft("graphics-access-id", "")) + button("Open saved capture", "graphics-access-open") + "</details>" + (result ? graphicsAccessReport(result) + '<div class="actions">' + button("Previous events", "graphics-access-page", { id: "-1", disabled: !result.offset }) + button("Next events", "graphics-access-page", { id: "1", disabled: result.offset + result.limit >= result.total_events }) + "</div>" + (result.memory_domains.length ? '<details open><summary>Inspect recorded video memory</summary><div class="field-row">' + select("graphics-memory-domain", "Memory domain", result.memory_domains.map((d) => [d.name, domainLabel(d.name) + " · " + d.size + " bytes"]), ctx2.draft("graphics-memory-domain", result.memory_domains[0].name)) + field("graphics-memory-offset", "Memory offset", ctx2.draft("graphics-memory-offset", "0")) + select("graphics-memory-codec", "Tile interpretation", [[codecs[state2.artifact.system_id], formatLabel(codecs[state2.artifact.system_id], state2.artifact.system_id)], ...state2.artifact.system_id === "snes" ? [["tile8-paired2-msb-v1", "SNES tiles (4 colors)"]] : []], ctx2.draft("graphics-memory-codec", codecs[state2.artifact.system_id])) + "</div>" + button("Preview 32 recorded tiles", "graphics-access-tiles") + '<p class="subtle">Choose pattern/video memory, not OAM or palette memory. Grayscale shows stored indices; this view does not identify a ROM source.</p>' + (entry.tiles ? '<canvas id="graphics-memory-tiles" aria-label="Recorded video-memory tile indices"></canvas><p>' + hex5(entry.tiles.offset) + " · " + entry.tiles.cells.length + " tiles · end of capture</p>" : "") + "</details>" : "") : "") + "</details>";
   }
   function graphicsAccessReport(r) {
-    return '<section class="notice"><h4>Recorded access trail</h4>' + (r.scene ? '<figure><img class="game-resource-preview" src="data:image/png;base64,' + esc(r.scene.png_base64) + '" alt="Native observer end-of-capture scene"><figcaption>Separate native replay · final scene</figcaption></figure>' : "") + "<p>" + r.total_events + " stored events · showing " + r.offset + "–" + Math.min(r.offset + r.limit, r.total_events) + ". " + (r.omitted_events ? r.omitted_events + " events omitted at the capture budget." : "") + "</p>" + (r.runtime_trusted === false ? '<p class="notice warm">Historical imported capture. Record a fresh replay for current execution evidence.</p>' : "") + '<div class="table-wrap"><table><thead><tr><th>Kind</th><th>Domain / address</th><th>ROM offset</th><th>Value</th><th>Native operation</th></tr></thead><tbody>' + (r.events || []).map((e) => "<tr><td>" + esc(e.kind) + "</td><td>" + esc(domainLabel(e.domain || "cpu")) + " " + hex4(e.physical_offset ?? e.address) + "</td><td>" + hex4(e.file_offset) + "</td><td>" + hex4(e.value) + "</td><td>" + esc(e.operation_kind || e.actor || "Not recorded") + "</td></tr>").join("") + "</tbody></table></div><p>Adjacent reads and writes do not establish dataflow. CPU context may precede the access. Use source verification to test literal ROM-to-picture dependencies.</p><details><summary>Technical names & register state</summary><pre>" + esc(JSON.stringify({ domains: [...new Set((r.events || []).map((e) => e.domain))], registers: r.graphics_state || {} }, null, 2)) + "</pre></details></section>";
+    return '<section class="notice"><h4>Recorded access trail</h4>' + (r.scene ? '<figure><img class="game-resource-preview" src="data:image/png;base64,' + esc(r.scene.png_base64) + '" alt="Native observer end-of-capture scene"><figcaption>Separate native replay · final scene</figcaption></figure>' : "") + "<p>" + r.total_events + " stored events · showing " + r.offset + "–" + Math.min(r.offset + r.limit, r.total_events) + ". " + (r.omitted_events ? r.omitted_events + " events omitted at the capture budget." : "") + "</p>" + (r.runtime_trusted === false ? '<p class="notice warm">Historical imported capture. Record a fresh replay for current execution evidence.</p>' : "") + '<div class="table-wrap"><table><thead><tr><th>Kind</th><th>Domain / address</th><th>ROM offset</th><th>Value</th><th>Native operation</th></tr></thead><tbody>' + (r.events || []).map((e) => "<tr><td>" + esc(e.kind) + "</td><td>" + esc(domainLabel(e.domain || "cpu")) + " " + hex5(e.physical_offset ?? e.address) + "</td><td>" + hex5(e.file_offset) + "</td><td>" + hex5(e.value) + "</td><td>" + esc(e.operation_kind || e.actor || "Not recorded") + "</td></tr>").join("") + "</tbody></table></div><p>Adjacent reads and writes do not establish dataflow. CPU context may precede the access. Use source verification to test literal ROM-to-picture dependencies.</p><details><summary>Technical names & register state</summary><pre>" + esc(JSON.stringify({ domains: [...new Set((r.events || []).map((e) => e.domain))], registers: r.graphics_state || {} }, null, 2)) + "</pre></details></section>";
   }
   function mountGraphicsAccess(ctx2) {
     const entry = ctx2.state.graphicsAccess, canvas = document.getElementById("graphics-memory-tiles");
@@ -7190,8 +7435,133 @@ ${font ? `<section class="card"><h3>Font metrics · ${esc(font.id)}</h3><div cla
     render: () => render10
   });
 
+  // romancer/ui/command_editor.js
+  function restoreCommandChanges(doc, encoded) {
+    const value = JSON.parse(encoded);
+    if (!doc || (value == null ? void 0 : value.document_id) !== doc.document_id) return [];
+    if (!Array.isArray(value.changes) || value.changes.length > 256) throw Error("Command draft exceeds its budget.");
+    const seen = /* @__PURE__ */ new Set();
+    for (const c of value.changes) {
+      if (!c || typeof c !== "object" || Object.keys(c).sort().join(",") !== "after,before,command_index,field,script_id") throw Error("Invalid command change.");
+      const script = doc.scripts.find((s) => s.id === c.script_id), cmd = Number.isSafeInteger(c.command_index) && (script == null ? void 0 : script.commands[c.command_index]), f = cmd == null ? void 0 : cmd.fields.find((f2) => f2.name === c.field), key3 = c.script_id + ":" + c.command_index + ":" + c.field;
+      if (!(script == null ? void 0 : script.editable) || !f || !Number.isSafeInteger(c.before) || c.before !== f.value || !Number.isSafeInteger(c.after) || c.after < f.minimum || c.after > f.maximum || seen.has(key3)) throw Error("Command change is stale, duplicated or outside its bounds.");
+      seen.add(key3);
+    }
+    return value.changes;
+  }
+  async function commandEditor(ctx2) {
+    var _a, _b, _c, _d;
+    const { state: state2 } = ctx2, a = state2.artifact;
+    if (!a) return "";
+    const page = state2.page, scope = selectionKey(state2), params = { ...ctx2.sourceParams() }, current2 = () => selectionKey(state2) === scope && state2.page === page;
+    let doc = state2.results["commands.inspect"];
+    if ((doc == null ? void 0 : doc.source_sha256) !== a.sha256) doc = null;
+    const saved = (_a = a.descriptors) == null ? void 0 : _a.commands;
+    let error = "";
+    if (!doc && saved) {
+      try {
+        doc = await ctx2.api.call("commands.inspect", { ...params, definition: saved });
+        if (!current2()) return "";
+        state2.results["commands.inspect"] = doc;
+      } catch (e) {
+        error = e.message;
+      }
+    }
+    if (((_b = state2.commandFocus) == null ? void 0 : _b.scope) === scope && doc) {
+      const focus = state2.commandFocus;
+      ctx2.setDraft("command-script", focus.script_id || doc.scripts[0].id);
+      ctx2.setDraft("command-index", String(focus.command_index || 0));
+      ctx2.setDraft("command-value", "");
+      state2.commandFocus = null;
+    }
+    let changes = [];
+    try {
+      changes = restoreCommandChanges(doc, ctx2.draft("command-changes", "null"));
+    } catch (e) {
+      changes = [];
+      error = "Saved command draft cannot be read. Discard it to continue.";
+    }
+    const script = (doc == null ? void 0 : doc.scripts.find((s) => s.id === ctx2.draft("command-script", ""))) || (doc == null ? void 0 : doc.scripts[0]), index = Math.max(0, Math.min(Number(ctx2.draft("command-index", "0")) || 0, ((script == null ? void 0 : script.commands.length) || 1) - 1)), cmd = script == null ? void 0 : script.commands[index], operand = (cmd == null ? void 0 : cmd.fields.find((f) => f.name === ctx2.draft("command-field", ""))) || (cmd == null ? void 0 : cmd.fields[0]);
+    const selected2 = () => {
+      const script2 = doc == null ? void 0 : doc.scripts.find((s) => s.id === read("command-script")), cmd2 = script2 == null ? void 0 : script2.commands[Number(read("command-index"))], f = cmd2 == null ? void 0 : cmd2.fields.find((f2) => f2.name === read("command-field"));
+      if (!current2() || !(script2 == null ? void 0 : script2.editable) || !f) throw Error("Choose a fully decoded command and a declared operand.");
+      return { script: script2, cmd: cmd2, f };
+    };
+    const store = (next) => {
+      state2.pending = null;
+      ctx2.setDraft("command-changes", JSON.stringify({ document_id: doc == null ? void 0 : doc.document_id, changes: next }));
+      return ctx2.render();
+    };
+    const schema = () => JSON.parse(read("command-definition"));
+    ctx2.use({
+      "command-choose": () => {
+        ctx2.setDraft("command-script", read("command-script"));
+        ctx2.setDraft("command-index", read("command-index"));
+        ctx2.setDraft("command-field", read("command-field"));
+        ctx2.setDraft("command-value", "");
+        return ctx2.render();
+      },
+      "command-inspect": async () => {
+        const definition = schema(), signature = JSON.stringify(definition), r = await ctx2.run("commands.inspect", { ...params, definition }, { render: false });
+        if (!current2()) return;
+        if (signature !== JSON.stringify(schema())) throw Error("The command definition changed. Inspect it again.");
+        state2.results["commands.inspect"] = r;
+        return ctx2.render();
+      },
+      "command-preview-definition": async () => {
+        const config = schema(), r = await ctx2.run("definitions.preview", { ...params, kind: "commands", config }, { render: false });
+        if (!current2()) return;
+        state2.commandDefinitionReview = { scope, config, review_id: r.review_id };
+        return ctx2.render();
+      },
+      "command-save-definition": async () => {
+        var _a2;
+        const review2 = state2.commandDefinitionReview;
+        if (!current2() || (review2 == null ? void 0 : review2.scope) !== scope || JSON.stringify(review2.config) !== JSON.stringify(schema())) throw Error("Preview the current command definition again.");
+        await ctx2.run("definitions.save", { ...params, kind: "commands", config: review2.config, review_id: review2.review_id, replace: !!((_a2 = document.getElementById("command-replace")) == null ? void 0 : _a2.checked) }, { render: false });
+        if (current2()) {
+          state2.commandDefinitionReview = null;
+          return ctx2.render();
+        }
+      },
+      "command-stage": () => {
+        const { script: script2, cmd: cmd2, f } = selected2(), text = read("command-value").trim(), after = Number(text);
+        if (!text || !Number.isSafeInteger(after) || after < f.minimum || after > f.maximum) throw Error("Enter a whole number from " + f.minimum + " to " + f.maximum + ".");
+        const next = changes.filter((c) => !(c.script_id === script2.id && c.command_index === cmd2.index && c.field === f.name));
+        if (after !== f.value) next.push({ script_id: script2.id, command_index: cmd2.index, field: f.name, before: f.value, after });
+        if (next.length > 256) throw Error("Build or discard the current256 command edits first.");
+        return store(next);
+      },
+      "command-discard": () => store([]),
+      "command-review": async () => {
+        if (!current2() || !doc || !changes.length) throw Error("Stage a declared operand change first.");
+        const signature = JSON.stringify(changes), r = await ctx2.run("commands.plan", { ...params, definition: doc.definition, document_id: doc.document_id, changes }, { render: false });
+        if (!current2()) return;
+        if (signature !== JSON.stringify(JSON.parse(ctx2.draft("command-changes", "{}")).changes)) throw Error("The edits changed. Review again.");
+        state2.pending = { kind: "commands", artifact_id: a.artifact_id, plan_id: r.plan_id, signature };
+        return ctx2.render();
+      },
+      "command-build": async () => {
+        const p = state2.pending;
+        if (!current2() || (p == null ? void 0 : p.kind) !== "commands" || p.artifact_id !== a.artifact_id || p.signature !== JSON.stringify(changes)) throw Error("Review the current command edits first.");
+        await ctx2.run("build.apply", { ...ctx2.projectParams(), plan_id: p.plan_id }, { render: false });
+        if (current2()) {
+          if (state2.pending !== p || JSON.stringify(restoreCommandChanges(doc, ctx2.draft("command-changes", "null"))) !== p.signature) {
+            ctx2.notify("Command build created. Your newer edits are still staged.");
+            return ctx2.render();
+          }
+          ctx2.notify("Separate command build created. Playtest its behavior before export.");
+          return store([]);
+        }
+      }
+    });
+    const template = { schema_version: 1, source_sha256: a.sha256, name: "Known event format", scripts: [], commands: [] };
+    const setup2 = `<details><summary>Declare a known command format · Advanced</summary><p>Supply documented opcode lengths and named fixed operands. This does not identify an unfamiliar script engine or execute code.</p>${jsonEditor("command-definition", "Source-bound command grammar", ctx2.draft("command-definition", JSON.stringify(saved || (doc == null ? void 0 : doc.definition) || template, null, 2)))}<div class="actions">${button("Inspect commands", "command-inspect")}${button("Preview saved definition", "command-preview-definition")}</div>${((_c = state2.commandDefinitionReview) == null ? void 0 : _c.scope) === scope ? `<label><input id="command-replace" type="checkbox"> Replace the existing command definition if present.</label>${button("Save reviewed definition", "command-save-definition")}` : ""}</details>`;
+    return `<${doc ? "section" : "details"} class="card command-editor">${doc ? "<h2>Events & commands</h2>" : "<summary>Events & commands</summary>"}${error ? `<p class="notice warm">${esc(error)}</p>${button("Discard invalid command edits", "command-discard")}` : ""}${doc ? `<p>${esc(doc.scope)}</p>${select("command-script", "Event script", doc.scripts.map((s) => [s.id, s.name]), script == null ? void 0 : script.id)}${(script == null ? void 0 : script.issues.length) ? `<p class="notice warm">Read-only: ${script.issues.map(esc).join(" ")}</p>` : ""}${cmd ? `<div class="field-row">${select("command-index", "Command", script.commands.map((c) => [c.index, c.name + " · 0x" + c.offset.toString(16)]), index)}${select("command-field", "Parameter", cmd.fields.map((f) => [f.name, f.name]), operand == null ? void 0 : operand.name)}${button("Choose command", "command-choose")}</div>${operand ? `${field("command-value", "New " + operand.name, ctx2.draft("command-value", "") || String(operand.value))}<p>Stored: ${operand.value} · allowed ${operand.minimum}–${operand.maximum} · file0x${operand.offset.toString(16)}</p>${button("Stage parameter change", "command-stage", { disabled: !script.editable || !!error })}` : "<p>This command has no editable operands.</p>"}` : ""}<div class="table-wrap"><table><thead><tr><th>Parameter</th><th>Before</th><th>After</th></tr></thead><tbody>${changes.map((c) => `<tr><td>${esc(c.field)}</td><td>${c.before}</td><td>${c.after}</td></tr>`).join("")}</tbody></table></div><div class="actions">${button("Review command changes", "command-review", { primary: true, disabled: !changes.length || !!error })}${((_d = state2.pending) == null ? void 0 : _d.kind) === "commands" ? button("Create command build", "command-build", { primary: true }) : ""}${button("Discard command edits", "command-discard", { disabled: !changes.length && !error })}</div>` : "<p>A verified or explicitly declared command grammar is required. Unknown instructions remain read-only.</p>"}${setup2}</${doc ? "section" : "details"}>`;
+  }
+
   // romancer/ui/structural_lab.js
-  var hex5 = (v) => "0x" + v.toString(16);
+  var hex6 = (v) => "0x" + v.toString(16);
   var bound = (state2, r) => {
     var _a, _b;
     return (r == null ? void 0 : r.source_sha256) === ((_a = state2.artifact) == null ? void 0 : _a.sha256) && r.artifact_id === ((_b = state2.artifact) == null ? void 0 : _b.artifact_id);
@@ -7236,7 +7606,7 @@ ${font ? `<section class="card"><h3>Font metrics · ${esc(font.id)}</h3><div cla
         await ctx2.navigate("tables");
       }
     });
-    return `<section class="card structural-lab"><h2>Explore ROM structure</h2><p>Test repeated numeric layouts, inspect sample records, and open a neutral editor. These are hypotheses; game meaning and pointer use need behavioral evidence.</p><div class="field-row">${field("lab-offset", "Window file offset", ctx2.draft("lab-offset", "0"))}${field("lab-length", "Window bytes (up to 65536)", ctx2.draft("lab-length", "4096"))}</div>${button("Test this range", "lab-survey", { primary: true })}${result ? `<p>${result.coverage.positions_tested} layouts tested · start positions sampled every ${result.coverage.position_stride} bytes · ${result.total_candidates} surviving hypotheses${result.truncated ? " · result limit reached" : ""}</p><p class="notice">${esc(result.next_experiment)}</p>${select("lab-interpretation", "Open editor as", [["numeric", "Neutral numeric values"], ["linear-pointer", "An explicit linear-pointer hypothesis"]], ctx2.draft("lab-interpretation", "numeric"))}${result.candidates.length ? `<div class="table-wrap"><table><thead><tr><th>First record</th><th>Layout</th><th>Sample values and possible targets</th><th></th></tr></thead><tbody>${result.candidates.slice(0, 12).map((c) => `<tr><td><code>${hex5(c.offset)}</code></td><td>${c.count} records · ${c.stride} bytes/record<br>${c.width * 8} bit · ${esc(c.endian)}<br>Target hypothesis: stored − ${hex5(c.base)}</td><td>${c.samples.slice(0, 3).map((s) => `<div><code>${hex5(s.stored_value)} → ${hex5(s.target_offset)}</code>${s.target_preview ? " · " + esc(s.target_preview) : ""}</div>`).join("")}</td><td>${button("Open table editor", "lab-open", { id: c.candidate_id })}</td></tr>`).join("")}</tbody></table></div><p class="subtle">Showing ${Math.min(12, result.candidates.length)} of ${result.candidates.length} retained hypotheses. Use a smaller range to separate layouts. Opening an editor does not modify ROM bytes.</p>` : "<p>No repeated layout survived these tests. Try another range or use native access evidence to locate data.</p>"}` : ""}</section>`;
+    return `<section class="card structural-lab"><h2>Explore ROM structure</h2><p>Test repeated numeric layouts, inspect sample records, and open a neutral editor. These are hypotheses; game meaning and pointer use need behavioral evidence.</p><div class="field-row">${field("lab-offset", "Window file offset", ctx2.draft("lab-offset", "0"))}${field("lab-length", "Window bytes (up to 65536)", ctx2.draft("lab-length", "4096"))}</div>${button("Test this range", "lab-survey", { primary: true })}${result ? `<p>${result.coverage.positions_tested} layouts tested · start positions sampled every ${result.coverage.position_stride} bytes · ${result.total_candidates} surviving hypotheses${result.truncated ? " · result limit reached" : ""}</p><p class="notice">${esc(result.next_experiment)}</p>${select("lab-interpretation", "Open editor as", [["numeric", "Neutral numeric values"], ["linear-pointer", "An explicit linear-pointer hypothesis"]], ctx2.draft("lab-interpretation", "numeric"))}${result.candidates.length ? `<div class="table-wrap"><table><thead><tr><th>First record</th><th>Layout</th><th>Sample values and possible targets</th><th></th></tr></thead><tbody>${result.candidates.slice(0, 12).map((c) => `<tr><td><code>${hex6(c.offset)}</code></td><td>${c.count} records · ${c.stride} bytes/record<br>${c.width * 8} bit · ${esc(c.endian)}<br>Target hypothesis: stored − ${hex6(c.base)}</td><td>${c.samples.slice(0, 3).map((s) => `<div><code>${hex6(s.stored_value)} → ${hex6(s.target_offset)}</code>${s.target_preview ? " · " + esc(s.target_preview) : ""}</div>`).join("")}</td><td>${button("Open table editor", "lab-open", { id: c.candidate_id })}</td></tr>`).join("")}</tbody></table></div><p class="subtle">Showing ${Math.min(12, result.candidates.length)} of ${result.candidates.length} retained hypotheses. Use a smaller range to separate layouts. Opening an editor does not modify ROM bytes.</p>` : "<p>No repeated layout survived these tests. Try another range or use native access evidence to locate data.</p>"}` : ""}</section>`;
   }
 
   // romancer/ui/value_finder.js
@@ -7546,13 +7916,15 @@ ${font ? `<section class="card"><h3>Font metrics · ${esc(font.id)}</h3><div cla
       "debug-observe": () => ctx2.run("debug.observe", { ...ctx2.sourceParams(), case: json("debug-case"), trace: json("debug-trace"), runtime: json("debug-runtime") })
     });
     const result = state2.results["debug.observe"] || state2.results["debug.inspect"];
+    const commands = await commandEditor(ctx2);
+    if (!current2()) return "";
     const investigation = await investigationSeries(ctx2);
     if (!current2()) return "";
     const native = await executionTrace(ctx2);
     if (!current2()) return "";
     const structures = await structuralLab(ctx2);
     if (!current2()) return "";
-    return `${heading("", "Investigation", "")}${investigation}${native}${structures}<details class="card"><summary>Additional memory tools</summary>${valueFinder(ctx2)}${memoryWatches(ctx2)}</details>${hardwareReference(ctx2)}<section class="card"><h3>Declared references</h3>${field("uses-offset", "Target file offset", ctx2.draft("uses-offset", "0"))}${button("Find declared references", "uses-read")}${(references == null ? void 0 : references.ok) ? `<div>${references.uses.map((row) => `<div class="actions"><span>${esc(row.name)} · ${esc(row.kind)}</span>${button("Inspect0x" + row.offset.toString(16), "uses-open", { id: String(row.offset) })}</div>`).join("") || "<p>No declared references to this offset.</p>"}<p class="subtle">${references.partial ? "Partial scan (first4,096 table records)." : "Undeclared uses remain unknown."}</p></div>` : ""}</section><div class="grid-even"><section class="card"><h3>Address explorer</h3>${select("address-system", "System", [["nes", "NES"], ["snes", "SNES"], ["genesis", "Genesis"], ["gb", "Game Boy"], ["gbc", "Game Boy Color"], ["gba", "GBA"]], ctx2.draft("address-system", state2.artifact.system_id || "nes"))}${field("cpu-address", "CPU address", ctx2.draft("cpu-address", "0x8000"))}${select("address-mapping", "Declared mapping", [["nrom", "NES NROM"], ["prg-bank", "NES explicit PRG bank"], ["lorom", "SNES LoROM"], ["hirom", "SNES HiROM"], ["linear", "Genesis linear"], ["gb-rom", "Game Boy explicit ROM bank"], ["rom", "GBA ROM windows"]], ctx2.draft("address-mapping", { nes: "nrom", snes: "lorom", genesis: "linear", gb: "gb-rom", gbc: "gb-rom", gba: "rom" }[state2.artifact.system_id] || "nrom"))}<details class="config"><summary>Mapping bounds</summary><div class="field-row">${field("address-bank", "Explicit bank (optional)", ctx2.draft("address-bank", ""))}${field("address-prg", "PRG file offset", ctx2.draft("address-prg", "16"))}${field("address-prg-size", "NROM PRG bytes", ctx2.draft("address-prg-size", "16384"))}${field("address-bank-size", "Bank bytes", ctx2.draft("address-bank-size", "8192"))}${field("address-window", "CPU window start", ctx2.draft("address-window", "0x8000"))}${field("address-prefix", "Copier header bytes", ctx2.draft("address-prefix", "0"))}${field("address-file", "Loaded-file offset", ctx2.draft("address-file", "0"))}${field("address-window-length", "Loaded-file bytes", ctx2.draft("address-window-length", "8192"))}</div></details>${button("Resolve address", "address-resolve", { primary: true })}${resolved ? button("Inspect mapped bytes", "address-open") + '<p class="subtle">Declared mapping only; active bank state was not observed.</p>' : ""}${report(mapped, "Mapped bytes")}</section><section class="card"><h3>Compare bytes</h3>${select("compare-other", "Compare selected source with", [...state2.project.sources, ...state2.project.builds].filter((r) => r.artifact_id !== state2.artifact.artifact_id).map((r) => [r.artifact_id, r.name]), ctx2.draft("compare-other", ""))}<div class="field-row">${field("compare-offset", "File offset", ctx2.draft("compare-offset", "0"))}${field("compare-length", "Bytes", ctx2.draft("compare-length", "256"))}</div>${button("Compare range", "compare-bytes")}${report(state2.results["resources.compare"], "Byte differences")}<h3>Native memory</h3><div class="field-row">${select("memory-region", "Region", [["2", "System RAM"], ["3", "Video RAM"], ["0", "Save RAM"]], ctx2.draft("memory-region", "2"))}${field("memory-offset", "Region offset", ctx2.draft("memory-offset", "0"))}${field("memory-length", "Bytes to observe", ctx2.draft("memory-length", "32"))}</div>${button("Capture memory snapshot", "memory-read", { disabled: !state2.runtime })}${report(state2.results["runtime.memory"], "Measured memory")}</section></div><details class="card"><summary>Advanced trace case</summary><div class="grid-two"><section class="card"><div class="card-heading"><h3>Case workspace</h3>${badge("EXPLICIT MAPPINGS")}</div><p class="subtle">Import your revision-bound case and trace JSON below. A bank or address space that has not been established stays unresolved.</p>${jsonEditor("debug-case", "Troubleshooting case", ctx2.draft("debug-case", "{}"), false)}${jsonEditor("debug-trace", "Explicit imported trace", ctx2.draft("debug-trace", "{}"), false)}<div class="actions">${button("Inspect case & source", "debug-inspect", { primary: true, icon: "debug" })}</div><div class="notice">Imported reads and writes are candidates. They do not establish an emulator write event or prove causation.</div></section><section class="card"><h3>Native observations</h3><p class="subtle">Use a fresh owned worker to compare declared memory probes before and after real controller input.</p>${jsonEditor("debug-runtime", "Observation configuration", ctx2.draft("debug-runtime", JSON.stringify({ load: {}, steps: [{ frames: 1, buttons: [], port: 0 }], initial_state_file: null, timeout: 30, frame_region: [0, 0, 1, 1], memory_probe_ids: [] }, null, 2)), true)}${button("Observe in native worker", "debug-observe", { icon: "playtest" })}<div class="notice warm">Memory snapshots are bounded observations. A changed value alone does not show which instruction wrote it.</div>${(result == null ? void 0 : result.probes) ? `<div class="table-wrap"><table><thead><tr><th>Probe</th><th>Resolution</th><th>Source bytes</th></tr></thead><tbody>${result.probes.map((p) => {
+    return `${heading("", "Investigation", "")}${commands}${investigation}${native}${structures}<details class="card"><summary>Additional memory tools</summary>${valueFinder(ctx2)}${memoryWatches(ctx2)}</details>${hardwareReference(ctx2)}<section class="card"><h3>Declared references</h3>${field("uses-offset", "Target file offset", ctx2.draft("uses-offset", "0"))}${button("Find declared references", "uses-read")}${(references == null ? void 0 : references.ok) ? `<div>${references.uses.map((row) => `<div class="actions"><span>${esc(row.name)} · ${esc(row.kind)}</span>${button("Inspect0x" + row.offset.toString(16), "uses-open", { id: String(row.offset) })}</div>`).join("") || "<p>No declared references to this offset.</p>"}<p class="subtle">${references.partial ? "Partial scan (first4,096 table records)." : "Undeclared uses remain unknown."}</p></div>` : ""}</section><div class="grid-even"><section class="card"><h3>Address explorer</h3>${select("address-system", "System", [["nes", "NES"], ["snes", "SNES"], ["genesis", "Genesis"], ["gb", "Game Boy"], ["gbc", "Game Boy Color"], ["gba", "GBA"]], ctx2.draft("address-system", state2.artifact.system_id || "nes"))}${field("cpu-address", "CPU address", ctx2.draft("cpu-address", "0x8000"))}${select("address-mapping", "Declared mapping", [["nrom", "NES NROM"], ["prg-bank", "NES explicit PRG bank"], ["lorom", "SNES LoROM"], ["hirom", "SNES HiROM"], ["linear", "Genesis linear"], ["gb-rom", "Game Boy explicit ROM bank"], ["rom", "GBA ROM windows"]], ctx2.draft("address-mapping", { nes: "nrom", snes: "lorom", genesis: "linear", gb: "gb-rom", gbc: "gb-rom", gba: "rom" }[state2.artifact.system_id] || "nrom"))}<details class="config"><summary>Mapping bounds</summary><div class="field-row">${field("address-bank", "Explicit bank (optional)", ctx2.draft("address-bank", ""))}${field("address-prg", "PRG file offset", ctx2.draft("address-prg", "16"))}${field("address-prg-size", "NROM PRG bytes", ctx2.draft("address-prg-size", "16384"))}${field("address-bank-size", "Bank bytes", ctx2.draft("address-bank-size", "8192"))}${field("address-window", "CPU window start", ctx2.draft("address-window", "0x8000"))}${field("address-prefix", "Copier header bytes", ctx2.draft("address-prefix", "0"))}${field("address-file", "Loaded-file offset", ctx2.draft("address-file", "0"))}${field("address-window-length", "Loaded-file bytes", ctx2.draft("address-window-length", "8192"))}</div></details>${button("Resolve address", "address-resolve", { primary: true })}${resolved ? button("Inspect mapped bytes", "address-open") + '<p class="subtle">Declared mapping only; active bank state was not observed.</p>' : ""}${report(mapped, "Mapped bytes")}</section><section class="card"><h3>Compare bytes</h3>${select("compare-other", "Compare selected source with", [...state2.project.sources, ...state2.project.builds].filter((r) => r.artifact_id !== state2.artifact.artifact_id).map((r) => [r.artifact_id, r.name]), ctx2.draft("compare-other", ""))}<div class="field-row">${field("compare-offset", "File offset", ctx2.draft("compare-offset", "0"))}${field("compare-length", "Bytes", ctx2.draft("compare-length", "256"))}</div>${button("Compare range", "compare-bytes")}${report(state2.results["resources.compare"], "Byte differences")}<h3>Native memory</h3><div class="field-row">${select("memory-region", "Region", [["2", "System RAM"], ["3", "Video RAM"], ["0", "Save RAM"]], ctx2.draft("memory-region", "2"))}${field("memory-offset", "Region offset", ctx2.draft("memory-offset", "0"))}${field("memory-length", "Bytes to observe", ctx2.draft("memory-length", "32"))}</div>${button("Capture memory snapshot", "memory-read", { disabled: !state2.runtime })}${report(state2.results["runtime.memory"], "Measured memory")}</section></div><details class="card"><summary>Advanced trace case</summary><div class="grid-two"><section class="card"><div class="card-heading"><h3>Case workspace</h3>${badge("EXPLICIT MAPPINGS")}</div><p class="subtle">Import your revision-bound case and trace JSON below. A bank or address space that has not been established stays unresolved.</p>${jsonEditor("debug-case", "Troubleshooting case", ctx2.draft("debug-case", "{}"), false)}${jsonEditor("debug-trace", "Explicit imported trace", ctx2.draft("debug-trace", "{}"), false)}<div class="actions">${button("Inspect case & source", "debug-inspect", { primary: true, icon: "debug" })}</div><div class="notice">Imported reads and writes are candidates. They do not establish an emulator write event or prove causation.</div></section><section class="card"><h3>Native observations</h3><p class="subtle">Use a fresh owned worker to compare declared memory probes before and after real controller input.</p>${jsonEditor("debug-runtime", "Observation configuration", ctx2.draft("debug-runtime", JSON.stringify({ load: {}, steps: [{ frames: 1, buttons: [], port: 0 }], initial_state_file: null, timeout: 30, frame_region: [0, 0, 1, 1], memory_probe_ids: [] }, null, 2)), true)}${button("Observe in native worker", "debug-observe", { icon: "playtest" })}<div class="notice warm">Memory snapshots are bounded observations. A changed value alone does not show which instruction wrote it.</div>${(result == null ? void 0 : result.probes) ? `<div class="table-wrap"><table><thead><tr><th>Probe</th><th>Resolution</th><th>Source bytes</th></tr></thead><tbody>${result.probes.map((p) => {
       var _a2;
       return `<tr><td>${esc(p.probe_id)}</td><td>${esc(p.status)}</td><td><code>${esc(((_a2 = p.source) == null ? void 0 : _a2.raw_hex) || "Unresolved")}</code></td></tr>`;
     }).join("")}</tbody></table></div>` : ""}</section></div></details>${report(state2.results["debug.inspect"], "Case inspection")}${report(state2.results["debug.observe"], "Measured before & after")}`;
@@ -7732,9 +8104,9 @@ ${font ? `<section class="card"><h3>Font metrics · ${esc(font.id)}</h3><div cla
   });
 
   // romancer/ui/patch_controls.js
-  function canApplyPatch(state2, preview) {
+  function canApplyPatch(state2, preview2) {
     var _a, _b, _c;
-    return !!((preview == null ? void 0 : preview.ok) && preview.plan_id && preview.changed_bytes > 0 && preview.project_id === ((_a = state2.project) == null ? void 0 : _a.project_id) && preview.source_id === ((_b = state2.artifact) == null ? void 0 : _b.artifact_id) && preview.source_sha256 === ((_c = state2.artifact) == null ? void 0 : _c.sha256));
+    return !!((preview2 == null ? void 0 : preview2.ok) && preview2.plan_id && preview2.changed_bytes > 0 && preview2.project_id === ((_a = state2.project) == null ? void 0 : _a.project_id) && preview2.source_id === ((_b = state2.artifact) == null ? void 0 : _b.artifact_id) && preview2.source_sha256 === ((_c = state2.artifact) == null ? void 0 : _c.sha256));
   }
   async function preparePatch(ctx2, file, expectedReference) {
     if (!ctx2.state.project || !ctx2.state.artifact) throw new Error("Choose the ROM this patch was made for in the top bar.");
@@ -7744,14 +8116,14 @@ ${font ? `<section class="card"><h3>Font metrics · ${esc(font.id)}</h3><div cla
     const current2 = () => selectionKey(ctx2.state) === scope && ctx2.state.patchRequest === request2;
     const input = await ctx2.api.uploadInput(project_id, file, "patch");
     if (!current2()) throw new Error("The selected file or ROM changed. Preview the patch for the new selection.");
-    const preview = await ctx2.run("patches.preview", { project_id, artifact_id, input_id: input.input_id, expected_reference: expectedReference }, { render: false });
+    const preview2 = await ctx2.run("patches.preview", { project_id, artifact_id, input_id: input.input_id, expected_reference: expectedReference }, { render: false });
     if (!current2()) throw new Error("The selection changed while the patch was checked. Preview it again.");
-    ctx2.state.patchImport = { scope, input, preview, file };
-    return preview;
+    ctx2.state.patchImport = { scope, input, preview: preview2, file };
+    return preview2;
   }
   function patchControls(ctx2) {
     var _a, _b, _c;
-    const { state: state2 } = ctx2, scope = selectionKey(state2), selected2 = ((_a = state2.patchImport) == null ? void 0 : _a.scope) === scope ? state2.patchImport : null, preview = selected2 == null ? void 0 : selected2.preview;
+    const { state: state2 } = ctx2, scope = selectionKey(state2), selected2 = ((_a = state2.patchImport) == null ? void 0 : _a.scope) === scope ? state2.patchImport : null, preview2 = selected2 == null ? void 0 : selected2.preview;
     ctx2.use({
       "patch-preview": async () => {
         var _a2, _b2;
@@ -7774,10 +8146,10 @@ ${font ? `<section class="card"><h3>Font metrics · ${esc(font.id)}</h3><div cla
     return `<section class="card" id="patch-import"><h3>Apply a downloaded patch</h3><p>Selected ${((_b = state2.artifact) == null ? void 0 : _b.kind) === "build" ? "build" : "ROM"} for patching: <strong>${esc(((_c = state2.artifact) == null ? void 0 : _c.name) || "Choose a ROM in the top bar")}</strong></p>
  ${fileInput("patch-file", "Patch file — choose or drop a BPS / IPS patch", ".bps,.ips")}${selected2 ? `<p>${esc(selected2.input.name)}</p>` : ""}
  ${field("patch-reference", "Expected original CRC32 or SHA256 (required for IPS)", ctx2.draft("patch-reference", ""), { hint: "Use the full-file checksum supplied by the patch author. BPS also checks its embedded checksums." })}
- <div class="actions">${button("Preview patch", "patch-preview", { primary: !preview, disabled: !state2.artifact })}</div>
- ${preview ? `<div class="notice">${badge(preview.format)} ${size(preview.target_size)} · ${preview.changed_bytes.toLocaleString()} changed bytes<p>${esc(preview.reference)}</p></div>
- ${preview.changed_bytes ? `${field("patch-build-name", "New build name", ctx2.draft("patch-build-name", "Patched build"))}${button("Create patched build", "patch-apply", { primary: true, disabled: !canApplyPatch(state2, preview) })}` : "<p>This patch makes no changes to the selected file.</p>"}
- <details><summary>Changed ranges and identities</summary><p>Original SHA256: <code>${esc(preview.source_sha256)}</code></p><p>Target SHA256: <code>${esc(preview.target_sha256)}</code></p><ul>${(preview.ranges || []).map((r) => `<li>0x${r.offset.toString(16)} · ${r.length} bytes</li>`).join("")}</ul>${preview.ranges_truncated ? "<p>More changed ranges exist; the total byte count includes them.</p>" : ""}</details>` : '<p class="subtle">Preview first. Applying creates a separate build.</p>'}</section>`;
+ <div class="actions">${button("Preview patch", "patch-preview", { primary: !preview2, disabled: !state2.artifact })}</div>
+ ${preview2 ? `<div class="notice">${badge(preview2.format)} ${size(preview2.target_size)} · ${preview2.changed_bytes.toLocaleString()} changed bytes<p>${esc(preview2.reference)}</p></div>
+ ${preview2.changed_bytes ? `${field("patch-build-name", "New build name", ctx2.draft("patch-build-name", "Patched build"))}${button("Create patched build", "patch-apply", { primary: true, disabled: !canApplyPatch(state2, preview2) })}` : "<p>This patch makes no changes to the selected file.</p>"}
+ <details><summary>Changed ranges and identities</summary><p>Original SHA256: <code>${esc(preview2.source_sha256)}</code></p><p>Target SHA256: <code>${esc(preview2.target_sha256)}</code></p><ul>${(preview2.ranges || []).map((r) => `<li>0x${r.offset.toString(16)} · ${r.length} bytes</li>`).join("")}</ul>${preview2.ranges_truncated ? "<p>More changed ranges exist; the total byte count includes them.</p>" : ""}</details>` : '<p class="subtle">Preview first. Applying creates a separate build.</p>'}</section>`;
   }
   function mountPatchControls(ctx2) {
     var _a, _b;
@@ -8575,7 +8947,7 @@ ${font ? `<section class="card"><h3>Font metrics · ${esc(font.id)}</h3><div cla
   }
 
   // romancer/ui/game_maps.js
-  var hex6 = (n) => "0x" + Number(n).toString(16).toUpperCase();
+  var hex7 = (n) => "0x" + Number(n).toString(16).toUpperCase();
   var clone = (value) => JSON.parse(JSON.stringify(value));
   var key2 = (c) => c.kind === "arrival" ? `arrival:${c.table}:${c.id}` : `${c.kind}:${c.offset}`;
   var number2 = (value, max = 63) => {
@@ -8931,15 +9303,15 @@ ${font ? `<section class="card"><h3>Font metrics · ${esc(font.id)}</h3><div cla
     if (doc.error) return browser + `<section class="card"><h3>Room unavailable</h3><p>${esc(doc.error)}</p></section>`;
     if (doc.map.status !== "decoded") return browser + `<section class="card"><h3>${esc(doc.room.label)}</h3><p class="notice">Terrain preview unavailable: ${esc(doc.map.reason)}</p><p>Conditional terrain needs an explicit game-state value. Unsupported circle paths remain unavailable. No state is assumed.</p>${definitions(doc)}</section>`;
     const model = view.model, chosen = currentTarget(view), editable = canEdit(view, chosen), pending = ((_d = view.pending) == null ? void 0 : _d.revision) === model.revision && view.pending.signature === JSON.stringify(model.values()) ? view.pending : null;
-    const options = [...doc.map.commands.filter((c) => "x" in c).map((c) => [targetKey("command", c), `${c.name || "Command"} ${hex6(c.offset)}${c.editable ? "" : " · read-only"}`]), ...doc.objects.map((n) => [targetKey("npc", n), objectName(doc.room, n) + (n.editable ? "" : " · conditional/read-only")]), ...doc.arrivals.map((a) => [targetKey("arrival", a), `Arrival ${a.table} ${hex6(a.id)}`])];
+    const options = [...doc.map.commands.filter((c) => "x" in c).map((c) => [targetKey("command", c), `${c.name || "Command"} ${hex7(c.offset)}${c.editable ? "" : " · read-only"}`]), ...doc.objects.map((n) => [targetKey("npc", n), objectName(doc.room, n) + (n.editable ? "" : " · conditional/read-only")]), ...doc.arrivals.map((a) => [targetKey("arrival", a), `Arrival ${a.table} ${hex7(a.id)}`])];
     const form = chosen ? `<aside class="card game-map-inspector"><h3>${chosen.kind === "npc" ? esc(objectName(doc.room, chosen.entity)) : chosen.kind === "arrival" ? "Arrival position" : "Existing terrain command"}</h3>${select("maps-target", "Selection", options, view.selection)}<div class="field-row">${field("maps-x", "X · 0–63", chosen.entity.x, { type: "number", min: 0, readonly: !editable })}${field("maps-y", "Y · 0–63", chosen.entity.y, { type: "number", min: 0, readonly: !editable })}${chosen.kind === "command" && "tile" in chosen.entity ? field("maps-tile", "Tile · 0–63", chosen.entity.tile, { type: "number", min: 0, readonly: !editable }) : ""}</div>${chosen.kind === "npc" ? `<p class="notice">NPCs are stored definitions. Their conditions may hide them in Playtest.${chosen.entity.event === 274 ? " Mother participates in the opening story. Moving her can affect the narrative; playtest the full conversation." : ""}</p>` : ""}${chosen.kind === "command" ? `<p>${chosen.entity.final_cells || 0} final terrain cells currently come from this command. Later commands can overwrite its drawing.</p><p>Edits preserve collision behavior, region bits and existing trigger bindings. Changes that fail these checks are refused.</p>` : ""}${chosen.kind === "arrival" ? "<p>Changes only the arrival position. Destination, facing and packed flags stay protected. Enter through its real door when playtesting.</p>" : ""}${button("Stage position / tile", "maps-stage", { disabled: !editable, reason: "This definition is read-only; writable scope is the initial shared atlas." })}</aside>` : "<p>Select an existing terrain command, NPC definition or arrival.</p>";
-    return browser + `<section class="card game-map-workbench"><h3>${header === 18539 ? "Opening bedroom / shared interiors" : esc(doc.room.label)}</h3><p>Terrain ${hex6(doc.room.map_pointer)} · shared by ${doc.room.shared_headers.map(hex6).join(", ")}. A terrain edit affects every listed definition.</p>${!doc.map.palette ? '<p class="notice">Color-index grayscale preview. This room’s live palette has not been verified.</p>' : ""}<div class="field-row">${select("maps-mode", "Canvas tool", [["inspect", "Inspect terrain command"], ["place", "Place selected definition"]], view.mode)}${button(view.overview ? "Return to readable crop" : "Show full overview", "maps-overview")}${button("Left", "maps-pan", { id: "-8,0" })}${button("Right", "maps-pan", { id: "8,0" })}${button("Up", "maps-pan", { id: "0,-6" })}${button("Down", "maps-pan", { id: "0,6" })}</div><div class="level-editor-layout game-map-layout"><div><div class="preview-pair game-map-previews"><div><span>Original for this edit · selected ROM</span><canvas id="maps-original" aria-label="Original decoded game terrain"></canvas></div><div><span>${(pending == null ? void 0 : pending.result.preview_map) ? "Reviewed terrain · exact planned bytes" : "Staged placement overlay"}</span><canvas id="maps-edit" tabindex="0" aria-label="Decoded game map: inspect or place selected definition"></canvas></div></div><p id="maps-position" role="status">Readable crop around (${view.center.join(", ")}). NPC and arrival markers are outlines, not character artwork.</p><p>${(pending == null ? void 0 : pending.result.preview_map) ? "The reviewed terrain comes from the server’s bounded decoder." : "Placement outlines show staged coordinates. Review computes exact terrain, including restored and overwritten cells."}</p></div>${form}</div><div class="actions">${button("Undo staged edit", "maps-undo", { disabled: !model.past.length })}${button("Redo staged edit", "maps-redo", { disabled: !model.future.length })}${button("Clear staged edits", "maps-clear", { disabled: !model.values().length })}${button("Review map changes", "maps-review", { disabled: !model.values().length, primary: !pending })}</div><p>${model.values().length} staged records. The selected ROM remains unchanged.</p>${pending ? review(pending.result) : ""}${definitions(doc)}</section>`;
+    return browser + `<section class="card game-map-workbench"><h3>${header === 18539 ? "Opening bedroom / shared interiors" : esc(doc.room.label)}</h3><p>Terrain ${hex7(doc.room.map_pointer)} · shared by ${doc.room.shared_headers.map(hex7).join(", ")}. A terrain edit affects every listed definition.</p>${!doc.map.palette ? '<p class="notice">Color-index grayscale preview. This room’s live palette has not been verified.</p>' : ""}<div class="field-row">${select("maps-mode", "Canvas tool", [["inspect", "Inspect terrain command"], ["place", "Place selected definition"]], view.mode)}${button(view.overview ? "Return to readable crop" : "Show full overview", "maps-overview")}${button("Left", "maps-pan", { id: "-8,0" })}${button("Right", "maps-pan", { id: "8,0" })}${button("Up", "maps-pan", { id: "0,-6" })}${button("Down", "maps-pan", { id: "0,6" })}</div><div class="level-editor-layout game-map-layout"><div><div class="preview-pair game-map-previews"><div><span>Original for this edit · selected ROM</span><canvas id="maps-original" aria-label="Original decoded game terrain"></canvas></div><div><span>${(pending == null ? void 0 : pending.result.preview_map) ? "Reviewed terrain · exact planned bytes" : "Staged placement overlay"}</span><canvas id="maps-edit" tabindex="0" aria-label="Decoded game map: inspect or place selected definition"></canvas></div></div><p id="maps-position" role="status">Readable crop around (${view.center.join(", ")}). NPC and arrival markers are outlines, not character artwork.</p><p>${(pending == null ? void 0 : pending.result.preview_map) ? "The reviewed terrain comes from the server’s bounded decoder." : "Placement outlines show staged coordinates. Review computes exact terrain, including restored and overwritten cells."}</p></div>${form}</div><div class="actions">${button("Undo staged edit", "maps-undo", { disabled: !model.past.length })}${button("Redo staged edit", "maps-redo", { disabled: !model.future.length })}${button("Clear staged edits", "maps-clear", { disabled: !model.values().length })}${button("Review map changes", "maps-review", { disabled: !model.values().length, primary: !pending })}</div><p>${model.values().length} staged records. The selected ROM remains unchanged.</p>${pending ? review(pending.result) : ""}${definitions(doc)}</section>`;
   }
   function definitions(doc) {
-    return `<details><summary>NPC conditions and interactions</summary><p>These records are conditional definitions, not a list of characters guaranteed to be visible now. Interaction destinations remain read-only.</p><table><thead><tr><th>NPC definition</th><th>Position</th><th>Condition</th></tr></thead><tbody>${doc.objects.map((n) => `<tr><td>${esc(objectName(doc.room, n))}</td><td>${n.x}, ${n.y}</td><td>${esc(n.state_status || "Live condition unobserved")}</td></tr>`).join("")}</tbody></table><table><thead><tr><th>Interaction</th><th>Destination</th></tr></thead><tbody>${doc.links.map((l) => `<tr><td>${l.index}</td><td>${l.transition.kind === "saved-return" ? "Saved return to the previous location" : l.destination ? `Room ${esc(hex6(l.destination.header))} · ${l.destination.x}, ${l.destination.y}` : `Event reference ${esc(hex6(l.word))} · not a direct room destination`}</td></tr>`).join("")}</tbody></table></details>`;
+    return `<details><summary>NPC conditions and interactions</summary><p>These records are conditional definitions, not a list of characters guaranteed to be visible now. Interaction destinations remain read-only.</p><table><thead><tr><th>NPC definition</th><th>Position</th><th>Condition</th></tr></thead><tbody>${doc.objects.map((n) => `<tr><td>${esc(objectName(doc.room, n))}</td><td>${n.x}, ${n.y}</td><td>${esc(n.state_status || "Live condition unobserved")}</td></tr>`).join("")}</tbody></table><table><thead><tr><th>Interaction</th><th>Destination</th></tr></thead><tbody>${doc.links.map((l) => `<tr><td>${l.index}</td><td>${l.transition.kind === "saved-return" ? "Saved return to the previous location" : l.destination ? `Room ${esc(hex7(l.destination.header))} · ${l.destination.x}, ${l.destination.y}` : `Event reference ${esc(hex7(l.word))} · not a direct room destination`}</td></tr>`).join("")}</tbody></table></details>`;
   }
   function review(plan) {
-    return `<section class="game-review"><h3>Review map changes</h3><p>${plan.edits.length} checked byte spans${plan.integrity_edit_count ? ` including ${plan.integrity_edit_count} integrity updates` : ""}. A separate build needs its own door and story playtests.</p><details><summary>Exact changed bytes</summary><table><thead><tr><th>Offset</th><th>Before</th><th>After</th></tr></thead><tbody>${plan.edits.map((e) => `<tr><td>${hex6(e.offset)}</td><td><code>${esc(e.before)}</code></td><td><code>${esc(e.after)}</code></td></tr>`).join("")}</tbody></table></details>${button("Create separate map build", "maps-build", { primary: true })}</section>`;
+    return `<section class="game-review"><h3>Review map changes</h3><p>${plan.edits.length} checked byte spans${plan.integrity_edit_count ? ` including ${plan.integrity_edit_count} integrity updates` : ""}. A separate build needs its own door and story playtests.</p><details><summary>Exact changed bytes</summary><table><thead><tr><th>Offset</th><th>Before</th><th>After</th></tr></thead><tbody>${plan.edits.map((e) => `<tr><td>${hex7(e.offset)}</td><td><code>${esc(e.before)}</code></td><td><code>${esc(e.after)}</code></td></tr>`).join("")}</tbody></table></details>${button("Create separate map build", "maps-build", { primary: true })}</section>`;
   }
   function mountGameMaps(ctx2) {
     var _a, _b, _c, _d;
@@ -9044,6 +9416,11 @@ ${font ? `<section class="card"><h3>Font metrics · ${esc(font.id)}</h3><div cla
     const scope = selectionKey(state2), current2 = () => scope === selectionKey(state2), saved = (_a = state2.artifact.descriptors) == null ? void 0 : _a.levels;
     if (((_b = state2.connectedLevelJump) == null ? void 0 : _b.scope) === scope) {
       ctx2.setDraft("level-room", state2.connectedLevelJump.room);
+      if (state2.connectedLevelJump.collision) {
+        ctx2.setDraft("level-layer", "collision");
+        ctx2.setDraft("level-overlay", "collision");
+        ctx2.setDraft("level-tool", "paint");
+      }
       state2.connectedLevelJump = null;
     }
     let doc = state2.results["levels.inspect"];
@@ -9264,6 +9641,26 @@ ${font ? `<section class="card"><h3>Font metrics · ${esc(font.id)}</h3><div cla
     render: () => render16
   });
 
+  // romancer/ui/music_instruments.js
+  function instrumentDetails(ctx2, song) {
+    var _a;
+    if (!["wl4-m4a-v1", "wl4-m4a-v2"].includes(song == null ? void 0 : song.driver)) return "";
+    const ids = [...new Set(song.events.map((e) => e.instrument).filter(Number.isSafeInteger))].sort((a, b) => a - b);
+    if (!ids.length) return "";
+    const { state: state2 } = ctx2, page = state2.page, scope = selectionKey(state2), params = { ...ctx2.sourceParams() }, current2 = () => selectionKey(state2) === scope && state2.page === page;
+    const r = ((_a = state2.soundInstrument) == null ? void 0 : _a.scope) === scope && state2.soundInstrument.result.song_id === song.id ? state2.soundInstrument.result : null;
+    ctx2.use({ "music-instrument-inspect": async () => {
+      const value = read("music-instrument").trim(), id = Number(value);
+      if (!current2() || !value || !ids.includes(id)) throw Error("Choose an instrument used by this decoded song.");
+      const result = await ctx2.run("sound.instrument", { ...params, song_id: song.id, instrument: id }, { render: false, refresh: false });
+      if (!current2()) return;
+      if (!result.ok || result.source_sha256 !== state2.artifact.sha256 || result.artifact_id !== state2.artifact.artifact_id) throw Error(result.error || "Instrument source changed.");
+      state2.soundInstrument = { scope, result };
+      return ctx2.render();
+    } });
+    return `<details class="music-instruments" ${r ? "open" : ""}><summary>Instruments used by this song</summary><div class="actions">${select("music-instrument", "Instrument number", ids.map((i) => [i, "Instrument " + i]), ctx2.draft("music-instrument", String(ids[0])))}${button("Inspect instrument", "music-instrument-inspect")}</div>${r ? `<h4>${esc(r.type_name)} · ${r.instrument}</h4><p>Read-only · ${esc(r.status)} · file0x${r.offset.toString(16)}</p><dl><dt>Base key</dt><dd>${r.key}</dd>${r.envelope ? Object.entries(r.envelope).map(([k, v]) => `<dt>${esc(k)}</dt><dd>${v}</dd>`).join("") : ""}${r.wave ? `<dt>Wave data</dt><dd>${esc(r.wave.format)} · file0x${r.wave.offset.toString(16)} · ${r.wave.length} bytes</dd>` : ""}</dl>${r.reason ? `<p class="notice">${esc(r.reason)}</p>` : ""}<p>${esc(r.scope)}</p>` : ""}</details>`;
+  }
+
   // romancer/ui/sound_preview.js
   var WavPreview = class {
     constructor(urls = { create: (blob) => URL.createObjectURL(blob), revoke: (url) => URL.revokeObjectURL(url) }) {
@@ -9358,7 +9755,7 @@ ${font ? `<section class="card"><h3>Font metrics · ${esc(font.id)}</h3><div cla
     if (change.kind !== "note" || change.song_id !== song.id || change.field !== field2) return false;
     if (change.index === index) return true;
     const offset = (_b = (_a = song.events[index]) == null ? void 0 : _a.edit_offsets) == null ? void 0 : _b[field2];
-    return song.driver === "wl4-m4a-v1" && Number.isSafeInteger(offset) && ((_d = (_c = song.events[change.index]) == null ? void 0 : _c.edit_offsets) == null ? void 0 : _d[field2]) === offset;
+    return ["wl4-m4a-v1", "wl4-m4a-v2"].includes(song.driver) && Number.isSafeInteger(offset) && ((_d = (_c = song.events[change.index]) == null ? void 0 : _c.edit_offsets) == null ? void 0 : _d[field2]) === offset;
   }
   function soundEventValue(song, changes, index, field2) {
     var _a;
@@ -9366,8 +9763,8 @@ ${font ? `<section class="card"><h3>Font metrics · ${esc(font.id)}</h3><div cla
   }
   function stageNote(doc, changes, songId, index, field2, value) {
     var _a, _b;
-    const song = doc.songs.find((s) => s.id === songId), bounds2 = (song == null ? void 0 : song.driver) === "wl4-m4a-v1" ? { note: [0, 127], volume: [0, 127], channel_volume: [0, 127], tempo: [1, 127] } : { note: [33, 108], duration: [1, 6e3], volume: [0, 127] };
-    if ((song == null ? void 0 : song.driver) === "wl4-m4a-v1" && (!song.sequence_edit_supported || !((_b = (_a = song.events[index]) == null ? void 0 : _a.editable_fields) == null ? void 0 : _b.includes(field2)))) throw Error("This value is inherited, protected or read-only. Choose an explicit editable event.");
+    const song = doc.songs.find((s) => s.id === songId), bounds2 = ["wl4-m4a-v1", "wl4-m4a-v2"].includes(song == null ? void 0 : song.driver) ? { note: [0, 127], volume: [0, 127], channel_volume: [0, 127], tempo: [1, 127], pan: [0, 127] } : { note: [33, 108], duration: [1, 6e3], volume: [0, 127] };
+    if (["wl4-m4a-v1", "wl4-m4a-v2"].includes(song == null ? void 0 : song.driver) && (!song.sequence_edit_supported || !((_b = (_a = song.events[index]) == null ? void 0 : _a.editable_fields) == null ? void 0 : _b.includes(field2)))) throw Error("This value is inherited, protected or read-only. Choose an explicit editable event.");
     if (!song || !Number.isInteger(index) || index < 0 || index >= song.events.length || !bounds2[field2] || !Number.isInteger(value) || value < bounds2[field2][0] || value > bounds2[field2][1]) throw Error("Choose a supported song field and an in-range value.");
     const result = changes.filter((change) => !sameOperand(song, change, index, field2));
     if (value !== song.events[index][field2]) result.push({ kind: "note", song_id: songId, index, field: field2, value });
@@ -9387,7 +9784,7 @@ ${font ? `<section class="card"><h3>Font metrics · ${esc(font.id)}</h3><div cla
       if (seen.has(key3)) throw Error("Saved audio edits contain duplicate changes.");
       seen.add(key3);
       const song = c.kind === "note" ? doc.songs.find((song2) => song2.id === c.song_id) : null;
-      if ((song == null ? void 0 : song.driver) === "wl4-m4a-v1" && result.some((change) => sameOperand(song, change, c.index, c.field))) throw Error("Saved audio edits contain duplicate shared-pattern changes.");
+      if (["wl4-m4a-v1", "wl4-m4a-v2"].includes(song == null ? void 0 : song.driver) && result.some((change) => sameOperand(song, change, c.index, c.field))) throw Error("Saved audio edits contain duplicate shared-pattern changes.");
       if (c.kind === "note") result = stageNote(doc, result, c.song_id, c.index, c.field, c.value);
       else if (c.kind === "sample") {
         if (!doc.samples.some((s) => s.id === c.sample_id) || !["gain", "reverse", "silence", "replace_wav"].includes(c.operation)) throw Error("Saved audio edits reference an unsupported sample.");
@@ -9462,11 +9859,11 @@ ${font ? `<section class="card"><h3>Font metrics · ${esc(font.id)}</h3><div cla
   }
   function musicSequenceControls(ctx2, song, changes) {
     var _a;
-    const m4a = song.driver === "wl4-m4a-v1", index = Math.min(Math.max(0, Number(ctx2.draft("sound-event", "0")) || 0), song.events.length - 1), event = song.events[index];
-    const labels2 = { note: "Note number", duration: "Duration ticks", volume: m4a ? "Note velocity" : "Volume", channel_volume: "Channel volume", tempo: "Tempo value (BPM ÷2)" };
+    const m4a = ["wl4-m4a-v1", "wl4-m4a-v2"].includes(song.driver), index = Math.min(Math.max(0, Number(ctx2.draft("sound-event", "0")) || 0), song.events.length - 1), event = song.events[index];
+    const labels2 = { pan: "Pan (0 left · 64 center · 127 right)", instrument: "Instrument (read-only)", note: "Note number", duration: "Duration ticks", volume: m4a ? "Note velocity" : "Volume", channel_volume: "Channel volume", tempo: "Tempo value (BPM ÷2)" };
     const editable = m4a ? (event == null ? void 0 : event.editable_fields) || [] : ["note", "duration", "volume"], choice = ctx2.draft("sound-note-field", "note"), name = editable.includes(choice) ? choice : editable[0];
     const events = m4a ? select("sound-event", "Event", song.events.map((e, i) => [i, "Track " + (e.channel + 1) + " · tick " + e.tick + " · " + e.kind + " · #" + i]), index) : field("sound-event", "Event index", ctx2.draft("sound-event", "0"));
-    return `<p>${esc(song.driver_scope)}</p>${((_a = song.issues) == null ? void 0 : _a.length) ? `<p class="notice">Read-only: ${song.issues.map(esc).join(" ")}</p>` : ""}<canvas id="music-note-canvas" class="music-note-canvas" width="1000" height="220" aria-label="Decoded notes: time increases to the right, pitch increases upward. Use Event to select a note."></canvas><p class="subtle">Click a note or choose Event. Yellow marks changed notes; outlined notes show the original pitch.</p><div class="field-row">${events}${select("sound-note-field", "Field", editable.map((name2) => [name2, labels2[name2]]), name)}${field("sound-note-value", "New value", ctx2.draft("sound-note-value", "") || String(event ? soundEventValue(song, changes, index, name) ?? 64 : 64))}</div>${button("Stage note edit", "sound-note-stage", { disabled: m4a && (!song.sequence_edit_supported || !editable.length), reason: "This song or event is read-only." })}${!m4a ? `<div class="field-row">${field("sound-transpose", "Transpose semitones", ctx2.draft("sound-transpose", "0"))}</div>${button("Transpose song", "sound-transpose")}` : ""}${button("Preview song & edits", "sound-song-preview", { primary: true })}<div class="table-wrap" tabindex="0" role="region" aria-label="Decoded music events"><table><thead><tr><th>Event</th>${m4a ? "<th>Track / tick</th><th>Type</th>" : ""}<th>Note</th><th>Ticks</th><th>Volume</th></tr></thead><tbody>${song.events.slice(0, 160).map((event2, index2) => `<tr><td>${index2}</td>${m4a ? `<td>${event2.channel + 1} / ${event2.tick}</td><td>${esc(event2.kind)}</td>` : ""}${["note", "duration", "volume"].map((field2) => `<td>${esc(soundEventValue(song, changes, index2, field2) ?? "—")}</td>`).join("")}</tr>`).join("")}</tbody></table></div>${song.events.length > 160 ? "<p>Showing160 events. Use Event above to select any decoded event.</p>" : ""}`;
+    return `<p>${esc(song.driver_scope)}</p>${((_a = song.issues) == null ? void 0 : _a.length) ? `<p class="notice">Read-only: ${song.issues.map(esc).join(" ")}</p>` : ""}<canvas id="music-note-canvas" class="music-note-canvas" width="1000" height="220" aria-label="Decoded notes: time increases to the right, pitch increases upward. Use Event to select a note."></canvas><p class="subtle">Click a note or choose Event. Yellow marks changed notes; outlined notes show the original pitch.</p><div class="field-row">${events}${select("sound-note-field", "Field", editable.map((name2) => [name2, labels2[name2]]), name)}${field("sound-note-value", "New value", ctx2.draft("sound-note-value", "") || String(event ? soundEventValue(song, changes, index, name) ?? 64 : 64))}</div>${button("Stage note edit", "sound-note-stage", { disabled: m4a && (!song.sequence_edit_supported || !editable.length), reason: "This song or event is read-only." })}${!m4a ? `<div class="field-row">${field("sound-transpose", "Transpose semitones", ctx2.draft("sound-transpose", "0"))}</div>${button("Transpose song", "sound-transpose")}` : ""}${button("Preview song & edits", "sound-song-preview", { primary: true })}<details><summary>Decoded event list (${song.events.length} events)</summary><div class="table-wrap" tabindex="0" role="region" aria-label="Decoded music events"><table><thead><tr><th>Event</th>${m4a ? "<th>Track / tick</th><th>Type</th>" : ""}<th>Note</th><th>Ticks</th><th>Volume</th></tr></thead><tbody>${song.events.slice(0, 160).map((event2, index2) => `<tr><td>${index2}</td>${m4a ? `<td>${event2.channel + 1} / ${event2.tick}</td><td>${esc(event2.kind)}</td>` : ""}${["note", "duration", "volume"].map((field2) => `<td>${esc(soundEventValue(song, changes, index2, field2) ?? "—")}</td>`).join("")}</tr>`).join("")}</tbody></table></div>${song.events.length > 160 ? "<p>Showing160 events. Use Event above to select any decoded event.</p>" : ""}</details>`;
   }
 
   // romancer/ui/views/sound.js
@@ -9519,7 +9916,7 @@ ${font ? `<section class="card"><h3>Font metrics · ${esc(font.id)}</h3><div cla
     if (ownsPreview(ctx2, owned)) await ctx2.render();
   }
   async function render16(ctx2) {
-    var _a, _b, _c, _d, _e;
+    var _a, _b, _c, _d, _e, _f;
     const setupReview = useResearchSetup(ctx2, "sound");
     if (setupReview) return setupReview;
     const { state: state2 } = ctx2;
@@ -9556,8 +9953,17 @@ ${font ? `<section class="card"><h3>Font metrics · ${esc(font.id)}</h3><div cla
       state2.pending = null;
       clearPreview(state2);
     };
+    if (((_e = state2.connectedSoundJump) == null ? void 0 : _e.scope) === scope) {
+      const jump = state2.connectedSoundJump;
+      if (doc == null ? void 0 : doc.songs.some((s) => s.id === jump.song_id)) {
+        ctx2.setDraft("sound-song", jump.song_id);
+        ctx2.setDraft("sound-event", String(jump.event || 0));
+        ctx2.setDraft("sound-note-value", "");
+      }
+      state2.connectedSoundJump = null;
+    }
     const sample = (doc == null ? void 0 : doc.samples.find((s) => s.id === ctx2.draft("sound-sample", ""))) || (doc == null ? void 0 : doc.samples[0]), song = (doc == null ? void 0 : doc.songs.find((s) => s.id === ctx2.draft("sound-song", ""))) || (doc == null ? void 0 : doc.songs[0]);
-    const preview = (kind, id) => previewSound(ctx2, doc, kind, id);
+    const preview2 = (kind, id) => previewSound(ctx2, doc, kind, id);
     ctx2.use({
       "sound-inspect": () => ctx2.run("sound.inspect", { ...params, definition: json("sound-definition") }),
       "sound-save": () => ctx2.run("studio.definition", { ...params, kind: "sound", definition: json("sound-definition") }),
@@ -9584,16 +9990,16 @@ ${font ? `<section class="card"><h3>Font metrics · ${esc(font.id)}</h3><div cla
           return;
         }
         persist([...latest.filter((c) => !(c.kind === "sample" && c.sample_id === sample.id)), change]);
-        return preview("sample", sample.id);
+        return preview2("sample", sample.id);
       },
       "sound-note-stage": () => {
         if (!song) throw Error("No supported music driver is identified for this source.");
         persist(stageNote(doc, restoreSoundChanges(doc, ctx2.draft("sound-changes", "{}")), song.id, Number(read("sound-event")), read("sound-note-field"), Number(read("sound-note-value"))));
-        return preview("song", song.id);
+        return preview2("song", song.id);
       },
       "sound-transpose": () => {
         var _a2;
-        if (!song || song.driver === "wl4-m4a-v1") throw Error("Shared M4A patterns require individual explicit edits.");
+        if (!song || ["wl4-m4a-v1", "wl4-m4a-v2"].includes(song.driver)) throw Error("Shared M4A patterns require individual explicit edits.");
         const shift = Number(read("sound-transpose"));
         if (!Number.isInteger(shift) || Math.abs(shift) > 24) throw Error("Transpose by at most24semitones.");
         let next = changes;
@@ -9602,10 +10008,10 @@ ${font ? `<section class="card"><h3>Font metrics · ${esc(font.id)}</h3><div cla
           next = stageNote(doc, next, song.id, i, "note", note + shift);
         }
         persist(next);
-        return preview("song", song.id);
+        return preview2("song", song.id);
       },
-      "sound-sample-preview": () => preview("sample", sample == null ? void 0 : sample.id),
-      "sound-song-preview": () => preview("song", song == null ? void 0 : song.id),
+      "sound-sample-preview": () => preview2("sample", sample == null ? void 0 : sample.id),
+      "sound-song-preview": () => preview2("song", song == null ? void 0 : song.id),
       "sound-capture": async () => {
         clearPreview(state2);
         const generation = state2.soundPreviewGeneration;
@@ -9656,9 +10062,9 @@ ${font ? `<section class="card"><h3>Font metrics · ${esc(font.id)}</h3><div cla
         return ctx2.render();
       }
     });
-    const hardware = system2.hardware, driver = system2.driver, packet = visiblePreview(ctx2), previewRequest = ownsPreview(ctx2, state2.soundPreviewRequest) ? state2.soundPreviewRequest : null, pending = ((_e = state2.pending) == null ? void 0 : _e.kind) === "sound" && state2.pending.document_id === (doc == null ? void 0 : doc.document_id);
+    const hardware = system2.hardware, driver = system2.driver, packet = visiblePreview(ctx2), previewRequest = ownsPreview(ctx2, state2.soundPreviewRequest) ? state2.soundPreviewRequest : null, pending = ((_f = state2.pending) == null ? void 0 : _f.kind) === "sound" && state2.pending.document_id === (doc == null ? void 0 : doc.document_id);
     const setup2 = `<details class="card" ${!doc ? "open" : ""}><summary>Supported sample setup</summary><p>Use a verified sample offset and allocation. A valid codec does not identify a sample's location, rate, loop or instrument.</p><div class="field-row">${field("sound-name", "Sample name", ctx2.draft("sound-name", "Sample"))}${field("sound-offset", "File offset", ctx2.draft("sound-offset", "0"))}${field("sound-length", "Allocated bytes", ctx2.draft("sound-length", "16"))}${select("sound-codec", "Sample format", Object.entries(codecNames), ctx2.draft("sound-codec", hardware.sample_formats[0]))}${field("sound-rate", "Preview sample rate (Hz)", ctx2.draft("sound-rate", "16000"))}${field("sound-initial", "DPCM initial level", ctx2.draft("sound-initial", "64"))}</div>${button("Check declared sample", "sound-declare")}${jsonEditor("sound-definition", "Source-bound sound definition", ctx2.draft("sound-definition", JSON.stringify((doc == null ? void 0 : doc.definition) || saved || {}, null, 2)))}<div class="actions">${button("Inspect definition", "sound-inspect")}${button("Save checked definition", "sound-save")}</div></details>`;
-    return `${heading("", "Music & sound", "")}${editCheckControls(ctx2)}<div class="identity"><strong>${esc(state2.artifact.name)}</strong><span>${changes.length} staged changes</span></div>${draftError ? `<p class="notice warm">${esc(draftError)} ${button("Discard saved audio edits", "sound-discard")}</p>` : ""}<div class="grid-two"><section class="card"><h3>${esc(hardware.name)}</h3><p>${hardware.channels.map(esc).join(" · ")}</p><p><strong>Music driver: ${esc(driver.name)}</strong></p><p>${esc(driver.status === "UNKNOWN" ? "Unknown driver: sequence editing unavailable." : driver.evidence)}</p><details><summary>Hardware and driver references</summary><p>${esc(hardware.notes)}</p>${[...hardware.references, ...driver.reference ? [driver.reference] : []].map((url) => `<p><a href="${esc(url)}" target="_blank" rel="noopener noreferrer">${esc(new URL(url).hostname)} reference</a></p>`).join("")}</details></section><section class="card"><h3>Native game audio</h3><p>Load this source in Playtest, reach the music or sound you want, then record its mixed output here.</p>${field("sound-frames", "Frames to record (1–300)", ctx2.draft("sound-frames", "120"), { type: "number", min: 1 })}${button("Record native preview", "sound-capture", { primary: !doc, disabled: !state2.runtime || state2.runtime.game_sha256 !== state2.artifact.sha256 })}${button("Open Playtest", "navigate", { id: "playtest" })}</section></div>${(previewRequest == null ? void 0 : previewRequest.status) === "loading" ? '<section class="card"><p class="preview-caption" role="status">Decoding original and edited audio…</p></section>' : (previewRequest == null ? void 0 : previewRequest.status) === "error" ? `<section class="card"><p class="error" role="status">Preview unavailable: ${esc(previewRequest.message)}</p></section>` : ""}${packet ? `<section class="card"><h3>Audio preview</h3>${packet.comparison ? `<div class="preview-pair"><div><span>Original</span><canvas id="original-waveform" width="720" height="140" style="display:block;width:100%;height:auto" aria-label="Original decoded audio waveform"></canvas></div><div><span>Edited</span><canvas id="edited-waveform" width="720" height="140" style="display:block;width:100%;height:auto" aria-label="Edited decoded audio waveform"></canvas></div></div><p class="preview-caption" role="status">${packet.comparison.changed ? "Preview updated · decoded audio changed · not built" : "Unchanged decoded audio preview"} · ${packet.kind === "sample" ? "Sample" : "Song reference"} · ${esc(packet.resource_id)}</p>` : ""}<audio id="sound-player" controls preload="metadata" aria-label="Sound preview play, pause and seek"></audio><div class="actions">${button("Toggle loop", "sound-loop")}${button("Save preview WAV", "sound-export-preview")}</div><p>${esc(packet.preview_scope)}${packet.truncated ? " Preview shortened to20seconds." : ""}</p><p>${packet.sample_frames} frames · ${packet.sample_rate}Hz${packet.channels ? " · " + packet.channels + " channels" : ""}</p></section>` : ""}${doc ? `<div class="grid-two ${doc.samples.length ? "" : "sound-song-only"}"><section class="card"><h3>Samples</h3>${sample ? `${select("sound-sample", "Sample", doc.samples.map((s) => [s.id, s.name]), sample.id)}<span>Original sample</span><canvas id="sample-waveform" width="720" height="140" aria-label="Original decoded sample waveform"></canvas><p>${sample.sample_count} samples · ${sample.duration_seconds.toFixed(3)}s · ${esc(sample.codec)}</p><div class="field-row">${select("sound-operation", "Edit", [["gain", "Set gain"], ["reverse", "Reverse"], ["silence", "Silence target"], ["replace_wav", "Replace from WAV"]], ctx2.draft("sound-operation", "gain"))}${field("sound-gain", "Gain (%)", ctx2.draft("sound-gain", "100"))}</div><label class="field"><span>Replacement PCM WAV, up to2MiB</span><input type="file" id="sound-wav" accept=".wav,audio/wav"></label><div class="actions">${button("Stage sample edit", "sound-sample-stage")}${button("Preview sample & edits", "sound-sample-preview", { primary: true })}</div><p>${sample.encoding_lossy ? "Re-encoding is lossy; preview and native-test the resulting build." : "Edits preserve the declared byte allocation."}</p>` : "<p>No sample storage declared.</p>"}</section><section class="card"><h3>Music sequences</h3>${song ? `${select("sound-song", "Identified song", doc.songs.map((s) => [s.id, s.name]), song.id)}${musicSequenceControls(ctx2, song, changes)}` : "<p>No supported sequence driver is identified. Native music recording and supported sample formats remain available.</p>"}</section></div><section class="card"><div class="actions">${button("Review sound changes", "sound-plan", { primary: !pending, disabled: !changes.length })}${pending ? button("Create sound build", "sound-build", { primary: true }) : ""}${button("Discard sound edits", "sound-discard", { disabled: !changes.length })}</div></section>` : ""}${setup2}${report(state2.results["sound.plan"], "Sound review")}`;
+    return `${heading("", "Music & sound", "")}${editCheckControls(ctx2)}<div class="identity"><strong>${esc(state2.artifact.name)}</strong><span>${changes.length} staged changes</span></div>${draftError ? `<p class="notice warm">${esc(draftError)} ${button("Discard saved audio edits", "sound-discard")}</p>` : ""}<div class="grid-two"><section class="card"><h3>${esc(hardware.name)}</h3><p>${hardware.channels.map(esc).join(" · ")}</p><p><strong>Music driver: ${esc(driver.name)}</strong></p><p>${esc(driver.status === "UNKNOWN" ? "Unknown driver: sequence editing unavailable." : driver.evidence)}</p><details><summary>Hardware and driver references</summary><p>${esc(hardware.notes)}</p>${[...hardware.references, ...driver.reference ? [driver.reference] : []].map((url) => `<p><a href="${esc(url)}" target="_blank" rel="noopener noreferrer">${esc(new URL(url).hostname)} reference</a></p>`).join("")}</details></section><section class="card"><h3>Native game audio</h3><p>Load this source in Playtest, reach the music or sound you want, then record its mixed output here.</p>${field("sound-frames", "Frames to record (1–300)", ctx2.draft("sound-frames", "120"), { type: "number", min: 1 })}${button("Record native preview", "sound-capture", { primary: !doc, disabled: !state2.runtime || state2.runtime.game_sha256 !== state2.artifact.sha256 })}${button("Open Playtest", "navigate", { id: "playtest" })}</section></div>${(previewRequest == null ? void 0 : previewRequest.status) === "loading" ? '<section class="card"><p class="preview-caption" role="status">Decoding original and edited audio…</p></section>' : (previewRequest == null ? void 0 : previewRequest.status) === "error" ? `<section class="card"><p class="error" role="status">Preview unavailable: ${esc(previewRequest.message)}</p></section>` : ""}${packet ? `<section class="card"><h3>Audio preview</h3>${packet.comparison ? `<div class="preview-pair"><div><span>Original</span><canvas id="original-waveform" width="720" height="140" style="display:block;width:100%;height:auto" aria-label="Original decoded audio waveform"></canvas></div><div><span>Edited</span><canvas id="edited-waveform" width="720" height="140" style="display:block;width:100%;height:auto" aria-label="Edited decoded audio waveform"></canvas></div></div><p class="preview-caption" role="status">${packet.comparison.changed ? "Preview updated · decoded audio changed · not built" : "Unchanged decoded audio preview"} · ${packet.kind === "sample" ? "Sample" : "Song reference"} · ${esc(packet.resource_id)}</p>` : ""}<audio id="sound-player" controls preload="metadata" aria-label="Sound preview play, pause and seek"></audio><div class="actions">${button("Toggle loop", "sound-loop")}${button("Save preview WAV", "sound-export-preview")}</div><p>${esc(packet.preview_scope)}${packet.truncated ? " Preview shortened to20seconds." : ""}</p><p>${packet.sample_frames} frames · ${packet.sample_rate}Hz${packet.channels ? " · " + packet.channels + " channels" : ""}</p></section>` : ""}${doc ? `<div class="grid-two ${doc.samples.length ? "" : "sound-song-only"}"><section class="card"><h3>Samples</h3>${sample ? `${select("sound-sample", "Sample", doc.samples.map((s) => [s.id, s.name]), sample.id)}<span>Original sample</span><canvas id="sample-waveform" width="720" height="140" aria-label="Original decoded sample waveform"></canvas><p>${sample.sample_count} samples · ${sample.duration_seconds.toFixed(3)}s · ${esc(sample.codec)}</p><div class="field-row">${select("sound-operation", "Edit", [["gain", "Set gain"], ["reverse", "Reverse"], ["silence", "Silence target"], ["replace_wav", "Replace from WAV"]], ctx2.draft("sound-operation", "gain"))}${field("sound-gain", "Gain (%)", ctx2.draft("sound-gain", "100"))}</div><label class="field"><span>Replacement PCM WAV, up to2MiB</span><input type="file" id="sound-wav" accept=".wav,audio/wav"></label><div class="actions">${button("Stage sample edit", "sound-sample-stage")}${button("Preview sample & edits", "sound-sample-preview", { primary: true })}</div><p>${sample.encoding_lossy ? "Re-encoding is lossy; preview and native-test the resulting build." : "Edits preserve the declared byte allocation."}</p>` : "<p>No sample storage declared.</p>"}</section><section class="card"><h3>Music sequences</h3>${song ? `${select("sound-song", "Identified song", doc.songs.map((s) => [s.id, s.name]), song.id)}${musicSequenceControls(ctx2, song, changes)}${instrumentDetails(ctx2, song)}` : "<p>No supported sequence driver is identified. Native music recording and supported sample formats remain available.</p>"}</section></div><section class="card"><div class="actions">${button("Review sound changes", "sound-plan", { primary: !pending, disabled: !changes.length })}${pending ? button("Create sound build", "sound-build", { primary: true }) : ""}${button("Discard sound edits", "sound-discard", { disabled: !changes.length })}</div></section>` : ""}${setup2}${report(state2.results["sound.plan"], "Sound review")}`;
   }
   function mount12(ctx2) {
     var _a, _b, _c, _d;
