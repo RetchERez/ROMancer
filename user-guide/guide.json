@@ -20,7 +20,7 @@
         "Open <b>Help</b> for this guide. Start a workshop or import a ROM you supply. No AI account, subscription or API key is required."
       ],
       "result": "ROMancer opens its local interface and your project list. The full Windows edition selects a matching included engine when you load a supported system.",
-      "note": "Keep the complete folder when moving a portable copy. Moving the program does not by itself move the workspace or its projects.",
+      "note": "Development build: full visual editing of the catalog is not complete. Keep a portable folder intact; moving the app does not move projects.",
       "details": [
         {
           "title": "Update and recovery",
@@ -2054,7 +2054,7 @@
         "Choose <b>Review level changes</b>, inspect the exact changes, then <b>Create level build</b>. Visit the room and test walking, collision, boundaries and transitions."
       ],
       "result": "The preview and checked changes stay within declared grid/object ranges. Test the built game to establish movement, collision, boundaries and transitions; the static preview alone does not certify them.",
-      "note": "A visible wall is not automatically a collision wall. Labels, sprite assemblies and hitboxes come from a checked declaration; generic declarations do not prove gameplay behavior. If collision is not mapped, the editor says so. Only the implemented original runtime has the collision/combat behavior described in the linked practice procedure.",
+      "note": "A visible wall is not automatically a collision wall. Labels, sprite assemblies and hitboxes come from a checked declaration; generic declarations do not prove gameplay behavior. If collision is not mapped, the editor says so. Only the implemented original runtime has the collision/combat behavior described in the linked practice procedure. This editor supports declared rectangular tile grids. Isometric projection, heightmaps and 3D level editing are not implemented. The Immortal has no verified level definition. Declared collision labels still need native testing.",
       "details": [
         {
           "title": "Shared metatiles",

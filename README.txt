@@ -1,4 +1,4 @@
-ROMancer v1.0 final
+ROMancer v1.0 development build46
 By RetchEWretched
 
 Local ROM editing for NES, SNES, Genesis, Master System, Game Boy, Game Boy Color.
@@ -6,6 +6,28 @@ Master System support covers validated Sega headers, checksums, literal graphics
 declared text/byte edits, checked level layouts, patches and playtesting.
 Game-specific collision, music and actor behavior require verified definitions.
 Everyday use works offline. No AI account, model, API key or subscription is required.
+
+COVERAGE STATUS - NOT READY FOR UNIVERSAL v1.0 RELEASE
+
+This development build fixes a sound-definition guard that could allow samples
+inside an identified original driver's header or interrupt-vector region.
+
+Full visual editing of all1,035 catalog revisions is the release requirement.
+That requirement is not met. Four additional supplied showcase revisions bring
+the acceptance set to1,039 exact source identities. No revision is certified for
+full-game editing. Six built-in profiles provide specific, limited edits.
+
+The generic level editor handles declared rectangular tile/metatile grids.
+It has no isometric projection, heightmap or 3D level editor. The Immortal's
+verified Genesis edit is its new-game prompt; no level/object grammar is enabled.
+Sample previews and native audio capture do not imply editable commercial songs.
+Only the original practice music drivers currently have sequence editors.
+
+The offline facts catalog records measured identities and candidates. It is not
+1,035 decoded game engines or a complete compatibility certificate. Each editor
+and exact revision needs its own decode/writeback, original-preservation, visual
+preview and native gameplay evidence before universal release acceptance passes.
+Keep this build private for development and testing; do not publish it as complete.
 
 EDITING TASKS
 
@@ -143,7 +165,7 @@ and is also supplied separately with the release. It works offline.
 
 START ON WINDOWS
 
-1. Run ROMancer-v1.0-Setup.exe and follow the installation steps.
+1. Run ROMancer-v1.0-development-Setup.exe and follow the installation steps.
 2. Open the ROMancer desktop or Start menu shortcut.
    The Windows ZIP is also available: extract it fully and run Install ROMancer.cmd.
 3. Open an original workshop or choose New project and import your own cartridge image.
@@ -201,9 +223,9 @@ engine to its two-button pad: A and B are buttons 1 and 2, and Start sends Pause
 
 GITHUB RELEASE PREPARATION
 
-Use the tag v1.0.0 for the public ROMancer v1.0 release. The numeric 1.0.45 build
+Use the tag v1.0.0 for the public ROMancer v1.0 release. The numeric 1.0.46 build
 identifier is internal installer/update identity. Lead the release description
-with ROMancer-v1.0-Setup.exe, then the portable Windows ZIP, offline guide and
+with ROMancer-v1.0-development-Setup.exe, then the portable Windows ZIP, offline guide and
 walkthrough. Provide the source, engine pack, component notices and SHA256SUMS.
 The Windows packaging workflow downloads ROMancer-v1.0-Engines.zip from the
 repository's v1.0.0 release: attach that supplied engine pack to a draft release
