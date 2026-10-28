@@ -107,13 +107,24 @@ These files lack an embedded ROM hash and require source acknowledgement.
 
 HACK EXAMPLES
 
-ROMancer-v1.0-Hack-Examples.zip contains the recoverable distinct editing examples
-for the supplied commercial game revisions plus the original-workshop example.
-Apply each BPS to its exact original revision listed in the collection README
-and manifest. Keep originals and create separate builds. Examples/ contains
-current examples; Experiments/ preserves failed or superseded investigations,
-including the rejected split-blob prototype and one historical checksum failure.
-These experiments are not recommendations. No full commercial ROMs are included.
+ROMancer-v1.0-Hack-Examples.zip is the main collection: six selected examples,
+one per supported system. Each includes its required original SHA-256 and CRC32.
+- NES / Castlevania: a Simon sprite edit.
+- SNES / Chrono Trigger: Wood Sword power changed to 30.
+- Genesis / The Immortal: a start-prompt text edit with its checked game fix.
+- Master System / Rastan: single-blob enemy graphics.
+- Game Boy / Final Fantasy Legend II: move the opening bedroom stool.
+- Game Boy Color / Deja Vu I & II: change startup palette colors.
+
+Start with these six. Extract the ZIP, then use Export > Apply downloaded patch
+with the exact original revision from its README and manifest. Review the result
+and create a separate build. The guide explains patching, editing and playtesting.
+
+ROMancer-v1.0-Hack-Archive-Optional.zip preserves the other 41 patches: earlier
+versions, original-workshop tests and experiments. You do not need this archive
+to use ROMancer or follow the guide. Failed and superseded variants remain
+clearly labeled; they are not recommended showcase hacks. All 47 original patch
+files are preserved unchanged across the two ZIPs. No commercial ROMs are included.
 
 Rastan-Single-Blob-Enemies.bps is the current Rastan graphics example. It was
 created with ROMancer assets.plan and structured.apply, then recreated through
@@ -165,8 +176,8 @@ The original NES workshop covers visual editing, undo/redo, separate builds,
 native playback, save/load states, verified patch export and draft recovery.
 The native system checks cover NES, SNES, Genesis, Master System, Game Boy and
 Game Boy Color. Supplied commercial revisions have their own bounded evidence.
-The retained collection contains 47 distinct patches from 18 exact source
-identities. Independent reconstruction checks their recorded target hashes;
+The six-example showcase and optional 41-patch archive together retain all 47
+distinct patches from 18 exact source identities. Independent reconstruction checks their recorded target hashes;
 historical experiments retain their limitations and quarantine status.
 
 These are automated local checks, not a claim that every commercial game or edit
@@ -190,7 +201,7 @@ engine to its two-button pad: A and B are buttons 1 and 2, and Start sends Pause
 
 GITHUB RELEASE PREPARATION
 
-Use the tag v1.0.0 for the public ROMancer v1.0 release. The numeric 1.0.44 build
+Use the tag v1.0.0 for the public ROMancer v1.0 release. The numeric 1.0.45 build
 identifier is internal installer/update identity. Lead the release description
 with ROMancer-v1.0-Setup.exe, then the portable Windows ZIP, offline guide and
 walkthrough. Provide the source, engine pack, component notices and SHA256SUMS.

@@ -32,7 +32,7 @@
         },
         {
           "title": "Choose your route",
-          "text": "Beginner: use an original workshop and follow Your first edit. To try a supplied hack, apply its BPS patch to the exact original revision. Experienced user: declare resource layouts and review byte plans. Expert or AI client: use the same plans through the local API/MCP interface; successful decoding and gameplay evidence are still separate."
+          "text": "Beginner: use the included original workshop and follow Your first edit. To try an existing hack, start with the six-example ZIP: one each for NES, SNES, Genesis, Master System, Game Boy and Game Boy Color. The optional 41-patch archive is extra research material, not required reading. Experienced users and AI clients use the same reviewed plans through the editor or local API/MCP."
         }
       ],
       "related": [
@@ -1012,7 +1012,7 @@
       "title": "Apply a downloaded BPS or IPS patch safely",
       "part": "Basic",
       "kicker": "Exact source / compatibility preview / separate build",
-      "intro": "A patch describes a change to a particular source. A matching game title alone is insufficient.",
+      "intro": "A patch requires an exact source revision. Start with ROMancer-v1.0-Hack-Examples.zip: six examples, one per supported system. Its README lists each change and original hash; the separate 41-patch archive is optional.",
       "steps": [
         "On Export, expand <b>Apply a patch downloaded from someone else</b>. Choose the exact ROM the patch requires in the top bar, then select or drop its BPS or IPS patch.",
         "Under <b>Apply a downloaded patch</b>, choose or drop one BPS or IPS file. For IPS, enter the author's full-file reference: eight hexadecimal CRC32 digits or 64 SHA-256 digits. BPS checks embedded checksums.",
