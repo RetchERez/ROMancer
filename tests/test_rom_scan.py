@@ -12,6 +12,14 @@ from romancer.boot_fixtures import make_boot_fixture
 
 class RomScanTests(unittest.TestCase):
 
+    def test_disabled_automatic_scan_on_import_still_allows_explicit_scan(self):
+        self.result(self.source['scan'])
+        settings=self.api.dispatch('settings.get',{});saved=self.api.dispatch('settings.save',{'revision':settings['revision'],'values':{**settings['values'],'autoDeepScan':False}});self.assertTrue(saved['ok'],saved)
+        project=self.api.dispatch('project.create',{'name':'Manual analysis'})
+        source=self.api.dispatch('source.import',{'project_id':project['project_id'],'path':str(self.file),'system':None});self.assertTrue(source['ok'],source)
+        self.assertEqual(source['scan']['status'],'DISABLED');self.assertNotIn('job_id',source['scan'])
+        start=self.api.dispatch('rom.scan.start',{'project_id':project['project_id'],'artifact_id':source['artifact_id'],'rescan':False});self.assertTrue(self.result(start)['ok'])
+
 
     def setUp(self):
         self.tmp=tempfile.TemporaryDirectory();self.addCleanup(self.tmp.cleanup)

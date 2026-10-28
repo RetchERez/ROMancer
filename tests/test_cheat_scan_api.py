@@ -1,6 +1,7 @@
 """Original synthetic catalog and cartridge; no publisher data in fixtures."""
 from pathlib import Path
 import tempfile
+import time
 import unittest
 
 from romancer.workbench_api import WorkbenchAPI
@@ -40,6 +41,17 @@ class CheatScanAPITests(unittest.TestCase):
 
     def test_replacing_catalog_invalidates_signed_scan_cache(self):
         from romancer import rom_scan,workbench_projects
+        # Cache replacement during a stable-read check may correctly be a miss.
+        # Wait for the import job before testing catalog invalidation in isolation.
+        imported=self.source['scan']
+        if imported['status']=='RUNNING':
+            deadline=time.monotonic()+10
+            while True:
+                job=self.api.dispatch('jobs.get',{'job_id':imported['job_id']})
+                if job['status'] in ('COMPLETED','FAILED','CANCELLED','INTERRUPTED'):
+                    self.assertEqual(job['status'],'COMPLETED',job);break
+                self.assertLess(time.monotonic(),deadline,'automatic import scan did not finish')
+                time.sleep(.01)
         project=self.api.project({'project_id':self.project})
         row=workbench_projects.artifact(project,self.source['artifact_id'])
         rom_scan.run(project,row)

@@ -1167,7 +1167,9 @@ class WorkbenchAPI:
                     with projects.locked(self.project(p)) as value:
                         owned=next(row for row in value['sources'] if row['artifact_id']==result['artifact_id']);owned.setdefault('descriptors',{}).update(checked)
                     result['descriptors']=checked
-        try:result['scan']=self._scan_start({'project_id':p['project_id'],'artifact_id':result['artifact_id'],'rescan':False},c)
+        try:
+            from .app_settings import get_settings
+            result['scan']=self._scan_start({'project_id':p['project_id'],'artifact_id':result['artifact_id'],'rescan':False},c) if get_settings(self.workspace)['values']['autoDeepScan'] else {'status':'DISABLED'}
         except (ValueError,OSError,RuntimeError) as error:result['scan']={'status':'NOT_STARTED','reason':str(error)}
         return result
 
