@@ -2,23 +2,12 @@
 import re
 from .asset_schema import fields,number
 
-LIMITS={'nes':0xffff,'snes':0xffffff,'gb':0xffff,'gbc':0xffff,'gba':0xfffffff,'genesis':0xffffff,'sms':0xffff}
-PHYSICAL_DOMAINS={'nes':{'nesInternalRam':2047,'nesPrgRom':64*1024**2-1},
-    'snes':{'snesWorkRam':131071,'snesPrgRom':8*1024**2-1},
-    'gb':{'gbWorkRam':8191,'gbPrgRom':8*1024**2-1},
-    'gbc':{'gbWorkRam':32767,'gbPrgRom':8*1024**2-1},
-    'gba':{'gbaExtWorkRam':262143,'gbaIntWorkRam':32767,'gbaPrgRom':32*1024**2-1},
-    'genesis':{'genesisWorkRam':65535},'sms':{'smsPrgRom':4*1024**2-1,'smsWorkRam':8191,'smsVideoRam':16383,'smsPaletteRam':31}}
+LIMITS={'nes': 65535, 'snes': 16777215, 'gb': 65535, 'gbc': 65535, 'genesis': 16777215, 'sms': 65535}
+PHYSICAL_DOMAINS={'nes': {'nesInternalRam': 2047, 'nesPrgRom': 64 * 1024 ** 2 - 1}, 'snes': {'snesWorkRam': 131071, 'snesPrgRom': 8 * 1024 ** 2 - 1}, 'gb': {'gbWorkRam': 8191, 'gbPrgRom': 8 * 1024 ** 2 - 1}, 'gbc': {'gbWorkRam': 32767, 'gbPrgRom': 8 * 1024 ** 2 - 1}, 'genesis': {'genesisWorkRam': 65535}, 'sms': {'smsPrgRom': 4 * 1024 ** 2 - 1, 'smsWorkRam': 8191, 'smsVideoRam': 16383, 'smsPaletteRam': 31}}
 PHYSICAL_DOMAINS['nes'].update(nesChrRom=64*1024**2-1,nesChrRam=32767,nesSpriteRam=255,nesPaletteRam=31,nesNametableRam=4095)
 PHYSICAL_DOMAINS['snes'].update(snesVideoRam=65535,snesSpriteRam=543,snesCgRam=511)
 for _system in ('gb','gbc'):PHYSICAL_DOMAINS[_system].update(gbVideoRam=16383 if _system=='gbc' else 8191,gbSpriteRam=159,gbBgPaletteRam=63,gbObjPaletteRam=63)
-PHYSICAL_DOMAINS['gba'].update(gbaVideoRam=98303,gbaSpriteRam=1023,gbaPaletteRam=1023)
-BUTTONS={'nes':{'a','b','select','start','up','down','left','right'},
-    'snes':{'a','b','x','y','l','r','select','start','up','down','left','right'},
-    'gb':{'a','b','select','start','up','down','left','right'},
-    'gbc':{'a','b','select','start','up','down','left','right'},
-    'gba':{'a','b','l','r','select','start','up','down','left','right'},
-    'genesis':{'a','b','c','start','up','down','left','right'},'sms':{'one','two','pause','up','down','left','right'}}
+BUTTONS={'nes': {'a', 'b', 'select', 'start', 'up', 'down', 'left', 'right'}, 'snes': {'a', 'b', 'x', 'y', 'l', 'r', 'select', 'start', 'up', 'down', 'left', 'right'}, 'gb': {'a', 'b', 'select', 'start', 'up', 'down', 'left', 'right'}, 'gbc': {'a', 'b', 'select', 'start', 'up', 'down', 'left', 'right'}, 'genesis': {'a', 'b', 'c', 'start', 'up', 'down', 'left', 'right'}, 'sms': {'one', 'two', 'pause', 'up', 'down', 'left', 'right'}}
 
 
 def validate_capture(system,config):
@@ -53,27 +42,31 @@ def validate_capture(system,config):
     return {**config,'frames':total,'start_frame':config.get('start_frame',0)}
 
 
-def _rom_regions(raw,system):
+def _rom_regions(raw, system):
+
     class Reader:
-        identity={'size':len(raw)}
-        def read_at(self,start,length):return raw[start:start+length]
-    if system=='nes':
+        identity = {'size': len(raw)}
+
+        def read_at(self, start, length):
+            return raw[start:start + length]
+    if system == 'nes':
         from .system_formats.nes import candidates
-        layouts=[c for c in candidates(Reader()) if c['layout_valid']]
-        if len(layouts)!=1:return {}
-        names={'prg-rom':'nesPrgRom','chr-rom':'nesChrRom'}
-        return {names[r['id']]:(r['offset'],r['length']) for r in layouts[0]['regions'] if r['id'] in names}
-    if system=='snes':
+        layouts = [c for c in candidates(Reader()) if c['layout_valid']]
+        if len(layouts) != 1:
+            return {}
+        names = {'prg-rom': 'nesPrgRom', 'chr-rom': 'nesChrRom'}
+        return {names[r['id']]: (r['offset'], r['length']) for r in layouts[0]['regions'] if r['id'] in names}
+    if system == 'snes':
         from .system_formats.snes import candidates
-        layouts=[c for c in candidates(Reader()) if c['layout_valid']]
-        regions={(r['offset'],r['length']) for c in layouts for r in c['regions'] if r['id']=='rom'}
-        return {'snesPrgRom':next(iter(regions))} if len(regions)==1 else {}
-    if system in ('gb','gbc'):return {'gbPrgRom':(0,len(raw))}
-    if system=='gba':return {'gbaPrgRom':(0,len(raw))}
-    if system=='sms':
+        layouts = [c for c in candidates(Reader()) if c['layout_valid']]
+        regions = {(r['offset'], r['length']) for c in layouts for r in c['regions'] if r['id'] == 'rom'}
+        return {'snesPrgRom': next(iter(regions))} if len(regions) == 1 else {}
+    if system in ('gb', 'gbc'):
+        return {'gbPrgRom': (0, len(raw))}
+    if system == 'sms':
         from .system_formats.sms import candidates
-        layouts=[c for c in candidates(Reader()) if c['layout_valid']]
-        return {'smsPrgRom':(0,len(raw))} if len(layouts)==1 else {}
+        layouts = [c for c in candidates(Reader()) if c['layout_valid']]
+        return {'smsPrgRom': (0, len(raw))} if len(layouts) == 1 else {}
     return {}
 
 

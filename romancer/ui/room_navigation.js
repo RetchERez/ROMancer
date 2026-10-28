@@ -41,6 +41,7 @@ export function roomThumbnail(doc,model,id){
 
 export function roomNavigation(doc,model,id){
  const connections=roomConnections(doc,model),names=new Map(doc.rooms.map(room=>[room.id,room.name]));
+ if(doc.rooms.length===1&&!connections.length)return '';
  return `<section class="level-room-navigation"><h3>Choose a room</h3><p class="subtle">Select an object to move it, or choose a terrain brush to paint.</p><div class="level-room-list">${doc.rooms.map(room=>{const count=connections.filter(connection=>connection.room_id===room.id).length;return `<button type="button" class="level-room-card" data-action="levels-open-room" data-id="${esc(room.id)}" aria-pressed="${room.id===id}"><canvas data-level-room-preview="${esc(room.id)}" aria-hidden="true"></canvas><strong>${esc(room.name)}</strong><span>${count} room ${count===1?'link':'links'}</span></button>`;}).join('')}</div><div class="level-connection-list">${connections.map(connection=>`<div class="level-connection"><span>${esc(names.get(connection.room_id))}</span>${button(connection.name,'levels-select-object',{id:String(connection.index),name:connection.room_id})}<span aria-hidden="true">→</span>${button(names.get(connection.target_room_id),'levels-open-room',{id:connection.target_room_id})}</div>`).join('')}</div></section>`;
 }
 
@@ -65,13 +66,14 @@ export function objectInspector(ctx,doc,model,id){
  const index=selectedObjectIndex(ctx,model,id),object=model.objects(id)[index],metadata=objectMetadata(doc,id,index),reference=metadata?.role==='exit'?metadata.reference:null;
  const names=new Map(doc.rooms.map(room=>[room.id,room.name]));
  const destination=reference?select('level-object-destination','Destination room',reference.targets.map(target=>[target.value,names.get(target.room_id)]),object[reference.field]):'';
- const controls=objectFields(doc,id).map((field,position)=>{
+ const fields=objectFields(doc,id),controls=fields.map((field,position)=>{
   if(reference?.field===field.name)return '';
   const maximum=objectMaximum(doc,id,field),minimum=field.minimum??0,label=objectFieldLabel(field,metadata);
   return `<label class="field"><span>${esc(label)}</span><input id="level-object-input-${position}" type="number" min="${minimum}" max="${maximum}" step="1" value="${object[field.name]}"><small>${minimum} to ${maximum}</small></label>`;
- }).join('');
+ });
+ const positions=controls.filter((_,i)=>['x','y'].includes(fields[i].name)).join(''),advanced=controls.filter((_,i)=>!['x','y'].includes(fields[i].name)).join('');
  const instruction=Number.isSafeInteger(object.x)&&Number.isSafeInteger(object.y)?"Choose Move object, then drag its label on the map.":'This object has no map position. Its values are available below.';
- return `<section class="card level-object-inspector"><h3>${allRecords?'Records (Advanced)':'Objects'}</h3>${select('level-object-index','Selected object',choices.map(choice=>[choice.index,choice.label]),index)}<p class="subtle">${instruction}</p>${destination}${metadata?.hitbox?'<p class="subtle">Hitboxes show the starting position. Build and playtest to check contact during movement.</p>':''}${button('Update preview','levels-object-apply')}<details class="level-object-advanced"${metadata?.hitbox?' open':''}><summary>${metadata?.hitbox?'Position, hitbox & behavior':'Position & advanced values'}</summary><div class="field-row">${controls}</div><p class="subtle">These values come from the layout definition. Names and roles do not establish game behavior.</p><details><summary>Raw record</summary><pre>${esc(JSON.stringify(object,null,2))}</pre></details></details></section>`;
+ return `<section class="card level-object-inspector"><h3>${allRecords?'Records (Advanced)':'Objects'}</h3>${select('level-object-index','Selected object',choices.map(choice=>[choice.index,choice.label]),index)}<p class="subtle">${instruction}</p>${destination}<div class="field-row">${positions}</div><details class="level-object-advanced"><summary>${metadata?.hitbox?'Hitbox & behavior · Advanced':'Other values · Advanced'}</summary>${metadata?.hitbox?'<p class="subtle">Hitboxes show the starting position. Build and playtest to check contact during movement.</p>':''}<div class="field-row">${advanced}</div><p class="subtle">These values come from the layout definition. Names and roles do not establish game behavior.</p><details><summary>Raw record</summary><pre>${esc(JSON.stringify(object,null,2))}</pre></details></details>${button('Update preview','levels-object-apply')}</section>`;
 }
 
 export function mountRoomNavigation(doc,model){

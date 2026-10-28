@@ -6,7 +6,7 @@ from tests.test_level_design import fixture
 
 class DeclaredStudioSystemsTests(unittest.TestCase):
  def test_checked_generic_level_layouts_use_same_plan_service_on_all_supported_cartridges(self):
-  for system in ('nes','snes','genesis','gb','gbc','gba','sms'):
+  for system in ('nes','snes','genesis','gb','gbc','sms'):
    with self.subTest(system=system),tempfile.TemporaryDirectory() as temp:
     api=WorkbenchAPI(Path(temp)/'work')
     try:

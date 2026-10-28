@@ -91,12 +91,13 @@ def cd_bytes(*,raw_sector=False):
 
 
 class RecognitionTests(unittest.TestCase):
-    def test_gba_linear_image_over_hardware_rom_capacity_is_not_editable_layout(self):
-        raw=gba_bytes()+bytes(32*1024**2-1024+1)
+    def test_excluded_header_does_not_become_an_editable_system(self):
+        raw=gba_bytes()
         result=self.investigate(raw)
-        self.assertEqual(result['status'],'BLOCKED',result)
-        self.assertFalse(result['candidates'][0]['layout_valid'])
-        self.assertTrue(any('32 MiB' in warning for warning in result['warnings']))
+        self.assertEqual(result['status'],'UNKNOWN')
+        self.assertIsNone(result['system_id']);self.assertEqual(result['candidates'],[])
+        self.assertFalse(result['write_authorized'])
+
 
     def test_snes_non_power_of_two_size_uses_rounded_header_declaration(self):
         raw=bytearray(snes_bytes())+bytearray(3*1024**2-32768)
@@ -146,13 +147,10 @@ class RecognitionTests(unittest.TestCase):
         result=self.investigate(snes_bytes(dual=True));self.assertEqual(result['status'],'AMBIGUOUS',result)
         self.assertIsNone(result['system_id']);self.assertEqual(len(result['candidates']),2)
 
-    def test_genesis_gba_and_disc_signatures_do_not_claim_boot(self):
-        for raw,family in ((genesis_bytes(),'genesis'),(gba_bytes(),'gba'),(cd_bytes(),'segacd'),(cd_bytes(raw_sector=True),'segacd')):
+    def test_genesis_and_disc_signatures_do_not_claim_boot(self):
+        for raw,family in ((genesis_bytes(),'genesis'),(cd_bytes(),'segacd'),(cd_bytes(raw_sector=True),'segacd')):
             result=self.investigate(raw,'.nes');self.assertEqual(result['system_id'],family,result)
             self.assertFalse(result['runtime_verified']);self.assertFalse(result['write_authorized'])
-        gba=bytearray(gba_bytes());gba[0xbd]^=1
-        self.assertEqual(self.investigate(gba)['status'],'BLOCKED')
-        self.assertEqual(self.investigate(gba_bytes())['candidates'][0]['metadata']['logo_validation'],'NOT_CHECKED')
         malformed=bytearray(cd_bytes(raw_sector=True));malformed[15]=2
         self.assertEqual(self.investigate(malformed)['status'],'BLOCKED')
 

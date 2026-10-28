@@ -18,7 +18,7 @@ class AdapterInventoryTests(unittest.TestCase):
         self.assertEqual(result["scope"], "adapter_inventory")
         self.assertFalse(result["write_authorized"])
         adapters = {entry["id"]: entry for entry in result["adapters"]}
-        self.assertEqual(set(adapters), {"nes", "snes", "genesis", "gb", "gbc", "gba", "sms"})
+        self.assertEqual(set(adapters), {"nes", "snes", "genesis", "gb", "gbc", "sms"})
         for identifier, entry in adapters.items():
             with self.subTest(adapter=identifier):
                 caps = entry["capabilities"]

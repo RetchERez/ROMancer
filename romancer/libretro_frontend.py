@@ -322,7 +322,6 @@ class LibretroFrontend:
         self._disk_control: RetroDiskControlCallback | None = None
         self._sram_loaded_from: str | None = None
         self._sram_saved_to: str | None = None
-        self._sram_seed_extent = None
         self._sram_write_ready = False
         self._audio_capture = AudioCapture()
 
@@ -479,18 +478,8 @@ class LibretroFrontend:
         if not ptr or size <= 0:
             return
         raw = path.read_bytes()
-        self._sram_seed_extent = None
         if len(raw) != size:
-            # mGBA exposes its maximum flash allocation while the GBA save type
-            # is AUTODETECT. Its actual SRAM/EEPROM extent is known later. This
-            # is not permission to truncate saves or accept arbitrary prefixes.
-            tail = ctypes.string_at(ptr + len(raw), size-len(raw)) if 0 < len(raw) < size else b''
-            if (self.core_info().library_name.casefold() != 'mgba'
-                    or self._content_path.suffix.lower() != '.gba'
-                    or size != 131072 or len(raw) not in (512, 8192, 32768, 65536)
-                    or not tail or len(set(tail)) != 1 or tail[0] not in (0, 255)):
-                raise ValueError('normal save RAM was not loaded exactly: save size differs from the core allocation')
-            self._sram_seed_extent = (len(raw), size, tail)
+            raise ValueError('normal save RAM was not loaded exactly: save size differs from the core allocation')
         ctypes.memmove(ptr, raw, len(raw))
         self.verify_save_seed(raw)
         self._sram_loaded_from = str(path)
@@ -504,11 +493,6 @@ class LibretroFrontend:
         if actual == seed:
             self._sram_write_ready = True
             return {'mode':'exact_region', 'save_bytes':len(seed), 'allocation_bytes':len(actual)}
-        extent = self._sram_seed_extent
-        if (extent is not None and extent[:2] == (len(seed), len(actual))
-                and actual[:len(seed)] == seed and actual[len(seed):] == extent[2]):
-            self._sram_write_ready = True
-            return {'mode':'mgba_autodetect_allocation', 'save_bytes':len(seed), 'allocation_bytes':len(actual)}
         raise ValueError('normal save RAM was not loaded exactly; check core and save format')
 
     def _persist_save_ram(self) -> None:

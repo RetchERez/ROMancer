@@ -19,7 +19,7 @@ Master System playtesting reuses the same separately licensed BlastEm engine;
 its original notices and corresponding source remain included.
 
 The full Windows release includes separately licensed FCEUmm, bsnes-mercury Balanced,
-BlastEm, Gambatte and mGBA engines. Their licenses, original notices, source commits,
+BlastEm and Gambatte engines. Their licenses, original notices, source commits,
 DLL hashes and corresponding-source archive are retained under cores/. The engines
 are third-party code; ROMancer does not claim authorship or relicense them as MIT.
 ROMancer's MIT grant applies to its own project code. The runtime worker source and

@@ -1,7 +1,7 @@
 ROMancer v1.0 final
 By RetchEWretched
 
-Local ROM editing for NES, SNES, Genesis, Master System, Game Boy, Game Boy Color and GBA.
+Local ROM editing for NES, SNES, Genesis, Master System, Game Boy, Game Boy Color.
 Master System support covers validated Sega headers, checksums, literal graphics,
 declared text/byte edits, checked level layouts, patches and playtesting.
 Game-specific collision, music and actor behavior require verified definitions.
@@ -37,7 +37,7 @@ Ready to use in the full Windows edition:
 - Load supported cartridges in Playtest using the included engines. Test
   controller input, pause, and save/load states for the exact selected build.
 
-Connected workbench across all seven systems:
+Connected workbench across all six systems:
 - Game view connects checked resources, rooms, named records and saved native
   gameplay traces to editors and exact bytes. It does not require a Pokemon profile.
 - Select a captured object to save literal pixel-match candidates and search
@@ -55,7 +55,7 @@ Verified graphic sources:
 - Inspect exact source offsets, screen pixel maps and codec-derived byte lanes.
   Open a verified source part in the existing visual editor. Original ROMs stay
   unchanged and diagnostic builds never enter the project build history.
-- This works with the tested literal tile formats on all seven systems. It does
+- This works with the tested literal tile formats on all six systems. It does
   not claim recorded CPU/DMA transfers, infer every compression format or label
   a whole sprite's role automatically. Unverified and partial results stay clear.
 - GUI and MCP share the source-proof service; traces.origin reads one precise
@@ -92,19 +92,16 @@ Still unknown until investigated:
 - Unsupported or ambiguous cartridge layouts cannot be imported. A missing game
   definition is not a failed checksum. Read matched,
   mismatched, unsupported and unknown results separately.
-- Tested system/data formats cover NES, SNES, Genesis, GB, GBC, GBA and
+- Tested system/data formats cover NES, SNES, Genesis, GB, GBC and
   basic Master System formats.
   This does not certify every commercial game or every edit within a game.
 
 BUILT-IN DOCUMENTED GAME DATA
 
-GBA Pokemon numeric-table discovery checks the first 151 species and first
-165 moves in the supported layout. Open named records, preview stat/power/PP
-changes, review the byte plan and make a separate build. Exact Emerald identity
-and structural matches in modified games are labeled separately. Expanded
-formats and custom scripts require additional checked definitions.
+GB/Color stat-prefix templates use declared table locations and record layouts.
+Public format references are distinct from exact-source and native verification.
 
-Resources also imports matching RGBDS GB/GBC .sym and GNU nm GBA listings.
+Resources also imports matching RGBDS GB/GBC .sym listings.
 Search names and inspect mapped ROM bytes; RAM labels remain CPU addresses.
 These files lack an embedded ROM hash and require source acknowledgement.
 
@@ -143,13 +140,13 @@ START ON WINDOWS
 Python and Pillow are included in the Windows x64 package. Edge provides the
 desktop window; Open in browser is available if the window cannot open.
 The launchers are unsigned. The full Windows release includes engines for
-NES, SNES, Genesis, Game Boy, Game Boy Color, GBA and supported Master System cartridges. Games, user saves and separately supplied
+NES, SNES, Genesis, Game Boy, Game Boy Color and supported Master System cartridges. Games, user saves and separately supplied
 firmware dumps are not distributed. Editing and patching also work without emulation.
 
 The full Windows runtime blocks changed or unreviewed core binaries before loading
 native code. Its included open-source engines are FCEUmm (NES), bsnes-mercury
 Balanced (SNES), BlastEm (Genesis/Mega Drive and Master System), Gambatte
-(Game Boy and Game Boy Color) and mGBA (GBA). SHA-256 pins, source revisions and
+(Game Boy and Game Boy Color). SHA-256 pins, source revisions and
 component licenses are included. Source development retains synthetic test-core
 support; custom builds require their own source/license and compatibility review.
 
@@ -159,21 +156,18 @@ launcher. Uninstall preserves projects and installed versions for recovery.
 
 VERIFICATION STATUS
 
-Build 1.0.32 adds portable research and pinned popular-game references.
-The source suite runs 1256 tests, with platform/optional skips reported separately.
-The full Windows bundle is checked separately with its bundled Python.
-All 80 UI regression suites passed. Automated accessibility checks covered
-42 view/theme combinations with zero reported violations, plus bounded
-keyboard and browser-width checks. Skipped tests are not counted as passes.
-The recorded original NES workshop verifies editing, undo/redo, separate build
-creation, native playback, save/load state, checked patch export, reopening and
-draft recovery. Package/hash audits and isolated setup/uninstall checks passed.
-Fresh native checks covered automatic selection, video, input and state replay
-for the six original workshop profiles. The seven supplied commercial games
-were also tested through actual Playtest controls, native-frame display, live
-Play/Pause, input and save/load replay. A flat/black SNES transition capture was
-replaced with the visibly rendered name-entry scene. Final package and remote
-CI records are attached to the private GitHub draft release as verification.json.
+The release verification.json records the exact source commit, source and
+bundled-runtime checks, skips, UI checks, native results, guide checks and
+package audits. SHA256SUMS identifies each delivered file. Read recorded test
+scope separately from whole-game compatibility.
+
+The original NES workshop covers visual editing, undo/redo, separate builds,
+native playback, save/load states, verified patch export and draft recovery.
+The native system checks cover NES, SNES, Genesis, Master System, Game Boy and
+Game Boy Color. Supplied commercial revisions have their own bounded evidence.
+The retained collection contains 47 distinct patches from 18 exact source
+identities. Independent reconstruction checks their recorded target hashes;
+historical experiments retain their limitations and quarantine status.
 
 These are automated local checks, not a claim that every commercial game or edit
 works. An independent beginner trial, a clean Windows VM and a human
@@ -196,7 +190,7 @@ engine to its two-button pad: A and B are buttons 1 and 2, and Start sends Pause
 
 GITHUB RELEASE PREPARATION
 
-Use the tag v1.0.0 for the public ROMancer v1.0 release. The numeric 1.0.42 build
+Use the tag v1.0.0 for the public ROMancer v1.0 release. The numeric 1.0.44 build
 identifier is internal installer/update identity. Lead the release description
 with ROMancer-v1.0-Setup.exe, then the portable Windows ZIP, offline guide and
 walkthrough. Provide the source, engine pack, component notices and SHA256SUMS.
@@ -262,7 +256,6 @@ Included Windows x64 engines:
   SNES:                      bsnes-mercury Balanced GPL-3.0
   Genesis:                   BlastEm                GPL-3.0
   Game Boy / Game Boy Color:  Gambatte               GPL-2.0
-  GBA:                       mGBA                   MPL-2.0
 
 These are separately licensed third-party engines. Their original notices,
 source revisions, DLL hashes and corresponding source archive are in cores/.
@@ -333,43 +326,39 @@ Resources -> Previous editor setups restores it. Document-specific editing
 drafts remain separate. Recovery storage is bounded and is not a project backup.
 
 Help and Resources -> Popular-game references include pinned primary research
-for Pokemon Red/Blue, Crystal, FireRed/LeafGreen, Emerald, Super Mario Bros.
+for Pokemon Red/Blue, Crystal, Super Mario Bros.
 and Super Mario World. No source code, graphics, music or ROMs from these projects
 are bundled. Published RAM labels are not ROM file offsets.
 
-Documented stat-prefix templates cover Red/Blue, Crystal and GBA Pokemon layouts.
+Documented stat-prefix templates cover Red/Blue and Crystal layouts.
 You must establish the table offset, full record stride and count for your
 matching project. Preview table layout opens a checked numeric proposal; it
 does not locate the table or certify an arbitrary modified hack. Check values
 and record identities before saving or editing. The illustrated prefix example
-uses an original GBA workshop, not a claimed Pokemon ROM compatibility test.
+uses an original Game Boy Color workshop; it does not certify a Pokemon revision.
 
 These are original factual summaries of public references, pinned in the
 application: github.com/pret/pokered, github.com/pret/pokecrystal,
-github.com/pret/pokefirered, github.com/pret/pokeemerald,
 github.com/Xkeeper0/smb1 and github.com/IsoFrieze/SMWDisX.
 MCP clients can use references.catalog, references.template, research.inspect,
 research.note_get, research.note_save, research.preview and research.apply.
 The same source guards and review requirements apply to humans and automation.
 
 Hardware & address help includes standard tile, palette and map storage facts
-for all seven system choices, with technical sources and explicit format scope.
+for all six system choices, with technical sources and explicit format scope.
 
 Automatic cartridge verification includes conservative startup-vector/entry
 checks, documented boot-header fingerprints and standard mirrored SNES checksums
 for ordinary LoROM/HiROM up to 4 MiB. Warnings and unsupported checks stay distinct
 from passed checks. It does not execute startup instructions or certify gameplay.
-The supported linear GBA cartridge format is limited to 32 MiB. A bounded
-engine analysis reports its own limit without discarding the other scan checks.
 
 Overview -> Build history -> Compare files compares original and modified ROMs.
 Select a changed range to view both byte columns in Resources. Highlights mark
 changes; a dash marks added/removed storage. Independent page controls cover
 unequal file lengths, and Follow hex editor restores the editor position.
 
-Automatic scans include system hardware/address context and a bounded GBA
-M4A-compatible structure recognizer. Recognition validates a supported code/data
-relationship; it does not certify engine version, full music playback or editing.
+Automatic scans include system hardware/address context and bounded resource
+candidates. Checked format packs use exact-source or explicit guarded matching.
 
 Resources -> ROM health & revision -> Code reference catalog imports local
 documented codes as read-only leads. NES/SNES/Genesis/GB/GBC Game Genie formats
@@ -394,7 +383,7 @@ Investigate accesses derives a physical watch from the pinned engine interface
 and replays a short controller route in a separate native debugger from power on.
 It does not resume Playtest or convert emulator save states.
 
-Advanced native capture uses reviewed MesenCE (NES/SNES/SMS/GB/GBC/GBA) and
+Advanced native capture uses reviewed MesenCE (NES/SNES/SMS/GB/GBC) and
 MAME (Genesis) observers. The full Windows package includes both, their licenses
 and complete matching source. Windows x64 is required; the Genesis observer
 requires an x86-64-v2 CPU. Exact binaries and source inventories are checked.
@@ -521,13 +510,9 @@ not inferred damage or gameplay formulas. Palette colors use the declared bit
 ranges; the picker may quantize a chosen color to the supported hardware format.
 
 Sound hardware is not a music driver. Original Hillside and Mossy Hollow
-sequences support checked note edits. The fingerprinted Wario Land4 M4A reader
-walks five selected song entries; three allow explicit note, velocity, volume
-and tempo value edits. Conditional or over-budget songs remain read-only.
-Commands, pointers and instruments are protected. The opening-cutscene note
-example was verified with repeatable original audio and changed build audio.
-Reference note sketches do not reproduce game instruments or effects. Native
-recordings contain measured mixed output, not isolated hardware channels.
+sequences support checked note edits. Reference note sketches omit hardware
+instruments and effects. Native recordings contain measured mixed output,
+not isolated hardware channels.
 
 Declared rooms and object fields use existing fixed storage. They do not add a
 game engine, infer collision meanings or allocate new rooms. Unsupported layouts,
@@ -763,17 +748,11 @@ frames and timings are author declarations, not automatic animation decoding.
 
 Compressed moves accept multiple explicit references, with a bounded numeric
 candidate survey. Candidates do not prove complete references or unused space.
-An original GBA example verifies two live pointers, relocation and native output.
-
-The checked Wario Land 4 M4A song catalog adds explicit pan edits and read-only
-instrument structure inspection. A native stereo comparison verifies the pan
-edit. The reference note sketch does not emulate instruments or stereo panning.
-Other games need their own checked formats; this is not a universal music driver.
 
 The guide includes illustrated procedures, glossary links and index entries for
 these tools. The independent beginner acceptance trial remains unperformed.
 
-BUILD 42 FORMAT AND WORKFLOW IMPROVEMENTS
+FORMAT AND WORKFLOW IMPROVEMENTS
 The default theme keeps the original ROMancer teal palette with deeper menus
 and input fields. Visual editing and values stay visible; investigation and automation
 are grouped under Advanced. Theme and interface size remain saved preferences.
@@ -793,14 +772,77 @@ remove and reorder fully declared commands inside the original allocation.
 Branches, pointer-bearing commands, unknown stored bytes and overflow refuse.
 A native original NES example exercises an actual command interpreter.
 
-Compression supports GBA LZ10, GBA RLE and explicit SNES LC_LZ2. An independent
+Compression supports LZ10, RLE and explicit SNES LC_LZ2. An independent
 original decoder verifies recompression. LC_LZ2 has no unique signature, so scan
 does not guess its locations. LC_LZ3 and other variants are separate formats.
 
 Native investigations can stop at a selected occurrence of one explicit access
-watch, retaining real registers and execution context. Seven original programs
-and the seven supplied real ROMs passed bounded callback-stop checks. This does
+watch, retaining real registers and execution context. Six original programs
+and the six supplied real ROMs passed bounded callback-stop checks. This does
 not provide continuous instruction stepping or prove every gameplay path.
 
 The illustrated guide covers these procedures, with glossary and index links.
 Independent unfamiliar-user acceptance remains pending in ACCEPTANCE.txt.
+
+RECORDED ROM FACTS DATABASE
+The release includes 1,035 independently measured cartridge samples:
+NES 273, SNES 314, Genesis 148, Master System 50, Game Boy 149 and Game Boy Color 101.
+Names come from supplied filenames and are not canonical-dump certifications.
+Every included source SHA-256 and CRC32 was independently recomputed. The catalog
+records standard header/layout numbers, cartridge check outcomes and bounded
+resource locations. Its 33,120 ASCII-like ranges and 32,907 generic graphics
+locations are hypotheses, not identified dialogue or sprites. 213 NES graphics
+locations derive from declared CHR-ROM headers. 4,660 LZ10/RLE encoding candidates
+passed a separate decoder; this does not prove a game uses those streams.
+
+Automatic deep scan and Check ROM use exact source hash/size matches. Expand
+Measured file facts & locations to inspect recorded offsets. A changed build
+can be unrecorded while its original still matches. These facts never authorize
+writes, invent a game-specific editor or identify every map, stat, script or
+music driver. Existing checked definitions, source guards and playtesting remain
+the editing workflow.
+
+The six supplied archives contained 1,048 cartridge candidates. 1,035 passed the
+current unique-layout admission checks; 13 were excluded for unsupported or
+inconsistent layouts. Two FDS disk images and a save file were outside scope.
+No excluded file was relabeled as supported. Deep analysis reads the whole file,
+but graphics are sampled and compression work/results are bounded. Coverage and
+truncation flags are stored per record.
+
+Advanced source-build maintenance:
+  python -B tools/scan_rom_archives.py --archives "collection.zip" --output "facts.json" --report "private-report.json" --journal "resume.jsonl" --jobs 2
+The tool accepts ZIPs and one nested ZIP level, verifies archive CRCs, bounds
+work and temporary extraction, validates its facts-only schema and can resume.
+Review the generated data before replacing knowledge/rom_samples.json in a
+source build. Keep private reports/journals outside the release. Do not modify
+an installed version's verified files. The shipped catalog works offline;
+users do not need to run this maintenance script to use its existing records.
+API/MCP clients can page rom.samples and read recorded_facts from rom.check and
+rom.scan.run. Sample matches do not grant canonical, runtime or edit authority.
+
+DATA PROVENANCE AND REDISTRIBUTION
+This catalog was measured independently from locally supplied game files.
+It does not copy a third-party hash database, editor definitions or guide prose.
+Only hashes, sizes, short filename labels, numeric layout/check facts, offsets,
+format identifiers, evidence levels and scan coverage are included. No ROM
+images, executable game bytes, dialogue excerpts, pixel data, audio, decoded
+resource payloads, personal paths or save contents are included in the catalog.
+Own code, schema and original compilation use LICENSE; the underlying games,
+trademarks and third-party emulator components retain their respective rights.
+
+US Copyright Office guidance distinguishes individual plain facts from protected
+expression and original database compilations:
+https://www.copyright.gov/register/tx-databases.html
+https://www.copyright.gov/circs/circ33.pdf
+The facts-only policy follows that distinction; it is not a worldwide legal
+guarantee or permission to redistribute extracted game content. Independent
+measurements and conservative export fields are used instead of copying another
+author's database or expressive material.
+
+BASIC WORKSPACE AND READABILITY
+The main navigation keeps text, graphics, levels, stats, music, playtesting and
+export visible. Game view, Resources/hex, investigation, recipes, routes and
+regression are under Advanced. Opening those tools from a task opens the group
+automatically. Manual table layout starts collapsed. The compact default layout
+uses a minimum interface text size of 18 CSS pixels; Settings offers larger
+interface sizes without changing game graphics.

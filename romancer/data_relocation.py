@@ -31,8 +31,8 @@ def prepare_edits(raw,system,spec,replacement=None,*,cancelled=lambda:False):
         if region is None:raise ValueError('The cartridge payload layout is unresolved.')
         low,extent=region
         if min(start,target)<low or max(start+length,target+capacity)>low+extent:raise ValueError('This move must stay inside the identified CPU ROM payload.')
-    elif system in ('gb','gbc','gba','genesis','sms'):
-        minimum={'gb':0x150,'gbc':0x150,'gba':0xc0,'genesis':0x200,'sms':0x100}[system]
+    elif system in ('gb', 'gbc', 'genesis', 'sms'):
+        minimum={'gb': 336, 'gbc': 336, 'genesis': 512, 'sms': 256}[system]
         if min(start,target)<minimum:raise ValueError('Data relocation cannot use this cartridge boot/header extent.')
     else:raise ValueError('Choose a supported cartridge system.')
     bank=number(spec['bank_size'],0,65536);origin=number(spec['bank_origin'],0,len(raw)-1)

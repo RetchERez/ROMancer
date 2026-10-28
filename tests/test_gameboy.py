@@ -20,7 +20,7 @@ class GameBoyTests(unittest.TestCase):
         with tempfile.TemporaryDirectory() as folder:
             api=WorkbenchAPI(Path(folder))
             try:
-                for system in ('nes','snes','genesis','gb','gba'):
+                for system in ('nes','snes','genesis','gb','gbc','sms'):
                     demo=api.dispatch('project.demo_system',{'system_id':system})
                     self.assertTrue(demo['ok'],demo);row=demo['sources'][0]
                     self.assertEqual(row['system_id'],system)

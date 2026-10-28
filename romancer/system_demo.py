@@ -22,10 +22,8 @@ def make_system_fixtures()->dict:
     snes[0x7fd5]=0x20;snes[0x7fd7]=5;snes[0x7fdc:0x7fe0]=b'\xff\xff\x00\x00'
     genesis=bytearray(1024);genesis[0x100:0x110]=b'SEGA MEGA DRIVE '
     genesis[0x1a4:0x1a8]=(len(genesis)-1).to_bytes(4,'big')
-    gba=bytearray(1024);gba[0xa0:0xac]=b'ROMANCERTEST';gba[0xac:0xb0]=b'TEST';gba[0xb0:0xb2]=b'00';gba[0xb2]=0x96
-    gba[0xbd]=(-sum(gba[0xa0:0xbd])-0x19)&255
     from .boot_fixtures import make_boot_fixture
-    return {'nes':make_nes_fixture(),'snes':bytes(snes),'genesis':bytes(genesis),'gb':make_boot_fixture('gb')['data'],'gba':bytes(gba)}
+    return {'nes':make_nes_fixture(), 'snes':bytes(snes), 'genesis':bytes(genesis), **{s:make_boot_fixture(s)['data'] for s in ('gb','gbc','sms')}}
 
 
 def create_nes_demo(root:Path,incoming:Path)->dict:
@@ -46,7 +44,7 @@ def create_nes_demo(root:Path,incoming:Path)->dict:
 def create_system_demo(root,incoming,system_id):
     from .boot_fixtures import make_boot_fixture
     from .resource_forms import graphics_schema
-    labels={'nes':'NES','snes':'SNES','genesis':'Genesis','gb':'Game Boy','gbc':'Game Boy Color','gba':'GBA'}
+    labels={'nes': 'NES', 'snes': 'SNES', 'genesis': 'Genesis', 'gb': 'Game Boy', 'gbc': 'Game Boy Color', 'sms': 'Master System'}
     fixture=make_boot_fixture(system_id);project=Path(create_project(root,labels[system_id]+' workshop')['path'])
     path=Path(incoming)/(uuid.uuid4().hex+fixture['suffix']);path.write_bytes(fixture['data'])
     try:source=register_source(project,path,None)

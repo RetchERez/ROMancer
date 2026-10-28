@@ -2,13 +2,13 @@ import unittest
 
 
 class RegistryTests(unittest.TestCase):
-    def test_seven_packs_separate_format_support_from_runtime(self):
+    def test_six_packs_separate_format_support_from_runtime(self):
         from romancer.system_registry import system_inventory, get_system
         result=system_inventory()
         self.assertEqual(result['schema_version'],1)
         self.assertEqual(result['registry_version'],'1')
         self.assertFalse(result['write_authorized']);self.assertFalse(result['runtime_verified'])
-        self.assertEqual({s['id'] for s in result['systems']},{'nes','snes','genesis','gb','gbc','gba','sms'})
+        self.assertEqual({s['id'] for s in result['systems']},{'nes','snes','genesis','gb','gbc','sms'})
         for pack in result['systems']:
             self.assertEqual(pack['version'],'1');self.assertTrue(pack['label']);self.assertTrue(pack['formats'])
             for capability in pack['capabilities'].values():

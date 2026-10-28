@@ -1,4 +1,4 @@
-"""Bounded original readers for RGBDS .sym and GNU nm BSD symbol listings.
+"""Bounded original readers for RGBDS .sym symbol listings.
 
 Symbols name addresses. They do not prove a matching ROM or authorize writes.
 """
@@ -13,7 +13,7 @@ LIMIT=2*1024**2
 
 def parse(text,format,system,size):
     if type(text) is not str or len(text.encode('utf-8'))>LIMIT:raise ValueError('Symbol text exceeds 2 MiB.')
-    if (format=='rgbds' and system not in ('gb','gbc')) or (format=='gnu-nm' and system!='gba') or format not in ('rgbds','gnu-nm'):raise ValueError('Choose RGBDS for Game Boy / Color or GNU nm for GBA.')
+    if format!='rgbds' or system not in ('gb','gbc'):raise ValueError('Choose RGBDS symbols for Game Boy or Game Boy Color.')
     number(size,1,64*1024**2);rows=[];seen=set();ignored=0
     for line in text.splitlines():
         if not line.strip() or line.lstrip().startswith((';','#')):continue
@@ -28,10 +28,6 @@ def parse(text,format,system,size):
             elif 0x4000<=address<0x8000 and bank>0:offset=bank*0x4000+address-0x4000
             elif address>=0x8000:domain='ram-or-io';reason='CPU RAM or I/O; no ROM file offset.'
             else:reason='Bank and CPU address do not establish a ROM file location.'
-        elif 0x08000000<=address<=0x0dffffff:
-            if second in 'Tt' and address&1:reason='Odd code address; resolve Thumb entry semantics before navigation.'
-            else:offset=address&0x01ffffff
-        elif 0x02000000<=address<0x08000000:domain='ram-or-io';reason='CPU RAM or I/O; no ROM file offset.'
         if offset is not None:
             if offset>=size:offset=None;reason='Mapped location falls outside this source.'
             else:domain='rom';reason='Explicit address mapping; source relationship is user acknowledged.'
@@ -39,7 +35,7 @@ def parse(text,format,system,size):
         if identity in seen:continue
         seen.add(identity);rows.append({'name':name,'address':address,'bank':bank,'file_offset':offset,'domain':domain,'reason':reason})
         if len(rows)>65536:raise ValueError('Symbol input exceeds 65,536 entries.')
-    if not rows:raise ValueError('No supported symbol records found. Use RGBDS .sym or GNU nm address/type/name output.')
+    if not rows:raise ValueError('No supported symbol records found. Use RGBDS .sym bank:address records.')
     return {'symbols':rows,'ignored_lines':ignored,'rom_match_proven':False,'write_authorized':False}
 
 

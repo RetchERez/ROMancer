@@ -5,7 +5,7 @@ class GraphicsAccessTests(unittest.TestCase):
     def replay(self,buttons=None):return {'status':'READY','steps':[{'frames':10,'buttons':buttons or [],'port':0}],'frames':10}
     def test_derived_probes_follow_real_source_domains_and_known_controller_mapping(self):
         from romancer.boot_fixtures import make_boot_fixture
-        for system in ('nes','snes','gb','gbc','gba','genesis','sms'):
+        for system in ('nes','snes','gb','gbc','genesis','sms'):
             if system=='sms':raw=bytearray(32768);raw[0x7ff0:0x7ff8]=b'TMR SEGA';raw[0x7fff]=0x4c;raw=bytes(raw)
             else:raw=make_boot_fixture(system)['data']
             r=capture_config(system,raw,self.replay(['a','b','r'] if system=='genesis' else ['a']),4096,32,0)

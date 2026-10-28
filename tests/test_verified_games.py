@@ -58,15 +58,15 @@ class VerifiedGameTests(unittest.TestCase):
                 self.assertFalse(invalid['ok'])
 
     def test_palette_previews_decode_current_and_both_exact_writer_choices(self):
-        from romancer.verified_games import palette_visuals,_rotate
+        from romancer.verified_games import palette_visuals
         root=self.root/'palette-root';selected=self.root/'palette-build'
         raw=bytes.fromhex('1f00e003007c0000')
-        root.write_bytes(raw);selected.write_bytes(_rotate(raw))
-        profile={'id':'wario-land4-ue','offsets':[(0,8,'Colors')]}
+        root.write_bytes(raw);selected.write_bytes(bytes.fromhex('0000285695155d5f'))
+        profile={'id':'dejavu-casebooks-usa','offsets':[(0,8,'Colors')]}
         value=palette_visuals(profile,{'path':str(root)},selected)
         palette=value['palettes'][0]
         self.assertEqual(palette['original'][:3],[[255,0,0],[0,255,0],[0,0,255]])
-        self.assertEqual(palette['current'],palette['teal_magenta'])
+        self.assertEqual(palette['current'],palette['parchment'])
         self.assertEqual(palette['original'][3],[0,0,0])
         self.assertEqual(root.read_bytes(),raw)
 
@@ -142,16 +142,13 @@ class VerifiedGameTests(unittest.TestCase):
         if profile['system']=='snes':raw[0x7fd7]=12;raw[0xc0267]=3
         if profile['system']=='genesis':
             raw[0x1a4:0x1a8]=(len(raw)-1).to_bytes(4,'big');raw[0x4e1b:0x4e25]=b'New game?%';raw[0xfffca:0xfffd4]=bytes.fromhex('0c80fede808566024e75')
-        if profile['system']=='gba':
-            for offset in (0x74253c,0x74273c):
-                for i in range(256):raw[offset+i*2:offset+i*2+2]=(i&31).to_bytes(2,'little')
         path=self.root/('original-workflow'+fixture['suffix']);path.write_bytes(raw)
         row=projects.register_source(Path(self.project['path']),path,None)
         profile['sha256']=row['sha256']
         return profile,row
 
-    def test_snes_named_power_and_gba_palette_builds_are_exact(self):
-        for identifier,values in [('chrono-trigger-usa',{'weapon_attack':30}),('wario-land4-ue',{'palette_style':'teal_magenta'})]:
+    def test_snes_named_power_build_is_exact(self):
+        for identifier,values in [('chrono-trigger-usa',{'weapon_attack':30})]:
             profile,row=self.other_game(identifier)
             with self.subTest(identifier=identifier),patch('romancer.verified_games.PROFILES',(profile,)):
                 p={**self.params,'artifact_id':row['artifact_id']}
@@ -202,7 +199,7 @@ class VerifiedGameTests(unittest.TestCase):
 
     def test_public_registry_contains_only_small_sourced_definitions(self):
         from romancer.verified_games import PROFILES
-        self.assertEqual(len(PROFILES),7)
+        self.assertEqual(len(PROFILES),6)
         for p in PROFILES:
             self.assertRegex(p['sha256'],r'^[a-f0-9]{64}$')
             self.assertTrue(p['reference'].startswith('https://github.com/') or p['id']=='rastan-sms' and p['reference']=='/user-guide/index.html#rastan-blobs')

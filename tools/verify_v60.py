@@ -20,7 +20,7 @@ from romancer.streaming_bps import create_patch,apply_patch
 
 def verify(root,cores=None):
     root=Path(root);root.mkdir(parents=True,exist_ok=True);results=[]
-    for system in ('nes','snes','genesis','gb','gbc','gba'):
+    for system in ('nes','snes','genesis','gb','gbc','sms'):
         fixture=make_boot_fixture(system);original=fixture['data'];source=root/(system+fixture['suffix']);source.write_bytes(original)
         sha=hashlib.sha256(original).hexdigest();assessment=identify_system(source,expected_sha256=sha)
         if assessment['system_id']!=system or assessment['status']!='IDENTIFIED':raise ValueError('fixture recognition failed: '+system)
@@ -38,8 +38,9 @@ def verify(root,cores=None):
                 before=model['bitmaps'][0]['cells'][0]['pixels'];after=before.copy();after[1]=1
                 changes=[{'kind':'cell','bitmap_id':'tiles','cell_index':0,'before_pixels':before,'after_pixels':after}]
             else:
-                palette=model['palettes'][0];entry=palette['entries'][0]
-                changes=[{'kind':'palette','palette_id':palette['id'],'bank':0,'index':0,'before':entry['components'],'after':{'r':7 if system=='genesis' else 31,'g':0,'b':0}}]
+                palette=model['palettes'][0];index=1 if system=='sms' else 0;entry=palette['entries'][index]
+                after={'r':0,'g':0,'b':3} if system=='sms' else {'r':7 if system=='genesis' else 31,'g':0,'b':0}
+                changes=[{'kind':'palette','palette_id':palette['id'],'bank':0,'index':index,'before':entry['components'],'after':after}]
             request={'schema_version':1,'document_id':model['document_id'],'changes':changes,'acknowledged_consumers':[]}
             plan=with_api.dispatch('assets.plan',{**params,'schema':schema,'edits':request})
             if not plan['ok'] and plan.get('required_consumers'):
@@ -57,7 +58,7 @@ def verify(root,cores=None):
         if system=='snes':allowed.update(range(0x7fdc,0x7fe0))
         if system=='genesis':allowed.update(range(0x18e,0x190))
         if system in ('gb','gbc'):allowed.update(range(0x14d,0x150))
-        if system=='gba':allowed.add(0xbd)
+        if system=="sms":allowed.update(range(0x7ffa,0x7ffc))
         differences=[i for i,(a,b) in enumerate(zip(original,changed)) if a!=b]
         if not differences or not set(differences)<=allowed:raise ValueError('unexpected complete output difference')
         patch=root/(system+'.bps');created=create_patch(source,target,patch,{'title':'Original '+system+' test'})
@@ -77,7 +78,7 @@ def verify(root,cores=None):
                     colors=set(zip(rgb[0::3],rgb[1::3],rgb[2::3]))
                     if label=='source':
                         if system in ('nes','gb','gbc') and len(colors)<2:raise ValueError('native pattern program did not draw')
-                        if system in ('snes','genesis','gba') and not all(g>r+100 and g>b+100 for r,g,b in colors):raise ValueError('native program did not draw green backdrop')
+                        if system in ('snes','genesis') and not all(g>r+100 and g>b+100 for r,g,b in colors):raise ValueError('native program did not draw green backdrop')
                     audio=runtime.request('audio');state=runtime.request('save_state');runtime.request('advance',frames=1,buttons=['a'],port=0)
                     runtime.request('load_state',snapshot=state);runtime.request('advance',frames=1,buttons=[],port=0);restored=runtime.request('capture')
                     if restored['sha256']!=frame['sha256']:raise ValueError('state restore did not reproduce the program frame')

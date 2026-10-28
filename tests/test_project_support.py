@@ -50,8 +50,8 @@ class ProjectSupportTests(unittest.TestCase):
         with tempfile.TemporaryDirectory() as folder:
             root=Path(folder);packed=root/'packed';packed.write_bytes(b'\x30\x08\x00\x00\x85A');decoded=root/'decoded';decoded.write_bytes(b'A'*8)
             project=Path(p.create_project(root/'projects','Compressed')['path']);parent=p.register_source(project,packed,None);child=p.register_source(project,decoded,None)
-            result=inspect_compressed(parent['path'],parent['sha256'],0,6,'gba-rle')
-            value=p.read_project(project);value['sources'][1]['compressed_parent']={'parent_id':parent['artifact_id'],'parent_sha256':parent['sha256'],'offset':0,'allocation':6,'codec':'gba-rle','decoded_sha256':child['sha256'],'stream_sha256':result['stream_sha256'],'consumed':result['consumed']};p.write_json(project/'project.json',value)
+            result=inspect_compressed(parent['path'],parent['sha256'],0,6,'rle')
+            value=p.read_project(project);value['sources'][1]['compressed_parent']={'parent_id':parent['artifact_id'],'parent_sha256':parent['sha256'],'offset':0,'allocation':6,'codec':'rle','decoded_sha256':child['sha256'],'stream_sha256':result['stream_sha256'],'consumed':result['consumed']};p.write_json(project/'project.json',value)
             plan=p.plan_byte_edits(project,child['artifact_id'],[{'offset':0,'before':'41'*8,'after':b'abcdefgh'.hex()}]);built=p.apply_build(project,plan['plan_id'])
             issues=validate_project(project)['issues'];problem=next(r for r in issues if r['code']=='COMPRESSED_ALLOCATION');self.assertEqual(problem['artifact_id'],built['artifact_id']);self.assertEqual(problem['offset'],0)
             saved=project/'plans'/(plan['plan_id']+'.json');data=json.loads(saved.read_text());data['edits'].append({'offset':1,'before':'41','after':'42'});p.write_json(saved,data)

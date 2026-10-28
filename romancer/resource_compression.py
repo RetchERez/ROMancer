@@ -1,6 +1,6 @@
-"""Bounded GBA LZ10/RLE resources and fixed-allocation recompression.
+"""Bounded LZ10/RLE resources and fixed-allocation recompression.
 
-Format reference: https://github.com/mgba-emu/mgba/blob/master/src/gba/bios.c
+Original bounded readers/writers for the documented 0x10 and 0x30 byte-stream formats.
 The parsers/encoders here are original implementations tested by literal vectors.
 """
 from collections import deque
@@ -12,10 +12,19 @@ from . import workbench_projects as projects
 
 OUTPUT_LIMIT=1024**2
 ALLOCATION_LIMIT=48*1024
-SIGNATURES={'gba-lz10':0x10,'gba-rle':0x30}
+SIGNATURES={'lz10':0x10,'rle':0x30}
+
+
+def canonical_codec(codec):
+    """Read obsolete generic-codec metadata without restoring console support."""
+    if type(codec) is not str:raise ValueError('choose a supported compression codec')
+    codec={'gba-lz10':'lz10','gba-rle':'rle'}.get(codec,codec)
+    if codec not in (*SIGNATURES,'snes-lz2'):raise ValueError('choose a supported compression codec')
+    return codec
 
 
 def decode_stream(data,codec,max_output=OUTPUT_LIMIT):
+    codec=canonical_codec(codec)
     number(max_output,1,OUTPUT_LIMIT)
     if codec=='snes-lz2':
         from .snes_lz2 import decode_lz2
@@ -31,7 +40,7 @@ def decode_stream(data,codec,max_output=OUTPUT_LIMIT):
         result=data[position:position+count];position+=count;return result
     while len(output)<size:
         flags=take(1)[0]
-        if codec=='gba-rle':
+        if codec=='rle':
             count=(flags&127)+(3 if flags&128 else 1)
             if count>size-len(output):raise ValueError('RLE block overruns the declared decoded size')
             output.extend(bytes([take(1)[0]])*count if flags&128 else take(count))
@@ -95,11 +104,12 @@ def _encode_rle(data):
 
 
 def encode_stream(raw,codec):
+    codec=canonical_codec(codec)
     if codec=='snes-lz2':
         from .snes_lz2 import encode_lz2
         return encode_lz2(raw)
     if type(raw) is not bytes or not 1<=len(raw)<=OUTPUT_LIMIT or codec not in SIGNATURES:raise ValueError('choose nonempty decoded bytes up to1MiB and a supported codec')
-    return (_encode_lz if codec=='gba-lz10' else _encode_rle)(raw)
+    return (_encode_lz if codec=='lz10' else _encode_rle)(raw)
 
 
 def compression_candidates(raw,start=0,*,cancelled=lambda:False,budget=None):
@@ -115,7 +125,7 @@ def compression_candidates(raw,start=0,*,cancelled=lambda:False,budget=None):
             if budget is not None:budget.update(partial=True,next_offset=start+offset,attempts=attempts-1)
             break
         if budget is not None:budget['attempts']=attempts
-        codec='gba-lz10' if raw[offset]==0x10 else 'gba-rle'
+        codec='lz10' if raw[offset]==0x10 else 'rle'
         try:decoded=decode_stream(view[offset:offset+ALLOCATION_LIMIT],codec,65536)
         except ValueError:continue
         decoded_total+=size
@@ -126,6 +136,7 @@ def compression_candidates(raw,start=0,*,cancelled=lambda:False,budget=None):
 
 
 def inspect_compressed(path,sha,offset,allocation,codec,*,include_data=False,cancelled=lambda:False):
+    codec=canonical_codec(codec)
     number(offset,0,64*1024**2);number(allocation,3 if codec=='snes-lz2' else 4,ALLOCATION_LIMIT)
     if cancelled():raise KeyboardInterrupt
     path=checked_path(Path(path));source=projects._measure(path,cancelled=cancelled)
@@ -141,9 +152,11 @@ def inspect_compressed(path,sha,offset,allocation,codec,*,include_data=False,can
 
 
 def prepare_reinsert(project,parent_id,decoded_id,edited_id,offset,allocation,codec,*,cancelled=lambda:False):
+    codec=canonical_codec(codec)
     project=Path(project);parent=projects.artifact(project,parent_id);decoded=projects.artifact(project,decoded_id);edited=projects.artifact(project,edited_id)
     inspected=inspect_compressed(parent['path'],parent['sha256'],offset,allocation,codec,include_data=True,cancelled=cancelled)
     metadata=decoded.get('compressed_parent')
+    if type(metadata) is dict:metadata={**metadata,'codec':canonical_codec(metadata.get('codec'))}
     required={'parent_id':parent_id,'parent_sha256':parent['sha256'],'offset':offset,'allocation':allocation,'codec':codec,
               'decoded_sha256':inspected['decoded_sha256'],'stream_sha256':inspected['stream_sha256'],'consumed':inspected['consumed']}
     if metadata!=required:raise ValueError('reinsert parameters differ from the confirmed extracted allocation')
@@ -173,6 +186,7 @@ def preview_reinsert(project,parent_id,decoded_id,edited_id,offset,allocation,co
 
 
 def plan_reinsert(project,parent_id,decoded_id,edited_id,offset,allocation,codec,*,cancelled=lambda:False):
+    codec=canonical_codec(codec)
     parent,edited,packed,summary=prepare_reinsert(project,parent_id,decoded_id,edited_id,offset,allocation,codec,cancelled=cancelled)
     verification=summary['decode_verification']
     if not summary['fits']:raise ValueError('recompressed data does not fit the confirmed allocation; reduce the edit or use a separately supported relocation')
@@ -182,7 +196,7 @@ def plan_reinsert(project,parent_id,decoded_id,edited_id,offset,allocation,codec
         old=before[position:position+4096];new=packed[position:position+4096]
         if old!=new:edits.append({'offset':offset+position,'before':old.hex(),'after':new.hex()})
     if not edits:raise ValueError('recompression makes no byte changes')
-    if parent.get('system_id') in ('nes','snes','genesis','gb','gbc','gba','sms'):
+    if parent.get('system_id') in ('nes', 'snes', 'genesis', 'gb', 'gbc', 'sms'):
         from .system_integrity import integrity_edits
         edits=integrity_edits(parent['path'],parent['sha256'],parent['system_id'],edits)
     projects._measure(parent['path'],parent,cancelled=cancelled);projects._measure(edited['path'],edited,cancelled=cancelled)

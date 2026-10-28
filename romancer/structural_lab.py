@@ -14,12 +14,12 @@ from .script_schema import canonical_bytes
 def survey(raw,source_sha256,system,offset,file_size,*,max_positions=16384,max_results=32,cancelled=lambda:False):
     if type(raw) is not bytes or not 1<=len(raw)<=65536:raise ValueError('Choose a structural window of 1 to 65536 bytes.')
     if type(source_sha256) is not str or re.fullmatch('[0-9a-f]{64}',source_sha256) is None:raise ValueError('invalid source identity')
-    if system not in ('nes','snes','genesis','gb','gbc','gba'):raise ValueError('choose a supported cartridge system')
+    if system not in ('nes', 'snes', 'genesis', 'gb', 'gbc', 'sms'):raise ValueError('choose a supported cartridge system')
     number(file_size,1,64*1024**2);number(offset,0,file_size-len(raw));number(max_positions,16,16384);number(max_results,1,64)
     stride=math.ceil(len(raw)/max_positions);window_sha=hashlib.sha256(raw).hexdigest()
     candidates=[];tested=0;total=0
     for width in (4,3,2):
-        bases=(0,0x08000000,0x0a000000,0x0c000000) if system=='gba' and width==4 else (0,)
+        bases=(0,)
         for endian in ('little','big'):
             for base in bases:
                 for record_stride in (width,width*2,width*4):

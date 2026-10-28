@@ -14,7 +14,7 @@ local lastExec=-1
 local lastDomain=-1
 local lastPhysical=-1
 output:write("BEGIN\t1\t@NONCE@\t@SYSTEM@\n")
-for _,name in ipairs({"nesPrgRom","nesChrRom","nesChrRam","nesInternalRam","nesSpriteRam","nesPaletteRam","nesNametableRam","snesPrgRom","snesWorkRam","snesVideoRam","snesSpriteRam","snesCgRam","gbPrgRom","gbWorkRam","gbVideoRam","gbSpriteRam","gbBgPaletteRam","gbObjPaletteRam","gbaPrgRom","gbaExtWorkRam","gbaIntWorkRam","gbaVideoRam","gbaSpriteRam","gbaPaletteRam","smsPrgRom","smsWorkRam","smsVideoRam","smsPaletteRam"}) do
+for _,name in ipairs({"nesPrgRom","nesChrRom","nesChrRam","nesInternalRam","nesSpriteRam","nesPaletteRam","nesNametableRam","snesPrgRom","snesWorkRam","snesVideoRam","snesSpriteRam","snesCgRam","gbPrgRom","gbWorkRam","gbVideoRam","gbSpriteRam","gbBgPaletteRam","gbObjPaletteRam","smsPrgRom","smsWorkRam","smsVideoRam","smsPaletteRam"}) do
  local value=emu.memType[name]
  if value~=nil then output:write("DOMAIN\t"..name.."\t"..value.."\n") end
 end
@@ -69,10 +69,9 @@ local function observedMapping(address,probe,access)
  local domain=probe.domain
  if physicalVideo[domain] then return {memType=emu.memType[domain],address=address} end
  if domain=="nesChrRom" or domain=="nesChrRam" or domain=="nesPaletteRam" or domain=="nesNametableRam" then return emu.convertAddress(address,emu.memType.nesPpuMemory,cpu) end
- -- GB/GBA CPU video accesses use bus addresses; PPU callbacks use physical indices.
+ -- GB CPU video accesses use bus addresses; PPU callbacks use physical indices.
  if domain=="gbVideoRam" and address<0x8000 or domain=="gbSpriteRam" and address<0xfe00 or
-    domain=="gbBgPaletteRam" or domain=="gbObjPaletteRam" or
-    (domain=="gbaVideoRam" or domain=="gbaSpriteRam" or domain=="gbaPaletteRam") and address<0x02000000 then
+    domain=="gbBgPaletteRam" or domain=="gbObjPaletteRam" then
   return {memType=emu.memType[domain],address=address}
  end
  return emu.convertAddress(address,memory,cpu)

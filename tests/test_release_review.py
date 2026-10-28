@@ -27,7 +27,7 @@ class ReviewTests(unittest.TestCase):
     def test_invalid_structural_header_edits_refuse(self):
         from romancer.system_integrity import integrity_edits
         with tempfile.TemporaryDirectory() as folder:
-            for system,offset,after in [('nes',4,'ff'),('gb',0x148,'08'),('snes',0x7fd5,'21'),('gba',0xb2,'00'),('genesis',0x1a7,'00')]:
+            for system,offset,after in [('nes',4,'ff'),('gb',0x148,'08'),('snes',0x7fd5,'21'),('genesis',0x1a7,'00')]:
                 data=make_boot_fixture(system)['data'];path=Path(folder)/system;path.write_bytes(data)
                 with self.subTest(system=system),self.assertRaises(ValueError):
                     integrity_edits(path,hashlib.sha256(data).hexdigest(),system,[{'offset':offset,'before':data[offset:offset+1].hex(),'after':after}])

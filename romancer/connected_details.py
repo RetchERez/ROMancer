@@ -34,10 +34,10 @@ def extend_graph(row,path,definitions,nodes,add,connect,cancelled):
         from .sound_studio import inspect_sound
         doc=inspect_sound(raw,definitions['sound'],row['sha256'])
         for song in doc['songs']:
-            m4a=song['driver'] in ('wl4-m4a-v1','wl4-m4a-v2');length=8+song['channels']*4 if m4a else song['count']*song['stride']
+            length=song['count']*song['stride']
             parent=add('song',song['name'],song['offset'],length,'sound',{'song_id':song['id']})
             for index,event in enumerate(song['events'][:128]):
-                at=event.get('offset',song['offset']+index*song['stride']);length=1 if m4a else song['stride']
+                at=event.get('offset',song['offset']+index*song['stride']);length=song['stride']
                 n=add('music_event',song['name']+' / '+event.get('kind','note')+' #'+str(index),at,length,'sound',{'song_id':song['id'],'event':index});connect(parent,n,'contains_music_event')
             partial|=len(song['events'])>128
     return partial

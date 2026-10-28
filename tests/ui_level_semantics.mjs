@@ -13,6 +13,10 @@ assert.deepEqual(semantics.actorHitboxes(doc,model,'lab'),[{index:0,name:'Hero',
 model.set({kind:'object',room_id:'lab',index:0,field:'width',value:4});assert.equal(semantics.actorHitboxes(doc,model,'lab')[0].width,4);
 assert.throws(()=>model.set({kind:'object',room_id:'lab',index:0,field:'width',value:0}),/bounds/);
 const inspector=objectInspector({draft:(id,f)=>f},doc,model,'lab');
+const advancedAt=inspector.indexOf('<details class="level-object-advanced"');
+assert(advancedAt>inspector.indexOf('id="level-object-input-0"'),'X/Y stay available without opening technical controls');
+assert(advancedAt<inspector.indexOf('id="level-object-input-2"'),'Hitbox controls belong inside Advanced');
+assert.doesNotMatch(inspector,/<details class="level-object-advanced" open/);
 assert.match(inspector,/Hitbox width \(pixels\)/);assert.match(inspector,/min="1"/);assert.match(inspector,/starting position/i);
 assert.equal(semantics.actorHitboxes({...doc,rooms:[{...room,object_metadata:[]}]},model,'lab').length,0);
 const previewDoc={...doc,tiles:[Array(64).fill(0),Array(64).fill(1)],palette:[[0,0,0],[255,120,60]],metatiles:[[0]],rooms:[{...room,terrain:Array(960).fill(0),object_metadata:[{...room.object_metadata[0],sprite:{tiles:[1],width:1,height:1,transparent_index:0}}]}]};

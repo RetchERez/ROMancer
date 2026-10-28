@@ -6,6 +6,24 @@ import tempfile
 import unittest
 
 class RecipeTests(unittest.TestCase):
+    def test_sms_recipe_rebuilds_checksum_without_replaying_protected_header_edits(self):
+        from romancer.workbench_api import WorkbenchAPI
+        from romancer.boot_fixtures import make_boot_fixture
+        with tempfile.TemporaryDirectory() as folder:
+            root=Path(folder);path=root/'original.sms';raw=make_boot_fixture('sms')['data'];path.write_bytes(raw);api=WorkbenchAPI(root/'work')
+            def call(op,args):
+                result=api.dispatch(op,args);self.assertTrue(result['ok'],result);return result
+            try:
+                p={'project_id':call('project.create',{'name':'SMS recipe checksum'})['project_id']};a=call('source.import',{**p,'path':str(path),'system':None});sp={**p,'artifact_id':a['artifact_id']}
+                before=int.from_bytes(raw[0x3000:0x3002],'little');after=before^1
+                definition={'schema_version':1,'name':'Value','offset':0x3000,'count':1,'stride':2,'fields':[{'name':'Value','offset':0,'type':'u16','endian':'little','pointer_base':None}]}
+                doc=call('tables.inspect',{**sp,'definition':definition,'page':0,'limit':1});plan=call('tables.plan',{**sp,'definition':definition,'document_id':doc['document_id'],'changes':[{'row':0,'field':'Value','before':before,'after':after}]})
+                recipe=call('recipes.from_plan',{**sp,'plan_id':plan['plan_id'],'name':'Change one data value'})['recipe'];preview=call('recipes.preview',{**sp,'recipe':recipe});built=call('build.apply',{**p,'plan_id':preview['plan_id']})
+                expected=bytearray(raw);expected[0x3000:0x3002]=after.to_bytes(2,'little');expected[0x7ffa:0x7ffc]=(sum(expected[:0x7ff0])&65535).to_bytes(2,'little')
+                self.assertEqual(Path(built['path']).read_bytes(),expected);self.assertEqual(path.read_bytes(),raw)
+                self.assertEqual(recipe['operations'],[{'kind':'bytes','offset':0x3000,'before':before.to_bytes(2,'little').hex(),'after':after.to_bytes(2,'little').hex()}])
+            finally:api.close()
+
     def service(self):
         self.assertIsNotNone(importlib.util.find_spec('romancer.workflow_recipes'),'offline recipes missing')
         from romancer import workflow_recipes

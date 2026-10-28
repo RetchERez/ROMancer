@@ -10,7 +10,7 @@ from .workbench_projects import _measure
 from .assets import digest
 
 PROVENANCE={'origin':'profile_assertion','note':'Explicit resource declaration entered in ROMancer.','reference':None}
-TEMPLATES={'sms':'tile8-rowplanar4-msb-v1','gb':'tile8-paired2-msb-v1','gbc':'tile8-paired2-msb-v1','nes':'tile8-planar2-msb-v1','snes':'tile8-paired4-msb-v1','genesis':'tile8-packed4-high-v1','segacd':'tile8-packed4-high-v1','gba':'tile8-packed4-low-v1'}
+TEMPLATES={'sms': 'tile8-rowplanar4-msb-v1', 'gb': 'tile8-paired2-msb-v1', 'gbc': 'tile8-paired2-msb-v1', 'nes': 'tile8-planar2-msb-v1', 'snes': 'tile8-paired4-msb-v1', 'genesis': 'tile8-packed4-high-v1', 'segacd': 'tile8-packed4-high-v1'}
 
 
 def _source(path,sha):
@@ -62,42 +62,64 @@ def script_schema(path,sha,config):
     _measure(path,source);return validate_schema(schema)['normalized_schema']
 
 
-def graphics_schema(path,sha,config):
-    source=_source(path,sha);system=_system(config)
-    allowed={'system_id','offset','count','codec','width','height','palette_offset','palette_banks','palette_format','map_offset','map_width','map_height','font_chars','advance_offset','advance_pixels'}
-    if set(config)-allowed:raise ValueError('unknown graphics declaration field')
-    codec=config.get('codec') or TEMPLATES[system]
-    if codec not in CODECS:raise ValueError('unsupported declared codec')
-    width=number(config.get('width',8),1,32);height=number(config.get('height',8),1,32);count=number(config['count'],1,1024)
-    offset=number(config['offset'],0,source['size']);length=cell_size(codec,width,height)*count
-    palette_offset=config.get('palette_offset');palette_id='colors' if palette_offset is not None else None
-    bitmap={'id':'tiles','offset':offset,'length':length,'codec':codec,'width':width,'height':height,'count':count,'palette_id':palette_id,'provenance':PROVENANCE}
-    palettes=[];maps=[];fonts=[]
+def graphics_schema(path, sha, config):
+    source = _source(path, sha)
+    system = _system(config)
+    allowed = {'system_id', 'offset', 'count', 'codec', 'width', 'height', 'palette_offset', 'palette_banks', 'palette_format', 'map_offset', 'map_width', 'map_height', 'font_chars', 'advance_offset', 'advance_pixels'}
+    if set(config) - allowed:
+        raise ValueError('unknown graphics declaration field')
+    codec = config.get('codec') or TEMPLATES[system]
+    if codec not in CODECS:
+        raise ValueError('unsupported declared codec')
+    width = number(config.get('width', 8), 1, 32)
+    height = number(config.get('height', 8), 1, 32)
+    count = number(config['count'], 1, 1024)
+    offset = number(config['offset'], 0, source['size'])
+    length = cell_size(codec, width, height) * count
+    palette_offset = config.get('palette_offset')
+    palette_id = 'colors' if palette_offset is not None else None
+    bitmap = {'id': 'tiles', 'offset': offset, 'length': length, 'codec': codec, 'width': width, 'height': height, 'count': count, 'palette_id': palette_id, 'provenance': PROVENANCE}
+    palettes = []
+    maps = []
+    fonts = []
     if palette_offset is not None:
-        number(palette_offset,0,source['size']);banks=number(config.get('palette_banks',1),1,16);colors=2**CODECS[codec]
-        fmt=config.get('palette_format','genesis' if system in ('genesis','segacd') else 'sms-rgb222' if system=='sms' else 'rgb555-le')
-        formats={'genesis':(2,'big',{'r':14,'g':224,'b':3584}),'rgb555-le':(2,'little',{'r':31,'g':992,'b':31744}),'rgb555-be':(2,'big',{'r':31,'g':992,'b':31744}),'sms-rgb222':(1,'little',{'r':3,'g':12,'b':48})}
-        if fmt not in formats:raise ValueError('unsupported palette format')
-        entry_bytes,byte_order,channels=formats[fmt]
-        palettes=[{'id':'colors','offset':palette_offset,'length':banks*colors*entry_bytes,'entry_bytes':entry_bytes,'byte_order':byte_order,'banks':banks,'colors_per_bank':colors,'channels':channels,'provenance':PROVENANCE}]
+        number(palette_offset, 0, source['size'])
+        banks = number(config.get('palette_banks', 1), 1, 16)
+        colors = 2 ** CODECS[codec]
+        fmt = config.get('palette_format', 'genesis' if system in ('genesis', 'segacd') else 'sms-rgb222' if system == 'sms' else 'rgb555-le')
+        formats = {'genesis': (2, 'big', {'r': 14, 'g': 224, 'b': 3584}), 'rgb555-le': (2, 'little', {'r': 31, 'g': 992, 'b': 31744}), 'rgb555-be': (2, 'big', {'r': 31, 'g': 992, 'b': 31744}), 'sms-rgb222': (1, 'little', {'r': 3, 'g': 12, 'b': 48})}
+        if fmt not in formats:
+            raise ValueError('unsupported palette format')
+        entry_bytes, byte_order, channels = formats[fmt]
+        palettes = [{'id': 'colors', 'offset': palette_offset, 'length': banks * colors * entry_bytes, 'entry_bytes': entry_bytes, 'byte_order': byte_order, 'banks': banks, 'colors_per_bank': colors, 'channels': channels, 'provenance': PROVENANCE}]
     if config.get('map_offset') is not None:
-        if not palettes or (width,height)!=(8,8):raise ValueError('tilemap requires a palette and8x8 tiles')
-        mw=number(config.get('map_width',1),1,64);mh=number(config.get('map_height',1),1,64)
-        if system in ('nes','gb','gbc'):entry=1;fields={'tile_index':255,'palette_bank':None,'flip_x':None,'flip_y':None}
-        elif system=='gba':entry=2;fields={'tile_index':1023,'palette_bank':61440,'flip_x':1024,'flip_y':2048}
-        elif system=='snes':entry=2;fields={'tile_index':1023,'palette_bank':7168,'flip_x':16384,'flip_y':32768}
-        elif system=='sms':entry=2;fields={'tile_index':511,'palette_bank':2048,'flip_x':512,'flip_y':1024}
-        else:entry=2;fields={'tile_index':2047,'palette_bank':24576,'flip_x':2048,'flip_y':4096}
-        maps=[{'id':'map','offset':config['map_offset'],'length':entry*mw*mh,'entry_bytes':entry,'byte_order':'big' if system in ('genesis','segacd') else 'little',
-               'width':mw,'height':mh,'bitmap_id':'tiles','palette_id':'colors','fields':{key:({'kind':'constant','value':0} if mask is None else {'kind':'bits','mask':mask}) for key,mask in fields.items()},'provenance':PROVENANCE}]
-    chars=config.get('font_chars','')
+        if not palettes or (width, height) != (8, 8):
+            raise ValueError('tilemap requires a palette and8x8 tiles')
+        mw = number(config.get('map_width', 1), 1, 64)
+        mh = number(config.get('map_height', 1), 1, 64)
+        if system in ('nes', 'gb', 'gbc'):
+            entry = 1
+            fields = {'tile_index': 255, 'palette_bank': None, 'flip_x': None, 'flip_y': None}
+        elif system == 'snes':
+            entry = 2
+            fields = {'tile_index': 1023, 'palette_bank': 7168, 'flip_x': 16384, 'flip_y': 32768}
+        elif system == 'sms':
+            entry = 2
+            fields = {'tile_index': 511, 'palette_bank': 2048, 'flip_x': 512, 'flip_y': 1024}
+        else:
+            entry = 2
+            fields = {'tile_index': 2047, 'palette_bank': 24576, 'flip_x': 2048, 'flip_y': 4096}
+        maps = [{'id': 'map', 'offset': config['map_offset'], 'length': entry * mw * mh, 'entry_bytes': entry, 'byte_order': 'big' if system in ('genesis', 'segacd') else 'little', 'width': mw, 'height': mh, 'bitmap_id': 'tiles', 'palette_id': 'colors', 'fields': {key: {'kind': 'constant', 'value': 0} if mask is None else {'kind': 'bits', 'mask': mask} for key, mask in fields.items()}, 'provenance': PROVENANCE}]
+    chars = config.get('font_chars', '')
     if chars:
-        if type(chars) is not str or len(chars)!=count or len(set(chars))!=count or codec!='mono-row-msb-v1':raise ValueError('font needs one unique character per mono cell')
-        advance_offset=config.get('advance_offset');advance_pixels=number(config.get('advance_pixels',width),0,128)
-        fonts=[{'id':'font','provenance':PROVENANCE,'glyphs':[{'id':'u'+format(ord(char),'04x'),'bitmap_id':'tiles','cell_index':i,'bearing':{'x':0,'y':0},
-                'advance':({'kind':'u8','offset':advance_offset+i} if advance_offset is not None else {'kind':'declared','pixels':advance_pixels,'provenance':PROVENANCE}),'provenance':PROVENANCE} for i,char in enumerate(chars)]}]
-    schema={'schema_version':1,'id':'declared-graphics','version':'1','source':source,'bitmaps':[bitmap],'palettes':palettes,'tilemaps':maps,'fonts':fonts,'provenance':PROVENANCE}
-    _measure(path,source);return validate_asset_schema(schema)['normalized_schema']
+        if type(chars) is not str or len(chars) != count or len(set(chars)) != count or (codec != 'mono-row-msb-v1'):
+            raise ValueError('font needs one unique character per mono cell')
+        advance_offset = config.get('advance_offset')
+        advance_pixels = number(config.get('advance_pixels', width), 0, 128)
+        fonts = [{'id': 'font', 'provenance': PROVENANCE, 'glyphs': [{'id': 'u' + format(ord(char), '04x'), 'bitmap_id': 'tiles', 'cell_index': i, 'bearing': {'x': 0, 'y': 0}, 'advance': {'kind': 'u8', 'offset': advance_offset + i} if advance_offset is not None else {'kind': 'declared', 'pixels': advance_pixels, 'provenance': PROVENANCE}, 'provenance': PROVENANCE} for i, char in enumerate(chars)]}]
+    schema = {'schema_version': 1, 'id': 'declared-graphics', 'version': '1', 'source': source, 'bitmaps': [bitmap], 'palettes': palettes, 'tilemaps': maps, 'fonts': fonts, 'provenance': PROVENANCE}
+    _measure(path, source)
+    return validate_asset_schema(schema)['normalized_schema']
 
 
 def font_schema_from_assets(schema):

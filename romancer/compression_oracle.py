@@ -37,7 +37,7 @@ def verify_encoded(encoded,codec,expected,*,cancelled=lambda:False):
     if codec=='snes-lz2':return _verify_lz2(encoded,expected,cancelled)
     if type(encoded) is not bytes or type(expected) is not bytes or not 1<=len(expected)<=1024**2 or not 4<=len(encoded)<=2*1024**2:
         raise ValueError('Independent decode input exceeds its bounds.')
-    signature={'gba-lz10':16,'gba-rle':48}.get(codec)
+    signature={'lz10':16,'rle':48}.get(codec)
     if signature is None or encoded[0]!=signature or int.from_bytes(encoded[1:4],'little')!=len(expected):
         raise ValueError('Independent decode header differs from the edited resource.')
     output=bytearray(len(expected));source=4;destination=0;checks=0

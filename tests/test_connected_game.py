@@ -14,7 +14,7 @@ class ConnectedGameTests(unittest.TestCase):
     def test_shared_view_connects_declared_resources_on_every_supported_system_without_game_profiles(self):
         with tempfile.TemporaryDirectory() as folder:
             root=Path(folder);api=WorkbenchAPI(root/'work');self.addCleanup(api.close)
-            for system in ('nes','snes','genesis','sms','gb','gbc','gba'):
+            for system in ('nes','snes','genesis','sms','gb','gbc'):
                 with self.subTest(system=system):
                     if system=='sms':
                         raw=bytearray(32768);raw[0x7ff0:0x7ff8]=b'TMR SEGA';raw[0x7fff]=0x4c;raw=bytes(raw)

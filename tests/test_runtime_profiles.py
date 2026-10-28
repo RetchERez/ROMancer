@@ -25,8 +25,8 @@ class RuntimeProfileTests(unittest.TestCase):
         from romancer.runtime_profiles import save_profile,load_profile,validate_profile
         with tempfile.TemporaryDirectory() as temp:
             root=Path(temp);workspace=root/'workspace';workspace.mkdir();core=root/'core';fake_core(core);system=root/'system';system.mkdir();bios=system/'own.bin';bios.write_bytes(b'own system file')
-            profile=save_profile(workspace,'segacd',str(core),{'region':'Japan'},str(system),{'up':'ArrowUp','a':'z'})
-            self.assertFalse(profile['runtime_verified']);self.assertEqual(load_profile(workspace,'segacd')['profile']['options'],{'region':'Japan'})
+            profile=save_profile(workspace,'snes',str(core),{'region':'Japan'},str(system),{'up':'ArrowUp','a':'z'})
+            self.assertFalse(profile['runtime_verified']);self.assertEqual(load_profile(workspace,'snes')['profile']['options'],{'region':'Japan'})
             verified=validate_profile(profile['profile']);self.assertEqual(verified['system_files'][0]['expected_sha256'],hashlib.sha256(b'own system file').hexdigest())
             bios.write_bytes(b'changed system!')
             with self.assertRaises(ValueError):validate_profile(profile['profile'])
@@ -39,7 +39,7 @@ class RuntimeProfileTests(unittest.TestCase):
         from romancer.runtime_profiles import save_profile
         with tempfile.TemporaryDirectory() as temp:
             root=Path(temp);core=root/'core';core.write_bytes(b'not a native library')
-            with self.assertRaises(ValueError):save_profile(root,'gba',str(core),{},None,{})
+            with self.assertRaises(ValueError):save_profile(root,'gbc',str(core),{},None,{})
 
     def test_preflight_measures_system_dependencies_and_refuses_changed_bytes(self):
         from romancer.runtime_session import preflight_load

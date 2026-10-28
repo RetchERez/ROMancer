@@ -10,7 +10,7 @@ class PopularReferenceTests(unittest.TestCase):
 
     def test_popular_game_library_has_pinned_primary_sources_and_no_edit_authority(self):
         result=self.library().catalog('pokemon','all')
-        self.assertGreaterEqual(len(result['references']),4)
+        self.assertEqual(len(result['references']),2)
         self.assertFalse(result['write_authorized'])
         for row in result['references']:
             self.assertEqual(row['status'],'DOCUMENTED_REFERENCE')
@@ -28,12 +28,11 @@ class PopularReferenceTests(unittest.TestCase):
         lib=self.library()
         red=lib.table_template('pokemon-red-blue',0,1,28,1024,'gb')
         crystal=lib.table_template('pokemon-crystal',0,1,32,1024,'gbc')
-        gba=lib.table_template('pokemon-gba',0,1,28,1024,'gba')
         field=lambda d,n:next(f['offset'] for f in d['fields'] if f['name']==n)
-        self.assertEqual((field(red,'HP'),field(crystal,'Sp. attack'),field(gba,'HP')),(1,5,0))
-        with self.assertRaises(ValueError):lib.table_template('pokemon-gba',0,1,9,1024,'gba')
-        with self.assertRaises(ValueError):lib.table_template('pokemon-gba',0,1,28,1024,'snes')
-        with self.assertRaises(ValueError):lib.table_template('pokemon-gba',1000,2,28,1024,'gba')
+        self.assertEqual((field(red,'HP'),field(crystal,'Sp. attack')),(1,5))
+        with self.assertRaises(ValueError):lib.table_template('pokemon-crystal',0,1,9,1024,'gbc')
+        with self.assertRaises(ValueError):lib.table_template('pokemon-crystal',0,1,28,1024,'snes')
+        with self.assertRaises(ValueError):lib.table_template('pokemon-crystal',1000,2,28,1024,'gbc')
 
     def test_dispatch_accepts_all_system_reference_filter_without_claiming_a_rom_system(self):
         import tempfile
@@ -42,7 +41,7 @@ class PopularReferenceTests(unittest.TestCase):
             api=WorkbenchAPI(d)
             try:
                 result=api.dispatch('references.catalog',{'query':'pokemon','system_filter':'all'})
-                self.assertTrue(result['ok'],result);self.assertEqual(len(result['references']),4)
+                self.assertTrue(result['ok'],result);self.assertEqual(len(result['references']),2)
             finally:api.close()
 
     def test_checked_template_opens_original_fixture_table_without_saving_or_claiming_pokemon(self):
@@ -50,12 +49,12 @@ class PopularReferenceTests(unittest.TestCase):
         from pathlib import Path
         from romancer.workbench_api import WorkbenchAPI
         with tempfile.TemporaryDirectory() as d:
-            path=Path(d)/'original.gba';raw=bytearray(make_boot_fixture('gba')['data']);raw[0x1000]=40;path.write_bytes(raw)
+            path=Path(d)/'original.gbc';raw=bytearray(make_boot_fixture('gbc')['data']);raw[0x1000]=40;path.write_bytes(raw)
             api=WorkbenchAPI(Path(d)/'work')
             try:
                 p=api.dispatch('project.create',{'name':'Original layout test'});source=api.dispatch('source.import',{'project_id':p['project_id'],'path':str(path),'system':None})
                 sp={'project_id':p['project_id'],'artifact_id':source['artifact_id']}
-                result=api.dispatch('references.template',{**sp,'template_id':'pokemon-gba','offset':0x1000,'count':1,'stride':28})
+                result=api.dispatch('references.template',{**sp,'template_id':'pokemon-crystal','offset':0x1000,'count':1,'stride':28})
                 self.assertTrue(result['ok'],result);self.assertFalse(result['rom_revision_verified'])
                 self.assertEqual(result['inspection']['rows'][0]['cells'][0]['value'],40)
                 self.assertNotIn('tables',api.dispatch('project.open',{'project_id':p['project_id']})['sources'][0].get('descriptors',{}))

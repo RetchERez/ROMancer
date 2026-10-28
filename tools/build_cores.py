@@ -23,10 +23,6 @@ MAKE_RECIPES={
     'genesis':['make','-f','Makefile.libretro','CC=gcc','OPT=-O2 -flto=4','-j4'],
     'gb':['make','-f','Makefile.libretro','platform=win','CC=gcc','CXX=g++','LDFLAGS=-static -lws2_32','-j3'],
 }
-MGBA_CONFIG=['cmake','-S','.','-B','build-romancer','-G','Ninja','-DCMAKE_BUILD_TYPE=Release',
-    '-DBUILD_LIBRETRO=ON','-DBUILD_QT=OFF','-DBUILD_SDL=OFF','-DBUILD_SHARED=OFF',
-    '-DBUILD_STATIC=OFF','-DSKIP_LIBRARY=ON','-DDISABLE_DEPS=ON','-DENABLE_SCRIPTING=OFF',
-    '-DUSE_PTHREADS=OFF','-DCMAKE_SHARED_LINKER_FLAGS=-static-libgcc -static-libstdc++']
 
 
 def extract_sources(archive,destination):
@@ -50,38 +46,38 @@ def extract_sources(archive,destination):
     return destination
 
 
-def rebuild(archive,destination,msys):
-    if os.name!='nt':raise ValueError('this recipe builds Windows x64 engines; use upstream build files for other hosts')
-    msys=Path(msys).absolute();root=extract_sources(archive,destination)
-    paths=[msys/'ucrt64/bin',msys/'usr/bin'];environment=os.environ.copy()
-    environment['PATH']=os.pathsep.join(map(str,paths))+os.pathsep+environment.get('PATH','')
-    # BlastEm selects its Windows recipe using this build-system identifier.
-    # Compiler paths below explicitly select UCRT64, rather than MINGW64's CRT.
-    environment['MSYSTEM']='MINGW64'
-    environment['PYTHON']=shlex.quote(sys.executable.replace('\\','/'))
-    tools={'make':msys/'usr/bin/make.exe','cmake':msys/'ucrt64/bin/cmake.exe'}
-    def run(args,cwd):
-        command=[str(tools[args[0]]),*args[1:]]
-        with (root/(cwd.name+'-build.log')).open('ab') as output:
-            subprocess.run(command,cwd=cwd,env=environment,stdout=output,stderr=subprocess.STDOUT,check=True)
-    result={}
-    for system,pin in CORE_PINS.items():
-        directory=root/pin['source_directory']
-        if system=='snes':
-            header=directory/'nall/platform.hpp';text=header.read_text(encoding='utf-8')
-            old='  #undef  __MSVCRT_VERSION__\n  #define __MSVCRT_VERSION__ 0x0601\n'
-            if text.count(old)!=1:raise ValueError('SNES UCRT compatibility patch precondition differs')
-            header.write_text(text.replace(old,''),encoding='utf-8',newline='\n')
-        if system=='gba':
-            args=[*MGBA_CONFIG,'-DCMAKE_C_COMPILER='+str(paths[0]/'gcc.exe'),
-                  '-DCMAKE_CXX_COMPILER='+str(paths[0]/'g++.exe'),'-DCMAKE_MAKE_PROGRAM='+str(paths[0]/'ninja.exe')]
-            run(args,directory);run(['cmake','--build','build-romancer','--target','mgba_libretro','-j','3'],directory)
-            binary=directory/'build-romancer'/pin['file']
-        else:
-            run(MAKE_RECIPES[system],directory);binary=directory/pin['file']
-        with binary.open('rb') as stream:sha=hashlib.file_digest(stream,'sha256').hexdigest()
-        result[system]={'path':str(binary),'sha256':sha,'matches_release_binary':sha==pin['sha256']}
-    (root/'build-results.json').write_text(json.dumps(result,indent=2)+'\n',encoding='utf-8')
+def rebuild(archive, destination, msys):
+    if os.name != 'nt':
+        raise ValueError('this recipe builds Windows x64 engines; use upstream build files for other hosts')
+    msys = Path(msys).absolute()
+    root = extract_sources(archive, destination)
+    paths = [msys / 'ucrt64/bin', msys / 'usr/bin']
+    environment = os.environ.copy()
+    environment['PATH'] = os.pathsep.join(map(str, paths)) + os.pathsep + environment.get('PATH', '')
+    environment['MSYSTEM'] = 'MINGW64'
+    environment['PYTHON'] = shlex.quote(sys.executable.replace('\\', '/'))
+    tools = {'make': msys / 'usr/bin/make.exe', 'cmake': msys / 'ucrt64/bin/cmake.exe'}
+
+    def run(args, cwd):
+        command = [str(tools[args[0]]), *args[1:]]
+        with (root / (cwd.name + '-build.log')).open('ab') as output:
+            subprocess.run(command, cwd=cwd, env=environment, stdout=output, stderr=subprocess.STDOUT, check=True)
+    result = {}
+    for system, pin in CORE_PINS.items():
+        directory = root / pin['source_directory']
+        if system == 'snes':
+            header = directory / 'nall/platform.hpp'
+            text = header.read_text(encoding='utf-8')
+            old = '  #undef  __MSVCRT_VERSION__\n  #define __MSVCRT_VERSION__ 0x0601\n'
+            if text.count(old) != 1:
+                raise ValueError('SNES UCRT compatibility patch precondition differs')
+            header.write_text(text.replace(old, ''), encoding='utf-8', newline='\n')
+        run(MAKE_RECIPES[system], directory)
+        binary = directory / pin['file']
+        with binary.open('rb') as stream:
+            sha = hashlib.file_digest(stream, 'sha256').hexdigest()
+        result[system] = {'path': str(binary), 'sha256': sha, 'matches_release_binary': sha == pin['sha256']}
+    (root / 'build-results.json').write_text(json.dumps(result, indent=2) + '\n', encoding='utf-8')
     return result
 
 

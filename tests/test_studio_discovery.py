@@ -4,13 +4,13 @@ import hashlib,unittest
 class StudioDiscoveryTests(unittest.TestCase):
     def test_pointer_values_are_candidates_with_exact_coverage_and_no_write_authority(self):
         from romancer.studio_discovery import scan_structures
-        raw=(0x08000020).to_bytes(4,'little')+bytes(60)
-        result=scan_structures(raw,'gba',0,64)
-        self.assertEqual(result['candidates'][0]['target_offset'],32)
+        raw=(0x220).to_bytes(4,'big')+bytes(1020)
+        result=scan_structures(raw,'genesis',0,1024)
+        self.assertEqual(result['candidates'][0]['target_offset'],0x220)
         self.assertEqual(result['candidates'][0]['confidence'],'CANDIDATE')
         self.assertFalse(result['write_authorized']);self.assertFalse(result['dereference_observed'])
-        self.assertEqual(result['coverage']['positions_checked'],16)
-        self.assertEqual(scan_structures(raw,'nes',0,64)['candidates'],[])
+        self.assertEqual(result['coverage']['positions_checked'],256)
+        self.assertEqual(scan_structures(raw,'nes',0,1024)['candidates'],[])
 
     def test_declared_level_and_audio_relationships_keep_exact_source_identity(self):
         from romancer.studio_discovery import resource_relationships

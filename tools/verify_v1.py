@@ -23,7 +23,9 @@ def checksum(raw,system):
     if system=='genesis':raw[0x18e:0x190]=(sum(int.from_bytes(raw[i:i+2],'big') for i in range(0x200,len(raw),2))&65535).to_bytes(2,'big')
     if system in ('gb','gbc'):
         raw[0x14d]=(-sum(raw[0x134:0x14d])-25)&255;raw[0x14e:0x150]=b'\0\0';raw[0x14e:0x150]=(sum(raw)&65535).to_bytes(2,'big')
-    if system=='gba':raw[0xbd]=(-sum(raw[0xa0:0xbd])-0x19)&255
+    if system=='sms':
+        from romancer.system_formats.sms import checksum as sms_checksum
+        raw[0x7ffa:0x7ffc]=sms_checksum(raw,0x7ff0,len(raw)).to_bytes(2,'little')
     return bytes(raw)
 
 
@@ -33,12 +35,12 @@ def verify(root,cores=None,restore=True):
         result=api.dispatch(operation,params)
         if not result.get('ok'):raise ValueError(operation+': '+str(result))
         return result
-    for system in ('nes','snes','genesis','gb','gbc','gba'):
+    for system in ('nes','snes','genesis','gb','gbc','sms'):
         for variant in (0,1):
             folder=root/(system+'-'+str(variant));folder.mkdir();fixture=make_boot_fixture(system);raw=bytearray(fixture['data'])
             raw[0x3000:0x3010]=(b'HELLO' if not variant else b'WORLD!')+b'\0'+b'\xff'*(10 if not variant else 9)
             value=100+variant*50;raw[0x3020:0x3024]=value.to_bytes(2,'little')+(value+10).to_bytes(2,'little')
-            codec='gba-lz10' if not variant else 'gba-rle';decoded=b'PACKED\0'+b'\xff'*9;stream=encode_stream(decoded,codec);raw[0x3040:0x3080]=stream+b'\0'*(64-len(stream))
+            codec='lz10' if not variant else 'rle';decoded=b'PACKED\0'+b'\xff'*9;stream=encode_stream(decoded,codec);raw[0x3040:0x3080]=stream+b'\0'*(64-len(stream))
             original=checksum(raw,system);source=folder/('original'+fixture['suffix']);source.write_bytes(original);expected=bytearray(original)
             api=WorkbenchAPI(folder/'workspace')
             try:

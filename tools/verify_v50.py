@@ -13,7 +13,7 @@ from romancer.release import prepare_patch,verify_patch
 
 def fixtures():
     from romancer.system_demo import make_system_fixtures
-    labels={'nes':'NES','snes':'SNES','genesis':'Genesis','gb':'Game Boy','gba':'GBA'}
+    labels={'nes':'NES','snes':'SNES','genesis':'Genesis','gb':'Game Boy','gbc':'Game Boy Color','sms':'Master System'}
     return {labels[k]:v for k,v in make_system_fixtures().items()}
 
 
@@ -21,7 +21,7 @@ def fixtures():
 def verify_v50(workspace:Path)->dict:
     from romancer.system_identify import identify_system
     root=Path(workspace)/('verification-'+uuid.uuid4().hex);root.mkdir(parents=True)
-    expected={'NES':'nes','SNES':'snes','Genesis':'genesis','Game Boy':'gb','GBA':'gba'}
+    expected={'NES':'nes','SNES':'snes','Genesis':'genesis','Game Boy':'gb','Game Boy Color':'gbc','Master System':'sms'}
     results={}
     for family,raw in fixtures().items():
         source=root/(family.replace(' ','-')+'.fixture');source.write_bytes(raw)

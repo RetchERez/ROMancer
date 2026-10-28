@@ -36,7 +36,7 @@ class CheatScanAPITests(unittest.TestCase):
         from romancer.mcp_server import READ_OPERATIONS,WRITE_OPERATIONS
         self.assertIn('cheats.inspect',READ_OPERATIONS);self.assertIn('cheats.catalog',READ_OPERATIONS)
         self.assertIn('cheats.import',WRITE_OPERATIONS);self.assertNotIn('cheats.import',READ_OPERATIONS)
-        self.assertIn('engines.inspect',READ_OPERATIONS)
+        self.assertNotIn('engines.inspect',READ_OPERATIONS)
 
     def test_replacing_catalog_invalidates_signed_scan_cache(self):
         from romancer import rom_scan,workbench_projects

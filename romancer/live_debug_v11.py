@@ -134,10 +134,3 @@ def bridge_probe(host:str,port:int,timeout:float=3.0)->dict[str,Any]:
         return {"tool":"ROMancer","feature":"v11 live debug bridge probe","ok":False,"error":str(e)}
     finally:
         c.close()
-
-
-def mgba_bridge_template(port:int=17680)->str:
-    # mGBA documents Lua TCP sockets and CoreAdapter memory/register/step APIs.
-    # This template is intentionally a starting bridge, not an assertion that a
-    # particular mGBA binary has been configured or launched by ROMancer.
-    return f'''-- ROMancer v11 mGBA bridge bootstrap\n-- Requires mGBA 0.10+ Lua scripting; dev APIs add breakpoint/watchpoint support.\nlocal server = socket.bind("127.0.0.1", {int(port)})\nassert(server:listen(1) == 0)\nconsole:log("ROMancer bridge listening on 127.0.0.1:{int(port)}")\n-- The production protocol is newline-delimited JSON.\n-- mGBA exposes socket:accept/receive/send and emu:read8/read16/read32,\n-- emu:write8/write16/write32, emu:readRegister/writeRegister, emu:step,\n-- save/load state and (development API) breakpoint/watchpoint callbacks.\n-- Deploy the full bridge appropriate to the exact mGBA version after verifying\n-- available methods in that version's scripting documentation.\n'''

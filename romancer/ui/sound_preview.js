@@ -32,15 +32,10 @@ export function drawWaveform(canvas,peaks){
  if(!canvas)return;const c=canvas.getContext('2d'),middle=canvas.height/2,amplitude=Math.max(0,middle-5);c.fillStyle='#102127';c.fillRect(0,0,canvas.width,canvas.height);c.strokeStyle='#73d7ba';c.beginPath();
  for(const [i,[low,high]] of peaks.entries()){const x=i/(peaks.length-1||1)*canvas.width;c.moveTo(x,middle-low/32768*amplitude);c.lineTo(x,middle-high/32768*amplitude);}c.stroke();
 }
-function sameOperand(song,change,index,field){
- if(change.kind!=='note'||change.song_id!==song.id||change.field!==field)return false;
- if(change.index===index)return true;
- const offset=song.events[index]?.edit_offsets?.[field];return ['wl4-m4a-v1','wl4-m4a-v2'].includes(song.driver)&&Number.isSafeInteger(offset)&&song.events[change.index]?.edit_offsets?.[field]===offset;
-}
+function sameOperand(song,change,index,field){return change.kind==='note'&&change.song_id===song.id&&change.index===index&&change.field===field;}
 export function soundEventValue(song,changes,index,field){return changes.find(change=>sameOperand(song,change,index,field))?.value??song.events[index][field];}
 export function stageNote(doc,changes,songId,index,field,value){
- const song=doc.songs.find(s=>s.id===songId),bounds=['wl4-m4a-v1','wl4-m4a-v2'].includes(song?.driver)?{note:[0,127],volume:[0,127],channel_volume:[0,127],tempo:[1,127],pan:[0,127]}:{note:[33,108],duration:[1,6000],volume:[0,127]};
- if(['wl4-m4a-v1','wl4-m4a-v2'].includes(song?.driver)&&(!song.sequence_edit_supported||!song.events[index]?.editable_fields?.includes(field)))throw Error('This value is inherited, protected or read-only. Choose an explicit editable event.');
+ const song=doc.songs.find(s=>s.id===songId),bounds={note:[33,108],duration:[1,6000],volume:[0,127]};
  if(!song||!Number.isInteger(index)||index<0||index>=song.events.length||!bounds[field]||!Number.isInteger(value)||value<bounds[field][0]||value>bounds[field][1])throw Error('Choose a supported song field and an in-range value.');
  const result=changes.filter(change=>!sameOperand(song,change,index,field));if(value!==song.events[index][field])result.push({kind:'note',song_id:songId,index,field,value});
  if(result.length>256)throw Error('Review at most256 sound changes. Create a build before staging more.');return result;
@@ -52,7 +47,6 @@ export function restoreSoundChanges(doc,encoded){
  for(const c of saved.changes){
   if(!c||typeof c!=='object'||Array.isArray(c))throw Error('Saved audio edits contain an invalid change.');
   const key=JSON.stringify([c.kind,c.song_id??c.sample_id,c.index,c.field]);if(seen.has(key))throw Error('Saved audio edits contain duplicate changes.');seen.add(key);
-  const song=c.kind==='note'?doc.songs.find(song=>song.id===c.song_id):null;if(['wl4-m4a-v1','wl4-m4a-v2'].includes(song?.driver)&&result.some(change=>sameOperand(song,change,c.index,c.field)))throw Error('Saved audio edits contain duplicate shared-pattern changes.');
   if(c.kind==='note')result=stageNote(doc,result,c.song_id,c.index,c.field,c.value);
   else if(c.kind==='sample'){
    if(!doc.samples.some(s=>s.id===c.sample_id)||!['gain','reverse','silence','replace_wav'].includes(c.operation))throw Error('Saved audio edits reference an unsupported sample.');

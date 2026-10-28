@@ -8,7 +8,7 @@ from romancer.hardware_reference import reference_for,classify_address
 
 class HardwareReferenceTests(unittest.TestCase):
     def test_supported_systems_have_sources_and_separate_address_domains(self):
-        for system in ('nes','snes','genesis','gb','gbc','gba','sms'):
+        for system in ('nes','snes','genesis','gb','gbc','sms'):
             doc=reference_for(system)
             self.assertTrue(doc['references']);self.assertIn('cpu',doc['domains'])
             self.assertFalse(doc['write_authorized'])
@@ -55,19 +55,11 @@ class HardwareReferenceTests(unittest.TestCase):
         self.assertEqual(classify_address('genesis',0xff0000,'cpu')['kind'],'ram')
         self.assertEqual(classify_address('genesis',0x100,'cpu')['kind'],'rom-window')
 
-    def test_gba_rom_mirrors_video_io_and_saves_are_distinct(self):
-        for address in (0x08000000,0x0a000000,0x0c000000):
-            self.assertEqual(classify_address('gba',address,'cpu')['kind'],'rom-window')
-        self.assertEqual(classify_address('gba',0x06000000,'cpu')['kind'],'graphics')
-        self.assertEqual(classify_address('gba',0x04000000,'cpu')['kind'],'io')
-        self.assertEqual(classify_address('gba',0x0e000000,'cpu')['kind'],'cartridge')
-        for address in (0x02040000,0x03008000):self.assertEqual(classify_address('gba',address,'cpu')['kind'],'ram-mirror')
-        for address in (0x05000400,0x06018000,0x07000400):self.assertEqual(classify_address('gba',address,'cpu')['kind'],'graphics')
 
     def test_strict_system_domain_address_bounds_and_no_write_authority(self):
         for args in (('nes',65536,'cpu'),('gb',-1,'cpu'),('snes',True,'cpu'),('gba',0,'ppu'),('gb',0,'file')):
             with self.subTest(args=args),self.assertRaises(ValueError):classify_address(*args)
-        for system in ('nes','snes','genesis','gb','gbc','gba'):
+        for system in ('nes','snes','genesis','gb','gbc'):
             doc=classify_address(system,0,'cpu')
             self.assertFalse(doc['write_authorized']);self.assertFalse(doc['game_semantics_verified'])
 

@@ -53,7 +53,7 @@ class VerificationSafetyTests(unittest.TestCase):
     def test_existing_fake_executable_is_discovery_only(self):
         exe = self.root / "fake.exe"
         exe.write_bytes(b"This is not an emulator")
-        config = self.json_file("bridge.json", {"backends": [{"name": "mgba", "path": str(exe)}]})
+        config = self.json_file("bridge.json", {"backends": [{"name": "gambatte", "path": str(exe)}]})
         result = lab.bridge_probe(str(config))
         row = result["backends"][0]
         self.assertFalse(row["live_control"])
@@ -64,7 +64,7 @@ class VerificationSafetyTests(unittest.TestCase):
         self.assertEqual(result["scope"], "executable_discovery")
 
     def test_bridge_directory_is_not_executable_discovery(self):
-        config = self.json_file("bridge.json", {"backends": [{"name": "mgba", "path": str(self.root)}]})
+        config = self.json_file("bridge.json", {"backends": [{"name": "gambatte", "path": str(self.root)}]})
         row = lab.bridge_probe(str(config))["backends"][0]
         self.assertFalse(row.get("executable_discovered", row["path_exists"]))
 

@@ -2,8 +2,8 @@
 import copy
 
 REGISTRY_VERSION='1'
-FOCUS_SYSTEM_IDS=('nes','snes','genesis','gb','gbc','gba','sms')
-SYSTEM_IDS=frozenset({'nes','snes','genesis','gb','gbc','gba','sms','segacd'})
+FOCUS_SYSTEM_IDS=('nes', 'snes', 'genesis', 'gb', 'gbc', 'sms')
+SYSTEM_IDS=frozenset({'nes', 'snes', 'genesis', 'gb', 'gbc', 'sms'})
 
 
 def _cap(status,reason,implementation):
@@ -11,16 +11,7 @@ def _cap(status,reason,implementation):
 
 
 def _definitions():
-    descriptions=(
-        ('nes','NES',['ines','nes2'],'iNES/NES 2.0 header, trainer, PRG-ROM and CHR-ROM extents.'),
-        ('snes','SNES',['lorom','hirom','exhirom-candidate'],'Header candidates and declared copier prefix; mapping remains heuristic.'),
-        ('genesis','Genesis',['genesis-linear'],'Linear cartridge header and declared ROM extent; interleaved variants are separate.'),
-        ('gb','Game Boy',['gb-cartridge'],'DMG header, declared ROM banks and header checksum.'),
-        ('gbc','Game Boy Color',['gbc-cartridge'],'CGB-compatible and Color-only header flags, ROM banks and checksums.'),
-        ('segacd','Sega CD',['mode1-2048','mode1-2352','cue-unresolved'],'System identifier and supported first-sector layout; CUE dependencies need explicit import.'),
-        ('sms','Master System',['sms-sega'],'Bounded Sega header and additive checksum; game resources require declarations.'),
-        ('gba','GBA',['gba-linear'],'Fixed header byte and complement; logo validation and boot are separate checks.'),
-    )
+    descriptions=(('nes', 'NES', ['ines', 'nes2'], 'iNES/NES 2.0 header, trainer, PRG-ROM and CHR-ROM extents.'), ('snes', 'SNES', ['lorom', 'hirom', 'exhirom-candidate'], 'Header candidates and declared copier prefix; mapping remains heuristic.'), ('genesis', 'Genesis', ['genesis-linear'], 'Linear cartridge header and declared ROM extent; interleaved variants are separate.'), ('gb', 'Game Boy', ['gb-cartridge'], 'DMG header, declared ROM banks and header checksum.'), ('gbc', 'Game Boy Color', ['gbc-cartridge'], 'CGB-compatible and Color-only header flags, ROM banks and checksums.'), ('sms', 'Master System', ['sms-sega'], 'Bounded Sega header and additive checksum; game resources require declarations.'))
     packs=[]
     for identifier,label,formats,description in descriptions:
         module='romancer/system_formats/'+('gb' if identifier=='gbc' else identifier)+'.py'

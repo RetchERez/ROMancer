@@ -202,7 +202,7 @@ class Workspace:
         # Several Windows cores still use MAX_PATH APIs. Hash-named owned builds
         # need a short staged basename; content identity remains the measured SHA.
         # Disc manifests keep their names and explicit relative dependencies.
-        content_name = ('game' + game.suffix.lower()) if not dependencies and len(game.name)>32 and game.suffix.lower() in ('.nes','.sfc','.smc','.md','.gen','.gb','.gbc','.gba','.rom','.bin') else game.name
+        content_name = ('game' + game.suffix.lower()) if not dependencies and len(game.name)>32 and game.suffix.lower() in ('.nes','.sfc','.smc','.md','.gen','.gb','.gbc','.sms','.rom','.bin') else game.name
         copies = [(core, session / 'native' / core.name, core_hash),
                   (game, session / 'content' / content_name, game_hash)]
         names = {content_name.casefold()}

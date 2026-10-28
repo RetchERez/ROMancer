@@ -57,7 +57,7 @@ class CommandTests(unittest.TestCase):
         folder=self.enterContext(tempfile.TemporaryDirectory())
         api=WorkbenchAPI(Path(folder)/'work');self.addCleanup(api.close)
         settings=api.dispatch('settings.get',{});api.dispatch('settings.save',{'revision':settings['revision'],'values':{**settings['values'],'autoDeepScan':False}})
-        for system in ('nes','snes','genesis','sms','gb','gbc','gba'):
+        for system in ('nes','snes','genesis','sms','gb','gbc'):
             with self.subTest(system=system):
                 data,d=sample();boot=bytearray(32768) if system=='sms' else bytearray(make_boot_fixture(system)['data']);
                 if system=='sms':boot[0x7ff0:0x7ff8]=b'TMR SEGA';boot[0x7fff]=0x4c

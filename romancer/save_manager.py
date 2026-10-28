@@ -75,17 +75,7 @@ def capture_save(api,project,artifact_id,name,*,cancelled=lambda:False):
 
 
 def _compatible_size(raw,current,session):
-    exposed=_payload(current)
-    if len(raw)==len(exposed):return True
-    # Match the frontend's narrow mGBA initial-allocation exception. The new
-    # worker still verifies every seed byte and the unchanged allocation tail.
-    runtime=session.get('runtime');loaded=getattr(runtime,'load_result',{})
-    core=loaded.get('loaded',{}).get('core',{})
-    tail=exposed[len(raw):]
-    return (core.get('library_name','').casefold()=='mgba'
-            and Path(session['load'].get('game','')).suffix.lower()=='.gba'
-            and len(exposed)==131072 and len(raw) in (512,8192,32768,65536)
-            and bool(tail) and len(set(tail))==1 and tail[0] in (0,255))
+    return len(raw)==len(_payload(current))
 
 
 def import_save(api,project,artifact_id,input_id,name,*,cancelled=lambda:False):

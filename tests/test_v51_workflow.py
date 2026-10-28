@@ -2,7 +2,7 @@ from romancer import ROMANCER_VERSION
 from pathlib import Path
 import tempfile
 import unittest
-from tests.test_system_identify import nes_bytes,gba_bytes
+from tests.test_system_identify import nes_bytes,snes_bytes
 
 
 class FoundationAPITests(unittest.TestCase):
@@ -12,7 +12,7 @@ class FoundationAPITests(unittest.TestCase):
             report=verify_v51(Path(temp))
             self.assertTrue(report['ok'],report)
             self.assertEqual(report['tool_version'],ROMANCER_VERSION)
-            self.assertEqual(set(report['families']),{'nes','snes','genesis','gb','gba'})
+            self.assertEqual(set(report['families']),{'nes','snes','genesis','gb','gbc','sms'})
             self.assertEqual(report['nes_edit']['independent_bytes'],'PASS')
             self.assertEqual(report['nes_edit']['independent_patch'],'PASS')
             self.assertFalse(report['runtime_verified']);self.assertFalse(report['full_game_compatibility_claimed'])
@@ -27,21 +27,21 @@ class FoundationAPITests(unittest.TestCase):
                 unknown=root/'misleading.nes';unknown.write_bytes(b'UNKNOWN BYTES')
                 row=api.dispatch('source.import',{**p,'path':str(unknown),'system':'NES'})
                 self.assertFalse(row['ok'],row);self.assertEqual(row['status'],'BLOCKED');self.assertIn('recognized',row['error'])
-                gba=root/'GBA with spaces.bin';gba.write_bytes(gba_bytes())
-                row=api.dispatch('source.import',{**p,'path':str(gba),'system':None})
-                self.assertEqual(row['system_id'],'gba');self.assertEqual(row['system'],'GBA')
+                fixture=root/'SNES with spaces.bin';fixture.write_bytes(snes_bytes())
+                row=api.dispatch('source.import',{**p,'path':str(fixture),'system':None})
+                self.assertEqual(row['system_id'],'snes');self.assertEqual(row['system'],'SNES')
                 params={**p,'artifact_id':row['artifact_id']}
                 fresh=api.dispatch('systems.identify',params);self.assertEqual(fresh['source']['sha256'],row['sha256'])
                 self.assertFalse(fresh['write_authorized']);self.assertFalse(fresh['runtime_verified'])
                 caps=api.dispatch('system.capabilities',{});self.assertEqual(caps['version'],__import__('romancer').ROMANCER_VERSION)
                 self.assertEqual(caps['target_version'],'1.0');self.assertIn('adapters',caps)
-                inventory=api.dispatch('systems.list',{});self.assertEqual(len(inventory['systems']),7)
+                inventory=api.dispatch('systems.list',{});self.assertEqual(len(inventory['systems']),6)
                 with self.assertRaises(ValueError):api.jobs.submit('systems.list',{})
-                self.assertFalse(api.dispatch('systems.identify',{**params,'path':str(gba)})['ok'])
+                self.assertFalse(api.dispatch('systems.identify',{**params,'path':str(fixture)})['ok'])
                 self.assertFalse(api.dispatch('systems.identify',{**p,'artifact_id':'0'*32})['ok'])
                 owned=Path(row['path']);raw=bytearray(owned.read_bytes());raw[-1]^=1;owned.write_bytes(raw)
                 self.assertEqual(api.dispatch('systems.identify',params)['status'],'BLOCKED')
-                self.assertEqual(gba.read_bytes(),gba_bytes())
+                self.assertEqual(fixture.read_bytes(),snes_bytes())
             finally:api.close()
 
     def test_legacy_record_without_assessment_can_be_identified(self):
@@ -77,7 +77,7 @@ class FoundationAPITests(unittest.TestCase):
                 for token,origin,code in ((None,None,401),(server.session_token,'https://example.invalid',403)):
                     with self.assertRaises(urllib.error.HTTPError) as caught:request(token,origin)
                     self.assertEqual(caught.exception.code,code);caught.exception.close()
-                self.assertEqual(len(request(server.session_token)['systems']),7)
+                self.assertEqual(len(request(server.session_token)['systems']),6)
             finally:server.shutdown();server.server_close();server.api.close();thread.join(3)
 
 

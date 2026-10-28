@@ -80,9 +80,9 @@ class ContainerTests(unittest.TestCase):
         from romancer.system_demo import make_system_fixtures
         with tempfile.TemporaryDirectory() as temp:
             root=Path(temp)
-            for system in ('snes','genesis','gba'):
+            for system in ('snes','genesis'):
                 data=make_system_fixtures()[system];source=root/system;source.write_bytes(data);sha=hashlib.sha256(data).hexdigest()
-                offset={'snes':0x100,'genesis':0x200,'gba':0xa0}[system]
+                offset={'snes':0x100,'genesis':0x200}[system]
                 edits=integrity_edits(source,sha,system,[{'offset':offset,'before':data[offset:offset+1].hex(),'after':'41'}])
                 target=bytearray(data)
                 for e in edits:target[e['offset']:e['offset']+len(bytes.fromhex(e['after']))]=bytes.fromhex(e['after'])

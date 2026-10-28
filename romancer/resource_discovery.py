@@ -43,7 +43,7 @@ def pointer_references(path,sha,*,target,width,endian,base,start=0,length=SCAN_L
 
 
 def discover(path,sha,system_id,start,length,kinds,*,target=None,cancelled=lambda:False):
-    if system_id not in FOCUS_SYSTEM_IDS:raise ValueError('choose NES, SNES, Genesis, Game Boy, Game Boy Color or GBA')
+    if system_id not in FOCUS_SYSTEM_IDS:raise ValueError('choose NES, SNES, Genesis, Game Boy, Game Boy Color or Master System')
     if type(kinds) is not list or not kinds or len(kinds)!=len(set(kinds)) or set(kinds)-{'text','graphics','pointers','compression'}:
         raise ValueError('choose supported discovery kinds')
     path,source,raw=_read(path,sha,start,length,cancelled);rows=[];truncated=False;sampling=None;compression_budget={}

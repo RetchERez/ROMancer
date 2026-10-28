@@ -10,7 +10,6 @@ _NES = 'https://www.nesdev.org/wiki/CPU_memory_map'
 _SNES = 'https://snes.nesdev.org/wiki/CPU_vectors'
 _GEN = 'https://www.plutiedev.com/memory-map'
 _GB = 'https://gbdev.io/pandocs/The_Cartridge_Header.html#0100-0103--entry-point'
-_GBA = 'https://problemkaputt.de/gbatek.htm#gbacartridgeheader'
 
 
 def _item(name, status, detail, locations=(), *, cpu_address=None, value=None, reference=None):
@@ -183,28 +182,6 @@ def _gb(raw, candidate, metadata):
                           cpu_address=target, value=target, reference=_GB)]
 
 
-def _gba(raw, candidate):
-    name = 'GBA ARM entry branch'
-    if candidate.get('format') != 'gba-linear' or len(raw) < 4:
-        return [_item(name, 'NOT_CHECKED', 'A complete linear ARM entry word is required.', reference=_GBA)]
-    word = int.from_bytes(raw[:4], 'little')
-    locations = [_location(0, 4, 'ARM cartridge entry word')]
-    if word & 0xff000000 != 0xea000000:
-        return [_item(name, 'NOT_CHECKED', 'Entry is not the supported unconditional ARM B instruction. Conditional branches, BL and other instructions are not decoded.',
-                      locations, value=word, reference=_GBA)]
-    displacement = word & 0xffffff
-    if displacement & 0x800000:
-        displacement -= 0x1000000
-    offset = 8+(displacement << 2)
-    address = (0x08000000+offset) & 0xffffffff
-    if offset == 0:
-        status, detail = 'WARN', 'Unconditional ARM B returns to its own entry word; no code is executed to assess intent.'
-    elif not 0 <= offset <= min(len(raw), 32*1024*1024)-4:
-        status, detail = 'WARN', 'Signed ARM branch destination is outside the bounded cartridge image; mirrors and alternate boot environments are not inferred.'
-    else:
-        locations.append(_location(offset, 4, 'ARM branch target word'))
-        status, detail = 'PASS', 'Signed imm24 displacement with the ARM PC+8 rule resolves to a complete word in the image. This is static encoding/mapping evidence, not instruction or boot verification.'
-    return [_item(name, status, detail, locations, cpu_address=address, value=address, reference=_GBA)]
 
 
 def inspect_startup(raw: bytes, candidate: dict) -> list:
@@ -216,8 +193,7 @@ def inspect_startup(raw: bytes, candidate: dict) -> list:
     if not isinstance(raw, (bytes, bytearray)):
         raise ValueError('startup inspection requires raw cartridge bytes')
     if not isinstance(candidate, dict) or candidate.get('layout_valid') is not True:
-        return [_item('Cartridge startup inspection', 'NOT_CHECKED',
-                      'A unique layout-valid system candidate is required; no startup mapping is inferred.')]
+        return [_item('Cartridge startup inspection', 'NOT_CHECKED', 'A unique layout-valid system candidate is required; no startup mapping is inferred.')]
     metadata = candidate.get('metadata')
     if not isinstance(metadata, dict):
         return [_item('Cartridge startup inspection', 'NOT_CHECKED', 'Candidate metadata is unavailable.')]
@@ -230,7 +206,4 @@ def inspect_startup(raw: bytes, candidate: dict) -> list:
         return _genesis(raw, candidate, metadata)
     if system in ('gb', 'gbc'):
         return _gb(raw, candidate, metadata)
-    if system == 'gba':
-        return _gba(raw, candidate)
-    return [_item('Cartridge startup inspection', 'NOT_CHECKED',
-                  'No startup inspection is implemented for this system.')]
+    return [_item('Cartridge startup inspection', 'NOT_CHECKED', 'No startup inspection is implemented for this system.')]

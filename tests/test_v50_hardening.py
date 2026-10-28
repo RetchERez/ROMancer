@@ -30,7 +30,7 @@ class HardeningTests(unittest.TestCase):
         with tempfile.TemporaryDirectory() as temp:
             report=module.verify_v50(Path(temp))
             self.assertTrue(report['ok'],report)
-            self.assertEqual(set(report['families']),{'NES','SNES','Genesis','Game Boy','GBA'})
+            self.assertEqual(set(report['families']),{'NES','SNES','Genesis','Game Boy','Game Boy Color','Master System'})
             for family,result in report['families'].items():
                 self.assertEqual(result['generic_workflow'],'PASS',family)
                 self.assertEqual(result['private_game_runtime'],'NOT_RUN',family)

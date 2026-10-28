@@ -102,7 +102,7 @@ def build_compact_pdf(data,folder,pages,glossary_groups,index_groups,contents_gr
         return bottom
     active='cover';y=frame('Make a change. Understand it. Test it.','ROMancer / compact user guide','cover')
     y=paragraph(html.escape(data['subtitle']),48,y-15,1280,26)-30
-    y=paragraph('NES / SNES / Genesis / Master System / Game Boy / Game Boy Color / GBA',48,y,1280,20,accent)-30
+    y=paragraph('NES / SNES / Genesis / Master System / Game Boy / Game Boy Color',48,y,1280,20,accent)-30
     y=paragraph('<b>Start here</b><br/>Open the editing studio or import a ROM. Check what is ready for that revision. Follow one task through preview, build, test and export.',48,y,1280,23)-30
     y=paragraph(html.escape(data['scope']),48,y,1280,19)-25
     y=paragraph('<b>Use this guide</b><br/>Procedures and illustrations share pages. Short topics share a spread. Every heading, contents entry, glossary term and index page number remains linked. The offline HTML edition includes full-size pictures and topic search.',48,y,1280,21)-30

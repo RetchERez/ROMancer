@@ -30,7 +30,7 @@ class CommandRewriteTests(unittest.TestCase):
         from tests.test_text_growth import TextGrowthTests
         from romancer.command_editor import inspect_commands
         helper=TextGrowthTests();helper.setUp();self.addCleanup(helper.doCleanups)
-        for system in ('nes','snes','genesis','sms','gb','gbc','gba'):
+        for system in ('nes','snes','genesis','sms','gb','gbc'):
             with self.subTest(system=system):
                 p,path,raw,_,_,*_=helper.source(system);api=helper.api
                 plan=api.dispatch('bytes.plan',{**p,'edits':[{'offset':0x1200,'before':raw[0x1200:0x1208].hex(),'after':'1008201234ff0000'}]});built=api.dispatch('build.apply',{'project_id':p['project_id'],'plan_id':plan['plan_id']});self.assertTrue(built['ok'],built);p['artifact_id']=built['artifact_id']

@@ -608,32 +608,7 @@ def version_diff(a: str, b: str, out: str | None = None) -> dict[str, Any]:
 
 def bridge_install_template(backend: str = "generic", out: str | None = None) -> Any:
     backend = backend.lower()
-    templates = {
-        "mgba": {
-            "backend": "mGBA",
-            "transport": "script socket or Lua bridge where configured",
-            "required_user_inputs": ["emulator path", "content path", "script path or socket endpoint"],
-            "capabilities": ["memory read/write where transport is exposed", "breakpoint templates", "scenario snapshots"],
-        },
-        "mesen2": {
-            "backend": "Mesen2",
-            "transport": "Lua/debugger scripting where configured",
-            "required_user_inputs": ["emulator path", "script output path", "ROM path"],
-            "capabilities": ["debugger event templates", "breakpoint templates", "memory watch templates"],
-        },
-        "blastem": {
-            "backend": "BlastEm",
-            "transport": "debugger command workflow or trace files",
-            "required_user_inputs": ["emulator path", "ROM path", "trace/log path"],
-            "capabilities": ["trace import", "breakpoint checklist", "memory-watch plan"],
-        },
-        "libretro": {
-            "backend": "libretro",
-            "transport": "existing ROMancer runtime layer",
-            "required_user_inputs": ["core path", "content path"],
-            "capabilities": ["deterministic input", "state capture", "RAM snapshot when core exposes memory"],
-        },
-    }
+    templates = {'mesen2': {'backend': 'Mesen2', 'transport': 'Lua/debugger scripting where configured', 'required_user_inputs': ['emulator path', 'script output path', 'ROM path'], 'capabilities': ['debugger event templates', 'breakpoint templates', 'memory watch templates']}, 'blastem': {'backend': 'BlastEm', 'transport': 'debugger command workflow or trace files', 'required_user_inputs': ['emulator path', 'ROM path', 'trace/log path'], 'capabilities': ['trace import', 'breakpoint checklist', 'memory-watch plan']}, 'libretro': {'backend': 'libretro', 'transport': 'existing ROMancer runtime layer', 'required_user_inputs': ['core path', 'content path'], 'capabilities': ['deterministic input', 'state capture', 'RAM snapshot when core exposes memory']}}
     result = {"tool": "ROMancer", "version": VERSION, "feature": "v23 bridge install template", "ok": True, "template": templates.get(backend, {"backend": backend, "transport": "manual evidence import", "required_user_inputs": [], "capabilities": ["trace import", "report generation"]})}
     return write_if(out, result)
 
@@ -647,7 +622,6 @@ def bridge_probe(config: str | None = None, out: str | None = None) -> dict[str,
             raise ValueError("backends must be a list")
         if not backends:
             backends = [
-                {"name": "mgba", "path": os.environ.get("MGBA_PATH", "")},
                 {"name": "mesen2", "path": os.environ.get("MESEN2_PATH", "")},
                 {"name": "blastem", "path": os.environ.get("BLASTEM_PATH", "")},
                 {"name": "libretro", "path": os.environ.get("LIBRETRO_CORE", "")},

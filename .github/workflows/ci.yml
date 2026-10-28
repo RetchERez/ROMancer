@@ -96,7 +96,7 @@ jobs:
             $body = @{ operation = 'system.capabilities'; parameters = @{} } | ConvertTo-Json -Compress
             $capabilities = Invoke-RestMethod -Uri ($parts[0] + '/api/call') -Method Post -Headers $headers -ContentType 'application/json' -Body $body
             if ($capabilities.version -ne $active.version) { throw 'Installed server version differs' }
-            foreach ($guideFile in @('index.html', 'guide.css', 'guide.pdf', 'screenshots/07-ffl2-room.png', 'screenshots/13-settings.png')) {
+            foreach ($guideFile in @('index.html', 'guide.css', 'guide.pdf', 'screenshots/07-ffl2-room.png', 'screenshots/249-readable-theme-and-advanced-settings.png')) {
               $download = Join-Path $PWD ('work_private/guide-' + ($guideFile -replace '/', '-'))
               Invoke-WebRequest -Uri ($parts[0] + '/user-guide/' + $guideFile) -OutFile $download
               $included = Join-Path $version ('app/user-guide/' + $guideFile)

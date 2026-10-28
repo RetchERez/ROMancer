@@ -1,7 +1,7 @@
 import {esc,button,badge} from './common.js';
 import {selectionKey} from './tool_inputs.js';
-const systems=new Set(['nes','snes','genesis','gb','gbc','gba','sms']);
-const names={nes:'NES',snes:'SNES',genesis:'Genesis',gb:'Game Boy',gbc:'Game Boy Color',gba:'GBA',sms:'Master System (basic)'};
+const systems=new Set(['nes','snes','genesis','gb','gbc','sms']);
+const names={nes:'NES',snes:'SNES',genesis:'Genesis',gb:'Game Boy',gbc:'Game Boy Color',sms:'Master System (basic)'};
 export function sourceSupport(ctx){const a=ctx.state.artifact;if(!a)return '';const allowed=systems.has(a.system_id),d=a.descriptors||{},scan=ctx.state.romScans?.[selectionKey(ctx.state)]?.result,profile=scan?.identification?.status==='MATCHED';
  return `<details class="card"><summary>What is known about this source ${badge(allowed?'Supported system':'Inspect only',allowed?'good':'warm')}</summary><p>System: ${esc(allowed?names[a.system_id]:'Unresolved or unsupported')} · ${profile?'Exact game revision verified':'Game-specific meanings require a verified definition'}</p><p>Saved definitions: ${Object.entries({Graphics:!!d.assets,Text:!!d.script,Tables:!!d.tables,Levels:!!d.levels,Samples:!!d.sound?.samples?.length,Music:!!d.sound?.songs?.length}).filter(([,v])=>v).map(([name])=>name).join(' · ')||'None yet'}</p><p>Known means a verified revision or documented system format. Saved declarations are checked when opened. Candidates and unknown data do not establish game behavior.</p><div class="actions">${button('Inspect bytes & health','navigate',{id:'resources'})}${button('System setup','navigate',{id:'playtest',disabled:!allowed})}</div></details>`;
 }

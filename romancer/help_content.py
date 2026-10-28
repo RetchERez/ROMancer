@@ -26,7 +26,7 @@ TOPICS=(
         'Open Music & sound to see documented audio hardware and the identified driver, or Unknown.',
         'Load this source in Playtest and reach a useful sound. Record native preview captures its mixed output; use play, pause, seek and loop.',
         'A supported sample definition allows waveform preview and fixed-allocation edits. Quantized re-encoding is lossy.',
-        'Sequence editing is enabled only for an implemented, verified driver. Hillside and Mossy Hollow have original note formats. The checked Wario Land4 M4A reader supports explicit values in selected songs; conditional songs stay read-only.'], 'music audio sample sound engine driver wav brr dpcm'),
+        'Sequence editing is enabled only for an implemented, verified driver. Hillside and Mossy Hollow have original note formats.'], 'music audio sample sound engine driver wav brr dpcm'),
     _topic('projects','Create and delete projects','Keep separate work in separate projects.',[
         'Choose New project, enter a name, then Create & import ROM or Create empty project.',
         'Open Projects in the sidebar to switch projects or choose Delete project.',
@@ -107,7 +107,7 @@ TOPICS=(
         'Review changes and any declared shared consumers, then create a build.',
         'Playtest the build and export a patch once the result is correct.'], 'tile palette image png font glyph map pixels sprite'),
     _topic('tables','Edit data tables and pointers','Define record layout before changing numeric fields.',[
-        'Open Data tables. Set the table offset, number of records and bytes per record.',
+        'Open Stats & data. Set the table offset, number of records and bytes per record.',
         'Add named fields with their relative offset, numeric type and byte order.',
         'For a linear pointer, declare its base. A resolved file offset does not establish a bank-switched CPU address.',
         'Inspect the rows, edit values or preview a batch change, then review the exact byte changes.',
@@ -117,7 +117,7 @@ TOPICS=(
         'Extract it into the project. Edit the decoded resource through the normal editors and create an edited build.',
         'Choose the edited decoded build and review recompression into its original parent.',
         'The new stream must fit the confirmed allocation. ROMancer refuses growth that would overwrite neighboring data.',
-        'Reinsertion independently decodes the result and compares every decoded byte. Unknown formats stay read-only.'], 'GBA lz77 lz10 rle extract reinsert allocation'),
+        'Reinsertion independently decodes the result and compares every decoded byte. Unknown formats stay read-only.'], 'lz77 lz10 rle extract reinsert allocation'),
     _topic('playtest','Playtest a source or build','Use the included engine or a matching saved setup.',[
         'Choose the source or build in the top bar and open Playtest.',
         'The full Windows release selects its included engine automatically. Choose Load game, then Play; custom cores are available in Advanced setup.',
@@ -187,10 +187,7 @@ TOPICS=(
         'Check the DMG/CGB header flags and declared cartridge size.',
         'Game Boy tiles store two bitplanes per row; this differs from the NES tile layout.',
         'The fixed bank-zero window and selected ROM banks can be translated explicitly. Game Boy and Game Boy Color use separate hardware profiles. Original DMG and Color-only drawing programs have measured native state replay; game compatibility still needs its own tests.'], 'system gameboy bank checksum'),
-    _topic('gba','GBA system notes','Linear ROM, low-nibble-first tiles and known BIOS compression.',[
-        'The header fixed byte and complement help establish the supported cartridge layout.',
-        'Templates include low-nibble-first4bpp tiles and RGB555 palettes. The ROM wait-state regions map to the same file content.',
-        'Validated LZ10 and RLE streams can be extracted and recompressed within a confirmed allocation; arbitrary audio drivers and other compression are not inferred.'], 'system advance lz10 rle'),
+
 )
 
 

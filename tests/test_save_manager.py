@@ -17,36 +17,6 @@ def snapshot(raw,game):
 
 
 class SaveManagerTests(unittest.TestCase):
-    def test_mgba_autodetect_import_and_restore_before_first_frame(self):
-        from romancer.save_manager import import_save,restore_save,list_saves
-        from romancer.workbench_api import WorkbenchAPI
-        from unittest.mock import Mock
-        from types import SimpleNamespace
-        with tempfile.TemporaryDirectory() as folder:
-            root=Path(folder);rom=root/'game.gba';rom.write_bytes(b'gba');save=root/'progress.sav';seed=b'W'*32768;save.write_bytes(seed)
-            api=WorkbenchAPI(root/'workspace')
-            try:
-                project=Path(p.create_project(api.projects,'Early save')['path']);row=p.register_source(project,rom,None)
-                api.runtime.session_selection=Mock(return_value={'id':row['artifact_id'],'sha256':row['sha256']})
-                api.runtime.request=Mock(return_value=snapshot(b'\xff'*131072,row['sha256']))
-                runtime=SimpleNamespace(load_result={'loaded':{'core':{'library_name':'mGBA'}}})
-                session={'runtime':runtime,'load':{'core':'fake','game':str(rom),'core_options':{},'expected_core_sha256':'a'*64,'system_files':[]}}
-                api.runtime.sessions[str(project)]=session
-                inp=import_input(project,save,save.name,'save')
-                imported=import_save(api,project,row['artifact_id'],inp['input_id'],'Existing progress')
-                api.runtime.close_session=Mock();api.runtime.load=Mock(return_value={'ok':True,'run_mode':'game_save_continuation'})
-                restored=restore_save(api,project,row['artifact_id'],imported['save_id'])
-                self.assertEqual(restored['status'],'RESTORED')
-                configuration=api.runtime.load.call_args.kwargs['configuration']
-                self.assertEqual(base64.b64decode(configuration['game_save']['save_ram_base64']),seed)
-                self.assertTrue(any(s['size']==131072 and s['origin']=='automatic_backup' for s in list_saves(project,row['artifact_id'])['saves']))
-                for core,game,raw in [('Other',str(rom),b'\xff'*131072),('mGBA',str(root/'game.gb'),b'\xff'*131072),('mGBA',str(rom),b'\xff'*32768+b'\x01\x02'*49152)]:
-                    runtime.load_result={'loaded':{'core':{'library_name':core}}};session['load']['game']=game
-                    api.runtime.request.return_value=snapshot(raw,row['sha256']);api.runtime.close_session.reset_mock()
-                    with self.subTest(core=core,game=game,uniform=len(set(raw))==1):
-                        with self.assertRaisesRegex(ValueError,'size'):restore_save(api,project,row['artifact_id'],imported['save_id'])
-                        api.runtime.close_session.assert_not_called()
-            finally:api.runtime.sessions.clear();api.close()
 
     def test_save_preflight_accepts_supported_large_payload_without_raising_generic_request_budget(self):
         from romancer.runtime_session import preflight_load,snapshot_json

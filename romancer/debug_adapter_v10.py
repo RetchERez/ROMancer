@@ -43,79 +43,7 @@ class BackendProfile:
 
 # These profiles state only what the cited backend documentation exposes. They do
 # not claim that ROMancer can automate the backend unless live_control=True.
-PROFILES: dict[str, BackendProfile] = {
-    "mgba": BackendProfile(
-        id="mgba",
-        systems=("gb", "gbc", "gba"),
-        documented_capabilities=(
-            "run", "reset", "step_instruction", "read_registers", "write_registers",
-            "read_memory", "write_memory", "execute_breakpoint", "read_watchpoint",
-            "write_watchpoint", "savestate", "input_injection", "screenshot"
-        ),
-        transport="lua-script bridge required",
-        live_control=False,
-        executable_names=("mgba-qt", "mgba"),
-        notes=(
-            "mGBA 0.10+ exposes Lua scripting. Development documentation also exposes breakpoint and range-watchpoint APIs.",
-            "ROMancer v10 ships an adapter contract and script-plan generator, not a hidden GUI automation layer."
-        ),
-        source_urls=("https://mgba.io/docs/dev/scripting.html", "https://mgba.io/docs/scripting.html")
-    ),
-    "blastem": BackendProfile(
-        id="blastem",
-        systems=("genesis", "mega-drive"),
-        documented_capabilities=(
-            "run", "pause", "step_instruction", "step_over", "execute_breakpoint",
-            "write_watchpoint", "callstack", "read_memory", "read_registers", "trace",
-            "vdp_state"
-        ),
-        transport="native command-line debugger; interactive bridge not bundled",
-        live_control=False,
-        executable_names=("blastem",),
-        notes=(
-            "BlastEm documents breakpoint, watchpoint, continue, advance, step, next, over, backtrace and print/display commands.",
-            "Backtrace is explicitly heuristic in BlastEm documentation."
-        ),
-        source_urls=("https://github.com/libretro/blastem",)
-    ),
-    "mesen2": BackendProfile(
-        id="mesen2",
-        systems=("nes", "snes", "gb", "gbc", "pc-engine", "sms", "game-gear"),
-        documented_capabilities=(
-            "run", "pause", "step_instruction", "step_over", "step_out",
-            "execute_breakpoint", "read_watchpoint", "write_watchpoint", "callstack",
-            "trace", "code_data_log", "access_counters", "ppu_state", "savestate",
-            "input_injection", "screenshot"
-        ),
-        transport="Lua/debugger integration required",
-        live_control=False,
-        executable_names=("Mesen", "mesen", "Mesen2", "mesen2"),
-        notes=(
-            "Mesen2 debugger interfaces expose breakpoint manager, callstack manager, trace logger, PPU tools and step-back infrastructure.",
-            "Its Lua documentation exposes CDL and access-counter retrieval among other debugger-oriented functions."
-        ),
-        source_urls=(
-            "https://github.com/SourMesen/Mesen2/blob/master/Core/Debugger/IDebugger.h",
-            "https://github.com/SourMesen/Mesen2/blob/master/UI/Debugger/Documentation/LuaDocumentation.json"
-        )
-    ),
-    "offline-trace": BackendProfile(
-        id="offline-trace",
-        systems=("nes", "snes", "genesis"),
-        documented_capabilities=("trace",),
-        transport="ROMancer normalized trace parser",
-        live_control=True,
-        notes=("Provides deterministic offline causal analysis only; it cannot stop a running emulator.",)
-    ),
-    "mock": BackendProfile(
-        id="mock",
-        systems=("test",),
-        documented_capabilities=tuple(sorted(CAPABILITIES)),
-        transport="in-process deterministic test adapter",
-        live_control=True,
-        notes=("Synthetic adapter used only by ROMancer self-tests.",)
-    ),
-}
+PROFILES: dict[str, BackendProfile] = {'blastem': BackendProfile(id='blastem', systems=('genesis', 'mega-drive'), documented_capabilities=('run', 'pause', 'step_instruction', 'step_over', 'execute_breakpoint', 'write_watchpoint', 'callstack', 'read_memory', 'read_registers', 'trace', 'vdp_state'), transport='native command-line debugger; interactive bridge not bundled', live_control=False, executable_names=('blastem',), notes=('BlastEm documents breakpoint, watchpoint, continue, advance, step, next, over, backtrace and print/display commands.', 'Backtrace is explicitly heuristic in BlastEm documentation.'), source_urls=('https://github.com/libretro/blastem',)), 'mesen2': BackendProfile(id='mesen2', systems=('nes', 'snes', 'gb', 'gbc', 'pc-engine', 'sms', 'game-gear'), documented_capabilities=('run', 'pause', 'step_instruction', 'step_over', 'step_out', 'execute_breakpoint', 'read_watchpoint', 'write_watchpoint', 'callstack', 'trace', 'code_data_log', 'access_counters', 'ppu_state', 'savestate', 'input_injection', 'screenshot'), transport='Lua/debugger integration required', live_control=False, executable_names=('Mesen', 'mesen', 'Mesen2', 'mesen2'), notes=('Mesen2 debugger interfaces expose breakpoint manager, callstack manager, trace logger, PPU tools and step-back infrastructure.', 'Its Lua documentation exposes CDL and access-counter retrieval among other debugger-oriented functions.'), source_urls=('https://github.com/SourMesen/Mesen2/blob/master/Core/Debugger/IDebugger.h', 'https://github.com/SourMesen/Mesen2/blob/master/UI/Debugger/Documentation/LuaDocumentation.json')), 'offline-trace': BackendProfile(id='offline-trace', systems=('nes', 'snes', 'genesis'), documented_capabilities=('trace',), transport='ROMancer normalized trace parser', live_control=True, notes=('Provides deterministic offline causal analysis only; it cannot stop a running emulator.',)), 'mock': BackendProfile(id='mock', systems=('test',), documented_capabilities=tuple(sorted(CAPABILITIES)), transport='in-process deterministic test adapter', live_control=True, notes=('Synthetic adapter used only by ROMancer self-tests.',))}
 
 
 def list_debug_backends() -> dict[str, Any]:
@@ -133,38 +61,25 @@ def debug_backend_profile(name: str) -> dict[str, Any]:
     return PROFILES[key].to_dict()
 
 
-def debugger_plan(name: str, *, address: str, access: str = "write", goal: str = "") -> dict[str, Any]:
+def debugger_plan(name: str, *, address: str, access: str='write', goal: str='') -> dict[str, Any]:
     """Generate a conservative human/machine integration plan without pretending live control exists."""
     p = PROFILES.get(name.lower())
     if not p:
-        raise ValueError(f"Unknown backend: {name}")
+        raise ValueError(f'Unknown backend: {name}')
     access = access.lower()
-    required = "execute_breakpoint" if access == "execute" else ("read_watchpoint" if access == "read" else "write_watchpoint")
+    required = 'execute_breakpoint' if access == 'execute' else 'read_watchpoint' if access == 'read' else 'write_watchpoint'
     supported = required in p.documented_capabilities
     commands: list[str] = []
-    if p.id == "blastem":
-        if access == "execute": commands = [f"breakpoint {address}", "continue", "backtrace"]
-        else: commands = [f"watchpoint {address}", "continue", "backtrace"]
-    elif p.id == "mgba":
-        commands = [
-            "Use mGBA Lua CoreAdapter.",
-            f"Set {'setBreakpoint' if access == 'execute' else 'setWatchpoint/setRangeWatchpoint'} for {address}.",
-            "In callback, record currentCycle(), readRegister(...), and relevant bus values."
-        ]
-    elif p.id == "mesen2":
-        commands = [
-            "Configure a debugger breakpoint/memory callback for the target address.",
-            "Capture CPU state, callstack/trace context, and CDL/access-counter evidence where supported."
-        ]
+    if p.id == 'blastem':
+        if access == 'execute':
+            commands = [f'breakpoint {address}', 'continue', 'backtrace']
+        else:
+            commands = [f'watchpoint {address}', 'continue', 'backtrace']
+    elif p.id == 'mesen2':
+        commands = ['Configure a debugger breakpoint/memory callback for the target address.', 'Capture CPU state, callstack/trace context, and CDL/access-counter evidence where supported.']
     else:
-        commands = ["Backend is analysis-only or synthetic; no external debugger command generated."]
-    return {
-        "backend": p.to_dict(), "goal": goal, "address": address, "access": access,
-        "required_capability": required, "documented_supported": supported,
-        "live_automation_available": p.live_control,
-        "plan": commands,
-        "status": "ready" if supported else "unsupported",
-    }
+        commands = ['Backend is analysis-only or synthetic; no external debugger command generated.']
+    return {'backend': p.to_dict(), 'goal': goal, 'address': address, 'access': access, 'required_capability': required, 'documented_supported': supported, 'live_automation_available': p.live_control, 'plan': commands, 'status': 'ready' if supported else 'unsupported'}
 
 
 class MockDebugAdapter:

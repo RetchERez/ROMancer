@@ -1,4 +1,4 @@
-"""Fresh-workspace native acceptance for the six automatically bundled engines.
+"""Fresh-workspace native acceptance for the six automatically configured systems.
 
 Uses only ROMancer's original drawing programs. This tests startup, input, video,
 state loading and worker closure, not compatibility with every commercial game.
@@ -25,7 +25,7 @@ def verify_engines(workspace,output):
         if not result.get('ok'):raise ValueError(operation+': '+str(result.get('error')))
         return result
     try:
-        for system in ('nes','snes','genesis','gb','gbc','gba'):
+        for system in ('nes','snes','genesis','gb','gbc','sms'):
             profile=call('profiles.get',system_id=system)
             if profile['status']!='BUNDLED':raise ValueError(system+' did not select a bundled engine automatically')
             demo=call('project.demo_system',system_id=system);p={'project_id':demo['project_id']}

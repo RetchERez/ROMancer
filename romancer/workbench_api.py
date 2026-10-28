@@ -44,7 +44,7 @@ class WorkbenchAPI:
             'cheats.import':('project_id input_id',self._cheat_import),
             'cheats.catalog':('project_id',self._cheat_catalog),
             'cheats.inspect':('project_id artifact_id query page limit',self._cheat_inspect),
-            'engines.inspect':('project_id artifact_id',self._engine_inspect),
+
             'games.plan':('project_id artifact_id profile_id values',self._game_plan),
             'graphics.observe':('project_id artifact_id frame_sha256 region offset length',self._graphics_observe),
             'graphics.declare':('project_id artifact_id evidence_id matches',self._graphics_declare),
@@ -54,6 +54,7 @@ class WorkbenchAPI:
             'project.delete':('project_id',self._project_delete),
             'project.undelete':('trash_id',self._project_undelete),
             'rom.check':('project_id artifact_id expected_crc32 crc_scope',self._rom_check),
+            'rom.samples':('query system_filter page limit',self._sample_catalog),
             'system.ui_ready':('launch_id',lambda p,c:self._ui_startup(p,True)),
             'system.ui_status':('launch_id',lambda p,c:self._ui_startup(p,False)),
             'recipes.list':('project_id artifact_id',self._recipes_list),
@@ -219,12 +220,8 @@ class WorkbenchAPI:
         self.command_rewrite=CommandRewriteTools(self);self.routes.update(self.command_rewrite.routes())
         from .animation_layouts import AnimationTools
         self.animations=AnimationTools(self);self.routes.update(self.animations.routes())
-        from .m4a_instruments import InstrumentTools
-        self.instruments=InstrumentTools(self);self.routes.update(self.instruments.routes())
         from .reference_survey import ReferenceSurveyTools
         self.reference_survey=ReferenceSurveyTools(self);self.routes.update(self.reference_survey.routes())
-        from .documented_tables import DocumentedTableTools
-        self.documented=DocumentedTableTools(self);self.routes.update(self.documented.routes())
         from .source_symbols import SymbolTools
         self.symbols=SymbolTools(self);self.routes.update(self.symbols.routes())
         from .connected_game import ConnectedGameTools
@@ -294,10 +291,6 @@ class WorkbenchAPI:
         project,row,path=self.source(p)
         return inspect_catalog(project,row,path,query=p['query'],page=p['page'],limit=p['limit'],cancelled=c)
 
-    def _engine_inspect(self,p,c):
-        from .engine_recognition import recognize_engines
-        project,row,path=self.source(p)
-        return recognize_engines(path,row['sha256'],row.get('system_id'),cancelled=c)
 
     def _operations(self,p,c):
         return {'ok':True,'operations':[{'name':name,'required_parameters':entry[0].split()} for name,entry in sorted(self.routes.items())],
@@ -464,10 +457,7 @@ class WorkbenchAPI:
     def _capabilities(self,p,c):
         from .contracts import adapter_inventory
         from .system_registry import system_inventory
-        return {'ok':True,'product':'ROMancer','version':ROMANCER_VERSION,'display_version':ROMANCER_BUILD_LABEL,'release_name':ROMANCER_RELEASE_NAME,'build_label':ROMANCER_BUILD_LABEL,'target_version':'1.0','credit':'By RetchEWretched','release_status':'RELEASE',
-                'python':platform.python_version(),'platform':platform.system(),'pillow':importlib.util.find_spec('PIL') is not None,
-                'native_dialog':os.name=='nt' or importlib.util.find_spec('tkinter') is not None,'adapters':{**adapter_inventory(),'adapters':[a for a in adapter_inventory()['adapters'] if a['id'] in ('nes','snes','genesis','gb','gbc','gba','sms')]},'systems':system_inventory(),
-                'runtime_note':'The full Windows release includes engines for all seven systems. Source installations can use compatible local libretro cores. Gameplay evidence applies to the exact ROM and tested setup.'}
+        return {'ok': True, 'product': 'ROMancer', 'version': ROMANCER_VERSION, 'display_version': ROMANCER_BUILD_LABEL, 'release_name': ROMANCER_RELEASE_NAME, 'build_label': ROMANCER_BUILD_LABEL, 'target_version': '1.0', 'credit': 'By RetchEWretched', 'release_status': 'RELEASE', 'python': platform.python_version(), 'platform': platform.system(), 'pillow': importlib.util.find_spec('PIL') is not None, 'native_dialog': os.name == 'nt' or importlib.util.find_spec('tkinter') is not None, 'adapters': {**adapter_inventory(), 'adapters': [a for a in adapter_inventory()['adapters'] if a['id'] in ('nes', 'snes', 'genesis', 'gb', 'gbc', 'sms')]}, 'systems': system_inventory(), 'runtime_note': 'The full Windows release includes engines for all six systems. Source installations can use compatible local libretro cores. Gameplay evidence applies to the exact ROM and tested setup.'}
 
     def _agent_config(self,p,c):
         if type(p['allow_writes']) is not bool or type(p['read_roots']) is not list or len(p['read_roots'])>8:raise ValueError('choose agent access and up to eight import folders')
@@ -488,13 +478,14 @@ class WorkbenchAPI:
         from .help_content import project_readiness
         from .runtime_profiles import load_profile,validate_profile
         from .workbench_evidence import load_evidence
+        from .release_scope import SYSTEMS
         project=self.project(p);value=projects.read_project(project);exports=self.exports(project)
         configured=False
-        for system in {row.get('system_id') for row in value['sources'] if row.get('system_id')}:
-            profile=load_profile(self.workspace,system)['profile']
-            if profile:
-                try:validate_profile(profile);configured=True
-                except (ValueError,OSError):pass
+        for system in {row.get('system_id') for row in value['sources'] if row.get('system_id') in SYSTEMS}:
+            try:
+                profile=load_profile(self.workspace,system)['profile']
+                if profile:validate_profile(profile);configured=True
+            except (ValueError,OSError):pass
         verified=[];rows={row['export_id']:row for row in exports if row['role']=='patch'}
         for file in sorted((project/'reports').glob('*.json'))[:4096]:
             try:
@@ -690,7 +681,7 @@ class WorkbenchAPI:
         project,row,path=self.source(p);inspection=inspect_table(path,row['sha256'],p['definition'],0,1)
         if p['document_id']!=inspection['document_id']:raise ValueError('table definition or source changed; inspect it again')
         edits=table_edits(path,row['sha256'],p['definition'],p['changes'])
-        if row.get('system_id') in ('nes','snes','genesis','gb','gbc','gba','sms'):
+        if row.get('system_id') in ('nes', 'snes', 'genesis', 'gb', 'gbc', 'sms'):
             return self._integrity_plan({'project_id':p['project_id'],'artifact_id':p['artifact_id'],'edits':edits},c)
         return projects.plan_byte_edits(project,row['artifact_id'],edits)
 
@@ -864,7 +855,7 @@ class WorkbenchAPI:
         from .workflow_recipes import preview_recipe
         project,row,path=self.source(p);preview=preview_recipe(path,p['recipe'],cancelled=c)
         if c():raise KeyboardInterrupt
-        planned=self._integrity_plan({**p,'edits':preview['edits']},c) if row.get('system_id') in ('nes','snes','genesis','gb','gbc','gba','sms') else projects.plan_byte_edits(project,row['artifact_id'],preview['edits'])
+        planned=self._integrity_plan({**p,'edits':preview['edits']},c) if row.get('system_id') in ('nes', 'snes', 'genesis', 'gb', 'gbc', 'sms') else projects.plan_byte_edits(project,row['artifact_id'],preview['edits'])
         return {**planned,'recipe_id':preview['recipe_id']}
 
     def _recipe_export(self,p,c):
@@ -966,7 +957,7 @@ class WorkbenchAPI:
         from .workbench_evidence import store_evidence
         import hashlib
         project,row,path=self.source(p)
-        if row.get('system_id') not in ('nes','snes','genesis','gb','gbc','gba','sms') or row['system_id']!=p['system_id']:raise ValueError('select an identified cartridge and its matching saved system setup')
+        if row.get('system_id') not in ('nes', 'snes', 'genesis', 'gb', 'gbc', 'sms') or row['system_id']!=p['system_id']:raise ValueError('select an identified cartridge and its matching saved system setup')
         checked=self._profile_load_config(p['system_id']);config={**checked,'game':str(path),'expected_game_sha256':row['sha256'],'session_dir':str(project/'sessions'/('check-'+uuid.uuid4().hex))}
         load=preflight_load(config,project)
         with OwnedRuntime(load,30,cancelled=c) as runtime:
@@ -1067,10 +1058,16 @@ class WorkbenchAPI:
         evidence=store_evidence(project,'runtime',{'scope':'native_memory_snapshot','origin':'owned_native_worker',**result})
         return {**result,'evidence_id':evidence['evidence_id']}
 
+    def _sample_catalog(self,p,c):
+        from .rom_sample_db import catalog
+        return catalog(p['query'],p['system_filter'],p['page'],p['limit'])
+
     def _rom_check(self,p,c):
         from .rom_health import check_rom
+        from .rom_sample_db import lookup
         row=projects.artifact(self.project(p),p['artifact_id'])
-        return {**check_rom(Path(row['path']),row['sha256'],p['expected_crc32'],p['crc_scope'],cancelled=c),'artifact_id':row['artifact_id']}
+        result=check_rom(Path(row['path']),row['sha256'],p['expected_crc32'],p['crc_scope'],cancelled=c)
+        return {**result,'artifact_id':row['artifact_id'],'recorded_facts':lookup(row['sha256'],row['size'])}
 
     def _system_identify(self,p,c):
         from .system_identify import identify_system
@@ -1223,7 +1220,7 @@ class WorkbenchAPI:
         from .system_identify import identify_system
         system=identify_system(source,expected_sha256=row['sha256'])['system_id']
         if system=='segacd':raise ValueError('extract and edit a disc resource, then rebuild its container')
-        if system in ('nes','snes','genesis','gb','gbc','gba','sms'):
+        if system in ('nes', 'snes', 'genesis', 'gb', 'gbc', 'sms'):
             from .system_integrity import integrity_edits
             hunks=[{'offset':h['offset'],'before':h['before_hex'],'after':h['after_hex']} for h in result['hunks']]
             repaired=integrity_edits(source,row['sha256'],system,hunks)
@@ -1482,7 +1479,7 @@ class WorkbenchAPI:
             if c():raise KeyboardInterrupt
             source_id=p['artifact_id']
             if changes:
-                plan=self._integrity_plan({'project_id':p['project_id'],'artifact_id':source_id,'edits':changes},c) if row.get('system_id') in ('nes','snes','genesis','gb','gbc','gba','sms') else projects.plan_byte_edits(project,source_id,changes);build_path=project/'builds'/(plan['plan_id']+Path(row['path']).suffix)
+                plan=self._integrity_plan({'project_id':p['project_id'],'artifact_id':source_id,'edits':changes},c) if row.get('system_id') in ('nes', 'snes', 'genesis', 'gb', 'gbc', 'sms') else projects.plan_byte_edits(project,source_id,changes);build_path=project/'builds'/(plan['plan_id']+Path(row['path']).suffix)
                 if build_path.exists():
                     candidates=[r for r in projects.read_project(project)['builds'] if r['plan_id']==plan['plan_id']]
                     if not candidates:raise ValueError('bisection output collision')
@@ -1531,7 +1528,7 @@ class WorkbenchAPI:
         title=title if title is not None else projects.read_project(project)['name']+'-'+role
         row={'export_id':path.stem,'name':path.name,'download_name':readable_name(title,path.suffix[1:]),'role':role,**projects._measure(path)}
         if result:
-            for key in ('source_sha256','target_sha256','format'): 
+            for key in ('source_sha256','target_sha256','format'):
                 if key in result:row[key]=result[key]
         rows=self.exports(project);rows.append(row);projects.write_json(project/'exports.json',{'schema_version':1,'exports':rows});return row
 

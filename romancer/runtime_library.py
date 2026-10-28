@@ -4,7 +4,7 @@ from pathlib import Path
 from .runtime_profiles import _binary,save_profile,load_profile
 from .assets import checked_path,digest
 
-NAMES={'fceumm':['nes'],'nestopia':['nes'],'snes9x':['snes'],'genesis_plus_gx':['genesis'],'picodrive':['genesis'],'gambatte':['gb','gbc'],'sameboy':['gb','gbc'],'mgba':['gba']}
+NAMES={'fceumm': ['nes'], 'nestopia': ['nes'], 'snes9x': ['snes'], 'genesis_plus_gx': ['genesis'], 'picodrive': ['genesis'], 'gambatte': ['gb', 'gbc'], 'sameboy': ['gb', 'gbc']}
 KEYS={'up':'ArrowUp','down':'ArrowDown','left':'ArrowLeft','right':'ArrowRight','a':'z','b':'x','start':'Enter','select':'Shift'}
 
 

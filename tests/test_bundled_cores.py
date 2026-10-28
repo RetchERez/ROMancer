@@ -36,7 +36,7 @@ class BundledCoreTests(unittest.TestCase):
         from romancer.runtime_profiles import load_profile,save_profile,validate_profile
         with tempfile.TemporaryDirectory() as temp:
             root=Path(temp);pack=root/'cores';pack.mkdir();pins={};files={}
-            for system in ('nes','snes','genesis','gb','gba'):
+            for system in ('nes','snes','genesis','gb'):
                 name=system+'.dll';fake_core(pack/name)
                 pins[system]={'name':'Test '+system,'file':name,'sha256':hashlib.sha256((pack/name).read_bytes()).hexdigest(),'options':{},'license':'MIT','source_url':'https://example.invalid/original-test-fixture','source_commit':'a'*40}
             (pack/'CORE-SOURCES.zip').write_bytes(b'original source fixture')

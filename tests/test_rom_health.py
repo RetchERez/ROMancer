@@ -55,7 +55,7 @@ class RomHealthTests(unittest.TestCase):
         with tempfile.TemporaryDirectory() as folder:
             api=WorkbenchAPI(Path(folder)/'workspace')
             try:
-                for system in ('nes','snes','genesis','gb','gba'):
+                for system in ('nes','snes','genesis','gb','gbc','sms'):
                     with self.subTest(system=system):
                         project=api.dispatch('project.demo_system',{'system_id':system});row=project['sources'][0]
                         raw=Path(row['path']).read_bytes();params={'project_id':project['project_id'],'artifact_id':row['artifact_id'],'expected_crc32':'','crc_scope':'file'}
@@ -63,8 +63,7 @@ class RomHealthTests(unittest.TestCase):
                         self.assertFalse(any(c['status']=='FAIL' for c in report['checks']),report)
                         self.assertEqual(Path(row['path']).read_bytes(),raw)
                         if system!='nes':
-                            changed=bytearray(raw);changed[0x134 if system=='gba' else 0x200]^=1
-                            if system=='gba':changed[0xa0]^=1
+                            changed=bytearray(raw);changed[0x200]^=1
                             bad=self.run_health(changed)
                             self.assertTrue(any(c['status']=='FAIL' for c in bad['checks']),bad)
                 self.assertEqual(api.dispatch('rom.check',params,cancelled=lambda:True)['status'],'CANCELLED')

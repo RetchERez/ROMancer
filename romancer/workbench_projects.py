@@ -169,7 +169,7 @@ def _publish_copy(source,destination,expected,edits=(),*,cancelled=lambda:False)
 
 def register_source(project:Path,source:Path,system:str|None,*,cancelled=lambda:False)->dict:
     project=Path(project);source=checked_path(Path(source))
-    if system not in (None,'Unknown','NES','SNES','Genesis','Game Boy','Game Boy Color','Sega CD','GBA'):raise ValueError('unsupported console label')
+    if system not in (None,'Unknown','NES','SNES','Genesis','Game Boy','Game Boy Color','Master System','Sega CD'):raise ValueError('unsupported console label')
     with locked(project) as value:
         if len(value['sources'])>=512:raise ValueError('project source limit reached')
         measured=_measure(source,cancelled=cancelled);artifact_id=uuid.uuid4().hex

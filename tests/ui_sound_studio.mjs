@@ -6,10 +6,10 @@ assert.deepEqual(stageNote(doc,stageNote(doc,[],'s',0,'note',67),'s',0,'note',60
 assert.throws(()=>stageNote(doc,[],'s',0,'note',200));assert.throws(()=>stageNote(doc,[],'other',0,'note',60));
 // Native evidence has its own `scope`; it must not overwrite selection ownership.
 const soundView=await import('../romancer/ui/views/sound.js'),handlers={};let html='';
-const state={project:{project_id:'p'},artifact:{artifact_id:'a',sha256:'sha',name:'Original.gba',system_id:'gba'},results:{},runtime:{game_sha256:'sha'}};
+const state={project:{project_id:'p'},artifact:{artifact_id:'a',sha256:'sha',name:'Original.sfc',system_id:'snes'},results:{},runtime:{game_sha256:'sha'}};
 globalThis.document={getElementById:id=>id==='sound-frames'?{value:'120'}:null};
 const ctx={state,sourceParams:()=>({project_id:'p',artifact_id:'a'}),draft:(_id,fallback)=>fallback,
- use:next=>Object.assign(handlers,next),api:{call:async()=>({hardware:{name:'GBA',channels:[],references:[],sample_formats:['pcm-s8']},driver:{name:'Unknown',status:'UNKNOWN'}})},
+ use:next=>Object.assign(handlers,next),api:{call:async()=>({hardware:{name:'SNES',channels:[],references:[],sample_formats:['pcm-s8']},driver:{name:'Unknown',status:'UNKNOWN'}})},
  run:async()=>({ok:true,scope:'native_sound_preview',wav_base64:'UklGRnRlc3RXQVZFZGF0YQ==',frame:{sha256:'frame'},sample_frames:4,sample_rate:8000,channels:2,preview_scope:'Measured native mixed stereo output.'}),
  render:async()=>{html=await soundView.render(ctx);}};
 await ctx.render();await handlers['sound-capture']();assert.match(html,/<h3>Audio preview<\/h3>/);assert.equal(state.soundPreview.scope,'native_sound_preview');

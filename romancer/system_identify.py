@@ -3,7 +3,7 @@ from pathlib import Path
 import re
 from .system_reader import SystemReader
 from .system_registry import REGISTRY_VERSION
-from .system_formats import nes,snes,genesis,gb,gba,sms,segacd
+from .system_formats import nes,snes,genesis,gb,sms,segacd
 
 
 def identify_system(path:Path,*,expected_sha256=None,cancelled=lambda:False)->dict:
@@ -19,7 +19,7 @@ def identify_system(path:Path,*,expected_sha256=None,cancelled=lambda:False)->di
                     warnings=['CUE container recognized; referenced tracks were not opened. Import and validate dependencies explicitly.'])
             else:
                 found=[]
-                for parser in (nes,snes,genesis,gb,gba,sms,segacd):found.extend(parser.candidates(reader))
+                for parser in (nes,snes,genesis,gb,sms,segacd):found.extend(parser.candidates(reader))
                 valid=[c for c in found if c['layout_valid']]
                 report['candidates']=found;report['warnings']=list(dict.fromkeys(w for c in found for w in c['warnings']))
                 if len(valid)==1:

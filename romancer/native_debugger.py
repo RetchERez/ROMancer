@@ -27,8 +27,7 @@ MEMBERS={
  'libSkiaSharp.dll':(9414216,'9a0d95e8caaa852c70d085af6a40a744242172ad9ea3fd6bc7599875a8a1dbcd'),
  'MesenNesDB.txt':(559276,'200e19903f1b2eeda1f59a7f3bcdacf388d0f8d228f6f842373477ddc2f5a3e1')}
 GRAPHICS_CORE=(7239680,'62e4c8a1b152e8d94adeb54335e1b0966c38c1f26db2ae4007b1a5e558077445')
-CPU={'nes':('nes','nesMemory'),'snes':('snes','snesMemory'),'gb':('gameboy','gameboyMemory'),
- 'gbc':('gameboy','gameboyMemory'),'gba':('gba','gbaMemory'),'sms':('sms','smsMemory')}
+CPU={'nes': ('nes', 'nesMemory'), 'snes': ('snes', 'snesMemory'), 'gb': ('gameboy', 'gameboyMemory'), 'gbc': ('gameboy', 'gameboyMemory'), 'sms': ('sms', 'smsMemory')}
 
 
 def remove_owned_job(job,parent):
@@ -87,7 +86,7 @@ def backend_capabilities(system):
 def portable_settings(system):
     return {'Version':VERSION,'Debug':{'ScriptWindow':{'AllowIoOsAccess':True,'AllowNetworkAccess':False,'ScriptTimeout':5}},
         'Gameboy':{'Model':5 if system=='gbc' else 4,'Controller':{'Type':40}},
-        'Gba':{'SkipBootScreen':True,'Controller':{'Type':48}},
+
         'Nes':{'Port1':{'Type':9}},'Snes':{'Port1':{'Type':1}}}
 
 
@@ -141,7 +140,7 @@ def capture_native(project,row,config,*,root=None,cancelled=lambda:False):
         settings=portable_settings(system);(job/'settings.json').write_text(json.dumps(settings),encoding='utf-8')
         nonce=secrets.token_hex(16);script=make_script(system,config,nonce)
         (job/'capture.lua').write_text(script,encoding='utf-8',newline='\n')
-        suffix={'nes':'.nes','snes':'.sfc','gb':'.gb','gbc':'.gbc','gba':'.gba','sms':'.sms'}[system]
+        suffix={'nes': '.nes', 'snes': '.sfc', 'gb': '.gb', 'gbc': '.gbc', 'sms': '.sms'}[system]
         game=job/('input'+suffix);shutil.copyfile(source,game)
         _measure(game,row,cancelled=cancelled)
         if not (job/'settings.json').is_file():raise ValueError('isolated portable settings must exist before launching')
@@ -169,7 +168,7 @@ def capture_native(project,row,config,*,root=None,cancelled=lambda:False):
         return {**result,'source_sha256':row['sha256'],'artifact_id':row['artifact_id'],'backend':backend,
             'configuration_sha256':hashlib.sha256(json.dumps(settings,sort_keys=True).encode()).hexdigest(),
             'adapter_sha256':hashlib.sha256(script.encode()).hexdigest(),'request':config,
-            'firmware_scope':'No external firmware supplied. GBA BIOS-dependent behavior is not certified.',
+            'firmware_scope':'No external firmware supplied.',
             'worker_exit_code':process.returncode,'original_unchanged':True}
     finally:
         if process is not None and process.poll() is None:process.kill();process.wait(timeout=5)

@@ -17,7 +17,7 @@ class CompressionTests(unittest.TestCase):
 
     def test_literal_lz_overlap_and_rle_streams(self):
         service=self.service()
-        for encoded,codec,expected in [(LZ,'gba-lz10',b'ABCABCABC'),(RLE,'gba-rle',b'AAAAABCD')]:
+        for encoded,codec,expected in [(LZ,'lz10',b'ABCABCABC'),(RLE,'rle',b'AAAAABCD')]:
             with self.subTest(codec=codec):
                 result=service.decode_stream(encoded+b'UNRELATED',codec)
                 self.assertEqual(result['data'],expected);self.assertEqual(result['consumed'],len(encoded))
@@ -25,27 +25,27 @@ class CompressionTests(unittest.TestCase):
 
     def test_bad_headers_truncation_backrefs_bombs_and_overruns_refuse(self):
         service=self.service()
-        bad=[('gba-lz10',LZ[:-1]),('gba-lz10',bytes.fromhex('10 08 00 00 80 00 00')),('gba-lz10',bytes.fromhex('10 ff ff ff')),
-             ('gba-rle',RLE[:-1]),('gba-rle',bytes.fromhex('30 01 00 00 ff 41')),('gba-rle',b'wrong')]
+        bad=[('lz10',LZ[:-1]),('lz10',bytes.fromhex('10 08 00 00 80 00 00')),('lz10',bytes.fromhex('10 ff ff ff')),
+             ('rle',RLE[:-1]),('rle',bytes.fromhex('30 01 00 00 ff 41')),('rle',b'wrong')]
         for codec,raw in bad:
             with self.subTest(raw=raw),self.assertRaises(ValueError):service.decode_stream(raw,codec)
-        with self.assertRaises(ValueError):service.encode_stream(b'','gba-lz10')
+        with self.assertRaises(ValueError):service.encode_stream(b'','lz10')
         with self.assertRaises(ValueError):service.decode_stream(LZ,'guessed-format')
 
     def test_encoders_cover_literal_groups_runs_and_window_boundaries(self):
         service=self.service()
         from romancer.compression_oracle import verify_encoded
         values=[bytes(range(256))*3,b'A'*9000,b'ABCD'*2000,bytes((index*37+index//17)&255 for index in range(6000))]
-        for codec in ('gba-lz10','gba-rle'):
+        for codec in ('lz10','rle'):
             for raw in values:
                 encoded=service.encode_stream(raw,codec);self.assertEqual(service.decode_stream(encoded,codec)['data'],raw)
                 self.assertTrue(verify_encoded(encoded,codec,raw)['verified'])
                 self.assertEqual(encoded,service.encode_stream(raw,codec))
-        self.assertLess(len(service.encode_stream(b'ABCD'*2000,'gba-lz10')),1100)
+        self.assertLess(len(service.encode_stream(b'ABCD'*2000,'lz10')),1100)
 
     def test_separate_oracle_rejects_wrong_payload_truncation_overrun_trailing_and_cancellation(self):
         from romancer.compression_oracle import verify_encoded
-        for encoded,codec,expected in [(LZ,'gba-lz10',b'ABCABCABC'),(RLE,'gba-rle',b'AAAAABCD')]:
+        for encoded,codec,expected in [(LZ,'lz10',b'ABCABCABC'),(RLE,'rle',b'AAAAABCD')]:
             self.assertTrue(verify_encoded(encoded,codec,expected)['verified'])
             for bad in (encoded[:-1],encoded+b'junk',encoded[:1]+b'\xff\xff\xff'+encoded[4:]):
                 with self.subTest(bad=bad),self.assertRaises(ValueError):verify_encoded(bad,codec,expected)
@@ -67,21 +67,21 @@ class CompressionTests(unittest.TestCase):
         from romancer.workbench_api import WorkbenchAPI
         from romancer.boot_fixtures import make_boot_fixture
         with tempfile.TemporaryDirectory() as folder:
-            root=Path(folder);raw=bytearray(make_boot_fixture('gba')['data']);raw[0x500:0x500+len(RLE)]=RLE;raw[0x300:0x304]=(0x08000500).to_bytes(4,'little');raw[0x800:0x820]=b'\xff'*32;source=root/'compressed.gba';source.write_bytes(raw)
+            root=Path(folder);raw=bytearray(make_boot_fixture('nes')['data']);raw[0x500:0x500+len(RLE)]=RLE;raw[0x300:0x304]=(0x84f0).to_bytes(4,'little');raw[0x800:0x820]=b'\xff'*32;source=root/'compressed.nes';source.write_bytes(raw)
             api=WorkbenchAPI(root/'workspace')
             try:
-                project=api.dispatch('project.create',{'name':'Compressed resource'});parent=api.dispatch('source.import',{'project_id':project['project_id'],'path':str(source),'system':None});params={'project_id':project['project_id'],'artifact_id':parent['artifact_id'],'offset':0x500,'allocation':32,'codec':'gba-rle'}
+                project=api.dispatch('project.create',{'name':'Compressed resource'});parent=api.dispatch('source.import',{'project_id':project['project_id'],'path':str(source),'system':None});params={'project_id':project['project_id'],'artifact_id':parent['artifact_id'],'offset':0x500,'allocation':32,'codec':'rle'}
                 inspected=api.dispatch('compression.inspect',params);self.assertTrue(inspected['ok'],inspected);self.assertEqual(inspected['decoded_size'],8)
                 extracted=api.dispatch('compression.extract',params);self.assertTrue(extracted['ok'],extracted);child=extracted['artifact'];self.assertEqual(Path(child['path']).read_bytes(),b'AAAAABCD')
                 edits=api.dispatch('bytes.plan',{'project_id':project['project_id'],'artifact_id':child['artifact_id'],'edits':[{'offset':5,'before':'42','after':'5a'}]});edited=api.dispatch('build.apply',{'project_id':project['project_id'],'plan_id':edits['plan_id']});self.assertTrue(edited['ok'],edited)
-                arguments={'project_id':project['project_id'],'parent_id':parent['artifact_id'],'decoded_id':child['artifact_id'],'edited_id':edited['artifact_id'],'offset':0x500,'allocation':32,'codec':'gba-rle'}
+                arguments={'project_id':project['project_id'],'parent_id':parent['artifact_id'],'decoded_id':child['artifact_id'],'edited_id':edited['artifact_id'],'offset':0x500,'allocation':32,'codec':'rle'}
                 real_read=Path.read_bytes
                 def changed_read(selected):
                     return b'AAAAAYCD' if selected==Path(edited['path']) else real_read(selected)
                 with patch.object(Path,'read_bytes',changed_read),self.assertRaisesRegex(ValueError,'identity'):
-                    service.plan_reinsert(Path(project['path']),parent['artifact_id'],child['artifact_id'],edited['artifact_id'],0x500,32,'gba-rle')
+                    service.plan_reinsert(Path(project['path']),parent['artifact_id'],child['artifact_id'],edited['artifact_id'],0x500,32,'rle')
                 real_decode=service.decode_stream
-                wrong=service.encode_stream(b'AAAAAYCD','gba-rle')
+                wrong=service.encode_stream(b'AAAAAYCD','rle')
                 def misleading_decode(data,codec,*args,**kwargs):
                     return {'data':b'AAAAAZCD','consumed':len(wrong)} if bytes(data)==wrong else real_decode(data,codec,*args,**kwargs)
                 with patch.object(service,'encode_stream',return_value=wrong),patch.object(service,'decode_stream',side_effect=misleading_decode):
@@ -101,11 +101,11 @@ class CompressionTests(unittest.TestCase):
                 overflow_args={**arguments,'decoded_id':tight['artifact_id'],'edited_id':tight_build['artifact_id'],'allocation':10}
                 preview=api.dispatch('compression.preview_reinsert',overflow_args);self.assertTrue(preview['ok'],preview);self.assertFalse(preview['fits']);self.assertEqual(preview['overflow_bytes'],3)
 
-                spec={'source_offset':0x500,'source_length':10,'target_offset':0x800,'target_capacity':32,'fill_byte':255,'alignment':4,'bank_size':0,'bank_origin':0,'references':[{'offset':0x300,'width':4,'endian':'little','base':0x08000000,'target_delta':0}],'references_complete':True,'destination_reserved':True,'replacement_input_id':None}
+                spec={'source_offset':0x500,'source_length':10,'target_offset':0x800,'target_capacity':32,'fill_byte':255,'alignment':4,'bank_size':16384,'bank_origin':16,'references':[{'offset':0x300,'width':4,'endian':'little','base':0x7ff0,'target_delta':0}],'references_complete':True,'destination_reserved':True,'replacement_input_id':None}
                 refused=api.dispatch('compression.plan_relocate',{**overflow_args,'spec':{**spec,'references_complete':False}});self.assertFalse(refused['ok'])
                 moved=api.dispatch('compression.plan_relocate',{**overflow_args,'spec':spec});self.assertTrue(moved['ok'],moved)
                 relocated=api.dispatch('build.apply',{'project_id':project['project_id'],'plan_id':moved['plan_id']});self.assertTrue(relocated['ok'],relocated)
-                content=Path(relocated['path']).read_bytes();self.assertEqual(int.from_bytes(content[0x300:0x304],'little'),0x08000800);self.assertEqual(service.decode_stream(content[0x800:0x820],'gba-rle')['data'],b'ABCDEFGH');self.assertEqual(source.read_bytes(),raw)
+                content=Path(relocated['path']).read_bytes();self.assertEqual(int.from_bytes(content[0x300:0x304],'little'),0x87f0);self.assertEqual(service.decode_stream(content[0x800:0x820],'rle')['data'],b'ABCDEFGH');self.assertEqual(source.read_bytes(),raw)
                 project_path=Path(project['path']);value=bytearray(Path(parent['path']).read_bytes());value[-1]^=1;Path(parent['path']).write_bytes(value)
-                with self.assertRaises(ValueError):service.plan_reinsert(project_path,parent['artifact_id'],child['artifact_id'],edited['artifact_id'],0x500,32,'gba-rle')
+                with self.assertRaises(ValueError):service.plan_reinsert(project_path,parent['artifact_id'],child['artifact_id'],edited['artifact_id'],0x500,32,'rle')
             finally:api.close()

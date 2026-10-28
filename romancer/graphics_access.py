@@ -7,33 +7,39 @@ from .native_debugger import verify_backend
 from .visual_checks import _png
 from . import workbench_projects as projects
 
-VIDEO_DOMAINS={'nes':['nesChrRam','nesSpriteRam','nesPaletteRam','nesNametableRam'],
-    'snes':['snesVideoRam','snesSpriteRam','snesCgRam'],
-    'gb':['gbVideoRam','gbSpriteRam'],'gbc':['gbVideoRam','gbSpriteRam','gbBgPaletteRam','gbObjPaletteRam'],
-    'gba':['gbaVideoRam','gbaSpriteRam','gbaPaletteRam'],'sms':['smsVideoRam','smsPaletteRam']}
+VIDEO_DOMAINS={'nes': ['nesChrRam', 'nesSpriteRam', 'nesPaletteRam', 'nesNametableRam'], 'snes': ['snesVideoRam', 'snesSpriteRam', 'snesCgRam'], 'gb': ['gbVideoRam', 'gbSpriteRam'], 'gbc': ['gbVideoRam', 'gbSpriteRam', 'gbBgPaletteRam', 'gbObjPaletteRam'], 'sms': ['smsVideoRam', 'smsPaletteRam']}
 
 
-def capture_config(system,raw,replay,offset,length,start_frame):
-    number(offset,0,len(raw)-1);number(length,1,min(2048,len(raw)-offset))
-    if replay.get('status')!='READY' or type(replay.get('steps')) is not list or not 1<=len(replay['steps'])<=64:raise ValueError('Capture a fresh cold-start route of at most 64 input steps.')
-    steps=[]
+def capture_config(system, raw, replay, offset, length, start_frame):
+    number(offset, 0, len(raw) - 1)
+    number(length, 1, min(2048, len(raw) - offset))
+    if replay.get('status') != 'READY' or type(replay.get('steps')) is not list or (not 1 <= len(replay['steps']) <= 64):
+        raise ValueError('Capture a fresh cold-start route of at most 64 input steps.')
+    steps = []
     for step in replay['steps']:
-        if type(step) is not dict or set(step)!={'frames','buttons','port'} or step['port']!=0 or type(step['buttons']) is not list:raise ValueError('Use a single supported controller route.')
-        mapping={'a':'b','b':'a','r':'c','up':'up','down':'down','left':'left','right':'right','start':'start'} if system=='genesis' else {'a':'one','b':'two','start':'pause','up':'up','down':'down','left':'left','right':'right'} if system=='sms' else {b:b for b in BUTTONS.get(system,())}
-        if any(type(b) is not str or b not in mapping for b in step['buttons']):raise ValueError('This route uses buttons unavailable on the native observer controller. Record a supported route.')
-        steps.append({**step,'buttons':[mapping[b] for b in step['buttons']]})
-    frames=sum(number(s['frames'],1,3600) for s in steps)
-    if frames!=replay.get('frames') or not 1<=frames<=3600:raise ValueError('Native graphics replay is limited to 3600 frames; the recorded route must fit without truncation.')
-    number(start_frame,0,frames-1)
-    if system=='genesis':probes=[{'kind':'read','start':offset,'end':offset+length-1},{'kind':'write','start':0xc00000,'end':0xc0001f}]
+        if type(step) is not dict or set(step) != {'frames', 'buttons', 'port'} or step['port'] != 0 or (type(step['buttons']) is not list):
+            raise ValueError('Use a single supported controller route.')
+        mapping = {'a': 'b', 'b': 'a', 'r': 'c', 'up': 'up', 'down': 'down', 'left': 'left', 'right': 'right', 'start': 'start'} if system == 'genesis' else {'a': 'one', 'b': 'two', 'start': 'pause', 'up': 'up', 'down': 'down', 'left': 'left', 'right': 'right'} if system == 'sms' else {b: b for b in BUTTONS.get(system, ())}
+        if any((type(b) is not str or b not in mapping for b in step['buttons'])):
+            raise ValueError('This route uses buttons unavailable on the native observer controller. Record a supported route.')
+        steps.append({**step, 'buttons': [mapping[b] for b in step['buttons']]})
+    frames = sum((number(s['frames'], 1, 3600) for s in steps))
+    if frames != replay.get('frames') or not 1 <= frames <= 3600:
+        raise ValueError('Native graphics replay is limited to 3600 frames; the recorded route must fit without truncation.')
+    number(start_frame, 0, frames - 1)
+    if system == 'genesis':
+        probes = [{'kind': 'read', 'start': offset, 'end': offset + length - 1}, {'kind': 'write', 'start': 12582912, 'end': 12582943}]
     else:
-        regions=_rom_regions(raw,system);region=next(((name,base,size) for name,(base,size) in regions.items() if base<=offset and offset+length<=base+size),None)
-        if region is None:raise ValueError('Choose a source span inside a checked native ROM region.')
-        name,base,_=region;probes=[{'kind':'read','domain':name,'start':offset-base,'end':offset-base+length-1}]
-        probes.extend({'kind':'write','domain':name,'start':0,'end':PHYSICAL_DOMAINS[system][name]} for name in VIDEO_DOMAINS[system])
-        if system=='gba':probes.append({'kind':'write','start':0x040000b0,'end':0x040000df})
-    result={'steps':steps,'probes':probes,'start_frame':start_frame,'event_limit':2000,'instruction_limit':20000000,'timeout':60,'graphics_snapshot':True}
-    validate_capture(system,result);return result
+        regions = _rom_regions(raw, system)
+        region = next(((name, base, size) for name, (base, size) in regions.items() if base <= offset and offset + length <= base + size), None)
+        if region is None:
+            raise ValueError('Choose a source span inside a checked native ROM region.')
+        name, base, _ = region
+        probes = [{'kind': 'read', 'domain': name, 'start': offset - base, 'end': offset - base + length - 1}]
+        probes.extend(({'kind': 'write', 'domain': name, 'start': 0, 'end': PHYSICAL_DOMAINS[system][name]} for name in VIDEO_DOMAINS[system]))
+    result = {'steps': steps, 'probes': probes, 'start_frame': start_frame, 'event_limit': 2000, 'instruction_limit': 20000000, 'timeout': 60, 'graphics_snapshot': True}
+    validate_capture(system, result)
+    return result
 
 
 def public_capture(result):
@@ -108,7 +114,7 @@ class GraphicsAccessTools:
         allowed=[SYSTEM_CODECS[row['system_id']]]
         if row['system_id']=='snes':allowed+=['tile8-paired2-msb-v1']
         if p['codec'] not in allowed:raise ValueError('Choose a tested literal tile codec for this system.')
-        video={'nes':'nesPpuMemory','snes':'snesVideoRam','sms':'smsVideoRam','gb':'gbVideoRam','gbc':'gbVideoRam','gba':'gbaVideoRam','genesis':'genesisVideoRam'}[row['system_id']]
+        video={'nes': 'nesPpuMemory', 'snes': 'snesVideoRam', 'sms': 'smsVideoRam', 'gb': 'gbVideoRam', 'gbc': 'gbVideoRam', 'genesis': 'genesisVideoRam'}[row['system_id']]
         if p['domain']!=video:raise ValueError('Choose the captured pattern/video memory domain for tile decoding.')
         count=number(p['count'],1,64);extent=cell_size(p['codec'],8,8)
         result=self.memory({**p,'length':count*extent},c);raw=bytes.fromhex(result['raw_hex'])

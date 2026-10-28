@@ -108,12 +108,13 @@ def import_definition(path,sha,document):
 
 
 def omit_checksum_ranges(path,system,edits):
-    spans={'gb':[(0x14d,0x150)],'gbc':[(0x14d,0x150)],'gba':[(0xbd,0xbe)],'genesis':[(0x18e,0x190)]}.get(system,[])
-    if system=='snes':
+    spans={'gb': [(333, 336)], 'gbc': [(333, 336)], 'genesis': [(398, 400)]}.get(system,[])
+    if system in ('snes','sms'):
         from .system_identify import identify_system
         assessment=identify_system(path);valid=[c for c in assessment['candidates'] if c['layout_valid']]
-        if len(valid)!=1:raise ValueError('a unique SNES layout is required')
-        start=valid[0]['header_offset']+28;spans=[(start,start+4)]
+        if len(valid)!=1:raise ValueError('a unique cartridge layout is required')
+        start=valid[0]['header_offset']+(28 if system=='snes' else 10)
+        spans=[(start,start+(4 if system=='snes' else 2))]
     result=[]
     for edit in edits:
         before=bytes.fromhex(edit['before']);after=bytes.fromhex(edit['after']);run=None

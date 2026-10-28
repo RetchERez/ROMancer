@@ -11,7 +11,7 @@ class TextGrowthTests(unittest.TestCase):
     def source(self,system='nes',interior_pointer=False):
         data=bytearray(32768) if system=='sms' else bytearray(make_boot_fixture(system)['data'])
         if system=='sms':data[0x7ff0:0x7ff8]=b'TMR SEGA';data[0x7fff]=0x4c
-        width=4 if system=='gba' else 2;base={'nes':0x7ff0,'snes':0x8000,'gba':0x08000000}.get(system,0);order='big' if system=='genesis' else 'little'
+        width=2;base={'nes':0x7ff0,'snes':0x8000}.get(system,0);order='big' if system=='genesis' else 'little'
         data[0x500:0x500+width]=(0x1000+base).to_bytes(width,order);data[0x1000:0x1008]=b'HI\x01\x07!\0\xff\xff';data[0x1800:0x1840]=b'\xff'*64
         if interior_pointer:data[0x508:0x508+width]=(0x1004+base).to_bytes(width,order)
         path=self.root/(system+'.rom');path.write_bytes(data);project=self.api.dispatch('project.create',{'name':system});source=self.api.dispatch('source.import',{'project_id':project['project_id'],'path':str(path),'system':None});self.assertTrue(source['ok'],source)
@@ -23,7 +23,7 @@ class TextGrowthTests(unittest.TestCase):
         return {**p,'schema':schema,'document_id':doc['document_id'],'record_id':'line-0','changes':[{'segment':0,'text':'WELCOME'},{'segment':1,'text':'FRIEND'}],
             'destination':{'offset':0x1800,'capacity':32,'fill_byte':255,'alignment':1,'bank_size':8192,'bank_origin':16,'extra_references':[],'references_complete':True,'destination_reserved':True}}
     def test_growing_text_preserves_controls_updates_declared_pointers_and_reopens_across_seven_systems(self):
-        for system in ('nes','snes','genesis','sms','gb','gbc','gba'):
+        for system in ('nes','snes','genesis','sms','gb','gbc'):
             with self.subTest(system=system):
                 p,path,original,schema,doc,base,width,order=self.source(system);args=self.args(p,schema,doc);args['destination'].update(bank_size={'nes':8192,'snes':32768,'gb':16384,'gbc':16384,'sms':16384}.get(system,0),bank_origin=16 if system=='nes' else 0)
                 before=self.api.dispatch('project.open',{'project_id':p['project_id']});preview=self.api.dispatch('text.grow.preview',args);self.assertTrue(preview['ok'],preview);self.assertEqual(preview['text_preview'],'WELCOME\nFRIEND');self.assertEqual(preview['required_bytes'],16);self.assertEqual(preview['pointer_updates'][0]['after'],0x1800+base)

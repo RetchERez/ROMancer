@@ -19,13 +19,7 @@ from .workbench_files import input_file,read_bounded
 MAX_BYTES=16*1024*1024
 MAX_RECORDS=20000
 MAX_STORE=16*1024*1024
-ALIASES={'nes':'nes','nintendo entertainment system':'nes','famicom':'nes',
-         'genesis':'genesis','genesis / mega drive':'genesis','mega drive':'genesis','sega genesis':'genesis','megadrive':'genesis',
-         'snes':'snes','super nintendo':'snes','super nes':'snes','super famicom':'snes',
-         'gb':'gb','game boy':'gb','gameboy':'gb','gbc':'gbc','game boy color':'gbc',
-         'gba':'gba','game boy advance':'gba','game gear':'gamegear','gamegear':'gamegear',
-         'fc':'nes','sfc':'snes','md':'genesis','gen':'genesis','gameboycolor':'gbc',
-         'sms':'sms','sega master system':'sms','master system':'sms'}
+ALIASES={'nes': 'nes', 'nintendo entertainment system': 'nes', 'famicom': 'nes', 'genesis': 'genesis', 'genesis / mega drive': 'genesis', 'mega drive': 'genesis', 'sega genesis': 'genesis', 'megadrive': 'genesis', 'snes': 'snes', 'super nintendo': 'snes', 'super nes': 'snes', 'super famicom': 'snes', 'gb': 'gb', 'game boy': 'gb', 'gameboy': 'gb', 'gbc': 'gbc', 'game boy color': 'gbc', 'game gear': 'gamegear', 'gamegear': 'gamegear', 'fc': 'nes', 'sfc': 'snes', 'md': 'genesis', 'gen': 'genesis', 'gameboycolor': 'gbc', 'sms': 'sms', 'sega master system': 'sms', 'master system': 'sms'}
 
 
 def _cancel(cancelled):

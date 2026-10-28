@@ -39,7 +39,7 @@ class SMSFormatTests(unittest.TestCase):
         from romancer.resource_compression import encode_stream
         with tempfile.TemporaryDirectory() as d:
             root=Path(d);raw=self.fixture()+bytearray(524288-32768);raw[0x7fff]=0x41
-            raw[0x40000:0x4000a]=encode_stream(b'AAAAABCD','gba-rle')
+            raw[0x40000:0x4000a]=encode_stream(b'AAAAABCD','rle')
             raw[0x7ffa:0x7ffc]=((sum(raw[:0x7ff0])+sum(raw[0x8000:]))&65535).to_bytes(2,'little')
             source=root/'large.sms';source.write_bytes(raw)
             self.assertEqual(identify_system(source)['candidates'][0]['metadata']['checksum_length'],524288)
@@ -50,11 +50,11 @@ class SMSFormatTests(unittest.TestCase):
             try:
                 p={'project_id':call('project.create',name='SMS compression')['project_id']}
                 parent=call('source.import',**p,path=str(source),system=None)
-                params={**p,'artifact_id':parent['artifact_id'],'offset':0x40000,'allocation':32,'codec':'gba-rle'}
+                params={**p,'artifact_id':parent['artifact_id'],'offset':0x40000,'allocation':32,'codec':'rle'}
                 child=call('compression.extract',**params)['artifact']
                 plan=call('bytes.plan',**p,artifact_id=child['artifact_id'],edits=[{'offset':5,'before':'42','after':'5a'}])
                 edited=call('build.apply',**p,plan_id=plan['plan_id'])
-                reinsert=call('compression.plan_reinsert',**p,parent_id=parent['artifact_id'],decoded_id=child['artifact_id'],edited_id=edited['artifact_id'],offset=0x40000,allocation=32,codec='gba-rle')
+                reinsert=call('compression.plan_reinsert',**p,parent_id=parent['artifact_id'],decoded_id=child['artifact_id'],edited_id=edited['artifact_id'],offset=0x40000,allocation=32,codec='rle')
                 built=call('build.apply',**p,plan_id=reinsert['plan_id']);after=Path(built['path']).read_bytes()
                 self.assertEqual(int.from_bytes(after[0x7ffa:0x7ffc],'little'),(sum(after[:0x7ff0])+sum(after[0x8000:]))&65535)
                 self.assertEqual(source.read_bytes(),raw)

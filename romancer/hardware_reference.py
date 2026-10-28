@@ -9,62 +9,11 @@ _GB='https://gbdev.io/pandocs/Memory_Map.html'
 _NES='https://www.nesdev.org/wiki/CPU_memory_map'
 _SNES='https://snes.nesdev.org/wiki/Memory_map'
 _MD='https://www.plutiedev.com/memory-map'
-_GBA='https://problemkaputt.de/gbatek.htm#gbamemorymap'
 _SMS='https://www.smspower.org/Development/MemoryMap'
 
-_STORAGE={
- 'nes':{'tiles':'An 8×8 2bpp pattern uses 16 bytes: 8 low-plane rows followed by 8 high-plane rows.',
-        'palettes':'PPU palette bytes select 6-bit system color indices; they are not RGB555 values. Emphasis and display conversion are separate.',
-        'maps':'Background tile indices are bytes. A separate attribute byte contains four 2-bit palette choices for four 16×16-pixel areas.'},
- 'snes':{'tiles':'Common planar 8×8 patterns use 16, 32 or 64 bytes for 2, 4 or 8 bits per pixel. Mode 7 uses a different arrangement.',
-         'palettes':'CGRAM colors use little-endian RGB555: red bits 0–4, green 5–9 and blue 10–14.',
-         'maps':'Ordinary BG words use tile bits 0–9, palette 10–12, priority 13, horizontal flip 14 and vertical flip 15. Mode 7 is separate.'},
- 'genesis':{'tiles':'An 8×8 4bpp pattern uses 32 bytes, with the left pixel in the high nibble of each byte.',
-            'palettes':'A big-endian color word uses red bits 1–3, green 5–7 and blue 9–11. Each palette line contains 16 entries.',
-            'maps':'VDP tile words use index bits 0–10, horizontal flip 11, vertical flip 12, palette 13–14 and priority 15.'},
- 'gb':{'tiles':'An 8×8 2bpp pattern uses 16 bytes: low and high bitplanes alternate for each row.',
-       'palettes':'DMG BGP/OBP registers select four shades using 2 bits per stored index. They do not contain RGB colors.',
-       'maps':'A background map cell is an 8-bit tile number. LCDC tile-addressing mode determines whether it is interpreted as signed or unsigned.'},
- 'gbc':{'tiles':'CGB patterns retain the Game Boy 16-byte paired-plane format; the selected VRAM bank matters.',
-        'palettes':'CGB palette entries are little-endian RGB555, with red bits 0–4, green 5–9 and blue 10–14.',
-        'maps':'Tile numbers and attributes occupy separate VRAM banks. Attributes select palette, tile bank, horizontal/vertical flips and priority.'},
- 'gba':{'tiles':'4bpp 8×8 patterns use 32 bytes, low nibble first; 8bpp patterns use 64 bytes. Bitmap and affine layouts are separate.',
-        'palettes':'Palette RAM stores little-endian RGB555: red bits 0–4, green 5–9 and blue 10–14.',
-        'maps':'Regular text-BG words use tile bits 0–9, horizontal flip 10, vertical flip 11 and palette bank 12–15. Affine maps and objects use other layouts.'},
- 'sms':{'tiles':'Mode 4 patterns use 32 bytes per 8×8 tile: four bitplane bytes for each row, leftmost pixel in bit 7.',
-        'palettes':'Mode 4 color entries are one byte, RGB222: red bits 0–1, green 2–3 and blue 4–5. Game Gear uses a different format.',
-        'maps':'Mode 4 little-endian words use tile bits 0–8, horizontal flip 9, vertical flip 10, palette 11 and priority 12. Other bits are preserved, not assigned game meanings.'}}
+_STORAGE={'nes': {'tiles': 'An 8×8 2bpp pattern uses 16 bytes: 8 low-plane rows followed by 8 high-plane rows.', 'palettes': 'PPU palette bytes select 6-bit system color indices; they are not RGB555 values. Emphasis and display conversion are separate.', 'maps': 'Background tile indices are bytes. A separate attribute byte contains four 2-bit palette choices for four 16×16-pixel areas.'}, 'snes': {'tiles': 'Common planar 8×8 patterns use 16, 32 or 64 bytes for 2, 4 or 8 bits per pixel. Mode 7 uses a different arrangement.', 'palettes': 'CGRAM colors use little-endian RGB555: red bits 0–4, green 5–9 and blue 10–14.', 'maps': 'Ordinary BG words use tile bits 0–9, palette 10–12, priority 13, horizontal flip 14 and vertical flip 15. Mode 7 is separate.'}, 'genesis': {'tiles': 'An 8×8 4bpp pattern uses 32 bytes, with the left pixel in the high nibble of each byte.', 'palettes': 'A big-endian color word uses red bits 1–3, green 5–7 and blue 9–11. Each palette line contains 16 entries.', 'maps': 'VDP tile words use index bits 0–10, horizontal flip 11, vertical flip 12, palette 13–14 and priority 15.'}, 'gb': {'tiles': 'An 8×8 2bpp pattern uses 16 bytes: low and high bitplanes alternate for each row.', 'palettes': 'DMG BGP/OBP registers select four shades using 2 bits per stored index. They do not contain RGB colors.', 'maps': 'A background map cell is an 8-bit tile number. LCDC tile-addressing mode determines whether it is interpreted as signed or unsigned.'}, 'gbc': {'tiles': 'CGB patterns retain the Game Boy 16-byte paired-plane format; the selected VRAM bank matters.', 'palettes': 'CGB palette entries are little-endian RGB555, with red bits 0–4, green 5–9 and blue 10–14.', 'maps': 'Tile numbers and attributes occupy separate VRAM banks. Attributes select palette, tile bank, horizontal/vertical flips and priority.'}, 'sms': {'tiles': 'Mode 4 patterns use 32 bytes per 8×8 tile: four bitplane bytes for each row, leftmost pixel in bit 7.', 'palettes': 'Mode 4 color entries are one byte, RGB222: red bits 0–1, green 2–3 and blue 4–5. Game Gear uses a different format.', 'maps': 'Mode 4 little-endian words use tile bits 0–8, horizontal flip 9, vertical flip 10, palette 11 and priority 12. Other bits are preserved, not assigned game meanings.'}}
 
-_SYSTEMS={
- 'sms':dict(name='Master System',cpu='Z80',endian='little',domains={'cpu':0xffff,'vram':0x3fff},
-   graphics='Mode 4 uses 8×8 tiles with four bitplane bytes per row, 32 bytes per tile and 16 stored indices. Palette selection and sprite assembly are separate data.',
-   mapping='CPU cartridge windows are not file offsets. The documented Sega mapper has three 16 KiB slots and an unpaged first 1 KiB; the header alone does not prove this mapper or its active bank state.',
-   references=[_SMS,'https://www.smspower.org/Development/Tiles','https://www.smspower.org/Development/Palette','https://www.smspower.org/Development/Tilemap','https://www.smspower.org/Development/ROMHeader','https://www.smspower.org/Development/SN76489']),
- 'nes':dict(name='NES',cpu='Ricoh 2A03/2A07 · 6502 family',endian='little',domains={'cpu':0xffff,'ppu':0x3fff},
-   graphics='Common 8×8 tiles use 16 bytes: eight low-plane rows, then eight high-plane rows. CHR-RAM graphics may be generated or decompressed during play.',
-   mapping='Read the 16-byte header, optional 512-byte trainer, PRG size and mapper. CPU and PPU have separate buses.',
-   references=[_NES,'https://www.nesdev.org/wiki/PPU_memory_map','https://www.nesdev.org/wiki/NES_2.0']),
- 'snes':dict(name='SNES',cpu='Ricoh 5A22 · 65C816 family',endian='little',domains={'cpu':0xffffff,'vram':0xffff,'apu':0xffff},
-   graphics='Common planar 8×8 tiles use 16/32/64 bytes at 2/4/8bpp. Palette, layer mode and color math are separate from tile data.',
-   mapping='Establish LoROM/HiROM or a special map and any 512-byte copier header. M/X processor flags change immediate instruction widths.',
-   references=[_SNES,'https://snes.nesdev.org/wiki/PPU_registers','https://snes.nesdev.org/wiki/S-SMP']),
- 'genesis':dict(name='Genesis',cpu='Motorola 68000 main CPU · Z80 sound CPU',endian='big',domains={'cpu':0xffffff,'vram':0xffff},
-   graphics='Common VDP 8×8 tiles use 32 packed-nibble bytes. Tile attributes select palette, flips and priority.',
-   mapping='Establish raw linear dump format and cartridge mapping. Base 68000 words and instructions require even alignment; sound RAM uses a separate bus.',
-   references=[_MD,'https://www.plutiedev.com/rom-header','https://www.plutiedev.com/tiles-and-palettes']),
- 'gb':dict(name='Game Boy',cpu='Sharp SM83 · not a full Z80',endian='little',domains={'cpu':0xffff,'vram':0x1fff},
-   graphics='Common 8×8 tiles use 16 bytes with two bitplane bytes per row. DMG palette registers select shades, not RGB555 colors.',
-   mapping='Record cartridge type and current bank/mode. MBC1 can change the lower ROM window; external cartridge space can expose RTC or other hardware.',
-   references=[_GB,'https://gbdev.io/pandocs/MBCs.html','https://gbdev.io/pandocs/Tile_Data.html']),
- 'gbc':dict(name='Game Boy Color',cpu='Sharp SM83 · CGB banked memory',endian='little',domains={'cpu':0xffff,'vram':0x3fff},
-   graphics='Tiles use the paired 2bpp format. Two VRAM banks, per-cell attributes and RGB555 palettes affect the composed image.',
-   mapping='Record cartridge bank/mode plus VRAM and WRAM banks. CPU addresses alone do not establish physical ROM or video offsets.',
-   references=[_GB,'https://gbdev.io/pandocs/Tile_Maps.html','https://gbdev.io/pandocs/Palettes.html']),
- 'gba':dict(name='GBA',cpu='ARM7TDMI · ARM and THUMB execution states',endian='little',domains={'cpu':0xffffffff},
-   graphics='4bpp/8bpp tiled graphics, bitmap modes and sprite mappings use different layouts. Compression and ownership require separate evidence.',
-   mapping='ROM wait-state windows mirror cartridge storage. RAM, palette RAM, VRAM, OAM and I/O have separate regions; cartridge saves can use several protocols.',
-   references=[_GBA,'https://problemkaputt.de/gbatek.htm#gbalcdvideocontroller']),
-}
+_SYSTEMS={'sms': dict(name='Master System', cpu='Z80', endian='little', domains={'cpu': 65535, 'vram': 16383}, graphics='Mode 4 uses 8×8 tiles with four bitplane bytes per row, 32 bytes per tile and 16 stored indices. Palette selection and sprite assembly are separate data.', mapping='CPU cartridge windows are not file offsets. The documented Sega mapper has three 16 KiB slots and an unpaged first 1 KiB; the header alone does not prove this mapper or its active bank state.', references=[_SMS, 'https://www.smspower.org/Development/Tiles', 'https://www.smspower.org/Development/Palette', 'https://www.smspower.org/Development/Tilemap', 'https://www.smspower.org/Development/ROMHeader', 'https://www.smspower.org/Development/SN76489']), 'nes': dict(name='NES', cpu='Ricoh 2A03/2A07 · 6502 family', endian='little', domains={'cpu': 65535, 'ppu': 16383}, graphics='Common 8×8 tiles use 16 bytes: eight low-plane rows, then eight high-plane rows. CHR-RAM graphics may be generated or decompressed during play.', mapping='Read the 16-byte header, optional 512-byte trainer, PRG size and mapper. CPU and PPU have separate buses.', references=[_NES, 'https://www.nesdev.org/wiki/PPU_memory_map', 'https://www.nesdev.org/wiki/NES_2.0']), 'snes': dict(name='SNES', cpu='Ricoh 5A22 · 65C816 family', endian='little', domains={'cpu': 16777215, 'vram': 65535, 'apu': 65535}, graphics='Common planar 8×8 tiles use 16/32/64 bytes at 2/4/8bpp. Palette, layer mode and color math are separate from tile data.', mapping='Establish LoROM/HiROM or a special map and any 512-byte copier header. M/X processor flags change immediate instruction widths.', references=[_SNES, 'https://snes.nesdev.org/wiki/PPU_registers', 'https://snes.nesdev.org/wiki/S-SMP']), 'genesis': dict(name='Genesis', cpu='Motorola 68000 main CPU · Z80 sound CPU', endian='big', domains={'cpu': 16777215, 'vram': 65535}, graphics='Common VDP 8×8 tiles use 32 packed-nibble bytes. Tile attributes select palette, flips and priority.', mapping='Establish raw linear dump format and cartridge mapping. Base 68000 words and instructions require even alignment; sound RAM uses a separate bus.', references=[_MD, 'https://www.plutiedev.com/rom-header', 'https://www.plutiedev.com/tiles-and-palettes']), 'gb': dict(name='Game Boy', cpu='Sharp SM83 · not a full Z80', endian='little', domains={'cpu': 65535, 'vram': 8191}, graphics='Common 8×8 tiles use 16 bytes with two bitplane bytes per row. DMG palette registers select shades, not RGB555 colors.', mapping='Record cartridge type and current bank/mode. MBC1 can change the lower ROM window; external cartridge space can expose RTC or other hardware.', references=[_GB, 'https://gbdev.io/pandocs/MBCs.html', 'https://gbdev.io/pandocs/Tile_Data.html']), 'gbc': dict(name='Game Boy Color', cpu='Sharp SM83 · CGB banked memory', endian='little', domains={'cpu': 65535, 'vram': 16383}, graphics='Tiles use the paired 2bpp format. Two VRAM banks, per-cell attributes and RGB555 palettes affect the composed image.', mapping='Record cartridge bank/mode plus VRAM and WRAM banks. CPU addresses alone do not establish physical ROM or video offsets.', references=[_GB, 'https://gbdev.io/pandocs/Tile_Maps.html', 'https://gbdev.io/pandocs/Palettes.html'])}
 
 
 def reference_for(system_id):

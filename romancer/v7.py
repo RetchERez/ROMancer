@@ -20,7 +20,6 @@ from .runtime_regression import run_regression, run_suite
 from .runtime_goal import goal_search
 from .state_model import capture_state_signature, compare_state_signature, load_state_library, match_state_library, save_state_signature
 
-from .systems.gba import identify_gba
 from .systems.segacd import identify_segacd_bytes
 from .util import write_json
 
@@ -388,14 +387,6 @@ def scenario_template(out: str | Path, profile: str | None = None) -> dict[str, 
     return template
 
 
-def _synthetic_gba() -> bytes:
-    data = bytearray(0xC0)
-    data[0xA0:0xAC] = b"ROMANCERTEST"
-    data[0xAC:0xB0] = b"R7TE"
-    data[0xB0:0xB2] = b"01"
-    data[0xB2] = 0x96
-    data[0xBD] = (-sum(data[0xA0:0xBD]) - 0x19) & 0xFF
-    return bytes(data)
 
 
 def v7_self_test(out: str | None = None) -> dict[str, Any]:
@@ -410,7 +401,6 @@ def v7_self_test(out: str | None = None) -> dict[str, Any]:
 
     check("profile validation", lambda: all(validate_profile(load_profile(x))["ok"] for x in ["generic_jrpg", "final_fantasy_iii_snes", "shadowrun_genesis"]))
     check("Genesis semantic A/C mapping", lambda: resolve_intent(load_profile("shadowrun_genesis"), "attack", "field") == ["y"] and resolve_intent(load_profile("shadowrun_genesis"), "switch_character", "field") == ["a"])
-    check("GBA header detection", lambda: bool((identify_gba(_synthetic_gba()) or {}).get("header_checksum_valid")))
     sega = bytearray(0x100); sega[:16] = b"SEGADISCSYSTEM  "
     check("Sega CD System ID detection", lambda: (identify_segacd_bytes(bytes(sega)) or {}).get("system") == "Sega CD / Mega-CD")
     check("PNG writer", lambda: _test_png_writer())

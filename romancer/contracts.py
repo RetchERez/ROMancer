@@ -21,7 +21,7 @@ MAX_CONTRACT_JSON_BYTES = 32 * 1024 * 1024
 MAX_JSON_DEPTH = 64
 MAX_JSON_NODES = 100000
 HASH_CHUNK_BYTES = 1024 * 1024
-ADAPTER_IDS = frozenset({"nes", "snes", "genesis", "gb", "gbc", "gba", "sms"})
+ADAPTER_IDS = frozenset({'nes', 'snes', 'genesis', 'gb', 'gbc', 'sms'})
 
 
 def _result(scope: str) -> dict:
@@ -30,15 +30,7 @@ def _result(scope: str) -> dict:
 
 
 def adapter_inventory() -> dict:
-    definitions = (
-        ("nes", "experimental", "iNES identification; NES 2.0 extended fields are not fully decoded."),
-        ("snes", "experimental", "Header scoring and address mapping are heuristic, not mapper-state proof."),
-        ("genesis", "supported", "SEGA cartridge header identification only; mapper and bank-switch behavior is not established."),
-        ("gb", "supported", "Validated DMG cartridge header and declared banks."),
-        ("gbc", "supported", "Validated CGB-compatible/Color-only header and declared banks; gameplay needs native evidence."),
-        ("gba", "supported", "Header/fixed-byte identification and checksum reporting; this is not runtime compatibility proof."),
-        ("sms", "supported", "Validated Sega cartridge header/checksum and explicitly declared resource ranges; gameplay needs native evidence."),
-    )
+    definitions=(('nes', 'experimental', 'iNES identification; NES 2.0 extended fields are not fully decoded.'), ('snes', 'experimental', 'Header scoring and address mapping are heuristic, not mapper-state proof.'), ('genesis', 'supported', 'SEGA cartridge header identification only; mapper and bank-switch behavior is not established.'), ('gb', 'supported', 'Validated DMG cartridge header and declared banks.'), ('gbc', 'supported', 'Validated CGB-compatible/Color-only header and declared banks; gameplay needs native evidence.'), ('sms', 'supported', 'Validated Sega cartridge header/checksum and explicitly declared resource ranges; gameplay needs native evidence.'))
     adapters = []
     for identifier, status, reason in definitions:
         implementation = "romancer/system_formats/gb.py" if identifier in ("gb","gbc") else "romancer/system_formats/sms.py" if identifier=="sms" else f"romancer/systems/{identifier}.py"

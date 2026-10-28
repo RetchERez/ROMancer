@@ -30,7 +30,7 @@ class ResourceFormsTests(unittest.TestCase):
         with tempfile.TemporaryDirectory() as temp:
             source=Path(temp)/'original';source.write_bytes((0x08000008).to_bytes(4,'little')+b'SAFEAB\0'+b'\xff'*5)
             sha=hashlib.sha256(source.read_bytes()).hexdigest()
-            config={'system_id':'gba','offset':8,'capacity':8,'count':1,'stride':8,
+            config={'system_id':'gb','offset':8,'capacity':8,'count':1,'stride':8,
                 'pointer_offset':0,'pointer_width':4,'pointer_endian':'little','pointer_base':-0x08000000}
             schema=script_schema(source,sha,config);doc=inspect_script(source,schema)
             self.assertTrue(doc['write_supported'],doc)
@@ -65,12 +65,12 @@ class ResourceFormsTests(unittest.TestCase):
         with tempfile.TemporaryDirectory() as temp:
             root=Path(temp);source=root/'own.resource';source.write_bytes(b'\x08\x00GUARD!AB\x00\xff\xff\xff\xff\xffTAIL')
             sha=hashlib.sha256(source.read_bytes()).hexdigest()
-            schema=script_schema(source,sha,{'system_id':'gba','offset':8,'capacity':8,'count':1,'stride':8,'pointer_offset':0,'pointer_width':2,'pointer_endian':'little','pointer_base':0,'terminator':0,'padding':255,'encoding':'ascii','table':'','controls':[]})
+            schema=script_schema(source,sha,{'system_id':'gb','offset':8,'capacity':8,'count':1,'stride':8,'pointer_offset':0,'pointer_width':2,'pointer_endian':'little','pointer_base':0,'terminator':0,'padding':255,'encoding':'ascii','table':'','controls':[]})
             doc=inspect_script(source,schema);self.assertTrue(doc['write_supported'],doc)
             edits={'schema_version':1,'document_id':doc['document_id'],'source_sha256':sha,'schema_sha256':doc['schema_sha256'],'changes':[{'record_id':'line-0','segment':0,'text':'BA'}]}
             out=root/'out';result=apply_script(source,out,schema,edits,expected_plan_id=plan_script(source,schema,edits)['plan_id']);self.assertTrue(result['ok'],result)
             self.assertEqual(out.read_bytes(),b'\x08\x00GUARD!BA\x00\xff\xff\xff\xff\xffTAIL')
-            with self.assertRaises(ValueError):script_schema(source,'0'*64,{'system_id':'gba'})
+            with self.assertRaises(ValueError):script_schema(source,'0'*64,{'system_id':'gb'})
 
     def test_system_graphics_templates_change_literal_first_pixel(self):
         from romancer.resource_forms import graphics_schema
@@ -78,7 +78,7 @@ class ResourceFormsTests(unittest.TestCase):
         from romancer.asset_patch import apply_assets
         with tempfile.TemporaryDirectory() as temp:
             root=Path(temp)
-            for system,want in [('nes',b'\x80'),('snes',b'\x80'),('genesis',b'\x10'),('segacd',b'\x10'),('gba',b'\x01')]:
+            for system,want in [('nes',b'\x80'),('snes',b'\x80'),('genesis',b'\x10')]:
                 with self.subTest(system=system):
                     source=root/system;source.write_bytes(b'GUARD!!!'+bytes(64)+b'TAIL');sha=hashlib.sha256(source.read_bytes()).hexdigest()
                     schema=graphics_schema(source,sha,{'system_id':system,'offset':8,'count':1})
@@ -94,7 +94,7 @@ class ResourceFormsTests(unittest.TestCase):
         with tempfile.TemporaryDirectory() as temp:
             source=Path(temp)/'font';source.write_bytes(bytes.fromhex('8000000000000000')+b'\x06'+bytes(55))
             sha=hashlib.sha256(source.read_bytes()).hexdigest()
-            schema=graphics_schema(source,sha,{'system_id':'gba','offset':0,'count':1,'codec':'mono-row-msb-v1','font_chars':'A','advance_offset':8})
+            schema=graphics_schema(source,sha,{'system_id':'gb','offset':0,'count':1,'codec':'mono-row-msb-v1','font_chars':'A','advance_offset':8})
             font=font_schema_from_assets(schema);measured=measure_font(source,font)
             self.assertTrue(measured['ok'],measured);self.assertEqual(measured['glyphs'][0]['advance_pixels'],6)
             with self.assertRaises(ValueError):graphics_schema(source,sha,{'system_id':'snes','offset':40,'count':2})

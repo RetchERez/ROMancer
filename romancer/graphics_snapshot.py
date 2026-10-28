@@ -4,15 +4,7 @@ import hashlib
 import re
 from .asset_schema import number
 
-SNAPSHOT_DOMAINS={
-    'nes':{'nesPpuMemory':8192,'nesSpriteRam':256,'nesPaletteRam':32,'nesNametableRam':4096},
-    'snes':{'snesVideoRam':65536,'snesSpriteRam':544,'snesCgRam':512},
-    'gb':{'gbVideoRam':8192,'gbSpriteRam':160},
-    'gbc':{'gbVideoRam':16384,'gbSpriteRam':160,'gbBgPaletteRam':64,'gbObjPaletteRam':64},
-    'gba':{'gbaVideoRam':98304,'gbaSpriteRam':1024,'gbaPaletteRam':1024},
-    'sms':{'smsVideoRam':16384,'smsPaletteRam':32},
-    'genesis':{'genesisVideoRam':65536,'genesisColorRam':128,'genesisVScrollRam':80},
-}
+SNAPSHOT_DOMAINS={'nes': {'nesPpuMemory': 8192, 'nesSpriteRam': 256, 'nesPaletteRam': 32, 'nesNametableRam': 4096}, 'snes': {'snesVideoRam': 65536, 'snesSpriteRam': 544, 'snesCgRam': 512}, 'gb': {'gbVideoRam': 8192, 'gbSpriteRam': 160}, 'gbc': {'gbVideoRam': 16384, 'gbSpriteRam': 160, 'gbBgPaletteRam': 64, 'gbObjPaletteRam': 64}, 'sms': {'smsVideoRam': 16384, 'smsPaletteRam': 32}, 'genesis': {'genesisVideoRam': 65536, 'genesisColorRam': 128, 'genesisVScrollRam': 80}}
 
 
 def parse_graphics_record(line,system,state):

@@ -33,7 +33,7 @@ class InvestigationMCPTests(unittest.TestCase):
         for key in ('before','after'):self.assertEqual(schemas['romancer_watches_compare'][key]['type'],'object')
         for key in ('case','trace'):self.assertEqual(schemas['romancer_debug_inspect'][key]['type'],'object')
         self.assertEqual(schemas['romancer_compression_inspect']['allocation']['maximum'],49152)
-        self.assertEqual(schemas['romancer_compression_inspect']['codec']['enum'],['gba-lz10','gba-rle','snes-lz2'])
+        self.assertEqual(schemas['romancer_compression_inspect']['codec']['enum'],['lz10','rle','snes-lz2'])
         self.assertEqual(schemas['romancer_definitions_import']['document']['type'],'object')
         self.assertEqual(schemas['romancer_definitions_export']['kind']['enum'],['script','assets','tables','levels','sound','commands'])
         self.assertTrue(tools['romancer_compression_inspect']['annotations']['readOnlyHint']);self.assertFalse(tools['romancer_values_start']['annotations']['readOnlyHint'])
@@ -47,20 +47,20 @@ class InvestigationMCPTests(unittest.TestCase):
         self.assertTrue(result['isError'],result);self.assertEqual(result['structuredContent']['status'],'BLOCKED');self.assertNotIn('offset',result['structuredContent'])
 
     def source(self):
-        self.root.joinpath('roms').mkdir();path=self.root/'roms/owned.bin';raw=bytearray(make_boot_fixture('gba')['data']);raw[:32]=bytes.fromhex('300400008141')+b'\xff'*26;path.write_bytes(raw)
+        self.root.joinpath('roms').mkdir();path=self.root/'roms/owned.bin';raw=bytearray(make_boot_fixture('snes')['data']);raw[:32]=bytes.fromhex('300400008141')+b'\xff'*26;path.write_bytes(raw)
         created=self.writer.call('romancer_project_create',{'name':'Investigation'})['structuredContent'];pid=created['project_id']
         imported=self.writer.call('romancer_source_import',{'project_id':pid,'path':str(path),'system':None})['structuredContent']
         return {'project_id':pid,'artifact_id':imported['artifact_id']},imported
 
     def test_compression_inspection_extraction_and_numeric_mapping_use_checked_services(self):
         params,source=self.source()
-        result=self.reader.call('romancer_compression_inspect',{**params,'offset':0,'allocation':32,'codec':'gba-rle'})
+        result=self.reader.call('romancer_compression_inspect',{**params,'offset':0,'allocation':32,'codec':'rle'})
         self.assertFalse(result['isError'],result);self.assertEqual(result['structuredContent']['decoded_sha256'],hashlib.sha256(b'AAAA').hexdigest())
-        extracted=self.writer.call('romancer_compression_extract',{**params,'offset':0,'allocation':32,'codec':'gba-rle'})
+        extracted=self.writer.call('romancer_compression_extract',{**params,'offset':0,'allocation':32,'codec':'rle'})
         self.assertFalse(extracted['isError'],extracted);self.assertEqual(extracted['structuredContent']['artifact']['compressed_parent']['parent_sha256'],source['sha256'])
-        mapped=self.reader.call('romancer_systems_address',{**params,'system_id':'gba','address':0x08000004,'mapping':{'id':'rom'},'bank':None})
+        mapped=self.reader.call('romancer_systems_address',{**params,'system_id':'snes','address':0x8004,'mapping':{'id':'lorom','copier_header':0},'bank':None})
         self.assertFalse(mapped['isError'],mapped);self.assertEqual(mapped['structuredContent']['offset'],4);self.assertFalse(mapped['structuredContent']['bank_state_observed'])
-        bad=self.reader.call('romancer_systems_address',{**params,'system_id':'gba','address':0x07000004,'mapping':{'id':'rom'},'bank':None})
+        bad=self.reader.call('romancer_systems_address',{**params,'system_id':'snes','address':0x700004,'mapping':{'id':'lorom','copier_header':0},'bank':None})
         self.assertTrue(bad['isError'])
         forbidden=self.writer.call('romancer_source_import',{'project_id':params['project_id'],'path':str(self.root/'secret.bin'),'system':None})
         self.assertTrue(forbidden['isError']);self.assertIn('allowed',forbidden['content'][0]['text'])
@@ -92,7 +92,7 @@ class InvestigationMCPTests(unittest.TestCase):
     def test_explicit_trace_inspection_is_available_without_live_native_loading(self):
         from tests.debug_fixtures import debug_fixture
         from romancer.history import register_build
-        params,_=self.source();fixture=debug_fixture();path=self.root/'roms/trace-fixture.bin';raw=bytearray(make_boot_fixture('gba')['data']);raw[:len(fixture['raw'])]=fixture['raw'];fixture['raw']=bytes(raw);fixture['trace']['source']={'sha256':hashlib.sha256(raw).hexdigest(),'size':len(raw)};fixture['case']['source']={'role':'resource',**fixture['trace']['source']};fixture['case']['trace_sha256']=hashlib.sha256(json.dumps(fixture['trace'],sort_keys=True,separators=(',',':'),ensure_ascii=True).encode()).hexdigest();path.write_bytes(raw)
+        params,_=self.source();fixture=debug_fixture();path=self.root/'roms/trace-fixture.bin';raw=bytearray(make_boot_fixture('snes')['data']);raw[:len(fixture['raw'])]=fixture['raw'];fixture['raw']=bytes(raw);fixture['trace']['source']={'sha256':hashlib.sha256(raw).hexdigest(),'size':len(raw)};fixture['case']['source']={'role':'resource',**fixture['trace']['source']};fixture['case']['trace_sha256']=hashlib.sha256(json.dumps(fixture['trace'],sort_keys=True,separators=(',',':'),ensure_ascii=True).encode()).hexdigest();path.write_bytes(raw)
         owned=self.writer.call('romancer_source_import',{'project_id':params['project_id'],'path':str(path),'system':None})['structuredContent']
         project=self.writer.api.project(params)
         registered=register_build(project,{'inputs':[{'role':'resource','path':owned['path']}],'output':owned['path'],
@@ -117,7 +117,7 @@ class InvestigationMCPTests(unittest.TestCase):
         self.assertEqual(path.read_bytes(),fixture['raw'])
 
     def test_large_definition_export_keeps_the_existing_ai_response_budget(self):
-        params,_=self.source();path=self.root/'roms/large-text.bin';raw=bytearray((b'A\0'+b'\xff'*65534)*3);raw[0xa0:0xc0]=make_boot_fixture('gba')['data'][0xa0:0xc0];path.write_bytes(raw)
+        params,_=self.source();path=self.root/'roms/large-text.bin';raw=bytearray((b'A\0'+b'\xff'*65534)*3);raw[0x7fc0:0x8000]=make_boot_fixture('snes')['data'][0x7fc0:0x8000];raw[0x7fd7]=8;path.write_bytes(raw)
         owned=self.writer.call('romancer_source_import',{'project_id':params['project_id'],'path':str(path),'system':None})['structuredContent'];selected={**params,'artifact_id':owned['artifact_id']}
         declared=self.writer.call('romancer_resources_declare_script',{**selected,'config':{'system_id':'gb','offset':0,'capacity':65536,'count':3}});self.assertFalse(declared['isError'],declared)
         result=self.writer.call('romancer_definitions_export',{**selected,'kind':'script'});self.assertFalse(result['isError'],result)

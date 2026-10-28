@@ -6,6 +6,11 @@ import {render} from '../romancer/ui/views/levels.js';
 
 function documentFixture(){return {ok:true,document_id:'rooms',source_sha256:'sha',uses:{},tiles:[Array(64).fill(0)],palette:[[10,20,30]],block_width:1,block_height:1,metatiles:[[0]],definition:{rooms:[{id:'first',objects:{fields:[{name:'kind',maximum:8},{name:'x',maximum:1},{name:'y',maximum:0},{name:'exit_room',maximum:0}]}}]},rooms:[{id:'first',name:'First',width:4,height:2,terrain:Array(8).fill(0),collision:[4,0,0,0,0,0,0,0],objects:[{kind:1,x:0,y:0,exit_room:0}]},{id:'second',name:'Second',width:4,height:2,terrain:Array(8).fill(0),collision:null,objects:[]}]};}
 
+test('a single room without connections does not repeat a room chooser',()=>{
+ const doc=documentFixture();doc.rooms=doc.rooms.slice(0,1);const model=new LevelDraft(doc);
+ assert.equal(rooms.roomNavigation(doc,model,'first'),'');
+});
+
 test('reserved object fields honor both declared maxima and room bounds',()=>{
  const model=new LevelDraft(documentFixture());
  for(const [field,value] of [['x',2],['y',1],['exit_room',1]])assert.throws(()=>model.set({kind:'object',room_id:'first',index:0,field,value}),/bounds/);
@@ -97,13 +102,13 @@ test('empty Levels view starts with importing a ROM and keeps practice secondary
  assert.match(html,/<details[^>]*><summary>Advanced practice<\/summary>/);assert.doesNotMatch(html,/Open design workshop/);
 });
 
-test('named object inspector keeps only selection, dragging and destination visible by default',()=>{
+test('named object inspector keeps position and destination visible while technical values stay collapsed',()=>{
  const doc=connectedDocument();doc.rooms[0].objects.push({kind:7,x:1,y:0,exit_room:0});const model=new LevelDraft(doc),ctx={draft:(id,fallback)=>fallback};
  const html=rooms.objectInspector(ctx,doc,model,'first'),advanced=html.indexOf('<details class="level-object-advanced"'),normal=html.slice(0,advanced);
- assert.ok(advanced>=0);assert.match(html.slice(advanced),/<summary>Position & advanced values<\/summary>/);
- assert.match(normal,/Selected object/);assert.match(normal,/Destination room/);assert.match(normal,/drag/i);assert.match(normal,/Update preview/);
- assert.doesNotMatch(normal,/level-object-input-|>kind<|Record 1|Object slot 1/);
- assert.match(html.slice(advanced),/id="level-object-input-0"/);assert.match(html.slice(advanced),/id="level-object-input-1"/);
+ assert.ok(advanced>=0);assert.match(html.slice(advanced),/<summary>Other values · Advanced<\/summary>/);
+ assert.match(normal,/Selected object/);assert.match(normal,/Destination room/);assert.match(normal,/drag/i);assert.match(html,/Update preview/);
+ assert.doesNotMatch(normal,/>kind<|Record 1|Object slot 1/);
+ assert.match(html.slice(advanced),/id="level-object-input-0"/);assert.match(normal,/id="level-object-input-1"/);
  assert.equal((html.match(/id="level-object-destination"/g)||[]).length,1);
 });
 

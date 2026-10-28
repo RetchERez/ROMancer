@@ -55,7 +55,7 @@ class CartridgeIntegrityTests(unittest.TestCase):
 
     def test_missing_custom_and_unsupported_logo_checks_never_certify_boot(self):
         from romancer.cartridge_integrity import check_boot_logo
-        for system, size in (('gb', 0x104+48), ('gbc', 0x104+48), ('gba', 4+156)):
+        for system, size in (('gb', 0x104+48), ('gbc', 0x104+48)):
             with self.subTest(system=system):
                 absent = check_boot_logo(bytes(size-1), system)
                 self.assertEqual(absent['status'], 'NOT_CHECKED')
@@ -85,39 +85,7 @@ class CartridgeIntegrityTests(unittest.TestCase):
                 self.assertFalse(value['trusted_revision_match'])
         self.assertEqual(bytes(raw), before)
 
-    def test_gba_normalizes_only_documented_variable_bits_and_names_hashes(self):
-        from romancer import cartridge_integrity as module
-        synthetic = bytearray((i*29+7) % 256 for i in range(156))
-        synthetic[0x9c-4], synthetic[0x9e-4] = 0x21, 0xf8
-        digest = hashlib.sha256(synthetic).hexdigest()
-        with patch.object(module, 'GBA_LOGO_SHA256', digest):
-            for debug in (0, 4, 128, 132):
-                for key in range(4):
-                    varied = bytearray(synthetic)
-                    varied[0x9c-4] ^= debug
-                    varied[0x9e-4] ^= key
-                    raw = bytearray(bytes(4)+varied+bytes(32))
-                    before = bytes(raw)
-                    report = module.check_boot_logo(raw, 'gba')
-                    self.assertEqual(report['status'], 'PASS')
-                    self.assertEqual(report['normalized_logo_sha256'], digest)
-                    self.assertEqual(report['observed_logo_sha256'], hashlib.sha256(varied).hexdigest())
-                    self.assertEqual(bytes(raw), before)
-            varied = bytearray(synthetic)
-            varied[0x9c-4] ^= 1  # Not one of the documented variable bits.
-            self.assertEqual(module.check_boot_logo(bytes(4)+varied, 'gba')['status'], 'WARN')
 
-    def test_fixed_gba_header_byte_is_separate_from_the_logo_fingerprint(self):
-        from romancer.cartridge_integrity import check_gba_fixed_header
-        self.assertEqual(check_gba_fixed_header(bytes(0xb2))['status'], 'NOT_CHECKED')
-        raw = bytearray(0xb3)
-        self.assertEqual(check_gba_fixed_header(raw)['status'], 'WARN')
-        raw[0xb2] = 0x96
-        report = check_gba_fixed_header(raw)
-        self.assertEqual(report['status'], 'PASS')
-        self.assertEqual(report['stored'], '96')
-        self.assertEqual(report['expected'], '96')
-        self.assertFalse(report['write_authorized'])
 
 
 if __name__ == '__main__':

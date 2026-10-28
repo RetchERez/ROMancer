@@ -44,11 +44,6 @@ def gb(system='gb', cart_type=0):
                           header=0x100, metadata={'cartridge_type':cart_type})
 
 
-def gba(destination=0x100):
-    raw = bytearray(4096)
-    displacement = (destination-8)//4
-    struct.pack_into('<I', raw, 0, 0xea000000 | (displacement & 0xffffff))
-    return raw, candidate('gba', 'gba-linear')
 
 
 class CartridgeStartupTests(unittest.TestCase):
@@ -195,26 +190,8 @@ class CartridgeStartupTests(unittest.TestCase):
         raw[0x100:0x104]=bytes((0x31,0,0,0))
         self.assertEqual(self.inspect(raw,cart)[0]['status'],'NOT_CHECKED')
 
-    def test_gba_arm_branch_signed_displacement_and_pc_pipeline(self):
-        for destination in (0x100,4):
-            raw,cart=gba(destination)
-            c=self.inspect(raw,cart)[0]
-            self.assertEqual(c['status'],'PASS')
-            self.assertEqual(c['value'],0x08000000+destination)
-            self.assertEqual(c['locations'][1]['offset'],destination)
 
-    def test_gba_entry_unknown_conditional_bl_or_truncated_is_not_checked(self):
-        for word in (0xe12fff1e,0xeb000010,0x0a000010):
-            raw,cart=gba()
-            struct.pack_into('<I',raw,0,word)
-            self.assertEqual(self.inspect(raw,cart)[0]['status'],'NOT_CHECKED')
-        raw,cart=gba()
-        self.assertEqual(self.inspect(raw[:3],cart)[0]['status'],'NOT_CHECKED')
 
-    def test_gba_outside_image_and_self_branch_are_warnings(self):
-        for destination in (0x2000,-4,0):
-            raw,cart=gba(destination)
-            self.assertEqual(self.inspect(raw,cart)[0]['status'],'WARN')
 
     def test_untrusted_candidate_and_system_cannot_assert_a_check(self):
         raw,cart=nes()
@@ -223,7 +200,7 @@ class CartridgeStartupTests(unittest.TestCase):
         self.assertEqual(self.inspect(raw,candidate('sms','raw'))[0]['status'],'NOT_CHECKED')
 
     def test_output_locations_are_bounded_and_input_is_preserved(self):
-        for factory in (nes,snes,genesis,gb,gba):
+        for factory in (nes,snes,genesis,gb):
             raw,cart=factory();before=bytes(raw);original=copy.deepcopy(cart)
             checks=self.inspect(raw,cart)
             for c in checks:

@@ -30,7 +30,7 @@ class SaveSeedTests(unittest.TestCase):
                     self.assertEqual(result['run_mode'],'game_save_continuation')
             finally:pool.close()
 
-    def frontend(self, folder, size, name='mGBA', suffix='.gba', fill=255):
+    def frontend(self, folder, size, name='Gambatte', suffix='.gb', fill=255):
         f=LibretroFrontend.__new__(LibretroFrontend)
         f._content_path=Path(folder)/('game'+suffix);f.save_dir=Path(folder)
         f._sram_loaded_from=None;f._sram_seed_extent=None
@@ -63,19 +63,9 @@ class SaveSeedTests(unittest.TestCase):
             f._load_save_ram();f._buffer[0]=71;f._persist_save_ram()
             self.assertEqual(path.read_bytes(),b'G'+b'S'*8191)
 
-    def test_mgba_autodetect_allocation_verifies_every_supplied_byte_without_frames(self):
-        with tempfile.TemporaryDirectory() as d:
-            f=self.frontend(d,131072);seed=bytes(range(256))*128
-            (Path(d)/'game.srm').write_bytes(seed);f._load_save_ram()
-            result=f.verify_save_seed(seed)
-            self.assertEqual(result,{'mode':'mgba_autodetect_allocation','save_bytes':32768,'allocation_bytes':131072})
-            self.assertEqual(f.memory_region('save_ram')[:32768],seed)
-            self.assertEqual(set(f.memory_region('save_ram')[32768:]),{255})
-            f._buffer[100]^=1
-            with self.assertRaisesRegex(ValueError,'exactly'):f.verify_save_seed(seed)
 
     def test_generic_or_unsupported_partial_allocations_are_not_accepted(self):
-        for name,suffix,length in [('Other','.gba',32768),('mGBA','.gb',32768),('mGBA','.gba',4096)]:
+        for name,suffix,length in [('Other','.gb',32768),('Gambatte','.gb',32768),('Gambatte','.gb',4096)]:
             with self.subTest(name=name,suffix=suffix,length=length),tempfile.TemporaryDirectory() as d:
                 f=self.frontend(d,131072,name,suffix);seed=b'S'*length
                 (Path(d)/'game.srm').write_bytes(seed)

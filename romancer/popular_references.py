@@ -15,28 +15,7 @@ def _entry(identifier,title,system,repo,commit,path,facts,templates=(),addresses
             'rom_revision_verified':False,'write_authorized':False}
 
 
-REFERENCES=[
- _entry('pokemon-red-blue','Pokemon Red / Blue','gb','pret/pokered','171e2c204f9c1ff8e577ca387a4bbb009e130843','constants/pokemon_data_constants.asm',
-        ['The documented base-data prefix has a Pokedex number followed by five base stats, two type bytes, catch rate and experience yield.',
-         'Banked ROM addresses and sprite pointers require the correct bank and revision; the prefix is not a table locator.'],['pokemon-red-blue']),
- _entry('pokemon-crystal','Pokemon Crystal','gbc','pret/pokecrystal','5c877ef55197039c9676e8e3eec6d254b1c40fe8','constants/pokemon_data_constants.asm',
-        ['The base-data prefix separates special attack and special defense. It differs from the Red/Blue layout.',
-         'The source also declares held items, gender, breeding and move-compatibility data beyond this prefix. Those bytes are not edited by the prefix template.'],['pokemon-crystal']),
- _entry('pokemon-firered','Pokemon FireRed / LeafGreen','gba','pret/pokefirered','ce6406d8c2eaf46d543c8a2606de0c3cb1951982','include/pokemon.h',
-        ['SpeciesInfo begins with six one-byte base stats, two type bytes, catch rate and experience yield.',
-         'EV-yield bitfields, held items and other properties follow. Modified projects can expand or replace this structure; table base and record stride must be established separately.'],['pokemon-gba']),
- _entry('pokemon-emerald','Pokemon Emerald','gba','pret/pokeemerald','731ad5bfd6e6f265508d0efcca0ba42f9dcf5881','include/pokemon.h',
-        ['SpeciesInfo has the documented six-stat prefix. Its data is separate from battle moves, evolutions and learnsets.',
-         'The published source exposes those other structures, but this reference does not claim a general event or music editor for Emerald-derived hacks.'],['pokemon-gba']),
- _entry('smb1','Super Mario Bros.','nes','Xkeeper0/smb1','1cc3c92cbbe8cda44903657f3da332688e806a89','smb1.asm',
-        ['The disassembly names player state, lives, world and area variables in CPU RAM.',
-         'These are runtime investigation leads, not ROM file offsets or universal addresses for rearranged hacks.'],
-        addresses=[{'name':name,'address':address,'domain':'cpu_ram','rom_file_offset_known':False} for name,address in
-                   [('Lives counter',0x75a),('Player power-up form',0x756),('Displayed level number',0x75c),('World number',0x75f),('Internal area number',0x760),('Player X low byte',0x86),('Player Y low byte',0xce)]]),
- _entry('smw','Super Mario World','snes','IsoFrieze/SMWDisX','30643c7595a7d097d731de69476f8059c7cf98c3','rammap.asm',
-        ['The published RAM map distinguishes current power-up, position, screen-relative position and saved player state.',
-         'Lunar Magic edits can change level storage and supporting code. A base-game RAM label does not decode a modified level or establish its ROM bytes.'])
-]
+REFERENCES=[_entry('pokemon-red-blue', 'Pokemon Red / Blue', 'gb', 'pret/pokered', '171e2c204f9c1ff8e577ca387a4bbb009e130843', 'constants/pokemon_data_constants.asm', ['The documented base-data prefix has a Pokedex number followed by five base stats, two type bytes, catch rate and experience yield.', 'Banked ROM addresses and sprite pointers require the correct bank and revision; the prefix is not a table locator.'], ['pokemon-red-blue']), _entry('pokemon-crystal', 'Pokemon Crystal', 'gbc', 'pret/pokecrystal', '5c877ef55197039c9676e8e3eec6d254b1c40fe8', 'constants/pokemon_data_constants.asm', ['The base-data prefix separates special attack and special defense. It differs from the Red/Blue layout.', 'The source also declares held items, gender, breeding and move-compatibility data beyond this prefix. Those bytes are not edited by the prefix template.'], ['pokemon-crystal']),   _entry('smb1', 'Super Mario Bros.', 'nes', 'Xkeeper0/smb1', '1cc3c92cbbe8cda44903657f3da332688e806a89', 'smb1.asm', ['The disassembly names player state, lives, world and area variables in CPU RAM.', 'These are runtime investigation leads, not ROM file offsets or universal addresses for rearranged hacks.'], addresses=[{'name': name, 'address': address, 'domain': 'cpu_ram', 'rom_file_offset_known': False} for name, address in [('Lives counter', 1882), ('Player power-up form', 1878), ('Displayed level number', 1884), ('World number', 1887), ('Internal area number', 1888), ('Player X low byte', 134), ('Player Y low byte', 206)]]), _entry('smw', 'Super Mario World', 'snes', 'IsoFrieze/SMWDisX', '30643c7595a7d097d731de69476f8059c7cf98c3', 'rammap.asm', ['The published RAM map distinguishes current power-up, position, screen-relative position and saved player state.', 'Lunar Magic edits can change level storage and supporting code. A base-game RAM label does not decode a modified level or establish its ROM bytes.'])]
 
 
 def _fold(value):return ''.join(c for c in unicodedata.normalize('NFKD',value.casefold()) if not unicodedata.combining(c))
@@ -44,7 +23,7 @@ def _fold(value):return ''.join(c for c in unicodedata.normalize('NFKD',value.ca
 
 def catalog(query,system):
     label(query,128,blank=True)
-    if system not in ('all','nes','snes','genesis','sms','gb','gbc','gba'):raise ValueError('Choose a supported reference system.')
+    if system not in ('all', 'nes', 'snes', 'genesis', 'sms', 'gb', 'gbc'):raise ValueError('Choose a supported reference system.')
     rows=[r for r in REFERENCES if system in ('all',r['system_id']) and _fold(query) in _fold(r['title']+' '+' '.join(r['facts']))]
     return {'ok':True,'references':deepcopy(rows),'write_authorized':False,'rom_revision_verified':False,
             'note':'Pinned public research, not automatic compatibility with every hack. No game code or ROM is bundled.'}
@@ -52,10 +31,7 @@ def catalog(query,system):
 
 def table_template(template_id,offset,count,stride,size,system):
     from .data_tables import validate_definition
-    variants={
-      'pokemon-red-blue':('gb',[('Dex number',0),('HP',1),('Attack',2),('Defense',3),('Speed',4),('Special',5),('Type 1',6),('Type 2',7),('Catch rate',8),('Exp. yield',9)]),
-      'pokemon-crystal':('gbc',[('Dex number',0),('HP',1),('Attack',2),('Defense',3),('Speed',4),('Sp. attack',5),('Sp. defense',6),('Type 1',7),('Type 2',8),('Catch rate',9),('Exp. yield',10)]),
-      'pokemon-gba':('gba',[('HP',0),('Attack',1),('Defense',2),('Speed',3),('Sp. attack',4),('Sp. defense',5),('Type 1',6),('Type 2',7),('Catch rate',8),('Exp. yield',9)])}
+    variants={'pokemon-red-blue': ('gb', [('Dex number', 0), ('HP', 1), ('Attack', 2), ('Defense', 3), ('Speed', 4), ('Special', 5), ('Type 1', 6), ('Type 2', 7), ('Catch rate', 8), ('Exp. yield', 9)]), 'pokemon-crystal': ('gbc', [('Dex number', 0), ('HP', 1), ('Attack', 2), ('Defense', 3), ('Speed', 4), ('Sp. attack', 5), ('Sp. defense', 6), ('Type 1', 7), ('Type 2', 8), ('Catch rate', 9), ('Exp. yield', 10)])}
     if template_id not in variants:raise ValueError('Choose a documented table prefix.')
     expected,fields=variants[template_id]
     if system!=expected:raise ValueError('This documented prefix belongs to another system.')

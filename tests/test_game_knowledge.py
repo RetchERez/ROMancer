@@ -22,7 +22,7 @@ class GameKnowledgeTests(unittest.TestCase):
 
     def test_derived_reference_is_not_a_new_runtime_or_layout_certification(self):
         from romancer.game_knowledge import reference_knowledge
-        result=reference_knowledge('wario-land4-ue','a'*64,True)
+        result=reference_knowledge('chrono-trigger-usa','a'*64,True)
         self.assertTrue(result['selected_is_derived'])
         self.assertFalse(result['selected_layout_revalidated'])
         self.assertFalse(result['gameplay_verified'])

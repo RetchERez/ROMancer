@@ -9,77 +9,9 @@ from . import workbench_projects as projects
 from .asset_schema import fields, number
 
 
-PROFILES=(
-    {'id':'rastan-sms','name':'Rastan','system':'sms','size':262144,
-     'sha256':'7e310ada1a09ace30e9dd8f5738f095c0ec7821edc225221cbba130fb8cbadb3',
-     'reference':'/user-guide/index.html#rastan-blobs',
-     'scope':'First humanoid enemy literal graphics and one observed 16×32 assembly. The three lower-body blob frames were checked in the edited output; other enemies, collision and AI are separate.',
-     'offsets':[(0x10000,1920,'First humanoid enemy graphics')]},
-    {'id':'ffl2-usa','name':'Final Fantasy Legend II','system':'gb','size':262144,
-     'sha256':'2d89231f9e264a024d634bcf7d00de5a66d8a45f6f4ca33e1fc1602a35b9840b',
-     'reference':'https://github.com/daid/FFL2-Disassembly/tree/a5c17a90d87d102a9a45d287042c9a36ffd06f97',
-     'scope':'ROM-decoded opening bedroom and stool placement. Five floor positions preserve collision; exits and other room commands are protected. Test each new build.',
-     'offsets':[(0x20375,3,'Bedroom stool map command')]},
-    {'id':'dejavu-casebooks-usa','name':'Deja Vu I & II - The Casebooks of Ace Harding','system':'gbc','size':1048576,
-     'sha256':'b3ca745829e018513eae8d760484140a031c0f031e1881fca3374a9194e3ecac',
-     'reference':'https://github.com/Hoshiruna/djv1-2disasm/tree/b7ae8ca791ba31b956e015d3c87f3acc47f0fb42',
-     'scope':'Startup and first Case Book 1 scene UI palette7. Later scenes use their own palettes.',
-     'offsets':[(0x28318,8,'Startup casebook interface colors'),(0x28504,8,'Opening scene interface colors')]},
-    {'id':'castlevania-usa','name':'Castlevania','system':'nes','size':131088,
-     'sha256':'55bcab0d9efc33a9d9efc90f2c3c4ab12f3221a44b1f357e6c6202a456399aa8',
-     'reference':'https://github.com/rumbleminze/castlevania-snes/blob/main/src/bank7.asm',
-     'scope':'Starting spare lives; both initialization constants. Verified HUD 3 to 9.',
-     'offsets':[(0x1c836,1,'Starting spare lives'),(0x1c93b,1,'Mirrored initialization')]},
-    {'id':'chrono-trigger-usa','name':'Chrono Trigger','system':'snes','size':4194304,
-     'sha256':'06d1c2b06b716052c5596aaa0c2e5632a027fee1a9a28439e509f813c30829a9',
-     'reference':'https://github.com/dscotton/ct_disassembly/blob/main/data/item_weapon_stats.asm',
-     'scope':'Wood Sword weapon power. Power 3 to 30 produced displayed attack 8 to 23; the game computes final attack.',
-     'offsets':[(0xc0267,1,'Wood Sword power')]},
-    {'id':'immortal-ue','name':'The Immortal','system':'genesis','size':1048576,
-     'sha256':'b60aa52e46a199f755a1eb99daea543c468acf07d83624c85a84cdd14b786375',
-     'reference':'https://github.com/sewave/translations/blob/master/smd/immortalthesmd/immortalthesmd.hex',
-     'scope':'New-game menu prompt, up to nine ASCII characters. Includes the documented game-specific ROM-check adjustment.',
-     'offsets':[(0x4e1b,9,'New-game prompt'),(0xfffca,2,'Game-specific integrity adjustment')]},
-    {'id':'wario-land4-ue','name':'Wario Land 4','system':'gba','size':8388608,
-     'sha256':'d16c7bf6e62bb84049fff1b387108fbd1e6e2cd38ca994ab5310dd9cbf9ba414',
-     'reference':'https://github.com/lilDavid/warioland4/blob/master/asm/disasm_file_select.s',
-     'scope':'Two file-select RGB555 palettes. Original or the verified teal/magenta variation.',
-     'offsets':[(0x74253c,512,'File-select palette 1'),(0x74273c,512,'File-select palette 2')]},
-)
+PROFILES=({'id': 'rastan-sms', 'name': 'Rastan', 'system': 'sms', 'size': 262144, 'sha256': '7e310ada1a09ace30e9dd8f5738f095c0ec7821edc225221cbba130fb8cbadb3', 'reference': '/user-guide/index.html#rastan-blobs', 'scope': 'First humanoid enemy literal graphics and one observed 16×32 assembly. The three lower-body blob frames were checked in the edited output; other enemies, collision and AI are separate.', 'offsets': [(65536, 1920, 'First humanoid enemy graphics')]}, {'id': 'ffl2-usa', 'name': 'Final Fantasy Legend II', 'system': 'gb', 'size': 262144, 'sha256': '2d89231f9e264a024d634bcf7d00de5a66d8a45f6f4ca33e1fc1602a35b9840b', 'reference': 'https://github.com/daid/FFL2-Disassembly/tree/a5c17a90d87d102a9a45d287042c9a36ffd06f97', 'scope': 'ROM-decoded opening bedroom and stool placement. Five floor positions preserve collision; exits and other room commands are protected. Test each new build.', 'offsets': [(131957, 3, 'Bedroom stool map command')]}, {'id': 'dejavu-casebooks-usa', 'name': 'Deja Vu I & II - The Casebooks of Ace Harding', 'system': 'gbc', 'size': 1048576, 'sha256': 'b3ca745829e018513eae8d760484140a031c0f031e1881fca3374a9194e3ecac', 'reference': 'https://github.com/Hoshiruna/djv1-2disasm/tree/b7ae8ca791ba31b956e015d3c87f3acc47f0fb42', 'scope': 'Startup and first Case Book 1 scene UI palette7. Later scenes use their own palettes.', 'offsets': [(164632, 8, 'Startup casebook interface colors'), (165124, 8, 'Opening scene interface colors')]}, {'id': 'castlevania-usa', 'name': 'Castlevania', 'system': 'nes', 'size': 131088, 'sha256': '55bcab0d9efc33a9d9efc90f2c3c4ab12f3221a44b1f357e6c6202a456399aa8', 'reference': 'https://github.com/rumbleminze/castlevania-snes/blob/main/src/bank7.asm', 'scope': 'Starting spare lives; both initialization constants. Verified HUD 3 to 9.', 'offsets': [(116790, 1, 'Starting spare lives'), (117051, 1, 'Mirrored initialization')]}, {'id': 'chrono-trigger-usa', 'name': 'Chrono Trigger', 'system': 'snes', 'size': 4194304, 'sha256': '06d1c2b06b716052c5596aaa0c2e5632a027fee1a9a28439e509f813c30829a9', 'reference': 'https://github.com/dscotton/ct_disassembly/blob/main/data/item_weapon_stats.asm', 'scope': 'Wood Sword weapon power. Power 3 to 30 produced displayed attack 8 to 23; the game computes final attack.', 'offsets': [(787047, 1, 'Wood Sword power')]}, {'id': 'immortal-ue', 'name': 'The Immortal', 'system': 'genesis', 'size': 1048576, 'sha256': 'b60aa52e46a199f755a1eb99daea543c468acf07d83624c85a84cdd14b786375', 'reference': 'https://github.com/sewave/translations/blob/master/smd/immortalthesmd/immortalthesmd.hex', 'scope': 'New-game menu prompt, up to nine ASCII characters. Includes the documented game-specific ROM-check adjustment.', 'offsets': [(19995, 9, 'New-game prompt'), (1048522, 2, 'Game-specific integrity adjustment')]})
 
-BYTE_NOTES={
- 'rastan-sms':[
-  {'storage':'60 literal 8×8 row-planar 4bpp tiles, 32 bytes each',
-   'meaning':'The first humanoid enemy graphics occupy this checked range. An observed pose joins tiles 30,32,31,33,52,54,53,55 as two columns and four rows. Palette bytes, collision and AI are not in this definition.',
-   'example':'Open first enemy sprites to edit the assembled pose. Stored color indices are shown in labeled grayscale until a palette is declared.',
-   'evidence':'ROMancer native original/build frame comparison at frame841 changed only enemy pixels in the measured opening scene. The guide retains the source/build hashes and actual editor captures.'}],
- 'ffl2-usa':[
-  {'storage':'Three-byte packed point command','meaning':'Places tile1D (stool) in map0265. 17 CE encodes (14,31); 18 0E encodes (14,32). Exit, story window and collision values are preserved.',
-   'example':'17 CE 1D to 18 0E 1D.','evidence':'Original room header486B, map0265 and tileset0B were observed in native WRAM. Each edited build needs its own playtest.'}],
- 'dejavu-casebooks-usa':[
-  {'storage':'Four little-endian RGB555 colors','meaning':'Startup palette7 used by the casebook interface. This is stored color data.',
-   'example':'Original or parchment interface palette.','evidence':'The 64-byte native target palette matches the original startup and first-scene ROM blocks.'},
-  {'storage':'Four little-endian RGB555 colors','meaning':'First Case Book 1 scene palette7. Updated with the startup copy; later scene palettes remain unchanged.',
-   'example':'Original or parchment interface palette.','evidence':'Scene loading replaces all64 colors, so both observed copies are changed together.'}],
- 'castlevania-usa':[
-  {'storage':'Unsigned 8-bit counter','meaning':'Initialization counter includes the current life. Spare lives = stored value minus 1. Both initialization constants must agree.',
-   'example':'04 = 3 spare lives; 0A = 9 spare lives.','evidence':'Native HUD changed from P-03 to P-09 after a new start.'},
-  {'storage':'Unsigned 8-bit counter','meaning':'Second guarded initialization constant for the same life counter. Keep it equal to 0x1C836.',
-   'example':'04 to 0A in both locations.','evidence':'Both code locations were checked against the exact original and tested together.'}],
- 'chrono-trigger-usa':[
-  {'storage':'Unsigned 8-bit weapon power','meaning':'Wood Sword base weapon power. This is an input to the game formula, not the final displayed attack stat.',
-   'example':'03 = power 3; 1E = power 30.','evidence':'The tested build changed displayed attack from 8 to 23 on Crono\'s equipment screen.'}],
- 'immortal-ue':[
-  {'storage':'Fixed 9-byte ASCII text slot','meaning':'New-game prompt. Shorter text is padded with spaces. The following % delimiter at 0x4E24 is preserved.',
-   'example':'New game? to New hack?; neither text changes the slot length.','evidence':'The changed prompt was visible after native boot with the required integrity adjustment.'},
-  {'storage':'68000 opcode word, 2-byte patch','meaning':'Game-specific ROM check adjustment: replace the guarded instruction start with RTS (4E 75). The named plan also repairs the standard Genesis checksum.',
-   'example':'0C 80 to 4E 75 at this exact guarded revision.','evidence':'Standard header checksum repair alone produced a black screen; the explicit adjustment allowed the tested menu edit to boot.'}],
- 'wario-land4-ue':[
-  {'storage':'256 little-endian RGB555 colors','meaning':'File-select palette block: 2 bytes per color. Red uses bits 0–4, green 5–9 and blue 10–14. This is palette data, not tile pixels.',
-   'example':'1F 00 = full red; E0 03 = full green; 00 7C = full blue.','evidence':'Rotating color channels in both blocks produced the observed teal/magenta file-select screen.'},
-  {'storage':'256 little-endian RGB555 colors','meaning':'Second file-select palette block. The verified color variation changes both 512-byte blocks together.',
-   'example':'Each color is 2 bytes; 256 colors occupy 512 bytes.','evidence':'Both palette blocks were tested together in the same build.'}]
-}
+BYTE_NOTES={'rastan-sms': [{'storage': '60 literal 8×8 row-planar 4bpp tiles, 32 bytes each', 'meaning': 'The first humanoid enemy graphics occupy this checked range. An observed pose joins tiles 30,32,31,33,52,54,53,55 as two columns and four rows. Palette bytes, collision and AI are not in this definition.', 'example': 'Open first enemy sprites to edit the assembled pose. Stored color indices are shown in labeled grayscale until a palette is declared.', 'evidence': 'ROMancer native original/build frame comparison at frame841 changed only enemy pixels in the measured opening scene. The guide retains the source/build hashes and actual editor captures.'}], 'ffl2-usa': [{'storage': 'Three-byte packed point command', 'meaning': 'Places tile1D (stool) in map0265. 17 CE encodes (14,31); 18 0E encodes (14,32). Exit, story window and collision values are preserved.', 'example': '17 CE 1D to 18 0E 1D.', 'evidence': 'Original room header486B, map0265 and tileset0B were observed in native WRAM. Each edited build needs its own playtest.'}], 'dejavu-casebooks-usa': [{'storage': 'Four little-endian RGB555 colors', 'meaning': 'Startup palette7 used by the casebook interface. This is stored color data.', 'example': 'Original or parchment interface palette.', 'evidence': 'The 64-byte native target palette matches the original startup and first-scene ROM blocks.'}, {'storage': 'Four little-endian RGB555 colors', 'meaning': 'First Case Book 1 scene palette7. Updated with the startup copy; later scene palettes remain unchanged.', 'example': 'Original or parchment interface palette.', 'evidence': 'Scene loading replaces all64 colors, so both observed copies are changed together.'}], 'castlevania-usa': [{'storage': 'Unsigned 8-bit counter', 'meaning': 'Initialization counter includes the current life. Spare lives = stored value minus 1. Both initialization constants must agree.', 'example': '04 = 3 spare lives; 0A = 9 spare lives.', 'evidence': 'Native HUD changed from P-03 to P-09 after a new start.'}, {'storage': 'Unsigned 8-bit counter', 'meaning': 'Second guarded initialization constant for the same life counter. Keep it equal to 0x1C836.', 'example': '04 to 0A in both locations.', 'evidence': 'Both code locations were checked against the exact original and tested together.'}], 'chrono-trigger-usa': [{'storage': 'Unsigned 8-bit weapon power', 'meaning': 'Wood Sword base weapon power. This is an input to the game formula, not the final displayed attack stat.', 'example': '03 = power 3; 1E = power 30.', 'evidence': "The tested build changed displayed attack from 8 to 23 on Crono's equipment screen."}], 'immortal-ue': [{'storage': 'Fixed 9-byte ASCII text slot', 'meaning': 'New-game prompt. Shorter text is padded with spaces. The following % delimiter at 0x4E24 is preserved.', 'example': 'New game? to New hack?; neither text changes the slot length.', 'evidence': 'The changed prompt was visible after native boot with the required integrity adjustment.'}, {'storage': '68000 opcode word, 2-byte patch', 'meaning': 'Game-specific ROM check adjustment: replace the guarded instruction start with RTS (4E 75). The named plan also repairs the standard Genesis checksum.', 'example': '0C 80 to 4E 75 at this exact guarded revision.', 'evidence': 'Standard header checksum repair alone produced a black screen; the explicit adjustment allowed the tested menu edit to boot.'}]}
 
 
 def _resolve(project,row,cancelled):
@@ -101,15 +33,6 @@ def _read(path,offset,length):
     with Path(path).open('rb') as stream:stream.seek(offset);raw=stream.read(length)
     if len(raw)!=length:raise ValueError('verified game location exceeds the selected ROM')
     return raw
-
-
-def _rotate(raw):
-    result=bytearray()
-    for i in range(0,len(raw),2):
-        c=int.from_bytes(raw[i:i+2],'little')
-        if c>0x7fff:raise ValueError('unsupported file-select palette value')
-        result.extend((((c>>10)&31)|((c&31)<<5)|(((c>>5)&31)<<10)).to_bytes(2,'little'))
-    return bytes(result)
 
 
 def _model(profile,root,path):
@@ -140,24 +63,20 @@ def _model(profile,root,path):
         if slot[-1]!=37 or any(c<32 or c>126 or c==37 for c in slot[:-1]):raise ValueError('menu text or protected terminator differs')
         if check not in (bytes.fromhex('0c80fede808566024e75'),bytes.fromhex('4e75fede808566024e75')):raise ValueError('game-specific integrity code guard differs')
         return [{'id':'menu_text','label':'New-game menu text','type':'text','max_length':9,'value':slot[:-1].decode('ascii').rstrip()}]
-    originals=[_read(root['path'],offset,length) for offset,length,_ in profile['offsets']]
-    current=[_read(path,offset,length) for offset,length,_ in profile['offsets']]
-    value='original' if current==originals else 'teal_magenta' if current==[_rotate(r) for r in originals] else ''
-    return [{'id':'palette_style','label':'File-select colors','type':'choice','value':value,
-             'options':[['original','Original colors'],['teal_magenta','Teal and magenta']]}]
+    raise ValueError('no enabled verified editor for this game definition')
 
 
 def palette_visuals(profile,root,path):
     if profile['id']=='ffl2-usa':
         from .verified_room import room_visual
         return room_visual(path,root['path'])
-    if profile['id'] not in ('wario-land4-ue','dejavu-casebooks-usa'):return None
+    if profile['id'] not in ('dejavu-casebooks-usa',):return None
     def colors(raw):
         return [[round(((int.from_bytes(raw[i:i+2],'little')>>shift)&31)*255/31) for shift in (0,5,10)] for i in range(0,len(raw),2)]
     rows=[]
     for offset,length,label in profile['offsets']:
         original=_read(root['path'],offset,length);current=_read(path,offset,length)
-        variant={'parchment':colors(bytes.fromhex('0000285695155d5f'))} if profile['id']=='dejavu-casebooks-usa' else {'teal_magenta':colors(_rotate(original))}
+        variant={'parchment':colors(bytes.fromhex('0000285695155d5f'))}
         rows.append({'name':label,'offset':offset,'current':colors(current),'original':colors(original),**variant})
     return {'kind':'rgb555-palettes','palettes':rows,'scope':'Literal stored colors; native scene rendering is not predicted.'}
 
@@ -262,11 +181,7 @@ def plan(api,parameters,*,cancelled=lambda:False):
         if _read(path,0xfffca,2)!=b'\x4e\x75':
             edit(0xfffca,b'\x4e\x75');additional.append('Game-specific ROM check: documented 2-byte adjustment at 0xFFFCA.')
         name='Menu text - '+value
-    else:
-        if type(value) is not str or value not in ('original','teal_magenta'):raise ValueError('choose one of the verified file-select palettes')
-        for offset,length,_ in profile['offsets']:
-            original=_read(root['path'],offset,length);edit(offset,_rotate(original) if value=='teal_magenta' else original)
-        name='File-select colors - '+('teal and magenta' if value=='teal_magenta' else 'original')
+    else:raise ValueError('no enabled verified editor for this game definition')
     if not edits:raise ValueError('no changes to build; choose a different value')
     preview.append({'label':field['label'],'before':field['value'],'after':value})
     result=api._integrity_plan({'project_id':parameters['project_id'],'artifact_id':row['artifact_id'],'edits':edits},cancelled)

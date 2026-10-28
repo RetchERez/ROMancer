@@ -16,7 +16,7 @@ class DebuggerProvisionTests(unittest.TestCase):
 
     def test_metadata_is_fixed_upstream_scoped_and_separate_from_bundled_cores(self):
         m=self.module()
-        for system in ('nes','snes','genesis','gb','gbc','gba'):
+        for system in ('nes','snes','genesis','gb','gbc'):
             info=m.download_info(system)
             self.assertFalse(info['bundled']);self.assertTrue(info['requires_network']);self.assertGreater(info['download_bytes'],1000000)
             self.assertTrue(info['upstream'].startswith('https://github.com/'))
@@ -56,7 +56,7 @@ class DebuggerProvisionTests(unittest.TestCase):
         m=self.module()
         with tempfile.TemporaryDirectory() as folder:
             workspace=Path(folder)
-            self.assertEqual(m.cache_root(workspace,'gba'),workspace/'debuggers'/'mesence-2.2.1')
+            self.assertEqual(m.cache_root(workspace,'gbc'),workspace/'debuggers'/'mesence-2.2.1')
             self.assertEqual(m.cache_root(workspace,'genesis'),workspace/'debuggers'/'mame-0.289')
         from romancer.mcp_server import WRITE_OPERATIONS,_investigation_properties
         self.assertIn('debugger.prepare',WRITE_OPERATIONS)
