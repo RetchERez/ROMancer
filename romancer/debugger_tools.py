@@ -89,7 +89,7 @@ class DebuggerTools:
     def investigate(self,p,c):
         from .investigation_tools import InvestigationTools
         proposed=InvestigationTools(self.api).probe(p,c);replay=p['replay']
-        if type(replay) is not dict or set(replay)-{'steps','start_frame','event_limit','instruction_limit','timeout'}:
+        if type(replay) is not dict or set(replay)-{'steps','start_frame','event_limit','instruction_limit','timeout','stop'}:
             raise ValueError('Replay accepts bounded steps and budgets only; its probe is derived from the authenticated candidate.')
         link={key:proposed[key] for key in ('investigation_id','candidate','physical_probe','core_sha256','same_runtime_state_claimed','replay_scope')}
         link['candidate_id']=proposed['candidate']['candidate_id']

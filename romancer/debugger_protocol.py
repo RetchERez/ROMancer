@@ -23,7 +23,7 @@ BUTTONS={'nes':{'a','b','select','start','up','down','left','right'},
 
 def validate_capture(system,config):
     if system not in LIMITS:raise ValueError('this native trace backend does not support the selected system')
-    fields(config,'steps probes event_limit instruction_limit timeout'+(' start_frame' if 'start_frame' in config else '')+(' graphics_snapshot' if 'graphics_snapshot' in config else ''))
+    fields(config,'steps probes event_limit instruction_limit timeout'+(' start_frame' if 'start_frame' in config else '')+(' graphics_snapshot' if 'graphics_snapshot' in config else '')+(' stop' if 'stop' in config else ''))
     if 'graphics_snapshot' in config and type(config['graphics_snapshot']) is not bool:raise ValueError('Choose whether to capture a graphics snapshot.')
     number(config['event_limit'],1,2000);number(config['instruction_limit'],1000,20000000);number(config['timeout'],1,60)
     if type(config['steps']) is not list or not 1<=len(config['steps'])<=64:raise ValueError('record 1 to 64 input steps')
@@ -47,6 +47,9 @@ def validate_capture(system,config):
         if any(p['kind']==probe['kind'] and p.get('domain','cpu')==domain and probe['start']<=p['end'] and p['start']<=probe['end'] for p in prior):
             raise ValueError('same-kind probe ranges must not overlap')
         prior.append(probe)
+    if 'stop' in config:
+        fields(config['stop'],'occurrence');number(config['stop']['occurrence'],1,config['event_limit'])
+        if len(prior)!=1 or config.get('graphics_snapshot'):raise ValueError('A focused stop uses one explicit probe without a graphics snapshot.')
     return {**config,'frames':total,'start_frame':config.get('start_frame',0)}
 
 
@@ -141,9 +144,11 @@ def parse_capture(text,nonce,system,raw,config):
         elif kind=='END' and len(part)==6:
             frame=integer(part[1],0,requested['frames']);emitted=integer(part[2],0,config['event_limit'])
             omitted=integer(part[3]);executed=integer(part[4],0,config['instruction_limit']);reason=part[5]
-            if emitted!=len(events) or reason not in ('frames','instruction_limit') or reason=='frames' and frame!=requested['frames']:
+            if emitted!=len(events) or reason not in ('frames','instruction_limit','access') or reason=='frames' and frame!=requested['frames']:
                 raise ValueError('native end record is incomplete or inconsistent')
             if reason=='instruction_limit' and executed!=config['instruction_limit']:raise ValueError('native instruction budget differs')
+            if reason=='access' and ('stop' not in config or emitted!=config['stop']['occurrence'] or omitted or frame<requested['start_frame']):raise ValueError('Native access stop does not match the requested occurrence.')
+            if 'stop' in config and reason!='access' and emitted>=config['stop']['occurrence']:raise ValueError('Native capture passed its requested access stop.')
             end={'frames_observed':frame,'omitted_events':omitted,'executed_callbacks':executed,'stop_reason':reason,'route_complete':reason=='frames'}
         else:raise ValueError('unknown or malformed native event record')
     if end is None:raise ValueError('native capture did not produce its end record')
@@ -151,10 +156,19 @@ def parse_capture(text,nonce,system,raw,config):
     if config.get('graphics_snapshot'):
         from .graphics_snapshot import finish_snapshot
         snapshot['graphics_snapshot']=finish_snapshot(graphics,system)
-    return {'ok':True,'status':'CAPTURED' if end['route_complete'] and not end['omitted_events'] else 'BUDGET_EXCEEDED',**snapshot,
+    focus=focus_result(config,events,end)
+    return {'ok':True,'status':focus['status'] if focus else 'CAPTURED' if end['route_complete'] and not end['omitted_events'] else 'BUDGET_EXCEEDED',**({'focus':focus} if focus else {}),**snapshot,
         'system_id':system,'native_callbacks_observed':True,'events':events,**end,
         'write_authorized':False,'memory_written':False,'runtime_scope':'main CPU callbacks from a bounded cold-start input route',
         'limitations':['Access width, DMA actor and dummy-read subtype are not exposed by this backend API.',
             'The last executed instruction supplies context; causal ownership of a transfer is not established.',
             'Physical ROM offsets are mapped only through supported source layouts; firmware and transformed storage remain unresolved.',
             'Cold-start captures do not import a libretro save state.']}
+
+
+def focus_result(config,events,end):
+    if 'stop' not in config:return None
+    matched=end.get('stop_reason')=='access'
+    return {'matched':matched,'occurrence':config['stop']['occurrence'],'event':events[-1] if matched else None,
+        'status':'STOPPED' if matched else 'NO_MATCH' if end['route_complete'] and not end['omitted_events'] else 'BUDGET_EXCEEDED',
+        'scope':'Bounded cold-start replay stopped after the requested native access callback. This is not continuous instruction stepping.'}

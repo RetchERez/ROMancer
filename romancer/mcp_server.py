@@ -35,8 +35,27 @@ recipes.from_plan recipes.preview recipes.import recipes.export jobs.cancel
 values.start values.narrow investigations.start investigations.capture debugger.prepare debugger.capture debugger.investigate relocation.plan watches.save video.inspect compression.extract compression.plan_reinsert
 definitions.export definitions.import'''.split())
 READ_OPERATIONS=READ_OPERATIONS|{'debugger.follow','definitions.preview','references.survey','commands.inspect','animations.list','animations.get','animations.preview','sound.instrument'}
+READ_OPERATIONS=READ_OPERATIONS|{'formats.list','formats.create','formats.preview'}
+READ_OPERATIONS=READ_OPERATIONS|{'text.grow.preview','text.grow.definition'}
+READ_OPERATIONS=READ_OPERATIONS|{'commands.rewrite.preview','commands.rewrite.definition'}
 WRITE_OPERATIONS=WRITE_OPERATIONS|{'definitions.save','commands.plan','animations.save','animations.delete'}
+WRITE_OPERATIONS=WRITE_OPERATIONS|{'formats.install','formats.apply','formats.delete','formats.export'}
+WRITE_OPERATIONS=WRITE_OPERATIONS|{'text.grow.plan'}
+WRITE_OPERATIONS=WRITE_OPERATIONS|{'commands.rewrite.plan'}
 DESCRIPTIONS={
+ 'commands.rewrite.preview':'Preview insert/remove/reorder of fully declared linear commands inside a confirmed fixed allocation. Requires no-interior-consumers acknowledgement. Branches, pointer operands, unmodelled bytes and overflow refuse. No ROM changes.',
+ 'commands.rewrite.plan':'Plan exactly previewed linear command sequence with source/document/review guards and cartridge checksum maintenance. Game semantics require playtesting.',
+ 'commands.rewrite.definition':'Reopen a reviewed command-sequence build after verifying the rewritten allocation hash and fresh decoding.',
+ 'text.grow.preview':'Preview growing one decoded position-independent text record into explicitly reserved capacity. Preserves controls, includes all declared record-start pointers, checks extra references and same-bank constraints. No ROM/plan mutation.',
+ 'text.grow.plan':'Plan exactly previewed text growth with source/document/destination review guards and checksum maintenance. Original text stays; builds still require playtesting.',
+ 'text.grow.definition':'Inspect the moved text layout from a reviewed text-growth build. Rechecks payload identity and every schema rule before offering the new source-bound declaration.',
+ 'formats.list':'List the local declarative editor-format library. Packs contain metadata, not executable plugins; invalid stored files are reported.',
+ 'formats.create':'Prepare a portable pack from current saved editor layouts. Exact-source matching is default. Guarded compatibility uses explicitly selected protected hash regions and remains an author declaration. Text precondition bytes are omitted.',
+ 'formats.preview':'Match a local pack against this console/source, run every actual editor inspector and return a metadata-bound review without saving.',
+ 'formats.install':'Install a bounded declarative format pack by content identity in the local workspace library. No ROM changes.',
+ 'formats.apply':'Apply exactly previewed editor layouts. Existing definitions require replacement acknowledgement; another revision requires guarded-compatibility acknowledgement. ROM bytes and editor drafts stay separate.',
+ 'formats.delete':'Remove a local format pack by content identity. Project definitions and ROM bytes remain.',
+ 'formats.export':'Export one local declarative pack as a project-owned JSON artifact for sharing.',
  'sound.instrument':'Read the tone structure selected by an instrument actually used in a checked M4A song. Shows supported hardware/sample/envelope fields; compound or unsupported structures remain read-only and are not followed.',
  'animations.list':'List exact-source saved sprite animation arrangements. Frame timings are author declarations, not decoded engine timing.',
  'animations.get':'Read a checked saved animation, its graphics schema, explicit tile placements/flips/colors and timing. Imported layouts never gain native authority.',
@@ -119,8 +138,8 @@ DESCRIPTIONS={
  'watches.compare':'Compare two identity-bound memory observations of at most 256 bytes. No instruction or write event is inferred.',
  'video.inspect':'Observe at most 4096 bytes of exposed video memory and decode a tested tile format. Palette and ROM ownership remain unknown.',
  'debug.inspect':'Inspect a source/build-bound declared case and explicit imported trace. Imports do not establish native events or causation. Native bridge loading is unavailable through MCP.',
- 'compression.inspect':'Inspect a declared GBA LZ10/RLE stream within a confirmed allocation of at most 48 KiB.',
- 'compression.extract':'Extract a bounded LZ10/RLE stream into a separate project-owned resource, preserving its confirmed allocation and parent identity.',
+ 'compression.inspect':'Inspect a declared GBA LZ10/RLE or SNES LC_LZ2 stream within a confirmed allocation of at most 48 KiB.',
+ 'compression.extract':'Extract a bounded GBA LZ10/RLE or SNES LC_LZ2 stream into a separate project-owned resource, preserving its confirmed allocation and parent identity.',
  'compression.plan_reinsert':'Review recompression of a descended edited resource into its exact confirmed parent allocation. Refuses growth and verifies independent decoding.',
  'definitions.export':'Export a checked source-bound resource definition to the project export store.',
  'definitions.import':'Validate and save a source-bound definition supplied as JSON. No arbitrary input or output path is accepted.'}
@@ -146,6 +165,23 @@ def _investigation_properties(operation):
     def obj(properties):return {'type':'object','properties':properties,'required':list(properties),'additionalProperties':False}
     def array(items,maximum,minimum=0):return {'type':'array','items':items,'minItems':minimum,'maxItems':maximum}
     source={'project_id':string(),'artifact_id':string()}
+    if operation in ('text.grow.definition','commands.rewrite.definition'):return source
+    if operation in ('commands.rewrite.preview','commands.rewrite.plan'):
+        props={**source,'definition':{'type':'object','description':'Checked source-bound fixed-length opcode grammar.'},'document_id':string(64),'script_id':string(64),'items':array(obj({'opcode':integer(0,255),'values':{'type':'object','description':'Exactly the declared operand names and bounded integer values.'}}),256,1),'fill_byte':integer(0,255),'no_interior_references':{'type':'boolean'}}
+        return {**props,'review_id':string(64)} if operation=='commands.rewrite.plan' else props
+    if operation in ('text.grow.preview','text.grow.plan'):
+        ref=obj({'offset':integer(),'width':integer(2,4),'endian':enum(['little','big']),'base':integer(-0xffffffff,0xffffffff),'target_delta':integer(0,0)})
+        destination=obj({'offset':integer(),'capacity':integer(1,49152),'fill_byte':integer(0,255),'alignment':{'type':'integer','enum':[1,2,4,8,16,32]},'bank_size':integer(0,65536),'bank_origin':integer(),'extra_references':array(ref,128),'references_complete':{'type':'boolean'},'destination_reserved':{'type':'boolean'}})
+        props={**source,'schema':{'type':'object','description':'Current checked fixed-slot script schema.'},'document_id':string(64),'record_id':string(128),'changes':array(obj({'segment':integer(0,4095),'text':string(65536)}),256,1),'destination':destination}
+        return {**props,'review_id':string(64)} if operation=='text.grow.plan' else props
+    if operation=='formats.list':return {}
+    if operation=='formats.create':return {**source,'name':string(80),'mode':enum(['exact','guarded']),'guards':array(obj({'offset':integer(),'length':integer(16,65536)}),32)}
+    if operation=='formats.install':return {'document':{'type':'object','description':'romancer-format-pack-v1 metadata, <=512KiB. Exact source or guarded hashes, known editor definitions; no code or raw text-rule precondition bytes.'}}
+    if operation in ('formats.preview','formats.apply'):
+        props={**source,'pack_id':string(64)}
+        return {**props,'review_id':string(64),'replace':{'type':'boolean'},'accept_guarded':{'type':'boolean'}} if operation=='formats.apply' else props
+    if operation=='formats.delete':return {'pack_id':string(64)}
+    if operation=='formats.export':return {'project_id':string(),'pack_id':string(64)}
     if operation=='sound.instrument':return {**source,'song_id':string(64),'instrument':integer(0,255)}
     if operation=='animations.list':return source
     if operation in ('animations.get','animations.delete'):return {**source,'animation_id':string(32)}
@@ -241,6 +277,7 @@ def _investigation_properties(operation):
         configuration=obj({'steps':array(step,64,1),'probes':array(probe,8,1),'event_limit':integer(1,2000),
             'instruction_limit':integer(1000,20000000),'timeout':integer(1,60)})
         configuration['properties']['start_frame']=integer(0,3599)
+        configuration['properties']['stop']=obj({'occurrence':integer(1,2000)})
         if operation=='debugger.investigate':
             del configuration['properties']['probes'];configuration['required'].remove('probes')
             return {**source,'investigation_id':string(64),'candidate_id':string(64),'replay':configuration}
@@ -263,7 +300,7 @@ def _investigation_properties(operation):
             variants.append({'type':'object','properties':{'kind':enum([kind]),**properties},
                 'required':['kind',*required],'additionalProperties':False})
         return {**source,'header':integer(0x4800,0x6f7f),'changes':array({'oneOf':variants},64,1)}
-    codecs=enum(['gba-lz10','gba-rle']);kinds=enum(['script','assets','tables','levels','sound','commands'])
+    codecs=enum(['gba-lz10','gba-rle','snes-lz2']);kinds=enum(['script','assets','tables','levels','sound','commands'])
     if operation=='systems.address':
         variants=[]
         for ids,extra in [(['nrom'],{'prg_offset':integer(16,528),'prg_size':integer(16384,32768)}),
@@ -292,7 +329,7 @@ def _investigation_properties(operation):
         'tile8-rowplanar4-msb-v1','tile8-planar2-msb-v1','tile8-paired2-msb-v1','tile8-paired4-msb-v1','tile8-packed4-high-v1','tile8-packed4-low-v1'])}
     if operation in ('compression.inspect','compression.extract','compression.plan_reinsert','compression.preview_reinsert','compression.plan_relocate'):
         identity=source if operation in ('compression.inspect','compression.extract') else {'project_id':string(),'parent_id':string(),'decoded_id':string(),'edited_id':string()}
-        properties={**identity,'offset':integer(),'allocation':integer(4,48*1024),'codec':codecs}
+        properties={**identity,'offset':integer(),'allocation':integer(3,48*1024),'codec':codecs}
         if operation=='compression.plan_relocate':properties['spec']=_investigation_properties('relocation.plan')['spec']
         return properties
     if operation=='definitions.export':return {**source,'kind':kinds}

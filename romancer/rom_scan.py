@@ -18,7 +18,10 @@ from .audio_systems import audio_system_info
 MAX_SCAN=64*1024**2
 WINDOW=1024**2
 PER_KIND=100
-VERSION=16
+VERSION=17
+
+def definitions_stamp(row):
+    return hashlib.sha256(canonical_bytes(row.get('descriptors',{}),max_bytes=projects.MAX_STORE)).hexdigest()
 
 
 def cache_path(project,row):
@@ -36,7 +39,8 @@ def fingerprint(project):
         if cheat_path.stat().st_size>16*1024**2:raise ValueError('code reference catalog exceeds scan budget')
         cheat_reference=hashlib.sha256(cheat_path.read_bytes()).hexdigest()
     else:cheat_reference=None
-    return hashlib.sha256(json.dumps({'version':VERSION,'catalog':reference,'cheats':cheat_reference,'definitions':PROFILES,'notes':BYTE_NOTES},sort_keys=True).encode()).hexdigest()
+    from .format_library import library_stamp
+    return hashlib.sha256(json.dumps({'version':VERSION,'catalog':reference,'cheats':cheat_reference,'definitions':PROFILES,'notes':BYTE_NOTES,'format_library':library_stamp(Path(project).parent.parent)},sort_keys=True).encode()).hexdigest()
 
 
 def cached(project,row,*,cancelled=lambda:False):
@@ -51,6 +55,7 @@ def cached(project,row,*,cancelled=lambda:False):
     except (ValueError,OSError,TypeError):return None
     if (type(result) is not dict or result.get('scan_version')!=VERSION or result.get('source_sha256')!=row['sha256']
             or result.get('artifact_id')!=row['artifact_id'] or result.get('fingerprint')!=fingerprint(project)):return None
+    if result.get('definitions_fingerprint')!=definitions_stamp(row):return None
     if (type(result.get('candidates')) is not list or len(result['candidates'])>3*PER_KIND
             or type(result.get('coverage')) is not dict or type(result.get('counts')) is not dict
             or set(result['counts'])!={'text','graphics','compression'}):return None
@@ -121,6 +126,7 @@ def run(project,row,*,cancelled=lambda:False,publish=None):
                       'Compression checks cover aligned supported LZ10/RLE signatures with per-window work budgets; see coverage.',
                       'Window boundaries may split resources. Use a focused range scan to investigate them.',
                       'Unknown stats, scripts and banked pointers need evidence or explicit mappings.']}
+    result['definitions_fingerprint']=definitions_stamp(row)
     result['structural_lab']={'source_sha256':row['sha256'],'candidates':lab_candidates,'coverage':lab_coverage,
         'total_candidates':lab_total,'truncated':lab_total>len(lab_candidates),'dereference_observed':False,
         'game_profile_required':False,'write_authorized':False,
@@ -134,6 +140,9 @@ def run(project,row,*,cancelled=lambda:False,publish=None):
         from .documented_tables import scan as documented_tables
         from .workbench_files import read_bounded
         result['documented_tables']=documented_tables(read_bounded(path,32*1024**2,row,cancelled=cancelled),row['sha256'],system,cancelled=cancelled)
+    from .format_library import scan_library
+    result['format_library']=scan_library(Path(project).parent.parent,row,path,cancelled)
+    if definitions_stamp(projects.artifact(project,row['artifact_id']))!=definitions_stamp(row):raise ValueError('Editor layouts changed during the scan. Scan this source again.')
     if publish:publish(result)
     else:
         projects.read_project(project)

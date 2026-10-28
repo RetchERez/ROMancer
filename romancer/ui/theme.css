@@ -1,4 +1,22 @@
-:root{--bg:#10191f;--panel:#18242b;--panel2:#1e2d35;--text:#e5e9e6;--muted:#91a5af;--accent:#76dbc3;--line:#2d3d46;--theme-nav:#0b1418;--theme-top:#101a20;--theme-menu:#111d23;color-scheme:dark}
+:root{--bg:#252d2f;--panel:#303a3c;--panel2:#3b4749;--text:#edf3f0;--muted:#bdccc6;--accent:#8cdeb1;--line:#61776f;--theme-nav:#11191c;--theme-top:#1b2528;--theme-menu:#1b282b;--theme-input:#182326;--theme-hover:#465451;--theme-soft:#354d42;--theme-ink:#10251b;color-scheme:dark}
+
+/* Default ROMancer: charcoal workspace, emerald controls and readable labels. */
+html:not([data-theme]),html[data-theme="romancer"]{color-scheme:dark}
+html:not([data-theme]) .nav-item,html[data-theme="romancer"] .nav-item{color:var(--muted)}
+html:not([data-theme]) .nav-item.active,html[data-theme="romancer"] .nav-item.active{background:var(--theme-soft);color:var(--accent)}
+html:not([data-theme]) .nav-item:hover,html[data-theme="romancer"] .nav-item:hover{background:var(--theme-hover);color:var(--text)}
+html:not([data-theme]) .field>span,html[data-theme="romancer"] .field>span,
+html:not([data-theme]) summary,html[data-theme="romancer"] summary{color:var(--text)}
+html:not([data-theme]) .field input,html:not([data-theme]) .field select,html:not([data-theme]) .field textarea,
+html[data-theme="romancer"] .field input,html[data-theme="romancer"] .field select,html[data-theme="romancer"] .field textarea,
+html[data-theme="romancer"] .hex-cell,html[data-theme="romancer"] pre{background:var(--theme-input);color:var(--text);border-color:var(--line)}
+html[data-theme="romancer"] .hero{background:linear-gradient(120deg,#354641,#303a3c);border-color:var(--line)}
+html[data-theme="romancer"] .hero p,html[data-theme="romancer"] .nav-label{color:var(--muted)}
+html[data-theme="romancer"] th,html[data-theme="romancer"] .identity code,html[data-theme="romancer"] .hex-address{color:var(--muted)}
+html[data-theme="romancer"] .notice,html[data-theme="romancer"] .script-line{background:var(--panel2);color:var(--text);border-color:var(--line)}
+html[data-theme="romancer"] button:hover{background:var(--theme-hover);border-color:var(--muted)}
+html[data-theme="romancer"] button.primary,html[data-theme="romancer"] button.primary:hover{background:var(--accent);border-color:var(--accent);color:var(--theme-ink)}
+html[data-theme="romancer"] .job-tray{background:#151e21;border-color:var(--line);color:var(--muted)}
 
 /* Menu surfaces stay distinct from editor panels in each appearance. */
 :root .sidebar{background:var(--theme-nav)}
@@ -85,3 +103,5 @@ html[data-theme="light"] .nav-label,html[data-theme="light"] .app-footer{color:v
 .build-context{max-width:14rem;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 
 .draft-scene-pictures{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:12px}.draft-scene-pictures img{width:100%;max-height:240px;object-fit:contain;image-rendering:pixelated;background:var(--theme-menu)}.draft-scene-pictures figure{margin:0}@media(max-width:800px){.draft-scene-pictures{grid-template-columns:1fr}}
+
+.text-growth>label,.command-sequence>label,.format-library section>label{display:flex;align-items:flex-start;gap:10px;margin:14px 0;line-height:1.5}.text-growth input[type=checkbox],.command-sequence input[type=checkbox],.format-library input[type=checkbox]{flex:none;width:18px;height:18px;accent-color:var(--accent)}.command-sequence>ol{max-height:260px;overflow:auto;padding:12px 12px 12px 38px;border:1px solid var(--line);border-radius:6px}.command-sequence>ol li{padding:5px 0}

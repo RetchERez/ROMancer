@@ -33,7 +33,7 @@ class InvestigationMCPTests(unittest.TestCase):
         for key in ('before','after'):self.assertEqual(schemas['romancer_watches_compare'][key]['type'],'object')
         for key in ('case','trace'):self.assertEqual(schemas['romancer_debug_inspect'][key]['type'],'object')
         self.assertEqual(schemas['romancer_compression_inspect']['allocation']['maximum'],49152)
-        self.assertEqual(schemas['romancer_compression_inspect']['codec']['enum'],['gba-lz10','gba-rle'])
+        self.assertEqual(schemas['romancer_compression_inspect']['codec']['enum'],['gba-lz10','gba-rle','snes-lz2'])
         self.assertEqual(schemas['romancer_definitions_import']['document']['type'],'object')
         self.assertEqual(schemas['romancer_definitions_export']['kind']['enum'],['script','assets','tables','levels','sound','commands'])
         self.assertTrue(tools['romancer_compression_inspect']['annotations']['readOnlyHint']);self.assertFalse(tools['romancer_values_start']['annotations']['readOnlyHint'])

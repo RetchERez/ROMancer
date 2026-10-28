@@ -1,0 +1,12 @@
+import assert from 'node:assert/strict';
+import {parseGrowthReferences,textGrowth} from '../romancer/ui/text_growth.js';
+assert.deepEqual(parseGrowthReferences('0x500 2 little 32752'),[{offset:1280,width:2,endian:'little',base:32752,target_delta:0}]);
+assert.throws(()=>parseGrowthReferences('0x500 1 little 0'));assert.throws(()=>parseGrowthReferences('4 2 guessed 0'));assert.throws(()=>parseGrowthReferences('1 2 little NaN'));
+const nodes={'growth-record':{value:'r'},'growth-target':{value:'0x1800'},'growth-capacity':{value:'32'},'growth-fill':{value:'255'},'growth-align':{value:'1'},'growth-bank':{value:'8192'},'growth-origin':{value:'16'},'growth-extra':{value:''},'growth-complete':{checked:true},'growth-reserved':{checked:true},'script-schema':{value:'{}'},'script-segment-0-0':{value:'Longer text'}};
+globalThis.document={getElementById:id=>nodes[id]};
+const actions={},state={page:'scripts',project:{project_id:'p'},artifact:{artifact_id:'a',system_id:'nes'},results:{}};
+const doc={ok:true,write_supported:true,document_id:'d',records:[{id:'r',capacity:8,segments:[{index:0,text:'Old'}],annotations:{label:'Message'}}]},ctx={state,sourceParams:()=>({project_id:'p',artifact_id:'a'}),projectParams:()=>({project_id:'p'}),draft:(k,d)=>d,use:r=>Object.assign(actions,r),render:async()=>{},notify:()=>{},run:async()=>({ok:true,review_id:'review',required_bytes:12,capacity:32,text_preview:'Longer text',pointer_updates:[]})};
+textGrowth(ctx,doc);await actions['growth-preview']();assert.equal(state.textGrowthReview.result.required_bytes,12);
+textGrowth(ctx,doc);nodes['script-segment-0-0'].value='Changed after preview';await assert.rejects(actions['growth-plan'](),/changed|Preview/i);
+let resolve;ctx.run=()=>new Promise(r=>resolve=r);const pending=actions['growth-preview']();state.page='assets';resolve({ok:true});await pending;assert.equal(state.textGrowthReview.result.required_bytes,12);
+console.log('Text growth parses explicit pointer encoding, refuses stale reviews and ignores late results after navigation.');

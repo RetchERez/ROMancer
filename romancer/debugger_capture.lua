@@ -88,7 +88,7 @@ local function record(kind,address,value,probe,access)
  output:write(string.format("E\t%d\t%s\t%d\t%d\t%d\t%d\t%d\t%d\t%d\t%d\n",emitted,kind,address,value,lastExec,
   mapping and mapping.memType or -1,mapping and mapping.address or -1,lastDomain,lastPhysical,state.frameCount))
  if access then output:write(string.format('N\t%d\t%s\t%d\t%d\t%d\n',emitted,access.operation,access.valueBytes,access.memoryType,access.physicalAddress)) end
- if emitted<=16 then
+ if emitted<=16 or (@STOP_AT@>0 and emitted>=@STOP_AT@) then
   local registers=emu.getCpuState(cpu)
   for _,name in ipairs(registerNames) do
    local v=registers[name]
@@ -96,6 +96,7 @@ local function record(kind,address,value,probe,access)
    elseif type(v)=="boolean" then output:write("R\t"..emitted.."\t"..name.."\tb\t"..tostring(v).."\n") end
   end
  end
+ if @STOP_AT@>0 and emitted>=@STOP_AT@ then finish("access") end
 end
 for _,probe in ipairs(probes) do
  local kind=probe.kind

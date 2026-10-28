@@ -14,6 +14,7 @@ export function hasStagedChanges(state){
  for(const [key,value] of Object.entries(state.drafts||{})){
   if(!key.startsWith(prefix))continue;
   if(/:(?:asset-changes|table-changes|level-changes|sound-changes|command-changes)$/.test(key)){try{const data=JSON.parse(value);if(changed(Array.isArray(data)?data:data?.changes))return true;}catch{}}
+  if(key.endsWith(':command-sequence')||key.includes(':command-sequence-')){try{if(JSON.parse(value)?.changed)return true;}catch{}}
   if(key.endsWith(':hex-changes')){try{const saved=JSON.parse(value);if(saved.artifact_id===state.artifact.artifact_id&&saved.sha256===state.artifact.sha256&&saved.edits?.length)return true;}catch{}}
   if(key.endsWith(':game-map-changes')){try{const saved=JSON.parse(value);if(saved.source_sha256===state.artifact.sha256&&Object.values(saved.changes_by_header||{}).some(changed))return true;}catch{}}
   if(key.includes(':game-')){const field=state.gameVisualModel?.model?.fields?.find(f=>key.endsWith(':game-'+f.id));if(field&&String(field.value)!==String(value))return true;}

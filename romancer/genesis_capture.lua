@@ -44,6 +44,7 @@ local function matches(kind,address)
  end
  return false
 end
+local finish
 local taps={}
 for _,kind in ipairs({'read','write'}) do
  local low,high=nil,nil
@@ -70,11 +71,12 @@ for _,kind in ipairs({'read','write'}) do
       local pc=cpu.state['CURPC'].value
       local value=(data>>shift)&255
       output:write(string.format('E\t%d\t%s\t%d\t%d\t%d\t%d\t%d\t%d\t%d\t%s\n',emitted,kind,byte_address,value,pc,frame,address,data,mask,window(pc)))
-      if emitted<=16 then
+      if emitted<=16 or (@STOP_AT@>0 and emitted>=@STOP_AT@) then
        for _,name in ipairs({'CURPC','PC','SR','D0','D1','D2','D3','D4','D5','D6','D7','A0','A1','A2','A3','A4','A5','A6','A7'}) do
         if cpu.state[name] then output:write(string.format('R\t%d\t%s\t%.0f\n',emitted,name,cpu.state[name].value)) end
        end
       end
+      if @STOP_AT@>0 and emitted>=@STOP_AT@ then finish('access');return end
      end
     end
    end
@@ -126,16 +128,22 @@ local function trace()
  debugger:command('rpset temp0>=#@TRACE_LIMIT@,{trace off,:maincpu;rpdisable;g}')
  debugger:command('trace "instructions.log",:maincpu,noloop,{do temp0=temp0+1;tracelog "EXEC n=%d curpc=%06X pc=%06X\\n",temp0,curpc,pc}')
 end
+finish=function(reason)
+ if finished then return end
+ finished=true
+ graphicsSnapshot()
+ if trace_started then debugger:command('trace off,:maincpu') end
+ for _,field in pairs(fields) do field:clear_value() end
+ if @STOP_AT@>0 then output:write(string.format('END\t%d\t%d\t%d\t%s\n',frame,emitted,omitted,reason))
+ else output:write(string.format('END\t%d\t%d\t%d\n',frame,emitted,omitted)) end
+ output:flush();output:close();manager.machine:exit()
+end
 output:write('BEGIN\t1\t@NONCE@\tgenesis\n');output:flush();input()
 if @START_FRAME@==0 then trace() end
 _G.romancer_frames=emu.add_machine_frame_notifier(function()
  frame=frame+1
  if frame>=@FRAMES@ then
-  finished=true
-  graphicsSnapshot()
-  if trace_started then debugger:command('trace off,:maincpu') end
-  for _,field in pairs(fields) do field:clear_value() end
-  output:write(string.format('END\t%d\t%d\t%d\n',frame,emitted,omitted));output:close();manager.machine:exit()
+  finish('frames')
  else
   input();if frame>=@START_FRAME@ then trace() end
   output:flush()

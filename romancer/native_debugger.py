@@ -80,7 +80,7 @@ def backend_capabilities(system):
     return {'ok':True,'system_id':system,'backend':'MesenCE','version':VERSION,
         'supported_system':supported,'host_supported':host,'instruction_events':supported,
         'execution_range_probes':supported,'memory_access_events':supported,'observed_mapping':supported,
-        'transport':'bounded headless cold-start capture','continuous_live_control':False,
+        'transport':'bounded headless cold-start capture','continuous_live_control':False,'focused_access_stop':supported,
         'access_width_available':False,'dma_actor_available':False,'upstream':UPSTREAM}
 
 
@@ -104,6 +104,7 @@ def make_script(system,config,nonce):
         'PROBES':'{'+','.join(probes)+'}','NONCE':nonce,'SYSTEM':system,'FRAMES':str(v['frames']),'START_FRAME':str(v['start_frame']),
         'EVENT_LIMIT':str(v['event_limit']),'INSTRUCTION_LIMIT':str(v['instruction_limit']),'MAX_ADDRESS':str(LIMITS[system]),'GRAPHICS_SNAPSHOT':'true' if v.get('graphics_snapshot') else 'false'}
     from .graphics_snapshot import SNAPSHOT_DOMAINS
+    replacements['STOP_AT']=str(v.get('stop',{}).get('occurrence',0))
     replacements['SNAPSHOT_DOMAINS']='{'+','.join('{name="'+name+'",size='+str(size)+'}' for name,size in SNAPSHOT_DOMAINS[system].items())+'}'
     script=(Path(__file__).with_name('debugger_capture.lua')).read_text(encoding='utf-8')
     for key,value in replacements.items():script=script.replace('@'+key+'@',value)

@@ -209,8 +209,14 @@ class WorkbenchAPI:
         self.research=ResearchTools(self);self.routes.update(self.research.routes())
         from .definition_builder import DefinitionBuilder
         self.definition_builder=DefinitionBuilder(self);self.routes.update(self.definition_builder.routes())
+        from .format_library import FormatLibrary
+        self.format_library=FormatLibrary(self);self.routes.update(self.format_library.routes())
+        from .text_growth import TextGrowthTools
+        self.text_growth=TextGrowthTools(self);self.routes.update(self.text_growth.routes())
         from .command_editor import CommandTools
         self.commands=CommandTools(self);self.routes.update(self.commands.routes())
+        from .command_rewrite import CommandRewriteTools
+        self.command_rewrite=CommandRewriteTools(self);self.routes.update(self.command_rewrite.routes())
         from .animation_layouts import AnimationTools
         self.animations=AnimationTools(self);self.routes.update(self.animations.routes())
         from .m4a_instruments import InstrumentTools

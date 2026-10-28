@@ -17,6 +17,9 @@ SIGNATURES={'gba-lz10':0x10,'gba-rle':0x30}
 
 def decode_stream(data,codec,max_output=OUTPUT_LIMIT):
     number(max_output,1,OUTPUT_LIMIT)
+    if codec=='snes-lz2':
+        from .snes_lz2 import decode_lz2
+        return decode_lz2(data,max_output)
     if codec not in SIGNATURES or not isinstance(data,(bytes,bytearray,memoryview)):raise ValueError('choose a supported LZ10 or RLE byte stream')
     if not 4<=len(data)<=2*OUTPUT_LIMIT or data[0]!=SIGNATURES[codec]:raise ValueError('compressed stream header is missing or invalid')
     size=int.from_bytes(data[1:4],'little')
@@ -92,6 +95,9 @@ def _encode_rle(data):
 
 
 def encode_stream(raw,codec):
+    if codec=='snes-lz2':
+        from .snes_lz2 import encode_lz2
+        return encode_lz2(raw)
     if type(raw) is not bytes or not 1<=len(raw)<=OUTPUT_LIMIT or codec not in SIGNATURES:raise ValueError('choose nonempty decoded bytes up to1MiB and a supported codec')
     return (_encode_lz if codec=='gba-lz10' else _encode_rle)(raw)
 
@@ -120,7 +126,7 @@ def compression_candidates(raw,start=0,*,cancelled=lambda:False,budget=None):
 
 
 def inspect_compressed(path,sha,offset,allocation,codec,*,include_data=False,cancelled=lambda:False):
-    number(offset,0,64*1024**2);number(allocation,4,ALLOCATION_LIMIT)
+    number(offset,0,64*1024**2);number(allocation,3 if codec=='snes-lz2' else 4,ALLOCATION_LIMIT)
     if cancelled():raise KeyboardInterrupt
     path=checked_path(Path(path));source=projects._measure(path,cancelled=cancelled)
     if source['sha256']!=sha:raise ValueError('compressed parent source revision changed')

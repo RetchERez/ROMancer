@@ -5,8 +5,36 @@ decoder. This is implementation diversity, not an external emulator certificatio
 """
 import hashlib
 
+def _verify_lz2(encoded,expected,cancelled):
+    if type(encoded) is not bytes or not 1<=len(encoded)<=2*1024**2 or type(expected) is not bytes or not 1<=len(expected)<=1024**2:raise ValueError('Independent LC_LZ2 inputs exceed their bounds.')
+    output=bytearray(len(expected));src=0;dst=0;packets=0
+    def get():
+        nonlocal src
+        if src==len(encoded):raise ValueError('Independent LC_LZ2 input is truncated.')
+        b=encoded[src];src+=1;return b
+    while True:
+        if packets%128==0 and cancelled():raise KeyboardInterrupt
+        first=get()
+        if first==255:break
+        if first>=224:tag=(first//4)%8;length=((first%4)*256)+get()+1
+        else:tag=first//32;length=first%32+1
+        if tag>4 or dst+length>len(output):raise ValueError('Independent LC_LZ2 command/output extent differs.')
+        if tag==0:
+            for _ in range(length):output[dst]=get();dst+=1
+        elif tag in (1,2,3):
+            a=get();b=get() if tag==2 else a
+            for i in range(length):output[dst]=(a+i)%256 if tag==3 else (b if tag==2 and i%2 else a);dst+=1
+        else:
+            origin=get()*256+get()
+            if origin>=dst:raise ValueError('Independent LC_LZ2 repeat lacks prior bytes.')
+            for i in range(length):output[dst]=output[origin+i];dst+=1
+        packets+=1
+    if src!=len(encoded) or dst!=len(output) or output!=expected:raise ValueError('Independent LC_LZ2 output differs from the edited resource.')
+    return {'verified':True,'decoder':'separate-original-lz2-parser-v1','consumed':src,'decoded_sha256':hashlib.sha256(output).hexdigest(),'external_implementation_certified':False}
+
 
 def verify_encoded(encoded,codec,expected,*,cancelled=lambda:False):
+    if codec=='snes-lz2':return _verify_lz2(encoded,expected,cancelled)
     if type(encoded) is not bytes or type(expected) is not bytes or not 1<=len(expected)<=1024**2 or not 4<=len(encoded)<=2*1024**2:
         raise ValueError('Independent decode input exceeds its bounds.')
     signature={'gba-lz10':16,'gba-rle':48}.get(codec)

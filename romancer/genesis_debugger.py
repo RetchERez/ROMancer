@@ -12,7 +12,7 @@ import time
 import uuid
 from .asset_schema import number
 from .assets import checked_path
-from .debugger_protocol import validate_capture
+from .debugger_protocol import validate_capture,focus_result
 from .workbench_projects import _measure
 
 VERSION='0.289'
@@ -39,7 +39,7 @@ def backend_capabilities():
         'host_supported':os.name=='nt' and platform.machine().lower() in ('amd64','x86_64'),
         'instruction_events':True,'execution_range_probes':False,'instruction_sample_scope':'global separately ordered samples; not an execution-range watch','memory_access_events':True,'observed_mapping':False,'continuous_live_control':False,
         'access_width_available':False,'bus_lane_masks_available':True,'dma_actor_available':False,
-        'transport':'bounded headless cold-start capture','instruction_sample_limit':2000,
+        'focused_access_stop':True,'transport':'bounded headless cold-start capture','instruction_sample_limit':2000,
         'controller':'3-button pad','upstream':UPSTREAM,
         'host_requirement':'Windows 10 or later, x86-64-v2 CPU; executable compatibility is confirmed only by a completed capture.'}
 
@@ -50,7 +50,7 @@ def make_script(config,nonce):
     steps=['{frames='+str(s['frames'])+',buttons={'+','.join(b+'=true' for b in s['buttons'])+'}}' for s in v['steps']]
     probes=['{kind="'+p['kind']+'",start='+str(p['start'])+',finish='+str(p['end'])+',domain="'+p.get('domain','cpu')+'"}' for p in v['probes']]
     replacements={'STEPS':'{'+','.join(steps)+'}','PROBES':'{'+','.join(probes)+'}','NONCE':nonce,
-        'FRAMES':str(v['frames']),'START_FRAME':str(v['start_frame']),'EVENT_LIMIT':str(v['event_limit']),
+        'STOP_AT':str(v.get('stop',{}).get('occurrence',0)),'FRAMES':str(v['frames']),'START_FRAME':str(v['start_frame']),'EVENT_LIMIT':str(v['event_limit']),
         'TRACE_LIMIT':str(min(v['instruction_limit'],2000)),'GRAPHICS_SNAPSHOT':'true' if v.get('graphics_snapshot') else 'false'}
     script=Path(__file__).with_name('genesis_capture.lua').read_text(encoding='utf-8')
     for key,value in replacements.items():script=script.replace('@'+key+'@',value)
@@ -109,12 +109,15 @@ def parse_capture(text,instructions,nonce,raw,config):
                 'registers':{},'access_width':None,'actor':None,'causation_proven':False})
         elif p[0]=='R' and len(p)==4:
             ident=integer(p[1],1,len(events));name=p[2]
-            if ident!=len(events) or ident>16 or name not in ('CURPC','PC','SR',*[f'D{i}' for i in range(8)],*[f'A{i}' for i in range(8)]) or name in events[-1]['registers']:raise ValueError('invalid native register')
+            if ident!=len(events) or (ident>16 and ident!=v.get('stop',{}).get('occurrence')) or name not in ('CURPC','PC','SR',*[f'D{i}' for i in range(8)],*[f'A{i}' for i in range(8)]) or name in events[-1]['registers']:raise ValueError('invalid native register')
             events[-1]['registers'][name]=integer(p[3],0,2**32-1)
-        elif p[0]=='END' and len(p)==4:
-            frame=integer(p[1],v['frames'],v['frames']);emitted=integer(p[2],0,v['event_limit']);omitted=integer(p[3],0,2**53-1)
-            if emitted!=len(events):raise ValueError('Genesis native event count differs')
-            end={'frames_observed':frame,'route_complete':True,'omitted_events':omitted}
+        elif p[0]=='END' and len(p)==(5 if 'stop' in v else 4):
+            reason=p[4] if len(p)==5 else 'frames'
+            frame=integer(p[1],0,v['frames']);emitted=integer(p[2],0,v['event_limit']);omitted=integer(p[3],0,2**53-1)
+            if emitted!=len(events) or reason not in ('frames','access') or reason=='frames' and frame!=v['frames']:raise ValueError('Genesis native end differs')
+            if reason=='access' and ('stop' not in v or emitted!=v['stop']['occurrence'] or omitted or frame<v['start_frame']):raise ValueError('Genesis access stop differs')
+            if 'stop' in v and reason!='access' and emitted>=v['stop']['occurrence']:raise ValueError('Genesis capture passed its requested access stop.')
+            end={'frames_observed':frame,'route_complete':reason=='frames','omitted_events':omitted,'stop_reason':reason}
         else:raise ValueError('unknown Genesis native record')
     if end is None:raise ValueError('Genesis capture did not produce its end record')
     samples=[];pending=None;limit=min(v['instruction_limit'],2000)
@@ -135,7 +138,9 @@ def parse_capture(text,instructions,nonce,raw,config):
     if v.get('graphics_snapshot'):
         from .graphics_snapshot import finish_snapshot
         snapshot['graphics_snapshot']=finish_snapshot(graphics,'genesis')
-    return {'ok':True,'system_id':'genesis','status':'BUDGET_EXCEEDED' if end['omitted_events'] or limited else 'CAPTURED',**snapshot,
+    focus=focus_result(config,events,end)
+    if focus and not focus['matched'] and limited:focus['status']='BUDGET_EXCEEDED'
+    return {'ok':True,'system_id':'genesis','status':focus['status'] if focus else 'BUDGET_EXCEEDED' if end['omitted_events'] or limited else 'CAPTURED',**({'focus':focus} if focus else {}),**snapshot,
         'events':events,'instruction_samples':samples,'instruction_sample_limit':limit,'instruction_samples_truncated':limited,
         'native_callbacks_observed':bool(events or samples),'merged_instruction_access_order_known':False,
         'observer_reads_filtered':True,'write_authorized':False,'memory_written':False,**end,

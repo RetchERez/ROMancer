@@ -1,8 +1,8 @@
 import {esc} from './common.js';
 import {selectionKey} from './tool_inputs.js';
 import {summaryText} from './change_summary.js';
-const actions=new Set(['asset-apply','script-apply','translation-apply','table-build','levels-build','sound-build','bytes-apply','hex-apply','game-apply','maps-build','reloc-build','compression-build','recipe-build']);
-const pendingKinds={'asset-apply':'assets','script-apply':'script','table-build':'table','levels-build':'levels','sound-build':'sound','bytes-apply':'bytes','reloc-build':'relocation','compression-build':'compression','recipe-build':'recipe'};
+const actions=new Set(['growth-build','cq-build','command-build','asset-apply','script-apply','translation-apply','table-build','levels-build','sound-build','bytes-apply','hex-apply','game-apply','maps-build','reloc-build','compression-build','recipe-build']);
+const pendingKinds={'growth-build':'text-growth','cq-build':'command-rewrite','command-build':'commands','asset-apply':'assets','script-apply':'script','table-build':'table','levels-build':'levels','sound-build':'sound','bytes-apply':'bytes','reloc-build':'relocation','compression-build':'compression','recipe-build':'recipe'};
 export function planForBuildAction(state,action){
  if(action==='hex-apply'){
   const row=state.hexReview;

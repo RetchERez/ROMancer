@@ -196,7 +196,7 @@ engine to its two-button pad: A and B are buttons 1 and 2, and Start sends Pause
 
 GITHUB RELEASE PREPARATION
 
-Use the tag v1.0.0 for the public ROMancer v1.0 release. The numeric 1.0.41 build
+Use the tag v1.0.0 for the public ROMancer v1.0 release. The numeric 1.0.42 build
 identifier is internal installer/update identity. Lead the release description
 with ROMancer-v1.0-Setup.exe, then the portable Windows ZIP, offline guide and
 walkthrough. Provide the source, engine pack, component notices and SHA256SUMS.
@@ -772,3 +772,35 @@ Other games need their own checked formats; this is not a universal music driver
 
 The guide includes illustrated procedures, glossary links and index entries for
 these tools. The independent beginner acceptance trial remains unperformed.
+
+BUILD 42 FORMAT AND WORKFLOW IMPROVEMENTS
+The default theme uses neutral charcoal panels, deeper menus/inputs and emerald
+controls. Visual editing and values stay visible; investigation and automation
+are grouped under Advanced. Theme and interface size remain saved preferences.
+
+Local format packs can reuse understood layouts with exact-source matching or
+explicit protected-region compatibility. Deep scan suggests matches and never
+silently applies them. Matching declarations do not prove native game semantics.
+
+Text & layout can move a growing position-independent message into author-reserved
+capacity, preserving controls and the original slot, updating all declared
+record-start pointers and reopening the checked moved schema. Interior pointers
+are refused; their offsets can shift as text grows. Complete consumers must be
+investigated before acknowledging a move.
+
+Known command grammars have form controls and a linear sequence editor. Insert,
+remove and reorder fully declared commands inside the original allocation.
+Branches, pointer-bearing commands, unknown stored bytes and overflow refuse.
+A native original NES example exercises an actual command interpreter.
+
+Compression supports GBA LZ10, GBA RLE and explicit SNES LC_LZ2. An independent
+original decoder verifies recompression. LC_LZ2 has no unique signature, so scan
+does not guess its locations. LC_LZ3 and other variants are separate formats.
+
+Native investigations can stop at a selected occurrence of one explicit access
+watch, retaining real registers and execution context. Seven original programs
+and the seven supplied real ROMs passed bounded callback-stop checks. This does
+not provide continuous instruction stepping or prove every gameplay path.
+
+The illustrated guide covers these procedures, with glossary and index links.
+Independent unfamiliar-user acceptance remains pending in ACCEPTANCE.txt.

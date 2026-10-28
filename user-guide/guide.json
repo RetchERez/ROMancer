@@ -83,12 +83,12 @@
       "intro": "Settings control the working environment: appearance, startup behavior, automatic analysis and audio defaults. Apply the choices you want to keep before closing the application.",
       "steps": [
         "Open <b>Settings</b>. Review appearance and startup preferences. <b>100%</b> is the standard interface size; it uses the more compact layout previously shown at 75%. Choose another offered size when useful.",
-        "Choose a theme: <b>ROMancer (default)</b>, <b>Dark</b> for neutral graphite or <b>Light</b> for grey panels on a light background. Adjust <b>Reduce interface motion</b> and <b>Show advanced tools in navigation</b> to suit your work.",
+        "Choose <b>ROMancer (default)</b> for charcoal editor panels, deeper menus and emerald controls; <b>Dark</b> for graphite or <b>Light</b> for grey panels on a light background. <b>Keep Advanced tools expanded</b> controls the navigation group.",
         "Review <b>Auto deep scan on ROM load</b>, enabled by default, and <b>Inspect gameplay graphics automatically</b>. Set <b>Remember my workspace</b> to reopen the last project, ROM, page and editing position. These preferences choose automatic work, not a new level of game-format verification.",
         "Set <b>Volume</b> from 0 to 100, <b>Start game audio muted</b> and <b>Loop audio previews</b>. Choose <b>Apply</b> to save and continue, or <b>OK</b> to save and close. <b>Cancel</b> discards unapplied changes. <b>Restore defaults</b> prepares the standard choices; use Apply or OK to keep that reset."
       ],
       "result": "Applied preferences persist across launches for this workspace. The chosen theme and size make the controls comfortable to read, and automatic scan/audio behavior follows the saved choices.",
-      "note": "ROMancer and Dark use deeper menu backgrounds; Light uses darker grey panels and menu boxes with dark labels. Selected items and keyboard focus remain distinct. Themes change appearance, not ROM bytes. Manual investigation remains available when automatic analysis is disabled.",
+      "note": "Basic editing pages stay visible. Expand Advanced for Investigation, Recipes & definitions, Routes and Regression. Deeper menu/input surfaces and a visible focus outline distinguish controls. Theme changes do not change game palettes.",
       "details": [
         {
           "title": "When to change automatic work",
@@ -114,63 +114,63 @@
         "term-theme",
         "term-candidate"
       ],
-      "image": "13-settings",
+      "image": "249-readable-theme-and-advanced-settings",
       "image_layout": "following-page",
       "image_alt": "Actual ROMancer Settings showing Appearance, Automatic tasks, Audio and Workspace tools preferences",
-      "caption": "Updated actual Settings in the default ROMancer theme, with automatic deep scanning enabled. Menus use slightly deeper dark surfaces; Light uses grey panels and menu boxes.",
+      "caption": "Current Settings, with the default charcoal-and-emerald appearance and Basic/Advanced navigation.",
       "extra_images": [
         {
-          "image": "14-light-theme",
-          "title": "Light theme / grey panels and dark labels"
+          "image": "251-light-settings-current",
+          "title": "Light / grey panels and readable dark labels"
         },
         {
-          "image": "15-dark-theme",
-          "title": "Dark theme / neutral graphite surfaces"
+          "image": "252-dark-settings-current",
+          "title": "Dark / neutral graphite"
         }
       ],
       "visual_page": {
         "title": "Settings / appearance examples",
         "kicker": "Basic / actual application captures",
-        "intro": "Updated ROMancer, Light and Dark menus. Themes affect the interface; game palettes stay unchanged.",
+        "intro": "Actual current settings in all three themes. The default uses deeper sidebar, input and menu surfaces.",
         "panels": [
           {
-            "image": "13-settings",
+            "image": "249-readable-theme-and-advanced-settings",
             "title": "ROMancer (default) / saved preferences",
             "x": 48,
             "top": 846,
             "width": 1100,
             "crop": [
-              180,
-              116,
-              1390,
-              588
+              164,
+              60,
+              1636,
+              730
             ],
             "caption": "Actual Settings panel detail. Full-resolution captures are linked in the offline HTML edition."
           },
           {
-            "image": "14-light-theme",
+            "image": "251-light-settings-current",
             "title": "Light theme / grey panels and dark labels",
             "x": 48,
             "top": 304,
             "width": 540,
             "crop": [
-              180,
-              116,
-              1390,
-              588
+              164,
+              60,
+              1636,
+              730
             ]
           },
           {
-            "image": "15-dark-theme",
+            "image": "252-dark-settings-current",
             "title": "Dark theme / neutral graphite surfaces",
             "x": 748,
             "top": 304,
             "width": 540,
             "crop": [
-              180,
-              116,
-              1390,
-              588
+              164,
+              60,
+              1636,
+              730
             ]
           }
         ]
@@ -252,6 +252,10 @@
         {
           "title": "Readiness is per ROM and area",
           "text": "Ready to edit opens a working editor. Needs investigation offers a next action for that area. Setup needs fixing means the saved setup is malformed, stale or read-only; Check setup opens its editor. Technical details keeps the exact diagnostic available."
+        },
+        {
+          "title": "Basic first, Advanced when needed",
+          "text": "Text, graphics, levels, music and data tables stay in the main navigation. Open Advanced when you need native investigation, reusable definitions, input routes or regression checks. The offline guide contains both levels."
         }
       ]
     },
@@ -2305,13 +2309,13 @@
       "kicker": "Allocations and independent decoding",
       "intro": "A decoded resource must return through a checked parent allocation or a separately reviewed reserved move. Preview recompression shows the exact capacity before planning.",
       "steps": [
-        "Select a validated supported LZ10 or RLE stream in Resources. Confirm its codec, file offset and allocated capacity using evidence for this revision.",
+        "In Resources, open <b>Compressed resources</b>. Choose <b>GBA LZ10</b>, <b>GBA RLE</b> or <b>SNES LC_LZ2</b> only when the stream format is documented. Confirm its file offset and reserved allocation; a plausible decode does not establish ownership.",
         "Extract the decoded resource into the project. Inspect and edit it through the normal supported editors, then create the edited decoded build.",
         "Select that edited decoded build and review recompression into its original parent. Read the proposed compressed length and confirmed capacity.",
         "Create the parent build only when the stream fits. Inspect the independently decoded comparison, then playtest the actual game resource."
       ],
       "result": "The encoded stream fits without overwriting neighbors, and independent decoding reconstructs every intended decoded byte.",
-      "note": "Unrecognized compression remains read-only. A run of zeroes or another fill pattern does not establish unowned capacity. Do not increase an allocation or move a stream to clear an error without a separately supported ownership and pointer model. Recompression is checked by the primary decoder and a separate original token parser; this is implementation diversity, not independent emulator certification. Use Preview recompression for free/overflow bytes, and the advanced reserved-move workflow only with an established complete reference set.",
+      "note": "LC_LZ2 has no unique magic signature, so it requires an explicit declared location; the initial signature scan does not guess these streams. LC_LZ3 and other variants are separate formats and are not accepted as LC_LZ2. Recompression is checked by a separately implemented decoder; native playtesting checks how the game consumes the edited data.",
       "details": [
         {
           "title": "Parent and child",
@@ -2320,6 +2324,10 @@
         {
           "title": "Capacity and relocation limits",
           "text": "Recompression stays inside its declared parent allocation. The separate Advanced data-move workflow checks explicitly declared linear references and reserved space; it does not discover compressed-stream ownership or make an oversized reinsertion safe. Follow the data-relocation chapter rather than increasing capacity to silence a failure."
+        },
+        {
+          "title": "Format reference",
+          "text": "The LC_LZ2 format follows the documented five-command encoding, including big-endian absolute repeat offsets: <a href=\"https://smw-editor.github.io/docs/smw-rom/compression-methods/\">SMW Editor compression reference</a>. The encoder is original deterministic code, not an optimal-size guarantee."
         }
       ],
       "related": [
@@ -2333,7 +2341,9 @@
         "term-allocation",
         "term-pointer",
         "term-ownership"
-      ]
+      ],
+      "image": "248-snes-lz2-stream-inspection",
+      "caption": "Actual SNES LC_LZ2 inspection before extraction. The original demonstration uses a direct-literal palette chunk; the original codec also tests fill, increment and repeating-reference commands."
     },
     {
       "id": "regression",
@@ -2419,7 +2429,7 @@
       "kicker": "Declarative automation",
       "intro": "A recipe repeats supported source-bound operations. A definition describes storage. Neither import grants arbitrary shell execution or native evidence trust.",
       "steps": [
-        "Open <b>More tools > Recipes & definitions</b> and select the exact original source revision.",
+        "Open <b>Advanced > Recipes & definitions</b> and select the exact original source revision.",
         "After reviewing or building edits, use <b>Save a plan as a recipe</b>, or import an existing recipe JSON file. Keep the recipe with its source identity and intended purpose.",
         "Preview every operation and affected range on rerun. Resolve wrong hashes, overlaps and unsupported commands before creating a new build.",
         "Export checked <b>Text</b>, <b>Graphics & fonts</b>, <b>Data tables</b>, <b>Levels & objects</b> or <b>Music & sound</b> definitions in Resource definitions. Reimport the JSON on the same source, choose <b>Check and import definition</b> and inspect the decoded result before editing."
@@ -2929,7 +2939,7 @@
       "kicker": "HARDWARE HELP / SEPARATE ADDRESS DOMAINS",
       "intro": "A CPU address, file offset and video-memory offset can have the same number and refer to different things. Hardware help explains the region without pretending to know a game variable.",
       "steps": [
-        "Open <b>More tools > Troubleshooting</b> and expand <b>Hardware & address help</b>. A completed ROM scan supplies the CPU, byte-order convention, graphics layout and mapping notes for the selected system.",
+        "Open <b>Advanced > Troubleshooting</b> and expand <b>Hardware & address help</b>. A completed ROM scan supplies the CPU, byte-order convention, graphics layout and mapping notes for the selected system.",
         "Choose the address domain, enter a decimal or 0x hexadecimal value, and click <b>Explain address</b>. NES PPU, physical VRAM and SNES audio CPU domains are separate choices only where supported.",
         "Read the region and its conditions. A GB cartridge window may contain RTC registers; a SNES audio port is not audio RAM; Genesis sound RAM requires bus arbitration. Register descriptions never read or write the hardware.",
         "For a persistent ROM edit, use Address explorer with a checked mapping, including the physical bank and header offset. A core’s exposed-memory offset also needs an established mapping before treating it as a CPU address."
@@ -3043,15 +3053,16 @@
       "kicker": "Native capture / observed mappings",
       "intro": "A changed RAM value is a lead. A native capture adds real access callbacks, execution context and supported source mappings.",
       "steps": [
-        "Choose <b>Investigate accesses</b> beside a value hypothesis. ROMancer derives a physical watch from the pinned core interface. Unknown core layouts are refused.",
+        "Open <b>Advanced > Investigation > Trace actual accesses</b>, or investigate a captured value. A value investigation derives a supported physical watch from authenticated core memory. Manual watches use an explicit CPU address and read/write/execution kind; Genesis supports read/write watches and separately ordered instruction samples.",
         "The full Windows package is ready to capture. In a source-only or smaller build, choose <b>Prepare debugger</b> if needed. Pinned tools are downloaded and checked once; no ROM is uploaded.",
         "Set a short route of frames and held buttons. It replays from power on in a separate debugger; Playtest and libretro save states are not resumed.",
-        "Set the first recording frame and sample limit, then replay. Check route completion and truncation separately. Empty results may require another route or watch range.",
+        "Choose <b>Capture route</b> for a bounded sample, or <b>Stop at a watched access</b> and set <b>Watched access number</b>. The focused mode uses one explicit watch and stops after that occurrence inside the requested recording window.",
         "Inspect access address, value, execution context and registers. A source button opens its recorded file location; Resources explains the association and links back.",
-        "Choose <b>Explain this capture</b> to summarize the whole retained capture, not only its current page. Writer code and source reads are separate lists. Open a source read in Resources to inspect its bytes or build an editor from a confirmed layout."
+        "Choose <b>Explain this capture</b> to summarize the whole retained capture, not only its current page. Writer code and source reads are separate lists. Open a source read in Resources to inspect its bytes or build an editor from a confirmed layout.",
+        "A focused result says <b>Stopped at requested access</b> only after the native protocol confirms the occurrence. Inspect that event’s registers and execution context. No matching occurrence, truncation and a budget stop are different outcomes."
       ],
       "result": "A durable native capture with mapped writer context, separate source-read locations, resource overlaps and a concrete next experiment. Historical and partial status remain visible.",
-      "note": "MesenCE covers NES/SNES/GB/GBC/GBA/SMS; Genesis uses MAME. The full Windows package includes the reviewed observers and corresponding source. Source-only installations retain deliberate preparation of pinned upstream tools. Operation kinds are recorded where exposed; DMA channel, instruction width and game meaning are not inferred. Genesis has read/write watches and separate global instruction samples, with no execution-range watch or live break/continue. A writer location is code, not automatically the ROM stat it used. Adjacent reads and writes do not prove data flow. The summary does not invent missing bank state or causation.",
+      "note": "Focused stops do not take a graphics snapshot or resume a libretro save state. Original and real supplied ROMs were checked across all seven systems. An observed access/context is evidence; higher-level semantics and causal ownership still need investigation.",
       "related": [
         "universal-values",
         "debugger-setup",
@@ -3065,8 +3076,8 @@
         "term-mapping",
         "term-evidence"
       ],
-      "image": "230-native-writer-evidence-summary",
-      "caption": "Actual retained native evidence from the original studio: mapped writer code and separate source reads. PARTIAL remains visible because the bounded capture does not prove a complete dependency or read-to-write causal chain.",
+      "image": "247-native-access-stop-registers",
+      "caption": "Actual authenticated native access-stop result with observed registers. This is a cold-start replay, not continuous instruction stepping.",
       "extra_images": [
         {
           "image": "28-native-source-context",
@@ -3098,20 +3109,20 @@
     },
     {
       "id": "command-operands",
-      "title": "Edit parameters in a known event format",
+      "title": "Edit and arrange known event commands",
       "part": "Advanced",
       "kicker": "Investigation / events & commands",
       "intro": "Events & commands decodes a supplied command grammar into named instructions and fixed integer parameters. It does not discover a scripting language or execute a script.",
       "steps": [
-        "Open <b>Investigation > Events & commands</b>. A saved exact-source grammar opens automatically. Without one, supply a verified definition under the collapsed Advanced declaration section.",
-        "A definition has schema_version1, source_sha256, name, scripts and commands. Each script declares id, name, file offset and allocated length. Each opcode declares its name, fixed byte length, role and named operand fields.",
+        "Open <b>Advanced > Investigation > Events & commands</b>. Expand <b>Build a documented command format</b> to enter opcode, command name, total byte count and role. Add named operands with byte position, width, byte order and integer bounds, then add the command to the grammar.",
+        "Add the documented script ID, name, file offset and reserved byte count. <b>Preview known format</b> runs the real decoder. Save only after reviewing it; replacing an existing setup requires acknowledgement. Advanced JSON supports larger grammars and pointer fields.",
         "Each operand declares offset within the command, bytes1–4, little/big endian, minimum, maximum and optional target_base. Byte0 is the opcode and cannot be edited. For a declared pointer operand, target file offset = stored value − target_base.",
         "Choose <b>Inspect commands</b>. Unknown instructions, truncated operands, invalid values or a missing declared end leave that script read-only. At most32 scripts,256 command types,256 decoded commands per script and2,048 commands overall are handled.",
-        "Choose an event, command and parameter; choose <b>Choose command</b> to refresh the value controls. Stage the new value, inspect Before and After, then review and create a command build. Undo/redo operates on saved drafts; Discard removes the staged parameter list.",
+        "For sequence changes, expand <b>Arrange a linear command sequence</b>. Insert before the selected row, remove or move commands, then stage their named values. Supply the confirmed unused-tail byte and acknowledge that no outside consumer enters the script’s middle. Preview, review and create the build.",
         "Preview and save a definition only after reviewing its structure. Game view connects the saved script and its commands. Declared target references can connect to existing resources, and author links can record triggers, destinations, collision or animation relationships."
       ],
-      "result": "Only checked fixed operands change. The original opcode bytes, allocation and source remain intact. Playtest the affected event before sharing a patch.",
-      "note": "Roles are labels used by this editor. An end role stops decoding the declared allocation; it does not add a native stop instruction. The demonstrated Wario PAN definition covers one documented two-byte command and produces the same pan plan as the checked music editor. It is not a complete Wario scripting grammar.",
+      "result": "Fixed parameter changes preserve opcodes. Sequence edits can change the order and count of fully declared linear commands inside the original allocation. Reopened builds are freshly inspected; the exact same recorded plan can reopen its existing build.",
+      "note": "Sequence editing requires exactly one final end command and all stored command bytes declared. Branches, pointer-bearing commands, unknown bytes, bad tail fill and overflow refuse. End is an editor role, not proof of a native instruction. Native event behavior still needs testing.",
       "related": [
         "connected-game-view",
         "native-accesses",
@@ -3124,8 +3135,18 @@
         "term-operand",
         "term-evidence"
       ],
-      "image": "232-wario-command-parameter-review",
-      "caption": "Actual Wario opening PAN operand staged and reviewed in Events & commands. Its target was checked against the music editor and native audio."
+      "image": "245-arranged-command-sequence-review",
+      "caption": "Actual sequence editor with named commands and fixed-allocation size review. The original NES interpreter is playtested separately.",
+      "extra_images": [
+        {
+          "image": "246-command-format-form",
+          "title": "Documented opcode and script allocation form"
+        },
+        {
+          "image": "232-wario-command-parameter-review",
+          "title": "Earlier real Wario M4A PAN operand review; this is one command, not a complete scripting grammar"
+        }
+      ]
     },
     {
       "id": "structural-experiments",
@@ -3931,6 +3952,75 @@
       ],
       "image": "233-wario-pan-and-instrument-inspection",
       "caption": "Actual Wario pan staging and read-only instrument inspection. The reference sketch is separate from the measured native audio proof."
+    },
+    {
+      "id": "text-growth",
+      "part": "Advanced",
+      "title": "Make room for a longer decoded message",
+      "kicker": "Text / known pointers / reserved capacity",
+      "intro": "Use this when a checked fixed-slot message is too long. The original slot stays intact; the reviewed build moves the encoded message and redirects its declared record-start pointers.",
+      "steps": [
+        "In <b>Text & layout</b>, edit the decoded segments. The ordinary capacity warning still describes the old slot. Expand <b>Make room for longer text</b> and choose the record.",
+        "Enter a reserved file offset and new byte capacity. Under Advanced, check fill byte, alignment, bank size and bank origin. Padding alone never proves free space.",
+        "Known schema pointers are included automatically. Add only checked extra references with <b>offset width little/big adjustment</b>; stored pointer = file offset + adjustment. Growing text supports record-start references only; interior pointers are refused because text lengths can shift.",
+        "Confirm that every consumer is covered and the destination is reserved. Preview the encoded byte count, preserved controls and pointer changes. Review the move plan, then create the build.",
+        "The moved definition reopens against the exact build. Playtest the real font, window, control behavior and every relevant consumer before exporting. Your original and any newer draft edits remain available."
+      ],
+      "result": "A separate build with a rechecked moved text definition. The original NES example actually displays WELCOME FRIEND! after its message and pointer move.",
+      "note": "Only checked writable, position-independent text can move. Unknown encoding, controls requiring their old position, known resource overlap, invalid banks, insufficient capacity or incomplete acknowledgement refuse. This is not automatic discovery of every text pointer.",
+      "related": [
+        "text",
+        "translation",
+        "data-relocation",
+        "checks"
+      ],
+      "terms": [
+        "term-encoding",
+        "term-control",
+        "term-allocation",
+        "term-pointer"
+      ],
+      "image": "241-longer-dialogue-pointer-preview",
+      "caption": "Actual longer-message encoding and pointer review. The full-resolution HTML screenshot is available.",
+      "extra_images": [
+        {
+          "image": "242-relocated-text-reopened",
+          "title": "Moved text reopened in the new build"
+        },
+        {
+          "image": "243-longer-dialogue-native-playtest",
+          "title": "Measured native display of the relocated message"
+        }
+      ]
+    },
+    {
+      "id": "format-library",
+      "part": "Advanced",
+      "title": "Reuse an understood editor format safely",
+      "kicker": "Local format library / explicit compatibility",
+      "intro": "A reusable format pack keeps saved editor layouts for later projects. Exact-source matching is the default; a successful match still needs review before layouts are saved.",
+      "steps": [
+        "On a source with checked saved editor layouts, open <b>Resources > Reusable format library</b>. Save a named local pack with <b>Exact ROM revision</b>. A pack contains declarative metadata, not executable plugins or a copy of the ROM.",
+        "To share it, export its JSON file. To use one, import a local JSON pack up to512KiB. The library holds up to32 packs. Invalid stored files can be removed without blocking the list.",
+        "Deep scan suggests matching packs. Open the library and choose <b>Preview match</b>; ROMancer checks the console, source identity and every actual editor decoder. A mismatch is not silently accepted.",
+        "Protected-region matching is Advanced: explicitly declare the hash regions that guard compatibility. Console and size must agree, protected bytes must match and the editors must inspect successfully. Another revision needs a separate compatibility acknowledgement.",
+        "Review listed definition replacements, then <b>Apply reviewed layouts</b>. ROM bytes are unchanged. Existing drafts are separate; reopen the appropriate editor to inspect this source. Export research notes and evidence separately when needed."
+      ],
+      "result": "Source-bound editor setup can be reused without retyping its grammar, ranges and field names. Scan suggestions do not apply it automatically.",
+      "note": "Protected hashes express an author’s compatibility rule; they do not prove game behavior, every pointer or unseen relocated data. Recheck modified ROMs. Library/layout changes invalidate cached scan results. No pack receives gameplay authority just because its JSON imports.",
+      "related": [
+        "research-packs",
+        "resources",
+        "startup-verification",
+        "command-operands"
+      ],
+      "terms": [
+        "term-format-pack",
+        "term-evidence",
+        "term-candidate"
+      ],
+      "image": "244-source-bound-format-library",
+      "caption": "Actual local library preview with source identity, checked editor kinds and explicit replacement review."
     }
   ],
   "glossary": [
@@ -4118,6 +4208,11 @@
       "id": "term-field",
       "term": "Field",
       "definition": "A named value at a declared relative position in a record. Its type, byte order and range determine its supported storage."
+    },
+    {
+      "id": "term-format-pack",
+      "term": "Format pack",
+      "definition": "Local declarative editor layouts with an exact source identity or explicit protected-region compatibility rule. It contains no executable plugin and does not prove native game semantics."
     },
     {
       "id": "term-frame",
@@ -4550,6 +4645,13 @@
       ]
     },
     {
+      "term": "Basic and Advanced navigation",
+      "topics": [
+        "settings",
+        "start"
+      ]
+    },
+    {
       "term": "Batch table edits",
       "topics": [
         "tables",
@@ -4693,6 +4795,12 @@
       "term": "Color picker",
       "topics": [
         "palettes"
+      ]
+    },
+    {
+      "term": "Command insertion and reordering",
+      "topics": [
+        "command-operands"
       ]
     },
     {
@@ -4946,9 +5054,21 @@
       ]
     },
     {
+      "term": "Focused access stop",
+      "topics": [
+        "native-accesses"
+      ]
+    },
+    {
       "term": "Fonts and glyphs",
       "topics": [
         "text-layout"
+      ]
+    },
+    {
+      "term": "Format library",
+      "topics": [
+        "format-library"
       ]
     },
     {
@@ -4999,6 +5119,12 @@
       "term": "Graphics discovery",
       "topics": [
         "resources"
+      ]
+    },
+    {
+      "term": "Growing text",
+      "topics": [
+        "text-growth"
       ]
     },
     {
@@ -5095,6 +5221,12 @@
       "topics": [
         "text-layout",
         "debug"
+      ]
+    },
+    {
+      "term": "LC_LZ2",
+      "topics": [
+        "compression"
       ]
     },
     {
@@ -5446,6 +5578,12 @@
       "term": "Recompression capacity",
       "topics": [
         "compressed-capacity"
+      ]
+    },
+    {
+      "term": "Record-start pointers",
+      "topics": [
+        "text-growth"
       ]
     },
     {
@@ -5843,6 +5981,7 @@
     "resources",
     "settings",
     "sound",
+    "start",
     "support-editing",
     "support-identity",
     "support-playback",
