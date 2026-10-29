@@ -61,7 +61,12 @@ jobs:
         shell: pwsh
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-        run: gh release download v1.0.0 --repo $env:GITHUB_REPOSITORY --pattern ROMancer-v1.0-Engines.zip --dir work_private/runtime-downloads
+        # A saved unpublished draft may have an untagged identifier. Asset IDs
+        # survive those draft metadata changes; fetch_cores verifies its pin.
+        run: |
+          $ErrorActionPreference = 'Stop'
+          gh api -H 'Accept: application/octet-stream' "repos/$env:GITHUB_REPOSITORY/releases/assets/686008547" > work_private/runtime-downloads/ROMancer-v1.0-Engines.zip
+          if ($LASTEXITCODE -ne 0) { throw 'Reviewed private engine asset download failed' }
       - run: python -B tools/fetch_cores.py --downloads work_private/runtime-downloads --archive work_private/runtime-downloads/ROMancer-v1.0-Engines.zip
       - run: python -B tools/fetch_installer.py --downloads work_private/runtime-downloads
       - run: python -B tools/package_windows.py --app . --downloads work_private/runtime-downloads --cores work_private/runtime-downloads/cores --output work_private/windows-bundle --zip work_private/windows.zip
