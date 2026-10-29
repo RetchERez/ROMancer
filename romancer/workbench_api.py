@@ -21,6 +21,8 @@ from .workbench_jobs import JobManager
 from .workbench_runtime import RuntimePool
 from . import ROMANCER_VERSION,ROMANCER_RELEASE_NAME,ROMANCER_BUILD_LABEL
 
+OPTIONAL_PARAMETERS={'games.maps.plan':{'state':None}}
+
 
 class WorkbenchAPI:
     def __init__(self,workspace):
@@ -294,8 +296,9 @@ class WorkbenchAPI:
 
 
     def _operations(self,p,c):
-        return {'ok':True,'operations':[{'name':name,'required_parameters':entry[0].split()} for name,entry in sorted(self.routes.items())],
-                'scope':'Operation names and required parameter names; value constraints are documented per operation.'}
+        return {'ok':True,'operations':[{'name':name,'required_parameters':entry[0].split(),
+                **({'optional_parameters':sorted(OPTIONAL_PARAMETERS[name])} if name in OPTIONAL_PARAMETERS else {})} for name,entry in sorted(self.routes.items())],
+                'scope':'Operation names, required and optional parameter names; value constraints are documented per operation.'}
 
     def _settings_get(self,p,c):
         from .app_settings import get_settings
@@ -417,7 +420,10 @@ class WorkbenchAPI:
             if operation=='jobs.cancel':fields(parameters,'job_id');return {'ok':True,**self.jobs.cancel(parameters['job_id'])}
             if operation=='jobs.list':fields(parameters,'');return {'ok':True,'jobs':self.jobs.list()}
             if operation not in self.routes:raise ValueError('unknown workbench operation')
-            names,handler=self.routes[operation];fields(parameters,names)
+            names,handler=self.routes[operation]
+            defaults=OPTIONAL_PARAMETERS.get(operation,{})
+            if defaults:parameters={**defaults,**parameters}
+            fields(parameters,names+' '+' '.join(defaults))
             if cancelled():raise KeyboardInterrupt
             if operation in ('rom.scan.run','graphics.observe','traces.capture','traces.verify','checks.run','checks.from_trace','graphics.accesses.capture','assets.preview_scene'):return handler(parameters,cancelled)
             if 'project_id' in parameters:

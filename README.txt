@@ -1,4 +1,4 @@
-ROMancer v1.0 development build48
+ROMancer v1.0 development build49
 By RetchEWretched
 
 Local ROM editing for NES, SNES, Genesis, Master System, Game Boy, Game Boy Color.
@@ -9,11 +9,14 @@ Everyday use works offline. No AI account, model, API key or subscription is req
 
 COVERAGE STATUS - NOT READY FOR UNIVERSAL v1.0 RELEASE
 
-This development build retains the exact-revision coverage ledger and declared
-isometric/elevation framework. It adds lossless FFL II stored-command encoding,
-large/zero-radius circle decoding and guarded circle edits in the existing
-room 486B definition. The Genesis observer starts its bounded capture with
-automatic Lua collection suspended; worker failures are still rejected.
+This development build adds state-aware terrain operand editing across all 219
+FFL II room headers and checks every encoded state outcome and shared header.
+Native constructor checks match 344 edited state cases across 164 streams. This
+covers terrain construction, not complete room events or full-game editing.
+Tiles, assembled sprites and animation can preview the selected declared ROM
+palette bank together. Level palettes support native Genesis RGB333 and SMS
+RGB222 storage, preserving unused bits. FFL II uses its checked normal field
+shades; fades and effects still need runtime evidence.
 These improvements do not establish complete editing support for any game.
 
 Full visual editing of all 1,035 catalog revisions is the release requirement.

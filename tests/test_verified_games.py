@@ -210,4 +210,4 @@ class VerifiedGameTests(unittest.TestCase):
         self.assertTrue(result['ok'],result)
         operation=next(r for r in result['operations'] if r['name']=='games.plan')
         self.assertEqual(operation['required_parameters'],['project_id','artifact_id','profile_id','values'])
-        self.assertEqual(result['scope'],'Operation names and required parameter names; value constraints are documented per operation.')
+        self.assertEqual(result['scope'],'Operation names, required and optional parameter names; value constraints are documented per operation.')

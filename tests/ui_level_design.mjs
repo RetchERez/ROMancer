@@ -24,7 +24,7 @@ for(let n=0;n<100;n++){model.begin();model.paint('a','terrain',0,n%2);model.comm
 const view=await import('../romancer/ui/views/levels.js'),actions={},drafts=new Map();let finish;
 const liveDoc={...doc,ok:true,source_sha256:'sha',uses:{'0':[],'1':[]},definition:{rooms:[]}},state={project:{project_id:'p'},artifact:{artifact_id:'a',sha256:'sha',name:'Room.nes'},results:{'levels.inspect':liveDoc}};
 const ctx={state,use:next=>Object.assign(actions,next),draft:(key,fallback)=>drafts.get(key)??fallback,setDraft:(key,value)=>drafts.set(key,value),run:()=>new Promise(resolve=>finish=resolve),sourceParams:()=>({project_id:'p',artifact_id:'a'}),projectParams:()=>({project_id:'p'}),render:async()=>{},notify:()=>{}};
-await view.render(ctx);state.levelEditor.paint('a','terrain',0,1);drafts.set('level-changes',JSON.stringify({document_id:'doc',changes:state.levelEditor.values()}));
+const levelMarkup=await view.render(ctx);assert.match(levelMarkup,/Genesis RGB333/);assert.match(levelMarkup,/Master System RGB222/);state.levelEditor.paint('a','terrain',0,1);drafts.set('level-changes',JSON.stringify({document_id:'doc',changes:state.levelEditor.values()}));
 state.pending={kind:'levels',artifact_id:'a',document_id:'doc',plan_id:'plan',changes:JSON.stringify(state.levelEditor.values())};
 const building=actions['levels-build']();state.levelEditor.paint('a','terrain',1,1);drafts.set('level-changes',JSON.stringify({document_id:'doc',changes:state.levelEditor.values()}));finish({ok:true});await building;
 assert.equal(state.levelEditor.values().length,2,'build completion preserves edits made while the build ran');

@@ -1759,8 +1759,8 @@
       "kicker": "Color indices and shared uses",
       "intro": "A pixel usually stores a color index. A palette supplies the RGB color for that index. Changing the palette can recolor many uses at once.",
       "steps": [
-        "Load a declared graphics resource and inspect <b>Palette colors</b>. Select the bank and entry before editing. Confirm the original swatch matches the intended resource.",
-        "Use <b>Choose color</b> for an RGB proposal, or <b>Color storage values</b> for the declared channels. Read the Original/Edited comparison as the change is staged.",
+        "Load declared graphics. If <b>Preview colors > ROM palette bank</b> appears, choose the bank used by the graphic. Tiles, assembled sprites and animation use it together. This selector changes the view only.",
+        "In <b>Palette colors</b>, select a bank and entry. Choosing an entry also selects its preview bank. Use <b>Choose color</b> or <b>Color storage values</b>; the edited views update while the original stays fixed.",
         "Review the channel limits and shared consumers. RGB555 stores 5-bit channels, so a chosen screen color is quantized to a representable value.",
         "Review graphics changes, create the build and inspect every scene known to share that palette. Verify the color in the actual game, not just the swatch."
       ],
@@ -1769,15 +1769,15 @@
       "details": [
         {
           "title": "Shared entries",
-          "text": "One index can be referenced by multiple tiles, objects or frames. A correct local swatch can cause an unintended global recolor. Inspect declared consumers and compare an unchanged neighboring object."
+          "text": "One stored entry may color many tiles, objects or frames. Preview-bank selection does not change pixels or palette bytes. Tilemap cells retain their encoded per-cell bank. Confirm shared consumers and compare an unchanged neighboring object."
         },
         {
           "title": "Original versus edited",
           "text": "The original view remains the reference while the edited view follows staged values. Saving the editor draft does not modify the playable source. Build and reload before judging the in-game effect."
         },
         {
-          "title": "Master System Mode 4 colors",
-          "text": "Choose Master System RGB222 for declared Mode 4 color bytes: one byte stores two bits per channel. Tilemap entries use the SMS index, flip and palette masks; priority and unused bits remain preserved. The reference color preview does not emulate analog display differences."
+          "title": "Native palette storage",
+          "text": "Declared level and graphics palettes support Genesis RGB333, Master System RGB222 and RGB555 in either byte order; levels also accept RGB888. ROMancer decodes the channel bits and preserves unused bits. Game Boy monochrome uses four hardware shades. Missing palette evidence is labeled; index grayscale is not claimed as natural game color."
         },
         {
           "title": "See the actual captured scene",
@@ -1795,7 +1795,15 @@
       "image": "08-dejavu-colors",
       "image_layout": "following-page",
       "image_alt": "Compare palette colors before building",
-      "caption": "Actual Game Boy Color interface palette, original and edited colors."
+      "caption": "Actual Game Boy Color interface palette, original and edited colors.",
+      "extra_images": [
+        {
+          "image": "262-native-palette-workshop-preview",
+          "alt": "Actual SMS workshop sprite preview with original green and staged cyan colors",
+          "title": "Practice: stored colors update the assembled preview",
+          "caption": "Actual editor capture using the original authored SMS workshop. A stored palette entry is staged from green to cyan; the original remains fixed. This is a preview exercise, not a commercial game support claim."
+        }
+      ]
     },
     {
       "id": "native-draft-preview",
@@ -2046,7 +2054,7 @@
       "title": "Edit declared terrain, objects and collision",
       "part": "Advanced",
       "kicker": "Levels and bounded game definitions",
-      "intro": "Levels needs a checked game-specific definition. The matched FFL II bedroom is a bounded real-game example. An unsupported source has no level definition; optional Advanced practice teaches the declared format without pretending to decode that game.",
+      "intro": "Levels uses a checked definition for the selected revision. Supported layouts show stored tiles with their declared palette. FFL II provides a real-game terrain-command workflow; Advanced practice is separate authored test data.",
       "steps": [
         "Open <b>Levels</b> for the selected source. If it says <b>No supported level map for this ROM yet</b>, investigate the source or supply a checked map definition through Advanced level setup. The separate collapsed <b>Advanced practice > Open test layout</b> is a learning exercise, not your game.",
         "Choose <b>Paint layer</b>: Terrain changes appearance; Collision edits a separately declared grid; Elevation appears only when a stored height grid is declared. Pick from room samples existing data. Paint, Fill and rectangle copy/paste stay inside the declared bounds.",
@@ -2054,7 +2062,7 @@
         "Choose <b>Review level changes</b>, inspect the exact changes, then <b>Create level build</b>. Visit the room and test walking, collision, boundaries and transitions."
       ],
       "result": "The preview and checked changes stay within declared grid/object ranges. Test the built game to establish movement, collision, boundaries and transitions; the static preview alone does not certify them.",
-      "note": "A visible wall or a height value does not establish collision. Labels and sprite assemblies describe checked declarations; gameplay still needs native testing. Rectangular and isometric previews use declared cell dimensions. Height comes only from a declared grid or explicit object-height field. There is no general 3D editor, and The Immortal still has no verified level definition.",
+      "note": "Map previews use the checked normal Game Boy field shades; fades and effects are excluded. Changed palette code loses that default. Grid palettes come from declared storage. A visible wall or height is not proof of collision. Isometric geometry requires declared dimensions and elevation. The Immortal still has no verified level grammar.",
       "details": [
         {
           "title": "Shared metatiles",
@@ -2074,7 +2082,7 @@
         },
         {
           "title": "FFL II stored terrain commands",
-          "text": "On the exact supported USA revision, Browse game maps inspects the original room headers and shared terrain streams. In room 486B, Inspect terrain command lets you stage a point, anchor, rectangle, circle or line change. Later commands may overwrite earlier drawing. Shared headers are listed above the canvas. Review rejects changed collision behavior, region bits and existing trigger bindings. State-dependent maps require an explicit story-state value; the tool does not guess it. A byte-identical storage check preserves the existing command widths and protected trailing bytes; it is not a free-space or gameplay certificate."
+          "text": "Browse game maps covers 219 headers sharing 164 stored streams on the matched USA revision. Select a room, choose any required Story-state preview and Apply. Inspect terrain command edits existing drawing operands; conditions and command widths stay protected. Switching preview state keeps staged records and undo history. Review checks every encoded state outcome and sharing header for collision, region bits, marker order and trigger bindings. NPC and arrival writes remain limited to room 486B. Build separately and test doors and story routes."
         }
       ],
       "related": [
@@ -2090,28 +2098,28 @@
         "term-collision",
         "term-layer"
       ],
-      "image": "260-ffl2-circle-editor",
+      "image": "261-ffl2-stateful-terrain-editor",
       "image_layout": "following-page",
-      "image_alt": "Actual FFL II circle-command edit with original and reviewed terrain and a separate build",
-      "caption": "Actual ROMancer edit: the circle-command X changes from 14 to 13. Review includes the terrain operand and cartridge integrity update. Shared-room effects still require playtesting.",
+      "image_alt": "Actual FFL II outdoor terrain command edited with its normal field palette and reviewed original/build comparison",
+      "caption": "Actual room 4807 edit: an existing circle draws trees instead of mountains. The normal monochrome field palette is checked; highlighted markers are editor overlays. Review protects every encoded state and shared header.",
       "visual_page": {
         "title": "Review a real terrain edit and declared scene geometry",
         "kicker": "Advanced / actual application capture",
-        "intro": "The first capture edits matched FFL II data. The second exercises the generic isometric framework with original authored test data.",
+        "intro": "The first capture edits a matched outdoor terrain command. The second tests declared isometric geometry using original authored data.",
         "panels": [
           {
-            "image": "260-ffl2-circle-editor",
-            "title": "Actual FFL II terrain command / before and reviewed",
+            "image": "261-ffl2-stateful-terrain-editor",
+            "title": "Actual outdoor terrain / checked normal field shades",
             "x": 48,
             "top": 846,
             "width": 1200,
             "crop": [
               0,
-              215,
-              1213,
-              430
+              210,
+              1095,
+              490
             ],
-            "caption": "Actual ROMancer edit: the circle-command X changes from 14 to 13. Review includes the terrain operand and cartridge integrity update. Shared-room effects still require playtesting."
+            "caption": "Actual room 4807 edit: an existing circle draws trees instead of mountains. The normal monochrome field palette is checked; highlighted markers are editor overlays. Review protects every encoded state and shared header."
           },
           {
             "image": "259-declared-isometric-editor",

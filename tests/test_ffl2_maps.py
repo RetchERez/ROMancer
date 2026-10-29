@@ -33,6 +33,121 @@ def fixture():
 
 
 class FFL2MapsTests(unittest.TestCase):
+    def test_all_room_previews_use_the_checked_normal_field_palette(self):
+        raw=self.terrain_source(xy(7,1,1)+b'\0')
+        # Synthetic fixture has its own palette-driver fingerprint; no game code is bundled.
+        with patch.object(self.maps,'FIELD_PALETTE_DRIVER_SHA256',hashlib.sha256(raw[0x3cf8:0x3d14]).hexdigest()):
+            for header in (0x4800,0x486b):
+                info=self.maps.inspect_room(self.current,self.original,header)
+                self.assertEqual(info['map']['palette'],[[85]*3,[255]*3,[170]*3,[0]*3])
+                self.assertIn('normal field',info['map']['palette_status'])
+            changed=bytearray(raw);changed[0x3d0c]^=1;self.current.write_bytes(changed)
+            info=self.maps.inspect_room(self.current,self.original,0x4800)
+            self.assertIsNone(info['map']['palette'],'a changed palette driver cannot retain certified default colors')
+
+    def terrain_source(self,program,*,flags=0):
+        raw=fixture();raw[0x20000:0x20000+len(program)]=program;raw[0x1c803]=flags
+        self.original.write_bytes(raw);self.current.write_bytes(raw)
+        guard=patch.object(self.maps,'ROOT_SHA256',hashlib.sha256(raw).hexdigest());guard.start();self.addCleanup(guard.stop)
+        return raw
+
+    def state_plan(self,*args,**kwargs):
+        import inspect
+        self.assertIn('state',inspect.signature(self.maps.plan_edits).parameters,'Explicit state-aware terrain planning is missing')
+        return self.maps.plan_edits(*args,**kwargs)
+
+    def test_nonopening_terrain_plan_is_source_bound_and_keeps_object_scope_separate(self):
+        program=xy(7,1,1)+xy(1,4,4)+b'\2\0';raw=self.terrain_source(program)
+        info=self.maps.inspect_room(self.current,self.original,0x4800)
+        self.assertTrue(info['room'].get('terrain_editable',False))
+        self.assertFalse(info['room']['editable'])
+        self.assertTrue(info['map']['commands'][1]['editable'])
+        result=self.maps.plan_edits(self.current,self.original,0x4800,[{'kind':'command','offset':0x20002,'x':5}])
+        self.assertEqual(result['preview_map']['cells'][4*64+5],2);self.assertEqual(result['changed_cells'],2)
+        self.assertFalse(result['native_verified']);self.assertEqual(self.current.read_bytes(),raw)
+        for change in ({'kind':'arrival','table':'main','id':0,'x':5},{'kind':'npc','offset':0x1c876,'x':5},{'kind':'link','index':0,'arrival_id':0}):
+            with self.subTest(change=change),self.assertRaisesRegex(ValueError,'486B|scope|terrain'):
+                self.maps.plan_edits(self.current,self.original,0x4800,[change])
+
+    def test_state_preview_checks_every_encoded_branch_and_preserves_selection(self):
+        program=xy(7,1,1)+bytes((0xa2,0x2f))+xy(1,5,5)+b'\2\0';raw=self.terrain_source(program)
+        doc=self.maps.inspect_room(self.current,self.original,0x4800)
+        self.assertEqual(doc.get('required_state_indexes'),[2])
+        result=self.state_plan(self.current,self.original,0x4800,[{'kind':'command','offset':0x20004,'x':6}],state={'2':0})
+        self.assertEqual(result['preview_state'],{'2':0});self.assertEqual(result['checked_state_variants'],2)
+        self.assertEqual(result['changed_cells'],0);self.assertEqual(result['preview_map']['cells'],[1]*4096)
+        self.assertEqual(self.original.read_bytes(),raw)
+        with self.assertRaisesRegex(ValueError,'state'):
+            self.state_plan(self.current,self.original,0x4800,[{'kind':'command','offset':0x20004,'x':6}])
+
+    def test_hidden_state_marker_and_trigger_changes_are_rejected(self):
+        for tile,new,flags,attribute,message in ((3,3,1,1,'marker'),(3,4,0,0xc0,'trigger')):
+            program=xy(7,1,1)+bytes((0xa2,0x1f))+xy(1,5,5)+bytes([tile,0]);raw=self.terrain_source(program,flags=flags)
+            raw[0x1f003]=attribute;raw[0x1f004]=attribute
+            self.original.write_bytes(raw);self.current.write_bytes(raw)
+            with patch.object(self.maps,'ROOT_SHA256',hashlib.sha256(raw).hexdigest()):
+                change={'kind':'command','offset':0x20004,**({'x':6} if new==tile else {'tile':new})}
+                with self.subTest(message=message),self.assertRaisesRegex(ValueError,message):
+                    self.state_plan(self.current,self.original,0x4800,[change],state={2:0})
+
+    def test_nonopening_edit_preserves_marker_order_for_every_shared_header(self):
+        program=xy(7,1,1)+xy(1,5,5)+b'\3\0';raw=self.terrain_source(program)
+        raw[0x1f003]=1;raw[0x1c86b:0x1c86d]=b'\0\0';raw[0x1c86e]=0x81
+        self.original.write_bytes(raw);self.current.write_bytes(raw)
+        with patch.object(self.maps,'ROOT_SHA256',hashlib.sha256(raw).hexdigest()):
+            with self.assertRaisesRegex(ValueError,'marker'):
+                self.maps.plan_edits(self.current,self.original,0x4800,[{'kind':'command','offset':0x20002,'x':6}])
+
+    def test_checker_and_span_operands_keep_their_format_meaning_and_width(self):
+        raw=self.terrain_source(xy(7,1,1)+xy(2,3,3)+xy(8,2,0)+b'\0')
+        result=self.maps.plan_edits(self.current,self.original,0x4800,[{'kind':'command','offset':0x20004,'x':1}])
+        self.assertEqual(result['edits'],[{'offset':0x20004,'before':xy(8,2,0).hex(),'after':xy(8,1,0).hex()}])
+        with self.assertRaisesRegex(ValueError,'reserved|unused'):
+            self.maps.plan_edits(self.current,self.original,0x4800,[{'kind':'command','offset':0x20004,'y':2}])
+        with self.assertRaisesRegex(ValueError,'tile operand|tile field'):
+            self.maps.plan_edits(self.current,self.original,0x4800,[{'kind':'command','offset':0x20000,'tile':2}])
+        raw=self.terrain_source(xy(7,1,1)+b'\0')
+        result=self.maps.plan_edits(self.current,self.original,0x4800,[{'kind':'command','offset':0x20000,'x':2}])
+        self.assertEqual(result['changed_cells'],2048)
+        self.assertEqual(self.current.read_bytes(),raw)
+
+    def test_terrain_state_combinations_and_cancellation_are_bounded(self):
+        program=xy(7,1,1)+b''.join(bytes((0xa0+i,0x11)) for i in range(6))+xy(1,4,4)+b'\2\0'
+        self.terrain_source(program)
+        with self.assertRaisesRegex(ValueError,'budget'):
+            self.state_plan(self.current,self.original,0x4800,[{'kind':'command','offset':0x2000e,'x':5}],state={i:1 for i in range(6)})
+        with self.assertRaises(KeyboardInterrupt):
+            self.state_plan(self.current,self.original,0x4800,[{'kind':'command','offset':0x2000e,'x':5}],state={i:1 for i in range(6)},cancelled=lambda:True)
+
+    def test_atlas_npc_position_is_walkable_in_every_story_state(self):
+        raw=fixture();program=xy(7,1,1)+bytes((0xa2,0x1f))+xy(1,13,45)+b'\0\0'
+        raw[0x20265:0x20265+len(program)]=program
+        self.original.write_bytes(raw);self.current.write_bytes(raw)
+        with patch.object(self.maps,'ROOT_SHA256',hashlib.sha256(raw).hexdigest()):
+            with self.assertRaisesRegex(ValueError,'walkable'):
+                self.state_plan(self.current,self.original,0x486b,[{'kind':'npc','offset':0x1c876,'x':13}],state={2:0})
+
+    def test_shared_room_state_work_budget_rejects_a_large_valid_graph(self):
+        raw=fixture();headers=[0x4800+32*i for i in range(219)]
+        for base,count in ((0x1c000,511),(0x1ef80,32)):
+            for i in range(count):raw[base+4*i:base+4*i+4]=headers[i%219].to_bytes(2,'little')+b'\4\4'
+        for header in headers:raw[0x18000+header:0x18000+header+5]=bytes(5)
+        program=xy(7,1,1)+b''.join(bytes((0xa0+i,0x1f)) for i in range(6))+xy(1,4,4)+b'\2\0'
+        raw[0x20000:0x20000+len(program)]=program;self.original.write_bytes(raw);self.current.write_bytes(raw)
+        with patch.object(self.maps,'ROOT_SHA256',hashlib.sha256(raw).hexdigest()):
+            with self.assertRaisesRegex(ValueError,'work budget'):
+                self.state_plan(self.current,self.original,0x4800,[{'kind':'command','offset':0x2000e,'x':5}],state={i:1 for i in range(6)})
+
+    def test_state_partition_covers_every_comparison_outcome(self):
+        import itertools
+        rules=[(0,2,4),(0,7,10),(1,0,6),(1,12,15)]
+        commands=[{'op':10,'state_index':index,'minimum':low,'maximum':high} for index,low,high in rules]
+        def outcomes(state):return tuple(low<=state[index]<=high for index,low,high in rules)
+        exhaustive={outcomes(dict(zip((0,1),values))) for values in itertools.product(range(16),repeat=2)}
+        partitions=self.maps._state_variants(commands,lambda:False)
+        self.assertEqual({outcomes(state) for state in partitions},exhaustive)
+        self.assertLess(len(partitions),256)
+
     def test_independent_encoder_roundtrips_all_stored_map_command_shapes(self):
         from romancer.ffl2_maps import _commands,encode_map_commands,check_map_storage
         stream=bytearray()

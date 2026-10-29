@@ -7,11 +7,12 @@ import copy,hashlib
 from .base import Resource,validate_resources,resource_impact,implementation_sha
 from ..asset_codecs import cell_size,encode_cell
 from ..level_design import inspect_level,plan_level
+from ..level_palette import entry_size,encode_palette
 from ..script_schema import canonical_bytes
 
 IMPLEMENTATION_FILES=('romancer/adapters/base.py','romancer/adapters/levels.py',
  'romancer/adapters/registry.py','romancer/level_design.py','romancer/level_semantics.py',
- 'romancer/scene_schema.py','romancer/asset_codecs.py','romancer/studio_runtime.py')
+ 'romancer/scene_schema.py','romancer/asset_codecs.py','romancer/studio_runtime.py','romancer/level_palette.py')
 
 
 class DeclaredLevelAdapter:
@@ -53,15 +54,8 @@ class DeclaredLevelAdapter:
         for index,pixels in enumerate(doc['tiles']):
             start=t['offset']+index*unit
             out[start:start+unit]=encode_cell(pixels,codec=t['codec'],width=8,height=8)
-        palette_size=3 if t['palette_format']=='rgb888' else 2
-        for index,rgb in enumerate(doc['palette']):
-            at=t['palette_offset']+index*palette_size
-            if palette_size==3:out[at:at+3]=bytes(rgb)
-            else:
-                endian='little' if t['palette_format'].endswith('le') else 'big'
-                reserved=int.from_bytes(self._raw[at:at+2],endian)&0x8000
-                value=reserved|sum(round(channel*31/255)<<shift for channel,shift in zip(rgb,(0,5,10)))
-                out[at:at+2]=value.to_bytes(2,endian)
+        at=t['palette_offset'];size=entry_size(t['palette_format'])*len(doc['palette'])
+        out[at:at+size]=encode_palette(doc['palette'],t['palette_format'],self._raw[at:at+size])
         def grid(storage,values):
             width=storage['entry_bytes'];start=storage['offset']
             for index,value in enumerate(values):out[start+index*width:start+(index+1)*width]=value.to_bytes(width,storage['endian'])

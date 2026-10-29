@@ -9,6 +9,98 @@ function context(){const actions={},drafts=new Map();const ctx={state:{page:'lev
 function fields(values){const old=globalThis.document;globalThis.document={getElementById:id=>({value:String(values[id]??'')})};return()=>globalThis.document=old;}
 function deferred(){let resolve;const promise=new Promise(r=>resolve=r);return {promise,resolve};}
 
+test('nonopening terrain edits persist while arrivals remain read-only',async()=>{
+ const {ctx,actions,drafts}=context();await gameMaps(ctx);await actions['maps-open-room']({dataset:{id:String(0x4800)}});await gameMaps(ctx);
+ const reset=fields({'maps-x':9,'maps-y':8,'maps-tile':1});try{await actions['maps-stage']();}finally{reset();}
+ assert.equal(ctx.state.gameMapsView.model.values()[0].x,9);
+ assert.equal(JSON.parse(drafts.get('game-map-changes')).changes_by_header[String(0x4800)][0].x,9);
+ ctx.state.gameMapsView=null;await gameMaps(ctx);await actions['maps-open-room']({dataset:{id:String(0x4800)}});await gameMaps(ctx);
+ assert.equal(ctx.state.gameMapsView.model.values()[0].x,9);
+ ctx.state.gameMapsView.selection='arrival:main:509';const fieldsBack=fields({'maps-x':10,'maps-y':8});
+ try{assert.throws(()=>actions['maps-stage'](),/read-only/);}finally{fieldsBack();}
+});
+
+function conditionalContext(){
+ const result=context();result.ctx.api.call=async(op,p)=>{
+  if(op==='games.maps.catalog')return catalog();
+  const doc=inspection(p.header);doc.required_state_indexes=[2];
+  doc.map=p.state?.['2']===undefined?{status:'unsupported',reason:'conditional map requires explicit state nibble 2'}:{...doc.map,preview_state:p.state};
+  return doc;
+ };return result;
+}
+
+test('explicit story-state preview preserves edits and is included in review',async()=>{
+ const {ctx,actions,drafts}=conditionalContext();let html=await gameMaps(ctx);assert.match(html,/maps-state-2/);assert.equal(typeof actions['maps-state-apply'],'function');
+ let reset=fields({'maps-state-2':3});try{await actions['maps-state-apply']();}finally{reset();}await gameMaps(ctx);
+ reset=fields({'maps-x':9,'maps-y':8,'maps-tile':1});try{await actions['maps-stage']();}finally{reset();}
+ const model=ctx.state.gameMapsView.model,past=model.past.length;
+ reset=fields({'maps-state-2':0});try{await actions['maps-state-apply']();}finally{reset();}html=await gameMaps(ctx);
+ assert.equal(ctx.state.gameMapsView.model,model);assert.equal(model.values()[0].x,9);assert.equal(model.past.length,past);
+ assert.deepEqual(model.doc.map.preview_state,{'2':0});assert.match(html,/selected.*state|state.*selected/i);
+ let reviewed;ctx.run=async(op,p)=>{reviewed=p;return {ok:true,source_sha256:'sha',preview_state:p.state,plan_id:'state-plan',edits:[]};};await actions['maps-review']();assert.deepEqual(reviewed.state,{'2':0});
+ assert.deepEqual(JSON.parse(drafts.get('game-map-changes')).states_by_header[String(0x486b)],{'2':0});
+ ctx.state.gameMapsView=null;await gameMaps(ctx);assert.deepEqual(ctx.state.gameMapsView.model.doc.map.preview_state,{'2':0});assert.equal(ctx.state.gameMapsView.pending,null);
+});
+
+test('a changed story-state selection invalidates delayed review and inspection',async()=>{
+ const {ctx,actions}=conditionalContext();await gameMaps(ctx);assert.equal(typeof actions['maps-state-apply'],'function');
+ let reset=fields({'maps-state-2':3});try{await actions['maps-state-apply']();}finally{reset();}await gameMaps(ctx);
+ ctx.state.gameMapsView.model.stage({kind:'command',offset:10,x:9});const later=deferred();ctx.run=()=>later.promise;const pending=actions['maps-review']();
+ reset=fields({'maps-state-2':0});try{await actions['maps-state-apply']();}finally{reset();}later.resolve({ok:true,source_sha256:'sha',plan_id:'old-state',edits:[]});await pending;
+ assert.equal(ctx.state.gameMapsView.pending,null);
+ const inspect=deferred();ctx.api.call=()=>inspect.promise;const older=gameMaps(ctx);
+ reset=fields({'maps-state-2':3});try{await actions['maps-state-apply']();}finally{reset();}inspect.resolve(inspection());assert.equal(await older,'');
+});
+
+test('checker and span controls describe tile values and protect unused fields',async()=>{
+ const {ctx}=context();ctx.api.call=async(op,p)=>{if(op==='games.maps.catalog')return catalog();const d=inspection(p.header);d.map.commands=[{offset:10,op:7,x:1,y:2,editable:true,name:'Checker background'}];return d;};
+ let html=await gameMaps(ctx);assert.match(html,/Tile 1/);assert.match(html,/Tile 2/);
+ ctx.state.gameMapsView=null;ctx.api.call=async(op,p)=>{if(op==='games.maps.catalog')return catalog();const d=inspection(p.header);d.map.commands=[{offset:10,op:8,x:1,y:0,editable:true,name:'Anchor span fill'}];return d;};
+ html=await gameMaps(ctx);assert.match(html,/Fill tile/);assert.doesNotMatch(html,/id="maps-y"/);
+ const model=ctx.state.gameMapsView.model;assert.throws(()=>model.stage({kind:'command',offset:10,y:4}),/protected|unused|field/);
+});
+
+test('nonspatial terrain operands cannot be changed by placing them on the canvas',async()=>{
+ const {ctx}=context();ctx.api.call=async(op,p)=>{if(op==='games.maps.catalog')return catalog();const d=inspection(p.header);d.map.commands=[{offset:10,op:7,x:1,y:2,editable:true,name:'Checker background'}];return d;};await gameMaps(ctx);
+ const view=ctx.state.gameMapsView;view.mode='place';const events={},messages=[];ctx.notify=s=>messages.push(s);
+ const g={createImageData:(w,h)=>({data:new Uint8ClampedArray(w*h*4)}),putImageData(){},strokeRect(){},fillText(){}},canvas={style:{},getContext:()=>g,getBoundingClientRect:()=>({left:0,top:0,width:256,height:192}),addEventListener:(name,fn)=>events[name]=fn};
+ const old=globalThis.document;try{globalThis.document={getElementById:id=>id==='maps-original'||id==='maps-edit'?canvas:null};mountGameMaps(ctx);events.click({clientX:20,clientY:20});}finally{globalThis.document=old;}
+ assert.deepEqual(view.model.values(),[]);assert.match(messages.join(' '),/tile|inspector/i);
+});
+
+test('source-wide draft limits refuse staging and undo without losing history',async()=>{
+ const {ctx,actions}=context();ctx.api.call=async(op,p)=>{if(op==='games.maps.catalog')return catalog();const d=inspection(p.header);d.map.commands=Array.from({length:64},(_,i)=>({offset:100+i,op:1,x:1,y:1,tile:1,editable:true}));return d;};
+ await gameMaps(ctx);const first=ctx.state.gameMapsView.model;first.stage({kind:'command',offset:100,x:2});first.clear();ctx.state.gameMapsView.persist();
+ for(const header of [0x4800,0x4820,0x4840,0x4880]){await actions['maps-open-room']({dataset:{id:String(header)}});await gameMaps(ctx);for(let i=0;i<64;i++)ctx.state.gameMapsView.model.stage({kind:'command',offset:100+i,x:2});ctx.state.gameMapsView.persist();}
+ await actions['maps-open-room']({dataset:{id:String(0x486b)}});await gameMaps(ctx);const view=ctx.state.gameMapsView,past=first.past.length,future=first.future.length;
+ assert.throws(()=>view.model.stage({kind:'command',offset:100,x:2}),/256|draft budget/);assert.deepEqual(view.model.values(),[]);assert.equal(first.past.length,past);
+ assert.throws(()=>first.undo(),/256|draft budget/);assert.equal(first.past.length,past);assert.equal(first.future.length,future);assert.deepEqual(first.values(),[]);
+});
+
+test('a mismatched state preview clears the active editor without losing saved records',async()=>{
+ const {ctx,actions}=conditionalContext();await gameMaps(ctx);let reset=fields({'maps-state-2':3});try{await actions['maps-state-apply']();}finally{reset();}await gameMaps(ctx);
+ ctx.state.gameMapsView.model.stage({kind:'command',offset:10,x:9});ctx.state.gameMapsView.persist();
+ reset=fields({'maps-state-2':0});try{await actions['maps-state-apply']();}finally{reset();}
+ ctx.api.call=async(op,p)=>{if(op==='games.maps.catalog')return catalog();const d=inspection(p.header);d.required_state_indexes=[2];d.map.preview_state={'2':3};return d;};
+ const html=await gameMaps(ctx);assert.match(html,/different story-state/);assert.equal(ctx.state.gameMapsView.model,null);assert.equal(ctx.state.gameMapEditor,null);
+ assert.equal(ctx.state.gameMapsView.saved[String(0x486b)][0].x,9);
+});
+
+test('malformed saved preview states are ignored with an explanation',async()=>{
+ for(const states of [null,[],{'18539':{'2':16}},{'18539':{'bad':1}}]){
+  const {ctx,drafts}=context();drafts.set('game-map-changes',JSON.stringify({version:2,source_sha256:'sha',changes_by_header:{'18539':[{kind:'command',offset:10,x:9}]},states_by_header:states}));
+  const html=await gameMaps(ctx);assert.deepEqual(ctx.state.gameMapsView.model.values(),[]);assert.match(html,/saved.*ignored|ignored.*saved/i);
+ }
+});
+
+test('unapplied state inputs invalidate reviewed builds and require applying the preview',async()=>{
+ const {ctx,actions}=conditionalContext();await gameMaps(ctx);const reset=fields({'maps-state-2':3});try{await actions['maps-state-apply']();}finally{reset();}await gameMaps(ctx);
+ ctx.state.gameMapsView.model.stage({kind:'command',offset:10,x:9});ctx.run=async(op,p)=>({ok:true,source_sha256:'sha',preview_state:p.state,plan_id:'state-plan',edits:[]});await actions['maps-review']();
+ const events={},g={createImageData:(w,h)=>({data:new Uint8ClampedArray(w*h*4)}),putImageData(){},strokeRect(){},fillText(){}},canvas={style:{},getContext:()=>g,addEventListener(){}};
+ const old=globalThis.document;try{globalThis.document={getElementById:id=>id==='maps-original'||id==='maps-edit'?canvas:{value:'0',addEventListener:(event,fn)=>events[id+':'+event]=fn},querySelectorAll:()=>[]};mountGameMaps(ctx);events['maps-state-2:change']();await assert.rejects(()=>actions['maps-review'](),/Apply/);await assert.rejects(()=>actions['maps-build'](),/Review/);}finally{globalThis.document=old;}
+ assert.equal(ctx.state.gameMapsView.pending,null);
+});
+
 test('staged edits merge fixed fields, undo and redo without changing source objects',()=>{
  const doc=inspection(),draft=new MapDraft(doc);draft.stage({kind:'command',offset:10,x:9,y:8});
  assert.deepEqual(draft.values(),[{kind:'command',offset:10,x:9}]);draft.stage({kind:'command',offset:10,y:10});

@@ -3316,10 +3316,10 @@
   // romancer/ui/brush_colors.js
   var bits = { "mono-row-msb-v1": 1, "tile8-paired2-msb-v1": 2, "tile8-planar2-msb-v1": 2, "tile8-rowplanar4-msb-v1": 4, "tile8-paired4-msb-v1": 4, "tile8-packed4-high-v1": 4, "tile8-packed4-low-v1": 4 };
   var valid = (rgb) => Array.isArray(rgb) && rgb.length === 3 && rgb.every((v) => Number.isInteger(v) && v >= 0 && v <= 255);
-  function brushColors(bitmap, palette2, layout) {
+  function brushColors(bitmap, palette2, layout, bank = 0) {
     const count = bits[bitmap == null ? void 0 : bitmap.codec] ? Math.min(2 ** bits[bitmap.codec], (palette2 == null ? void 0 : palette2.colors_per_bank) || 256) : 0;
     return Array.from({ length: count }, (_, index) => {
-      const entry = palette2 == null ? void 0 : palette2.entries.find((e) => e.bank === 0 && e.index === index), declared2 = entry && [entry.rgb.r, entry.rgb.g, entry.rgb.b];
+      const entry = palette2 == null ? void 0 : palette2.entries.find((e) => e.bank === bank && e.index === index), declared2 = entry && [entry.rgb.r, entry.rgb.g, entry.rgb.b];
       if (valid(declared2)) return { index, rgb: declared2, colors: [declared2], origin: "declared" };
       const observed = [...new Map(((layout == null ? void 0 : layout.colors) || []).map((part) => part == null ? void 0 : part[index]).filter(valid).map((rgb2) => [rgb2.join(","), rgb2])).values()];
       if (observed.length) return { index, rgb: observed[0], colors: observed, origin: "observed" };
@@ -3940,6 +3940,38 @@ ${font ? `<section class="card"><h3>Font metrics · ${esc(font.id)}</h3><div cla
     mountTilemap(ctx2, doc, map, changes);
   }
 
+  // romancer/ui/preview_palette.js
+  function paletteBankCount(palette2) {
+    if (!palette2) return 0;
+    const count = palette2.banks ?? Math.max(1, ...(palette2.entries || []).map((e) => e.bank + 1));
+    return Number.isSafeInteger(count) && count >= 1 && count <= 4096 ? count : 0;
+  }
+  function previewPaletteBank(ctx2, palette2) {
+    const bank = Number(ctx2.draft("asset-preview-bank", "0"));
+    return Number.isSafeInteger(bank) && bank >= 0 && bank < paletteBankCount(palette2) ? bank : 0;
+  }
+  function paletteColor(palette2, index, bank = 0) {
+    var _a;
+    return (_a = palette2 == null ? void 0 : palette2.entries.find((entry) => entry.bank === bank && entry.index === index)) == null ? void 0 : _a.rgb;
+  }
+  function previewPaletteControls(ctx2, palette2) {
+    const count = paletteBankCount(palette2);
+    if (count < 2) return "";
+    return `<section class="card"><h3>Preview colors</h3>${select("asset-preview-bank", "ROM palette bank", Array.from({ length: count }, (_, i) => [String(i), "Bank " + i]), String(previewPaletteBank(ctx2, palette2)))}<p class="subtle">Choose the bank used by this graphic. This changes the preview; stored pixels and palette colors stay unchanged.</p></section>`;
+  }
+  function applyPreviewPaletteBank(ctx2, palette2, value = read("asset-preview-bank")) {
+    const bank = Number(value);
+    if (!Number.isSafeInteger(bank) || bank < 0 || bank >= paletteBankCount(palette2)) throw Error("Choose an existing ROM palette bank.");
+    const colors = editorPalette(ctx2, palette2), prior = colors.entries[Number(ctx2.draft("palette-index", "0"))], index = colors.entries.findIndex((e) => e.bank === bank && e.index === ((prior == null ? void 0 : prior.index) ?? 0));
+    const selected2 = index >= 0 ? index : colors.entries.findIndex((e) => e.bank === bank);
+    if (selected2 < 0) throw Error("The selected palette bank has no declared colors.");
+    ctx2.setDraft("asset-preview-bank", String(bank));
+    ctx2.setDraft("palette-index", String(selected2));
+    for (const channel of ["r", "g", "b"]) ctx2.setDraft("palette-" + channel, String(colors.entries[selected2].components[channel]));
+    ctx2.notify("Preview palette updated. Stored pixels are unchanged.");
+    return ctx2.render();
+  }
+
   // romancer/ui/sprite_assembly.js
   function spritePreviewSize(width, height, zoom = "fit", available = 384) {
     const scale = ["8", "16", "32"].includes(String(zoom)) ? Number(zoom) : Math.max(1, Math.min(32, Math.floor(Math.min(Math.max(1, available) / width, 384 / height))));
@@ -4031,7 +4063,7 @@ ${font ? `<section class="card"><h3>Font metrics · ${esc(font.id)}</h3><div cla
     const checkHistory = () => {
       if (JSON.stringify(imageFor(ctx2, doc, bitmap, layout).pixels) !== JSON.stringify(undo.current)) throw Error("Tiles changed in another editor. Start a fresh sprite stroke before undo or redo.");
     };
-    const colors = brushColors(bitmap, editorPalette(ctx2, palette2), layout);
+    const colors = brushColors(bitmap, editorPalette(ctx2, palette2), layout, previewPaletteBank(ctx2, palette2));
     const connectedObject = !!layout && ((_a = ctx2.state.objectWorkbench) == null ? void 0 : _a.scope) === scope;
     ctx2.use({
       "sprite-brush": (node) => {
@@ -4088,8 +4120,8 @@ ${font ? `<section class="card"><h3>Font metrics · ${esc(font.id)}</h3><div cla
     const rgba = (values, colors) => {
       const data = new Uint8ClampedArray(values.length * 4);
       values.forEach((value, i) => {
-        var _a2, _b2, _c2;
-        const part = Math.floor(Math.floor(i / image.width) / bitmap.height) * layout.columns + Math.floor(i % image.width / bitmap.width), observed = (_b2 = (_a2 = layout.colors) == null ? void 0 : _a2[part]) == null ? void 0 : _b2[value], color = (_c2 = colors == null ? void 0 : colors.entries.find((e) => e.index === value && e.bank === 0)) == null ? void 0 : _c2.rgb, shade = Math.round(18 + value / Math.max(1, count - 1) * 216);
+        var _a2, _b2;
+        const part = Math.floor(Math.floor(i / image.width) / bitmap.height) * layout.columns + Math.floor(i % image.width / bitmap.width), observed = (_b2 = (_a2 = layout.colors) == null ? void 0 : _a2[part]) == null ? void 0 : _b2[value], color = paletteColor(colors, value, previewPaletteBank(ctx2, palette2)), shade = Math.round(18 + value / Math.max(1, count - 1) * 216);
         data.set([(color == null ? void 0 : color.r) ?? (observed == null ? void 0 : observed[0]) ?? shade, (color == null ? void 0 : color.g) ?? (observed == null ? void 0 : observed[1]) ?? shade, (color == null ? void 0 : color.b) ?? (observed == null ? void 0 : observed[2]) ?? shade, 255], i * 4);
       });
       return data;
@@ -4133,7 +4165,7 @@ ${font ? `<section class="card"><h3>Font metrics · ${esc(font.id)}</h3><div cla
     const updateSwatches = () => {
       var _a2;
       const host = document.getElementById("sprite-brush-palette");
-      if (host) host.innerHTML = brushSwatches(brushColors(bitmap, editorPalette(ctx2, palette2), layout), ((_a2 = document.getElementById("sprite-color")) == null ? void 0 : _a2.value) ?? ctx2.draft("sprite-color", "1"));
+      if (host) host.innerHTML = brushSwatches(brushColors(bitmap, editorPalette(ctx2, palette2), layout, previewPaletteBank(ctx2, palette2)), ((_a2 = document.getElementById("sprite-color")) == null ? void 0 : _a2.value) ?? ctx2.draft("sprite-color", "1"));
     };
     (_a = document.getElementById("sprite-color")) == null ? void 0 : _a.addEventListener("input", updateSwatches);
     const resize = () => {
@@ -4335,8 +4367,8 @@ ${font ? `<section class="card"><h3>Font metrics · ${esc(font.id)}</h3><div cla
       canvas.height = image.height;
       const c = canvas.getContext("2d"), pixels = c.createImageData(image.width, image.height);
       image.pixels.forEach((value, i) => {
-        var _a2, _b, _c;
-        const part = Math.floor(Math.floor(i / image.width) / bitmap.height) * frames[index].columns + Math.floor(i % image.width / bitmap.width), observed = (_b = (_a2 = frames[index].colors) == null ? void 0 : _a2[part]) == null ? void 0 : _b[value], color = (_c = colors == null ? void 0 : colors.entries.find((e) => e.index === value && e.bank === 0)) == null ? void 0 : _c.rgb, shade = Math.round(18 + value / Math.max(1, count - 1) * 216);
+        var _a2, _b;
+        const part = Math.floor(Math.floor(i / image.width) / bitmap.height) * frames[index].columns + Math.floor(i % image.width / bitmap.width), observed = (_b = (_a2 = frames[index].colors) == null ? void 0 : _a2[part]) == null ? void 0 : _b[value], color = paletteColor(colors, value, previewPaletteBank(ctx2, palette2)), shade = Math.round(18 + value / Math.max(1, count - 1) * 216);
         pixels.data.set([(color == null ? void 0 : color.r) ?? (observed == null ? void 0 : observed[0]) ?? shade, (color == null ? void 0 : color.g) ?? (observed == null ? void 0 : observed[1]) ?? shade, (color == null ? void 0 : color.b) ?? (observed == null ? void 0 : observed[2]) ?? shade, 255], i * 4);
       });
       c.putImageData(pixels, 0, 0);
@@ -6644,6 +6676,7 @@ ${font ? `<section class="card"><h3>Font metrics · ${esc(font.id)}</h3><div cla
         const entry = editedPalette(palette2, JSON.parse(ctx2.draft("asset-changes", "[]"))).entries[Number(selector.value)];
         if (!entry) return;
         ctx2.setDraft("palette-index", selector.value);
+        ctx2.setDraft("asset-preview-bank", String(entry.bank));
         for (const c of ["r", "g", "b"]) ctx2.setDraft("palette-" + c, String(entry.components[c]));
         await ctx2.render();
       } catch (error) {
@@ -6746,6 +6779,7 @@ ${font ? `<section class="card"><h3>Font metrics · ${esc(font.id)}</h3><div cla
         state2.paint = null;
         await ctx2.run("assets.inspect", { ...ctx2.sourceParams(), schema: json("asset-schema") });
       },
+      "asset-preview-palette": () => applyPreviewPaletteBank(ctx2, palette2),
       "asset-select-cell": (node) => {
         activateCell(ctx2, document2, bitmap.id, Number(node.dataset.id));
         return ctx2.render();
@@ -6834,16 +6868,15 @@ ${font ? `<section class="card"><h3>Font metrics · ${esc(font.id)}</h3><div cla
       return { schema: JSON.parse(ctx2.draft("asset-schema", JSON.stringify(fallback))), edits: { schema_version: 1, document_id: document2.document_id, changes: mergeCellChanges(JSON.parse(ctx2.draft("asset-changes", "[]")), ((_a2 = state2.paint) == null ? void 0 : _a2.document_id) === document2.document_id ? [{ kind: "cell", bitmap_id: state2.paint.bitmap_id, cell_index: state2.paint.cell_index, before_pixels: document2.bitmaps.find((b) => b.id === state2.paint.bitmap_id).cells[state2.paint.cell_index].pixels, after_pixels: state2.paint.pixels }] : []), acknowledged_consumers: state2.assetAcknowledgements || [] } };
     });
     const pending = ((_m = state2.pending) == null ? void 0 : _m.kind) === "assets" && state2.pending.artifact_id === state2.artifact.artifact_id;
-    return `${heading("Asset workshop", "Graphics & fonts", "Inspect declared tiles, palettes, maps, and fonts. Shared consumers require explicit acknowledgment.")}<div class="identity"><strong>${esc(state2.artifact.name)}</strong><code>${short(state2.artifact.sha256)}</code>${badge((document2 == null ? void 0 : document2.write_supported) ? "Editable" : "Declaration needed", (document2 == null ? void 0 : document2.write_supported) ? "good" : "warm")}</div><div class="grid-two asset-workspace"><div class="asset-editors">${((_n = state2.verifiedVisualSource) == null ? void 0 : _n.scope) === selectionKey(state2) && state2.verifiedVisualSource.document_id === (document2 == null ? void 0 : document2.document_id) ? '<p class="notice">This editor was opened from authenticated causal source verification. The proof covers the captured placement and replay; later edits still need playtesting.</p>' : ""}${await objectWorkbench(ctx2, document2, bitmap)}${spriteAssembly(ctx2, document2, bitmap, palette2)}${animationStudio(ctx2, document2, bitmap)}${await savedAnimationControls(ctx2, document2, bitmap)}${paletteEditor(ctx2, palette2)}${scene}${assetTools(ctx2, document2, bitmap, palette2)}<section class="card asset-collection"><div class="card-heading"><h3>Tile collection</h3><span class="subtle">${(bitmap == null ? void 0 : bitmap.count) || 0} cells · ${esc(bitmap ? formatLabel(bitmap.codec, state2.artifact.system_id) : "No tile layout loaded")}</span></div>${bitmap ? `<div class="pixel-grid">${bitmap.cells.slice((state2.assetPage || 0) * 64, (state2.assetPage || 0) * 64 + 64).map((cell) => `<div class="pixel-card"><canvas width="${bitmap.width}" height="${bitmap.height}" data-cell="${cell.index}" aria-label="Tile ${cell.index}"></canvas>${button("Edit tile " + cell.index, "asset-select-cell", { id: String(cell.index) })}</div>`).join("")}</div>` : empty("Load a declared asset descriptor", "Unknown compression and codecs remain read only.")}<div class="actions">${button("Previous page", "asset-page", { id: "-1", disabled: !(state2.assetPage > 0) })}${button("Next page", "asset-page", { id: "1", disabled: !bitmap || (state2.assetPage || 0) * 64 + 64 >= bitmap.count })}</div><div class="swatches" role="group" aria-label="Declared palette colors">${(palette2 == null ? void 0 : palette2.entries.slice(0, 64).map((entry, i) => `<span class="swatch" data-color-index="${i}" title="Color ${entry.index} (${entry.components.r}, ${entry.components.g}, ${entry.components.b})"></span>`).join("")) || ""}</div></section>${bitmap ? `<section class="card asset-pixel-editor"><div class="card-heading"><h3>Pixel editor · cell ${selected2}</h3><span id="pixel-edit-status">${JSON.stringify(pixelBuffer(ctx2, document2, bitmap, selected2)) !== JSON.stringify(bitmap.cells[selected2].pixels) ? badge("Staged", "warm") : badge("Unchanged")}</span></div><div class="preview-pair pixel-comparison"><div><span>Original tile</span><div class="pixel-card"><canvas id="paint-original" aria-label="Original selected tile"></canvas></div></div><div><span>Editing · paint here</span><div class="pixel-card"><canvas id="paint-canvas" width="${bitmap.width}" height="${bitmap.height}" tabindex="0" role="img" aria-label="Pixel editor: arrows move; Space paints selected index"></canvas><small>Drag to paint. Undo restores a complete stroke.</small></div></div></div><p id="pixel-preview-status" class="preview-caption" role="status" aria-live="polite"></p><div>${field("paint-color", "Palette index", ctx2.draft("paint-color", "1"), { type: "number", min: 0 })}<p class="subtle small">Grayscale shows stored indices when no palette is declared.</p>${button("Discard pending pixels", "asset-discard")}</div></section>` : ""}</div><section class="card"><h3>Graphics setup</h3>${graphicsDeclaration(ctx2)}${jsonEditor("asset-schema", "Advanced asset schema", ctx2.draft("asset-schema", JSON.stringify(fallback, null, 2)), false)}${button("Inspect assets", "asset-inspect", { icon: "assets" })}${jsonEditor("asset-changes", "Additional cell / palette / map / advance changes", ctx2.draft("asset-changes", "[]"), false)}<div class="actions">${button("Review graphics changes", "asset-plan", { primary: !pending, disabled: !(document2 == null ? void 0 : document2.write_supported) })}${pending ? button("Create graphics build", "asset-apply", { primary: true, icon: "check" }) : ""}</div>${((_p = (_o = state2.results["assets.plan"]) == null ? void 0 : _o.required_consumers) == null ? void 0 : _p.length) && !((_q = state2.results["assets.plan"]) == null ? void 0 : _q.ok) ? `<div class="notice warm">${state2.results["assets.plan"].required_consumers.length} declared consumers are affected. Read the report below before acknowledging them.</div>${button("Acknowledge listed consumers", "asset-acknowledge")}` : ""}</section></div>${report(state2.results["assets.plan"], "Asset plan & affected consumers")}${report(state2.results["structured.apply"], "Build result")}${editCheckControls(ctx2)}`;
+    return `${heading("Asset workshop", "Graphics & fonts", "Inspect declared tiles, palettes, maps, and fonts. Shared consumers require explicit acknowledgment.")}<div class="identity"><strong>${esc(state2.artifact.name)}</strong><code>${short(state2.artifact.sha256)}</code>${badge((document2 == null ? void 0 : document2.write_supported) ? "Editable" : "Declaration needed", (document2 == null ? void 0 : document2.write_supported) ? "good" : "warm")}</div><div class="grid-two asset-workspace"><div class="asset-editors">${((_n = state2.verifiedVisualSource) == null ? void 0 : _n.scope) === selectionKey(state2) && state2.verifiedVisualSource.document_id === (document2 == null ? void 0 : document2.document_id) ? '<p class="notice">This editor was opened from authenticated causal source verification. The proof covers the captured placement and replay; later edits still need playtesting.</p>' : ""}${previewPaletteControls(ctx2, palette2)}${await objectWorkbench(ctx2, document2, bitmap)}${spriteAssembly(ctx2, document2, bitmap, palette2)}${animationStudio(ctx2, document2, bitmap)}${await savedAnimationControls(ctx2, document2, bitmap)}${paletteEditor(ctx2, palette2)}${scene}${assetTools(ctx2, document2, bitmap, palette2)}<section class="card asset-collection"><div class="card-heading"><h3>Tile collection</h3><span class="subtle">${(bitmap == null ? void 0 : bitmap.count) || 0} cells · ${esc(bitmap ? formatLabel(bitmap.codec, state2.artifact.system_id) : "No tile layout loaded")}</span></div>${bitmap ? `<div class="pixel-grid">${bitmap.cells.slice((state2.assetPage || 0) * 64, (state2.assetPage || 0) * 64 + 64).map((cell) => `<div class="pixel-card"><canvas width="${bitmap.width}" height="${bitmap.height}" data-cell="${cell.index}" aria-label="Tile ${cell.index}"></canvas>${button("Edit tile " + cell.index, "asset-select-cell", { id: String(cell.index) })}</div>`).join("")}</div>` : empty("Load a declared asset descriptor", "Unknown compression and codecs remain read only.")}<div class="actions">${button("Previous page", "asset-page", { id: "-1", disabled: !(state2.assetPage > 0) })}${button("Next page", "asset-page", { id: "1", disabled: !bitmap || (state2.assetPage || 0) * 64 + 64 >= bitmap.count })}</div><div class="swatches" role="group" aria-label="Declared palette colors">${(palette2 == null ? void 0 : palette2.entries.slice(0, 64).map((entry, i) => `<span class="swatch" data-color-index="${i}" title="Color ${entry.index} (${entry.components.r}, ${entry.components.g}, ${entry.components.b})"></span>`).join("")) || ""}</div></section>${bitmap ? `<section class="card asset-pixel-editor"><div class="card-heading"><h3>Pixel editor · cell ${selected2}</h3><span id="pixel-edit-status">${JSON.stringify(pixelBuffer(ctx2, document2, bitmap, selected2)) !== JSON.stringify(bitmap.cells[selected2].pixels) ? badge("Staged", "warm") : badge("Unchanged")}</span></div><div class="preview-pair pixel-comparison"><div><span>Original tile</span><div class="pixel-card"><canvas id="paint-original" aria-label="Original selected tile"></canvas></div></div><div><span>Editing · paint here</span><div class="pixel-card"><canvas id="paint-canvas" width="${bitmap.width}" height="${bitmap.height}" tabindex="0" role="img" aria-label="Pixel editor: arrows move; Space paints selected index"></canvas><small>Drag to paint. Undo restores a complete stroke.</small></div></div></div><p id="pixel-preview-status" class="preview-caption" role="status" aria-live="polite"></p><div>${field("paint-color", "Palette index", ctx2.draft("paint-color", "1"), { type: "number", min: 0 })}<p class="subtle small">Grayscale shows stored indices when no palette is declared.</p>${button("Discard pending pixels", "asset-discard")}</div></section>` : ""}</div><section class="card"><h3>Graphics setup</h3>${graphicsDeclaration(ctx2)}${jsonEditor("asset-schema", "Advanced asset schema", ctx2.draft("asset-schema", JSON.stringify(fallback, null, 2)), false)}${button("Inspect assets", "asset-inspect", { icon: "assets" })}${jsonEditor("asset-changes", "Additional cell / palette / map / advance changes", ctx2.draft("asset-changes", "[]"), false)}<div class="actions">${button("Review graphics changes", "asset-plan", { primary: !pending, disabled: !(document2 == null ? void 0 : document2.write_supported) })}${pending ? button("Create graphics build", "asset-apply", { primary: true, icon: "check" }) : ""}</div>${((_p = (_o = state2.results["assets.plan"]) == null ? void 0 : _o.required_consumers) == null ? void 0 : _p.length) && !((_q = state2.results["assets.plan"]) == null ? void 0 : _q.ok) ? `<div class="notice warm">${state2.results["assets.plan"].required_consumers.length} declared consumers are affected. Read the report below before acknowledging them.</div>${button("Acknowledge listed consumers", "asset-acknowledge")}` : ""}</section></div>${report(state2.results["assets.plan"], "Asset plan & affected consumers")}${report(state2.results["structured.apply"], "Build result")}${editCheckControls(ctx2)}`;
   }
   function documentNode(id) {
     return document.getElementById(id);
   }
-  function draw(canvas, bitmap, pixels, palette2) {
+  function draw(canvas, bitmap, pixels, palette2, bank = 0) {
     const context = canvas.getContext("2d"), image = context.createImageData(bitmap.width, bitmap.height);
     pixels.forEach((value, index) => {
-      var _a;
-      const color = ((_a = palette2 == null ? void 0 : palette2.entries[value]) == null ? void 0 : _a.rgb) || literalRGB(bitmap, value);
+      const color = paletteColor(palette2, value, bank) || literalRGB(bitmap, value);
       image.data.set([color.r, color.g, color.b, 255], index * 4);
     });
     context.putImageData(image, 0, 0);
@@ -6854,11 +6887,11 @@ ${font ? `<section class="card"><h3>Font metrics · ${esc(font.id)}</h3><div cla
     const bitmap = doc.bitmaps.find((b) => b.id === ctx2.state.assetBitmapId) || doc.bitmaps[0], original2 = doc.palettes.find((p) => p.id === bitmap.palette_id), palette2 = editorPalette(ctx2, original2), canvas = documentNode("paint-canvas"), before = documentNode("paint-original");
     const index = ((_a = ctx2.state.paint) == null ? void 0 : _a.cell_index) ?? 0, pixels = pixelBuffer(ctx2, doc, bitmap, index), status = documentNode("pixel-edit-status");
     if (status) status.innerHTML = JSON.stringify(pixels) !== JSON.stringify(bitmap.cells[index].pixels) ? badge("Staged", "warm") : badge("Unchanged");
-    if (canvas) draw(canvas, bitmap, pixels, palette2);
+    if (canvas) draw(canvas, bitmap, pixels, palette2, previewPaletteBank(ctx2, original2));
     if (before) {
       before.width = bitmap.width;
       before.height = bitmap.height;
-      draw(before, bitmap, bitmap.cells[index].pixels, original2);
+      draw(before, bitmap, bitmap.cells[index].pixels, original2, previewPaletteBank(ctx2, original2));
     }
     const notice = documentNode("pixel-preview-status");
     if (notice) notice.textContent = "Live editing preview · " + pixels.filter((v, i) => v !== bitmap.cells[index].pixels[i]).length + " stored pixels changed · review and build to save.";
@@ -6867,6 +6900,7 @@ ${font ? `<section class="card"><h3>Font metrics · ${esc(font.id)}</h3><div cla
     (_d = documentNode("map-preview")) == null ? void 0 : _d.dispatchEvent(new Event("map-refresh"));
   }
   function mount6(ctx2) {
+    var _a;
     const doc = ctx2.state.results["assets.inspect"];
     if (!(doc == null ? void 0 : doc.ok)) return;
     const bitmap = doc.bitmaps.find((b) => b.id === ctx2.state.assetBitmapId) || doc.bitmaps[0], palette2 = doc.palettes.find((p) => p.id === bitmap.palette_id);
@@ -6874,7 +6908,7 @@ ${font ? `<section class="card"><h3>Font metrics · ${esc(font.id)}</h3><div cla
       const colors = editorPalette(ctx2, palette2);
       document.querySelectorAll("canvas[data-cell]").forEach((canvas) => {
         const index = Number(canvas.dataset.cell);
-        draw(canvas, bitmap, pixelBuffer(ctx2, doc, bitmap, index), colors);
+        draw(canvas, bitmap, pixelBuffer(ctx2, doc, bitmap, index), colors, previewPaletteBank(ctx2, palette2));
       });
       document.querySelectorAll("[data-color-index]").forEach((node) => {
         const c = colors.entries[Number(node.dataset.colorIndex)].rgb;
@@ -6882,6 +6916,7 @@ ${font ? `<section class="card"><h3>Font metrics · ${esc(font.id)}</h3><div cla
       });
       drawPaint(ctx2, doc);
     };
+    (_a = documentNode("asset-preview-bank")) == null ? void 0 : _a.addEventListener("change", () => applyPreviewPaletteBank(ctx2, palette2));
     refresh();
     mountObjectWorkbench(ctx2);
     mountDraftScene(ctx2);
@@ -7571,8 +7606,8 @@ ${font ? `<section class="card"><h3>Font metrics · ${esc(font.id)}</h3><div cla
     const pads = typeof navigator !== "undefined" ? [...((_o = navigator.getGamepads) == null ? void 0 : _o.call(navigator)) || []].filter(Boolean) : [];
     const physicalChoices = [[-1, "Automatic gamepad"], [-2, "Keyboard only"], ...pads.map((p) => [p.index, p.id || "Gamepad " + (p.index + 1)])];
     const controllerSetup = `<div class="field-row">${select("physical-pad", "Input device", physicalChoices, state2.physicalPadIndex ?? -1)}${button("Use input device", "controller-physical")}</div>${active ? `<div class="field-row">${select("controller-type", "Emulated controller", controllerChoices, ((_p = loaded == null ? void 0 : loaded.controller_devices) == null ? void 0 : _p["0"]) ?? 1)}${button("Apply type & restart game", "controller-reload")}</div><p class="subtle">Changing the emulated type restarts the selected ROM. Save states require the same controller setup.</p>` : ""}`;
-    const stateControls = `<div class="playtest-toolbar"><div class="actions">${state2.playing ? button("Pause", "runtime-pause", { primary: true }) : button("Play", "runtime-play", { disabled: !active, primary: true })}${button("Save state", "runtime-save", { disabled: !active })}</div><div class="actions state-slot">${select("checkpoint-id", "Saved state", checkpoints.map((c) => [c.snapshot_id, c.created_utc ? c.created_utc.replace("T", " ").replace("+00:00", " UTC") : c.snapshot_id.slice(0, 8) + " · " + c.run_mode]), ((_q = state2.snapshot) == null ? void 0 : _q.snapshot_id) || ((_r = checkpoints.at(-1)) == null ? void 0 : _r.snapshot_id))}${button("Load state", "runtime-restore", { disabled: !active || !checkpoints.length })}</div></div>`;
-    return `${heading("", "Playtest", "", active ? button(state2.playtestExpanded ? "Show setup" : "Expand game", "runtime-view") + button("Unload game", "runtime-close", { icon: "close" }) : "")}<div class="identity">${badge(active ? state2.playing ? "Game running" : "Game paused" : state2.profileAvailable ? "Ready to play" : "Setup needed", active ? "good" : "warm")}<strong>${esc(((_s = state2.artifact) == null ? void 0 : _s.name) || "Selected source")}</strong><code>${short((_t = state2.artifact) == null ? void 0 : _t.sha256)}</code></div><div class="grid-two playtest-layout ${active && state2.playtestExpanded ? "playtest-expanded" : ""}"><section class="card"><div class="card-heading"><h3>Playtest screen</h3><span class="subtle" id="runtime-frame-label">${state2.frame ? `Frame ${state2.frame.index} · ${state2.frame.width} × ${state2.frame.height}` : "No measured frame yet"}</span></div>${stateControls}<div class="actions">${button("Inspect graphics", "graphics-show-region", { disabled: !state2.frame, icon: "assets" })}</div><div class="screen" id="runtime-controller" tabindex="0" aria-label="Game controller keyboard focus">${state2.frame || active ? '<canvas id="runtime-screen" aria-label="Measured emulator capture"></canvas>' : empty(state2.profileAvailable ? "Ready to playtest" : "Set up playtesting", state2.profileAvailable ? "Load game to begin." : "Choose the emulator under Game & emulator.")}</div><details class="manual-runtime"><summary>Controller & frame tools</summary>${controllerSetup}<div class="runtime-controls"><div><div class="field-row">${field("runtime-frames", "Frames to advance", ctx2.draft("runtime-frames", "60"), { type: "number", min: 1 })}${field("input-frames", "Frames per input", ctx2.draft("input-frames", "1"), { type: "number", min: 1 })}</div><div class="actions">${button("Advance frames", "runtime-advance", { primary: true, disabled: !active, icon: "playtest" })}${button("Capture", "runtime-capture", { disabled: !active })}${button("Reset", "runtime-reset", { disabled: !active })}${button(state2.liveMuted ? "Unmute" : "Mute", "runtime-mute", { disabled: !active })}${field("runtime-volume", "Volume (%)", ctx2.draft("runtime-volume", String(getSettings().volume)), { type: "number", min: 0, max: 100 })}${button("Set volume", "runtime-volume", { disabled: !active })}${button("Test sound", "runtime-sound-check")}${button("Check ROM", "runtime-check", { disabled: !state2.profile })}</div></div><div class="dpad" aria-label="Controller directions">${button("↑", "runtime-input", { id: "up", disabled: !active })}${button("←", "runtime-input", { id: "left", disabled: !active })}${button("→", "runtime-input", { id: "right", disabled: !active })}${button("↓", "runtime-input", { id: "down", disabled: !active })}</div></div><div class="actions">${["a", "b", "x", "y", "l", "r", "start", "select"].map((id) => button(id.toUpperCase(), "runtime-input", { id, disabled: !active })).join("")}</div><p class="subtle">Use your saved controller keys while the game has focus.</p></details></section><section class="card playtest-setup"><h3>Game &amp; emulator</h3>${setup2}<p class="subtle">Load game, then press Play. Click the game screen to use your controller keys.</p>${button("Load game", "runtime-load", { primary: !active, disabled: active || !state2.profileAvailable, reason: active ? "Unload the current game before loading another one." : "Check the setup message under Game & emulator." })}<details class="config"><summary>Advanced core setup</summary>${field("core-path", "Native libretro core", ctx2.draft("core-path", ((_u = state2.profile) == null ? void 0 : _u.core) || readPreference("romancer-core") || ""), { placeholder: state2.capabilities.platform === "Windows" ? "C:\\RetroArch\\cores\\snes9x_libretro.dll" : "/path/to/core_libretro.so", hint: `Choose a core built for ${state2.capabilities.platform}. A Linux .so cannot load in Windows Python.` })}<div class="actions">${button("Choose core", "core-choose", { icon: "folder" })}${button("Load selected source", "runtime-load", { primary: !active, disabled: active, reason: "Unload the current game before loading another one." })}</div>${jsonEditor("core-options", "Advanced core options", ctx2.draft("core-options", JSON.stringify(((_v = state2.profile) == null ? void 0 : _v.options) || {}, null, 2)))}</details><div class="config"><h3>Audio</h3>${button("Get captured audio", "runtime-audio", { disabled: !active })}</div>${((_w = state2.audio) == null ? void 0 : _w.observed) ? `<canvas id="pcm-wave" width="480" height="80" aria-label="Captured PCM waveform"></canvas><audio id="pcm-player" controls aria-label="Play captured audio"></audio>${button("Save captured WAV", "runtime-audio-export", { disabled: !state2.audio.complete })}` : ""}<details class="config"><summary>Audio capture test (advanced)</summary>${jsonEditor("audio-config", "Cold-boot audio capture configuration", ctx2.draft("audio-config", JSON.stringify({ schema_version: 1, load: {}, steps: [{ frames: 1, buttons: [], port: 0 }], timeout_seconds: 30 }, null, 2)))}${jsonEditor("audio-baseline", "Exact sample-duration baseline", ctx2.draft("audio-baseline", "{}"))}${button("Capture & export WAV", "audio-export")}<p class="subtle small">Audio duration is checked against samples and an explicit rational baseline, independently of video timing.</p></details></section></div>${((_x = state2.results["runtime.smoke_profile"]) == null ? void 0 : _x.source_sha256) === ((_y = state2.artifact) == null ? void 0 : _y.sha256) ? `<section class="card"><h3>ROM startup check</h3><p>${state2.results["runtime.smoke_profile"].frames_advanced} frames · ${state2.results["runtime.smoke_profile"].frame.width} × ${state2.results["runtime.smoke_profile"].frame.height} video · ${state2.results["runtime.smoke_profile"].audio.captured_frames} audio sample frames · worker closed</p><p class="subtle">Startup observations only. Regression checks need expected results.</p><div class="actions">${button("Record a test route", "navigate", { id: "routes" })}${button("Compare regression runs", "navigate", { id: "regression" })}</div></section>` : ""}${report(state2.results["runtime.smoke_profile"], "ROM check details")}${report(state2.results["runtime.load"], "Emulator details")}${report(state2.results["runtime.close"], "Game unload details")}${report(state2.results["runtime.save_state"] ? { ...state2.results["runtime.save_state"], state_base64: "[local snapshot payload hidden]" } : null, "State identity")}${report(state2.audio ? { ...state2.audio, pcm_s16le_base64: "[PCM payload hidden]" } : null, "Captured audio")}${report(state2.results["audio.capture"], "WAV export")}${state2.artifact ? saveManager(ctx2, saveListing) + checkpointControls(ctx2) + traceControls(ctx2) + graphicsInvestigation(ctx2) : ""}${evidence(ctx2)}`;
+    const stateControls2 = `<div class="playtest-toolbar"><div class="actions">${state2.playing ? button("Pause", "runtime-pause", { primary: true }) : button("Play", "runtime-play", { disabled: !active, primary: true })}${button("Save state", "runtime-save", { disabled: !active })}</div><div class="actions state-slot">${select("checkpoint-id", "Saved state", checkpoints.map((c) => [c.snapshot_id, c.created_utc ? c.created_utc.replace("T", " ").replace("+00:00", " UTC") : c.snapshot_id.slice(0, 8) + " · " + c.run_mode]), ((_q = state2.snapshot) == null ? void 0 : _q.snapshot_id) || ((_r = checkpoints.at(-1)) == null ? void 0 : _r.snapshot_id))}${button("Load state", "runtime-restore", { disabled: !active || !checkpoints.length })}</div></div>`;
+    return `${heading("", "Playtest", "", active ? button(state2.playtestExpanded ? "Show setup" : "Expand game", "runtime-view") + button("Unload game", "runtime-close", { icon: "close" }) : "")}<div class="identity">${badge(active ? state2.playing ? "Game running" : "Game paused" : state2.profileAvailable ? "Ready to play" : "Setup needed", active ? "good" : "warm")}<strong>${esc(((_s = state2.artifact) == null ? void 0 : _s.name) || "Selected source")}</strong><code>${short((_t = state2.artifact) == null ? void 0 : _t.sha256)}</code></div><div class="grid-two playtest-layout ${active && state2.playtestExpanded ? "playtest-expanded" : ""}"><section class="card"><div class="card-heading"><h3>Playtest screen</h3><span class="subtle" id="runtime-frame-label">${state2.frame ? `Frame ${state2.frame.index} · ${state2.frame.width} × ${state2.frame.height}` : "No measured frame yet"}</span></div>${stateControls2}<div class="actions">${button("Inspect graphics", "graphics-show-region", { disabled: !state2.frame, icon: "assets" })}</div><div class="screen" id="runtime-controller" tabindex="0" aria-label="Game controller keyboard focus">${state2.frame || active ? '<canvas id="runtime-screen" aria-label="Measured emulator capture"></canvas>' : empty(state2.profileAvailable ? "Ready to playtest" : "Set up playtesting", state2.profileAvailable ? "Load game to begin." : "Choose the emulator under Game & emulator.")}</div><details class="manual-runtime"><summary>Controller & frame tools</summary>${controllerSetup}<div class="runtime-controls"><div><div class="field-row">${field("runtime-frames", "Frames to advance", ctx2.draft("runtime-frames", "60"), { type: "number", min: 1 })}${field("input-frames", "Frames per input", ctx2.draft("input-frames", "1"), { type: "number", min: 1 })}</div><div class="actions">${button("Advance frames", "runtime-advance", { primary: true, disabled: !active, icon: "playtest" })}${button("Capture", "runtime-capture", { disabled: !active })}${button("Reset", "runtime-reset", { disabled: !active })}${button(state2.liveMuted ? "Unmute" : "Mute", "runtime-mute", { disabled: !active })}${field("runtime-volume", "Volume (%)", ctx2.draft("runtime-volume", String(getSettings().volume)), { type: "number", min: 0, max: 100 })}${button("Set volume", "runtime-volume", { disabled: !active })}${button("Test sound", "runtime-sound-check")}${button("Check ROM", "runtime-check", { disabled: !state2.profile })}</div></div><div class="dpad" aria-label="Controller directions">${button("↑", "runtime-input", { id: "up", disabled: !active })}${button("←", "runtime-input", { id: "left", disabled: !active })}${button("→", "runtime-input", { id: "right", disabled: !active })}${button("↓", "runtime-input", { id: "down", disabled: !active })}</div></div><div class="actions">${["a", "b", "x", "y", "l", "r", "start", "select"].map((id) => button(id.toUpperCase(), "runtime-input", { id, disabled: !active })).join("")}</div><p class="subtle">Use your saved controller keys while the game has focus.</p></details></section><section class="card playtest-setup"><h3>Game &amp; emulator</h3>${setup2}<p class="subtle">Load game, then press Play. Click the game screen to use your controller keys.</p>${button("Load game", "runtime-load", { primary: !active, disabled: active || !state2.profileAvailable, reason: active ? "Unload the current game before loading another one." : "Check the setup message under Game & emulator." })}<details class="config"><summary>Advanced core setup</summary>${field("core-path", "Native libretro core", ctx2.draft("core-path", ((_u = state2.profile) == null ? void 0 : _u.core) || readPreference("romancer-core") || ""), { placeholder: state2.capabilities.platform === "Windows" ? "C:\\RetroArch\\cores\\snes9x_libretro.dll" : "/path/to/core_libretro.so", hint: `Choose a core built for ${state2.capabilities.platform}. A Linux .so cannot load in Windows Python.` })}<div class="actions">${button("Choose core", "core-choose", { icon: "folder" })}${button("Load selected source", "runtime-load", { primary: !active, disabled: active, reason: "Unload the current game before loading another one." })}</div>${jsonEditor("core-options", "Advanced core options", ctx2.draft("core-options", JSON.stringify(((_v = state2.profile) == null ? void 0 : _v.options) || {}, null, 2)))}</details><div class="config"><h3>Audio</h3>${button("Get captured audio", "runtime-audio", { disabled: !active })}</div>${((_w = state2.audio) == null ? void 0 : _w.observed) ? `<canvas id="pcm-wave" width="480" height="80" aria-label="Captured PCM waveform"></canvas><audio id="pcm-player" controls aria-label="Play captured audio"></audio>${button("Save captured WAV", "runtime-audio-export", { disabled: !state2.audio.complete })}` : ""}<details class="config"><summary>Audio capture test (advanced)</summary>${jsonEditor("audio-config", "Cold-boot audio capture configuration", ctx2.draft("audio-config", JSON.stringify({ schema_version: 1, load: {}, steps: [{ frames: 1, buttons: [], port: 0 }], timeout_seconds: 30 }, null, 2)))}${jsonEditor("audio-baseline", "Exact sample-duration baseline", ctx2.draft("audio-baseline", "{}"))}${button("Capture & export WAV", "audio-export")}<p class="subtle small">Audio duration is checked against samples and an explicit rational baseline, independently of video timing.</p></details></section></div>${((_x = state2.results["runtime.smoke_profile"]) == null ? void 0 : _x.source_sha256) === ((_y = state2.artifact) == null ? void 0 : _y.sha256) ? `<section class="card"><h3>ROM startup check</h3><p>${state2.results["runtime.smoke_profile"].frames_advanced} frames · ${state2.results["runtime.smoke_profile"].frame.width} × ${state2.results["runtime.smoke_profile"].frame.height} video · ${state2.results["runtime.smoke_profile"].audio.captured_frames} audio sample frames · worker closed</p><p class="subtle">Startup observations only. Regression checks need expected results.</p><div class="actions">${button("Record a test route", "navigate", { id: "routes" })}${button("Compare regression runs", "navigate", { id: "regression" })}</div></section>` : ""}${report(state2.results["runtime.smoke_profile"], "ROM check details")}${report(state2.results["runtime.load"], "Emulator details")}${report(state2.results["runtime.close"], "Game unload details")}${report(state2.results["runtime.save_state"] ? { ...state2.results["runtime.save_state"], state_base64: "[local snapshot payload hidden]" } : null, "State identity")}${report(state2.audio ? { ...state2.audio, pcm_s16le_base64: "[PCM payload hidden]" } : null, "Captured audio")}${report(state2.results["audio.capture"], "WAV export")}${state2.artifact ? saveManager(ctx2, saveListing) + checkpointControls(ctx2) + traceControls(ctx2) + graphicsInvestigation(ctx2) : ""}${evidence(ctx2)}`;
   }
   function mount7(ctx2) {
     mountGraphicsAccess(ctx2);
@@ -9743,9 +9778,39 @@ ${font ? `<section class="card"><h3>Font metrics · ${esc(font.id)}</h3><div cla
     return Number(value);
   };
   var objectName = (room, n) => room.header === 18539 && n.event === 274 ? "Mother" : `NPC definition ${n.index + 1}`;
+  var validHeader = (value) => /^(0|[1-9]\d*)$/.test(String(value)) && Number(value) >= 18432 && Number(value) <= 28543;
+  var spatial = (chosen) => (chosen == null ? void 0 : chosen.kind) !== "command" || [1, 2, 3, 4, 5, 6, 9].includes(chosen.entity.op);
+  var stateKey = (value) => JSON.stringify(Object.entries(value || {}).sort((a, b) => Number(a[0]) - Number(b[0])));
+  var previewState = (view) => {
+    var _a;
+    return ((_a = view.states) == null ? void 0 : _a[String(view.header)]) || null;
+  };
+  var validState = (value) => value && typeof value === "object" && !Array.isArray(value) && Object.keys(value).length <= 32 && Object.entries(value).every(([k, v]) => /^(?:[0-9]|[12][0-9]|3[01])$/.test(k) && Number.isInteger(v) && v >= 0 && v <= 15);
+  var MAX_DRAFT_RECORDS = 256;
+  function draftChanges(view, replacement = null) {
+    const result = { ...view.saved };
+    for (const [header, model] of view.models) {
+      const values = (replacement == null ? void 0 : replacement.header) === header ? replacement.values : model.values();
+      if (values.length) result[String(header)] = values;
+      else delete result[String(header)];
+    }
+    if (replacement && !view.models.has(replacement.header)) {
+      if (replacement.values.length) result[String(replacement.header)] = replacement.values;
+      else delete result[String(replacement.header)];
+    }
+    return result;
+  }
+  function draftDocument(view, sha, replacement = null) {
+    const changes_by_header = draftChanges(view, replacement), count = Object.values(changes_by_header).reduce((n, values) => n + values.length, 0);
+    if (count > MAX_DRAFT_RECORDS) throw Error("At most 256 map records can be staged across rooms. Create builds or clear unused staged changes.");
+    const result = { version: 2, source_sha256: sha, changes_by_header, states_by_header: view.states };
+    if (JSON.stringify(result).length > 4e4) throw Error("Map draft budget reached. Create builds or clear unused staged changes.");
+    return result;
+  }
   var MapDraft = class {
-    constructor(doc) {
+    constructor(doc, validate2 = null) {
       this.doc = doc;
+      this.validate = validate2;
       this.changes = /* @__PURE__ */ new Map();
       this.past = [];
       this.future = [];
@@ -9761,9 +9826,11 @@ ${font ? `<section class="card"><h3>Font metrics · ${esc(font.id)}</h3><div cla
       return null;
     }
     stage(change) {
+      var _a;
       const base = this.entity(change), allowed = change.kind === "command" ? ["kind", "offset", "x", "y", "tile"] : change.kind === "npc" ? ["kind", "offset", "x", "y"] : ["kind", "table", "id", "x", "y"];
       if (!base || !["command", "npc", "arrival"].includes(change.kind) || Object.keys(change).some((k) => !allowed.includes(k))) throw Error("Unknown or protected map field.");
-      if (change.kind !== "arrival" && !base.editable) throw Error("This definition is read-only.");
+      if (change.kind !== "arrival" && (!base.editable || change.kind === "npc" && !this.doc.room.editable)) throw Error("This definition is read-only.");
+      if (change.kind === "command" && base.op === 8 && "y" in change && change.y !== base.y) throw Error("The span-fill Y field is unused and protected.");
       if (change.kind === "arrival" && (change.table !== "main" || !this.doc.room.editable)) throw Error("This arrival is read-only.");
       const before = this.values(), id = key2(change), next = { ...this.changes.get(id) || {}, ...change };
       for (const name2 of ["x", "y", "tile"]) if (name2 in next) {
@@ -9772,8 +9839,11 @@ ${font ? `<section class="card"><h3>Font metrics · ${esc(font.id)}</h3><div cla
         if (next[name2] === base[name2]) delete next[name2];
       }
       if (!this.changes.has(id) && this.changes.size >= 64 && ["x", "y", "tile"].some((k) => k in next)) throw Error("At most 64 map records can be staged.");
-      if (["x", "y", "tile"].some((k) => k in next)) this.changes.set(id, next);
-      else this.changes.delete(id);
+      const proposed = new Map(this.changes);
+      if (["x", "y", "tile"].some((k) => k in next)) proposed.set(id, next);
+      else proposed.delete(id);
+      (_a = this.validate) == null ? void 0 : _a.call(this, [...proposed.values()].map(clone));
+      this.changes = proposed;
       if (JSON.stringify(before) !== JSON.stringify(this.values())) {
         this.past.push(before);
         if (this.past.length > 200) this.past.shift();
@@ -9782,18 +9852,24 @@ ${font ? `<section class="card"><h3>Font metrics · ${esc(font.id)}</h3><div cla
       }
     }
     restore(values) {
+      var _a;
+      (_a = this.validate) == null ? void 0 : _a.call(this, values);
       this.changes = new Map(values.map((c) => [key2(c), clone(c)]));
       this.revision++;
     }
     undo() {
+      var _a;
       if (this.past.length) {
+        (_a = this.validate) == null ? void 0 : _a.call(this, this.past.at(-1));
         this.future.push(this.values());
         if (this.future.length > 200) this.future.shift();
         this.restore(this.past.pop());
       }
     }
     redo() {
+      var _a;
       if (this.future.length) {
+        (_a = this.validate) == null ? void 0 : _a.call(this, this.future.at(-1));
         this.past.push(this.values());
         if (this.past.length > 200) this.past.shift();
         this.restore(this.future.pop());
@@ -9847,12 +9923,13 @@ ${font ? `<section class="card"><h3>Font metrics · ${esc(font.id)}</h3><div cla
   function requestFields(view) {
     const chosen = selected(view);
     if (!chosen) throw Error("Select an existing command, NPC or arrival.");
-    const data = { kind: chosen.kind, ...chosen.kind === "arrival" ? { table: chosen.entity.table, id: chosen.entity.id } : { offset: chosen.entity.offset }, x: number2(read("maps-x")), y: number2(read("maps-y")) };
+    const data = { kind: chosen.kind, ...chosen.kind === "arrival" ? { table: chosen.entity.table, id: chosen.entity.id } : { offset: chosen.entity.offset }, x: number2(read("maps-x")) };
+    if (chosen.kind !== "command" || chosen.entity.op !== 8) data.y = number2(read("maps-y"));
     if (chosen.kind === "command" && "tile" in chosen.entity) data.tile = number2(read("maps-tile"));
     return data;
   }
   function canEdit(view, chosen) {
-    return !!chosen && view.model.doc.room.editable && (chosen.kind === "arrival" ? chosen.entity.table === "main" : chosen.entity.editable);
+    return !!chosen && (chosen.kind === "command" ? chosen.entity.editable && view.model.doc.room.terrain_editable !== false : view.model.doc.room.editable && (chosen.kind === "arrival" ? chosen.entity.table === "main" : chosen.entity.editable));
   }
   function savedChanges(ctx2, sha) {
     const text = ctx2.draft("game-map-changes", "{}");
@@ -9860,20 +9937,22 @@ ${font ? `<section class="card"><h3>Font metrics · ${esc(font.id)}</h3><div cla
     try {
       if (typeof text !== "string" || text.length > 65536) throw Error();
       const data = JSON.parse(text);
-      if (!data || data.version !== 1 || data.source_sha256 !== sha || !data.changes_by_header || typeof data.changes_by_header !== "object" || Array.isArray(data.changes_by_header) || Object.keys(data).some((k) => !["version", "source_sha256", "changes_by_header"].includes(k))) throw Error();
-      if (Object.entries(data.changes_by_header).some(([header, values]) => header !== String(18539) || !Array.isArray(values) || values.length > 64)) throw Error();
-      return { changes: data.changes_by_header };
+      if (!data || ![1, 2].includes(data.version) || data.source_sha256 !== sha || !data.changes_by_header || typeof data.changes_by_header !== "object" || Array.isArray(data.changes_by_header) || Object.keys(data).some((k) => !["version", "source_sha256", "changes_by_header", "states_by_header"].includes(k))) throw Error();
+      const states = data.states_by_header === void 0 ? {} : data.states_by_header;
+      if (Object.keys(data.changes_by_header).length > 219 || Object.entries(data.changes_by_header).some(([header, values]) => !validHeader(header) || !Array.isArray(values) || values.length > 64) || Object.values(data.changes_by_header).reduce((n, v) => n + v.length, 0) > MAX_DRAFT_RECORDS) throw Error();
+      if (!states || typeof states !== "object" || Array.isArray(states) || Object.keys(states).length > 219 || Object.entries(states).some(([header, value]) => !validHeader(header) || !validState(value))) throw Error();
+      return { changes: data.changes_by_header, states };
     } catch {
       return { changes: {}, note: "Saved map edits were ignored because their source, header or fields no longer match." };
     }
   }
   async function gameMaps(ctx2, { simpleAvailable = false } = {}) {
-    var _a, _b, _c, _d;
+    var _a, _b, _c, _d, _e;
     const { state: state2 } = ctx2, scope = selectionKey(state2), params = { ...ctx2.sourceParams() };
     let view = state2.gameMapsView;
     if ((view == null ? void 0 : view.scope) !== scope) {
       const saved = savedChanges(ctx2, state2.artifact.sha256);
-      view = { scope, header: 18539, offset: 0, query: "", request: 0, reviewSerial: 0, pending: null, models: /* @__PURE__ */ new Map(), overview: false, mode: "inspect", center: null, saved: saved.changes, draftNote: saved.note, active: true, epoch: 1 };
+      view = { scope, header: 18539, offset: 0, query: "", request: 0, reviewSerial: 0, pending: null, models: /* @__PURE__ */ new Map(), requiredStates: /* @__PURE__ */ new Map(), overview: false, mode: "inspect", center: null, saved: saved.changes, states: saved.states || {}, draftNote: saved.note, active: true, epoch: 1 };
       state2.gameMapsView = view;
     }
     if (!view.active) {
@@ -9888,12 +9967,9 @@ ${font ? `<section class="card"><h3>Font metrics · ${esc(font.id)}</h3><div cla
     };
     const persist = () => {
       if (!current2()) return;
-      const changes_by_header = {};
-      for (const [header2, model2] of view.models) {
-        const values = model2.values();
-        if (header2 === 18539 && model2.doc.source_sha256 === state2.artifact.sha256 && values.length) changes_by_header[String(header2)] = values;
-      }
-      ctx2.setDraft("game-map-changes", JSON.stringify({ version: 1, source_sha256: state2.artifact.sha256, changes_by_header }));
+      const document2 = draftDocument(view, state2.artifact.sha256);
+      ctx2.setDraft("game-map-changes", JSON.stringify(document2));
+      view.saved = document2.changes_by_header;
       state2.historyEditor = "maps-edit";
     };
     view.persist = persist;
@@ -9901,7 +9977,7 @@ ${font ? `<section class="card"><h3>Font metrics · ${esc(font.id)}</h3><div cla
       view.selection = value;
       view.formDirty = false;
       const target = currentTarget(view);
-      if (target) view.center = [target.entity.x, target.entity.y];
+      if (target && spatial(target)) view.center = [target.entity.x, target.entity.y];
     };
     ctx2.use({
       "maps-open-room": (node) => {
@@ -9912,6 +9988,7 @@ ${font ? `<section class="card"><h3>Font metrics · ${esc(font.id)}</h3><div cla
         view.selection = null;
         view.center = null;
         view.formDirty = false;
+        view.stateDirty = false;
         view.inspection = void 0;
         view.request++;
         invalidate();
@@ -9972,8 +10049,42 @@ ${font ? `<section class="card"><h3>Font metrics · ${esc(font.id)}</h3><div cla
         view.mode = value;
         return ctx2.render();
       },
+      "maps-state-apply": () => {
+        var _a2;
+        if (!current2()) return;
+        if (view.formDirty) throw Error("Stage the changed fields before changing story state.");
+        const indexes = ((_a2 = view.inspection) == null ? void 0 : _a2.required_state_indexes) || view.requiredStates.get(view.header) || [];
+        if (!indexes.length) return;
+        const next = {};
+        for (const index of indexes) {
+          const value = read("maps-state-" + index);
+          if (value === "") throw Error("Choose a value for each required story state.");
+          next[String(index)] = number2(value, 15);
+        }
+        const states2 = { ...view.states, [String(view.header)]: next };
+        draftDocument({ ...view, states: states2 }, state2.artifact.sha256);
+        view.states = states2;
+        view.stateDirty = false;
+        view.inspection = void 0;
+        view.request++;
+        invalidate();
+        persist();
+        return ctx2.render();
+      },
+      "maps-state-clear": () => {
+        if (!current2()) return;
+        if (view.formDirty) throw Error("Stage the changed fields before clearing story state.");
+        delete view.states[String(view.header)];
+        view.stateDirty = false;
+        view.inspection = void 0;
+        view.request++;
+        invalidate();
+        persist();
+        return ctx2.render();
+      },
       "maps-stage": () => {
         if (!current2() || !view.model) return;
+        if (view.stateDirty) throw Error("Apply the story-state choices first.");
         if (!canEdit(view, selected(view))) throw Error("This map definition is read-only.");
         view.model.stage(requestFields(view));
         view.formDirty = false;
@@ -10011,18 +10122,20 @@ ${font ? `<section class="card"><h3>Font metrics · ${esc(font.id)}</h3><div cla
       "maps-review": async () => {
         if (!current2() || !view.model || !view.model.values().length) throw Error("Stage a map edit first.");
         if (view.formDirty) throw Error("Stage the changed coordinate fields before reviewing.");
-        const model2 = view.model, header2 = view.header, changes = model2.values(), signature = JSON.stringify(changes), revision = model2.revision, serial = ++view.reviewSerial;
+        if (view.stateDirty) throw Error("Apply the story-state choices first.");
+        const model2 = view.model, header2 = view.header, changes = model2.values(), signature = JSON.stringify(changes), selectedState2 = previewState(view), stateSignature2 = stateKey(selectedState2), revision = model2.revision, serial = ++view.reviewSerial;
         view.pending = null;
-        const result = await ctx2.run("games.maps.plan", { ...params, header: header2, changes }, { render: false, refresh: false });
-        if (!current2() || view.header !== header2 || view.model !== model2 || view.reviewSerial !== serial || model2.revision !== revision || JSON.stringify(model2.values()) !== signature) return;
+        const result = await ctx2.run("games.maps.plan", { ...params, header: header2, changes, state: selectedState2 }, { render: false, refresh: false });
+        if (!current2() || view.header !== header2 || view.model !== model2 || view.reviewSerial !== serial || model2.revision !== revision || JSON.stringify(model2.values()) !== signature || stateKey(previewState(view)) !== stateSignature2) return;
         if (result.ok === false || result.source_sha256 !== state2.artifact.sha256) throw Error("Map review does not match the selected ROM. Review again.");
-        view.pending = { scope, header: header2, signature, revision, result };
+        if (selectedState2 && stateKey(result.preview_state) !== stateSignature2) throw Error("Map review does not match the selected story state. Review again.");
+        view.pending = { scope, header: header2, signature, stateSignature: stateSignature2, revision, result };
         return ctx2.render();
       },
       "maps-build": async () => {
         var _a2;
         const pending2 = view.pending, model2 = view.model;
-        if (!current2() || view.formDirty || !pending2 || pending2.scope !== scope || pending2.header !== view.header || pending2.revision !== (model2 == null ? void 0 : model2.revision) || pending2.signature !== JSON.stringify(model2.values())) throw Error("Review the current map changes first.");
+        if (!current2() || view.formDirty || view.stateDirty || !pending2 || pending2.scope !== scope || pending2.header !== view.header || pending2.revision !== (model2 == null ? void 0 : model2.revision) || pending2.signature !== JSON.stringify(model2.values()) || pending2.stateSignature !== stateKey(previewState(view))) throw Error("Review the current map changes first.");
         const result = await ctx2.run("build.apply", { ...ctx2.projectParams(), plan_id: pending2.result.plan_id }, { render: false, refresh: false });
         if (!current2()) return;
         await ((_a2 = ctx2.refreshProject) == null ? void 0 : _a2.call(ctx2));
@@ -10039,9 +10152,9 @@ ${font ? `<section class="card"><h3>Font metrics · ${esc(font.id)}</h3><div cla
         ctx2.notify("Separate map build created. Playtest its story and door routes before exporting.");
       }
     });
-    const token2 = ++view.request, header = view.header, offset = view.offset, query = view.query;
-    const valid2 = () => current2() && view.request === token2 && view.header === header && view.offset === offset && view.query === query && (!ctx2.isCurrentRender || ctx2.isCurrentRender());
-    const tasks = [view.catalog ? Promise.resolve(view.catalog) : ctx2.api.call("games.maps.catalog", { ...params, offset, limit: 12, query }), ((_b = (_a = view.inspection) == null ? void 0 : _a.room) == null ? void 0 : _b.header) === header ? Promise.resolve(view.inspection) : ctx2.api.call("games.maps.inspect", { ...params, header, state: null })];
+    const token2 = ++view.request, header = view.header, offset = view.offset, query = view.query, selectedState = previewState(view), stateSignature = stateKey(selectedState);
+    const valid2 = () => current2() && view.request === token2 && view.header === header && view.offset === offset && view.query === query && stateKey(previewState(view)) === stateSignature && (!ctx2.isCurrentRender || ctx2.isCurrentRender());
+    const tasks = [view.catalog ? Promise.resolve(view.catalog) : ctx2.api.call("games.maps.catalog", { ...params, offset, limit: 12, query }), ((_b = (_a = view.inspection) == null ? void 0 : _a.room) == null ? void 0 : _b.header) === header && view.inspectionState === stateSignature ? Promise.resolve(view.inspection) : ctx2.api.call("games.maps.inspect", { ...params, header, state: selectedState })];
     const [catalogResult, inspectResult] = await Promise.allSettled(tasks);
     if (!valid2()) return "";
     const response = (result) => {
@@ -10052,31 +10165,35 @@ ${font ? `<section class="card"><h3>Font metrics · ${esc(font.id)}</h3><div cla
     };
     const catalogDoc = response(catalogResult), doc = response(inspectResult);
     if (catalogDoc.error) return `<section class="card"><h3>Game maps unavailable</h3><p>${esc(catalogDoc.error)}</p></section>`;
+    if (!doc.error && doc.map.status === "decoded" && ((_c = doc.required_state_indexes) == null ? void 0 : _c.length) && stateKey(doc.map.preview_state) !== stateSignature) doc.error = "Room preview belongs to a different story-state selection. Apply the preview state again.";
     view.catalog = catalogDoc;
     if (!doc.error) {
       view.inspection = doc;
+      view.inspectionState = stateSignature;
+      view.requiredStates.set(header, doc.required_state_indexes || []);
       if (doc.map.status === "decoded") {
+        const validate2 = (values) => draftDocument(view, state2.artifact.sha256, { header, values });
         let model2 = view.models.get(header);
         if (!model2) {
-          model2 = new MapDraft(doc);
+          model2 = new MapDraft(doc, validate2);
           try {
-            for (const change of ((_c = view.saved) == null ? void 0 : _c[String(header)]) || []) model2.stage(change);
+            for (const change of ((_d = view.saved) == null ? void 0 : _d[String(header)]) || []) model2.stage(change);
           } catch {
-            model2 = new MapDraft(doc);
+            model2 = new MapDraft(doc, validate2);
             view.draftNote = "Saved map edits were ignored because a definition or field no longer matches.";
           }
           view.models.set(header, model2);
-        }
+        } else model2.doc = doc;
         view.model = model2;
         state2.gameMapEditor = model2;
         if (model2.values().length) state2.historyEditor = "maps-edit";
         if (!selected(view)) {
-          const target = doc.map.commands.find((c) => c.offset === 131957 && c.editable) || doc.map.commands.find((c) => c.editable) || doc.arrivals[0];
+          const target = doc.map.commands.find((c) => c.offset === 131957 && c.editable) || doc.map.commands.find((c) => c.editable && spatial({ kind: "command", entity: c })) || doc.map.commands.find((c) => c.editable) || doc.arrivals[0];
           view.selection = target ? targetKey("op" in target ? "command" : "arrival", target) : null;
         }
         if (!view.center) {
           const target = currentTarget(view), arrival = doc.arrivals.find((a) => a.id === 509) || doc.arrivals[0];
-          view.center = target ? [target.entity.x, target.entity.y] : arrival ? [arrival.x, arrival.y] : [32, 32];
+          view.center = target && spatial(target) ? [target.entity.x, target.entity.y] : arrival ? [arrival.x, arrival.y] : [32, 32];
         }
       } else {
         view.model = null;
@@ -10088,12 +10205,29 @@ ${font ? `<section class="card"><h3>Font metrics · ${esc(font.id)}</h3><div cla
       var _a2, _b2;
       return `<article class="card"><h4>${esc(r.label)}</h4>${((_a2 = r.thumbnail) == null ? void 0 : _a2.status) === "available" ? `<img width="96" height="96" src="${esc(r.thumbnail.data_url)}" alt="Decoded terrain overview for ${esc(r.label)}"><small>${esc(r.thumbnail.palette_status)}</small>` : `<p class="subtle">Preview unavailable: ${esc(((_b2 = r.thumbnail) == null ? void 0 : _b2.reason) || "Unknown format")}</p>`}<p>${r.object_count} NPC definitions · ${r.arrival_count} arrivals</p>${button(r.header === header ? "Viewing this room" : "Inspect room", "maps-open-room", { id: String(r.header), primary: r.header === header })}</article>`;
     }).join("")}</div><div class="actions">${button("Previous maps", "maps-page", { id: String(Math.max(0, offset - 12)), disabled: offset === 0 })}<span>${rows.length ? offset + 1 : 0}–${end} of ${catalogDoc.total}</span>${button("Next maps", "maps-page", { id: String(offset + 12), disabled: end >= catalogDoc.total })}</div></section>`;
-    if (doc.error) return browser + `<section class="card"><h3>Room unavailable</h3><p>${esc(doc.error)}</p></section>`;
-    if (doc.map.status !== "decoded") return browser + `<section class="card"><h3>${esc(doc.room.label)}</h3><p class="notice">Terrain preview unavailable: ${esc(doc.map.reason)}</p><p>Conditional terrain needs an explicit game-state value. Unsupported circle paths remain unavailable. No state is assumed.</p>${definitions(doc)}</section>`;
-    const model = view.model, chosen = currentTarget(view), editable = canEdit(view, chosen), pending = ((_d = view.pending) == null ? void 0 : _d.revision) === model.revision && view.pending.signature === JSON.stringify(model.values()) ? view.pending : null;
+    if (doc.error) {
+      view.model = null;
+      state2.gameMapEditor = null;
+      return browser + `<section class="card"><h3>Room unavailable</h3><p>${esc(doc.error)}</p></section>`;
+    }
+    const states = stateControls(view, doc);
+    if (doc.map.status !== "decoded") return browser + states + `<section class="card"><h3>${esc(doc.room.label)}</h3><p class="notice">Terrain preview unavailable: ${esc(doc.map.reason)}</p><p>Select the required story-state values above to preview conditional terrain. No state is assumed.</p>${definitions(doc)}</section>`;
+    const model = view.model, chosen = currentTarget(view), editable = canEdit(view, chosen), pending = ((_e = view.pending) == null ? void 0 : _e.revision) === model.revision && view.pending.signature === JSON.stringify(model.values()) ? view.pending : null;
     const options = [...doc.map.commands.filter((c) => "x" in c).map((c) => [targetKey("command", c), `${c.name || "Command"} ${hex7(c.offset)}${c.editable ? "" : " · read-only"}`]), ...doc.objects.map((n) => [targetKey("npc", n), objectName(doc.room, n) + (n.editable ? "" : " · conditional/read-only")]), ...doc.arrivals.map((a) => [targetKey("arrival", a), `Arrival ${a.table} ${hex7(a.id)}`])];
-    const form = chosen ? `<aside class="card game-map-inspector"><h3>${chosen.kind === "npc" ? esc(objectName(doc.room, chosen.entity)) : chosen.kind === "arrival" ? "Arrival position" : "Existing terrain command"}</h3>${select("maps-target", "Selection", options, view.selection)}<div class="field-row">${field("maps-x", "X · 0–63", chosen.entity.x, { type: "number", min: 0, readonly: !editable })}${field("maps-y", "Y · 0–63", chosen.entity.y, { type: "number", min: 0, readonly: !editable })}${chosen.kind === "command" && "tile" in chosen.entity ? field("maps-tile", "Tile · 0–63", chosen.entity.tile, { type: "number", min: 0, readonly: !editable }) : ""}</div>${chosen.kind === "npc" ? `<p class="notice">NPCs are stored definitions. Their conditions may hide them in Playtest.${chosen.entity.event === 274 ? " Mother participates in the opening story. Moving her can affect the narrative; playtest the full conversation." : ""}</p>` : ""}${chosen.kind === "command" ? `<p>${chosen.entity.final_cells || 0} final terrain cells currently come from this command. Later commands can overwrite its drawing.</p><p>Edits preserve collision behavior, region bits and existing trigger bindings. Changes that fail these checks are refused.</p>` : ""}${chosen.kind === "arrival" ? "<p>Changes only the arrival position. Destination, facing and packed flags stay protected. Enter through its real door when playtesting.</p>" : ""}${button("Stage position / tile", "maps-stage", { disabled: !editable, reason: "This definition is read-only; writable scope is the initial shared atlas." })}</aside>` : "<p>Select an existing terrain command, NPC definition or arrival.</p>";
-    return browser + `<section class="card game-map-workbench"><h3>${header === 18539 ? "Opening bedroom / shared interiors" : esc(doc.room.label)}</h3><p>Terrain ${hex7(doc.room.map_pointer)} · shared by ${doc.room.shared_headers.map(hex7).join(", ")}. A terrain edit affects every listed definition.</p>${!doc.map.palette ? '<p class="notice">Color-index grayscale preview. This room’s live palette has not been verified.</p>' : ""}<div class="field-row">${select("maps-mode", "Canvas tool", [["inspect", "Inspect terrain command"], ["place", "Place selected definition"]], view.mode)}${button(view.overview ? "Return to readable crop" : "Show full overview", "maps-overview")}${button("Left", "maps-pan", { id: "-8,0" })}${button("Right", "maps-pan", { id: "8,0" })}${button("Up", "maps-pan", { id: "0,-6" })}${button("Down", "maps-pan", { id: "0,6" })}</div><div class="level-editor-layout game-map-layout"><div><div class="preview-pair game-map-previews"><div><span>Original for this edit · selected ROM</span><canvas id="maps-original" aria-label="Original decoded game terrain"></canvas></div><div><span>${(pending == null ? void 0 : pending.result.preview_map) ? "Reviewed terrain · exact planned bytes" : "Staged placement overlay"}</span><canvas id="maps-edit" tabindex="0" aria-label="Decoded game map: inspect or place selected definition"></canvas></div></div><p id="maps-position" role="status">Readable crop around (${view.center.join(", ")}). NPC and arrival markers are outlines, not character artwork.</p><p>${(pending == null ? void 0 : pending.result.preview_map) ? "The reviewed terrain comes from the server’s bounded decoder." : "Placement outlines show staged coordinates. Review computes exact terrain, including restored and overwritten cells."}</p></div>${form}</div><div class="actions">${button("Undo staged edit", "maps-undo", { disabled: !model.past.length })}${button("Redo staged edit", "maps-redo", { disabled: !model.future.length })}${button("Clear staged edits", "maps-clear", { disabled: !model.values().length })}${button("Review map changes", "maps-review", { disabled: !model.values().length, primary: !pending })}</div><p>${model.values().length} staged records. The selected ROM remains unchanged.</p>${pending ? review(pending.result) : ""}${definitions(doc)}</section>`;
+    const form = chosen ? `<aside class="card game-map-inspector"><h3>${chosen.kind === "npc" ? esc(objectName(doc.room, chosen.entity)) : chosen.kind === "arrival" ? "Arrival position" : "Existing terrain command"}</h3>${select("maps-target", "Selection", options, view.selection)}<div class="field-row">${operandFields(chosen, editable)}</div>${chosen.kind === "npc" ? `<p class="notice">NPCs are stored definitions. Their conditions may hide them in Playtest.${chosen.entity.event === 274 ? " Mother participates in the opening story. Moving her can affect the narrative; playtest the full conversation." : ""}</p>` : ""}${chosen.kind === "command" ? `<p>${chosen.entity.final_cells || 0} final terrain cells currently come from this command. Later commands can overwrite its drawing.</p><p>Review checks collision, region bits and trigger bindings in every encoded state and sharing room.</p>` : ""}${chosen.kind === "arrival" ? "<p>Changes only the arrival position. Destination, facing and packed flags stay protected. Enter through its real door when playtesting.</p>" : ""}${button("Stage change", "maps-stage", { disabled: !editable, reason: "Object and arrival editing is limited to the opening atlas. State conditions stay protected." })}</aside>` : "<p>Select an existing terrain command, NPC definition or arrival.</p>";
+    return browser + states + `<section class="card game-map-workbench"><h3>${header === 18539 ? "Opening bedroom / shared interiors" : esc(doc.room.label)}</h3><p>Terrain ${hex7(doc.room.map_pointer)} · shared by ${doc.room.shared_headers.map(hex7).join(", ")}. A terrain edit affects every listed definition.</p>${!doc.map.palette ? '<p class="notice">Color-index grayscale preview. This room’s live palette has not been verified.</p>' : ""}<div class="field-row">${select("maps-mode", "Canvas tool", [["inspect", "Inspect terrain command"], ["place", "Place selected definition"]], view.mode)}${button(view.overview ? "Return to readable crop" : "Show full overview", "maps-overview")}${button("Left", "maps-pan", { id: "-8,0" })}${button("Right", "maps-pan", { id: "8,0" })}${button("Up", "maps-pan", { id: "0,-6" })}${button("Down", "maps-pan", { id: "0,6" })}</div><div class="level-editor-layout game-map-layout"><div><div class="preview-pair game-map-previews"><div><span>Original for this edit · selected ROM</span><canvas id="maps-original" aria-label="Original decoded game terrain"></canvas></div><div><span>${(pending == null ? void 0 : pending.result.preview_map) ? "Reviewed terrain · exact planned bytes" : "Staged placement overlay"}</span><canvas id="maps-edit" tabindex="0" aria-label="Decoded game map: inspect or place selected definition"></canvas></div></div><p id="maps-position" role="status">Readable crop around (${view.center.join(", ")}). NPC and arrival markers are outlines, not character artwork.</p><p>${(pending == null ? void 0 : pending.result.preview_map) ? "The reviewed terrain comes from the server’s bounded decoder." : "Placement outlines show staged coordinates. Review computes exact terrain, including restored and overwritten cells."}</p></div>${form}</div><div class="actions">${button("Undo staged edit", "maps-undo", { disabled: !model.past.length })}${button("Redo staged edit", "maps-redo", { disabled: !model.future.length })}${button("Clear staged edits", "maps-clear", { disabled: !model.values().length })}${button("Review map changes", "maps-review", { disabled: !model.values().length, primary: !pending })}</div><p>${model.values().length} staged records. The selected ROM remains unchanged.</p>${pending ? review(pending.result) : ""}${definitions(doc)}</section>`;
+  }
+  function stateControls(view, doc) {
+    const indexes = doc.required_state_indexes || [];
+    if (!indexes.length) return "";
+    const state2 = previewState(view), options = [["", "Not selected"], ...Array.from({ length: 16 }, (_, i) => [String(i), String(i)])];
+    return `<section class="card"><h3>Story-state preview</h3><p>${state2 ? "Selected state for this preview; not a live game-state capture." : "Choose the stored state values needed to draw this room."} These choices do not change your ROM or game save.</p><div class="field-row">${indexes.map((index) => select("maps-state-" + index, "Story state " + index, options, String((state2 == null ? void 0 : state2[index]) ?? ""))).join("")}${button("Apply preview state", "maps-state-apply")}${button("Clear preview state", "maps-state-clear", { disabled: !state2 })}</div></section>`;
+  }
+  function operandFields(chosen, editable) {
+    const e = chosen.entity, props = { type: "number", min: 0, readonly: !editable };
+    if (chosen.kind === "command" && e.op === 10) return field("maps-condition-index", "State index", e.state_index, { ...props, readonly: true }) + field("maps-condition-min", "Minimum", e.minimum, { ...props, readonly: true }) + field("maps-condition-max", "Maximum", e.maximum, { ...props, readonly: true });
+    const x = chosen.kind === "command" && e.op === 7 ? "Tile 1 · 0–63" : chosen.kind === "command" && e.op === 8 ? "Fill tile · 0–63" : "X · 0–63";
+    return field("maps-x", x, e.x, props) + (chosen.kind === "command" && e.op === 8 ? "" : field("maps-y", chosen.kind === "command" && e.op === 7 ? "Tile 2 · 0–63" : "Y · 0–63", e.y, props)) + (chosen.kind === "command" && "tile" in e ? field("maps-tile", "Tile · 0–63", e.tile, props) : "");
   }
   function definitions(doc) {
     return `<details><summary>NPC conditions and interactions</summary><p>These records are conditional definitions, not a list of characters guaranteed to be visible now. Interaction destinations remain read-only.</p><table><thead><tr><th>NPC definition</th><th>Position</th><th>Condition</th></tr></thead><tbody>${doc.objects.map((n) => `<tr><td>${esc(objectName(doc.room, n))}</td><td>${n.x}, ${n.y}</td><td>${esc(n.state_status || "Live condition unobserved")}</td></tr>`).join("")}</tbody></table><table><thead><tr><th>Interaction</th><th>Destination</th></tr></thead><tbody>${doc.links.map((l) => `<tr><td>${l.index}</td><td>${l.transition.kind === "saved-return" ? "Saved return to the previous location" : l.destination ? `Room ${esc(hex7(l.destination.header))} · ${l.destination.x}, ${l.destination.y}` : `Event reference ${esc(hex7(l.word))} · not a direct room destination`}</td></tr>`).join("")}</tbody></table></details>`;
@@ -10102,7 +10236,7 @@ ${font ? `<section class="card"><h3>Font metrics · ${esc(font.id)}</h3><div cla
     return `<section class="game-review"><h3>Review map changes</h3><p>${plan.edits.length} checked byte spans${plan.integrity_edit_count ? ` including ${plan.integrity_edit_count} integrity updates` : ""}. A separate build needs its own door and story playtests.</p><details><summary>Exact changed bytes</summary><table><thead><tr><th>Offset</th><th>Before</th><th>After</th></tr></thead><tbody>${plan.edits.map((e) => `<tr><td>${hex7(e.offset)}</td><td><code>${esc(e.before)}</code></td><td><code>${esc(e.after)}</code></td></tr>`).join("")}</tbody></table></details>${button("Create separate map build", "maps-build", { primary: true })}</section>`;
   }
   function mountGameMaps(ctx2) {
-    var _a, _b, _c, _d;
+    var _a, _b, _c, _d, _e, _f;
     const view = ctx2.state.gameMapsView;
     if (!view || view.scope !== selectionKey(ctx2.state) || !view.model) return;
     const original2 = document.getElementById("maps-original"), canvas = document.getElementById("maps-edit");
@@ -10135,7 +10269,7 @@ ${font ? `<section class="card"><h3>Font metrics · ${esc(font.id)}</h3><div cla
       arrivals.forEach((a) => mark(a, "#3ba9ff", "A"));
       objects.forEach((n) => mark(n, "#ffbc49", "N"));
       const chosen = editing ? currentTarget(view) : selected(view);
-      if (chosen) mark(chosen.entity, "#f7478c", "•");
+      if (chosen && spatial(chosen)) mark(chosen.entity, "#f7478c", "•");
     }
     draw2(original2, map.cells, false);
     draw2(canvas, ((_b = pending == null ? void 0 : pending.result.preview_map) == null ? void 0 : _b.cells) || map.cells, true);
@@ -10148,6 +10282,8 @@ ${font ? `<section class="card"><h3>Font metrics · ${esc(font.id)}</h3><div cla
       if (view.mode === "place") {
         const chosen = selected(view);
         if (!canEdit(view, chosen)) return ctx2.notify("Select an editable existing command, NPC or arrival first.");
+        if (!spatial(chosen)) return ctx2.notify("Background and fill commands choose tiles. Change them in the inspector.");
+        if (view.stateDirty) return ctx2.notify("Apply the story-state choices first.");
         view.model.stage({ kind: chosen.kind, ...chosen.kind === "arrival" ? { table: chosen.entity.table, id: chosen.entity.id } : { offset: chosen.entity.offset }, x, y });
         view.formDirty = false;
         view.pending = null;
@@ -10166,7 +10302,7 @@ ${font ? `<section class="card"><h3>Font metrics · ${esc(font.id)}</h3><div cla
         view.selection = read(id);
         view.formDirty = false;
         const chosen = currentTarget(view);
-        if (chosen) view.center = [chosen.entity.x, chosen.entity.y];
+        if (chosen && spatial(chosen)) view.center = [chosen.entity.x, chosen.entity.y];
       } else view.mode = read(id);
       ctx2.render();
     });
@@ -10178,7 +10314,17 @@ ${font ? `<section class="card"><h3>Font metrics · ${esc(font.id)}</h3><div cla
       view.reviewSerial++;
       (_a2 = document.querySelectorAll) == null ? void 0 : _a2.call(document, '[data-action="maps-build"]').forEach((node) => node.disabled = true);
       const status = document.getElementById("maps-position");
-      if (status) status.textContent = "Fields changed. Stage position / tile, then review again.";
+      if (status) status.textContent = "Fields changed. Stage change, then review again.";
+    });
+    for (const index of ((_e = view.inspection) == null ? void 0 : _e.required_state_indexes) || []) (_f = document.getElementById("maps-state-" + index)) == null ? void 0 : _f.addEventListener("change", () => {
+      var _a2;
+      if (!current2()) return;
+      view.stateDirty = true;
+      view.pending = null;
+      view.reviewSerial++;
+      (_a2 = document.querySelectorAll) == null ? void 0 : _a2.call(document, '[data-action="maps-build"]').forEach((node) => node.disabled = true);
+      const status = document.getElementById("maps-position");
+      if (status) status.textContent = "Story-state choices changed. Apply preview state before reviewing.";
     });
   }
 
@@ -10376,7 +10522,7 @@ ${font ? `<section class="card"><h3>Font metrics · ${esc(font.id)}</h3><div cla
         ctx2.notify(unchanged ? "Separate level build created. Select it in Playtest." : "Separate level build created. Your newer edits are still staged.");
       }
     });
-    const setup2 = `<details class="card"><summary>Advanced level setup</summary><p>Level editing needs a layout definition for this ROM. Confirm tile grids, object fields, and room-reference mappings before using them. Names and roles alone do not establish game behavior.</p><details><summary>Single-room layout form</summary><div class="field-row">${field("level-name", "Room name", ctx2.draft("level-name", "Room"))}${field("level-width", "Blocks across", ctx2.draft("level-width", "16"), { type: "number", min: 1 })}${field("level-height", "Blocks down", ctx2.draft("level-height", "14"), { type: "number", min: 1 })}${select("level-entry", "Grid integer bytes", [[1, "8 bit"], [2, "16 bit"]], ctx2.draft("level-entry", "1"))}${select("level-endian", "Grid byte order", [["little", "Little endian"], ["big", "Big endian"]], ctx2.draft("level-endian", "little"))}</div><div class="field-row">${field("level-tiles-offset", "Tiles offset", ctx2.draft("level-tiles-offset", "0"))}${field("level-tiles-count", "Tile count", ctx2.draft("level-tiles-count", "16"))}${select("level-codec", "Tile format", Object.entries(codecs2).map(([system2, codec]) => [codec, system2.toUpperCase()]), ctx2.draft("level-codec", codecs2[state2.artifact.system_id] || codecs2.nes))}${field("level-palette-offset", "Palette offset", ctx2.draft("level-palette-offset", "0"))}${select("level-palette-format", "Palette format", [["rgb888", "RGB888"], ["rgb555-le", "RGB555 little endian"], ["rgb555-be", "RGB555 big endian"]], ctx2.draft("level-palette-format", "rgb555-le"))}</div><div class="field-row">${field("level-blocks-offset", "Metatile table offset", ctx2.draft("level-blocks-offset", "0"))}${field("level-blocks-count", "Metatile count", ctx2.draft("level-blocks-count", "16"))}${field("level-block-width", "Tiles per block across", ctx2.draft("level-block-width", "2"))}${field("level-block-height", "Tiles per block down", ctx2.draft("level-block-height", "2"))}${field("level-terrain-offset", "Terrain grid offset", ctx2.draft("level-terrain-offset", "0"))}${field("level-collision-offset", "Collision grid offset (optional)", ctx2.draft("level-collision-offset", ""))}</div><div class="field-row">${select("level-projection", "Projection", [["orthogonal", "Rectangular"], ["isometric", "Isometric"]], ctx2.draft("level-projection", "orthogonal"))}${field("level-projection-width", "Projected cell width", ctx2.draft("level-projection-width", "32"), { type: "number", min: 1, max: 256 })}${field("level-projection-height", "Projected cell height", ctx2.draft("level-projection-height", "16"), { type: "number", min: 1, max: 256 })}${field("level-elevation-step", "Pixels per height unit", ctx2.draft("level-elevation-step", "8"), { type: "number", min: 1, max: 256 })}${field("level-elevation-offset", "Height grid offset (optional)", ctx2.draft("level-elevation-offset", ""))}</div><p class="subtle">Projection draws declared coordinates. A height grid needs its own checked source range.</p>${button("Check declared layout", "levels-declare")}</details>${jsonEditor("level-definition", "Verified layout definition", ctx2.draft("level-definition", JSON.stringify(definition, null, 2)))}<div class="actions">${button("Inspect layout", "levels-inspect")}${button("Save checked definition", "levels-save")}</div></details>`;
+    const setup2 = `<details class="card"><summary>Advanced level setup</summary><p>Level editing needs a layout definition for this ROM. Confirm tile grids, object fields, and room-reference mappings before using them. Names and roles alone do not establish game behavior.</p><details><summary>Single-room layout form</summary><div class="field-row">${field("level-name", "Room name", ctx2.draft("level-name", "Room"))}${field("level-width", "Blocks across", ctx2.draft("level-width", "16"), { type: "number", min: 1 })}${field("level-height", "Blocks down", ctx2.draft("level-height", "14"), { type: "number", min: 1 })}${select("level-entry", "Grid integer bytes", [[1, "8 bit"], [2, "16 bit"]], ctx2.draft("level-entry", "1"))}${select("level-endian", "Grid byte order", [["little", "Little endian"], ["big", "Big endian"]], ctx2.draft("level-endian", "little"))}</div><div class="field-row">${field("level-tiles-offset", "Tiles offset", ctx2.draft("level-tiles-offset", "0"))}${field("level-tiles-count", "Tile count", ctx2.draft("level-tiles-count", "16"))}${select("level-codec", "Tile format", Object.entries(codecs2).map(([system2, codec]) => [codec, system2.toUpperCase()]), ctx2.draft("level-codec", codecs2[state2.artifact.system_id] || codecs2.nes))}${field("level-palette-offset", "Palette offset", ctx2.draft("level-palette-offset", "0"))}${select("level-palette-format", "Palette format", [["rgb888", "RGB888"], ["rgb555-le", "RGB555 little endian"], ["rgb555-be", "RGB555 big endian"], ["genesis", "Genesis RGB333"], ["sms-rgb222", "Master System RGB222"]], ctx2.draft("level-palette-format", state2.artifact.system_id === "genesis" ? "genesis" : state2.artifact.system_id === "sms" ? "sms-rgb222" : "rgb555-le"))}</div><div class="field-row">${field("level-blocks-offset", "Metatile table offset", ctx2.draft("level-blocks-offset", "0"))}${field("level-blocks-count", "Metatile count", ctx2.draft("level-blocks-count", "16"))}${field("level-block-width", "Tiles per block across", ctx2.draft("level-block-width", "2"))}${field("level-block-height", "Tiles per block down", ctx2.draft("level-block-height", "2"))}${field("level-terrain-offset", "Terrain grid offset", ctx2.draft("level-terrain-offset", "0"))}${field("level-collision-offset", "Collision grid offset (optional)", ctx2.draft("level-collision-offset", ""))}</div><div class="field-row">${select("level-projection", "Projection", [["orthogonal", "Rectangular"], ["isometric", "Isometric"]], ctx2.draft("level-projection", "orthogonal"))}${field("level-projection-width", "Projected cell width", ctx2.draft("level-projection-width", "32"), { type: "number", min: 1, max: 256 })}${field("level-projection-height", "Projected cell height", ctx2.draft("level-projection-height", "16"), { type: "number", min: 1, max: 256 })}${field("level-elevation-step", "Pixels per height unit", ctx2.draft("level-elevation-step", "8"), { type: "number", min: 1, max: 256 })}${field("level-elevation-offset", "Height grid offset (optional)", ctx2.draft("level-elevation-offset", ""))}</div><p class="subtle">Projection draws declared coordinates. A height grid needs its own checked source range.</p>${button("Check declared layout", "levels-declare")}</details>${jsonEditor("level-definition", "Verified layout definition", ctx2.draft("level-definition", JSON.stringify(definition, null, 2)))}<div class="actions">${button("Inspect layout", "levels-inspect")}${button("Save checked definition", "levels-save")}</div></details>`;
     if (!(doc == null ? void 0 : doc.ok)) return heading("", "Levels", "") + empty("No supported level map for this ROM yet", "Inspect the ROM in Resources. A supported map definition is needed before its levels can be shown.", button("Investigate bytes", "navigate", { id: "resources", primary: true })) + setup2 + practiceControls();
     const objects = model.objects(room.id), namedObjects = objects.some((object, index) => !!objectMetadata(doc, room.id, index)), block = Number(ctx2.draft("level-block-index", "0")), uses = doc.uses[String(block)] || [], pending = ((_l = state2.pending) == null ? void 0 : _l.kind) === "levels" && state2.pending.document_id === doc.document_id;
     return `${heading("", "Levels", "")}${editCheckControls(ctx2)}<div class="identity"><strong>${esc(state2.artifact.name)}</strong><span>${model.values().length} preview changes</span></div>${((_m = doc.definition) == null ? void 0 : _m.scene) || room.elevation ? '<p class="notice">Declared ' + esc(((_n = doc.scene) == null ? void 0 : _n.projection) || "orthogonal") + " scene preview. Playtest verifies the actual game.</p>" : ""}<section class="card">${state2.project.demo && ((_o = doc.definition) == null ? void 0 : _o.name) === "Hillside editor-layout workshop" ? '<p class="notice">Practice layout. These room links and object records do not run in Playtest; only Hillside terrain and music do.</p>' : ""}${roomNavigation(doc, model, room.id)}<div class="field-row level-toolbar">${doc.rooms.length > 1 ? select("level-room", "Room", doc.rooms.map((r) => [r.id, r.name]), room.id) : '<input type="hidden" id="level-room" value="' + esc(room.id) + '">'}${select("level-layer", "Paint layer", [["terrain", "Terrain"], ...room.collision ? [["collision", "Collision"]] : [], ...room.elevation ? [["elevation", "Elevation"]] : []], layer)}${select("level-tool", "Tool", [["paint", "Paint"], ["pick", "Pick from room"], ["fill", "Fill"], ["select", "Select rectangle"], ["paste", "Paste rectangle"], ...objects.some((o) => Number.isSafeInteger(o.x) && Number.isSafeInteger(o.y)) ? [["objects", "Move object"]] : []], ctx2.draft("level-tool", namedObjects ? "objects" : "paint"))}<details><summary>Advanced brush value</summary>${field("level-brush", "Brush value", ctx2.draft("level-brush", "1"), { type: "number", min: 0 })}</details>${select("level-overlay", "Overlay", [["none", "No extra overlays"], ...room.collision ? [["collision", "Collision"]] : [], ...objects.length ? [["objects", "Named objects"], ...!((_p = doc.definition) == null ? void 0 : _p.scene) && !room.elevation && ((_q = room.object_metadata) == null ? void 0 : _q.some((row) => row.hitbox)) ? [["hitboxes", "Starting hitboxes"]] : [], ["records", "All records (Advanced)"]] : []], ctx2.draft("level-overlay", "objects"))}${select("level-zoom", "Zoom", [["fit", "Fit"], ["1", "1x"], ["2", "2x"], ["3", "3x"]], ctx2.draft("level-zoom", "fit"))}</div><div class="level-brush-panel"><strong>${layer === "elevation" ? "Elevation" : layer === "collision" ? "Collision brushes" : "Terrain brushes"}</strong><p class="subtle">${layer === "elevation" ? "Paint a stored height value from the Advanced brush field. This does not infer collision rules." : layer === "collision" ? "Paint where movement is blocked or allowed. Labels come from this layout; raw values have no mapped meaning." : "Choose a thumbnail to paint, or use Pick from room to sample an existing cell."}</p>${layer === "elevation" ? "<p>Height value: " + esc(ctx2.draft("level-brush", "1")) + "</p>" : layer === "collision" ? collisionPalette(room, model.cells(room.id, "collision"), ctx2.draft("level-brush", "1")) : levelBrushPalette(doc, model, ctx2.draft("level-brush", "1"))}${!room.collision ? '<p class="notice">Collision is not mapped for this room. Terrain changes its appearance; investigate the collision layout to change movement.</p>' : ""}</div><div class="editor-key" aria-label="Editor highlight key"><span><i class="key-selection" aria-hidden="true"></i>Selected cell</span><span><i class="key-change" aria-hidden="true"></i>Changed cell</span>${!((_r = doc.definition) == null ? void 0 : _r.scene) && !room.elevation ? '<span><i class="key-hitbox" aria-hidden="true"></i>Starting hitbox</span>' : ""}</div><div class="level-editor-layout"><div class="level-room-editor"><div class="preview-pair room-comparison"><div><span>Original room</span><div class="hex-scroll" role="region" tabindex="0" aria-label="Original room preview"><canvas id="level-original" aria-label="Original declared room"></canvas></div></div><div><span>Editing · highlighted cells changed</span><div class="hex-scroll" role="region" tabindex="0" aria-label="Edited room preview"><canvas id="level-canvas" tabindex="0" role="application" aria-label="Room editor: arrows select, Space paints"></canvas></div></div></div><p id="level-difference-count" class="preview-caption" role="status" aria-live="polite"></p><p id="level-position">Select an object or choose a terrain brush to begin.</p></div>${objectInspector(ctx2, doc, model, room.id)}</div><div class="actions">${button("Undo stroke", "levels-undo", { disabled: !model.past.length })}${button("Redo stroke", "levels-redo", { disabled: !model.future.length })}${button("Copy rectangle", "levels-copy")}${button("Review level changes", "levels-plan", { primary: !pending, disabled: !model.values().length })}${pending ? button("Create level build", "levels-build", { primary: true }) : ""}</div><p class="subtle">Review changes and create a build to save this in the ROM.</p></section><details class="card"><summary>Metatiles & shared uses</summary><div class="field-row">${field("level-block-index", "Metatile index", ctx2.draft("level-block-index", "0"))}${field("level-block-part", "Part index", ctx2.draft("level-block-part", "0"))}${field("level-block-tile", "Replacement tile index", ctx2.draft("level-block-tile", "1"))}</div>${button("Stage block change", "levels-block")}<p>Selected block is used in ${uses.length} declared cells. Changes affect every use.</p><p>${uses.slice(0, 32).map((u) => esc(u.room_id) + " cell " + u.cell).join(" · ")}</p></details>${setup2}${practiceControls()}${report(state2.results["levels.plan"], "Level review")}${report(state2.results["build.apply"], "Separate build")}`;

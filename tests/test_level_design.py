@@ -19,6 +19,21 @@ def fixture():
 
 
 class LevelDesignTests(unittest.TestCase):
+    def test_native_sega_palette_formats_show_stored_colors_and_roundtrip_reserved_bits(self):
+        from romancer.level_design import inspect_level
+        from romancer.adapters.registry import adapter_for
+        colors=[[255,0,0],[0,255,0],[0,0,255],[255,255,255]]*4
+        for fmt,codec,encoded in [('genesis','tile8-packed4-high-v1',bytes.fromhex('f11ff1f1ff11ffff')*4),
+                                  ('sms-rgb222','tile8-rowplanar4-msb-v1',bytes.fromhex('c3ccf0ff')*4)]:
+            with self.subTest(format=fmt):
+                raw,d,_=fixture();raw=bytearray(raw);d['tiles'].update(codec=codec,palette_offset=256,palette_format=fmt)
+                raw[256:256+len(encoded)]=encoded;sha=hashlib.sha256(raw).hexdigest();d['source_sha256']=sha
+                try:doc=inspect_level(bytes(raw),d,sha)
+                except ValueError as error:self.fail('Native palette colors are not decoded: '+str(error))
+                self.assertEqual(doc['palette'],colors)
+                proof=adapter_for('levels',bytes(raw),d,sha).roundtrip()
+                self.assertTrue(proof['byte_identical']);self.assertTrue(proof['reserved_bytes_preserved'])
+
     def inspect(self):
         from romancer.level_design import inspect_level
         return inspect_level(*fixture())

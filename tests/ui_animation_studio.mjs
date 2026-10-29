@@ -22,3 +22,7 @@ mountAnimation(ctx,coloredDoc,coloredBitmap,null);assert.deepEqual(rgba,[255,0,0
 mountAnimation(ctx,coloredDoc,coloredBitmap,{id:'p',colors_per_bank:4,entries:[{bank:0,index:1,rgb:{r:0,g:255,b:0}}]});assert.deepEqual(rgba,[0,255,0,255,0,255,0,255],'declared palette colors take priority over observed colors');
 frame={...frame,colors:null};coloredBitmap.cells=[{pixels:[0]},{pixels:[3]}];mountAnimation(ctx,coloredDoc,coloredBitmap,null);assert.deepEqual(rgba,[18,18,18,255,234,234,234,255],'2bpp grayscale spans the same literal index range as sprite assembly');
 console.log('Animation colors retain observed per-part RGB, prefer declared palettes, and scale grayscale to the codec depth.');
+const bankPalette={banks:2,colors_per_bank:4,entries:[{bank:0,index:0,rgb:{r:255,g:0,b:0}},{bank:1,index:0,rgb:{r:0,g:0,b:255}},{bank:1,index:3,rgb:{r:0,g:255,b:0}}]};
+const priorDraft=ctx.draft;ctx.draft=(key,fallback)=>key==='asset-preview-bank'?'1':priorDraft(key,fallback);
+mountAnimation(ctx,coloredDoc,coloredBitmap,bankPalette);
+assert.deepEqual(rgba,[0,0,255,255,0,255,0,255],'animation uses the selected ROM palette bank');

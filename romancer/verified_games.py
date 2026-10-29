@@ -108,7 +108,7 @@ def maps(api,parameters,operation,*,cancelled=lambda:False):
     elif operation=='inspect':
         result=ffl2_maps.inspect_room(path,root['path'],parameters['header'],state=parameters['state'],cancelled=cancelled)
     else:
-        result=ffl2_maps.plan_edits(path,root['path'],parameters['header'],parameters['changes'],cancelled=cancelled)
+        result=ffl2_maps.plan_edits(path,root['path'],parameters['header'],parameters['changes'],state=parameters.get('state'),cancelled=cancelled)
         planned=api._integrity_plan({'project_id':parameters['project_id'],'artifact_id':row['artifact_id'],
                                      'edits':result['edits']},cancelled)
         result={**result,**planned}

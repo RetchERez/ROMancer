@@ -5,6 +5,7 @@ from .asset_codecs import cell_size,decode_cell,CODECS
 from .script_schema import canonical_bytes
 from .level_semantics import collision_types,validate_hitbox,validate_changed_hitboxes,validate_sprite
 from .scene_schema import normalize_scene,validate_scene
+from .level_palette import entry_size,decode_palette
 
 
 def _identity(raw,definition,source_sha256):
@@ -74,14 +75,8 @@ def inspect_level(raw,definition,source_sha256):
     unit=cell_size(t['codec'],8,8);storage(t['offset'],t['count']*unit,'tiles')
     tiles=[decode_cell(raw[t['offset']+i*unit:t['offset']+(i+1)*unit],codec=t['codec'],width=8,height=8) for i in range(t['count'])]
     colors=2**CODECS[t['codec']]
-    if t['palette_format'] not in ('rgb888','rgb555-le','rgb555-be'):raise ValueError('unsupported declared level palette')
-    n=3 if t['palette_format']=='rgb888' else 2;storage(t['palette_offset'],colors*n,'palette');palette=[]
-    for i in range(colors):
-        data=raw[t['palette_offset']+i*n:t['palette_offset']+(i+1)*n]
-        if n==3:palette.append(list(data))
-        else:
-            value=int.from_bytes(data,'little' if t['palette_format'].endswith('le') else 'big')
-            palette.append([round(((value>>shift)&31)*255/31) for shift in (0,5,10)])
+    n=entry_size(t['palette_format']);storage(t['palette_offset'],colors*n,'palette')
+    palette=decode_palette(raw[t['palette_offset']:t['palette_offset']+colors*n],t['palette_format'],colors)
     m=d['metatiles'];fields(m,'offset count width height entry_bytes endian');number(m['count'],1,1024);number(m['width'],1,8);number(m['height'],1,8)
     parts=m['width']*m['height'];flat=format_grid({k:m[k] for k in ('offset','entry_bytes','endian')},m['count']*parts,'metatiles')
     if any(v>=len(tiles) for v in flat):raise ValueError('metatile references an undeclared tile')

@@ -108,7 +108,7 @@ DESCRIPTIONS={
  'games.plan':'Preview named game edits; returns a source-bound plan, not a modified ROM.',
  'games.maps.catalog':'Browse bounded real map thumbnails and references for the exact supported game revision. Structural decoding is not gameplay certification.',
  'games.maps.inspect':'Decode a real room, arrival and object definitions. Conditional map branches require explicit observed or selected state; object visibility is not inferred.',
- 'games.maps.plan':'Review fixed-width edits in the supported opening atlas, preserving collision, trigger bindings and packed flags. Returns a plan; every build needs playtesting.',
+ 'games.maps.plan':'Review fixed-width terrain commands in source-bound rooms, preserving collision and triggers across every encoded story-state outcome and sharing header. Optional state selects the preview. Object/arrival/link writes remain limited to the opening atlas; every build needs playtesting.',
  'cheats.catalog':'Inspect the local code-reference catalog. Source publication labels are separate from gameplay verification.',
  'cheats.inspect':'Decode matching local code references into source-bound investigation clues. Unconfirmed banks, unsupported codes and revision mismatches do not authorize edits or activate cheats.',
  'cheats.import':'Import a bounded project-owned catalog input. Preserves code combinations, revision alternatives and provenance; does not modify ROM bytes.',
@@ -288,8 +288,9 @@ def _investigation_properties(operation):
     if operation=='systems.reference':return {'system_id': enum(['nes', 'snes', 'genesis', 'gb', 'gbc', 'sms'])}
     if operation=='systems.classify_address':return {'system_id': enum(['nes', 'snes', 'genesis', 'gb', 'gbc', 'sms']), 'address': integer(0, 4294967295), 'domain': enum(['cpu', 'ppu', 'vram', 'apu'])}
     if operation=='games.maps.catalog':return {**source,'offset':integer(0,10000),'limit':integer(1,24),'query':string(128)}
-    if operation=='games.maps.inspect':return {**source,'header':integer(0x4800,0x6f7f),
-        'state':{'type':['object','null'],'maxProperties':32,'propertyNames':{'pattern':'^(?:[0-9]|[12][0-9]|3[01])$'},'additionalProperties':integer(0,15)}}
+    if operation in ('games.maps.inspect','games.maps.plan'):
+        map_state={'type':['object','null'],'maxProperties':32,'propertyNames':{'pattern':'^(?:[0-9]|[12][0-9]|3[01])$'},'additionalProperties':integer(0,15)}
+    if operation=='games.maps.inspect':return {**source,'header':integer(0x4800,0x6f7f),'state':map_state}
     if operation=='games.maps.plan':
         optional_coordinate={'x':integer(0,63),'y':integer(0,63)}
         variants=[]
@@ -300,7 +301,7 @@ def _investigation_properties(operation):
             ('link',{'index':integer(0,31),'arrival_id':integer(0,510)},['index','arrival_id'])]:
             variants.append({'type':'object','properties':{'kind':enum([kind]),**properties},
                 'required':['kind',*required],'additionalProperties':False})
-        return {**source,'header':integer(0x4800,0x6f7f),'changes':array({'oneOf':variants},64,1)}
+        return {**source,'header':integer(0x4800,0x6f7f),'state':map_state,'changes':array({'oneOf':variants},64,1)}
     codecs=enum(['lz10','rle','snes-lz2']);kinds=enum(['script','assets','tables','levels','sound','commands'])
     if operation=='systems.address':
         variants=[]
