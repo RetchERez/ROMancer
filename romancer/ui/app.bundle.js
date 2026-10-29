@@ -4811,12 +4811,12 @@ ${font ? `<section class="card"><h3>Font metrics · ${esc(font.id)}</h3><div cla
   }
   function compressionReferences(ctx2, parent, target) {
     const { state: state2 } = ctx2, page = state2.page, scope = selectionKey(state2), current2 = () => selectionKey(state2) === scope && state2.page === page, entry = state2.compressedReferenceSurvey;
-    const integer15 = (id) => {
+    const integer16 = (id) => {
       const s = read(id).trim(), n = Number(s);
       if (!s || !Number.isSafeInteger(n)) throw Error("Enter a whole number for " + id + ".");
       return n;
     };
-    const params = () => ({ project_id: ctx2.sourceParams().project_id, artifact_id: parent.artifact_id, target_offset: target, width: integer15("compressed-move-width"), endian: read("compressed-move-order"), base: integer15("compressed-move-base"), offset: integer15("compressed-ref-start"), length: integer15("compressed-ref-length"), alignment: integer15("compressed-ref-align") });
+    const params = () => ({ project_id: ctx2.sourceParams().project_id, artifact_id: parent.artifact_id, target_offset: target, width: integer16("compressed-move-width"), endian: read("compressed-move-order"), base: integer16("compressed-move-base"), offset: integer16("compressed-ref-start"), length: integer16("compressed-ref-length"), alignment: integer16("compressed-ref-align") });
     const result = (entry == null ? void 0 : entry.scope) === scope && entry.result.artifact_id === parent.artifact_id && entry.result.source_sha256 === parent.sha256 && entry.result.target_offset === target ? entry.result : null;
     ctx2.use({
       "compressed-ref-survey": async () => {
@@ -8813,6 +8813,101 @@ ${font ? `<section class="card"><h3>Font metrics · ${esc(font.id)}</h3><div cla
     return pixels;
   }
 
+  // romancer/ui/scene_geometry.js
+  var finite = (v, max = 1048576) => {
+    if (typeof v !== "number" || !Number.isFinite(v) || Math.abs(v) > max) throw Error("Scene coordinates exceed finite bounds.");
+    return v;
+  };
+  var integer14 = (v, min, max) => {
+    if (!Number.isSafeInteger(v) || v < min || v > max) throw Error("Scene integer is outside declared bounds.");
+    return v;
+  };
+  var snapCoordinate = (value) => Math.round(finite(value));
+  var cameraValue = (c) => {
+    c = c || { offset_x: 0, offset_y: 0, zoom: 1 };
+    finite(c.offset_x);
+    finite(c.offset_y);
+    finite(c.zoom, 8);
+    if (c.zoom < 0.01) throw Error("Scene zoom must be positive.");
+    return c;
+  };
+  var specValue = (s) => {
+    if (!s || !["orthogonal", "isometric"].includes(s.projection)) throw Error("Unsupported scene projection.");
+    for (const k of ["tile_width", "tile_height", "elevation_step"]) integer14(s[k], 1, 256);
+    return s;
+  };
+  var specFor = (doc) => doc.scene || { projection: "orthogonal", tile_width: doc.block_width * 8, tile_height: doc.block_height * 8, elevation_step: 1, object_fields: { z: null, layer: null, order: null } };
+  function projectPoint(scene, point, camera) {
+    specValue(scene);
+    const c = cameraValue(camera), x = finite(point.x), y = finite(point.y), z = finite(point.z, 1024), iso = scene.projection === "isometric";
+    return { x: c.offset_x + c.zoom * (iso ? (x - y) * scene.tile_width / 2 : x * scene.tile_width), y: c.offset_y + c.zoom * ((iso ? (x + y) * scene.tile_height / 2 : y * scene.tile_height) - z * scene.elevation_step) };
+  }
+  function inverseAtZ(scene, point, z, camera) {
+    specValue(scene);
+    const c = cameraValue(camera);
+    finite(z, 1024);
+    const px = (finite(point.x) - c.offset_x) / c.zoom, py = (finite(point.y) - c.offset_y) / c.zoom + z * scene.elevation_step;
+    return scene.projection === "isometric" ? { x: px / scene.tile_width + py / scene.tile_height, y: py / scene.tile_height - px / scene.tile_width, z } : { x: px / scene.tile_width, y: py / scene.tile_height, z };
+  }
+  function validNode(n) {
+    if (!n || !["terrain", "object"].includes(n.kind)) throw Error("Invalid source scene node.");
+    for (const k of ["x", "y"]) integer14(n[k], -1048576, 1048576);
+    integer14(n.z, -1024, 1024);
+    for (const k of ["layer", "order"]) integer14(n[k], -65535, 65535);
+    integer14(n.index, 0, 32768);
+    integer14(n.width, 1, 128);
+    integer14(n.height, 1, 128);
+    return n;
+  }
+  function footprint(scene, node, camera) {
+    validNode(node);
+    return [[0, 0], [node.width, 0], [node.width, node.height], [0, node.height]].map(([dx, dy]) => projectPoint(scene, { x: node.x + dx, y: node.y + dy, z: node.z }, camera));
+  }
+  function sortNodes(scene, nodes) {
+    specValue(scene);
+    if (!Array.isArray(nodes) || nodes.length > 32768) throw Error("Scene node budget exceeded.");
+    for (const n of nodes) validNode(n);
+    const rank = (n) => [n.layer, n.order, scene.projection === "isometric" ? n.x + n.y : n.y, n.z, n.kind === "terrain" ? 0 : 1, n.index];
+    return [...nodes].sort((a, b) => {
+      const aa = rank(a), bb = rank(b);
+      for (let i = 0; i < aa.length; i++) if (aa[i] !== bb[i]) return aa[i] - bb[i];
+      return 0;
+    });
+  }
+  function pickNodes(scene, nodes, point, camera) {
+    return sortNodes(scene, nodes).reverse().filter((n) => {
+      const p = inverseAtZ(scene, point, n.z, camera);
+      return p.x >= n.x && p.y >= n.y && p.x < n.x + n.width && p.y < n.y + n.height;
+    });
+  }
+  function sceneNodes(doc, model, id) {
+    const room = model.room(id), scene = specFor(doc), heights = room.elevation ? model.cells(id, "elevation") : null;
+    specValue(scene);
+    const identity2 = (kind) => [doc.source_sha256, doc.document_id, id, kind].join(":");
+    const terrain = model.cells(id, "terrain").map((block, index) => ({ kind: "terrain", index, key: identity2("terrain") + ":" + index, x: index % room.width, y: Math.floor(index / room.width), z: heights ? heights[index] : 0, width: 1, height: 1, layer: 0, order: 0, block }));
+    const objects = model.objects(id).flatMap((obj, index) => {
+      if (!Number.isSafeInteger(obj.x) || !Number.isSafeInteger(obj.y)) return [];
+      const binding = scene.object_fields || {}, value = (kind, fallback) => binding[kind] === null || binding[kind] === void 0 ? fallback : obj[binding[kind]];
+      return [{ kind: "object", index, key: identity2("object") + ":" + index, x: obj.x, y: obj.y, z: value("z", 0), width: 1, height: 1, layer: value("layer", 1), order: value("order", 0) }];
+    });
+    const nodes = [...terrain, ...objects];
+    for (const n of nodes) validNode(n);
+    return nodes;
+  }
+  function sceneBounds(scene, nodes) {
+    if (!nodes.length) throw Error("Scene has no declared cells.");
+    let minx = Infinity, miny = Infinity, maxx = -Infinity, maxy = -Infinity;
+    for (const node of nodes) for (const p of footprint(scene, node)) {
+      minx = Math.min(minx, p.x);
+      miny = Math.min(miny, p.y);
+      maxx = Math.max(maxx, p.x);
+      maxy = Math.max(maxy, p.y);
+    }
+    const width = Math.ceil(maxx - minx) + 128, height = Math.ceil(maxy - miny) + 128;
+    if (width > 8192 || height > 8192 || width * height > 4 * 1024 ** 2) throw Error("Projected scene exceeds the pixel budget.");
+    return { width, height, offset_x: 64 - minx, offset_y: 64 - miny, zoom: 1 };
+  }
+
   // romancer/ui/room_navigation.js
   function objectMetadata(doc, id, index) {
     var _a, _b;
@@ -8842,6 +8937,8 @@ ${font ? `<section class="card"><h3>Font metrics · ${esc(font.id)}</h3><div cla
     return result;
   }
   function roomThumbnail(doc, model, id) {
+    var _a;
+    if (((_a = doc.definition) == null ? void 0 : _a.scene) || model.room(id).elevation) return projectedThumbnail(doc, model, id);
     const room = model.room(id), sourceWidth = room.width * doc.block_width * 8, sourceHeight = room.height * doc.block_height * 8;
     const scale = Math.min(1, 160 / sourceWidth, 96 / sourceHeight), width = Math.max(1, Math.floor(sourceWidth * scale)), height = Math.max(1, Math.floor(sourceHeight * scale));
     const pixels = new Uint8ClampedArray(width * height * 4), cells = model.cells(id, "terrain"), blocks = model.blocks();
@@ -8850,6 +8947,24 @@ ${font ? `<section class="card"><h3>Font metrics · ${esc(font.id)}</h3><div cla
       const part = Math.floor(sy / 8) % doc.block_height * doc.block_width + Math.floor(sx / 8) % doc.block_width;
       const tile = blocks[cells[by * room.width + bx]][part], value = doc.tiles[tile][sy % 8 * 8 + sx % 8];
       pixels.set([...doc.palette[value], 255], (y * width + x) * 4);
+    }
+    return { width, height, pixels };
+  }
+  function projectedThumbnail(doc, model, id) {
+    const scene = specFor(doc), nodes = sortNodes(scene, sceneNodes(doc, model, id).filter((n) => n.kind === "terrain"));
+    const bounds2 = sceneBounds(scene, nodes), sourceWidth = bounds2.width - 128, sourceHeight = bounds2.height - 128;
+    const scale = Math.min(1, 160 / sourceWidth, 96 / sourceHeight), width = Math.max(1, Math.ceil(sourceWidth * scale)), height = Math.max(1, Math.ceil(sourceHeight * scale));
+    const camera = { offset_x: (bounds2.offset_x - 64) * scale, offset_y: (bounds2.offset_y - 64) * scale, zoom: scale };
+    const pixels = new Uint8ClampedArray(width * height * 4), blocks = model.blocks();
+    for (const node of nodes) {
+      const corners = footprint(scene, node, camera), xs = corners.map((p) => p.x), ys = corners.map((p) => p.y);
+      for (let y = Math.max(0, Math.floor(Math.min(...ys))); y < Math.min(height, Math.ceil(Math.max(...ys))); y++) for (let x = Math.max(0, Math.floor(Math.min(...xs))); x < Math.min(width, Math.ceil(Math.max(...xs))); x++) {
+        const p = inverseAtZ(scene, { x: x + 0.5, y: y + 0.5 }, node.z, camera), dx = p.x - node.x, dy = p.y - node.y;
+        if (dx < 0 || dy < 0 || dx >= 1 || dy >= 1) continue;
+        const tx = Math.min(doc.block_width * 8 - 1, Math.floor(dx * doc.block_width * 8)), ty = Math.min(doc.block_height * 8 - 1, Math.floor(dy * doc.block_height * 8));
+        const tile = blocks[node.block][Math.floor(ty / 8) * doc.block_width + Math.floor(tx / 8)], value = doc.tiles[tile][ty % 8 * 8 + tx % 8];
+        pixels.set([...doc.palette[value], 255], (y * width + x) * 4);
+      }
     }
     return { width, height, pixels };
   }
@@ -8904,8 +9019,294 @@ ${font ? `<section class="card"><h3>Font metrics · ${esc(font.id)}</h3><div cla
     }
   }
 
+  // romancer/ui/scene_canvas.js
+  function selectableSceneObjects(doc, model, id, mode) {
+    const visible = new Set(visibleLevelObjects(doc, model, id, mode).map((row) => row.index));
+    return sceneNodes(doc, model, id).filter((n) => n.kind === "object" && visible.has(n.index));
+  }
+  function polygon(c, points) {
+    c.beginPath();
+    points.forEach((p, i) => i ? c.lineTo(p.x, p.y) : c.moveTo(p.x, p.y));
+    c.closePath();
+  }
+  function mountSceneLevel(ctx2, doc, model, id, persist, { makeOriginal, blockPixels: blockPixels2, scale }) {
+    var _a;
+    const canvas = document.getElementById("level-canvas");
+    if (!canvas) return;
+    const scope = selectionKey(ctx2.state), scene = specFor(doc), room = model.room(id), original2 = makeOriginal();
+    const current2 = () => scope === selectionKey(ctx2.state) && ctx2.state.page === "levels" && ctx2.state.levelEditor === model && document.getElementById("level-canvas") === canvas;
+    let pointer = null, anchor = null, selected2 = 0, drag = null, dragOffset = null, held = null, drawn = null;
+    const cache = /* @__PURE__ */ new Map();
+    const markerMode = () => read("level-overlay") === "records" ? "records" : read("level-tool") === "objects" ? "objects" : read("level-overlay");
+    const metadata = (index) => {
+      var _a2, _b;
+      return (((_b = (_a2 = doc.definition) == null ? void 0 : _a2.rooms.find((r) => r.id === id)) == null ? void 0 : _b.object_metadata) || []).find((r) => r.index === index);
+    };
+    function bitmap(index, sourceModel = model, blocks = sourceModel.blocks()) {
+      const signature = blocks[index].join(","), key3 = index + ":" + signature;
+      if (cache.has(key3)) return cache.get(key3);
+      const tile = document.createElement("canvas");
+      tile.width = doc.block_width * 8;
+      tile.height = doc.block_height * 8;
+      const c = tile.getContext("2d"), image = c.createImageData(tile.width, tile.height);
+      image.data.set(blockPixels2(doc, sourceModel, index));
+      c.putImageData(image, 0, 0);
+      if (cache.size > 1024) cache.clear();
+      cache.set(key3, tile);
+      return tile;
+    }
+    function paint(target, sourceModel, bounds2, overlays) {
+      target.width = bounds2.width;
+      target.height = bounds2.height;
+      target.style.width = bounds2.width * scale(bounds2.width, bounds2.height, window.innerHeight, target.parentElement.clientWidth, read("level-zoom")) + "px";
+      const c = target.getContext("2d");
+      c.imageSmoothingEnabled = false;
+      c.fillStyle = "#0b1418";
+      c.fillRect(0, 0, target.width, target.height);
+      const nodes = sortNodes(scene, sceneNodes(doc, sourceModel, id)), blocks = sourceModel.blocks(), changes = sourceModel.values(), changedCells = new Set(changes.filter((v) => v.room_id === id && v.kind !== "object").map((v) => v.index)), changedBlocks = new Set(changes.filter((v) => v.kind === "metatile").map((v) => v.index)), collision = room.collision ? sourceModel.cells(id, "collision") : null, visibleObjects = new Set(selectableSceneObjects(doc, sourceModel, id, markerMode()).map((row) => row.index));
+      for (const n of nodes) {
+        const corners = footprint(scene, n, bounds2);
+        if (n.kind === "terrain") {
+          const tile = bitmap(n.block, sourceModel, blocks), a = corners[0], b = corners[1], d = corners[3];
+          c.save();
+          c.setTransform((b.x - a.x) / tile.width, (b.y - a.y) / tile.width, (d.x - a.x) / tile.height, (d.y - a.y) / tile.height, a.x, a.y);
+          c.drawImage(tile, 0, 0);
+          c.restore();
+          if (overlays && room.collision && (read("level-overlay") === "collision" || read("level-layer") === "collision") && collision[n.index]) {
+            polygon(c, corners);
+            c.fillStyle = "#ffbd3f66";
+            c.fill();
+          }
+          if (overlays && (changedCells.has(n.index) || changedBlocks.has(n.block))) {
+            polygon(c, corners);
+            c.strokeStyle = "#ffcf58";
+            c.lineWidth = 2;
+            c.stroke();
+          }
+        } else {
+          const entry = metadata(n.index), sprite = entry == null ? void 0 : entry.sprite;
+          if (sprite) {
+            const at = projectPoint(scene, { x: n.x + 0.5, y: n.y + 0.5, z: n.z }, bounds2), width = sprite.width * 8, height = sprite.height * 8;
+            for (const [part, tileIndex] of sprite.tiles.entries()) for (const [pixel, value] of doc.tiles[tileIndex].entries()) {
+              if (value === sprite.transparent_index) continue;
+              c.fillStyle = "rgb(" + doc.palette[value].join(",") + ")";
+              c.fillRect(at.x - width / 2 + part % sprite.width * 8 + pixel % 8, at.y - height + Math.floor(part / sprite.width) * 8 + Math.floor(pixel / 8), 1, 1);
+            }
+          }
+          if (overlays && visibleObjects.has(n.index)) {
+            polygon(c, corners);
+            c.fillStyle = "#64cfb05c";
+            c.fill();
+            c.strokeStyle = String(n.index) === read("level-object-index") ? "#ffcf58" : "#86ddca";
+            c.lineWidth = 2;
+            c.stroke();
+            const at = projectPoint(scene, { x: n.x + 0.5, y: n.y + 0.5, z: n.z }, bounds2);
+            c.fillStyle = "#e7f3ef";
+            c.font = "12px sans-serif";
+            c.fillText((entry == null ? void 0 : entry.name) || "Object " + n.index, at.x + 3, at.y - 3);
+          }
+        }
+      }
+      if (overlays) {
+        const rectangle = ctx2.state.levelRect;
+        if (read("level-tool") === "select" && rectangle) {
+          for (const n2 of nodes) if (n2.kind === "terrain" && n2.x >= rectangle.x && n2.y >= rectangle.y && n2.x < rectangle.x + rectangle.width && n2.y < rectangle.y + rectangle.height) {
+            polygon(c, footprint(scene, n2, bounds2));
+            c.strokeStyle = "#9ce5ff";
+            c.lineWidth = 2;
+            c.stroke();
+          }
+        }
+        const n = nodes.find((n2) => n2.kind === "terrain" && n2.index === selected2);
+        if (n) {
+          polygon(c, footprint(scene, n, bounds2));
+          c.strokeStyle = "#91e4cd";
+          c.lineWidth = 2;
+          c.stroke();
+        }
+      }
+      const image = c.getImageData(0, 0, target.width, target.height);
+      rememberPreview(target, target.width, target.height, image.data, { note: "Declared scene projection and object placement. This preview is not an emulated game frame." });
+    }
+    const draw2 = () => {
+      if (!current2()) return;
+      const nodes = sceneNodes(doc, model, id);
+      drawn = held || sceneBounds(scene, [...nodes, ...sceneNodes(doc, original2, id)]);
+      paint(canvas, model, drawn, true);
+      const before = document.getElementById("level-original");
+      if (before) paint(before, original2, drawn, false);
+      const label = document.getElementById("level-difference-count");
+      if (label) label.textContent = "Declared " + scene.projection + " preview · " + model.values().length + " changes · not built" + (read("level-overlay") === "hitboxes" ? " · hitboxes need a projection-specific layout" : "");
+    };
+    const point = (e) => {
+      const r = canvas.getBoundingClientRect();
+      return { x: (e.clientX - r.left) / r.width * canvas.width, y: (e.clientY - r.top) / r.height * canvas.height };
+    };
+    function paintAt(e) {
+      const p = point(e), nodes = sceneNodes(doc, model, id);
+      let cell;
+      if (drag !== null) {
+        const object = nodes.find((n) => n.kind === "object" && n.index === drag), world = inverseAtZ(scene, p, object.z, drawn);
+        const x = snapCoordinate(world.x - dragOffset.x), y = snapCoordinate(world.y - dragOffset.y);
+        if (x < 0 || y < 0 || x >= room.width || y >= room.height) return;
+        model.set({ kind: "object", room_id: id, index: drag, field: "x", value: x });
+        model.set({ kind: "object", room_id: id, index: drag, field: "y", value: y });
+        cell = { index: y * room.width + x, x, y };
+      } else {
+        const hit = pickNodes(scene, nodes.filter((n) => n.kind === "terrain"), p, drawn)[0];
+        if (!hit) return;
+        cell = { index: hit.index, x: hit.x, y: hit.y };
+        const layer = read("level-layer"), tool = read("level-tool"), value = Number(read("level-brush"));
+        if (tool === "paint") model.paint(id, layer, cell.index, value);
+        else if (tool === "fill") model.fill(id, layer, cell.index, value);
+        else if (tool === "paste") model.paste(id, layer, cell.index, ctx2.state.levelClipboard);
+        else if (tool === "pick") {
+          const value2 = model.cells(id, layer)[cell.index];
+          ctx2.setDraft("level-brush", String(value2));
+          const input = document.getElementById("level-brush");
+          if (input) input.value = String(value2);
+        } else if (tool === "select") {
+          const first = anchor ?? cell.index;
+          ctx2.state.levelRect = { x: Math.min(first % room.width, cell.x), y: Math.min(Math.floor(first / room.width), cell.y), width: Math.abs(first % room.width - cell.x) + 1, height: Math.abs(Math.floor(first / room.width) - cell.y) + 1 };
+        }
+      }
+      selected2 = cell.index;
+      if (anchor === null) anchor = cell.index;
+      draw2();
+    }
+    canvas.style.touchAction = "none";
+    canvas.addEventListener("pointerdown", (e) => {
+      if (!current2() || e.button !== 0) return;
+      const p = point(e);
+      drag = null;
+      if (read("level-tool") === "objects") {
+        const hits = pickNodes(scene, selectableSceneObjects(doc, model, id, markerMode()), p, drawn), chosen = hits.find((n) => String(n.index) === read("level-object-index")) || (hits.length === 1 ? hits[0] : null);
+        if (!chosen) {
+          ctx2.notify(hits.length ? "Select the overlapping object in the inspector first." : "Choose a declared object to move.");
+          return;
+        }
+        drag = chosen.index;
+        const at = inverseAtZ(scene, p, chosen.z, drawn);
+        dragOffset = { x: at.x - chosen.x, y: at.y - chosen.y };
+        ctx2.setDraft("level-object-index", String(drag));
+        const selector = document.getElementById("level-object-index");
+        if (selector) selector.value = String(drag);
+      }
+      e.preventDefault();
+      canvas.focus();
+      held = { ...drawn };
+      pointer = e.pointerId;
+      anchor = null;
+      canvas.setPointerCapture(pointer);
+      model.begin();
+      try {
+        paintAt(e);
+      } catch (error) {
+        model.cancel();
+        pointer = null;
+        held = null;
+        drag = null;
+        ctx2.notify(error.message, true);
+        draw2();
+      }
+    });
+    canvas.addEventListener("pointermove", (e) => {
+      if (pointer === e.pointerId && current2() && ["paint", "select", "objects"].includes(read("level-tool"))) try {
+        paintAt(e);
+      } catch (error) {
+        model.cancel();
+        pointer = null;
+        held = null;
+        drag = null;
+        ctx2.notify(error.message, true);
+        draw2();
+      }
+    });
+    canvas.addEventListener("keydown", (e) => {
+      if (!current2() || pointer !== null) return;
+      const directions = { ArrowLeft: [-1, 0], ArrowRight: [1, 0], ArrowUp: [0, -1], ArrowDown: [0, 1] }, delta = directions[e.key];
+      if (delta) {
+        e.preventDefault();
+        const x = Math.max(0, Math.min(room.width - 1, selected2 % room.width + delta[0])), y = Math.max(0, Math.min(room.height - 1, Math.floor(selected2 / room.width) + delta[1]));
+        selected2 = y * room.width + x;
+        draw2();
+        return;
+      }
+      if (e.key !== " ") return;
+      e.preventDefault();
+      const layer = read("level-layer"), tool = read("level-tool"), value = Number(read("level-brush"));
+      model.begin();
+      try {
+        if (tool === "paint") model.paint(id, layer, selected2, value);
+        else if (tool === "fill") model.fill(id, layer, selected2, value);
+        else if (tool === "paste") model.paste(id, layer, selected2, ctx2.state.levelClipboard);
+        else if (tool === "pick") {
+          ctx2.setDraft("level-brush", String(model.cells(id, layer)[selected2]));
+        }
+        const changed2 = model.start !== JSON.stringify(model.values());
+        model.commit();
+        if (changed2) persist();
+        ctx2.render();
+      } catch (error) {
+        model.cancel();
+        ctx2.notify(error.message, true);
+        draw2();
+      }
+    });
+    const finish = (e) => {
+      if (pointer !== e.pointerId) return;
+      const active = current2();
+      if (active) {
+        if (e.type === "pointercancel") model.cancel();
+        else {
+          const changed2 = model.start !== JSON.stringify(model.values());
+          model.commit();
+          if (changed2) persist();
+        }
+      }
+      pointer = null;
+      held = null;
+      drag = null;
+      anchor = null;
+      if (active) {
+        draw2();
+        ctx2.render();
+      }
+    };
+    for (const event of ["pointerup", "pointercancel", "lostpointercapture"]) canvas.addEventListener(event, finish);
+    for (const node of document.querySelectorAll("[data-level-brush]")) {
+      const index = Number(node.dataset.levelBrush), thumb = node.querySelector("canvas");
+      if (thumb) {
+        const tile = bitmap(index);
+        thumb.width = tile.width;
+        thumb.height = tile.height;
+        thumb.getContext("2d").drawImage(tile, 0, 0);
+      }
+      node.addEventListener("click", () => {
+        if (!current2()) return;
+        ctx2.setDraft("level-brush", String(index));
+        ctx2.setDraft("level-layer", "terrain");
+        ctx2.setDraft("level-tool", "paint");
+        for (const [key3, value] of [["level-brush", index], ["level-layer", "terrain"], ["level-tool", "paint"]]) {
+          const input = document.getElementById(key3);
+          if (input) input.value = String(value);
+        }
+        draw2();
+      });
+    }
+    for (const node of document.querySelectorAll("[data-level-collision]")) node.addEventListener("click", () => {
+      if (!current2()) return;
+      ctx2.setDraft("level-brush", node.dataset.levelCollision);
+      const input = document.getElementById("level-brush");
+      if (input) input.value = node.dataset.levelCollision;
+      draw2();
+    });
+    for (const name2 of ["level-overlay", "level-zoom", "level-tool"]) (_a = document.getElementById(name2)) == null ? void 0 : _a.addEventListener("change", draw2);
+    draw2();
+  }
+
   // romancer/ui/level_canvas.js
-  var integer14 = (v, min, max) => {
+  var integer15 = (v, min, max) => {
     if (!Number.isSafeInteger(v) || v < min || v > max) throw Error("Level value is outside declared bounds.");
     return v;
   };
@@ -8913,7 +9314,7 @@ ${font ? `<section class="card"><h3>Font metrics · ${esc(font.id)}</h3><div cla
   function levelScale(width, height, viewportHeight, availableWidth, mode) {
     if (mode === "fit") return Math.max(0.25, Math.min(3, Math.max(160, viewportHeight - 420) / height, availableWidth / width));
     const value = Number(mode);
-    integer14(value, 1, 3);
+    integer15(value, 1, 3);
     return value;
   }
   var LevelDraft = class {
@@ -8935,28 +9336,28 @@ ${font ? `<section class="card"><h3>Font metrics · ${esc(font.id)}</h3><div cla
       var _a, _b, _c, _d, _e, _f;
       let original2, max, min = 0;
       if (c.kind === "metatile") {
-        integer14(c.index, 0, this.doc.metatiles.length - 1);
-        integer14(c.part, 0, this.doc.metatiles[c.index].length - 1);
+        integer15(c.index, 0, this.doc.metatiles.length - 1);
+        integer15(c.part, 0, this.doc.metatiles[c.index].length - 1);
         original2 = this.doc.metatiles[c.index][c.part];
         max = this.doc.tiles.length - 1;
       } else {
         const r = this.room(c.room_id);
         if (c.kind === "object") {
-          integer14(c.index, 0, r.objects.length - 1);
+          integer15(c.index, 0, r.objects.length - 1);
           if (!(c.field in r.objects[c.index])) throw Error("Unknown object field.");
           original2 = r.objects[c.index][c.field];
           const declared2 = (_c = (_b = (_a = this.doc.definition) == null ? void 0 : _a.rooms.find((x) => x.id === r.id)) == null ? void 0 : _b.objects) == null ? void 0 : _c.fields.find((f) => f.name === c.field);
           min = (declared2 == null ? void 0 : declared2.minimum) ?? 0;
           max = Math.min((declared2 == null ? void 0 : declared2.maximum) ?? 65535, c.field === "x" ? r.width - 1 : c.field === "y" ? r.height - 1 : c.field === "exit_room" ? this.doc.rooms.length - 1 : 65535);
         } else {
-          if (!["terrain", "collision"].includes(c.kind) || !r[c.kind]) throw Error("This layer is not declared.");
-          integer14(c.index, 0, r[c.kind].length - 1);
+          if (!["terrain", "collision", "elevation"].includes(c.kind) || !r[c.kind]) throw Error("This layer is not declared.");
+          integer15(c.index, 0, r[c.kind].length - 1);
           original2 = r[c.kind][c.index];
           const declared2 = (_e = (_d = this.doc.definition) == null ? void 0 : _d.rooms.find((x) => x.id === r.id)) == null ? void 0 : _e[c.kind];
-          max = c.kind === "terrain" ? this.doc.metatiles.length - 1 : 2 ** (8 * ((declared2 == null ? void 0 : declared2.entry_bytes) || 1)) - 1;
+          max = c.kind === "terrain" ? this.doc.metatiles.length - 1 : Math.min(c.kind === "elevation" ? 1024 : 65535, 2 ** (8 * ((declared2 == null ? void 0 : declared2.entry_bytes) || 1)) - 1);
         }
       }
-      integer14(c.value, min, max);
+      integer15(c.value, min, max);
       if (c.kind === "object") {
         const metadata = objectMetadata(this.doc, c.room_id, c.index);
         if ((metadata == null ? void 0 : metadata.role) === "exit" && ((_f = metadata.reference) == null ? void 0 : _f.field) === c.field && !metadata.reference.targets.some((target) => target.value === c.value)) throw Error("Exit destination is not mapped.");
@@ -9027,8 +9428,8 @@ ${font ? `<section class="card"><h3>Font metrics · ${esc(font.id)}</h3><div cla
     }
     fill(id, layer, index, value) {
       const r = this.room(id), cells = this.cells(id, layer);
-      integer14(index, 0, cells.length - 1);
-      integer14(value, 0, layer === "terrain" ? this.doc.metatiles.length - 1 : 65535);
+      integer15(index, 0, cells.length - 1);
+      integer15(value, 0, layer === "terrain" ? this.doc.metatiles.length - 1 : 65535);
       const old = cells[index];
       if (old === value) return;
       const queue = [index], seen = /* @__PURE__ */ new Set();
@@ -9043,15 +9444,15 @@ ${font ? `<section class="card"><h3>Font metrics · ${esc(font.id)}</h3><div cla
     }
     copy(id, layer, rect) {
       const r = this.room(id);
-      for (const k of ["x", "y"]) integer14(rect[k], 0, (k === "x" ? r.width : r.height) - 1);
-      integer14(rect.width, 1, r.width - rect.x);
-      integer14(rect.height, 1, r.height - rect.y);
+      for (const k of ["x", "y"]) integer15(rect[k], 0, (k === "x" ? r.width : r.height) - 1);
+      integer15(rect.width, 1, r.width - rect.x);
+      integer15(rect.height, 1, r.height - rect.y);
       const cells = this.cells(id, layer);
       return { width: rect.width, height: rect.height, values: Array.from({ length: rect.width * rect.height }, (_, i) => cells[(rect.y + Math.floor(i / rect.width)) * r.width + rect.x + i % rect.width]) };
     }
     paste(id, layer, index, clip) {
       const r = this.room(id);
-      integer14(index, 0, r.width * r.height - 1);
+      integer15(index, 0, r.width * r.height - 1);
       if (!clip || !Array.isArray(clip.values)) throw Error("Copy a rectangle first.");
       const x = index % r.width, y = Math.floor(index / r.width);
       if (clip.width < 1 || clip.height < 1 || clip.values.length !== clip.width * clip.height || x + clip.width > r.width || y + clip.height > r.height) throw Error("Copied rectangle must fit inside room bounds.");
@@ -9084,7 +9485,7 @@ ${font ? `<section class="card"><h3>Font metrics · ${esc(font.id)}</h3><div cla
     return [...result].sort((a, b) => a - b);
   }
   function blockPixels(doc, model, index) {
-    integer14(index, 0, doc.metatiles.length - 1);
+    integer15(index, 0, doc.metatiles.length - 1);
     const width = doc.block_width * 8, height = doc.block_height * 8, pixels = new Uint8ClampedArray(width * height * 4);
     for (const [part, tile] of model.blocks()[index].entries()) for (const [pixel, value] of doc.tiles[tile].entries()) {
       const x = part % doc.block_width * 8 + pixel % 8, y = Math.floor(part / doc.block_width) * 8 + Math.floor(pixel / 8);
@@ -9094,14 +9495,14 @@ ${font ? `<section class="card"><h3>Font metrics · ${esc(font.id)}</h3><div cla
   }
   function pickLevelBrush(model, id, layer, index) {
     const cells = model.cells(id, layer);
-    integer14(index, 0, cells.length - 1);
+    integer15(index, 0, cells.length - 1);
     return cells[index];
   }
   function moveLevelObject(model, id, index, x, y) {
     const room = model.room(id);
-    integer14(index, 0, room.objects.length - 1);
-    integer14(x, 0, room.width - 1);
-    integer14(y, 0, room.height - 1);
+    integer15(index, 0, room.objects.length - 1);
+    integer15(x, 0, room.width - 1);
+    integer15(y, 0, room.height - 1);
     const object = room.objects[index];
     if (!Object.hasOwn(object, "x") || !Object.hasOwn(object, "y")) throw Error("Object coordinates are not declared.");
     model.set({ kind: "object", room_id: id, index, field: "x", value: x });
@@ -9111,7 +9512,8 @@ ${font ? `<section class="card"><h3>Font metrics · ${esc(font.id)}</h3><div cla
     return `<div class="level-brush-palette" role="group" aria-label="Terrain brushes">${model.blocks().map((_, index) => `<button type="button" data-level-brush="${index}" aria-pressed="${Number(selected2) === index}" aria-label="Paint with metatile ${index}" title="Metatile ${index}"><canvas data-level-block="${index}" aria-hidden="true"></canvas><span>${index}</span></button>`).join("")}</div>`;
   }
   function mountLevel(ctx2, doc, model, id, persist) {
-    var _a, _b, _c;
+    var _a, _b, _c, _d;
+    if (((_a = doc.definition) == null ? void 0 : _a.scene) || model.room(id).elevation) return mountSceneLevel(ctx2, doc, model, id, persist, { makeOriginal: () => new LevelDraft(doc), blockPixels, scale: levelScale });
     const canvas = document.getElementById("level-canvas");
     if (!canvas) return;
     const scope = selectionKey(ctx2.state), current2 = () => scope === selectionKey(ctx2.state) && ctx2.state.page === "levels", room = model.room(id);
@@ -9321,14 +9723,14 @@ ${font ? `<section class="card"><h3>Font metrics · ${esc(font.id)}</h3><div cla
         draw2();
       });
     }
-    for (const node of ((_a = document.querySelectorAll) == null ? void 0 : _a.call(document, "[data-level-collision]")) || []) if (node.dataset.levelCollision !== void 0) node.addEventListener("click", () => {
+    for (const node of ((_b = document.querySelectorAll) == null ? void 0 : _b.call(document, "[data-level-collision]")) || []) if (node.dataset.levelCollision !== void 0) node.addEventListener("click", () => {
       if (!current2()) return;
       chooseBrush(Number(node.dataset.levelCollision));
       ctx2.setDraft("level-tool", "paint");
       ctx2.render();
     });
-    for (const name2 of ["level-overlay", "level-zoom", "level-tool"]) (_b = document.getElementById(name2)) == null ? void 0 : _b.addEventListener("change", draw2);
-    (_c = document.getElementById("level-brush")) == null ? void 0 : _c.addEventListener("change", () => chooseBrush(Number(read("level-brush"))));
+    for (const name2 of ["level-overlay", "level-zoom", "level-tool"]) (_c = document.getElementById(name2)) == null ? void 0 : _c.addEventListener("change", draw2);
+    (_d = document.getElementById("level-brush")) == null ? void 0 : _d.addEventListener("change", () => chooseBrush(Number(read("level-brush"))));
     draw2();
   }
 
@@ -9789,7 +10191,7 @@ ${font ? `<section class="card"><h3>Font metrics · ${esc(font.id)}</h3><div cla
   };
   var practiceControls = () => `<details class="card"><summary>Advanced practice</summary><p>Open a separate test layout to learn the editor controls.</p>${button("Open test layout", "studio-example")}</details>`;
   async function render15(ctx2) {
-    var _a, _b, _c, _d, _e, _f, _g, _h, _i, _j, _k, _l, _m, _n;
+    var _a, _b, _c, _d, _e, _f, _g, _h, _i, _j, _k, _l, _m, _n, _o, _p, _q, _r;
     const setupReview = useResearchSetup(ctx2, "levels");
     if (setupReview) return setupReview;
     const { state: state2 } = ctx2;
@@ -9866,7 +10268,7 @@ ${font ? `<section class="card"><h3>Font metrics · ${esc(font.id)}</h3><div cla
       model.scope = scope;
       state2.levelEditor = model;
     }
-    const room = (doc == null ? void 0 : doc.rooms.find((r) => r.id === ctx2.draft("level-room", ""))) || (doc == null ? void 0 : doc.rooms[0]), layer = (room == null ? void 0 : room.collision) && ctx2.draft("level-layer", "terrain") === "collision" ? "collision" : "terrain";
+    const room = (doc == null ? void 0 : doc.rooms.find((r) => r.id === ctx2.draft("level-room", ""))) || (doc == null ? void 0 : doc.rooms[0]), layer = ["terrain", ...(room == null ? void 0 : room.collision) ? ["collision"] : [], ...(room == null ? void 0 : room.elevation) ? ["elevation"] : []].includes(ctx2.draft("level-layer", "terrain")) ? ctx2.draft("level-layer", "terrain") : "terrain";
     const persist = () => {
       if (!current2()) return;
       state2.historyEditor = "level-canvas";
@@ -9891,6 +10293,9 @@ ${font ? `<section class="card"><h3>Font metrics · ${esc(font.id)}</h3><div cla
       "levels-save": () => ctx2.run("studio.definition", { ...ctx2.sourceParams(), kind: "levels", definition: json("level-definition") }),
       "levels-declare": () => {
         const n = (id) => Number(read("level-" + id)), g = (offset) => ({ offset, entry_bytes: n("entry"), endian: read("level-endian") }), next = { schema_version: 1, source_sha256: state2.artifact.sha256, name: read("level-name"), tiles: { offset: n("tiles-offset"), count: n("tiles-count"), codec: read("level-codec"), palette_offset: n("palette-offset"), palette_format: read("level-palette-format") }, metatiles: { ...g(n("blocks-offset")), count: n("blocks-count"), width: n("block-width"), height: n("block-height") }, rooms: [{ id: "room-0", name: read("level-name"), width: n("width"), height: n("height"), terrain: g(n("terrain-offset")), collision: read("level-collision-offset").trim() ? g(n("collision-offset")) : null, objects: null }] };
+        const elevation = read("level-elevation-offset").trim();
+        if (elevation) next.rooms[0].elevation = g(Number(elevation));
+        if (read("level-projection") === "isometric" || elevation) next.scene = { projection: read("level-projection"), tile_width: n("projection-width"), tile_height: n("projection-height"), elevation_step: n("elevation-step"), object_fields: { z: null, layer: null, order: null } };
         ctx2.setDraft("level-definition", JSON.stringify(next, null, 2));
         return ctx2.run("levels.inspect", { ...ctx2.sourceParams(), definition: next });
       },
@@ -9971,10 +10376,10 @@ ${font ? `<section class="card"><h3>Font metrics · ${esc(font.id)}</h3><div cla
         ctx2.notify(unchanged ? "Separate level build created. Select it in Playtest." : "Separate level build created. Your newer edits are still staged.");
       }
     });
-    const setup2 = `<details class="card"><summary>Advanced level setup</summary><p>Level editing needs a layout definition for this ROM. Confirm tile grids, object fields, and room-reference mappings before using them. Names and roles alone do not establish game behavior.</p><details><summary>Single-room layout form</summary><div class="field-row">${field("level-name", "Room name", ctx2.draft("level-name", "Room"))}${field("level-width", "Blocks across", ctx2.draft("level-width", "16"), { type: "number", min: 1 })}${field("level-height", "Blocks down", ctx2.draft("level-height", "14"), { type: "number", min: 1 })}${select("level-entry", "Grid integer bytes", [[1, "8 bit"], [2, "16 bit"]], ctx2.draft("level-entry", "1"))}${select("level-endian", "Grid byte order", [["little", "Little endian"], ["big", "Big endian"]], ctx2.draft("level-endian", "little"))}</div><div class="field-row">${field("level-tiles-offset", "Tiles offset", ctx2.draft("level-tiles-offset", "0"))}${field("level-tiles-count", "Tile count", ctx2.draft("level-tiles-count", "16"))}${select("level-codec", "Tile format", Object.entries(codecs2).map(([system2, codec]) => [codec, system2.toUpperCase()]), ctx2.draft("level-codec", codecs2[state2.artifact.system_id] || codecs2.nes))}${field("level-palette-offset", "Palette offset", ctx2.draft("level-palette-offset", "0"))}${select("level-palette-format", "Palette format", [["rgb888", "RGB888"], ["rgb555-le", "RGB555 little endian"], ["rgb555-be", "RGB555 big endian"]], ctx2.draft("level-palette-format", "rgb555-le"))}</div><div class="field-row">${field("level-blocks-offset", "Metatile table offset", ctx2.draft("level-blocks-offset", "0"))}${field("level-blocks-count", "Metatile count", ctx2.draft("level-blocks-count", "16"))}${field("level-block-width", "Tiles per block across", ctx2.draft("level-block-width", "2"))}${field("level-block-height", "Tiles per block down", ctx2.draft("level-block-height", "2"))}${field("level-terrain-offset", "Terrain grid offset", ctx2.draft("level-terrain-offset", "0"))}${field("level-collision-offset", "Collision grid offset (optional)", ctx2.draft("level-collision-offset", ""))}</div>${button("Check declared layout", "levels-declare")}</details>${jsonEditor("level-definition", "Verified layout definition", ctx2.draft("level-definition", JSON.stringify(definition, null, 2)))}<div class="actions">${button("Inspect layout", "levels-inspect")}${button("Save checked definition", "levels-save")}</div></details>`;
+    const setup2 = `<details class="card"><summary>Advanced level setup</summary><p>Level editing needs a layout definition for this ROM. Confirm tile grids, object fields, and room-reference mappings before using them. Names and roles alone do not establish game behavior.</p><details><summary>Single-room layout form</summary><div class="field-row">${field("level-name", "Room name", ctx2.draft("level-name", "Room"))}${field("level-width", "Blocks across", ctx2.draft("level-width", "16"), { type: "number", min: 1 })}${field("level-height", "Blocks down", ctx2.draft("level-height", "14"), { type: "number", min: 1 })}${select("level-entry", "Grid integer bytes", [[1, "8 bit"], [2, "16 bit"]], ctx2.draft("level-entry", "1"))}${select("level-endian", "Grid byte order", [["little", "Little endian"], ["big", "Big endian"]], ctx2.draft("level-endian", "little"))}</div><div class="field-row">${field("level-tiles-offset", "Tiles offset", ctx2.draft("level-tiles-offset", "0"))}${field("level-tiles-count", "Tile count", ctx2.draft("level-tiles-count", "16"))}${select("level-codec", "Tile format", Object.entries(codecs2).map(([system2, codec]) => [codec, system2.toUpperCase()]), ctx2.draft("level-codec", codecs2[state2.artifact.system_id] || codecs2.nes))}${field("level-palette-offset", "Palette offset", ctx2.draft("level-palette-offset", "0"))}${select("level-palette-format", "Palette format", [["rgb888", "RGB888"], ["rgb555-le", "RGB555 little endian"], ["rgb555-be", "RGB555 big endian"]], ctx2.draft("level-palette-format", "rgb555-le"))}</div><div class="field-row">${field("level-blocks-offset", "Metatile table offset", ctx2.draft("level-blocks-offset", "0"))}${field("level-blocks-count", "Metatile count", ctx2.draft("level-blocks-count", "16"))}${field("level-block-width", "Tiles per block across", ctx2.draft("level-block-width", "2"))}${field("level-block-height", "Tiles per block down", ctx2.draft("level-block-height", "2"))}${field("level-terrain-offset", "Terrain grid offset", ctx2.draft("level-terrain-offset", "0"))}${field("level-collision-offset", "Collision grid offset (optional)", ctx2.draft("level-collision-offset", ""))}</div><div class="field-row">${select("level-projection", "Projection", [["orthogonal", "Rectangular"], ["isometric", "Isometric"]], ctx2.draft("level-projection", "orthogonal"))}${field("level-projection-width", "Projected cell width", ctx2.draft("level-projection-width", "32"), { type: "number", min: 1, max: 256 })}${field("level-projection-height", "Projected cell height", ctx2.draft("level-projection-height", "16"), { type: "number", min: 1, max: 256 })}${field("level-elevation-step", "Pixels per height unit", ctx2.draft("level-elevation-step", "8"), { type: "number", min: 1, max: 256 })}${field("level-elevation-offset", "Height grid offset (optional)", ctx2.draft("level-elevation-offset", ""))}</div><p class="subtle">Projection draws declared coordinates. A height grid needs its own checked source range.</p>${button("Check declared layout", "levels-declare")}</details>${jsonEditor("level-definition", "Verified layout definition", ctx2.draft("level-definition", JSON.stringify(definition, null, 2)))}<div class="actions">${button("Inspect layout", "levels-inspect")}${button("Save checked definition", "levels-save")}</div></details>`;
     if (!(doc == null ? void 0 : doc.ok)) return heading("", "Levels", "") + empty("No supported level map for this ROM yet", "Inspect the ROM in Resources. A supported map definition is needed before its levels can be shown.", button("Investigate bytes", "navigate", { id: "resources", primary: true })) + setup2 + practiceControls();
     const objects = model.objects(room.id), namedObjects = objects.some((object, index) => !!objectMetadata(doc, room.id, index)), block = Number(ctx2.draft("level-block-index", "0")), uses = doc.uses[String(block)] || [], pending = ((_l = state2.pending) == null ? void 0 : _l.kind) === "levels" && state2.pending.document_id === doc.document_id;
-    return `${heading("", "Levels", "")}${editCheckControls(ctx2)}<div class="identity"><strong>${esc(state2.artifact.name)}</strong><span>${model.values().length} preview changes</span></div><section class="card">${state2.project.demo && ((_m = doc.definition) == null ? void 0 : _m.name) === "Hillside editor-layout workshop" ? '<p class="notice">Practice layout. These room links and object records do not run in Playtest; only Hillside terrain and music do.</p>' : ""}${roomNavigation(doc, model, room.id)}<div class="field-row level-toolbar">${doc.rooms.length > 1 ? select("level-room", "Room", doc.rooms.map((r) => [r.id, r.name]), room.id) : '<input type="hidden" id="level-room" value="' + esc(room.id) + '">'}${select("level-layer", "Paint layer", [["terrain", "Terrain"], ...room.collision ? [["collision", "Collision"]] : []], layer)}${select("level-tool", "Tool", [["paint", "Paint"], ["pick", "Pick from room"], ["fill", "Fill"], ["select", "Select rectangle"], ["paste", "Paste rectangle"], ...objects.some((o) => Number.isSafeInteger(o.x) && Number.isSafeInteger(o.y)) ? [["objects", "Move object"]] : []], ctx2.draft("level-tool", namedObjects ? "objects" : "paint"))}<details><summary>Advanced brush value</summary>${field("level-brush", "Brush value", ctx2.draft("level-brush", "1"), { type: "number", min: 0 })}</details>${select("level-overlay", "Overlay", [["none", "No extra overlays"], ...room.collision ? [["collision", "Collision"]] : [], ...objects.length ? [["objects", "Named objects"], ...((_n = room.object_metadata) == null ? void 0 : _n.some((row) => row.hitbox)) ? [["hitboxes", "Starting hitboxes"]] : [], ["records", "All records (Advanced)"]] : []], ctx2.draft("level-overlay", "objects"))}${select("level-zoom", "Zoom", [["fit", "Fit"], ["1", "1x"], ["2", "2x"], ["3", "3x"]], ctx2.draft("level-zoom", "fit"))}</div><div class="level-brush-panel"><strong>${layer === "collision" ? "Collision brushes" : "Terrain brushes"}</strong><p class="subtle">${layer === "collision" ? "Paint where movement is blocked or allowed. Labels come from this layout; raw values have no mapped meaning." : "Choose a thumbnail to paint, or use Pick from room to sample an existing cell."}</p>${layer === "collision" ? collisionPalette(room, model.cells(room.id, "collision"), ctx2.draft("level-brush", "1")) : levelBrushPalette(doc, model, ctx2.draft("level-brush", "1"))}${!room.collision ? '<p class="notice">Collision is not mapped for this room. Terrain changes its appearance; investigate the collision layout to change movement.</p>' : ""}</div><div class="editor-key" aria-label="Editor highlight key"><span><i class="key-selection" aria-hidden="true"></i>Selected cell</span><span><i class="key-change" aria-hidden="true"></i>Changed cell</span><span><i class="key-hitbox" aria-hidden="true"></i>Starting hitbox</span></div><div class="level-editor-layout"><div class="level-room-editor"><div class="preview-pair room-comparison"><div><span>Original room</span><div class="hex-scroll" role="region" tabindex="0" aria-label="Original room preview"><canvas id="level-original" aria-label="Original declared room"></canvas></div></div><div><span>Editing · highlighted cells changed</span><div class="hex-scroll" role="region" tabindex="0" aria-label="Edited room preview"><canvas id="level-canvas" tabindex="0" role="application" aria-label="Room editor: arrows select, Space paints"></canvas></div></div></div><p id="level-difference-count" class="preview-caption" role="status" aria-live="polite"></p><p id="level-position">Select an object or choose a terrain brush to begin.</p></div>${objectInspector(ctx2, doc, model, room.id)}</div><div class="actions">${button("Undo stroke", "levels-undo", { disabled: !model.past.length })}${button("Redo stroke", "levels-redo", { disabled: !model.future.length })}${button("Copy rectangle", "levels-copy")}${button("Review level changes", "levels-plan", { primary: !pending, disabled: !model.values().length })}${pending ? button("Create level build", "levels-build", { primary: true }) : ""}</div><p class="subtle">Review changes and create a build to save this in the ROM.</p></section><details class="card"><summary>Metatiles & shared uses</summary><div class="field-row">${field("level-block-index", "Metatile index", ctx2.draft("level-block-index", "0"))}${field("level-block-part", "Part index", ctx2.draft("level-block-part", "0"))}${field("level-block-tile", "Replacement tile index", ctx2.draft("level-block-tile", "1"))}</div>${button("Stage block change", "levels-block")}<p>Selected block is used in ${uses.length} declared cells. Changes affect every use.</p><p>${uses.slice(0, 32).map((u) => esc(u.room_id) + " cell " + u.cell).join(" · ")}</p></details>${setup2}${practiceControls()}${report(state2.results["levels.plan"], "Level review")}${report(state2.results["build.apply"], "Separate build")}`;
+    return `${heading("", "Levels", "")}${editCheckControls(ctx2)}<div class="identity"><strong>${esc(state2.artifact.name)}</strong><span>${model.values().length} preview changes</span></div>${((_m = doc.definition) == null ? void 0 : _m.scene) || room.elevation ? '<p class="notice">Declared ' + esc(((_n = doc.scene) == null ? void 0 : _n.projection) || "orthogonal") + " scene preview. Playtest verifies the actual game.</p>" : ""}<section class="card">${state2.project.demo && ((_o = doc.definition) == null ? void 0 : _o.name) === "Hillside editor-layout workshop" ? '<p class="notice">Practice layout. These room links and object records do not run in Playtest; only Hillside terrain and music do.</p>' : ""}${roomNavigation(doc, model, room.id)}<div class="field-row level-toolbar">${doc.rooms.length > 1 ? select("level-room", "Room", doc.rooms.map((r) => [r.id, r.name]), room.id) : '<input type="hidden" id="level-room" value="' + esc(room.id) + '">'}${select("level-layer", "Paint layer", [["terrain", "Terrain"], ...room.collision ? [["collision", "Collision"]] : [], ...room.elevation ? [["elevation", "Elevation"]] : []], layer)}${select("level-tool", "Tool", [["paint", "Paint"], ["pick", "Pick from room"], ["fill", "Fill"], ["select", "Select rectangle"], ["paste", "Paste rectangle"], ...objects.some((o) => Number.isSafeInteger(o.x) && Number.isSafeInteger(o.y)) ? [["objects", "Move object"]] : []], ctx2.draft("level-tool", namedObjects ? "objects" : "paint"))}<details><summary>Advanced brush value</summary>${field("level-brush", "Brush value", ctx2.draft("level-brush", "1"), { type: "number", min: 0 })}</details>${select("level-overlay", "Overlay", [["none", "No extra overlays"], ...room.collision ? [["collision", "Collision"]] : [], ...objects.length ? [["objects", "Named objects"], ...!((_p = doc.definition) == null ? void 0 : _p.scene) && !room.elevation && ((_q = room.object_metadata) == null ? void 0 : _q.some((row) => row.hitbox)) ? [["hitboxes", "Starting hitboxes"]] : [], ["records", "All records (Advanced)"]] : []], ctx2.draft("level-overlay", "objects"))}${select("level-zoom", "Zoom", [["fit", "Fit"], ["1", "1x"], ["2", "2x"], ["3", "3x"]], ctx2.draft("level-zoom", "fit"))}</div><div class="level-brush-panel"><strong>${layer === "elevation" ? "Elevation" : layer === "collision" ? "Collision brushes" : "Terrain brushes"}</strong><p class="subtle">${layer === "elevation" ? "Paint a stored height value from the Advanced brush field. This does not infer collision rules." : layer === "collision" ? "Paint where movement is blocked or allowed. Labels come from this layout; raw values have no mapped meaning." : "Choose a thumbnail to paint, or use Pick from room to sample an existing cell."}</p>${layer === "elevation" ? "<p>Height value: " + esc(ctx2.draft("level-brush", "1")) + "</p>" : layer === "collision" ? collisionPalette(room, model.cells(room.id, "collision"), ctx2.draft("level-brush", "1")) : levelBrushPalette(doc, model, ctx2.draft("level-brush", "1"))}${!room.collision ? '<p class="notice">Collision is not mapped for this room. Terrain changes its appearance; investigate the collision layout to change movement.</p>' : ""}</div><div class="editor-key" aria-label="Editor highlight key"><span><i class="key-selection" aria-hidden="true"></i>Selected cell</span><span><i class="key-change" aria-hidden="true"></i>Changed cell</span>${!((_r = doc.definition) == null ? void 0 : _r.scene) && !room.elevation ? '<span><i class="key-hitbox" aria-hidden="true"></i>Starting hitbox</span>' : ""}</div><div class="level-editor-layout"><div class="level-room-editor"><div class="preview-pair room-comparison"><div><span>Original room</span><div class="hex-scroll" role="region" tabindex="0" aria-label="Original room preview"><canvas id="level-original" aria-label="Original declared room"></canvas></div></div><div><span>Editing · highlighted cells changed</span><div class="hex-scroll" role="region" tabindex="0" aria-label="Edited room preview"><canvas id="level-canvas" tabindex="0" role="application" aria-label="Room editor: arrows select, Space paints"></canvas></div></div></div><p id="level-difference-count" class="preview-caption" role="status" aria-live="polite"></p><p id="level-position">Select an object or choose a terrain brush to begin.</p></div>${objectInspector(ctx2, doc, model, room.id)}</div><div class="actions">${button("Undo stroke", "levels-undo", { disabled: !model.past.length })}${button("Redo stroke", "levels-redo", { disabled: !model.future.length })}${button("Copy rectangle", "levels-copy")}${button("Review level changes", "levels-plan", { primary: !pending, disabled: !model.values().length })}${pending ? button("Create level build", "levels-build", { primary: true }) : ""}</div><p class="subtle">Review changes and create a build to save this in the ROM.</p></section><details class="card"><summary>Metatiles & shared uses</summary><div class="field-row">${field("level-block-index", "Metatile index", ctx2.draft("level-block-index", "0"))}${field("level-block-part", "Part index", ctx2.draft("level-block-part", "0"))}${field("level-block-tile", "Replacement tile index", ctx2.draft("level-block-tile", "1"))}</div>${button("Stage block change", "levels-block")}<p>Selected block is used in ${uses.length} declared cells. Changes affect every use.</p><p>${uses.slice(0, 32).map((u) => esc(u.room_id) + " cell " + u.cell).join(" · ")}</p></details>${setup2}${practiceControls()}${report(state2.results["levels.plan"], "Level review")}${report(state2.results["build.apply"], "Separate build")}`;
   }
   function mount11(ctx2) {
     var _a, _b, _c, _d, _e, _f, _g, _h;

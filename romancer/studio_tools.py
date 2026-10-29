@@ -116,15 +116,16 @@ class StudioTools:
         return {'ok': True, 'status': 'SAVED', 'source_sha256': row['sha256'], 'kind': kind}
 
     def levels_inspect(self, p, c):
-        from .level_design import inspect_level
+        from .adapters.registry import adapter_for
         _, row, raw = self.source(p, c)
-        return inspect_level(raw, p['definition'], row['sha256'])
+        return adapter_for('levels',raw,p['definition'],row['sha256']).inspect()
 
     def levels_plan(self, p, c):
-        from .level_design import plan_level
+        from .adapters.registry import adapter_for
         _, row, raw = self.source(p, c)
-        result = plan_level(raw, p['definition'], p['document_id'], p['changes'], row['sha256'])
-        return {**self.plan(p, result['edits'], c), 'affected_rooms': result['affected_rooms'], 'document_id': result['document_id']}
+        result = adapter_for('levels',raw,p['definition'],row['sha256']).plan(p['document_id'],p['changes'])
+        return {**self.plan(p, result['edits'], c), 'affected_rooms': result['affected_rooms'], 'document_id': result['document_id'],
+                'adapter_id':result['adapter_id'],'adapter_sha256':result['adapter_sha256'],'resource_impact':result['resource_impact']}
 
     def plan(self, p, edits, c):
         merged = []

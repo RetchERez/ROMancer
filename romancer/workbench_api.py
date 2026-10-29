@@ -55,6 +55,7 @@ class WorkbenchAPI:
             'project.undelete':('trash_id',self._project_undelete),
             'rom.check':('project_id artifact_id expected_crc32 crc_scope',self._rom_check),
             'rom.samples':('query system_filter page limit',self._sample_catalog),
+            'coverage.status':('query system_filter page limit',self._coverage_status),
             'system.ui_ready':('launch_id',lambda p,c:self._ui_startup(p,True)),
             'system.ui_status':('launch_id',lambda p,c:self._ui_startup(p,False)),
             'recipes.list':('project_id artifact_id',self._recipes_list),
@@ -1061,6 +1062,10 @@ class WorkbenchAPI:
     def _sample_catalog(self,p,c):
         from .rom_sample_db import catalog
         return catalog(p['query'],p['system_filter'],p['page'],p['limit'])
+
+    def _coverage_status(self,p,c):
+        from .game_coverage import status
+        return status(p['query'],p['system_filter'],p['page'],p['limit'])
 
     def _rom_check(self,p,c):
         from .rom_health import check_rom

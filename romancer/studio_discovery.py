@@ -25,7 +25,9 @@ def resource_relationships(raw,descriptors,source_sha256):
         from .level_design import inspect_level
         doc=inspect_level(raw,descriptors['levels'],source_sha256)
         for r in doc['ranges']:nodes.append({'id':'level:'+r['name'],'name':r['name'],**r,'confidence':'DECLARED'})
-        for room in doc['rooms']:edges.append({'from':'level:'+room['id']+' terrain','to':'level:metatiles','relation':'indexes metatiles'})
+        for room in doc['rooms']:
+            edges.append({'from':'level:'+room['id']+' terrain','to':'level:metatiles','relation':'indexes metatiles'})
+            if room.get('elevation') is not None:edges.append({'from':'level:'+room['id']+' elevation','to':'level:'+room['id']+' terrain','relation':'declared terrain height'})
         edges.extend([{'from':'level:metatiles','to':'level:tiles','relation':'indexes tiles'},
           {'from':'level:tiles','to':'level:palette','relation':'declared preview palette'}])
         connection_count=len(doc.get('connections',[]))

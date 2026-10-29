@@ -2049,12 +2049,12 @@
       "intro": "Levels needs a checked game-specific definition. The matched FFL II bedroom is a bounded real-game example. An unsupported source has no level definition; optional Advanced practice teaches the declared format without pretending to decode that game.",
       "steps": [
         "Open <b>Levels</b> for the selected source. If it says <b>No supported level map for this ROM yet</b>, investigate the source or supply a checked map definition through Advanced level setup. The separate collapsed <b>Advanced practice > Open test layout</b> is a learning exercise, not your game.",
-        "Choose <b>Paint layer</b>: Terrain changes appearance; Collision edits a separately declared grid. Choose a named collision brush or a raw value. Pick from room samples existing data; Paint, Fill and rectangle copy/paste stay inside the declared bounds.",
-        "Use Undo stroke and Redo stroke. With Move object, drag a named label. When a starting sprite is declared, its preview moves too. Starting hitboxes shows declared rectangles. Pixel hitbox dimensions are separate from cell-based positions; use Update preview before reviewing.",
+        "Choose <b>Paint layer</b>: Terrain changes appearance; Collision edits a separately declared grid; Elevation appears only when a stored height grid is declared. Pick from room samples existing data. Paint, Fill and rectangle copy/paste stay inside the declared bounds.",
+        "Use <b>Undo stroke</b> and <b>Redo stroke</b>. With Move object, drag a named marker or select its record in the inspector when markers overlap. A declared object-height field keeps dragging at that height. Arrow keys select a cell; Space applies the current brush. Starting hitboxes is available for the rectangular editor, not projected scenes.",
         "Choose <b>Review level changes</b>, inspect the exact changes, then <b>Create level build</b>. Visit the room and test walking, collision, boundaries and transitions."
       ],
       "result": "The preview and checked changes stay within declared grid/object ranges. Test the built game to establish movement, collision, boundaries and transitions; the static preview alone does not certify them.",
-      "note": "A visible wall is not automatically a collision wall. Labels, sprite assemblies and hitboxes come from a checked declaration; generic declarations do not prove gameplay behavior. If collision is not mapped, the editor says so. Only the implemented original runtime has the collision/combat behavior described in the linked practice procedure. This editor supports declared rectangular tile grids. Isometric projection, heightmaps and 3D level editing are not implemented. The Immortal has no verified level definition. Declared collision labels still need native testing.",
+      "note": "A visible wall or a height value does not establish collision. Labels and sprite assemblies describe checked declarations; gameplay still needs native testing. Rectangular and isometric previews use declared cell dimensions. Height comes only from a declared grid or explicit object-height field. There is no general 3D editor, and The Immortal still has no verified level definition.",
       "details": [
         {
           "title": "Shared metatiles",
@@ -2063,6 +2063,14 @@
         {
           "title": "Optional practice is not your game",
           "text": "The artificial Hillside/Courtyard layouts demonstrate checked storage and declared relationships. Only Hillside graphics and music are rendered by the native test program. Their other room, objects and connections are editor practice data, not implemented doors or events. Actual game-room editing requires a verified definition for that game and revision."
+        },
+        {
+          "title": "Isometric layouts and elevation",
+          "text": "Advanced level setup lets a definition specify projection, projected cell width/height and height step. An optional stored elevation grid adds the Elevation paint layer. Advanced brush value selects the height to paint. Object z, layer and order bindings are explicit definition fields; a field called z is not inferred. The editor projects individual source cells and sprites, rather than stretching a complete room screenshot."
+        },
+        {
+          "title": "Adapter checks cover declared storage",
+          "text": "Levels inspection re-encodes the declared tiles, palette, grids and object fields and checks byte equality. Reserved palette bits, object padding and other opaque bytes are preserved. Review reports dependent resources affected by an edit. This is not a complete game inventory or proof that an edit works in gameplay."
         }
       ],
       "related": [
@@ -2099,9 +2107,31 @@
               700
             ],
             "caption": "Use a supported room preview and its declared fields. Unsupported map commands remain unavailable; a rendered image alone does not establish collision, events or a working exit."
+          },
+          {
+            "image": "259-declared-isometric-editor",
+            "title": "Declared isometric geometry fixture (original test data)",
+            "x": 48,
+            "top": 460,
+            "width": 1200,
+            "crop": [
+              0,
+              0,
+              1213,
+              722
+            ],
+            "caption": "Actual editor capture using authored test data. Height painting, keyboard editing and object dragging were built through ROMancer. This is a framework test, not a commercial game map."
           }
         ]
-      }
+      },
+      "extra_images": [
+        {
+          "image": "259-declared-isometric-editor",
+          "alt": "Original geometry fixture: elevation and object movement with before and edited previews",
+          "caption": "Actual editor capture using authored test data. Height painting, keyboard editing and object dragging were built through ROMancer. This is a framework test, not a commercial game map.",
+          "title": "Declared isometric geometry fixture (original test data)"
+        }
+      ]
     },
     {
       "id": "connections",
@@ -2408,6 +2438,10 @@
         {
           "title": "New investigation and editing operations",
           "text": "debugger.follow summarizes authenticated full captures; definitions.preview/save uses source/research-bound review digests; references.survey reports exact numeric candidates; commands.inspect/plan protects opcode bytes; animations.list/get/preview/save/delete manages declared arrangements. Read-only mode exposes inspections, not saving or plan operations. Writes retain explicit --allow-writes and allowed import roots."
+        },
+        {
+          "title": "Read-only coverage status",
+          "text": "coverage.status lists the frozen 1,039 exact target identities with bounded query, system_filter, page and limit arguments. Current accepted revisions: zero. A catalog match is not a decoded game. Evidence metadata preflight cannot certify a revision or authorize ROM writes."
         }
       ],
       "related": [
@@ -5656,6 +5690,25 @@
       "topics": [
         "recorded-rom-facts",
         "mcp"
+      ]
+    },
+    {
+      "term": "Isometric projection",
+      "topics": [
+        "levels"
+      ]
+    },
+    {
+      "term": "Elevation and object height",
+      "topics": [
+        "levels"
+      ]
+    },
+    {
+      "term": "Coverage status",
+      "topics": [
+        "mcp",
+        "release-checks"
       ]
     }
   ],

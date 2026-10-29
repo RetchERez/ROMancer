@@ -1,5 +1,6 @@
 import {esc,button,select} from './common.js';
 import {objectFieldLabel} from './level_semantics.js';
+import {specFor,sceneNodes,sceneBounds,sortNodes,footprint,inverseAtZ} from './scene_geometry.js';
 
 export function objectMetadata(doc,id,index){
  const room=doc.rooms.find(room=>room.id===id),definition=doc.definition?.rooms?.find(room=>room.id===id);
@@ -28,6 +29,7 @@ export function roomConnections(doc,model){
 }
 
 export function roomThumbnail(doc,model,id){
+ if(doc.definition?.scene||model.room(id).elevation)return projectedThumbnail(doc,model,id);
  const room=model.room(id),sourceWidth=room.width*doc.block_width*8,sourceHeight=room.height*doc.block_height*8;
  const scale=Math.min(1,160/sourceWidth,96/sourceHeight),width=Math.max(1,Math.floor(sourceWidth*scale)),height=Math.max(1,Math.floor(sourceHeight*scale));
  const pixels=new Uint8ClampedArray(width*height*4),cells=model.cells(id,'terrain'),blocks=model.blocks();
@@ -35,6 +37,22 @@ export function roomThumbnail(doc,model,id){
   const sx=Math.floor(x*sourceWidth/width),sy=Math.floor(y*sourceHeight/height),bx=Math.floor(sx/(doc.block_width*8)),by=Math.floor(sy/(doc.block_height*8));
   const part=Math.floor(sy/8)%doc.block_height*doc.block_width+Math.floor(sx/8)%doc.block_width;
   const tile=blocks[cells[by*room.width+bx]][part],value=doc.tiles[tile][sy%8*8+sx%8];pixels.set([...doc.palette[value],255],(y*width+x)*4);
+ }
+ return {width,height,pixels};
+}
+
+function projectedThumbnail(doc,model,id){
+ const scene=specFor(doc),nodes=sortNodes(scene,sceneNodes(doc,model,id).filter(n=>n.kind==='terrain'));
+ const bounds=sceneBounds(scene,nodes),sourceWidth=bounds.width-128,sourceHeight=bounds.height-128;
+ const scale=Math.min(1,160/sourceWidth,96/sourceHeight),width=Math.max(1,Math.ceil(sourceWidth*scale)),height=Math.max(1,Math.ceil(sourceHeight*scale));
+ const camera={offset_x:(bounds.offset_x-64)*scale,offset_y:(bounds.offset_y-64)*scale,zoom:scale};
+ const pixels=new Uint8ClampedArray(width*height*4),blocks=model.blocks();
+ for(const node of nodes){const corners=footprint(scene,node,camera),xs=corners.map(p=>p.x),ys=corners.map(p=>p.y);
+  for(let y=Math.max(0,Math.floor(Math.min(...ys)));y<Math.min(height,Math.ceil(Math.max(...ys)));y++)for(let x=Math.max(0,Math.floor(Math.min(...xs)));x<Math.min(width,Math.ceil(Math.max(...xs)));x++){
+   const p=inverseAtZ(scene,{x:x+.5,y:y+.5},node.z,camera),dx=p.x-node.x,dy=p.y-node.y;if(dx<0||dy<0||dx>=1||dy>=1)continue;
+   const tx=Math.min(doc.block_width*8-1,Math.floor(dx*doc.block_width*8)),ty=Math.min(doc.block_height*8-1,Math.floor(dy*doc.block_height*8));
+   const tile=blocks[node.block][Math.floor(ty/8)*doc.block_width+Math.floor(tx/8)],value=doc.tiles[tile][ty%8*8+tx%8];pixels.set([...doc.palette[value],255],(y*width+x)*4);
+  }
  }
  return {width,height,pixels};
 }

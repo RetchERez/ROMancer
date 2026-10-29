@@ -27,6 +27,15 @@ READ_CHUNK_BYTES = 64 * 1024
 # Release source selection is explicit. Adding a file or fixture requires review;
 # a text extension or placement under docs/tests never grants distribution approval.
 APPROVED_FILES = frozenset({
+    'knowledge/game_support.json',
+    'romancer/game_coverage.py',
+    'tools/audit_game_coverage.py',
+    'tests/test_game_coverage.py',
+    'romancer/scene_schema.py',
+    'tests/test_scene_schema.py',
+    'romancer/ui/scene_canvas.js','romancer/ui/scene_geometry.js','romancer/adapters/__init__.py','romancer/adapters/base.py','romancer/adapters/levels.py','romancer/adapters/registry.py','tests/test_game_adapters.py',
+    'tests/ui_scene_canvas.mjs',
+    'user-guide/screenshots/259-declared-isometric-editor.png',
     'user-guide/screenshots/258-collision-edit-preview.png',
     'user-guide/screenshots/253-recorded-rom-facts.png',
     'romancer/rom_sample_db.py',

@@ -3,6 +3,7 @@ import {selectionKey} from './tool_inputs.js';
 import {read} from './common.js';
 import {objectMetadata,visibleLevelObjects} from './room_navigation.js';
 import {actorHitboxes,collisionBrushes,paintStartingSprites} from './level_semantics.js';
+import {mountSceneLevel} from './scene_canvas.js';
 const integer=(v,min,max)=>{if(!Number.isSafeInteger(v)||v<min||v>max)throw Error('Level value is outside declared bounds.');return v;};
 const key=c=>[c.kind,c.room_id??'',c.index,c.part??c.field??''].join(':');
 export function levelScale(width,height,viewportHeight,availableWidth,mode){if(mode==='fit')return Math.max(.25,Math.min(3,Math.max(160,viewportHeight-420)/height,availableWidth/width));const value=Number(mode);integer(value,1,3);return value;}
@@ -12,7 +13,7 @@ export class LevelDraft{
  set(c){let original,max,min=0;
   if(c.kind==='metatile'){integer(c.index,0,this.doc.metatiles.length-1);integer(c.part,0,this.doc.metatiles[c.index].length-1);original=this.doc.metatiles[c.index][c.part];max=this.doc.tiles.length-1;}
   else{const r=this.room(c.room_id);if(c.kind==='object'){integer(c.index,0,r.objects.length-1);if(!(c.field in r.objects[c.index]))throw Error('Unknown object field.');original=r.objects[c.index][c.field];const declared=this.doc.definition?.rooms.find(x=>x.id===r.id)?.objects?.fields.find(f=>f.name===c.field);min=declared?.minimum??0;max=Math.min(declared?.maximum??65535,c.field==='x'?r.width-1:c.field==='y'?r.height-1:c.field==='exit_room'?this.doc.rooms.length-1:65535);}
-   else{if(!['terrain','collision'].includes(c.kind)||!r[c.kind])throw Error('This layer is not declared.');integer(c.index,0,r[c.kind].length-1);original=r[c.kind][c.index];const declared=this.doc.definition?.rooms.find(x=>x.id===r.id)?.[c.kind];max=c.kind==='terrain'?this.doc.metatiles.length-1:2**(8*(declared?.entry_bytes||1))-1;}}
+   else{if(!['terrain','collision','elevation'].includes(c.kind)||!r[c.kind])throw Error('This layer is not declared.');integer(c.index,0,r[c.kind].length-1);original=r[c.kind][c.index];const declared=this.doc.definition?.rooms.find(x=>x.id===r.id)?.[c.kind];max=c.kind==='terrain'?this.doc.metatiles.length-1:Math.min(c.kind==='elevation'?1024:65535,2**(8*(declared?.entry_bytes||1))-1);}}
   integer(c.value,min,max);if(c.kind==='object'){const metadata=objectMetadata(this.doc,c.room_id,c.index);if(metadata?.role==='exit'&&metadata.reference?.field===c.field&&!metadata.reference.targets.some(target=>target.value===c.value))throw Error('Exit destination is not mapped.');}if(c.value===original)this.changes.delete(key(c));else this.changes.set(key(c),{...c});if(this.changes.size>8192){this.changes.delete(key(c));throw Error('Review at most8192level changes.');}
  }
  values(){return [...this.changes.values()];}
@@ -41,7 +42,7 @@ export function blockPixels(doc,model,index){integer(index,0,doc.metatiles.lengt
 export function pickLevelBrush(model,id,layer,index){const cells=model.cells(id,layer);integer(index,0,cells.length-1);return cells[index];}
 export function moveLevelObject(model,id,index,x,y){const room=model.room(id);integer(index,0,room.objects.length-1);integer(x,0,room.width-1);integer(y,0,room.height-1);const object=room.objects[index];if(!Object.hasOwn(object,'x')||!Object.hasOwn(object,'y'))throw Error('Object coordinates are not declared.');model.set({kind:'object',room_id:id,index,field:'x',value:x});model.set({kind:'object',room_id:id,index,field:'y',value:y});}
 export function levelBrushPalette(doc,model,selected){return `<div class="level-brush-palette" role="group" aria-label="Terrain brushes">${model.blocks().map((_,index)=>`<button type="button" data-level-brush="${index}" aria-pressed="${Number(selected)===index}" aria-label="Paint with metatile ${index}" title="Metatile ${index}"><canvas data-level-block="${index}" aria-hidden="true"></canvas><span>${index}</span></button>`).join('')}</div>`;}
-export function mountLevel(ctx,doc,model,id,persist){const canvas=document.getElementById('level-canvas');if(!canvas)return;const scope=selectionKey(ctx.state),current=()=>scope===selectionKey(ctx.state)&&ctx.state.page==='levels',room=model.room(id);let pointer=null,selected=0,anchor=null,dragObject=null,dragOffset={x:0,y:0};
+export function mountLevel(ctx,doc,model,id,persist){if(doc.definition?.scene||model.room(id).elevation)return mountSceneLevel(ctx,doc,model,id,persist,{makeOriginal:()=>new LevelDraft(doc),blockPixels,scale:levelScale});const canvas=document.getElementById('level-canvas');if(!canvas)return;const scope=selectionKey(ctx.state),current=()=>scope===selectionKey(ctx.state)&&ctx.state.page==='levels',room=model.room(id);let pointer=null,selected=0,anchor=null,dragObject=null,dragOffset={x:0,y:0};
  const brushNodes=()=>[...(document.querySelectorAll?.('[data-level-brush]')||[])];
  const markerMode=()=>read('level-overlay')==='records'?'records':read('level-overlay')==='objects'||read('level-tool')==='objects'?'objects':'none';
  const visibleMarkers=()=>visibleLevelObjects(doc,model,id,markerMode());

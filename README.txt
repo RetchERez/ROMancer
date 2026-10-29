@@ -1,4 +1,4 @@
-ROMancer v1.0 development build46
+ROMancer v1.0 development build47
 By RetchEWretched
 
 Local ROM editing for NES, SNES, Genesis, Master System, Game Boy, Game Boy Color.
@@ -9,17 +9,21 @@ Everyday use works offline. No AI account, model, API key or subscription is req
 
 COVERAGE STATUS - NOT READY FOR UNIVERSAL v1.0 RELEASE
 
-This development build fixes a sound-definition guard that could allow samples
-inside an identified original driver's header or interrupt-vector region.
+This development build adds a frozen exact-revision coverage ledger, declared
+isometric/elevation editing, and lossless adapter checks for declared level data.
+The earlier sound-definition guard fix remains included.
 
-Full visual editing of all1,035 catalog revisions is the release requirement.
+Full visual editing of all 1,035 catalog revisions is the release requirement.
 That requirement is not met. Four additional supplied showcase revisions bring
-the acceptance set to1,039 exact source identities. No revision is certified for
+the acceptance set to 1,039 exact source identities. No revision is certified for
 full-game editing. Six built-in profiles provide specific, limited edits.
 
-The generic level editor handles declared rectangular tile/metatile grids.
-It has no isometric projection, heightmap or 3D level editor. The Immortal's
-verified Genesis edit is its new-game prompt; no level/object grammar is enabled.
+The generic level editor handles declared rectangular and isometric grids,
+explicit height grids and object-height fields. Source-bound previews, room
+thumbs, picking, stroke undo/redo and reviewed builds share that geometry.
+This framework does not decode a game automatically or provide a 3D editor.
+The Immortal's verified edit remains its new-game prompt; no level/object
+grammar is enabled. The new isometric screenshot uses original fixture data.
 Sample previews and native audio capture do not imply editable commercial songs.
 Only the original practice music drivers currently have sequence editors.
 
@@ -28,6 +32,14 @@ The offline facts catalog records measured identities and candidates. It is not
 and exact revision needs its own decode/writeback, original-preservation, visual
 preview and native gameplay evidence before universal release acceptance passes.
 Keep this build private for development and testing; do not publish it as complete.
+
+Run python -B tools/audit_game_coverage.py for the frozen target summary.
+Exit code 1 means the required full-game acceptance is incomplete; code 2 means
+an invalid input or tool failure. coverage.status exposes a bounded read-only
+view through the local API/MCP. Neither interface can certify a revision.
+levels.inspect reports source-bound resources, dependencies and a no-op
+serialization check. levels.plan reports affected resources and uses the
+existing guarded build path. These checks cover declared storage only.
 
 EDITING TASKS
 
