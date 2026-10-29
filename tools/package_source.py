@@ -35,6 +35,7 @@ APPROVED_FILES = frozenset({
     'tests/test_scene_schema.py',
     'romancer/ui/scene_canvas.js','romancer/ui/scene_geometry.js','romancer/adapters/__init__.py','romancer/adapters/base.py','romancer/adapters/levels.py','romancer/adapters/registry.py','tests/test_game_adapters.py',
     'tests/ui_scene_canvas.mjs',
+    'user-guide/screenshots/260-ffl2-circle-editor.png',
     'user-guide/screenshots/259-declared-isometric-editor.png',
     'user-guide/screenshots/258-collision-edit-preview.png',
     'user-guide/screenshots/253-recorded-rom-facts.png',

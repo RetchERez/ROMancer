@@ -186,12 +186,63 @@ def _commands(raw, start, end, cancelled):
     raise ValueError('map command budget exceeded')
 
 
+def encode_map_commands(commands):
+    """Rebuild the stored grammar; preserve only explicitly reserved operand bits.
+
+    No allocation or ROM mutation occurs. Opaque bytes after End are not emitted.
+    Decoding and serializing a stream does not prove its gameplay semantics.
+    """
+    if type(commands) is not list or not 1 <= len(commands) <= 4096:
+        raise ValueError('map command count exceeds its budget')
+    output=bytearray();expected=None
+    for index,command in enumerate(commands):
+        if type(command) is not dict:raise ValueError('map command must be a record')
+        op=number(command.get('op'),0,10);offset=number(command.get('offset'),0,SIZE-1)
+        text=command.get('raw')
+        if type(text) is not str or len(text) not in (2,4,6,8) or any(c not in '0123456789abcdef' for c in text):raise ValueError('invalid stored map command bytes')
+        original=bytes.fromhex(text)
+        if original[0]>>4!=op or number(command.get('size'),1,4)!=len(original):raise ValueError('map command layout differs')
+        if expected is not None and offset!=expected:raise ValueError('map command offsets have gaps or overlap')
+        if op==0:
+            if len(original)!=1 or index!=len(commands)-1:raise ValueError('map End must be the last single-byte record')
+            data=bytes([original[0]&15])
+        elif op==10:
+            data=bytes([0xa0|number(command.get('state_index'),0,15),
+                        number(command.get('minimum'),0,15)<<4|number(command.get('maximum'),0,15)])
+        else:
+            x=number(command.get('x'),0,63);y=number(command.get('y'),0,63)
+            data=bytes([(op<<4)|(y>>2),((y&3)<<6)|x])
+            if op in (1,3,4,5,6,9):
+                if len(original)<3:raise ValueError('map tile operand is missing')
+                flags=original[2]&192;data+=bytes([flags|number(command.get('tile'),0,63)])
+                if op!=1 and flags:data+=bytes([number(command.get('second_tile'),0,63)])
+                elif 'second_tile' in command:raise ValueError('map command has no alternate tile operand')
+        if len(data)!=len(original):raise ValueError('map command serialization changed its width')
+        output+=data;expected=offset+len(data)
+    if commands[-1]['op']!=0:raise ValueError('map stream is missing End')
+    return bytes(output)
+
+
+def check_map_storage(raw,start,end,*,cancelled=lambda:False):
+    """Independent no-op encoding check within an existing catalog-bounded range."""
+    if type(raw) not in (bytes,bytearray) or len(raw)>SIZE:raise ValueError('map source exceeds the revision storage budget')
+    commands,used_end=_commands(raw,start,end,cancelled)
+    encoded=encode_map_commands(commands);_check(cancelled)
+    original=bytes(raw[start:used_end])
+    if encoded!=original:raise ValueError('map command storage failed its lossless roundtrip')
+    return {'status':'byte_identical','codec':'ffl2-map-command-stream-v1','offset':start,
+            'used_bytes':len(encoded),'command_count':len(commands),'range_bound_bytes':end-start,
+            'protected_trailing_bytes':end-used_end,'stored_sha256':hashlib.sha256(original).hexdigest(),
+            'encoded_sha256':hashlib.sha256(encoded).hexdigest(),'native_verified':False,'write_authorized':False}
+
+
 def decode_map(raw, start, end, *, state=None, cancelled=lambda: False):
     """Decode terrain, original command provenance, and exact owned byte extent.
 
     State is an explicit mapping of state-nibble index to captured/selected value.
-    Large circles are intentionally unsupported. Opcode8 matches the game's
-    fixed-column span fill; it is not a general connected-region flood fill.
+    Circle rendering uses the game's small-radius table and signed 16-bit
+    recurrence for larger/zero radii. Opcode8 is fixed-column span fill,
+    not a general connected-region flood fill.
     """
     if state is not None:
         if type(state) is not dict or len(state) > 32:
@@ -249,7 +300,20 @@ def decode_map(raw, start, end, *, state=None, cancelled=lambda: False):
         elif op == 5:
             sx, sy = anchor; radius = abs(x-sx)+abs(y-sy)
             if not 1 <= radius < 8:
-                raise ValueError('large or zero-radius circle requires an unsupported decoder path')
+                # Original fixed-point rotation, including its integer rounding,
+                # word wrapping and zero-divisor quotient. The sampled routine
+                # draws after updating both vector components, not before.
+                vx=((x-sx)&255)<<8;vy=((y-sy)&255)<<8
+                def quotient(value):
+                    negative=bool(value&32768);magnitude=(-value)&65535 if negative else value
+                    result=magnitude//radius if radius else 65535
+                    return (-result if negative else result)&65535
+                for _ in range(radius*8+1):
+                    _check(cancelled)
+                    vx=(vx+quotient(vy))&65535;vy=(vy-quotient(vx))&65535
+                    xx=(sx+(vx>>8))&255;yy=(sy+(vy>>8))&255
+                    if xx<64 and yy<64:put(xx,yy,t,offset)
+                continue
             table = 0x2670+2*(radius-1)
             if table+2 > len(raw):
                 raise ValueError('circle table exceeds source')
@@ -395,12 +459,14 @@ def inspect_room(path, original_path, header, *, state=None, cancelled=lambda: F
                                     and a['table'] == ref['table'] and a['id'] == ref['id']), None)
     result = {'room': room, 'objects': room['objects'], 'links': room['links'],
               'arrivals': [a for a in arrivals if a['header'] == header], 'reference': REFERENCE}
+    try:result['storage']=check_map_storage(raw,room['map_start'],room['map_bound'],cancelled=cancelled)
+    except ValueError as error:result['storage']={'status':'unsupported','reason':str(error),'write_authorized':False,'native_verified':False}
     try:
         decoded = decode_map(raw, room['map_start'], room['map_bound'], state=state, cancelled=cancelled)
         counts = Counter(decoded['provenance'])
         for command in decoded['commands']:
             command['final_cells'] = counts[command['offset']]
-            command['editable'] = header == EDITABLE_HEADER and command['op'] in (1, 2, 3, 4, 6, 9)
+            command['editable'] = header == EDITABLE_HEADER and command['op'] in (1, 2, 3, 4, 5, 6, 9)
         marked, markers = _markers(decoded['cells'], room['flags'])
         behavior = list(raw[0x1f000+32*room['tileset']:0x1f020+32*room['tileset']])
         result['map'] = {**decoded, 'status': 'decoded', 'size': [64, 64], 'tile_size': 16,
@@ -445,6 +511,7 @@ def plan_edits(path, original_path, header, changes, *, cancelled=lambda: False)
                 b['condition'], b['range'], b['event'], b['flags'], b['x_flags'], b['y_flags']):
             raise ValueError('NPC conditions, references and packed flags are protected')
     before = decode_map(raw, room['map_start'], room['map_bound'], cancelled=cancelled)
+    check_map_storage(raw,room['map_start'],room['map_bound'],cancelled=cancelled)
     baseline = decode_map(original, root['map_start'], root['map_bound'], cancelled=cancelled)
     shared_contexts=[r for r in rooms if r['map_start']==room['map_start']]
     for context in shared_contexts:
@@ -454,7 +521,7 @@ def plan_edits(path, original_path, header, changes, *, cancelled=lambda: False)
     if [(c['offset'], c['op'], c['size']) for c in before['commands']] != [(c['offset'], c['op'], c['size']) for c in baseline['commands']]:
         raise ValueError('map command structure differs from original')
     for a, b in zip(before['commands'], baseline['commands']):
-        if a['op'] not in (1, 2, 3, 4, 6, 9) and a['raw'] != b['raw']:
+        if a['op'] not in (1, 2, 3, 4, 5, 6, 9) and a['raw'] != b['raw']:
             raise ValueError('unsupported map command operands are protected')
         if 'tile' in a and ((bytes.fromhex(a['raw'])[2] & 192) != (bytes.fromhex(b['raw'])[2] & 192)
                             or a.get('second_tile') != b.get('second_tile')):
@@ -482,8 +549,8 @@ def plan_edits(path, original_path, header, changes, *, cancelled=lambda: False)
             _fields(change, 'kind offset x y tile', 'kind offset')
             number(change['offset'], 0, SIZE-1)
             c = next((c for c in before['commands'] if c['offset'] == change['offset']), None)
-            if c is None or c['op'] not in (1, 2, 3, 4, 6, 9):
-                raise ValueError('select an existing editable point, anchor, rectangle or line')
+            if c is None or c['op'] not in (1, 2, 3, 4, 5, 6, 9):
+                raise ValueError('select an existing editable point, anchor, rectangle, circle or line')
             if 'tile' in change and c['op'] == 2:
                 raise ValueError('anchor commands have no tile operand')
             x, y = _coord(change, 'x', c['x']), _coord(change, 'y', c['y'])
@@ -530,6 +597,7 @@ def plan_edits(path, original_path, header, changes, *, cancelled=lambda: False)
         else:
             raise ValueError('unsupported map edit kind')
     after = decode_map(work, room['map_start'], room['map_bound'], cancelled=cancelled)
+    check_map_storage(work,room['map_start'],room['map_bound'],cancelled=cancelled)
     behavior = raw[0x1f000+32*room['tileset']:0x1f020+32*room['tileset']]
     if any(behavior[a & 31] != behavior[b & 31] or (a & 32) != (b & 32)
            for a, b in zip(before['cells'], baseline['cells'])):

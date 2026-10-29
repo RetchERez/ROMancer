@@ -33,6 +33,74 @@ def fixture():
 
 
 class FFL2MapsTests(unittest.TestCase):
+    def test_independent_encoder_roundtrips_all_stored_map_command_shapes(self):
+        from romancer.ffl2_maps import _commands,encode_map_commands,check_map_storage
+        stream=bytearray()
+        for op in range(1,11):
+            stream+=xy(op,3,5)
+            if op in (1,3,4,5,6,9):stream+=bytes([0xc1])+(b'\x02' if op!=1 else b'')
+        stream+=b'\x0f';raw=bytes(64)+bytes(stream)+b'\xa1\xb2'
+        commands,end=_commands(raw,64,len(raw),lambda:False)
+        self.assertEqual(encode_map_commands(commands),bytes(stream))
+        result=check_map_storage(raw,64,len(raw))
+        self.assertEqual(result['status'],'byte_identical');self.assertEqual(result['used_bytes'],len(stream))
+        self.assertEqual(result['protected_trailing_bytes'],2);self.assertFalse(result['native_verified']);self.assertFalse(result['write_authorized'])
+        self.assertEqual(end,64+len(stream))
+
+    def test_encoder_rebuilds_packed_coordinates_without_copying_them(self):
+        from romancer.ffl2_maps import _commands,encode_map_commands
+        commands,_=_commands(bytes.fromhex('17ce9d0f'),0,4,lambda:False)
+        commands[0]['x']=15
+        self.assertEqual(encode_map_commands(commands),bytes.fromhex('17cf9d0f'))
+        commands[0]['y']=32
+        self.assertEqual(encode_map_commands(commands),bytes.fromhex('180f9d0f'))
+
+    def test_encoder_refuses_wrong_shape_gaps_missing_end_and_unbounded_operands(self):
+        import copy
+        from romancer.ffl2_maps import _commands,encode_map_commands
+        commands,_=_commands(bytes.fromhex('17ce1d00'),0,4,lambda:False)
+        for mutate in [lambda c:c.pop(),lambda c:c.append(copy.deepcopy(c[-1])),
+                       lambda c:c[0].update(x=64),lambda c:c[0].update(op=True),
+                       lambda c:c[0].update(size=2),lambda c:c[1].update(offset=4),
+                       lambda c:c[0].update(raw='07ce1d')]:
+            changed=copy.deepcopy(commands);mutate(changed)
+            with self.subTest(mutation=mutate),self.assertRaises(ValueError):encode_map_commands(changed)
+
+    def test_encoder_rejects_boolean_width_and_records_outside_cartridge(self):
+        from romancer.ffl2_maps import _commands,encode_map_commands,SIZE
+        with self.assertRaises(ValueError):
+            encode_map_commands([{'op':0,'offset':0,'raw':'00','size':True}])
+        stream=bytes.fromhex('10000100')
+        commands,_=_commands(stream,0,len(stream),lambda:False)
+        for command in commands:command['offset']+=SIZE-len(stream)
+        self.assertEqual(encode_map_commands(commands),stream)
+        for command in commands:command['offset']+=1
+        with self.assertRaises(ValueError):encode_map_commands(commands)
+
+    def test_storage_check_is_independent_of_state_and_drawing_support(self):
+        from romancer.ffl2_maps import check_map_storage,decode_map
+        raw=bytes.fromhex('a03f00')
+        self.assertEqual(check_map_storage(raw,0,len(raw))['status'],'byte_identical')
+        with self.assertRaisesRegex(ValueError,'state'):decode_map(raw,0,len(raw))
+        with self.assertRaises(KeyboardInterrupt):check_map_storage(raw,0,len(raw),cancelled=lambda:True)
+
+    def test_reviewed_circle_edit_preserves_collision_and_command_width(self):
+        raw=fixture();start=0x20265
+        program=xy(7,1,1)+xy(2,32,32)+xy(5,40,32)+b'\2\0'
+        raw[start:start+len(program)]=program
+        self.original.write_bytes(raw);self.current.write_bytes(raw)
+        with patch.object(self.maps,'ROOT_SHA256',hashlib.sha256(raw).hexdigest()):
+            plan=self.maps.plan_edits(self.current,self.original,0x486b,[{'kind':'command','offset':start+4,'x':41}])
+            self.assertEqual(plan['edits'],[{'offset':start+4,'before':xy(5,40,32).hex()+'02','after':xy(5,41,32).hex()+'02'}])
+            self.assertTrue(plan['requires_native_playtest']);self.assertFalse(plan['native_verified'])
+            inspected=self.maps.inspect_room(self.current,self.original,0x486b)
+            self.assertTrue(next(c for c in inspected['map']['commands'] if c['op']==5)['editable'])
+
+    def test_room_inspection_exposes_storage_scope_without_expanding_edit_permission(self):
+        result=self.maps.inspect_room(self.current,self.original,0x4800)
+        self.assertEqual(result['storage']['status'],'byte_identical')
+        self.assertFalse(result['room']['editable']);self.assertFalse(result['storage']['write_authorized'])
+
     def test_terrain_edit_preserves_each_shared_headers_collision_context(self):
         from romancer import ffl2_maps
         with tempfile.TemporaryDirectory() as folder:
@@ -172,10 +240,22 @@ class FFL2MapsTests(unittest.TestCase):
             with self.assertRaises(ValueError):
                 self.maps.decode_map(program, 0, len(program), state=state)
 
-    def test_large_circle_fails_closed_and_cancellation_is_observed(self):
-        program = xy(2, 1, 1) + xy(5, 12, 1) + b'\2\0'
-        with self.assertRaisesRegex(ValueError, 'circle'):
-            self.maps.decode_map(program, 0, len(program))
+    def test_large_and_zero_circles_match_original_cpu_oracle_vectors(self):
+        # Authored geometry, executed by the unchanged original circle routine
+        # through private ROMancer test builds. No game maps/assets are embedded.
+        vectors=[((32,32),(40,32),'6f2cf3955965f930cdb0cd02fd021c14cb767a951ba0d7fb39e512281606e923'),
+                 ((32,32),(32,40),'c6114ad3adce9f30c2b464535478a10908d5560c49e7f17ea5085ba70457806c'),
+                 ((32,32),(22,28),'06c566104fde1adeafc653a9361d061ffb2cd222c9c31a0172200b32c46b9a45'),
+                 ((2,2),(14,3),'e3a474bc118125d13b02dabdd07a66172a116f70e9fdfd21f32df9c5ad6de6ac'),
+                 ((30,30),(30,30),'3e9e3d2a2981403d9248359eb84b26bc506bbb41821a5dee70dabb9524ba0c83'),
+                 ((0,0),(63,63),'3589f2a3266d8f727d4292a8d99331bc5943c33e444e60f4b580893e89aeabca')]
+        for anchor,point,expected in vectors:
+            with self.subTest(anchor=anchor,point=point):
+                program=xy(2,*anchor)+xy(5,*point)+b'\2\0'
+                result=self.maps.decode_map(program,0,len(program))
+                self.assertEqual(hashlib.sha256(bytes(result['cells'])).hexdigest(),expected)
+
+    def test_map_catalog_cancellation_is_observed(self):
         with self.assertRaises(KeyboardInterrupt):
             self.maps.catalog(self.current, self.original, cancelled=lambda: True)
         with self.assertRaises(KeyboardInterrupt):

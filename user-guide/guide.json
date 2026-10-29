@@ -2071,6 +2071,10 @@
         {
           "title": "Adapter checks cover declared storage",
           "text": "Levels inspection re-encodes the declared tiles, palette, grids and object fields and checks byte equality. Reserved palette bits, object padding and other opaque bytes are preserved. Review reports dependent resources affected by an edit. This is not a complete game inventory or proof that an edit works in gameplay."
+        },
+        {
+          "title": "FFL II stored terrain commands",
+          "text": "On the exact supported USA revision, Browse game maps inspects the original room headers and shared terrain streams. In room 486B, Inspect terrain command lets you stage a point, anchor, rectangle, circle or line change. Later commands may overwrite earlier drawing. Shared headers are listed above the canvas. Review rejects changed collision behavior, region bits and existing trigger bindings. State-dependent maps require an explicit story-state value; the tool does not guess it. A byte-identical storage check preserves the existing command widths and protected trailing bytes; it is not a free-space or gameplay certificate."
         }
       ],
       "related": [
@@ -2078,35 +2082,36 @@
         "room",
         "tilemaps",
         "regression",
-        "collision-actors"
+        "collision-actors",
+        "checks"
       ],
       "terms": [
         "term-metatile",
         "term-collision",
         "term-layer"
       ],
-      "image": "20-ffl2-map-browser",
+      "image": "260-ffl2-circle-editor",
       "image_layout": "following-page",
-      "image_alt": "Find a real room before editing it",
-      "caption": "Use a supported room preview and its declared fields. Unsupported map commands remain unavailable; a rendered image alone does not establish collision, events or a working exit.",
+      "image_alt": "Actual FFL II circle-command edit with original and reviewed terrain and a separate build",
+      "caption": "Actual ROMancer edit: the circle-command X changes from 14 to 13. Review includes the terrain operand and cartridge integrity update. Shared-room effects still require playtesting.",
       "visual_page": {
-        "title": "Find a real room before editing it",
+        "title": "Review a real terrain edit and declared scene geometry",
         "kicker": "Advanced / actual application capture",
-        "intro": "Actual Final Fantasy Legend II map browser and decoded room preview, bound to the matched original revision.",
+        "intro": "The first capture edits matched FFL II data. The second exercises the generic isometric framework with original authored test data.",
         "panels": [
           {
-            "image": "20-ffl2-map-browser",
-            "title": "Find a real room before editing it",
+            "image": "260-ffl2-circle-editor",
+            "title": "Actual FFL II terrain command / before and reviewed",
             "x": 48,
             "top": 846,
             "width": 1200,
             "crop": [
-              180,
-              80,
-              1390,
-              700
+              0,
+              215,
+              1213,
+              430
             ],
-            "caption": "Use a supported room preview and its declared fields. Unsupported map commands remain unavailable; a rendered image alone does not establish collision, events or a working exit."
+            "caption": "Actual ROMancer edit: the circle-command X changes from 14 to 13. Review includes the terrain operand and cartridge integrity update. Shared-room effects still require playtesting."
           },
           {
             "image": "259-declared-isometric-editor",
@@ -3099,7 +3104,13 @@
             "caption": "Actual headless application capture. The offline HTML edition links the full-resolution image."
           }
         ]
-      }
+      },
+      "details": [
+        {
+          "title": "If an observer exits unexpectedly",
+          "text": "A native observer failure is reported as a failed capture; a partially written file is not accepted. The bounded Genesis observer now suspends automatic Lua collection before creating native handles and is closed after its capture. If a failure remains, keep the exact ROM identity and request settings in a sanitized support report. A successful capture or black frame alone does not establish that gameplay or a game format was verified."
+        }
+      ]
     },
     {
       "id": "data-relocation",
