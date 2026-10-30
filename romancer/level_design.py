@@ -1,11 +1,11 @@
 """Declared fixed-capacity level data. No inferred game semantics or allocation."""
 import hashlib
 from .asset_schema import fields,number,label
-from .asset_codecs import cell_size,decode_cell,CODECS
 from .script_schema import canonical_bytes
 from .level_semantics import collision_types,validate_hitbox,validate_changed_hitboxes,validate_sprite
 from .scene_schema import normalize_scene,validate_scene
-from .level_palette import entry_size,decode_palette
+from .level_palette import storage_length,decode_palette
+from .level_tiles import decode_tiles
 
 
 def _identity(raw,definition,source_sha256):
@@ -71,18 +71,22 @@ def inspect_level(raw,definition,source_sha256):
         if g['endian'] not in ('little','big'):raise ValueError('invalid integer byte order')
         storage(g['offset'],count*g['entry_bytes'],name)
         return [int.from_bytes(raw[g['offset']+i*g['entry_bytes']:g['offset']+(i+1)*g['entry_bytes']],g['endian']) for i in range(count)]
-    t=d['tiles'];fields(t,'offset count codec palette_offset palette_format');number(t['count'],1,1024)
-    unit=cell_size(t['codec'],8,8);storage(t['offset'],t['count']*unit,'tiles')
-    tiles=[decode_cell(raw[t['offset']+i*unit:t['offset']+(i+1)*unit],codec=t['codec'],width=8,height=8) for i in range(t['count'])]
-    colors=2**CODECS[t['codec']]
-    n=entry_size(t['palette_format']);storage(t['palette_offset'],colors*n,'palette')
-    palette=decode_palette(raw[t['palette_offset']:t['palette_offset']+colors*n],t['palette_format'],colors)
-    m=d['metatiles'];fields(m,'offset count width height entry_bytes endian');number(m['count'],1,1024);number(m['width'],1,8);number(m['height'],1,8)
-    parts=m['width']*m['height'];flat=format_grid({k:m[k] for k in ('offset','entry_bytes','endian')},m['count']*parts,'metatiles')
-    if any(v>=len(tiles) for v in flat):raise ValueError('metatile references an undeclared tile')
-    blocks=[flat[i*parts:(i+1)*parts] for i in range(m['count'])]
+    t=d['tiles'];tiles,colors,segments=decode_tiles(raw,t,storage)
+    length=storage_length(t['palette_format'],colors);storage(t['palette_offset'],length,'palette')
+    palette=decode_palette(raw[t['palette_offset']:t['palette_offset']+length],t['palette_format'],colors)
+    m=d['metatiles']
+    if type(m) is not dict:raise ValueError('metatile definition must be an object')
+    stored=m.get('kind')!='identity'
+    if not stored:
+        fields(m,'kind');block_width=block_height=parts=1;blocks=[[i] for i in range(len(tiles))]
+    else:
+        fields(m,'offset count width height entry_bytes endian');number(m['count'],1,1024);number(m['width'],1,8);number(m['height'],1,8)
+        block_width=m['width'];block_height=m['height'];parts=block_width*block_height
+        flat=format_grid({k:m[k] for k in ('offset','entry_bytes','endian')},m['count']*parts,'metatiles')
+        if any(v>=len(tiles) for v in flat):raise ValueError('metatile references an undeclared tile')
+        blocks=[flat[i*parts:(i+1)*parts] for i in range(m['count'])]
     if type(d['rooms']) is not list or not 1<=len(d['rooms'])<=32:raise ValueError('declare 1 to 32 rooms')
-    rooms=[];ids=set();uses={str(i):[] for i in range(m['count'])};total=0
+    rooms=[];ids=set();uses={str(i):[] for i in range(len(blocks))};total=0
     for r in d['rooms']:
         fields(r,'id name width height terrain collision objects'+''.join(' '+key for key in ('object_metadata','collision_types','elevation') if type(r) is dict and key in r));label(r['id']);label(r['name'])
         if r['id'] in ids:raise ValueError('duplicate room ID')
@@ -112,11 +116,11 @@ def inspect_level(raw,definition,source_sha256):
                 objects.append(obj)
         for i,value in enumerate(terrain):uses[str(value)].append({'room_id':r['id'],'cell':i})
         rooms.append({'id':r['id'],'name':r['name'],'width':r['width'],'height':r['height'],'terrain':terrain,'collision':collision,'elevation':elevation,'collision_types':collision_types(r),'objects':objects})
-    scene=normalize_scene(d.get('scene'),m['width']*8,m['height']*8)
+    scene=normalize_scene(d.get('scene'),block_width*8,block_height*8)
     if 'scene' in d or any(r['elevation'] is not None for r in rooms):validate_scene(scene,rooms,d['rooms'])
     connections=_connections(rooms,d['rooms'],len(tiles),colors)
     document_id=hashlib.sha256(canonical_bytes(d,max_bytes=256*1024)).hexdigest()
-    result={'ok':True,'document_id':document_id,'source_sha256':source_sha256,'definition':d,'scene':scene,'tiles':tiles,'palette':palette,'metatiles':blocks,'block_width':m['width'],'block_height':m['height'],'rooms':rooms,'connections':connections,'uses':uses,'ranges':[{'offset':a,'length':b-a,'name':name} for a,b,name in ranges],'game_semantics_verified':False}
+    result={'ok':True,'document_id':document_id,'source_sha256':source_sha256,'definition':d,'scene':scene,'tiles':tiles,'tile_segments':segments,'palette':palette,'metatiles':blocks,'metatiles_stored':stored,'block_width':block_width,'block_height':block_height,'rooms':rooms,'connections':connections,'uses':uses,'ranges':[{'offset':a,'length':b-a,'name':name} for a,b,name in ranges],'game_semantics_verified':False}
     try:canonical_bytes(result,max_bytes=2*1024**2)
     except ValueError as exc:raise ValueError('combined level preview budget exceeded; declare fewer rooms, cells or tiles') from exc
     return result
@@ -131,6 +135,7 @@ def plan_level(raw,definition,document_id,changes,source_sha256):
         if type(change) is not dict:raise ValueError('level changes must be JSON objects')
         kind=change.get('kind')
         if kind=='metatile':
+            if not doc['metatiles_stored']:raise ValueError('identity tile blocks are derived, not a stored metatile table')
             fields(change,'kind index part value');m=d['metatiles'];number(change['index'],0,m['count']-1);number(change['part'],0,m['width']*m['height']-1);number(change['value'],0,len(doc['tiles'])-1)
             offset=m['offset']+(change['index']*m['width']*m['height']+change['part'])*m['entry_bytes'];width=m['entry_bytes'];endian=m['endian']
             affected.update(use['room_id'] for use in doc['uses'][str(change['index'])])

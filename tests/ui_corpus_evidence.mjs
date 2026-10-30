@@ -1,0 +1,14 @@
+import assert from 'node:assert/strict';
+import {ensureRomScan,scanControls} from '../romancer/ui/rom_scan.js';
+globalThis.document={getElementById:()=>null};
+const source='a'.repeat(64),other='b'.repeat(64);let handlers={},visited=[];
+const evidence={status:'RECORDED_SOURCE_EVIDENCE',source_sha256:source,source_count:1052,related_total:12,sample_total:1,record:{sha256:source,size:1024,label:'Current game',references:[{id:'nes:example',scope:'prg_chr',additional_inputs:0,nonlinear:false,board:'slot: nrom',dump_status:'good'}],driver_candidates:[],samples:[{offset:128,length:9,sha256:'c'.repeat(64)}],related:[{sha256:other,label:'<img src=x onerror=alert(1)>',shared_file_bytes:256,sound_contexts:1,loaded_blocks:0,sample_streams:0,locations:[{offset:32,other_offset:64,length:128,hash:'d'.repeat(32)}]}]}};
+const result={ok:true,identification:{profile:null},coverage:{file_bytes_read:1024,file_size:1024,whole_file_read:true,result_limit_per_kind:100,segments:[]},catalog:{file:{status:'NO_CATALOG'}},system_id:'nes',counts:{text:0,graphics:0,compression:0},candidates:[],limits:[],source_evidence:evidence};
+const ctx={state:{project:{project_id:'p'},artifact:{artifact_id:'a',sha256:source,size:1024}},sourceParams:()=>({project_id:'p',artifact_id:'a'}),use(map){Object.assign(handlers,map)},navigate:async view=>visited.push(view),api:{call:async()=>({status:'READY',result})}};
+await ensureRomScan(ctx);let html=scanControls(ctx);
+assert.match(html,/Related source evidence/);assert.match(html,/12 related files/);assert.match(html,/PRG\/CHR inputs/);assert.match(html,/&lt;img/);assert.doesNotMatch(html,/<img src=x/);assert.match(html,/Sound contexts/);assert.match(html,/Inspect bytes/);
+await handlers['evidence-location']({dataset:{id:'32'}});assert.equal(ctx.state.resourceJump,32);assert.deepEqual(visited,['resources']);
+await assert.rejects(()=>handlers['evidence-location']({dataset:{id:'999'}}),/recorded location/);
+ctx.state.artifact={artifact_id:'b',sha256:other,size:1024};await handlers['evidence-location']({dataset:{id:'128'}});assert.equal(visited.length,1,'a late action must not jump in a new ROM');
+ctx.state.artifact={artifact_id:'a',sha256:source,size:1025};assert.doesNotMatch(scanControls(ctx),/Related source evidence/,'evidence must match actual byte size');
+console.log('Corpus evidence stays readable, escaped, read-only and bound to the exact selected source.');

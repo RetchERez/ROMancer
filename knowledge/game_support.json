@@ -1,6 +1,6 @@
 {
   "schema_version": 1,
-  "target_set_id": "romancer-v1.0-initial-1039",
+  "target_set_id": "romancer-v1.0-uploaded-1052",
   "targets": [
     {
       "sha256": "000f4534a0376958edcc7ae3e6c5a7ea0dd6a775646207f60ad3923e27f110f3",
@@ -1527,6 +1527,17 @@
       "size": 1048576,
       "labels": [
         "Operation Logic Bomb - The Ultimate Search & Destroy (USA)"
+      ],
+      "origin": [
+        "catalog"
+      ]
+    },
+    {
+      "sha256": "190999122aacc2cff20c5677b3f60ed938d8a36b696d16cc1bf416705efe151e",
+      "system_id": "snes",
+      "size": 1048576,
+      "labels": [
+        "Super Adventure Island (USA)"
       ],
       "origin": [
         "catalog"
@@ -3151,6 +3162,17 @@
       ]
     },
     {
+      "sha256": "3fdb9dd4e1c98760ec2c57af08f1c172a9f964a695c3f07e8a28c4eb5819082d",
+      "system_id": "genesis",
+      "size": 524288,
+      "labels": [
+        "Target Earth (USA)"
+      ],
+      "origin": [
+        "catalog"
+      ]
+    },
+    {
       "sha256": "401b65fbdcf5228ff63ae1d7578d7eb25db8b20fc8f74061ab927c9a5eb8f4f6",
       "system_id": "gb",
       "size": 524288,
@@ -3387,6 +3409,17 @@
       "size": 262144,
       "labels": [
         "Golvellius - Valley of Doom (USA, Europe, Brazil)"
+      ],
+      "origin": [
+        "catalog"
+      ]
+    },
+    {
+      "sha256": "44c96f106b966d55131473ea6554522279953c73cf33e2ad34abc73f1bcc465d",
+      "system_id": "genesis",
+      "size": 524288,
+      "labels": [
+        "QuackShot Starring Donald Duck (World) (Rev A)"
       ],
       "origin": [
         "catalog"
@@ -3866,6 +3899,17 @@
       ]
     },
     {
+      "sha256": "4e095fbbdec4a16b075d7140385ff68b259870ca9e3357f076dfff7f3d1c4a62",
+      "system_id": "snes",
+      "size": 4194304,
+      "labels": [
+        "Kirby Super Star (USA)"
+      ],
+      "origin": [
+        "catalog"
+      ]
+    },
+    {
       "sha256": "4e18938c4274266da1cdf352ef5b9b80b3050af662f283ec7c12bbd9bab65310",
       "system_id": "sms",
       "size": 131072,
@@ -4179,6 +4223,17 @@
       "size": 2097152,
       "labels": [
         "Taz in Escape from Mars (USA)"
+      ],
+      "origin": [
+        "catalog"
+      ]
+    },
+    {
+      "sha256": "5577a3a73929790d92c2d0f311d7674142de9555ce0c713020a08a894550441e",
+      "system_id": "snes",
+      "size": 3145728,
+      "labels": [
+        "Dragon Ball Z - Hyper Dimension (Japan) [T-En by Twilight Translations v1.00]"
       ],
       "origin": [
         "catalog"
@@ -5076,6 +5131,17 @@
       ]
     },
     {
+      "sha256": "6a2f280ed1ef5166d95e3b0eb1a6665564f7ddcfd3feaf53344a1268b54b85c6",
+      "system_id": "snes",
+      "size": 3145728,
+      "labels": [
+        "Jikkyou Oshaberi Parodius (Japan)"
+      ],
+      "origin": [
+        "catalog"
+      ]
+    },
+    {
       "sha256": "6a778422aeca1fd12cb6a414682a6ecd992d8435ac215a4fd9cdbfe7fe702c8a",
       "system_id": "genesis",
       "size": 2097152,
@@ -5604,6 +5670,17 @@
       ]
     },
     {
+      "sha256": "740646f3535bfb365ca44e70d46ab433467b142bd84010393070bd0b141af853",
+      "system_id": "snes",
+      "size": 4194304,
+      "labels": [
+        "Super Mario RPG - Legend of the Seven Stars (USA)"
+      ],
+      "origin": [
+        "catalog"
+      ]
+    },
+    {
       "sha256": "7468c271d7240cf4e0d08c16e9969a1b1b1caf5adc0e5adc568d93c92651a057",
       "system_id": "snes",
       "size": 1048576,
@@ -5741,6 +5818,17 @@
       "size": 4194304,
       "labels": [
         "Dragon Quest VI - Realms of Revelation (Japan) [T-En by NoPrgress v0.90b2] [n]"
+      ],
+      "origin": [
+        "catalog"
+      ]
+    },
+    {
+      "sha256": "776f36a33b1a60b464d4d56ca1cecb6ca65ad2b84822a42bc89772d8b934f97a",
+      "system_id": "snes",
+      "size": 2621440,
+      "labels": [
+        "Magical Pop'n (Japan) [T-En by Aeon Genesis v1.01]"
       ],
       "origin": [
         "catalog"
@@ -6803,6 +6891,17 @@
       ]
     },
     {
+      "sha256": "910a29f834199c63c22beddc749baba746da9922196a553255deade59f4fc127",
+      "system_id": "snes",
+      "size": 4194304,
+      "labels": [
+        "Street Fighter Alpha 2 (USA)"
+      ],
+      "origin": [
+        "catalog"
+      ]
+    },
+    {
       "sha256": "914652f72d6ceb83b8b43414d6c42581ec12e9b3f45259b8b2768d26b8d4f073",
       "system_id": "snes",
       "size": 1048576,
@@ -7452,6 +7551,17 @@
       ]
     },
     {
+      "sha256": "a0c9ea9c9b48d2e41af512fd2454c846b043760cde284650d6a7311ee7a9fee4",
+      "system_id": "snes",
+      "size": 6291456,
+      "labels": [
+        "Star Ocean (Japan) [T-En by DeJap v1.0]"
+      ],
+      "origin": [
+        "catalog"
+      ]
+    },
+    {
       "sha256": "a13fa8164a0ab2d549d9a9bb3f998907c3f64b42eab9f4fae3d666abab510fdd",
       "system_id": "sms",
       "size": 131072,
@@ -7754,6 +7864,17 @@
       "size": 3145728,
       "labels": [
         "EarthBound (USA)"
+      ],
+      "origin": [
+        "catalog"
+      ]
+    },
+    {
+      "sha256": "a93ea87fc835c530b5135c5294433d15eef6dbf656144b387e89ac19cf864996",
+      "system_id": "snes",
+      "size": 1048576,
+      "labels": [
+        "Contra III - The Alien Wars (USA)"
       ],
       "origin": [
         "catalog"
@@ -8194,6 +8315,17 @@
       "size": 524304,
       "labels": [
         "Gemfire (USA)"
+      ],
+      "origin": [
+        "catalog"
+      ]
+    },
+    {
+      "sha256": "b50bf9d95485e8aeb7a6730e9f9f9c9c4ec23a85b336a4fb2e3b63034531e36f",
+      "system_id": "snes",
+      "size": 4194304,
+      "labels": [
+        "Kirby's Dream Land 3 (USA)"
       ],
       "origin": [
         "catalog"
@@ -8755,6 +8887,17 @@
       "size": 3145728,
       "labels": [
         "Streets of Rage 3 (USA)"
+      ],
+      "origin": [
+        "catalog"
+      ]
+    },
+    {
+      "sha256": "c2cb34b5ac3f386689c95a465004b480b74614df4d33d510c2f6c5629573a978",
+      "system_id": "snes",
+      "size": 2097152,
+      "labels": [
+        "Dragon Quest I & II (Japan) [T-En by RPGOne v2.0 DQ] [Add by Mziab v1.0]"
       ],
       "origin": [
         "catalog"

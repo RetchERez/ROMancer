@@ -16,11 +16,11 @@ class GameCoverageTests(unittest.TestCase):
 
     def test_frozen_target_set_preserves_every_catalog_and_showcase_identity(self):
         rows=coverage.validate_manifest(self.manifest)
-        self.assertEqual(len(rows),1039)
-        self.assertEqual(sum('catalog' in r['origin'] for r in rows),1035)
+        self.assertEqual(len(rows),1052)
+        self.assertEqual(sum('catalog' in r['origin'] for r in rows),1048)
         self.assertEqual(sum('showcase' in r['origin'] for r in rows),6)
         report=coverage.status(limit=1)
-        self.assertEqual(report['target_count'],1039)
+        self.assertEqual(report['target_count'],1052)
         self.assertEqual(report['accepted_count'],0)
         self.assertFalse(report['release_ready'])
         self.assertFalse(report['write_authorized'])
@@ -100,7 +100,7 @@ class GameCoverageTests(unittest.TestCase):
             api=WorkbenchAPI(Path(temp)/'work')
             try:
                 r=api.dispatch('coverage.status',{'query':'','system_filter':'all','page':0,'limit':2})
-                self.assertTrue(r['ok'],r);self.assertEqual(r['target_count'],1039)
+                self.assertTrue(r['ok'],r);self.assertEqual(r['target_count'],1052)
                 self.assertFalse(r['release_ready']);self.assertFalse(r['write_authorized'])
                 self.assertIn('coverage.status',READ_OPERATIONS)
                 self.assertIn('system_filter',_investigation_properties('coverage.status'))
@@ -118,3 +118,12 @@ class GameCoverageTests(unittest.TestCase):
             p=subprocess.run(args,cwd=root,capture_output=True,text=True)
             self.assertEqual(p.returncode,2,p.stderr)
             self.assertEqual(output.read_bytes(),b'preserve existing report')
+
+    def test_original_intake_rejections_remain_in_the_upload_goal_and_last_page_is_accessible(self):
+        for source in ('740646f3535bfb365ca44e70d46ab433467b142bd84010393070bd0b141af853',
+                       '44c96f106b966d55131473ea6554522279953c73cf33e2ad34abc73f1bcc465d'):
+            packet=coverage.status(query=source,limit=1)
+            self.assertEqual(packet['total'],1,packet)
+            self.assertEqual(packet['revisions'][0]['sha256'],source)
+            self.assertFalse(packet['revisions'][0]['full_editing_verified'])
+        self.assertEqual(len(coverage.status(page=1051,limit=1)['revisions']),1)

@@ -4,7 +4,9 @@ from . import candidate,region,text
 
 def candidates(reader):
     size=reader.identity['size']
-    if size<0x104 or reader.read_at(0x100,4)!=b'SEGA':return []
+    if size<0x104:return []
+    identifier=reader.read_at(0x100,min(16,size-0x100))
+    if not identifier.lstrip(b' ').startswith(b'SEGA'):return []
     if size<512:return [candidate('genesis','genesis-linear',0x100,metadata={},valid=False,warnings=['Truncated Genesis cartridge header.'])]
     h=reader.read_at(0x100,256);start=int.from_bytes(h[0xa0:0xa4],'big');end=int.from_bytes(h[0xa4:0xa8],'big')
     valid=start==0 and 511<=end<size;warnings=['ROM window and checksum are not runtime or mapper-state proof.']

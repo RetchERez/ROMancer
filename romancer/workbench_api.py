@@ -57,6 +57,7 @@ class WorkbenchAPI:
             'project.undelete':('trash_id',self._project_undelete),
             'rom.check':('project_id artifact_id expected_crc32 crc_scope',self._rom_check),
             'rom.samples':('query system_filter page limit',self._sample_catalog),
+            'rom.evidence':('sha256 size',self._corpus_evidence),
             'coverage.status':('query system_filter page limit',self._coverage_status),
             'system.ui_ready':('launch_id',lambda p,c:self._ui_startup(p,True)),
             'system.ui_status':('launch_id',lambda p,c:self._ui_startup(p,False)),
@@ -1064,6 +1065,10 @@ class WorkbenchAPI:
         from .workbench_evidence import store_evidence
         evidence=store_evidence(project,'runtime',{'scope':'native_memory_snapshot','origin':'owned_native_worker',**result})
         return {**result,'evidence_id':evidence['evidence_id']}
+
+    def _corpus_evidence(self,p,c):
+        from .corpus_evidence import lookup
+        return lookup(p['sha256'],p['size'])
 
     def _sample_catalog(self,p,c):
         from .rom_sample_db import catalog

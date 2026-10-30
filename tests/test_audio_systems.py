@@ -10,3 +10,11 @@ class AudioSystemTests(unittest.TestCase):
             self.assertEqual(value['driver']['status'],'UNKNOWN');self.assertFalse(value['sequence_edit_supported'])
             self.assertTrue(value['hardware']['references'])
         with self.assertRaises(ValueError):audio_system_info('unknown','0'*64)
+
+    def test_sms_optional_fm_is_separate_from_the_four_channel_psg(self):
+        from romancer.audio_systems import audio_system_info
+        hardware=audio_system_info('sms','0'*64)['hardware']
+        self.assertEqual(hardware['nominal_channels'],4)
+        self.assertIn('YM2413',hardware['notes'])
+        self.assertEqual(hardware['optional_expansions'][0]['ports'],[0xf0,0xf1,0xf2])
+        self.assertFalse(hardware['optional_expansions'][0]['present_in_every_console'])

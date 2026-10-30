@@ -38,5 +38,8 @@ assert.equal(state.pending,null,'a review for an old definition cannot authorize
 state.pending={kind:'levels',artifact_id:'a',document_id:'doc',plan_id:'old-plan',changes:JSON.stringify(state.levelEditor.values())};await view.render(ctx);
 await assert.rejects(actions['levels-build'](),/Review/);
 console.log('Level strokes, fill, copy/paste, shared block preview and bounded undo preserve source data.');
+state.results['levels.inspect']={...liveDoc,document_id:'direct',metatiles_stored:false,definition:{rooms:[],metatiles:{kind:'identity'}}};
+const directMarkup=await view.render(ctx);assert.doesNotMatch(directMarkup,/id="level-block-part"/,'direct tile grids must not expose a fabricated stored-block editor');
+assert.match(directMarkup,/tile numbers directly/);assert.throws(()=>actions['levels-block'](),/stored|direct/);
 
 const oversized={...doc,block_width:8,block_height:8,rooms:[{id:'big',width:128,height:128,terrain:[],collision:null,objects:[]}]};assert.throws(()=>roomPixels(oversized,new LevelDraft(oversized),'big'),/million pixels/);

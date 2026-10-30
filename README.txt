@@ -1,4 +1,4 @@
-ROMancer v1.0 development build49
+ROMancer v1.0 development build50
 By RetchEWretched
 
 Local ROM editing for NES, SNES, Genesis, Master System, Game Boy, Game Boy Color.
@@ -9,20 +9,36 @@ Everyday use works offline. No AI account, model, API key or subscription is req
 
 COVERAGE STATUS - NOT READY FOR UNIVERSAL v1.0 RELEASE
 
-This development build adds state-aware terrain operand editing across all 219
-FFL II room headers and checks every encoded state outcome and shared header.
-Native constructor checks match 344 edited state cases across 164 streams. This
-covers terrain construction, not complete room events or full-game editing.
-Tiles, assembled sprites and animation can preview the selected declared ROM
-palette bank together. Level palettes support native Genesis RGB333 and SMS
-RGB222 storage, preserving unused bits. FFL II uses its checked normal field
-shades; fades and effects still need runtime evidence.
-These improvements do not establish complete editing support for any game.
+This build follows a census-first approach across all 1,052 distinct uploaded
+ROMs. All files were rehashed and grouped into 76 cartridge/header classes.
+62,205 retained shared 128-byte groups provide 3,991 file-byte relationships.
+Bounded native sound observations and exact encoded-sample matches add separate
+relationship types. The combined read-only index has 4,228 direct relationships,
+covering 640 files; 906 files have scoped reference input matches.
 
-Full visual editing of all 1,035 catalog revisions is the release requirement.
-That requirement is not met. Four additional supplied showcase revisions bring
-the acceptance set to 1,039 exact source identities. No revision is certified for
-full-game editing. Six built-in profiles provide specific, limited edits.
+Resources > ROM investigation > Related source evidence shows selected source
+relationships and opens checked offsets. AI clients use rom.evidence with sha256
+and size, without a project. Results are source-bound, bounded and read-only.
+Shared bytes and cartridge classes do not establish shared level, script or music
+formats. Full visual editing of all 1,052 exact revisions remains the release
+requirement. No revision has passed complete full-game editing acceptance.
+
+The measured cartridge facts catalog now contains 1,051 files. Twelve previously
+rejected inputs pass corrected header intake, including SA-1/S-DD1 physical SNES
+containers and a padded Genesis identifier. SNES checksum maintenance selects
+the valid header, including when an earlier false header is present. QuackShot's
+known sparse cartridge mapping remains blocked by the current linear loader.
+Optional Master System YM2413 FM is documented separately from standard PSG.
+
+Reference facts come from independently checked inputs against the pinned MAME
+software metadata (commit f34f02505e32c1993c6a782b6814232cbfc74e36).
+NES reference comparisons exclude the container header and match complete declared
+PRG/CHR file inputs. Other matches describe entire named inputs; they do not
+certify full cartridge behavior. Sound pattern labels are candidates based on
+VGMTrans metadata (commit a6af8d2e593b6c2c6602849f75687b505ae258fc),
+with bounded native observations. No third-party decoder implementation or game
+payload is copied into these indexes. Existing bundled engine licenses and
+corresponding source remain in the full Windows distribution.
 
 The generic level editor handles declared rectangular and isometric grids,
 explicit height grids and object-height fields. Source-bound previews, room
@@ -34,7 +50,7 @@ Sample previews and native audio capture do not imply editable commercial songs.
 Only the original practice music drivers currently have sequence editors.
 
 The offline facts catalog records measured identities and candidates. It is not
-1,035 decoded game engines or a complete compatibility certificate. Each editor
+1,051 decoded game engines or a complete compatibility certificate. Each editor
 and exact revision needs its own decode/writeback, original-preservation, visual
 preview and native gameplay evidence before universal release acceptance passes.
 Keep this build private for development and testing; do not publish it as complete.
@@ -836,29 +852,21 @@ The illustrated guide covers these procedures, with glossary and index links.
 Independent unfamiliar-user acceptance remains pending in ACCEPTANCE.txt.
 
 RECORDED ROM FACTS DATABASE
-The release includes 1,035 independently measured cartridge samples:
-NES 273, SNES 314, Genesis 148, Master System 50, Game Boy 149 and Game Boy Color 101.
-Names come from supplied filenames and are not canonical-dump certifications.
-Every included source SHA-256 and CRC32 was independently recomputed. The catalog
-records standard header/layout numbers, cartridge check outcomes and bounded
-resource locations. Its 33,120 ASCII-like ranges and 32,907 generic graphics
-locations are hypotheses, not identified dialogue or sprites. 213 NES graphics
-locations derive from declared CHR-ROM headers. 4,660 LZ10/RLE encoding candidates
-passed a separate decoder; this does not prove a game uses those streams.
+The build includes 1,051 independently measured cartridge samples:
+NES 274, SNES 325, Genesis 150, Master System 51, Game Boy 149, Game Boy Color 102.
+Names come from supplied filenames. Hashes, sizes, numeric header facts, check
+outcomes and bounded candidate locations describe exact source inputs; they do
+not certify every game purpose, level, music format or safe editing operation.
+The separate 1,052-source evidence index retains the known sparse-layout input
+that the current linear Genesis loader cannot admit. No upload is silently
+removed from the full-editing goal.
 
-Automatic deep scan and Check ROM use exact source hash/size matches. Expand
-Measured file facts & locations to inspect recorded offsets. A changed build
-can be unrecorded while its original still matches. These facts never authorize
-writes, invent a game-specific editor or identify every map, stat, script or
-music driver. Existing checked definitions, source guards and playtesting remain
-the editing workflow.
-
-The six supplied archives contained 1,048 cartridge candidates. 1,035 passed the
-current unique-layout admission checks; 13 were excluded for unsupported or
-inconsistent layouts. Two FDS disk images and a save file were outside scope.
-No excluded file was relabeled as supported. Deep analysis reads the whole file,
-but graphics are sampled and compression work/results are bounded. Coverage and
-truncation flags are stored per record.
+Automatic deep scan and Check ROM match source hash and size. Open Advanced >
+Resources > ROM investigation. Expand Measured file facts & locations or Related
+source evidence to inspect recorded addresses and relationships. Changed builds
+may be unrecorded while their originals match. Candidate locations, sampled
+graphics, bounded compression checks and native observations keep explicit scope.
+Use checked definitions, reviewed plans, separate builds and native playtesting.
 
 Advanced source-build maintenance:
   python -B tools/scan_rom_archives.py --archives "collection.zip" --output "facts.json" --report "private-report.json" --journal "resume.jsonl" --jobs 2
@@ -873,7 +881,9 @@ rom.scan.run. Sample matches do not grant canonical, runtime or edit authority.
 
 DATA PROVENANCE AND REDISTRIBUTION
 This catalog was measured independently from locally supplied game files.
-It does not copy a third-party hash database, editor definitions or guide prose.
+The measured-facts catalog does not copy editor definitions or guide prose.
+The separate corpus index adds scoped MAME reference input associations and
+VGMTrans pattern candidate names as described above; no decoder is transplanted.
 Only hashes, sizes, short filename labels, numeric layout/check facts, offsets,
 format identifiers, evidence levels and scan coverage are included. No ROM
 images, executable game bytes, dialogue excerpts, pixel data, audio, decoded

@@ -18,7 +18,7 @@ from .audio_systems import audio_system_info
 MAX_SCAN=64*1024**2
 WINDOW=1024**2
 PER_KIND=100
-VERSION=19
+VERSION=20
 
 def definitions_stamp(row):
     return hashlib.sha256(canonical_bytes(row.get('descriptors',{}),max_bytes=projects.MAX_STORE)).hexdigest()
@@ -41,7 +41,10 @@ def fingerprint(project):
     else:cheat_reference=None
     from .format_library import library_stamp
     from .rom_sample_db import fingerprint as sample_fingerprint
-    return hashlib.sha256(json.dumps({'version':VERSION,'catalog':reference,'cheats':cheat_reference,'definitions':PROFILES,'notes':BYTE_NOTES,'format_library':library_stamp(Path(project).parent.parent),'recorded_samples':sample_fingerprint()},sort_keys=True).encode()).hexdigest()
+    from .corpus_evidence import fingerprint as evidence_fingerprint
+    try:evidence_stamp=evidence_fingerprint()
+    except (OSError,ValueError):evidence_stamp='UNAVAILABLE'
+    return hashlib.sha256(json.dumps({'version':VERSION,'catalog':reference,'cheats':cheat_reference,'definitions':PROFILES,'notes':BYTE_NOTES,'format_library':library_stamp(Path(project).parent.parent),'recorded_samples':sample_fingerprint(),'corpus_evidence':evidence_stamp},sort_keys=True).encode()).hexdigest()
 
 
 def cached(project,row,*,cancelled=lambda:False):
@@ -135,6 +138,10 @@ def run(project, row, *, cancelled=lambda: False, publish=None):
     result = {'ok': True, 'status': 'SCANNED' if supported else 'SYSTEM_UNRESOLVED', 'scan_version': VERSION, 'fingerprint': stamp, 'artifact_id': row['artifact_id'], 'source_sha256': row['sha256'], 'system_id': system, 'identification': model, 'catalog': catalog, 'hardware_reference': hardware, 'health': health, 'graphics_index': graphics_index, 'cheat_references': cheat_references, 'engine_recognition': engines, 'sound_system': audio_system_info(system, row['sha256']) if supported else None, 'structures': {'candidates': structures, 'coverage': structure_coverage, 'dereference_observed': False}, 'counts': counts, 'candidates': sorted(rows, key=lambda r: (r['offset'], r['kind'])), 'coverage': {'file_bytes_read': size if supported else 0, 'file_size': row['size'], 'whole_file_read': supported and size == row['size'], 'segments': segments, 'result_limit_per_kind': PER_KIND, 'exhaustive_semantic_analysis': False}, 'write_authorized': False, 'runtime_verified': False, 'limits': ['Printable ASCII only; custom text encodings need a definition.', 'Graphics are sampled codec candidates, not proven sprite layouts.', 'Compression checks cover aligned supported LZ10/RLE signatures with per-window work budgets; see coverage.', 'Window boundaries may split resources. Use a focused range scan to investigate them.', 'Unknown stats, scripts and banked pointers need evidence or explicit mappings.']}
     from .rom_sample_db import lookup as sample_lookup
     result['recorded_facts']=sample_lookup(row['sha256'],row['size'])
+    from .corpus_evidence import lookup as evidence_lookup
+    try:result['source_evidence']=evidence_lookup(row['sha256'],row['size'])
+    except (OSError,ValueError):
+        result['source_evidence']={'status':'EVIDENCE_UNAVAILABLE','source_sha256':row['sha256'],'record':None,'write_authorized':False,'full_editing_verified':False}
     result['definitions_fingerprint'] = definitions_stamp(row)
     result['structural_lab'] = {'source_sha256': row['sha256'], 'candidates': lab_candidates, 'coverage': lab_coverage, 'total_candidates': lab_total, 'truncated': lab_total > len(lab_candidates), 'dereference_observed': False, 'game_profile_required': False, 'write_authorized': False, 'scope': 'Sampled first 4096 bytes of each 1 MiB segment. Use focused structural experiments to test other ranges and byte alignments.'}
     if supported and row['size'] <= 32 * 1024 ** 2:

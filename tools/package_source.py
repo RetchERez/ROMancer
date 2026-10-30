@@ -27,6 +27,15 @@ READ_CHUNK_BYTES = 64 * 1024
 # Release source selection is explicit. Adding a file or fixture requires review;
 # a text extension or placement under docs/tests never grants distribution approval.
 APPROVED_FILES = frozenset({
+    'user-guide/screenshots/263-related-source-evidence.png',
+    'knowledge/corpus_evidence.json',
+    'romancer/corpus_evidence.py',
+    'romancer/ui/corpus_evidence.js',
+    'romancer/level_tiles.py',
+    'tests/test_corpus_evidence.py',
+    'tests/test_cartridge_intake_variants.py',
+    'tests/test_level_tile_segments.py',
+    'tests/ui_corpus_evidence.mjs',
     'knowledge/game_support.json',
     'romancer/game_coverage.py',
     'tools/audit_game_coverage.py',

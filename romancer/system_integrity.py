@@ -50,7 +50,7 @@ def integrity_edits(path, expected_sha256, system_id, edits):
         _validate_result(raw, system_id)
         return edits
     if system_id == 'snes':
-        candidate = assessment['candidates'][0]
+        candidate = next(c for c in assessment['candidates'] if c['layout_valid'])
         prefix = candidate['metadata']['copier_header_bytes']
         body = len(raw) - prefix
         if candidate['format'] not in ('lorom', 'hirom') or body & body - 1:
