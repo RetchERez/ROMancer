@@ -623,7 +623,7 @@
       "title": "Use the offline ROM facts database",
       "part": "Basic",
       "kicker": "Recorded samples / exact file identity",
-      "intro": "ROMancer includes 1,051 measured cartridge samples and a 1,052-source research inventory across six systems. Exact SHA-256 and size connect the selected file to its measured facts and recorded relationships.",
+      "intro": "ROMancer includes 1,052 measured cartridge samples and a 1,052-source research inventory across six systems. Exact SHA-256 and size connect the selected file to its measured facts and recorded relationships.",
       "steps": [
         "Import your ROM and let automatic deep scan finish. Open <b>Advanced &gt; Resources</b>, then find <b>ROM investigation</b>. A recorded match uses the file hash and size; the sample name comes from its supplied filename.",
         "Expand <b>Measured file facts &amp; locations</b> for header numbers and candidates. Open <b>Related source evidence</b> for shared byte blocks, captured sound contexts and reference input matches. These are investigation leads, not inherited game editors.",
@@ -631,7 +631,7 @@
         "Review, build and playtest normally. A changed build can be unrecorded even though its original remains matched. A sample match never creates a game-specific editor by itself."
       ],
       "result": "You can begin with measured addresses and format facts while keeping candidates, trusted game meanings and actual gameplay observations separate.",
-      "note": "The full inventory contains 1,052 distinct uploaded ROMs in 76 cartridge/header classes. QuackShot uses a known sparse cartridge map that the current linear loader does not support. No full-game editing acceptance is granted by this census.",
+      "note": "The inventory contains 1,052 distinct uploaded ROMs in 76 cartridge/header classes. All passed the generic byte-edit/build/export pipeline; this is separate from game-specific formats and level editing. QuackShot now uses a checked scattered file/bus map and a separate native mapped view.",
       "details": [
         {
           "title": "What is recorded",
@@ -1579,27 +1579,34 @@
       "id": "hex-editor",
       "title": "Inspect bytes with useful context",
       "kicker": "RESOURCES / HEX EDITOR",
-      "image": "11-hex-inspection",
+      "image": "265-quackshot-byte-editor",
       "steps": [
-        "Use a <b>Known locations > View 0x...</b> button to jump to a documented offset, or open <b>Resources</b> and enter an offset.",
+        "Open <b>Advanced &gt; Resources</b>. Choose a documented location or enter a decimal or 0x hexadecimal offset and choose <b>Go</b>.",
         "Search bytes such as AB ?? CD, UTF-8 text or an integer with explicit byte order. Inspect signed/unsigned numbers, read nearby verified notes and bookmark the selected offset before editing.",
-        "Edit a byte using two hex digits. Choose <b>Review byte edits</b>, inspect the plan, then <b>Create separate build</b>."
+        "Edit a byte using two hex digits. Use the footer <b>Undo</b> and <b>Redo</b> to check the staged change, then choose <b>Review byte edits</b> and <b>Create separate build</b>. Your original remains unchanged.",
+        "To share a build, open <b>Export</b>, select its original revision and target build, and create a verified patch. Keep the original ROM private."
       ],
-      "result": "The editor is opened at The Immortal's documented menu bytes rather than an arbitrary location.",
-      "note": "Hexadecimal is a way to write numbers; it does not tell you what a byte means. Unknown data stays unknown until evidence establishes its structure and purpose.",
+      "result": "The exact before/after byte change is reviewed, stored in a separate build and can be exported as an independently verified patch.",
+      "note": "The 1,052-ROM pipeline check used controlled test mutations, not gameplay-approved hacks. A hex editor can change bytes without knowing their meaning. Level, script and music edits still require checked definitions.",
       "part": "Advanced",
-      "intro": "Inspect exact stored bytes with a known purpose and an explicit address scope. Use higher-level tools when their definitions describe the change.",
+      "intro": "Inspect exact stored bytes and create a separate reviewed build. Use a known location or higher-level editor when its definition describes the intended change.",
       "related": [
         "investigation",
         "debug",
         "checks",
         "tables"
       ],
-      "caption": "Actual ROMancer interface. The HTML edition links to the full-resolution capture.",
+      "caption": "Actual QuackShot byte editing after undo/redo, with a reviewed separate-build plan. This byte mutation demonstrates the editing pipeline; it is not a gameplay-tested hack.",
       "terms": [
         "term-hex",
         "term-offset",
         "term-byte-order"
+      ],
+      "details": [
+        {
+          "title": "Checksum policy · Advanced",
+          "text": "Automatic checksum maintenance is the default. Under Advanced byte options, Preserve checksum fields explicitly requests byte-exact edits without repairing cartridge fields. Use it only when you understand the convention. One supplied Trials of Mana revision needs this explicit choice because its stored checksum differs from the supported algorithm. A mismatch is reported; it is not silently repaired or certified. Changing policy requires a new review."
+        }
       ]
     },
     {
@@ -2057,19 +2064,19 @@
       "title": "Edit declared terrain, objects and collision",
       "part": "Advanced",
       "kicker": "Levels and bounded game definitions",
-      "intro": "Levels uses a checked definition for the selected revision. Supported layouts show stored tiles with their declared palette. FFL II provides a real-game terrain-command workflow; Advanced practice is separate authored test data.",
+      "intro": "Levels opens checked storage for the selected revision. Super Mario Land has 12 terrain presets; FFL II has a terrain-command browser. Declared rectangular and isometric layouts use the same reviewed-build workflow.",
       "steps": [
-        "Open <b>Levels</b> for the selected source. If it says <b>No supported level map for this ROM yet</b>, investigate the source or supply a checked map definition through Advanced level setup. The separate collapsed <b>Advanced practice > Open test layout</b> is a learning exercise, not your game.",
-        "Choose <b>Paint layer</b>: Terrain changes appearance; Collision edits a separately declared grid; Elevation appears only when a stored height grid is declared. Pick from room samples existing data. Paint, Fill and rectangle copy/paste stay inside the declared bounds.",
-        "Use <b>Undo stroke</b> and <b>Redo stroke</b>. With Move object, drag a named marker or select its record in the inspector when markers overlap. A declared object-height field keeps dragging at that height. Arrow keys select a cell; Space applies the current brush. Starting hitboxes is available for the rectangular editor, not projected scenes.",
+        "Open <b>Levels</b>. When <b>Checked level</b> appears, choose a level and select <b>Open level</b>. Otherwise use the supported game browser or a checked definition in Advanced level setup. <b>No supported level map</b> means this source still needs investigation.",
+        "Choose a room and a thumbnail brush. <b>Terrain brush range</b> pages large palettes in groups of 64. Pick from room samples a tile. Terrain, Collision and Elevation appear only when their stored layers are defined; visible terrain is not proof of movement rules.",
+        "Use <b>Undo stroke</b> and <b>Redo stroke</b>. Switching checked levels preserves their staged drafts. Expand <b>Other uses</b> before changing shared screens. A repeated stored value may change several highlighted cells at once. Move object appears only for defined coordinates.",
         "Choose <b>Review level changes</b>, inspect the exact changes, then <b>Create level build</b>. Visit the room and test walking, collision, boundaries and transitions."
       ],
       "result": "The preview and checked changes stay within declared grid/object ranges. Test the built game to establish movement, collision, boundaries and transitions; the static preview alone does not certify them.",
-      "note": "Map previews use the checked normal Game Boy field shades; fades and effects are excluded. Changed palette code loses that default. Grid palettes come from declared storage. A visible wall or height is not proof of collision. Isometric geometry requires declared dimensions and elevation. The Immortal still has no verified level grammar.",
+      "note": "Super Mario Land: checked 64 KiB revision only, 114 distinct stage screens across 12 levels. Presets cover stored terrain and baseline signed tile graphics, not collision, interactive metadata or arbitrary new cells. Canonical grayscale follows stored BGP; host captures can use a different display palette.",
       "details": [
         {
-          "title": "Shared metatiles",
-          "text": "A block can be used in many cells or rooms. Changing its component tile changes every declared use; changing one terrain cell selects a different block for that cell."
+          "title": "Stored cells and shared uses",
+          "text": "A compressed terrain operand can paint several cells. All linked cells preview and build together; implicit blanks without an operand cannot be inserted. Interactive tile values and stream growth are protected. A shared screen changes every listed reference, including uses outside the selected level. Checked presets remain available on owned builds only while protected layout bindings still match."
         },
         {
           "title": "Optional practice is not your game",
@@ -2101,28 +2108,28 @@
         "term-collision",
         "term-layer"
       ],
-      "image": "261-ffl2-stateful-terrain-editor",
+      "image": "264-sml-checked-terrain-editor",
       "image_layout": "following-page",
-      "image_alt": "Actual FFL II outdoor terrain command edited with its normal field palette and reviewed original/build comparison",
-      "caption": "Actual room 4807 edit: an existing circle draws trees instead of mountains. The normal monochrome field palette is checked; highlighted markers are editor overlays. Review protects every encoded state and shared header.",
+      "image_alt": "Actual checked Super Mario Land terrain editor with original and staged grayscale room previews and sixteen changed linked cells",
+      "caption": "Actual ROMancer edit: one stored repeated wall value is replaced by the empty tile, previewing all 16 affected cells. Undo, redo, level switching, review and a separate build passed. This is a staged visual preview, not a played frame.",
       "visual_page": {
-        "title": "Review a real terrain edit and declared scene geometry",
+        "title": "Edit checked terrain and preview declared scene geometry",
         "kicker": "Advanced / actual application capture",
-        "intro": "The first capture edits a matched outdoor terrain command. The second tests declared isometric geometry using original authored data.",
+        "intro": "The first capture edits checked compressed terrain. The second tests declared isometric geometry using original authored data.",
         "panels": [
           {
-            "image": "261-ffl2-stateful-terrain-editor",
-            "title": "Actual outdoor terrain / checked normal field shades",
+            "image": "264-sml-checked-terrain-editor",
+            "title": "Checked Super Mario Land terrain / actual editor",
             "x": 48,
             "top": 846,
             "width": 1200,
             "crop": [
-              0,
-              210,
-              1095,
-              490
+              190,
+              65,
+              1385,
+              965
             ],
-            "caption": "Actual room 4807 edit: an existing circle draws trees instead of mountains. The normal monochrome field palette is checked; highlighted markers are editor overlays. Review protects every encoded state and shared header."
+            "caption": "Actual ROMancer edit: one stored repeated wall value is replaced by the empty tile, previewing all 16 affected cells. Undo, redo, level switching, review and a separate build passed. This is a staged visual preview, not a played frame."
           },
           {
             "image": "259-declared-isometric-editor",
@@ -2141,6 +2148,12 @@
         ]
       },
       "extra_images": [
+        {
+          "image": "261-ffl2-stateful-terrain-editor",
+          "alt": "Actual FFL II terrain-command original and staged preview",
+          "caption": "The matched USA revision also provides its separate checked terrain-command workflow.",
+          "title": "FFL II terrain commands"
+        },
         {
           "image": "259-declared-isometric-editor",
           "alt": "Original geometry fixture: elevation and object movement with before and edited previews",
@@ -2449,7 +2462,7 @@
         },
         {
           "title": "The same current tools",
-          "text": "Read editing.readiness before choosing an editor. sound.system returns known music definitions read-only; select one song before sound.inspect to stay within the response budget. With explicit writes, sound.plan or levels.plan followed by build.apply uses the same checked services as the GUI. These paths reproduced the native-tested targets. Query system.operations and the MCP tool list for current schemas."
+          "text": "Read editing.readiness before choosing an editor. sound.system returns known music definitions read-only; select one song before sound.inspect to stay within the response budget. With explicit writes, sound.plan or levels.plan followed by build.apply uses the same checked services as the GUI. These paths reproduced the native-tested targets. Query system.operations and the MCP tool list for current schemas. levels.presets lists checked layout choices; levels.preset returns a source-bound definition for a selected preset_id. Both are read-only. They do not grant write permission or full-game certification."
         },
         {
           "title": "New investigation and editing operations",
@@ -2458,6 +2471,10 @@
         {
           "title": "Read-only coverage status",
           "text": "coverage.status lists the frozen 1,052 exact target identities with bounded query, system_filter, page and limit arguments. Current accepted revisions: zero. A catalog match is not a decoded game. Evidence metadata preflight cannot certify a revision or authorize ROM writes."
+        },
+        {
+          "title": "Generic editing acceptance",
+          "text": "The same source-bound inspect, draft history, plan, build and independently verified patch export path passed all 1,052 frozen inputs. This establishes file operations, not automatic recognition of every game format. Level editors remain a separate verification phase."
         }
       ],
       "related": [
@@ -3120,6 +3137,10 @@
         {
           "title": "If an observer exits unexpectedly",
           "text": "A native observer failure is reported as a failed capture; a partially written file is not accepted. The bounded Genesis observer now suspends automatic Lua collection before creating native handles and is closed after its capture. If a failure remains, keep the exact ROM identity and request settings in a sanitized support report. A successful capture or black frame alone does not establish that gameplay or a game format was verified."
+        },
+        {
+          "title": "GB and GBC capture brightness",
+          "text": "Owned native workers disable Game Boy frame blending. A fresh capture no longer blends its frame with a black previous frame. This worker-only setting does not change personal emulator settings. The native host palette and canonical editor grayscale remain separate rendering contexts."
         }
       ]
     },
@@ -5753,6 +5774,7 @@
     "connected-game-view",
     "connections",
     "debug",
+    "debugger-setup",
     "editing-studio",
     "editor-builder",
     "everyday-controls",

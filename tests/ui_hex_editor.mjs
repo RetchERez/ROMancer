@@ -29,3 +29,13 @@ state.hexExplanation={scope:state.hexDraft.scope,result:{offset:0,note:'Old unse
 state.hexNumbers={scope:state.hexDraft.scope,result:{offset:0,values:{stale_number:987654321}}};
 assert.doesNotMatch(hexEditor(ctx,data),/Old unseen annotation|stale_number/,'Results for another cursor position must not appear under this byte.');
 console.log('Hex drafts preserve exact old bytes, reject invalid cells, and cannot cross source changes.');
+
+// Completing a page read must not replace the newer byte edit as the undo target.
+let finishRead,latestField;const navigationActions={};
+const navState={project:{project_id:'p'},artifact:{artifact_id:'nav',sha256:'nav-sha',size:2048},results:{}};
+const navData={artifact_id:'nav',sha256:'nav-sha',offset:512,length:16,hex:'00'.repeat(16)};
+const navCtx={state:navState,use:h=>Object.assign(navigationActions,h),draft:(_k,v)=>v,setDraft:(key)=>{latestField=key;},sourceParams:()=>({project_id:'p',artifact_id:'nav'}),run:()=>new Promise(resolve=>{finishRead=resolve;}),render:async()=>{}};
+globalThis.document={getElementById:()=>({value:'512'})};
+hexEditor(navCtx,navData);const pageRead=navigationActions['hex-go']();
+navState.hexDraft.set(512,'01');navCtx.setDraft('hex-changes',serializeHexDraft(navState,navState.hexDraft));finishRead(navData);await pageRead;
+assert.equal(latestField,'hex-changes','A late page read must keep undo focused on the newer byte edit.');

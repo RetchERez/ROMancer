@@ -1,6 +1,6 @@
 """Explicit cartridge checksum obligations for supported linear layouts.
 
-SNES power-of-two images: SNESdev ROM_header#Checksum (Nintendo manual).
+SNES recursive mirrored images: SNESdev ROM_header#Checksum (Nintendo manual).
 Genesis linear ROM checksum: big-endian words from0x200 through end.
 """
 from pathlib import Path
@@ -35,6 +35,13 @@ def integrity_edits(path, expected_sha256, system_id, edits):
     if system_id == 'snes':
         header = next((c for c in assessment['candidates'] if c['layout_valid']))['header_offset']
         protected = [(header + 21, header + 28)]
+    extended_checksum_verified=None
+    if system_id=='snes':
+        chosen=next(c for c in assessment['candidates']if c['layout_valid'])
+        if chosen['format']=='exhirom-candidate':
+            from .cartridge_integrity import snes_mirrored_checksum
+            h=chosen['header_offset'];prefix=chosen['metadata']['copier_header_bytes']
+            extended_checksum_verified=snes_mirrored_checksum(bytes(raw[prefix:]))==int.from_bytes(raw[h+30:h+32],'little')
     for edit in edits:
         offset = edit['offset']
         before = bytes.fromhex(edit['before'])
@@ -53,12 +60,15 @@ def integrity_edits(path, expected_sha256, system_id, edits):
         candidate = next(c for c in assessment['candidates'] if c['layout_valid'])
         prefix = candidate['metadata']['copier_header_bytes']
         body = len(raw) - prefix
-        if candidate['format'] not in ('lorom', 'hirom') or body & body - 1:
-            raise ValueError('checksum repair requires a supported power-of-two LoROM/HiROM image')
+        if candidate['format'] not in ('lorom','hirom','exhirom-candidate') or not 32768<=body<=8*1024**2 or body%32768:
+            raise ValueError('Checksum maintenance requires a checked 32KiB-aligned SNES container up to8MiB.')
+        if candidate['format']=='exhirom-candidate' and not extended_checksum_verified:
+            raise ValueError('This extended ROM does not match the supported checksum convention. Preserve its checksum explicitly in Advanced byte options or supply a checked convention.')
         start = candidate['header_offset'] + 28
         length = 4
         raw[start:start + 4] = b'\xff\xff\x00\x00'
-        checksum = sum(raw[prefix:]) & 65535
+        from .cartridge_integrity import snes_mirrored_checksum
+        checksum = snes_mirrored_checksum(bytes(raw[prefix:]))
         replacement = (checksum ^ 65535).to_bytes(2, 'little') + checksum.to_bytes(2, 'little')
     elif system_id == 'sms':
         from .system_formats.sms import checksum

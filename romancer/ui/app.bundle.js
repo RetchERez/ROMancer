@@ -500,7 +500,7 @@
     const prefix = state2.project.project_id + ":" + state2.artifact.artifact_id + ":";
     for (const [key3, value] of Object.entries(state2.drafts || {})) {
       if (!key3.startsWith(prefix)) continue;
-      if (/:(?:asset-changes|table-changes|level-changes|sound-changes|command-changes)$/.test(key3)) {
+      if (/:(?:asset-changes|table-changes|level-changes|sound-changes|command-changes)$/.test(key3) || key3.includes(":level-layout-draft-")) {
         try {
           const data = JSON.parse(value);
           if (changed(Array.isArray(data) ? data : data == null ? void 0 : data.changes)) return true;
@@ -5552,6 +5552,7 @@ ${font ? `<section class="card"><h3>Font metrics · ${esc(font.id)}</h3><div cla
       state2.hexDraft.selected = state2.resumeHexSelection;
       delete state2.resumeHexSelection;
     }
+    const policy = () => ctx2.draft("hex-checksum-policy", "maintain");
     const draft = state2.hexDraft, current2 = () => selectionKey(state2) === ticket;
     const scoped = async (op, p) => {
       const result = await ctx2.run(op, { ...ctx2.sourceParams(), ...p }, { render: false });
@@ -5559,10 +5560,11 @@ ${font ? `<section class="card"><h3>Font metrics · ${esc(font.id)}</h3><div cla
       return result;
     };
     const go = async (offset) => {
-      const result = await scoped("resource.inspect", { offset: Math.min(integer8(offset), Math.max(0, state2.artifact.size - 1)), length: 256 });
+      const next = Math.min(integer8(offset), Math.max(0, state2.artifact.size - 1));
+      ctx2.setDraft("hex-offset", String(next));
+      const result = await scoped("resource.inspect", { offset: next, length: 256 });
       state2.results["resource.inspect"] = result;
       draft.selected = result.offset;
-      ctx2.setDraft("hex-offset", String(result.offset));
       await ctx2.render();
     };
     ctx2.use({
@@ -5610,15 +5612,18 @@ ${font ? `<section class="card"><h3>Font metrics · ${esc(font.id)}</h3><div cla
         if (document.querySelector("#hex-editor input:invalid")) throw Error("Finish the byte with two hex digits first.");
         const edits = draft.edits(state2);
         if (!edits.length) throw Error("Change one or more byte cells first.");
-        const signature = JSON.stringify(edits), source = state2.artifact;
-        const plan = await scoped(source.system_id ? "systems.plan_edits" : "bytes.plan", { edits });
+        const signature = JSON.stringify(edits), source = state2.artifact, checksumPolicy = policy();
+        if (!["maintain", "preserve"].includes(checksumPolicy)) throw Error("Choose a supported checksum policy.");
+        state2.hexReview = null;
+        const plan = await scoped(source.system_id && checksumPolicy === "maintain" ? "systems.plan_edits" : "bytes.plan", { edits });
+        if (policy() !== checksumPolicy) throw Error("Checksum policy changed during review. Review the edits again.");
         if (JSON.stringify(draft.edits(state2)) !== signature) throw Error("Bytes changed during review. Review them again.");
-        state2.hexReview = { scope: ticket, signature, plan };
+        state2.hexReview = { scope: ticket, signature, plan, checksumPolicy };
         await ctx2.render();
       },
       "hex-apply": async () => {
         const reviewed2 = state2.hexReview;
-        if ((reviewed2 == null ? void 0 : reviewed2.scope) !== ticket || reviewed2.signature !== JSON.stringify(draft.edits(state2))) throw Error("Review the current byte edits first.");
+        if ((reviewed2 == null ? void 0 : reviewed2.scope) !== ticket || reviewed2.checksumPolicy !== policy() || reviewed2.signature !== JSON.stringify(draft.edits(state2))) throw Error("Review the current byte edits first.");
         const built = await ctx2.run("build.apply", { ...ctx2.projectParams(), plan_id: reviewed2.plan.plan_id }, { render: false });
         if (!current2()) return;
         if (state2.hexReview !== reviewed2 || JSON.stringify(draft.edits(state2)) !== reviewed2.signature) {
@@ -5635,7 +5640,7 @@ ${font ? `<section class="card"><h3>Font metrics · ${esc(font.id)}</h3><div cla
       }
     });
     const bytes = data.hex.match(/../g) || [], search = ((_d = state2.hexSearch) == null ? void 0 : _d.scope) === ticket ? state2.hexSearch.result : null, numbers = ((_e = state2.hexNumbers) == null ? void 0 : _e.scope) === ticket && state2.hexNumbers.result.offset === draft.selected ? state2.hexNumbers.result : null, marks = ((_f = state2.hexBookmarks) == null ? void 0 : _f.scope) === ticket ? state2.hexBookmarks.result : null;
-    const reviewed = ((_g = state2.hexReview) == null ? void 0 : _g.scope) === ticket && state2.hexReview.signature === JSON.stringify(draft.edits(state2));
+    const reviewed = ((_g = state2.hexReview) == null ? void 0 : _g.scope) === ticket && state2.hexReview.checksumPolicy === policy() && state2.hexReview.signature === JSON.stringify(draft.edits(state2));
     return `<section class="card" id="hex-editor"><div class="card-heading"><h3>Hex editor</h3>${badge(`${draft.changes.size} staged bytes`)}</div>
  <div class="toolbar">${field("hex-offset", "Offset", ctx2.draft("hex-offset", data.offset))}${button("Go", "hex-go")}${button("Previous page", "hex-page", { id: "-256", disabled: data.offset === 0 })}${button("Next page", "hex-page", { id: "256", disabled: data.offset + data.length >= state2.artifact.size })}</div>
  <div class="hex-scroll"><div class="hex-edit-grid" aria-label="Editable hex bytes">${Array.from({ length: Math.ceil(bytes.length / 16) }, (_, row) => {
@@ -5645,8 +5650,9 @@ ${font ? `<section class="card"><h3>Font metrics · ${esc(font.id)}</h3><div cla
         return `<input aria-label="Byte 0x${offset.toString(16)}" data-hex-offset="${offset}" value="${draft.changes.get(offset) || b}" maxlength="2" size="2" spellcheck="false" class="hex-cell ${draft.changes.has(offset) ? "changed" : ""}">`;
       }).join("")}</div><code>${esc(((_a2 = data.text) == null ? void 0 : _a2.slice(row * 16, row * 16 + 16)) || "")}</code></div>`;
     }).join("")}</div></div>
+${state2.artifact.system_id ? `<details><summary>Advanced byte options</summary>${select("hex-checksum-policy", "Checksum policy", [["maintain", "Maintain supported console checksums"], ["preserve", "Preserve checksum fields (Advanced)"]], policy())}<p>Preserving fields is for a separately checked convention or an intentional raw edit. It does not verify the game’s integrity checks.</p></details>` : ""}
  <p class="subtle">Edit a byte, then review. Your source stays unchanged. Arrow keys move between bytes.</p><div class="actions">${button("Review byte edits", "hex-review", { primary: true, disabled: !draft.changes.size })}${button("Create separate build", "hex-apply", { disabled: !reviewed })}${button("Discard byte edits", "hex-clear", { disabled: !draft.changes.size })}</div>
- ${reviewed ? `<div class="notice">${state2.hexReview.plan.changed_bytes} bytes in the reviewed plan, including supported checksum repairs.</div>` : ""}
+ ${reviewed ? `<div class="notice">${state2.hexReview.plan.changed_bytes} bytes in the reviewed plan. ${state2.hexReview.checksumPolicy === "preserve" ? "Checksum fields are preserved; game-specific integrity is not verified." : "Supported console checksum maintenance is included."}</div>` : ""}
  <details><summary>Search bytes, text or numbers</summary><div class="field-row">${select("hex-search-kind", "Search for", [["hex", "Hex pattern (?? wildcard)"], ["text", "UTF-8 text"], ["number", "Integer"]], ctx2.draft("hex-search-kind", "hex"))}${field("hex-search-query", "Pattern or value", ctx2.draft("hex-search-query", ""))}${field("hex-search-start", "Start offset", ctx2.draft("hex-search-start", "0"))}</div><div class="field-row">${select("hex-endian", "Byte order", [["little", "Little endian"], ["big", "Big endian"]], ctx2.draft("hex-endian", "little"))}${select("hex-width", "Number width", [[1, "8-bit"], [2, "16-bit"], [4, "32-bit"]], ctx2.draft("hex-width", "2"))}${select("hex-signed", "Number sign", [["false", "Unsigned"], ["true", "Signed"]], ctx2.draft("hex-signed", "false"))}</div>${button("Search selected file", "hex-search")}
  ${search ? `<p>${search.offsets.length} matches · ${search.complete ? "Reached end of file" : `Scanned through 0x${search.scanned_to.toString(16)}`}</p><div class="actions">${search.offsets.slice(0, 1e3).map((o) => button("0x" + o.toString(16), "hex-jump", { id: String(o) })).join("")}</div>${search.complete ? "" : button("Set next search position", "hex-search-more")}` : ""}</details>
  <details><summary>Number inspector & bookmarks</summary><p>Selected offset: <code id="hex-selected">0x${draft.selected.toString(16)}</code></p>${button("Explain selected bytes", "hex-explain")}${button("Inspect selected number", "hex-numbers")}<div id="hex-explanation">${((_h = state2.hexExplanation) == null ? void 0 : _h.scope) === ticket && state2.hexExplanation.result.offset === draft.selected ? researchNoteHelp(state2.hexExplanation.result.research_notes) : ""}${((_i = state2.hexExplanation) == null ? void 0 : _i.scope) === ticket && state2.hexExplanation.result.offset === draft.selected ? `<p>${esc(state2.hexExplanation.result.note)}</p>${state2.hexExplanation.result.interpretations.map((row) => `<dl><dt>${esc(row.name)} · declared</dt><dd>File offset 0x${row.offset.toString(16)} · ${row.length} bytes${row.type ? " · " + esc(row.type) + " " + esc(row.endian) + " · value " + esc(row.value) + " · numeric range " + row.minimum + "–" + row.maximum : ""}${row.description ? "<br>" + esc(row.description) : ""}</dd></dl>`).join("")}` : ""}</div><div id="hex-number-result">${numbers ? `<dl>${Object.entries(numbers.values).map(([k, v]) => `<dt>${esc(k)}</dt><dd>${esc(v)}</dd>`).join("")}</dl>` : ""}</div>${field("hex-bookmark-name", "Bookmark name", ctx2.draft("hex-bookmark-name", ""))}<div class="actions">${button("Bookmark selected byte", "hex-bookmark")}${button("Load bookmarks", "hex-bookmarks")}</div>${((marks == null ? void 0 : marks.bookmarks) || []).map((r) => `<div class="actions">${button(`${r.name} · 0x${r.offset.toString(16)}`, "hex-jump", { id: String(r.offset) })}${button("Remove", "hex-unbookmark", { id: String(r.offset) })}</div>`).join("")}</details></section>`;
@@ -5682,15 +5688,21 @@ ${font ? `<section class="card"><h3>Font metrics · ${esc(font.id)}</h3><div cla
     return `<details class="card hex-comparison" open><summary>Compare at 0x${offset.toString(16)}</summary><p>${esc(left.name)} → ${esc(a.name)}</p><p>Changed bytes are highlighted. — means this file has no byte at that offset.</p><div class="actions">${button("Previous comparison page", "hex-diff-page", { id: "-256", disabled: offset === 0 })}${button("Next comparison page", "hex-diff-page", { id: "256", disabled: offset + span >= maximum })}${button("Follow hex editor", "hex-diff-follow")}</div><div class="hex-scroll"><table><thead><tr><th>Offset</th><th>Earlier bytes</th><th>Selected bytes</th></tr></thead><tbody>${Array.from({ length: Math.ceil(span / 16) }, (_, i) => `<tr><td><code>${(offset + i * 16).toString(16)}</code></td><td><code>${cells(x, y, i * 16)}</code></td><td><code>${cells(y, x, i * 16)}</code></td></tr>`).join("")}</tbody></table></div></details>`;
   }
   function mountHexEditor(ctx2) {
+    var _a;
     const root = document.getElementById("hex-editor");
     if (!root) return;
     const draft = ctx2.state.hexDraft;
+    (_a = root.querySelector("#hex-checksum-policy")) == null ? void 0 : _a.addEventListener("change", (event) => {
+      ctx2.setDraft("hex-checksum-policy", event.target.value);
+      ctx2.state.hexReview = null;
+      ctx2.render();
+    });
     root.querySelectorAll("[data-hex-offset]").forEach((node) => {
       node.addEventListener("focus", () => {
-        var _a, _b, _c, _d, _e, _f;
+        var _a2, _b, _c, _d, _e, _f;
         if (draft.scope !== selectionKey(ctx2.state)) return;
         draft.selected = Number(node.dataset.hexOffset);
-        if (((_a = ctx2.state.hexExplanation) == null ? void 0 : _a.result.offset) !== draft.selected) {
+        if (((_a2 = ctx2.state.hexExplanation) == null ? void 0 : _a2.result.offset) !== draft.selected) {
           ctx2.state.hexExplanation = null;
           (_c = (_b = root.querySelector("#hex-explanation")) == null ? void 0 : _b.replaceChildren) == null ? void 0 : _c.call(_b);
         }
@@ -8827,6 +8839,67 @@ ${font ? `<section class="card"><h3>Font metrics · ${esc(font.id)}</h3><div cla
     render: () => render15
   });
 
+  // romancer/ui/level_presets.js
+  function saveLevelDraft(ctx2, model) {
+    var _a;
+    if (!((_a = model == null ? void 0 : model.doc) == null ? void 0 : _a.document_id)) return;
+    const text = JSON.stringify({ document_id: model.doc.document_id, changes: model.values() });
+    ctx2.setDraft("level-changes", text);
+    ctx2.setDraft("level-layout-draft-" + model.doc.document_id, text);
+  }
+  function loadLevelDraft(ctx2, doc) {
+    for (const key3 of ["level-changes", "level-layout-draft-" + doc.document_id]) {
+      try {
+        const draft = JSON.parse(ctx2.draft(key3, "{}"));
+        if (draft.document_id === doc.document_id && Array.isArray(draft.changes)) return draft.changes;
+      } catch {
+      }
+    }
+    return [];
+  }
+  async function checkedLevelChoices(ctx2, currentName = "") {
+    var _a, _b, _c;
+    if (((_a = ctx2.state.artifact) == null ? void 0 : _a.system_id) !== "gb") return "";
+    const scope = selectionKey(ctx2.state), current2 = () => {
+      var _a2;
+      return scope === selectionKey(ctx2.state) && ((_a2 = ctx2.isCurrentRender) == null ? void 0 : _a2.call(ctx2)) !== false;
+    };
+    const source = { ...ctx2.sourceParams() };
+    let packet;
+    try {
+      packet = await ctx2.api.call("levels.presets", source);
+    } catch {
+      return "";
+    }
+    if (!current2() || !(packet == null ? void 0 : packet.ok) || packet.source_sha256 !== ctx2.state.artifact.sha256 || !((_b = packet.presets) == null ? void 0 : _b.length)) return "";
+    const selected2 = ((_c = packet.presets.find((p) => p.name === currentName)) == null ? void 0 : _c.id) || packet.presets[0].id;
+    ctx2.use({ "levels-preset-open": async () => {
+      var _a2, _b2, _c2;
+      if (!current2()) return;
+      const id = (_a2 = globalThis.document.getElementById("level-preset")) == null ? void 0 : _a2.value;
+      if (!packet.presets.some((p) => p.id === id)) throw Error("Choose a checked level.");
+      saveLevelDraft(ctx2, ((_b2 = ctx2.state.levelEditor) == null ? void 0 : _b2.scope) === scope ? ctx2.state.levelEditor : null);
+      const result = await ctx2.api.call("levels.preset", { ...source, preset_id: id });
+      if (!current2()) return;
+      if (!result.ok || result.source_sha256 !== ctx2.state.artifact.sha256) throw Error("This level does not match the selected source.");
+      const inspected = await ctx2.api.call("levels.inspect", { ...source, definition: result.definition });
+      if (!current2()) return;
+      if (!(inspected == null ? void 0 : inspected.ok) || inspected.source_sha256 !== ctx2.state.artifact.sha256) throw Error("The checked layout could not be opened.");
+      await ctx2.api.call("studio.definition", { ...source, kind: "levels", definition: result.definition });
+      if (!current2()) return;
+      ctx2.state.artifact.descriptors = { ...ctx2.state.artifact.descriptors, levels: result.definition };
+      ctx2.state.results["levels.inspect"] = inspected;
+      ctx2.state.pending = null;
+      ctx2.setDraft("level-definition", JSON.stringify(result.definition, null, 2));
+      ctx2.setDraft("level-room", ((_c2 = inspected.rooms[0]) == null ? void 0 : _c2.id) || "");
+      ctx2.setDraft("level-layer", "terrain");
+      ctx2.setDraft("level-tool", "paint");
+      ctx2.state.levelRect = null;
+      return ctx2.render();
+    } });
+    return '<section class="card"><div class="field-row">' + select("level-preset", "Checked level", packet.presets.map((p) => [p.id, p.name]), selected2) + button("Open level", "levels-preset-open", { primary: true }) + '</div><p class="subtle">Stored terrain and baseline graphics. Each screen is shown once; shared uses are listed below it.</p></section>';
+  }
+
   // romancer/ui/level_semantics.js
   function collisionBrushes(room, values) {
     const rows = (room.collision_types || []).map((row) => ({ ...row })), known = new Set(rows.map((row) => row.value));
@@ -9379,6 +9452,17 @@ ${font ? `<section class="card"><h3>Font metrics · ${esc(font.id)}</h3><div cla
       this.past = [];
       this.future = [];
       this.start = null;
+      this.encodedTerrain = /* @__PURE__ */ new Map();
+      for (const room of doc.rooms) {
+        const storage = room.terrain_storage;
+        if (!storage) continue;
+        storage.origins.forEach((offset, index) => {
+          if (!Number.isSafeInteger(offset) || this.encodedTerrain.has(offset)) return;
+          const operand = storage.operands.find((o) => o.offset === offset);
+          if (!operand) throw Error("Encoded terrain operand is missing.");
+          this.encodedTerrain.set(offset, { room_id: room.id, index, value: room.terrain[index], repeat: operand.repeat, protected: storage.protected_values || [] });
+        });
+      }
       if (!Array.isArray(changes) || changes.length > 8192) throw Error("Level draft exceeds its change budget.");
       for (const change of changes) this.set(change);
     }
@@ -9387,8 +9471,35 @@ ${font ? `<section class="card"><h3>Font metrics · ${esc(font.id)}</h3><div cla
       if (!r) throw Error("Unknown room.");
       return r;
     }
+    terrainChange(c) {
+      if (c.kind !== "terrain") return c;
+      const room = this.room(c.room_id), storage = room.terrain_storage;
+      if (!storage) return c;
+      integer15(c.index, 0, room.terrain.length - 1);
+      integer15(c.value, 0, this.doc.metatiles.length - 1);
+      const offset = storage.origins[c.index];
+      if (offset === null) {
+        if (c.value === room.terrain[c.index]) return null;
+        throw Error("This implicit blank has no stored value. Stream growth needs a separate layout transform.");
+      }
+      if (storage.overlaps) throw Error("Overlapping terrain needs separate consumer verification.");
+      const operand = this.encodedTerrain.get(offset);
+      if (!operand) throw Error("Choose a recorded terrain operand.");
+      if (c.value !== operand.value) {
+        if (operand.protected.includes(c.value) || operand.protected.includes(operand.value)) throw Error("Interactive terrain needs a separate metadata edit.");
+        if (c.value === 253 && !operand.repeat) throw Error("A literal cannot become a repeat marker.");
+      }
+      return { ...c, room_id: operand.room_id, index: operand.index };
+    }
+    cellKey(id, layer, index) {
+      var _a;
+      const room = this.room(id), offset = layer === "terrain" ? (_a = room.terrain_storage) == null ? void 0 : _a.origins[index] : null, operand = this.encodedTerrain.get(offset);
+      return key(operand ? { kind: layer, room_id: operand.room_id, index: operand.index } : { kind: layer, room_id: id, index });
+    }
     set(c) {
       var _a, _b, _c, _d, _e, _f;
+      c = this.terrainChange(c);
+      if (c === null) return;
       let original2, max, min = 0;
       if (c.kind === "metatile") {
         integer15(c.index, 0, this.doc.metatiles.length - 1);
@@ -9432,7 +9543,7 @@ ${font ? `<section class="card"><h3>Font metrics · ${esc(font.id)}</h3><div cla
       if (!original2) throw Error("This layer is not declared.");
       return original2.map((v, index) => {
         var _a;
-        return ((_a = this.changes.get(key({ kind: layer, room_id: id, index }))) == null ? void 0 : _a.value) ?? v;
+        return ((_a = this.changes.get(this.cellKey(id, layer, index))) == null ? void 0 : _a.value) ?? v;
       });
     }
     blocks() {
@@ -9563,8 +9674,14 @@ ${font ? `<section class="card"><h3>Font metrics · ${esc(font.id)}</h3><div cla
     model.set({ kind: "object", room_id: id, index, field: "x", value: x });
     model.set({ kind: "object", room_id: id, index, field: "y", value: y });
   }
-  function levelBrushPalette(doc, model, selected2) {
-    return `<div class="level-brush-palette" role="group" aria-label="Terrain brushes">${model.blocks().map((_, index) => `<button type="button" data-level-brush="${index}" aria-pressed="${Number(selected2) === index}" aria-label="Paint with metatile ${index}" title="Metatile ${index}"><canvas data-level-block="${index}" aria-hidden="true"></canvas><span>${index}</span></button>`).join("")}</div>`;
+  function levelBrushPalette(doc, model, selected2, page = Math.floor(Number(selected2) / 64) || 0) {
+    const blocks = model.blocks();
+    integer15(page, 0, Math.max(0, Math.ceil(blocks.length / 64) - 1));
+    const first = page * 64;
+    return `<div class="level-brush-palette" role="group" aria-label="Terrain brushes">${blocks.slice(first, first + 64).map((_, position) => {
+      const index = first + position;
+      return `<button type="button" data-level-brush="${index}" aria-pressed="${Number(selected2) === index}" aria-label="Paint with metatile ${index}" title="Metatile ${index}"><canvas data-level-block="${index}" aria-hidden="true"></canvas><span>${index}</span></button>`;
+    }).join("")}</div>`;
   }
   function mountLevel(ctx2, doc, model, id, persist) {
     var _a, _b, _c, _d;
@@ -10357,7 +10474,7 @@ ${font ? `<section class="card"><h3>Font metrics · ${esc(font.id)}</h3><div cla
   };
   var practiceControls = () => `<details class="card"><summary>Advanced practice</summary><p>Open a separate test layout to learn the editor controls.</p>${button("Open test layout", "studio-example")}</details>`;
   async function render15(ctx2) {
-    var _a, _b, _c, _d, _e, _f, _g, _h, _i, _j, _k, _l, _m, _n, _o, _p, _q, _r;
+    var _a, _b, _c, _d, _e, _f, _g, _h, _i, _j, _k, _l, _m, _n, _o, _p, _q, _r, _s, _t, _u;
     const setupReview = useResearchSetup(ctx2, "levels");
     if (setupReview) return setupReview;
     const { state: state2 } = ctx2;
@@ -10388,35 +10505,37 @@ ${font ? `<section class="card"><h3>Font metrics · ${esc(font.id)}</h3><div cla
       if (!current2() || ((_c = ctx2.isCurrentRender) == null ? void 0 : _c.call(ctx2)) === false) return "";
       if (doc) state2.results["levels.inspect"] = doc;
     }
+    const presetChoices = await checkedLevelChoices(ctx2, ((_d = doc == null ? void 0 : doc.definition) == null ? void 0 : _d.name) || (saved == null ? void 0 : saved.name));
+    if (!current2() || ((_e = ctx2.isCurrentRender) == null ? void 0 : _e.call(ctx2)) === false) return "";
     state2.levelRoomVisualScope = null;
     state2.gameMapRenderScope = null;
-    if (!(doc == null ? void 0 : doc.ok) && !saved) {
+    if (!(doc == null ? void 0 : doc.ok) && !saved && !presetChoices) {
       let game;
       try {
         game = await ctx2.api.call("games.inspect", ctx2.sourceParams());
       } catch {
       }
-      if (!current2() || ((_d = ctx2.isCurrentRender) == null ? void 0 : _d.call(ctx2)) === false) return "";
-      if (((_e = game == null ? void 0 : game.profile) == null ? void 0 : _e.id) === "ffl2-usa" && (game.map_workbench || ((_f = game.visual) == null ? void 0 : _f.kind) === "room-map")) {
+      if (!current2() || ((_f = ctx2.isCurrentRender) == null ? void 0 : _f.call(ctx2)) === false) return "";
+      if (((_g = game == null ? void 0 : game.profile) == null ? void 0 : _g.id) === "ffl2-usa" && (game.map_workbench || ((_h = game.visual) == null ? void 0 : _h.kind) === "room-map")) {
         ctx2.use({ "ffl2-maps-open": () => {
           if (!current2()) return;
           ctx2.setDraft("ffl2-map-mode", "browser");
           return ctx2.render();
         } });
         if (ctx2.draft("ffl2-map-mode", "simple") === "browser" || !game.visual) {
-          const markup2 = await gameMaps(ctx2, { simpleAvailable: ((_g = game.visual) == null ? void 0 : _g.kind) === "room-map" });
-          if (!current2() || ((_h = ctx2.isCurrentRender) == null ? void 0 : _h.call(ctx2)) === false) return "";
+          const markup2 = await gameMaps(ctx2, { simpleAvailable: ((_i = game.visual) == null ? void 0 : _i.kind) === "room-map" });
+          if (!current2() || ((_j = ctx2.isCurrentRender) == null ? void 0 : _j.call(ctx2)) === false) return "";
           state2.gameMapRenderScope = scope;
           return heading("", "Levels", "") + markup2;
         }
         const markup = await gameEdits(ctx2);
-        if (!current2() || ((_i = ctx2.isCurrentRender) == null ? void 0 : _i.call(ctx2)) === false) return "";
+        if (!current2() || ((_k = ctx2.isCurrentRender) == null ? void 0 : _k.call(ctx2)) === false) return "";
         state2.levelRoomVisualScope = scope;
         return heading("", "Levels", "") + `<section class="card"><h3>Explore the actual game</h3><p>Open the ROM’s room catalog, terrain commands, NPC definitions and arrivals.</p>${button("Browse game maps", "ffl2-maps-open")}</section>` + markup;
       }
-      if (((_j = game == null ? void 0 : game.visual) == null ? void 0 : _j.kind) === "room-map") {
+      if (((_l = game == null ? void 0 : game.visual) == null ? void 0 : _l.kind) === "room-map") {
         const markup = await gameEdits(ctx2);
-        if (!current2() || ((_k = ctx2.isCurrentRender) == null ? void 0 : _k.call(ctx2)) === false) return "";
+        if (!current2() || ((_m = ctx2.isCurrentRender) == null ? void 0 : _m.call(ctx2)) === false) return "";
         state2.levelRoomVisualScope = scope;
         return heading("", "Levels", "") + markup;
       }
@@ -10424,21 +10543,19 @@ ${font ? `<section class="card"><h3>Font metrics · ${esc(font.id)}</h3><div cla
     const definition = (doc == null ? void 0 : doc.definition) || saved || {};
     let model = state2.levelEditor;
     if ((doc == null ? void 0 : doc.ok) && ((model == null ? void 0 : model.scope) !== scope || model.doc.document_id !== doc.document_id)) {
-      let changes = [];
-      try {
-        const draft = JSON.parse(ctx2.draft("level-changes", "{}"));
-        if (draft.document_id === doc.document_id) changes = draft.changes;
-      } catch {
-      }
+      const changes = loadLevelDraft(ctx2, doc);
       model = new LevelDraft(doc, changes);
+      if (model.values().length) model.past.push("[]");
       model.scope = scope;
       state2.levelEditor = model;
+      if (changes.length) saveLevelDraft(ctx2, model);
     }
     const room = (doc == null ? void 0 : doc.rooms.find((r) => r.id === ctx2.draft("level-room", ""))) || (doc == null ? void 0 : doc.rooms[0]), layer = ["terrain", ...(room == null ? void 0 : room.collision) ? ["collision"] : [], ...(room == null ? void 0 : room.elevation) ? ["elevation"] : []].includes(ctx2.draft("level-layer", "terrain")) ? ctx2.draft("level-layer", "terrain") : "terrain";
+    const rawBrushPage = Number(ctx2.draft("level-brush-page", String(Math.floor(Number(ctx2.draft("level-brush", "1")) / 64) || 0))), brushPage = Number.isSafeInteger(rawBrushPage) ? Math.max(0, Math.min(rawBrushPage, Math.max(0, Math.ceil(((doc == null ? void 0 : doc.metatiles.length) || 0) / 64) - 1))) : 0;
     const persist = () => {
       if (!current2()) return;
       state2.historyEditor = "level-canvas";
-      ctx2.setDraft("level-changes", JSON.stringify({ document_id: doc.document_id, changes: model.values() }));
+      saveLevelDraft(ctx2, model);
       state2.pending = null;
     };
     const change = (action) => {
@@ -10546,12 +10663,12 @@ ${font ? `<section class="card"><h3>Font metrics · ${esc(font.id)}</h3><div cla
       }
     });
     const setup2 = `<details class="card"><summary>Advanced level setup</summary><p>Level editing needs a layout definition for this ROM. Confirm tile grids, object fields, and room-reference mappings before using them. Names and roles alone do not establish game behavior.</p><details><summary>Single-room layout form</summary><div class="field-row">${field("level-name", "Room name", ctx2.draft("level-name", "Room"))}${field("level-width", "Blocks across", ctx2.draft("level-width", "16"), { type: "number", min: 1 })}${field("level-height", "Blocks down", ctx2.draft("level-height", "14"), { type: "number", min: 1 })}${select("level-entry", "Grid integer bytes", [[1, "8 bit"], [2, "16 bit"]], ctx2.draft("level-entry", "1"))}${select("level-endian", "Grid byte order", [["little", "Little endian"], ["big", "Big endian"]], ctx2.draft("level-endian", "little"))}</div><div class="field-row">${field("level-tiles-offset", "Tiles offset", ctx2.draft("level-tiles-offset", "0"))}${field("level-tiles-count", "Tile count", ctx2.draft("level-tiles-count", "16"))}${select("level-codec", "Tile format", Object.entries(codecs2).map(([system2, codec]) => [codec, system2.toUpperCase()]), ctx2.draft("level-codec", codecs2[state2.artifact.system_id] || codecs2.nes))}${field("level-palette-offset", "Palette offset", ctx2.draft("level-palette-offset", "0"))}${select("level-palette-format", "Palette format", [["rgb888", "RGB888"], ["rgb555-le", "RGB555 little endian"], ["rgb555-be", "RGB555 big endian"], ["genesis", "Genesis RGB333"], ["sms-rgb222", "Master System RGB222"], ["dmg-shades", "Game Boy shade register"]], ctx2.draft("level-palette-format", state2.artifact.system_id === "genesis" ? "genesis" : state2.artifact.system_id === "sms" ? "sms-rgb222" : "rgb555-le"))}</div><div class="field-row">${field("level-blocks-offset", "Metatile table offset", ctx2.draft("level-blocks-offset", "0"))}${field("level-blocks-count", "Metatile count", ctx2.draft("level-blocks-count", "16"))}${field("level-block-width", "Tiles per block across", ctx2.draft("level-block-width", "2"))}${field("level-block-height", "Tiles per block down", ctx2.draft("level-block-height", "2"))}${field("level-terrain-offset", "Terrain grid offset", ctx2.draft("level-terrain-offset", "0"))}${field("level-collision-offset", "Collision grid offset (optional)", ctx2.draft("level-collision-offset", ""))}</div><div class="field-row">${select("level-projection", "Projection", [["orthogonal", "Rectangular"], ["isometric", "Isometric"]], ctx2.draft("level-projection", "orthogonal"))}${field("level-projection-width", "Projected cell width", ctx2.draft("level-projection-width", "32"), { type: "number", min: 1, max: 256 })}${field("level-projection-height", "Projected cell height", ctx2.draft("level-projection-height", "16"), { type: "number", min: 1, max: 256 })}${field("level-elevation-step", "Pixels per height unit", ctx2.draft("level-elevation-step", "8"), { type: "number", min: 1, max: 256 })}${field("level-elevation-offset", "Height grid offset (optional)", ctx2.draft("level-elevation-offset", ""))}</div><p class="subtle">Projection draws declared coordinates. A height grid needs its own checked source range.</p>${button("Check declared layout", "levels-declare")}</details>${jsonEditor("level-definition", "Verified layout definition", ctx2.draft("level-definition", JSON.stringify(definition, null, 2)))}<div class="actions">${button("Inspect layout", "levels-inspect")}${button("Save checked definition", "levels-save")}</div></details>`;
-    if (!(doc == null ? void 0 : doc.ok)) return heading("", "Levels", "") + empty("No supported level map for this ROM yet", "Inspect the ROM in Resources. A supported map definition is needed before its levels can be shown.", button("Investigate bytes", "navigate", { id: "resources", primary: true })) + setup2 + practiceControls();
-    const objects = model.objects(room.id), namedObjects = objects.some((object, index) => !!objectMetadata(doc, room.id, index)), block = Number(ctx2.draft("level-block-index", "0")), uses = doc.uses[String(block)] || [], pending = ((_l = state2.pending) == null ? void 0 : _l.kind) === "levels" && state2.pending.document_id === doc.document_id;
-    return `${heading("", "Levels", "")}${editCheckControls(ctx2)}<div class="identity"><strong>${esc(state2.artifact.name)}</strong><span>${model.values().length} preview changes</span></div>${((_m = doc.definition) == null ? void 0 : _m.scene) || room.elevation ? '<p class="notice">Declared ' + esc(((_n = doc.scene) == null ? void 0 : _n.projection) || "orthogonal") + " scene preview. Playtest verifies the actual game.</p>" : ""}<section class="card">${state2.project.demo && ((_o = doc.definition) == null ? void 0 : _o.name) === "Hillside editor-layout workshop" ? '<p class="notice">Practice layout. These room links and object records do not run in Playtest; only Hillside terrain and music do.</p>' : ""}${roomNavigation(doc, model, room.id)}<div class="field-row level-toolbar">${doc.rooms.length > 1 ? select("level-room", "Room", doc.rooms.map((r) => [r.id, r.name]), room.id) : '<input type="hidden" id="level-room" value="' + esc(room.id) + '">'}${select("level-layer", "Paint layer", [["terrain", "Terrain"], ...room.collision ? [["collision", "Collision"]] : [], ...room.elevation ? [["elevation", "Elevation"]] : []], layer)}${select("level-tool", "Tool", [["paint", "Paint"], ["pick", "Pick from room"], ["fill", "Fill"], ["select", "Select rectangle"], ["paste", "Paste rectangle"], ...objects.some((o) => Number.isSafeInteger(o.x) && Number.isSafeInteger(o.y)) ? [["objects", "Move object"]] : []], ctx2.draft("level-tool", namedObjects ? "objects" : "paint"))}<details><summary>Advanced brush value</summary>${field("level-brush", "Brush value", ctx2.draft("level-brush", "1"), { type: "number", min: 0 })}</details>${select("level-overlay", "Overlay", [["none", "No extra overlays"], ...room.collision ? [["collision", "Collision"]] : [], ...objects.length ? [["objects", "Named objects"], ...!((_p = doc.definition) == null ? void 0 : _p.scene) && !room.elevation && ((_q = room.object_metadata) == null ? void 0 : _q.some((row) => row.hitbox)) ? [["hitboxes", "Starting hitboxes"]] : [], ["records", "All records (Advanced)"]] : []], ctx2.draft("level-overlay", "objects"))}${select("level-zoom", "Zoom", [["fit", "Fit"], ["1", "1x"], ["2", "2x"], ["3", "3x"]], ctx2.draft("level-zoom", "fit"))}</div><div class="level-brush-panel"><strong>${layer === "elevation" ? "Elevation" : layer === "collision" ? "Collision brushes" : "Terrain brushes"}</strong><p class="subtle">${layer === "elevation" ? "Paint a stored height value from the Advanced brush field. This does not infer collision rules." : layer === "collision" ? "Paint where movement is blocked or allowed. Labels come from this layout; raw values have no mapped meaning." : "Choose a thumbnail to paint, or use Pick from room to sample an existing cell."}</p>${layer === "elevation" ? "<p>Height value: " + esc(ctx2.draft("level-brush", "1")) + "</p>" : layer === "collision" ? collisionPalette(room, model.cells(room.id, "collision"), ctx2.draft("level-brush", "1")) : levelBrushPalette(doc, model, ctx2.draft("level-brush", "1"))}${!room.collision ? '<p class="notice">Collision is not mapped for this room. Terrain changes its appearance; investigate the collision layout to change movement.</p>' : ""}</div><div class="editor-key" aria-label="Editor highlight key"><span><i class="key-selection" aria-hidden="true"></i>Selected cell</span><span><i class="key-change" aria-hidden="true"></i>Changed cell</span>${!((_r = doc.definition) == null ? void 0 : _r.scene) && !room.elevation ? '<span><i class="key-hitbox" aria-hidden="true"></i>Starting hitbox</span>' : ""}</div><div class="level-editor-layout"><div class="level-room-editor"><div class="preview-pair room-comparison"><div><span>Original room</span><div class="hex-scroll" role="region" tabindex="0" aria-label="Original room preview"><canvas id="level-original" aria-label="Original declared room"></canvas></div></div><div><span>Editing · highlighted cells changed</span><div class="hex-scroll" role="region" tabindex="0" aria-label="Edited room preview"><canvas id="level-canvas" tabindex="0" role="application" aria-label="Room editor: arrows select, Space paints"></canvas></div></div></div><p id="level-difference-count" class="preview-caption" role="status" aria-live="polite"></p><p id="level-position">Select an object or choose a terrain brush to begin.</p></div>${objectInspector(ctx2, doc, model, room.id)}</div><div class="actions">${button("Undo stroke", "levels-undo", { disabled: !model.past.length })}${button("Redo stroke", "levels-redo", { disabled: !model.future.length })}${button("Copy rectangle", "levels-copy")}${button("Review level changes", "levels-plan", { primary: !pending, disabled: !model.values().length })}${pending ? button("Create level build", "levels-build", { primary: true }) : ""}</div><p class="subtle">Review changes and create a build to save this in the ROM.</p></section>${doc.metatiles_stored === false ? '<section class="card"><p>This screen stores tile numbers directly. Paint terrain to select a tile; there is no stored metatile table.</p></section>' : `<details class="card"><summary>Metatiles & shared uses</summary><div class="field-row">${field("level-block-index", "Metatile index", ctx2.draft("level-block-index", "0"))}${field("level-block-part", "Part index", ctx2.draft("level-block-part", "0"))}${field("level-block-tile", "Replacement tile index", ctx2.draft("level-block-tile", "1"))}</div>${button("Stage block change", "levels-block")}<p>Selected block is used in ${uses.length} declared cells. Changes affect every use.</p><p>${uses.slice(0, 32).map((u) => esc(u.room_id) + " cell " + u.cell).join(" · ")}</p></details>`}${setup2}${practiceControls()}${report(state2.results["levels.plan"], "Level review")}${report(state2.results["build.apply"], "Separate build")}`;
+    if (!(doc == null ? void 0 : doc.ok)) return heading("", "Levels", "") + presetChoices + (presetChoices ? "" : empty("No supported level map for this ROM yet", "Inspect the ROM in Resources. A supported map definition is needed before its levels can be shown.", button("Investigate bytes", "navigate", { id: "resources", primary: true }))) + setup2 + practiceControls();
+    const objects = model.objects(room.id), namedObjects = objects.some((object, index) => !!objectMetadata(doc, room.id, index)), block = Number(ctx2.draft("level-block-index", "0")), uses = doc.uses[String(block)] || [], pending = ((_n = state2.pending) == null ? void 0 : _n.kind) === "levels" && state2.pending.document_id === doc.document_id;
+    return `${heading("", "Levels", "")}${presetChoices}${editCheckControls(ctx2)}<div class="identity"><strong>${esc(state2.artifact.name)}</strong><span>${model.values().length} preview changes</span></div>${((_o = doc.definition) == null ? void 0 : _o.scene) || room.elevation ? '<p class="notice">Declared ' + esc(((_p = doc.scene) == null ? void 0 : _p.projection) || "orthogonal") + " scene preview. Playtest verifies the actual game.</p>" : ""}<section class="card">${state2.project.demo && ((_q = doc.definition) == null ? void 0 : _q.name) === "Hillside editor-layout workshop" ? '<p class="notice">Practice layout. These room links and object records do not run in Playtest; only Hillside terrain and music do.</p>' : ""}${roomNavigation(doc, model, room.id)}${((_r = room.references) == null ? void 0 : _r.length) ? "<details><summary>Other uses · " + room.references.length + " references</summary><p>Editing this stored screen changes every listed use.</p><ul>" + room.references.map((label) => "<li>" + esc(label) + "</li>").join("") + "</ul></details>" : ""}${room.terrain_storage ? '<p class="notice">Repeated cells share one stored value and change together. Empty cells without stored data and interactive tiles are protected.</p>' : ""}<div class="field-row level-toolbar">${doc.rooms.length > 1 ? select("level-room", "Room", doc.rooms.map((r) => [r.id, r.name]), room.id) : '<input type="hidden" id="level-room" value="' + esc(room.id) + '">'}${select("level-layer", "Paint layer", [["terrain", "Terrain"], ...room.collision ? [["collision", "Collision"]] : [], ...room.elevation ? [["elevation", "Elevation"]] : []], layer)}${select("level-tool", "Tool", [["paint", "Paint"], ["pick", "Pick from room"], ["fill", "Fill"], ["select", "Select rectangle"], ["paste", "Paste rectangle"], ...objects.some((o) => Number.isSafeInteger(o.x) && Number.isSafeInteger(o.y)) ? [["objects", "Move object"]] : []], ctx2.draft("level-tool", namedObjects ? "objects" : "paint"))}<details><summary>Advanced brush value</summary>${field("level-brush", "Brush value", ctx2.draft("level-brush", "1"), { type: "number", min: 0 })}</details>${select("level-overlay", "Overlay", [["none", "No extra overlays"], ...room.collision ? [["collision", "Collision"]] : [], ...objects.length ? [["objects", "Named objects"], ...!((_s = doc.definition) == null ? void 0 : _s.scene) && !room.elevation && ((_t = room.object_metadata) == null ? void 0 : _t.some((row) => row.hitbox)) ? [["hitboxes", "Starting hitboxes"]] : [], ["records", "All records (Advanced)"]] : []], ctx2.draft("level-overlay", "objects"))}${select("level-zoom", "Zoom", [["fit", "Fit"], ["1", "1x"], ["2", "2x"], ["3", "3x"]], ctx2.draft("level-zoom", "fit"))}</div><div class="level-brush-panel"><strong>${layer === "elevation" ? "Elevation" : layer === "collision" ? "Collision brushes" : "Terrain brushes"}</strong><p class="subtle">${layer === "elevation" ? "Paint a stored height value from the Advanced brush field. This does not infer collision rules." : layer === "collision" ? "Paint where movement is blocked or allowed. Labels come from this layout; raw values have no mapped meaning." : "Choose a thumbnail to paint, or use Pick from room to sample an existing cell."}</p>${layer === "elevation" ? "<p>Height value: " + esc(ctx2.draft("level-brush", "1")) + "</p>" : layer === "collision" ? collisionPalette(room, model.cells(room.id, "collision"), ctx2.draft("level-brush", "1")) : (doc.metatiles.length > 64 ? select("level-brush-page", "Terrain brush range", Array.from({ length: Math.ceil(doc.metatiles.length / 64) }, (_, i) => [i, i * 64 + "–" + Math.min(doc.metatiles.length - 1, i * 64 + 63)]), brushPage) : "") + levelBrushPalette(doc, model, ctx2.draft("level-brush", "1"), Number(brushPage))}${!room.collision ? '<p class="notice">Collision is not mapped for this room. Terrain changes its appearance; investigate the collision layout to change movement.</p>' : ""}</div><div class="editor-key" aria-label="Editor highlight key"><span><i class="key-selection" aria-hidden="true"></i>Selected cell</span><span><i class="key-change" aria-hidden="true"></i>Changed cell</span>${!((_u = doc.definition) == null ? void 0 : _u.scene) && !room.elevation ? '<span><i class="key-hitbox" aria-hidden="true"></i>Starting hitbox</span>' : ""}</div><div class="level-editor-layout"><div class="level-room-editor"><div class="preview-pair room-comparison"><div><span>Original room</span><div class="hex-scroll" role="region" tabindex="0" aria-label="Original room preview"><canvas id="level-original" aria-label="Original declared room"></canvas></div></div><div><span>Editing · highlighted cells changed</span><div class="hex-scroll" role="region" tabindex="0" aria-label="Edited room preview"><canvas id="level-canvas" tabindex="0" role="application" aria-label="Room editor: arrows select, Space paints"></canvas></div></div></div><p id="level-difference-count" class="preview-caption" role="status" aria-live="polite"></p><p id="level-position">Select an object or choose a terrain brush to begin.</p></div>${objectInspector(ctx2, doc, model, room.id)}</div><div class="actions">${button("Undo stroke", "levels-undo", { disabled: !model.past.length })}${button("Redo stroke", "levels-redo", { disabled: !model.future.length })}${button("Copy rectangle", "levels-copy")}${button("Review level changes", "levels-plan", { primary: !pending, disabled: !model.values().length })}${pending ? button("Create level build", "levels-build", { primary: true }) : ""}</div><p class="subtle">Review changes and create a build to save this in the ROM.</p></section>${doc.metatiles_stored === false ? '<section class="card"><p>This screen stores tile numbers directly. Paint terrain to select a tile; there is no stored metatile table.</p></section>' : `<details class="card"><summary>Metatiles & shared uses</summary><div class="field-row">${field("level-block-index", "Metatile index", ctx2.draft("level-block-index", "0"))}${field("level-block-part", "Part index", ctx2.draft("level-block-part", "0"))}${field("level-block-tile", "Replacement tile index", ctx2.draft("level-block-tile", "1"))}</div>${button("Stage block change", "levels-block")}<p>Selected block is used in ${uses.length} declared cells. Changes affect every use.</p><p>${uses.slice(0, 32).map((u) => esc(u.room_id) + " cell " + u.cell).join(" · ")}</p></details>`}${setup2}${practiceControls()}${report(state2.results["levels.plan"], "Level review")}${report(state2.results["build.apply"], "Separate build")}`;
   }
   function mount11(ctx2) {
-    var _a, _b, _c, _d, _e, _f, _g, _h;
+    var _a, _b, _c, _d, _e, _f, _g, _h, _i;
     if (ctx2.state.gameMapRenderScope === selectionKey(ctx2.state)) {
       mountGameMaps(ctx2);
       return;
@@ -10565,7 +10682,7 @@ ${font ? `<section class="card"><h3>Font metrics · ${esc(font.id)}</h3><div cla
     const id = (_d = document.getElementById("level-room")) == null ? void 0 : _d.value;
     if (!id) return;
     const persist = () => {
-      ctx2.setDraft("level-changes", JSON.stringify({ document_id: doc.document_id, changes: model.values() }));
+      saveLevelDraft(ctx2, model);
       ctx2.state.pending = null;
     };
     (_e = document.getElementById("level-room")) == null ? void 0 : _e.addEventListener("change", (event) => {
@@ -10588,6 +10705,10 @@ ${font ? `<section class="card"><h3>Font metrics · ${esc(font.id)}</h3><div cla
       ctx2.setDraft("level-brush", "1");
       ctx2.setDraft("level-tool", "paint");
       ctx2.setDraft("level-overlay", event.target.value === "collision" ? "collision" : "objects");
+      ctx2.render();
+    });
+    (_i = document.getElementById("level-brush-page")) == null ? void 0 : _i.addEventListener("change", (event) => {
+      ctx2.setDraft("level-brush-page", event.target.value);
       ctx2.render();
     });
     mountLevel(ctx2, doc, model, id, persist);

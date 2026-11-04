@@ -27,7 +27,7 @@ def validate_record(row):
     _hash(row['sha256'])
     if type(row['crc32']) is not str or not re.fullmatch('[0-9A-F]{8}',row['crc32']):raise ValueError('Invalid sample CRC32.')
     _int(row['size'],1,64*1024**2)
-    formats={'nes':('ines','nes2'),'snes':('lorom','hirom','exhirom-candidate'),'genesis':('genesis-linear',),'gb':('gb-cartridge',),'gbc':('gbc-cartridge',),'sms':('sms-sega',)}
+    formats={'nes':('ines','nes2'),'snes':('lorom','hirom','exhirom-candidate'),'genesis':('genesis-linear','genesis-scattered'),'gb':('gb-cartridge',),'gbc':('gbc-cartridge',),'sms':('sms-sega',)}
     if type(row['system_id']) is not str or row['system_id'] not in SYSTEMS:raise ValueError('Sample system is outside this release.')
     if row['format'] not in formats[row['system_id']]:raise ValueError('Sample format does not match its system.')
     if type(row['labels']) is not list or not 1<=len(row['labels'])<=8:raise ValueError('Invalid sample labels.')

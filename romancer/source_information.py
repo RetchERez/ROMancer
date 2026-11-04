@@ -45,6 +45,14 @@ def _level_details(raw,doc,offset):
         for key in ('terrain','collision'):
             g=room[key]
             if g is None:continue
+            if key=='terrain' and g.get('codec')=='sml-column-segments-v1':
+                observed=next(r for r in doc['rooms']if r['id']==room['id'])['terrain_storage']
+                operand=next((o for o in observed['operands']if o['offset']==offset),None)
+                if operand:
+                    value(room['name']+' / stored terrain operand','terrain-operand',offset,1,'little',len(doc['metatiles'])-1,
+                        room_id=room['id'],affected_cells=operand['cells'],repeated=operand['repeat'],
+                        description='One stored byte supplies '+str(len(operand['cells']))+' visible cells. Interaction and collision meaning need separate evidence.')
+                continue
             width=g['entry_bytes'];index=(offset-g['offset'])//width
             if 0<=index<room['width']*room['height']:
                 x,y=index%room['width'],index//room['width']

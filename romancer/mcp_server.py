@@ -39,13 +39,15 @@ READ_OPERATIONS=READ_OPERATIONS|{'formats.list','formats.create','formats.previe
 READ_OPERATIONS=READ_OPERATIONS|{'text.grow.preview','text.grow.definition'}
 READ_OPERATIONS=READ_OPERATIONS|{'commands.rewrite.preview','commands.rewrite.definition'}
 READ_OPERATIONS=READ_OPERATIONS|{'rom.samples','rom.evidence'}
-READ_OPERATIONS=READ_OPERATIONS|{'coverage.status'}
+READ_OPERATIONS=READ_OPERATIONS|{'coverage.status','levels.presets','levels.preset'}
 WRITE_OPERATIONS=WRITE_OPERATIONS|{'definitions.save','commands.plan','animations.save','animations.delete'}
 WRITE_OPERATIONS=WRITE_OPERATIONS|{'formats.install','formats.apply','formats.delete','formats.export'}
 WRITE_OPERATIONS=WRITE_OPERATIONS|{'text.grow.plan'}
 WRITE_OPERATIONS=WRITE_OPERATIONS|{'commands.rewrite.plan'}
 DESCRIPTIONS={
  'coverage.status':'Read the frozen exact-revision target ledger and unfinished acceptance status. Catalog or preflight success never grants full editing acceptance or write authority.',
+ 'levels.presets':'List checked stored-terrain presets for this exact source or protected owned lineage; no full-game acceptance or edit authority.',
+ 'levels.preset':'Read a checked source-bound level definition. Opening a preset does not write a ROM.',
  'rom.evidence':'Read exact-source corpus relationships and scoped reference associations. Candidate similarities never authorize edits or establish full game support.',
  'rom.samples':'Search independently measured ROM sample hashes, sizes, formats and filename labels. No ROM payload, canonical authenticity, gameplay semantics or edit authority is supplied.',
  'commands.rewrite.preview':'Preview insert/remove/reorder of fully declared linear commands inside a confirmed fixed allocation. Requires no-interior-consumers acknowledgement. Branches, pointer operands, unmodelled bytes and overflow refuse. No ROM changes.',
@@ -235,6 +237,8 @@ def _investigation_properties(operation):
         return {**base,'review_id':string(64),'acknowledged':{'type':'boolean'}} if operation=='symbols.import' else base
     if operation=='symbols.search':return {**source,'query':string(128),'page':integer(0,1311)}
     if operation=='references.catalog':return {'query': string(128), 'system_filter': enum(['all', 'nes', 'snes', 'genesis', 'sms', 'gb', 'gbc'])}
+    if operation=='levels.presets':return source
+    if operation=='levels.preset':return {**source,'preset_id':string(64)}
     if operation=='rom.evidence':return {'sha256':{'type':'string','pattern':'^[0-9a-f]{64}$'},'size':integer(1,64*1024**2)}
     if operation=='rom.samples':return {'query':string(128),'system_filter':enum(['all','nes','snes','genesis','sms','gb','gbc']),'page':integer(0,1000),'limit':integer(1,50)}
     if operation=='coverage.status':return {'query':string(128),'system_filter':enum(['all','nes','snes','genesis','sms','gb','gbc']),'page':integer(0,1052),'limit':integer(1,100)}

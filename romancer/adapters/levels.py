@@ -12,7 +12,7 @@ from ..script_schema import canonical_bytes
 
 IMPLEMENTATION_FILES=('romancer/adapters/base.py','romancer/adapters/levels.py',
  'romancer/adapters/registry.py','romancer/level_design.py','romancer/level_semantics.py',
- 'romancer/scene_schema.py','romancer/asset_codecs.py','romancer/studio_runtime.py','romancer/level_palette.py','romancer/level_tiles.py')
+ 'romancer/scene_schema.py','romancer/asset_codecs.py','romancer/studio_runtime.py','romancer/level_palette.py','romancer/level_tiles.py','romancer/column_terrain.py')
 
 
 class DeclaredLevelAdapter:
@@ -56,6 +56,12 @@ class DeclaredLevelAdapter:
         at=t['palette_offset'];size=storage_length(t['palette_format'],len(doc['palette']))
         out[at:at+size]=encode_palette(doc['palette'],t['palette_format'],self._raw[at:at+size])
         def grid(storage,values):
+            if storage.get('codec')=='sml-column-segments-v1':
+                from ..column_terrain import decode_stream,edit_operands
+                start=storage['offset'];encoded=self._raw[start:start+storage['length']]
+                if list(decode_stream(encoded,base=start).tiles)!=values:raise ValueError('encoded terrain no-op values differ')
+                out[start:start+storage['length']]=edit_operands(encoded,base=start,edits=[])
+                return
             width=storage['entry_bytes'];start=storage['offset']
             for index,value in enumerate(values):out[start+index*width:start+(index+1)*width]=value.to_bytes(width,storage['endian'])
         if doc['metatiles_stored']:grid(d['metatiles'],[v for parts in doc['metatiles'] for v in parts])

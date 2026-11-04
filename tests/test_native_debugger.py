@@ -66,6 +66,17 @@ class NativeDebuggerTests(unittest.TestCase):
         self.assertTrue(settings['Debug']['ScriptWindow']['AllowIoOsAccess'])
         self.assertEqual(settings['Gameboy']['Model'],5)
 
+    def test_owned_gameboy_capture_does_not_blend_a_fresh_frame_with_black(self):
+        m=self.module()
+        for system,model in [('gb',4),('gbc',5)]:
+            settings=m.portable_settings(system)
+            self.assertIs(settings['Gameboy'].get('BlendFrames'),False)
+            self.assertEqual(settings['Gameboy']['Model'],model)
+            self.assertFalse(settings['Debug']['ScriptWindow']['AllowNetworkAccess'])
+            settings['Gameboy']['BlendFrames']=True
+            self.assertIs(m.portable_settings(system)['Gameboy']['BlendFrames'],False)
+        self.assertNotIn('BlendFrames',m.portable_settings('nes')['Gameboy'])
+
     def test_sms_physical_rom_and_video_memory_are_observed_without_cpu_address_guessing(self):
         m=self.module();self.assertTrue(m.backend_capabilities('sms')['supported_system'])
         cfg={'steps':[{'frames':4,'buttons':['one'],'port':0}],'probes':[{'kind':'read','domain':'smsPrgRom','start':0x100,'end':0x101},{'kind':'write','domain':'smsVideoRam','start':0,'end':31}],'event_limit':32,'instruction_limit':2000000,'timeout':10}

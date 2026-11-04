@@ -1,4 +1,4 @@
-ROMancer v1.0 development build50
+ROMancer v1.0 development build54
 By RetchEWretched
 
 Local ROM editing for NES, SNES, Genesis, Master System, Game Boy, Game Boy Color.
@@ -23,11 +23,12 @@ Shared bytes and cartridge classes do not establish shared level, script or musi
 formats. Full visual editing of all 1,052 exact revisions remains the release
 requirement. No revision has passed complete full-game editing acceptance.
 
-The measured cartridge facts catalog now contains 1,051 files. Twelve previously
+The measured cartridge facts catalog now contains 1,052 files. Twelve previously
 rejected inputs pass corrected header intake, including SA-1/S-DD1 physical SNES
 containers and a padded Genesis identifier. SNES checksum maintenance selects
 the valid header, including when an earlier false header is present. QuackShot's
-known sparse cartridge mapping remains blocked by the current linear loader.
+checked scattered storage map is admitted with explicit bus/file segments. Native
+playtesting uses a separate zero-gap mapped view; its source stays unchanged.
 Optional Master System YM2413 FM is documented separately from standard PSG.
 
 Reference facts come from independently checked inputs against the pinned MAME
@@ -40,6 +41,62 @@ with bounded native observations. No third-party decoder implementation or game
 payload is copied into these indexes. Existing bundled engine licenses and
 corresponding source remain in the full Windows distribution.
 
+GENERIC FILE EDITING ACCEPTANCE - DEVELOPMENT54
+
+All 1,052 frozen source identities passed open/import, inspect, controlled byte
+edit, persistent undo/redo, reopen, reviewed separate build, BPS export and
+independent patch reconstruction. Entire build bytes matched an independent
+expected result, and both the original and owned source remained unchanged.
+These are infrastructure checks using a one-byte test mutation, not released
+romhacks, decoded game meanings or verified gameplay modifications.
+
+The frontend byte-draft implementation also passed staging, undo, redo, reopen
+and wrong-source refusal for all 1,052 cases. Eight actual browser cases cover
+all six systems, including QuackShot and the special SNES checksum policy.
+A slow page read no longer takes Undo away from a newer byte edit.
+
+Automatic checksum maintenance passed for 1,051 cases, including checked SNES
+mirrored tails. One supplied Trials of Mana revision has a pre-existing checksum
+that differs from the supported convention. In Advanced > Resources > Hex editor
+> Advanced byte options, explicitly choose Preserve checksum fields for this
+kind of byte-exact work. No automatic fallback or checksum-validity claim is made.
+Changing that choice invalidates an earlier review. Playtest any intended mod.
+
+QuackShot reached native gameplay with the checked mapped input, preserved its
+source, and passed a bounded save/load and 60-frame replay check. This does not
+certify a complete playthrough. Level decoders and full-game editing acceptance
+are a separate next phase; this remains a private development build.
+
+CHECKED TERRAIN PRESETS
+
+For the exact checked Super Mario Land GB revision, Levels offers 12 checked
+stage layouts with 114 distinct stored screens. Choose Checked level > Open level.
+Normal Game Boy tile shades are decoded from the stored BGP value. Terrain
+brushes use pages of 64; original and staged room previews share the same tiles.
+Other uses lists shared screen references. One repeated operand can change many
+highlighted cells. Implicit empty cells, interactive tile metadata, stream growth,
+collision and object semantics remain protected or outside this decoder.
+Each layout keeps staged edits, undo/redo and unbuilt-change close protection.
+Review level changes > Create level build uses the existing guarded build path,
+maintains Game Boy checksums and preserves the original. Checked presets reopen
+on owned descendants only while protected layout bindings remain unchanged.
+
+The read-only API/MCP operations levels.presets and levels.preset expose the
+same source-bound choices and definitions. Saving a definition, planning or
+building still requires explicit write-enabled client access. Unknown sources
+receive no preset; filenames and cartridge similarity grant no edit authority.
+
+Verification: all 12 production presets passed lossless re-encoding and matched
+native terrain output and signed tile addressing (196,608 tile-pixel comparisons).
+Independent constructor experiments checked 116 original and 116 one-operand
+edited streams, including the separate title/first-hangar contexts. Constructor
+checks do not establish natural gameplay or complete revision acceptance.
+
+Owned GB/GBC native capture workers disable frame blending so a fresh screenshot
+is not averaged with a black preceding frame. Controlled unchanged fixtures
+verified the setting. Personal emulator settings are not modified. Canonical
+editor grayscale is separate from a native host palette or physical LCD colors.
+
 The generic level editor handles declared rectangular and isometric grids,
 explicit height grids and object-height fields. Source-bound previews, room
 thumbs, picking, stroke undo/redo and reviewed builds share that geometry.
@@ -50,7 +107,7 @@ Sample previews and native audio capture do not imply editable commercial songs.
 Only the original practice music drivers currently have sequence editors.
 
 The offline facts catalog records measured identities and candidates. It is not
-1,051 decoded game engines or a complete compatibility certificate. Each editor
+1,052 decoded game engines or a complete compatibility certificate. Each editor
 and exact revision needs its own decode/writeback, original-preservation, visual
 preview and native gameplay evidence before universal release acceptance passes.
 Keep this build private for development and testing; do not publish it as complete.
@@ -852,14 +909,14 @@ The illustrated guide covers these procedures, with glossary and index links.
 Independent unfamiliar-user acceptance remains pending in ACCEPTANCE.txt.
 
 RECORDED ROM FACTS DATABASE
-The build includes 1,051 independently measured cartridge samples:
-NES 274, SNES 325, Genesis 150, Master System 51, Game Boy 149, Game Boy Color 102.
+The build includes 1,052 independently measured cartridge samples:
+NES 274, SNES 325, Genesis 151, Master System 51, Game Boy 149, Game Boy Color 102.
 Names come from supplied filenames. Hashes, sizes, numeric header facts, check
 outcomes and bounded candidate locations describe exact source inputs; they do
 not certify every game purpose, level, music format or safe editing operation.
-The separate 1,052-source evidence index retains the known sparse-layout input
-that the current linear Genesis loader cannot admit. No upload is silently
-removed from the full-editing goal.
+The 1,052-source evidence index and facts catalog cover the same frozen corpus.
+QuackShot's checked scattered layout has explicit file-to-bus mapping; physical
+file edits and runtime mapped input remain separate.
 
 Automatic deep scan and Check ROM match source hash and size. Open Advanced >
 Resources > ROM investigation. Expand Measured file facts & locations or Related

@@ -88,11 +88,28 @@ def inspect_level(raw,definition,source_sha256):
     if type(d['rooms']) is not list or not 1<=len(d['rooms'])<=32:raise ValueError('declare 1 to 32 rooms')
     rooms=[];ids=set();uses={str(i):[] for i in range(len(blocks))};total=0
     for r in d['rooms']:
-        fields(r,'id name width height terrain collision objects'+''.join(' '+key for key in ('object_metadata','collision_types','elevation') if type(r) is dict and key in r));label(r['id']);label(r['name'])
+        fields(r,'id name width height terrain collision objects'+''.join(' '+key for key in ('object_metadata','collision_types','elevation','references') if type(r) is dict and key in r));label(r['id']);label(r['name'])
+        if 'references' in r:
+            if type(r['references'])is not list or len(r['references'])>256:raise ValueError('too many declared room references')
+            for name in r['references']:label(name,128)
+            if len(set(r['references']))!=len(r['references']):raise ValueError('duplicate declared room reference')
         if r['id'] in ids:raise ValueError('duplicate room ID')
         ids.add(r['id']);number(r['width'],1,128);number(r['height'],1,128);count=r['width']*r['height'];total+=count
         if total>32768 or count*parts*64>4*1024**2:raise ValueError('level preview exceeds pixel budget')
-        terrain=format_grid(r['terrain'],count,r['id']+' terrain')
+        terrain_storage=None
+        g=r['terrain']
+        if type(g) is dict and 'codec' in g:
+            from .column_terrain import decode_stream,INTERACTIVE
+            fields(g,'codec offset length')
+            if g['codec']!='sml-column-segments-v1' or (r['width'],r['height'])!=(20,16):
+                raise ValueError('unsupported encoded terrain layout or dimensions')
+            number(g['length'],20,0x4000);storage(g['offset'],g['length'],r['id']+' terrain')
+            encoded=decode_stream(raw[g['offset']:g['offset']+g['length']],base=g['offset'])
+            if encoded.consumed!=g['length']:raise ValueError('encoded terrain length includes undeclared trailing bytes')
+            terrain=list(encoded.tiles)
+            terrain_storage={'codec':g['codec'],'origins':list(encoded.origins),'overlaps':encoded.overlaps,
+                'protected_values':sorted(INTERACTIVE),'operands':[{'offset':o.offset,'tile':o.tile,'repeat':o.repeat,'cells':list(o.cells)}for o in encoded.operands]}
+        else:terrain=format_grid(g,count,r['id']+' terrain')
         if any(v>=len(blocks) for v in terrain):raise ValueError('room references an undeclared metatile')
         collision=format_grid(r['collision'],count,r['id']+' collision') if r['collision'] is not None else None
         elevation=format_grid(r['elevation'],count,r['id']+' elevation') if r.get('elevation') is not None else None
@@ -116,6 +133,8 @@ def inspect_level(raw,definition,source_sha256):
                 objects.append(obj)
         for i,value in enumerate(terrain):uses[str(value)].append({'room_id':r['id'],'cell':i})
         rooms.append({'id':r['id'],'name':r['name'],'width':r['width'],'height':r['height'],'terrain':terrain,'collision':collision,'elevation':elevation,'collision_types':collision_types(r),'objects':objects})
+        if terrain_storage is not None:rooms[-1]['terrain_storage']=terrain_storage
+        if 'references' in r:rooms[-1]['references']=list(r['references'])
     scene=normalize_scene(d.get('scene'),block_width*8,block_height*8)
     if 'scene' in d or any(r['elevation'] is not None for r in rooms):validate_scene(scene,rooms,d['rooms'])
     connections=_connections(rooms,d['rooms'],len(tiles),colors)
@@ -130,10 +149,10 @@ def plan_level(raw,definition,document_id,changes,source_sha256):
     doc=inspect_level(raw,definition,source_sha256)
     if doc['document_id']!=document_id:raise ValueError('level review document is stale')
     if type(changes) is not list or not 1<=len(changes)<=8192:raise ValueError('review 1 to 8192 level changes')
-    d=doc['definition'];writes={};seen=set();affected=set()
+    d=doc['definition'];writes={};seen=set();seen_after={};affected=set();encoded_changes=False
     for change in changes:
         if type(change) is not dict:raise ValueError('level changes must be JSON objects')
-        kind=change.get('kind')
+        kind=change.get('kind');encoded_change=False
         if kind=='metatile':
             if not doc['metatiles_stored']:raise ValueError('identity tile blocks are derived, not a stored metatile table')
             fields(change,'kind index part value');m=d['metatiles'];number(change['index'],0,m['count']-1);number(change['part'],0,m['width']*m['height']-1);number(change['value'],0,len(doc['tiles'])-1)
@@ -155,12 +174,26 @@ def plan_level(raw,definition,document_id,changes,source_sha256):
             else:
                 fields(change,'kind room_id index value');number(change['index'],0,r['width']*r['height']-1);g=r.get(kind)
                 if g is None:raise ValueError('requested room layer is not declared')
-                width=g['entry_bytes'];endian=g['endian'];maximum=len(doc['metatiles'])-1 if kind=='terrain' else min(1024,(1<<(8*width))-1) if kind=='elevation' else (1<<(8*width))-1
-                number(change['value'],0,maximum);offset=g['offset']+change['index']*width
+                if kind=='terrain' and 'codec' in g:
+                    from .column_terrain import edit_operands
+                    room_doc=next(v for v in doc['rooms']if v['id']==r['id'])
+                    number(change['value'],0,len(doc['metatiles'])-1)
+                    offset=room_doc['terrain_storage']['origins'][change['index']]
+                    if offset is None:
+                        if change['value']==room_doc['terrain'][change['index']]:continue
+                        raise ValueError('This implicit blank has no stored operand; growing the stream is not supported.')
+                    edit_operands(raw[g['offset']:g['offset']+g['length']],base=g['offset'],edits=[{'offset':offset,'tile':change['value']}])
+                    width=1;endian='little';encoded_change=True;encoded_changes=True
+                else:
+                    width=g['entry_bytes'];endian=g['endian'];maximum=len(doc['metatiles'])-1 if kind=='terrain' else min(1024,(1<<(8*width))-1) if kind=='elevation' else (1<<(8*width))-1
+                    number(change['value'],0,maximum);offset=g['offset']+change['index']*width
         else:raise ValueError('unknown level change')
         key=(offset,width)
-        if key in seen:raise ValueError('duplicate level edit')
-        seen.add(key);after=change['value'].to_bytes(width,endian);before=raw[offset:offset+width]
+        after=change['value'].to_bytes(width,endian)
+        if key in seen:
+            if encoded_change and seen_after[key]==after:continue
+            raise ValueError('shared operand has conflicting edits' if encoded_change else 'duplicate level edit')
+        seen.add(key);seen_after[key]=after;before=raw[offset:offset+width]
         if before!=after:writes[offset]={'offset':offset,'before':before.hex(),'after':after.hex()}
     if not writes:raise ValueError('no changed level bytes')
     shadow=bytearray(raw)
@@ -168,7 +201,10 @@ def plan_level(raw,definition,document_id,changes,source_sha256):
     validate_changed_hitboxes(shadow,d['rooms'])
     from .studio_runtime import validate_studio_data
     validate_studio_data(bytes(shadow))
-    if 'scene' in d or any(r.get('elevation') is not None for r in d['rooms']):
+    if encoded_changes or 'scene' in d or any(r.get('elevation') is not None for r in d['rooms']):
         shadow_definition=__import__('copy').deepcopy(d);shadow_sha=hashlib.sha256(shadow).hexdigest();shadow_definition['source_sha256']=shadow_sha
         inspect_level(bytes(shadow),shadow_definition,shadow_sha)
-    return {'ok':True,'edits':[writes[k] for k in sorted(writes)],'affected_rooms':sorted(affected),'document_id':document_id,'source_sha256':source_sha256}
+    result={'ok':True,'edits':[writes[k] for k in sorted(writes)],'affected_rooms':sorted(affected),'document_id':document_id,'source_sha256':source_sha256}
+    if encoded_changes:
+        result['affected_cells']=[{'room_id':r['id'],'cells':[i for i,offset in enumerate(r['terrain_storage']['origins'])if offset in writes]}for r in doc['rooms']if r.get('terrain_storage') and any(offset in writes for offset in r['terrain_storage']['origins'])]
+    return result
