@@ -223,7 +223,7 @@
       "image": "267-practice-studio-readiness",
       "steps": [
         "Click <b>New project</b>. Give this piece of work a useful name, then import your ROM into that project.",
-        "Check the ROM or build selected at the top. On Overview, read <b>What can I edit in this ROM?</b>. Open a ready editor, or follow the area's action to find graphics, investigate values, or check text or sound setup.",
+        "Check the ROM or build selected at the top. On Overview, read <b>What can I edit in this ROM?</b>. Choose Edit graphics, Edit text, Edit stats or Edit sound when ready. Follow a setup action when a checked layout is needed. Choose Inspect ROM bytes for offsets, search and comparisons.",
         "Make one small edit, review it, create a separate <a href=\"#term-build\">build</a>, then playtest that build. Export its patch after checking the result."
       ],
       "result": "A project holds owned source copies, editing setup, builds and evidence. Start a new project for unrelated work.",
@@ -247,7 +247,7 @@
       "details": [
         {
           "title": "Choose an editing tool",
-          "text": "What do you want to change? opens graphics, text, numbers, sound, investigation, playtesting or patches. Ready to edit means a working editing setup is saved for this ROM; it does not certify every game behavior or identify an unsupported music format."
+          "text": "The editor cards open graphics, text, numbers or sound. Inspect, test and share links to raw bytes, investigation, Playtest and Export. Ready to edit means a checked layout is available for this ROM."
         },
         {
           "title": "Find help without reading every page",
@@ -272,7 +272,7 @@
       "steps": [
         "Graphics: open <b>Graphics &amp; fonts</b>, set Tiles across and Tiles down to 2, then Assemble tiles. Paint the first four hero tiles, try Undo and Redo, review and create a separate graphics build. Edit the second hero animation too for a consistent result.",
         "Dialogue: select the Original again and open <b>Text &amp; layout</b>. Replace HELLO, EXPLORER! with WELCOME, ROM HACKER! Check capacity, review and build. The character table supports uppercase letters.",
-        "Movement: in <b>Numbers &amp; stats</b>, change Hero speed from 2 to 3, review and build. Compare equal Right input frames in Playtest. Zero stops movement; the checked limit is8 pixels per frame.",
+        "Movement: choose <b>Edit stats</b> on Overview. Change Hero speed from 2 to 3, review and build. Compare equal Right input frames in Playtest. Zero stops movement; the checked limit is 8 pixels per frame.",
         "Music: in <b>Music &amp; sound</b>, click a melody note or choose its Event, change Note number and choose Stage note edit. Inspect the note view and Original/Edited waveform previews. Review, build and listen in Playtest.",
         "Playtest controls: arrows move, A attacks an overlapping enemy and chirps, Start restarts. HP0 stops the hero; an enemy with0 health disappears. Save/load states belong to that exact build. Export and verify a patch from its Original."
       ],
@@ -1528,7 +1528,7 @@
       "image": "266-hex-selection-and-staged-edit",
       "steps": [
         "Open <b>Advanced &gt; Resources</b>. Choose a documented location or enter a decimal or 0x hexadecimal offset and choose <b>Go</b>.",
-        "Read the file offset on the left, hex bytes in the middle and printable ASCII on the right. A centered dot stands for a nonprintable byte. The outline follows the selected byte in both columns. Underlined values are staged edits.",
+        "Read the file offset on the left, hex bytes in the middle and printable ASCII on the right. A centered dot stands for a nonprintable byte. The outline follows the selected byte in both columns. Underlined values are staged edits. Below the grid, Original and Draft show the exact selected byte.",
         "Search AB ?? CD, UTF-8 or an integer with an explicit byte order. Open <b>Number inspector &amp; bookmarks</b> to inspect or bookmark the selected offset.",
         "Edit a byte using two hex digits. Use the footer <b>Undo</b> and <b>Redo</b> to check the staged change, then choose <b>Review byte edits</b> and <b>Create separate build</b>. Your original remains unchanged.",
         "To share a build, open <b>Export</b>, select its original revision and target build, and create a verified patch. Keep the original ROM private."

@@ -2547,7 +2547,7 @@
         ctx2.setDraft("table-changes", "null");
         resetCells();
         await ctx2.render();
-        ctx2.notify("Build created. Choose it in the source/build selector to playtest.");
+        ctx2.notify("Build saved. Choose Playtest saved build.");
       },
       "table-batch": async () => {
         var _a2;
@@ -2767,27 +2767,38 @@
     ["scripts", "Text & layout", "Text, fonts and dialogue"],
     ["tables", "Numbers & stats", "Editable tables and values"],
     ["sound", "Music & sound", "Samples and known sequences"],
-    ["debug", "Investigation", "Find values and source bytes"],
+    ["resources", "Inspect ROM bytes", "Search bytes and compare files"],
+    ["debug", "Investigation", "Find changing values and trace access"],
     ["playtest", "Playtest", "Play, step and save states"],
     ["release", "Export & patches", "Apply or export patches"]
   ];
-  function overviewTasks() {
-    return `<section class="card"><div class="card-heading"><h3>What do you want to change?</h3></div><div class="overview-tasks">${OVERVIEW_TASKS.map(([id, label, note]) => `<div>${button(label, "navigate", { id, icon: id })}<p class="subtle">${esc(note)}</p></div>`).join("")}</div></section>`;
+  function overviewTasks(hasReadiness = false) {
+    const tasks = hasReadiness ? OVERVIEW_TASKS.slice(4) : OVERVIEW_TASKS;
+    return `<section class="card"><div class="card-heading"><h3>${hasReadiness ? "Inspect, test and share" : "What do you want to change?"}</h3></div><div class="overview-tasks">${tasks.map(([id, label, note]) => `<div>${button(label, "navigate", { id, icon: id })}<p class="subtle">${esc(note)}</p></div>`).join("")}</div></section>`;
   }
 
   // romancer/ui/editing_readiness.js
   var labels = { ready: "Ready to edit", needs_investigation: "Needs investigation", unsupported: "Setup needs fixing" };
   var missing = { assets: ["Play this ROM, pause, then inspect a sprite to find its graphics.", "Find graphics"], script: ["Text needs a character table and text locations before it can be edited.", "Check text setup"], tables: ["Find a changing value, then save its table layout.", "Find values"], levels: ["Level editing needs a saved map layout, tiles and object records.", "Check level setup"], sound: ["Preview supported samples, or capture audio from Playtest. Editing music needs a supported format.", "Open sound tools"] };
-  function readinessCards(model) {
-    return '<section class="card editing-readiness"><h3>What can I edit in this ROM?</h3><div class="readiness-grid">' + model.areas.map((a) => {
-      const suggestion = missing[a.kind] || ["Find and save an editing setup for this ROM.", "Investigate"], summary = a.status === "ready" ? "A checked editing setup is available for this ROM." : a.status === "unsupported" ? "The saved setup does not work with this ROM. Open it to check the details." : suggestion[0], action = a.status === "ready" ? "Open editor" : a.status === "unsupported" ? "Check setup" : suggestion[1];
-      return "<div><strong>" + esc(a.title) + '</strong><p class="readiness-state ' + esc(a.status) + '">' + esc(labels[a.status]) + "</p><p>" + esc(summary) + "</p>" + button(action, "readiness-open", { id: a.kind }) + '<details class="readiness-details"><summary>Technical details</summary><p>' + esc(a.reason) + "</p></details></div>";
-    }).join("") + '</div><p class="subtle">Ready applies to the checked layout, not every part of the game. Playtest your changes.</p></section>';
+  var editLabels = { assets: "Edit graphics", script: "Edit text", tables: "Edit stats", sound: "Edit sound" };
+  function readinessCards(model, { firstPracticeEdit = false } = {}) {
+    const cards = model.areas.map((area2) => {
+      const ready = area2.status === "ready", broken = area2.status === "unsupported";
+      const [hint, next] = missing[area2.kind] || ["Find and save an editing setup for this ROM.", "Investigate"];
+      const first = firstPracticeEdit && area2.kind === "tables" && ready;
+      const action = ready ? editLabels[area2.kind] || "Open editor" : broken ? "Check setup" : next;
+      const message = first ? "For a first edit, change Hero speed from 2 to 3." : ready ? "" : broken ? "Check the details of the saved setup." : hint;
+      return `<div><strong>${esc(area2.title)}</strong><p class="readiness-state ${esc(area2.status)}">${esc(labels[area2.status])}</p>${message ? "<p>" + esc(message) + "</p>" : ""}
+   ${button(action, "readiness-open", { id: area2.kind, primary: first })}
+   <details class="readiness-details"><summary>Technical details</summary><p>${esc(area2.reason)}</p></details></div>`;
+    }).join("");
+    return `<section class="card editing-readiness"><h3>What can I edit in this ROM?</h3><div class="readiness-grid">${cards}</div><p class="subtle">Playtest changes to any checked layout.</p></section>`;
   }
   async function editingReadiness(ctx2) {
+    var _a, _b, _c, _d;
     const scope = selectionKey(ctx2.state), current2 = () => {
-      var _a;
-      return scope === selectionKey(ctx2.state) && ((_a = ctx2.isCurrentRender) == null ? void 0 : _a.call(ctx2)) !== false;
+      var _a2;
+      return scope === selectionKey(ctx2.state) && ((_a2 = ctx2.isCurrentRender) == null ? void 0 : _a2.call(ctx2)) !== false;
     };
     const model = await ctx2.api.call("editing.readiness", ctx2.sourceParams());
     if (!current2()) return "";
@@ -2804,7 +2815,9 @@
       ctx2.state.researchOpen = { scope, kind: area2.kind };
       return ctx2.navigate(area2.page);
     } });
-    return readinessCards(model);
+    const { project, artifact } = ctx2.state;
+    const firstPracticeEdit = (project == null ? void 0 : project.demo_type) === "original-studio" && ((_a = project.builds) == null ? void 0 : _a.length) === 0 && (artifact == null ? void 0 : artifact.kind) === "source" && ((_d = (_c = (_b = artifact.descriptors) == null ? void 0 : _b.tables) == null ? void 0 : _c.definition) == null ? void 0 : _d.name) === "Scene controls";
+    return readinessCards(model, { firstPracticeEdit });
   }
 
   // romancer/ui/source_support.js
@@ -3305,7 +3318,7 @@
     const exports = (await ctx2.api.call("exports.list", { project_id: p.project_id })).exports;
     const gameEditing = await gameEdits(ctx2);
     const ready = state2.artifact ? await editingReadiness(ctx2) : "";
-    return `${heading("Workspace overview", "Overview", p.demo ? "An original, redistributable fixture. Explore the real editing and release workflows." : "Your sources, builds, and recorded evidence in one place.", button("Import ROM", "import", { icon: "plus" }))}<p class="notice edit-basics">Your original stays unchanged. Edits autosave as a <strong>draft</strong>. Create a <strong>build</strong> to play them; export a <strong>patch</strong> to share them.</p>${sourceSupport(ctx2)}${ready}${overviewTasks()}${gameEditing}${scanControls(ctx2)}<details class="card task-checklist"><summary>Project checklist</summary>${p.demo ? badge("Practice ROM") : ""}<div class="actions">${progress.steps.map((step) => button((step.complete ? "✓ " : "") + step.title, "navigate", { id: step.page })).join("")}</div></details><div class="stats">${stat("Sources", p.sources.length, "Owned copies; originals preserved", "resources")}${stat("Builds", p.builds.length, "Content identities stored in history", "check")}${stat("Test records", reports.length, "Measured scope shown per report", "shield")}${stat("Exports", exports.length, "Selected documentation and patches", "release")}</div><section class="card"><div class="card-heading"><h3>Files</h3><span class="subtle">${p.sources.length + p.builds.length} ${p.sources.length + p.builds.length === 1 ? "item" : "items"}</span></div>${[...p.sources, ...p.builds].slice(-6).map(resource).join("") || empty("Import your first source", "Add a game file or a resource extracted from your own project.", button("Import ROM", "import", { primary: true }))}</section>${buildHistory(ctx2, timeline)}${projectChecks(ctx2)}`;
+    return `${heading("Workspace overview", "Overview", p.demo ? "An original, redistributable fixture. Explore the real editing and release workflows." : "Your sources, builds, and recorded evidence in one place.", button("Import ROM", "import", { icon: "plus" }))}<p class="notice edit-basics">Your original stays unchanged. Edits autosave as a <strong>draft</strong>. Create a <strong>build</strong> to play them; export a <strong>patch</strong> to share them.</p>${sourceSupport(ctx2)}${ready}${overviewTasks(Boolean(ready))}${gameEditing}${scanControls(ctx2)}<details class="card task-checklist"><summary>Project checklist</summary>${p.demo ? badge("Practice ROM") : ""}<div class="actions">${progress.steps.map((step) => button((step.complete ? "✓ " : "") + step.title, "navigate", { id: step.page })).join("")}</div></details><div class="stats">${stat("Sources", p.sources.length, "Owned copies; originals preserved", "resources")}${stat("Builds", p.builds.length, "Content identities stored in history", "check")}${stat("Test records", reports.length, "Measured scope shown per report", "shield")}${stat("Exports", exports.length, "Selected documentation and patches", "release")}</div><section class="card"><div class="card-heading"><h3>Files</h3><span class="subtle">${p.sources.length + p.builds.length} ${p.sources.length + p.builds.length === 1 ? "item" : "items"}</span></div>${[...p.sources, ...p.builds].slice(-6).map(resource).join("") || empty("Import your first source", "Add a game file or a resource extracted from your own project.", button("Import ROM", "import", { primary: true }))}</section>${buildHistory(ctx2, timeline)}${projectChecks(ctx2)}`;
   }
   function stat(title, value, note, ico) {
     return `<div class="stat"><div class="stat-top"><span>${title}</span>${icon(ico)}</div><strong>${value}</strong></div>`;
@@ -5496,6 +5509,10 @@ ${font ? `<section class="card"><h3>Font metrics · ${esc(font.id)}</h3><div cla
     return value >= 32 && value <= 126 ? String.fromCharCode(value) : "·";
   };
   var byteCount = (count) => `${count} byte${count === 1 ? "" : "s"}`;
+  var bytePreview = (draft, offset) => {
+    const before = draft.original.get(offset);
+    return before === void 0 ? "" : `0x${offset.toString(16)} · Original ${before.toUpperCase()} → Draft ${(draft.changes.get(offset) || before).toUpperCase()}`;
+  };
   var integer8 = (value) => {
     const n = Number(value);
     if (!Number.isSafeInteger(n) || n < 0) throw Error("Enter a nonnegative decimal or 0x hex offset.");
@@ -5650,6 +5667,7 @@ ${font ? `<section class="card"><h3>Font metrics · ${esc(font.id)}</h3><div cla
       return `<span data-hex-ascii="${offset}" class="${draft.changes.has(offset) ? "changed" : ""} ${draft.selected === offset ? "current-byte" : ""}">${esc(printableByte(draft.changes.get(offset) || b))}</span>`;
     }).join("")}</code></div>`).join("")}</div></div>
 ${state2.artifact.system_id ? `<details><summary>Advanced byte options</summary>${select("hex-checksum-policy", "Checksum policy", [["maintain", "Maintain supported console checksums"], ["preserve", "Preserve checksum fields (Advanced)"]], policy())}<p>Preserving fields is for a separately checked convention or an intentional raw edit. It does not verify the game’s integrity checks.</p></details>` : ""}
+ <p class="preview-caption"><code id="hex-byte-preview">${bytePreview(draft, draft.selected)}</code></p>
  <p class="subtle">Edit a byte, then review. Your source stays unchanged. Arrow keys move between bytes.</p><div class="actions">${button("Review byte edits", "hex-review", { primary: true, disabled: !draft.changes.size })}${button("Create separate build", "hex-apply", { disabled: !reviewed })}${button("Discard byte edits", "hex-clear", { disabled: !draft.changes.size })}</div>
  ${reviewed ? `<div class="notice">${byteCount(state2.hexReview.plan.changed_bytes)} in the reviewed plan. ${state2.hexReview.checksumPolicy === "preserve" ? "Checksum fields are preserved; game-specific integrity is not verified." : "Supported console checksum maintenance is included."}</div>` : ""}
  <details><summary>Search bytes, text or numbers</summary><div class="field-row">${select("hex-search-kind", "Search for", [["hex", "Hex pattern (?? wildcard)"], ["text", "UTF-8 text"], ["number", "Integer"]], ctx2.draft("hex-search-kind", "hex"))}${field("hex-search-query", "Pattern or value", ctx2.draft("hex-search-query", ""))}${field("hex-search-start", "Start offset", ctx2.draft("hex-search-start", "0"))}</div><div class="field-row">${select("hex-endian", "Byte order", [["little", "Little endian"], ["big", "Big endian"]], ctx2.draft("hex-endian", "little"))}${select("hex-width", "Number width", [[1, "8-bit"], [2, "16-bit"], [4, "32-bit"]], ctx2.draft("hex-width", "2"))}${select("hex-signed", "Number sign", [["false", "Unsigned"], ["true", "Signed"]], ctx2.draft("hex-signed", "false"))}</div>${button("Search selected file", "hex-search")}
@@ -5696,7 +5714,10 @@ ${state2.artifact.system_id ? `<details><summary>Advanced byte options</summary>
       ctx2.state.hexReview = null;
       ctx2.render();
     });
-    const count = root.querySelector("#hex-staged-count");
+    const count = root.querySelector("#hex-staged-count"), preview2 = root.querySelector("#hex-byte-preview");
+    const showPreview = () => {
+      if (preview2) preview2.textContent = bytePreview(draft, draft.selected);
+    };
     root.querySelectorAll("[data-hex-offset]").forEach((node) => {
       const offset = Number(node.dataset.hexOffset), ascii = root.querySelector(`[data-hex-ascii="${offset}"]`);
       node.addEventListener("focus", () => {
@@ -5706,6 +5727,7 @@ ${state2.artifact.system_id ? `<details><summary>Advanced byte options</summary>
         node.classList.add("current-byte");
         ascii == null ? void 0 : ascii.classList.add("current-byte");
         draft.selected = offset;
+        showPreview();
         if (((_a2 = ctx2.state.hexExplanation) == null ? void 0 : _a2.result.offset) !== draft.selected) {
           ctx2.state.hexExplanation = null;
           (_c = (_b = root.querySelector("#hex-explanation")) == null ? void 0 : _b.replaceChildren) == null ? void 0 : _c.call(_b);
@@ -5725,6 +5747,7 @@ ${state2.artifact.system_id ? `<details><summary>Advanced byte options</summary>
           draft.set(Number(node.dataset.hexOffset), node.value);
           ctx2.setDraft("hex-changes", serializeHexDraft(ctx2.state, draft));
           node.setCustomValidity("");
+          showPreview();
           const changed2 = draft.changes.has(offset);
           node.classList.toggle("changed", changed2);
           if (ascii) {
@@ -7915,7 +7938,7 @@ ${state2.artifact.system_id ? `<details><summary>Advanced byte options</summary>
     return value.changes;
   }
   async function commandEditor(ctx2) {
-    var _a, _b, _c, _d;
+    var _a, _b, _c, _d, _e;
     const { state: state2 } = ctx2, a = state2.artifact;
     if (!a) return "";
     const page = state2.page, scope = selectionKey(state2), params = { ...ctx2.sourceParams() }, current2 = () => selectionKey(state2) === scope && state2.page === page;
@@ -8020,9 +8043,10 @@ ${state2.artifact.system_id ? `<details><summary>Advanced byte options</summary>
         }
       }
     });
+    const value = operand ? ctx2.draft("command-value", "") || String(((_c = changes.find((c) => c.script_id === script.id && c.command_index === cmd.index && c.field === operand.name)) == null ? void 0 : _c.after) ?? operand.value) : "", preview2 = operand ? numberComparison(operand.value, value, { minimum: operand.minimum, maximum: operand.maximum, compact: true }) : "";
     const template = { schema_version: 1, source_sha256: a.sha256, name: "Known event format", scripts: [], commands: [] };
-    const setup2 = `<details><summary>Declare a known command format · Advanced</summary><p>Supply documented opcode lengths and named fixed operands. This does not identify an unfamiliar script engine or execute code.</p>${jsonEditor("command-definition", "Source-bound command grammar", ctx2.draft("command-definition", JSON.stringify(saved || (doc == null ? void 0 : doc.definition) || template, null, 2)))}<div class="actions">${button("Inspect commands", "command-inspect")}${button("Preview saved definition", "command-preview-definition")}</div>${((_c = state2.commandDefinitionReview) == null ? void 0 : _c.scope) === scope ? `<label><input id="command-replace" type="checkbox"> Replace the existing command definition if present.</label>${button("Save reviewed definition", "command-save-definition")}` : ""}</details>`;
-    return `<${doc ? "section" : "details"} class="card command-editor">${doc ? "<h2>Events & commands</h2>" : "<summary>Events & commands</summary>"}${error ? `<p class="notice warm">${esc(error)}</p>${button("Discard invalid command edits", "command-discard")}` : ""}${doc ? `<p>${esc(doc.scope)}</p>${select("command-script", "Event script", doc.scripts.map((s) => [s.id, s.name]), script == null ? void 0 : script.id)}${(script == null ? void 0 : script.issues.length) ? `<p class="notice warm">Read-only: ${script.issues.map(esc).join(" ")}</p>` : ""}${cmd ? `<div class="field-row">${select("command-index", "Command", script.commands.map((c) => [c.index, c.name + " · 0x" + c.offset.toString(16)]), index)}${select("command-field", "Parameter", cmd.fields.map((f) => [f.name, f.name]), operand == null ? void 0 : operand.name)}${button("Choose command", "command-choose")}</div>${operand ? `${field("command-value", "New " + operand.name, ctx2.draft("command-value", "") || String(operand.value))}<p>Stored: ${operand.value} · allowed ${operand.minimum}–${operand.maximum} · file0x${operand.offset.toString(16)}</p>${button("Stage parameter change", "command-stage", { disabled: !script.editable || !!error })}` : "<p>This command has no editable operands.</p>"}` : ""}<div class="table-wrap"><table><thead><tr><th>Parameter</th><th>Before</th><th>After</th></tr></thead><tbody>${changes.map((c) => `<tr><td>${esc(c.field)}</td><td>${c.before}</td><td>${c.after}</td></tr>`).join("")}</tbody></table></div><div class="actions">${button("Review command changes", "command-review", { primary: true, disabled: !changes.length || !!error })}${((_d = state2.pending) == null ? void 0 : _d.kind) === "commands" ? button("Create command build", "command-build", { primary: true }) : ""}${button("Discard command edits", "command-discard", { disabled: !changes.length && !error })}</div>` : "<p>A verified or explicitly declared command grammar is required. Unknown instructions remain read-only.</p>"}${commandSequence(ctx2, doc)}${commandForms(ctx2, doc)}${setup2}</${doc ? "section" : "details"}>`;
+    const setup2 = `<details><summary>Declare a known command format · Advanced</summary><p>Supply documented opcode lengths and named fixed operands. This does not identify an unfamiliar script engine or execute code.</p>${jsonEditor("command-definition", "Source-bound command grammar", ctx2.draft("command-definition", JSON.stringify(saved || (doc == null ? void 0 : doc.definition) || template, null, 2)))}<div class="actions">${button("Inspect commands", "command-inspect")}${button("Preview saved definition", "command-preview-definition")}</div>${((_d = state2.commandDefinitionReview) == null ? void 0 : _d.scope) === scope ? `<label><input id="command-replace" type="checkbox"> Replace the existing command definition if present.</label>${button("Save reviewed definition", "command-save-definition")}` : ""}</details>`;
+    return `<${doc ? "section" : "details"} class="card command-editor">${doc ? "<h2>Events & commands</h2>" : "<summary>Events & commands</summary>"}${error ? `<p class="notice warm">${esc(error)}</p>${button("Discard invalid command edits", "command-discard")}` : ""}${doc ? `<p>${esc(doc.scope)}</p>${select("command-script", "Event script", doc.scripts.map((s) => [s.id, s.name]), script == null ? void 0 : script.id)}${(script == null ? void 0 : script.issues.length) ? `<p class="notice warm">Read-only: ${script.issues.map(esc).join(" ")}</p>` : ""}${cmd ? `<div class="field-row">${select("command-index", "Command", script.commands.map((c) => [c.index, c.name + " · 0x" + c.offset.toString(16)]), index)}${select("command-field", "Parameter", cmd.fields.map((f) => [f.name, f.name]), operand == null ? void 0 : operand.name)}${button("Choose command", "command-choose")}</div>${operand ? `${field("command-value", "New " + operand.name, value)}<div data-number-input="command-value" data-before="${operand.value}" data-minimum="${operand.minimum}" data-maximum="${operand.maximum}" data-compact="true">${preview2}</div><p>Stored: ${operand.value} · allowed ${operand.minimum}–${operand.maximum} · file0x${operand.offset.toString(16)}</p>${button("Stage parameter change", "command-stage", { disabled: !script.editable || !!error })}` : "<p>This command has no editable operands.</p>"}` : ""}<div class="table-wrap"><table><thead><tr><th>Parameter</th><th>Before</th><th>After</th></tr></thead><tbody>${changes.map((c) => `<tr><td>${esc(c.field)}</td><td>${c.before}</td><td>${c.after}</td></tr>`).join("")}</tbody></table></div><div class="actions">${button("Review command changes", "command-review", { primary: true, disabled: !changes.length || !!error })}${((_e = state2.pending) == null ? void 0 : _e.kind) === "commands" ? button("Create command build", "command-build", { primary: true }) : ""}${button("Discard command edits", "command-discard", { disabled: !changes.length && !error })}</div>` : "<p>A verified or explicitly declared command grammar is required. Unknown instructions remain read-only.</p>"}${commandSequence(ctx2, doc)}${commandForms(ctx2, doc)}${setup2}</${doc ? "section" : "details"}>`;
   }
 
   // romancer/ui/structural_lab.js
@@ -8396,6 +8420,7 @@ ${state2.artifact.system_id ? `<details><summary>Advanced byte options</summary>
   }
   function mount8(ctx2) {
     mountValueFinder(ctx2);
+    mountNumberPreviews();
   }
 
   // romancer/ui/views/routes.js
@@ -8945,8 +8970,9 @@ ${state2.artifact.system_id ? `<details><summary>Advanced byte options</summary>
     var _a;
     return ((_a = changes.find((change) => sameOperand(song, change, index, field2))) == null ? void 0 : _a.value) ?? song.events[index][field2];
   }
+  var NOTE_BOUNDS = { note: [33, 108], duration: [1, 6e3], volume: [0, 127] };
   function stageNote(doc, changes, songId, index, field2, value) {
-    const song = doc.songs.find((s) => s.id === songId), bounds2 = { note: [33, 108], duration: [1, 6e3], volume: [0, 127] };
+    const song = doc.songs.find((s) => s.id === songId), bounds2 = NOTE_BOUNDS;
     if (!song || !Number.isInteger(index) || index < 0 || index >= song.events.length || !bounds2[field2] || !Number.isInteger(value) || value < bounds2[field2][0] || value > bounds2[field2][1]) throw Error("Choose a supported song field and an in-range value.");
     const result = changes.filter((change) => !sameOperand(song, change, index, field2));
     if (value !== song.events[index][field2]) result.push({ kind: "note", song_id: songId, index, field: field2, value });
@@ -9043,7 +9069,11 @@ ${state2.artifact.system_id ? `<details><summary>Advanced byte options</summary>
     const labels2 = { pan: "Pan (0 left · 64 center · 127 right)", instrument: "Instrument (read-only)", note: "Note number", duration: "Duration ticks", volume: "Volume", channel_volume: "Channel volume", tempo: "Tempo value (BPM ÷2)" };
     const editable = ["note", "duration", "volume"], choice = ctx2.draft("sound-note-field", "note"), name2 = editable.includes(choice) ? choice : editable[0];
     const events = field("sound-event", "Event index", ctx2.draft("sound-event", "0"));
-    return `<p>${esc(song.driver_scope)}</p>${((_a = song.issues) == null ? void 0 : _a.length) ? `<p class="notice">Read-only: ${song.issues.map(esc).join(" ")}</p>` : ""}<canvas id="music-note-canvas" class="music-note-canvas" width="1000" height="220" aria-label="Decoded notes: time increases to the right, pitch increases upward. Use Event to select a note."></canvas><p class="subtle">Click a note or choose Event. Yellow marks changed notes; outlined notes show the original pitch.</p><div class="field-row">${events}${select("sound-note-field", "Field", editable.map((name3) => [name3, labels2[name3]]), name2)}${field("sound-note-value", "New value", ctx2.draft("sound-note-value", "") || String(event ? soundEventValue(song, changes, index, name2) ?? 64 : 64))}</div>${button("Stage note edit", "sound-note-stage", { disabled: false, reason: "This song or event is read-only." })}<div class="field-row">${field("sound-transpose", "Transpose semitones", ctx2.draft("sound-transpose", "0"))}</div>${button("Transpose song", "sound-transpose")}${button("Preview song & edits", "sound-song-preview", { primary: true })}<details><summary>Decoded event list (${song.events.length} events)</summary><div class="table-wrap" tabindex="0" role="region" aria-label="Decoded music events"><table><thead><tr><th>Event</th><th>Note</th><th>Ticks</th><th>Volume</th></tr></thead><tbody>${song.events.slice(0, 160).map((event2, index2) => `<tr><td>${index2}</td>${["note", "duration", "volume"].map((field2) => `<td>${esc(soundEventValue(song, changes, index2, field2) ?? "—")}</td>`).join("")}</tr>`).join("")}</tbody></table></div>${song.events.length > 160 ? "<p>Showing160 events. Use Event above to select any decoded event.</p>" : ""}</details>`;
+    const value = ctx2.draft("sound-note-value", "") || String(event ? soundEventValue(song, changes, index, name2) ?? 64 : 64);
+    const [minimum, maximum] = NOTE_BOUNDS[name2] || [];
+    const before = event == null ? void 0 : event[name2];
+    const preview2 = Number.isSafeInteger(before) ? `<div data-number-input="sound-note-value" data-before="${before}" data-minimum="${minimum}" data-maximum="${maximum}" data-compact="true">${numberComparison(before, value, { minimum, maximum, compact: true })}</div>` : "";
+    return `<p>${esc(song.driver_scope)}</p>${((_a = song.issues) == null ? void 0 : _a.length) ? `<p class="notice">Read-only: ${song.issues.map(esc).join(" ")}</p>` : ""}<canvas id="music-note-canvas" class="music-note-canvas" width="1000" height="220" aria-label="Decoded notes: time increases to the right, pitch increases upward. Use Event to select a note."></canvas><p class="subtle">Click a note or choose Event. Yellow marks changed notes; outlined notes show the original pitch.</p><div class="field-row">${events}${select("sound-note-field", "Field", editable.map((name3) => [name3, labels2[name3]]), name2)}${field("sound-note-value", "New value", value)}</div>${preview2}${button("Stage note edit", "sound-note-stage", { disabled: false, reason: "This song or event is read-only." })}<div class="field-row">${field("sound-transpose", "Transpose semitones", ctx2.draft("sound-transpose", "0"))}</div>${button("Transpose song", "sound-transpose")}${button("Preview song & edits", "sound-song-preview", { primary: true })}<details><summary>Decoded event list (${song.events.length} events)</summary><div class="table-wrap" tabindex="0" role="region" aria-label="Decoded music events"><table><thead><tr><th>Event</th><th>Note</th><th>Ticks</th><th>Volume</th></tr></thead><tbody>${song.events.slice(0, 160).map((event2, index2) => `<tr><td>${index2}</td>${["note", "duration", "volume"].map((field2) => `<td>${esc(soundEventValue(song, changes, index2, field2) ?? "—")}</td>`).join("")}</tr>`).join("")}</tbody></table></div>${song.events.length > 160 ? "<p>Showing160 events. Use Event above to select any decoded event.</p>" : ""}</details>`;
   }
 
   // romancer/ui/views/sound.js
@@ -9248,6 +9278,7 @@ ${state2.artifact.system_id ? `<details><summary>Advanced byte options</summary>
   }
   function mount11(ctx2) {
     var _a, _b, _c, _d;
+    mountNumberPreviews();
     const packet = visiblePreview(ctx2);
     (_a = ctx2.state.soundPlayer) == null ? void 0 : _a.close();
     ctx2.state.soundPlayer = null;

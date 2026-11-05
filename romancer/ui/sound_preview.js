@@ -34,8 +34,9 @@ export function drawWaveform(canvas,peaks){
 }
 function sameOperand(song,change,index,field){return change.kind==='note'&&change.song_id===song.id&&change.index===index&&change.field===field;}
 export function soundEventValue(song,changes,index,field){return changes.find(change=>sameOperand(song,change,index,field))?.value??song.events[index][field];}
+export const NOTE_BOUNDS={note:[33,108],duration:[1,6000],volume:[0,127]};
 export function stageNote(doc,changes,songId,index,field,value){
- const song=doc.songs.find(s=>s.id===songId),bounds={note:[33,108],duration:[1,6000],volume:[0,127]};
+ const song=doc.songs.find(s=>s.id===songId),bounds=NOTE_BOUNDS;
  if(!song||!Number.isInteger(index)||index<0||index>=song.events.length||!bounds[field]||!Number.isInteger(value)||value<bounds[field][0]||value>bounds[field][1])throw Error('Choose a supported song field and an in-range value.');
  const result=changes.filter(change=>!sameOperand(song,change,index,field));if(value!==song.events[index][field])result.push({kind:'note',song_id:songId,index,field,value});
  if(result.length>256)throw Error('Review at most256 sound changes. Create a build before staging more.');return result;
