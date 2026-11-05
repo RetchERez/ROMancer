@@ -1353,7 +1353,8 @@
       "kicker": "Game view / Build checks",
       "intro": "Compare a separate build with two fresh runs of its original using identical inputs and a reviewed emulator core. A saved test can run after each descendant build or imported patch.",
       "steps": [
-        "In Game view open Automatic check setup. Give the check a name, choose the frame count and select whether visual changes need review or identical pixels are required.",
+        "After creating a build, choose <b>Check my hack</b> in the footer. The review pairs the build with its exact original. Choose <b>Compare original and build</b> to see changed bytes and open a range in hex.",
+        "Use <b>Run checks</b> to replay the configured inputs. Original, build and difference frames show the selected checkpoint. A named edit describes its latest build step.",
         "Leave Run after new builds selected to queue this check automatically. Save test setup for this revision. For button sequences or a fixed comparison region, expand Advanced inputs and comparison region.",
         "Create a build normally, or choose an existing Build to check and Run checks. The application shows progress and lets you cancel the job. It remains usable while separate workers run.",
         "Open a recent result. Compare Original, Build and Difference. Read cartridge integrity, state replay and worker closure results alongside the visual result.",
@@ -1553,6 +1554,10 @@
         {
           "title": "Checksum policy · Advanced",
           "text": "Automatic checksum maintenance is the default. Under Advanced byte options, Preserve checksum fields explicitly requests byte-exact edits without repairing cartridge fields. Use it only when you understand the convention. One supplied Trials of Mana revision needs this explicit choice because its stored checksum differs from the supported algorithm. A mismatch is reported; it is not silently repaired or certified. Changing policy requires a new review."
+        },
+        {
+          "title": "Name a confirmed byte",
+          "text": "Use a controlled edit and a matching replay to check what a byte does. Select that byte on the original ROM, open Number inspector & bookmarks, enter a name and choose Preview named field. Stats & data opens the unsigned one-byte field. Save this layout makes it reusable for this exact source when no table layout is already saved."
         }
       ],
       "image_alt": "Selected hex byte and its ASCII character outlined, with the staged byte underlined"
@@ -5253,6 +5258,7 @@
     "editing-studio",
     "editor-builder",
     "everyday-controls",
+    "hex-editor",
     "investigation",
     "known-music",
     "mcp",

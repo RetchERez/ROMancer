@@ -697,8 +697,10 @@ class WorkbenchAPI:
         project,row,path=self.source(p);inspection=inspect_table(path,row['sha256'],p['definition'],0,1)
         if p['document_id']!=inspection['document_id']:raise ValueError('table definition or source changed; inspect it again')
         edits=table_edits(path,row['sha256'],p['definition'],p['changes'])
+        annotations={'kind':'reviewed-table-changes-v1','changes':[
+            {key: change[key] for key in ('field','row','before','after')} for change in p['changes'][:32]]}
         if row.get('system_id') in ('nes', 'snes', 'genesis', 'gb', 'gbc', 'sms'):
-            return self._integrity_plan({'project_id':p['project_id'],'artifact_id':p['artifact_id'],'edits':edits},c)
+            return self._integrity_plan({'project_id':p['project_id'],'artifact_id':p['artifact_id'],'edits':edits},c,annotations=annotations)
         return projects.plan_byte_edits(project,row['artifact_id'],edits)
 
     def _tables_batch(self,p,c):

@@ -62,6 +62,12 @@ choose a checked resource. Use Advanced > Resources for the hex editor,
 ROM investigation, checksums and recorded locations. Review the edit,
 create a separate build, playtest it and verify a patch in Export.
 
+After a build, choose Check my hack to compare it with the exact original
+and inspect the saved gameplay checkpoint.
+
+The Windows installer is unsigned. Verify its SHA-256 against SHA256SUMS
+from the same trusted release location. Windows may show a publisher warning.
+
 Open Help for the illustrated offline guide. The source package includes
 user-guide/index.html and user-guide/guide.pdf. The release package
 includes an installer, portable Windows build, source, guide, component
@@ -105,9 +111,9 @@ For the Windows bundle:
   python -B tools/package_windows.py --help
 
 The Windows packager uses pinned Python/Pillow archives and verifies their
-SHA-256 identities. GitHub CI is included for Windows/Linux and Python 3.13/3.14;
-a workflow file is not evidence that a remote Actions run has passed. See the test summary supplied with the Desktop package. Detailed local logs are retained privately; no claim is made that
-a remote Actions run has passed for this package.
+SHA-256 identities. GitHub CI covers Windows and Linux with Python 3.13 and
+3.14. The Desktop package's TEST-SUMMARY.txt records the checks for its
+exact source commit and installer.
 
 AUTOMATION AND CONTRIBUTING
 
