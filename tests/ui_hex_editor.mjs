@@ -19,6 +19,10 @@ draft.set(2,'00');state.artifact={...state.artifact,sha256:'new'};assert.throws(
 state.artifact={...state.artifact,sha256:'s'};
 const ctx={state,use:()=>{},draft:(_k,f)=>f};const html=hexEditor(ctx,data);
 assert.match(html,/data-hex-offset="1"/);assert.match(html,/Review byte edits/);assert.match(html,/bookmarks/i);
+assert.match(html,/data-hex-ascii="0" class=" current-byte">a/);
+state.hexDraft.set(1,'3c');assert.match(hexEditor(ctx,data),/data-hex-ascii="1" class="changed ">&lt;/);
+state.hexDraft.set(1,'00');assert.match(hexEditor(ctx,data),/data-hex-ascii="1" class="changed ">·/);
+state.hexDraft.set(1,'62');assert.match(hexEditor(ctx,data),/data-hex-ascii="1" class=" ">b/);
 const current=state.hexDraft;assert.throws(()=>hexEditor(ctx,{...data,artifact_id:'other'}),/selected|selection/i);assert.equal(state.hexDraft,current);assert.throws(()=>hexEditor(ctx,{...data,sha256:'other'}),/selected|selection/i);
 const cursor=new HexDraft(state,{...data,offset:0,hex:'00'.repeat(16),length:16});
 cursor.selected=8;cursor.load({...data,offset:16,hex:'11'.repeat(16),length:16});

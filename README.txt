@@ -1,4 +1,4 @@
-ROMancer v1.0 release candidate (build55)
+ROMancer v1.0.0
 By RetchEWretched
 
 ROMancer is a local ROM editing, investigation and playtesting workbench.
@@ -23,14 +23,17 @@ labels. An exact file match identifies a supplied revision.
 
 All 1,052 ROMs passed controlled byte editing, undo/redo, separate build
 and independent BPS reconstruction in the build54 corpus acceptance run.
-One supplied SNES revision uses explicit checksum preservation. Named
+One supplied SNES revision uses explicit checksum preservation.
+Recognized cartridge formats can use the same byte workflow without a
+catalog match. The hex editor outlines the selected byte and its ASCII
+character. Staged changes are underlined. Named
 game edits, palettes and other structured editors depend on the available
 source-bound definitions. Playtest the intended behavior before sharing
 a patch.
 
 START ON WINDOWS
 
-1. Run ROMancer-v1.0-development-Setup.exe and follow the installation steps.
+1. Run ROMancer-v1.0.0-Setup.exe and follow the installation steps.
 2. Open the ROMancer desktop or Start menu shortcut.
    The Windows ZIP is also available: extract it fully and run Install ROMancer.cmd.
 3. Open an original workshop or choose New project and import your own cartridge image.

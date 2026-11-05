@@ -9,7 +9,7 @@ def _topic(identifier,title,summary,steps,terms=''):
 TOPICS=(
     _topic('saving','Save, undo and exit','Drafts preserve your work; a build is the playable result.',[
         'Drafts save automatically. Ctrl+S saves them now; Saved in the bottom bar confirms completion. Save failed keeps your edits and offers Retry save.',
-        'Undo and Redo target the active sprite, pixel or level editor, or the last edited field. Text boxes keep normal Ctrl+Z and Ctrl+Y.',
+        'Undo and Redo target the active sprite or pixel editor, or the last edited field. Text boxes keep normal Ctrl+Z and Ctrl+Y.',
         'Review changes, then Create build before playtesting. Original ROMs are preserved; build history lets you return to an earlier result.',
         'Closing with pending saves, staged ROM edits or an active job asks you to confirm. Cancel closing, save drafts, and create a build if you want a playable result.'], 'save exit close undo redo draft build original patch safety'),
     _topic('terms','What the terms mean','Short explanations also appear beside storage fields on hover or focus.',[
@@ -17,11 +17,6 @@ TOPICS=(
         'Offset: a byte position counted from zero. Capacity: reserved storage. Stride: distance between record starts. A CPU address may need bank mapping to become a file offset.',
         'Tiles store pixels; palettes store colors; tilemaps arrange tiles; sprites may combine several tiles. A declaration describes checked storage, not automatically proven game behavior.',
         'Matched uses an exact reference. Candidate needs confirmation. Unknown means no supported meaning has been established.'], 'glossary offset bank palette tile sprite pointer checksum encoding capacity stride'),
-    _topic('levels','Edit rooms and levels','Use checked fixed-capacity layouts and separate builds.',[
-        'Open Levels. Open design workshop creates a separate original NES practice project.',
-        'Choose a room and terrain or collision layer. Paint, fill, or select and copy a rectangle; undo restores a stroke.',
-        'Metatile changes update every declared use. Object fields use explicit storage and cell coordinates.',
-        'Review level changes, create a build, then select that build in Playtest. Unknown collision meanings and object formats require verified definitions.'], 'level map room collision metatile terrain enemy door exit'),
     _topic('sound','Inspect music and sound','Console hardware, driver recognition and sample codecs are separate.',[
         'Open Music & sound to see documented audio hardware and the identified driver, or Unknown.',
         'Load this source in Playtest and reach a useful sound. Record native preview captures its mixed output; use play, pause, seek and loop.',
@@ -48,7 +43,7 @@ TOPICS=(
         'Identify the selected ROM. Unknown means no reference matched; it does not establish corruption.',
         'Search a specific reference to check an expected revision. A mismatch uses that reference’s scope.'], 'crc32 sha1 sha256 catalog dat unknown matched mismatch'),
     _topic('hex','Edit bytes','Stage exact-byte changes, then review.',[
-        'Open Resources, choose a byte cell and enter two hex digits. Arrow keys move between cells.',
+        'Open Resources, choose a byte cell and enter two hex digits. Arrow keys move between cells. The outline pairs the selected byte with its ASCII character. Underlining marks staged changes.',
         'Search bytes using AB ?? CD, UTF-8 text or an integer with an explicit byte order.',
         'Use the number inspector or bookmark a selected offset.',
         'Review the edits and create a separate build. Overview → Build history compares versions and names builds.'], 'hex endian wildcard bookmark bytes history'),

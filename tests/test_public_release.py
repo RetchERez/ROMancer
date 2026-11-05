@@ -11,14 +11,14 @@ import zipfile
 
 
 class PublicReleaseTests(unittest.TestCase):
-    def test_development_identity_does_not_claim_a_finished_release(self):
+    def test_public_version_identity(self):
         from romancer.workbench_api import WorkbenchAPI
         with tempfile.TemporaryDirectory() as folder:
             api=WorkbenchAPI(Path(folder))
             try:
                 value=api.dispatch('system.capabilities',{})
-                self.assertEqual(value['release_name'],'ROMancer v1.0 development')
-                self.assertEqual(value['build_label'],'v1.0 development')
+                self.assertEqual(value['release_name'],'ROMancer v1.0.0')
+                self.assertEqual(value['build_label'],'v1.0.0')
             finally:api.close()
 
     def test_level_editing_is_excluded_from_the_release(self):

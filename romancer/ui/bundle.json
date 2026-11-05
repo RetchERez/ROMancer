@@ -42,7 +42,7 @@
     "romancer/ui/graphics_formats.js": "6ce91bc1364f64e4e9c8d90369164c62254192168af330f299d4bba1f6135d3d",
     "romancer/ui/graphics_investigation.js": "cc3455e76ad62b1513fe22afa95f9c4d2653900a3bb7ffdc6e272f2e710d39db",
     "romancer/ui/hardware_reference.js": "b0206e6041643fc1e93b0641234950e400a7c0f7f95931472e30771435f4f802",
-    "romancer/ui/hex_editor.js": "719c77407a3806c643aca80e96aa46750f88a1874696b28d9577b013390baa19",
+    "romancer/ui/hex_editor.js": "ef61131d023814ed1221e35f0e4301293a12e150b567e58572114d2b2618317c",
     "romancer/ui/icons.js": "54b4e56205917bdaddfae74d2335106ae5e83541c68e0d0efea047f1097e9b40",
     "romancer/ui/interface_scale.js": "943998f0b2e83bcd42fd26ba1c45637bf395eb69fbde61afc5e090886130e81f",
     "romancer/ui/investigation_follow.js": "cd98854bf787a36ff1055c7485a0a8f190e899684ebe12359e73fd36278f4ebf",
@@ -111,5 +111,5 @@
     "romancer/ui/workspace_search.js": "ea65f3f0c59cd3d00f21943d51ffc69823ac3c75b08e3fcc36a550902c4a32da",
     "romancer/ui/workspace_status.js": "acb73a77cb03fe9566fc59bc26c5f1585ec7e0e34aef4fa6e13edf74251bdc62"
   },
-  "sha256": "f78d8db2b05e80fb127b58f900f46ab7372ad2c17029ff1e859666e9bd9233e8"
+  "sha256": "f891c5111fcafe0635928e155b58c18ff32c23993276247c5bd8f8d9d797baeb"
 }

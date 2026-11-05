@@ -5492,6 +5492,11 @@ ${font ? `<section class="card"><h3>Font metrics · ${esc(font.id)}</h3><div cla
       return [...this.changes].sort(([a], [b]) => a - b).map(([offset, after]) => ({ offset, before: this.original.get(offset), after }));
     }
   };
+  var printableByte = (hex7) => {
+    const value = parseInt(hex7, 16);
+    return value >= 32 && value <= 126 ? String.fromCharCode(value) : "·";
+  };
+  var byteCount = (count) => `${count} byte${count === 1 ? "" : "s"}`;
   var integer8 = (value) => {
     const n = Number(value);
     if (!Number.isSafeInteger(n) || n < 0) throw Error("Enter a nonnegative decimal or 0x hex offset.");
@@ -5635,18 +5640,19 @@ ${font ? `<section class="card"><h3>Font metrics · ${esc(font.id)}</h3><div cla
     });
     const bytes = data.hex.match(/../g) || [], search = ((_d = state2.hexSearch) == null ? void 0 : _d.scope) === ticket ? state2.hexSearch.result : null, numbers = ((_e = state2.hexNumbers) == null ? void 0 : _e.scope) === ticket && state2.hexNumbers.result.offset === draft.selected ? state2.hexNumbers.result : null, marks = ((_f = state2.hexBookmarks) == null ? void 0 : _f.scope) === ticket ? state2.hexBookmarks.result : null;
     const reviewed = ((_g = state2.hexReview) == null ? void 0 : _g.scope) === ticket && state2.hexReview.checksumPolicy === policy() && state2.hexReview.signature === JSON.stringify(draft.edits(state2));
-    return `<section class="card" id="hex-editor"><div class="card-heading"><h3>Hex editor</h3>${badge(`${draft.changes.size} staged bytes`)}</div>
+    return `<section class="card" id="hex-editor"><div class="card-heading"><h3>Hex editor</h3><span id="hex-staged-count" class="badge">${byteCount(draft.changes.size)} staged</span></div>
  <div class="toolbar">${field("hex-offset", "Offset", ctx2.draft("hex-offset", data.offset))}${button("Go", "hex-go")}${button("Previous page", "hex-page", { id: "-256", disabled: data.offset === 0 })}${button("Next page", "hex-page", { id: "256", disabled: data.offset + data.length >= state2.artifact.size })}</div>
- <div class="hex-scroll"><div class="hex-edit-grid" aria-label="Editable hex bytes">${Array.from({ length: Math.ceil(bytes.length / 16) }, (_, row) => {
-      var _a2;
-      return `<div class="hex-edit-row"><code>${(data.offset + row * 16).toString(16).padStart(8, "0")}</code><div class="hex-edit-cells">${bytes.slice(row * 16, row * 16 + 16).map((b, i) => {
-        const offset = data.offset + row * 16 + i;
-        return `<input aria-label="Byte 0x${offset.toString(16)}" data-hex-offset="${offset}" value="${draft.changes.get(offset) || b}" maxlength="2" size="2" spellcheck="false" class="hex-cell ${draft.changes.has(offset) ? "changed" : ""}">`;
-      }).join("")}</div><code>${esc(((_a2 = data.text) == null ? void 0 : _a2.slice(row * 16, row * 16 + 16)) || "")}</code></div>`;
-    }).join("")}</div></div>
+ <div class="hex-legend"><span>Offset</span><span>Hex bytes</span><span>ASCII preview (· for nonprintable bytes)</span><span class="hex-legend-edited">Underlined · Staged edit</span><span class="hex-legend-selected">Outlined · Selected byte</span></div>
+ <div class="hex-scroll"><div class="hex-edit-grid" aria-label="Editable hex bytes">${Array.from({ length: Math.ceil(bytes.length / 16) }, (_, row) => `<div class="hex-edit-row"><code>${(data.offset + row * 16).toString(16).padStart(8, "0")}</code><div class="hex-edit-cells">${bytes.slice(row * 16, row * 16 + 16).map((b, i) => {
+      const offset = data.offset + row * 16 + i;
+      return `<input aria-label="Byte 0x${offset.toString(16)}" data-hex-offset="${offset}" value="${draft.changes.get(offset) || b}" maxlength="2" size="2" spellcheck="false" class="hex-cell ${draft.changes.has(offset) ? "changed" : ""} ${draft.selected === offset ? "current-byte" : ""}">`;
+    }).join("")}</div><code class="hex-ascii" aria-label="ASCII preview">${bytes.slice(row * 16, row * 16 + 16).map((b, i) => {
+      const offset = data.offset + row * 16 + i;
+      return `<span data-hex-ascii="${offset}" class="${draft.changes.has(offset) ? "changed" : ""} ${draft.selected === offset ? "current-byte" : ""}">${esc(printableByte(draft.changes.get(offset) || b))}</span>`;
+    }).join("")}</code></div>`).join("")}</div></div>
 ${state2.artifact.system_id ? `<details><summary>Advanced byte options</summary>${select("hex-checksum-policy", "Checksum policy", [["maintain", "Maintain supported console checksums"], ["preserve", "Preserve checksum fields (Advanced)"]], policy())}<p>Preserving fields is for a separately checked convention or an intentional raw edit. It does not verify the game’s integrity checks.</p></details>` : ""}
  <p class="subtle">Edit a byte, then review. Your source stays unchanged. Arrow keys move between bytes.</p><div class="actions">${button("Review byte edits", "hex-review", { primary: true, disabled: !draft.changes.size })}${button("Create separate build", "hex-apply", { disabled: !reviewed })}${button("Discard byte edits", "hex-clear", { disabled: !draft.changes.size })}</div>
- ${reviewed ? `<div class="notice">${state2.hexReview.plan.changed_bytes} bytes in the reviewed plan. ${state2.hexReview.checksumPolicy === "preserve" ? "Checksum fields are preserved; game-specific integrity is not verified." : "Supported console checksum maintenance is included."}</div>` : ""}
+ ${reviewed ? `<div class="notice">${byteCount(state2.hexReview.plan.changed_bytes)} in the reviewed plan. ${state2.hexReview.checksumPolicy === "preserve" ? "Checksum fields are preserved; game-specific integrity is not verified." : "Supported console checksum maintenance is included."}</div>` : ""}
  <details><summary>Search bytes, text or numbers</summary><div class="field-row">${select("hex-search-kind", "Search for", [["hex", "Hex pattern (?? wildcard)"], ["text", "UTF-8 text"], ["number", "Integer"]], ctx2.draft("hex-search-kind", "hex"))}${field("hex-search-query", "Pattern or value", ctx2.draft("hex-search-query", ""))}${field("hex-search-start", "Start offset", ctx2.draft("hex-search-start", "0"))}</div><div class="field-row">${select("hex-endian", "Byte order", [["little", "Little endian"], ["big", "Big endian"]], ctx2.draft("hex-endian", "little"))}${select("hex-width", "Number width", [[1, "8-bit"], [2, "16-bit"], [4, "32-bit"]], ctx2.draft("hex-width", "2"))}${select("hex-signed", "Number sign", [["false", "Unsigned"], ["true", "Signed"]], ctx2.draft("hex-signed", "false"))}</div>${button("Search selected file", "hex-search")}
  ${search ? `<p>${search.offsets.length} matches · ${search.complete ? "Reached end of file" : `Scanned through 0x${search.scanned_to.toString(16)}`}</p><div class="actions">${search.offsets.slice(0, 1e3).map((o) => button("0x" + o.toString(16), "hex-jump", { id: String(o) })).join("")}</div>${search.complete ? "" : button("Set next search position", "hex-search-more")}` : ""}</details>
  <details><summary>Number inspector & bookmarks</summary><p>Selected offset: <code id="hex-selected">0x${draft.selected.toString(16)}</code></p>${button("Explain selected bytes", "hex-explain")}${button("Inspect selected number", "hex-numbers")}<div id="hex-explanation">${((_h = state2.hexExplanation) == null ? void 0 : _h.scope) === ticket && state2.hexExplanation.result.offset === draft.selected ? researchNoteHelp(state2.hexExplanation.result.research_notes) : ""}${((_i = state2.hexExplanation) == null ? void 0 : _i.scope) === ticket && state2.hexExplanation.result.offset === draft.selected ? `<p>${esc(state2.hexExplanation.result.note)}</p>${state2.hexExplanation.result.interpretations.map((row) => `<dl><dt>${esc(row.name)} · declared</dt><dd>File offset 0x${row.offset.toString(16)} · ${row.length} bytes${row.type ? " · " + esc(row.type) + " " + esc(row.endian) + " · value " + esc(row.value) + " · numeric range " + row.minimum + "–" + row.maximum : ""}${row.description ? "<br>" + esc(row.description) : ""}</dd></dl>`).join("")}` : ""}</div><div id="hex-number-result">${numbers ? `<dl>${Object.entries(numbers.values).map(([k, v]) => `<dt>${esc(k)}</dt><dd>${esc(v)}</dd>`).join("")}</dl>` : ""}</div>${field("hex-bookmark-name", "Bookmark name", ctx2.draft("hex-bookmark-name", ""))}<div class="actions">${button("Bookmark selected byte", "hex-bookmark")}${button("Load bookmarks", "hex-bookmarks")}</div>${((marks == null ? void 0 : marks.bookmarks) || []).map((r) => `<div class="actions">${button(`${r.name} · 0x${r.offset.toString(16)}`, "hex-jump", { id: String(r.offset) })}${button("Remove", "hex-unbookmark", { id: String(r.offset) })}</div>`).join("")}</details></section>`;
@@ -5691,11 +5697,16 @@ ${state2.artifact.system_id ? `<details><summary>Advanced byte options</summary>
       ctx2.state.hexReview = null;
       ctx2.render();
     });
+    const count = root.querySelector("#hex-staged-count");
     root.querySelectorAll("[data-hex-offset]").forEach((node) => {
+      const offset = Number(node.dataset.hexOffset), ascii = root.querySelector(`[data-hex-ascii="${offset}"]`);
       node.addEventListener("focus", () => {
         var _a2, _b, _c, _d, _e, _f;
         if (draft.scope !== selectionKey(ctx2.state)) return;
-        draft.selected = Number(node.dataset.hexOffset);
+        root.querySelectorAll(".current-byte").forEach((cell) => cell.classList.remove("current-byte"));
+        node.classList.add("current-byte");
+        ascii == null ? void 0 : ascii.classList.add("current-byte");
+        draft.selected = offset;
         if (((_a2 = ctx2.state.hexExplanation) == null ? void 0 : _a2.result.offset) !== draft.selected) {
           ctx2.state.hexExplanation = null;
           (_c = (_b = root.querySelector("#hex-explanation")) == null ? void 0 : _b.replaceChildren) == null ? void 0 : _c.call(_b);
@@ -5715,7 +5726,13 @@ ${state2.artifact.system_id ? `<details><summary>Advanced byte options</summary>
           draft.set(Number(node.dataset.hexOffset), node.value);
           ctx2.setDraft("hex-changes", serializeHexDraft(ctx2.state, draft));
           node.setCustomValidity("");
-          node.classList.toggle("changed", draft.changes.has(Number(node.dataset.hexOffset)));
+          const changed2 = draft.changes.has(offset);
+          node.classList.toggle("changed", changed2);
+          if (ascii) {
+            ascii.classList.toggle("changed", changed2);
+            ascii.textContent = printableByte(draft.changes.get(offset) || draft.original.get(offset));
+          }
+          if (count) count.textContent = `${byteCount(draft.changes.size)} staged`;
           setUnavailable(root.querySelector('[data-action="hex-review"]'), !draft.changes.size);
           setUnavailable(root.querySelector('[data-action="hex-clear"]'), !draft.changes.size);
         } catch (error) {

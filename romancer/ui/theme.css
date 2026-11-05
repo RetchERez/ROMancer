@@ -74,7 +74,6 @@ html[data-theme="light"] .badge.danger{background:#fff0eb;border-color:#d1a397;c
 html[data-theme="light"] .error,html[data-theme="light"] .save-state.danger{color:#ad3427}
 html[data-theme="light"] .hex-bytes{color:#263c49}
 html[data-theme="light"] .hex-text{color:#166655}
-html[data-theme="light"] .hex-cell.changed{background:#fff1c9;border-color:#ad7c26;color:#694500}
 html[data-theme="light"] .graph-node{background:#e1f2e9;border-color:#9fbdac;color:#1f5f42}
 html[data-theme="light"] #toast{background:#e2f0ea;border-color:#7da692;color:#1c3e30}
 html[data-theme="light"] #toast.error{background:#fff0eb;border-color:#c59b90;color:#923328}
@@ -105,3 +104,12 @@ html[data-theme="light"] .nav-label,html[data-theme="light"] .app-footer{color:v
 .draft-scene-pictures{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:12px}.draft-scene-pictures img{width:100%;max-height:240px;object-fit:contain;image-rendering:pixelated;background:var(--theme-menu)}.draft-scene-pictures figure{margin:0}@media(max-width:800px){.draft-scene-pictures{grid-template-columns:1fr}}
 
 .text-growth>label,.command-sequence>label,.format-library section>label{display:flex;align-items:flex-start;gap:10px;margin:14px 0;line-height:1.5}.text-growth input[type=checkbox],.command-sequence input[type=checkbox],.format-library input[type=checkbox]{flex:none;width:18px;height:18px;accent-color:var(--accent)}.command-sequence>ol{max-height:260px;overflow:auto;padding:12px 12px 12px 38px;border:1px solid var(--line);border-radius:6px}.command-sequence>ol li{padding:5px 0}
+
+/* The byte and its character preview share the same edit and selection markers. */
+.hex-legend{display:flex;flex-wrap:wrap;gap:.4rem 1rem;margin:.5rem 0;color:var(--muted)}
+.hex-ascii{display:inline-flex;font-family:var(--mono,monospace)}
+.hex-ascii span{display:inline-block;min-width:1ch;text-align:center}
+.hex-legend-edited,#hex-editor .hex-cell.changed,.hex-ascii .changed{text-decoration:underline;text-underline-offset:.19em}
+#hex-editor .hex-cell.changed,.hex-ascii .changed{background:#214d43;color:#e8fff6;border-color:#76dbc3}
+html[data-theme="light"] #hex-editor .hex-cell.changed,html[data-theme="light"] .hex-ascii .changed{background:#fff1c9;color:#694500;border-color:#ad7c26}
+.hex-legend-selected,#hex-editor .current-byte{outline:2px solid var(--accent);outline-offset:1px;border-radius:2px}
