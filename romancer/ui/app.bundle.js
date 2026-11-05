@@ -2766,7 +2766,6 @@
     ["assets", "Graphics & fonts", "Tiles, sprites and palettes"],
     ["scripts", "Text & layout", "Text, fonts and dialogue"],
     ["tables", "Numbers & stats", "Editable tables and values"],
-    ["levels", "Levels", "Rooms, objects and terrain"],
     ["sound", "Music & sound", "Samples and known sequences"],
     ["debug", "Investigation", "Find values and source bytes"],
     ["playtest", "Playtest", "Play, step and save states"],
