@@ -220,7 +220,7 @@
       "id": "start",
       "title": "Start with a project",
       "kicker": "YOUR FIRST FIVE MINUTES",
-      "image": "211-what-can-i-edit",
+      "image": "267-practice-studio-readiness",
       "steps": [
         "Click <b>New project</b>. Give this piece of work a useful name, then import your ROM into that project.",
         "Check the ROM or build selected at the top. On Overview, read <b>What can I edit in this ROM?</b>. Open a ready editor, or follow the area's action to find graphics, investigate values, or check text or sound setup.",
@@ -288,7 +288,7 @@
         "term-build",
         "term-hitbox"
       ],
-      "image": "220-five-editing-tools-ready",
+      "image": "267-practice-studio-readiness",
       "caption": "The original practice studio has checked layouts for graphics, text, numbers and music.",
       "extra_images": []
     },
