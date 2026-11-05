@@ -80,3 +80,12 @@ class LevelPresetTests(unittest.TestCase):
         self.assertNotEqual(level_presets.layout_fingerprint(bytes(changed)),baseline)
         changed=bytearray(raw);changed[0x9032]^=255;changed[0x1a6]=0xd2
         self.assertEqual(level_presets.layout_fingerprint(bytes(changed)),baseline)
+
+
+def setUpModule():
+    # Exercise preserved development internals separately from the release boundary.
+    from unittest import addModuleCleanup
+    from unittest.mock import patch
+    feature = patch("romancer.release_scope.LEVEL_EDITOR_ENABLED", True)
+    feature.start()
+    addModuleCleanup(feature.stop)

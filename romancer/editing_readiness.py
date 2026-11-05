@@ -12,7 +12,10 @@ class EditingReadinessTools:
     def readiness(self, p, c):
         project, row, path = self.api.source(p)
         areas = []
+        from .release_scope import LEVEL_EDITOR_ENABLED
         for kind, (title, page) in AREAS.items():
+            if kind == 'levels' and not LEVEL_EDITOR_ENABLED:
+                continue
             if c():
                 raise KeyboardInterrupt
             status = 'needs_investigation'

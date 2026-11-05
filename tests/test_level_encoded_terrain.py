@@ -98,3 +98,12 @@ class EncodedTerrainTests(unittest.TestCase):
                 derived=api.dispatch('levels.inspect',{**p,'artifact_id':built['artifact_id'],'definition':definition})
                 self.assertTrue(derived['ok'],derived);self.assertEqual(derived['rooms'][0]['terrain'][300],6)
             finally:api.close()
+
+
+def setUpModule():
+    # Exercise preserved development internals separately from the release boundary.
+    from unittest import addModuleCleanup
+    from unittest.mock import patch
+    feature = patch("romancer.release_scope.LEVEL_EDITOR_ENABLED", True)
+    feature.start()
+    addModuleCleanup(feature.stop)

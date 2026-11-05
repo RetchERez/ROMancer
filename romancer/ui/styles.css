@@ -193,3 +193,6 @@ main,.scaled-compact main,.scaled-narrow main{padding:20px clamp(18px,1.5vw,28px
 
 /* Editor overlays describe UI state; ROM palette colors remain untouched. */
 .editor-key{display:flex;align-items:center;gap:10px 20px;flex-wrap:wrap;margin:12px 0;color:var(--muted)}.editor-key>span{display:inline-flex;align-items:center;gap:8px}.editor-key i{width:15px;height:15px;border:2px solid;display:inline-block;flex:none}.key-selection{border-color:#70d4b4!important}.key-change{border-color:#ffca5c!important}.key-hitbox{border-color:#ad9cf2!important}
+
+.nav-coming-soon:disabled { opacity: 1; color: var(--muted); cursor: default; }
+.nav-coming-soon small { display: block; color: inherit; }

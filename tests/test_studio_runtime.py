@@ -78,3 +78,12 @@ class NativeStudioRuntimeTests(unittest.TestCase):
     wide=self.build(api,p,source,base);narrow=self.build(api,p,source,base+[actor('offset_x',7),actor('width',1)])
     first=self.run_scene(wide['path'],22,['right']);second=self.run_scene(narrow['path'],22,['right']);self.assertLess(first['hp'],second['hp']);self.assertEqual(second['hp'],5)
    finally:api.close()
+
+
+def setUpModule():
+    # Exercise preserved development internals separately from the release boundary.
+    from unittest import addModuleCleanup
+    from unittest.mock import patch
+    feature = patch("romancer.release_scope.LEVEL_EDITOR_ENABLED", True)
+    feature.start()
+    addModuleCleanup(feature.stop)

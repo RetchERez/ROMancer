@@ -144,3 +144,12 @@ class KnownChronoRegistryTests(unittest.TestCase):
 
 
 if __name__=='__main__':unittest.main()
+
+
+def setUpModule():
+    # Exercise preserved development internals separately from the release boundary.
+    from unittest import addModuleCleanup
+    from unittest.mock import patch
+    feature = patch("romancer.release_scope.LEVEL_EDITOR_ENABLED", True)
+    feature.start()
+    addModuleCleanup(feature.stop)

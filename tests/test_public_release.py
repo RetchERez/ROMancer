@@ -21,6 +21,21 @@ class PublicReleaseTests(unittest.TestCase):
                 self.assertEqual(value['build_label'],'v1.0 development')
             finally:api.close()
 
+    def test_level_editing_is_excluded_from_the_release(self):
+        from romancer.mcp_server import MCPServer
+        with tempfile.TemporaryDirectory() as folder:
+            server = MCPServer(Path(folder), allow_writes=True)
+            try:
+                operations = {row['name'] for row in server.api.dispatch('system.operations', {})['operations']}
+                for operation in ('levels.plan','games.maps.plan'):
+                    self.assertNotIn(operation, operations)
+                    self.assertNotIn(operation, server.operations)
+                self.assertIn('levels.inspect', operations)
+                self.assertIn('bytes.plan', operations)
+                self.assertIn('release.prepare', operations)
+            finally:
+                server.close()
+
     def test_public_metadata_is_in_the_explicit_source_inventory(self):
         from tools.package_source import APPROVED_FILES
         required={'LICENSE','.gitignore','.gitattributes','.editorconfig','README.txt','THIRD_PARTY_NOTICES.txt',

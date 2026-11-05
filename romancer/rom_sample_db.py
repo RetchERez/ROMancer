@@ -23,7 +23,10 @@ def _name(value,limit=80):
     if type(value) is not str or not 1<=len(value)<=limit or any(ord(c)<32 or c in '/\\:' for c in value):raise ValueError('Invalid short sample label.')
 
 def validate_record(row):
-    _fields(row,'sha256 crc32 size system_id format labels header_offset regions header_numbers checks discoveries coverage')
+    optional = ''.join(' '+key for key in ('sha1','structures') if isinstance(row, dict) and key in row)
+    _fields(row,'sha256 crc32 size system_id format labels header_offset regions header_numbers checks discoveries coverage'+optional)
+    if 'sha1' in row and (type(row['sha1']) is not str or not re.fullmatch('[0-9a-f]{40}',row['sha1'])):
+        raise ValueError('Invalid sample SHA-1.')
     _hash(row['sha256'])
     if type(row['crc32']) is not str or not re.fullmatch('[0-9A-F]{8}',row['crc32']):raise ValueError('Invalid sample CRC32.')
     _int(row['size'],1,64*1024**2)
@@ -65,6 +68,19 @@ def validate_record(row):
             if found['kind']=='graphics':
                 if found['format']!=SYSTEM_CODECS[row['system_id']] or found['confidence'] not in ('candidate','format-derived'):raise ValueError('Invalid graphics evidence.')
                 if found['confidence']=='format-derived' and (row['system_id']!='nes' or not any(r['id']=='chr-rom' and r['offset']==found['offset'] and found['length']<=r['length'] for r in row['regions'])):raise ValueError('Graphics evidence lacks a declared CHR-ROM region.')
+    if 'structures' in row:
+        structures = row['structures']
+        kinds = {'map-pointer-table','map-bank-table','tileset-header-table','background-block-grid',
+                 'background-block-dictionary','background-tiles','palette-words'}
+        if type(structures) is not list or len(structures)>16:
+            raise ValueError('Invalid measured structure inventory.')
+        for item in structures:
+            _fields(item,'kind offset count stride')
+            if type(item['kind']) is not str or item['kind'] not in kinds:
+                raise ValueError('Invalid measured structure kind.')
+            _int(item['count'],1,65536)
+            _int(item['stride'],1,65536)
+            _range({'offset':item['offset'],'length':item['count']*item['stride']},row['size'])
     _fields(row['coverage'],'whole_file_read bytes_read text_runs graphics_stride graphics_samples compression_windows compression_work_limited text_truncated graphics_truncated compression_truncated')
     coverage=row['coverage']
     for key in ('whole_file_read','compression_work_limited','text_truncated','graphics_truncated','compression_truncated'):
@@ -121,8 +137,8 @@ def catalog(query='',system_filter='all',page=0,limit=20):
     if DATABASE_PATH.exists():
         stat=DATABASE_PATH.stat();records=_load_cached(str(DATABASE_PATH),stat.st_size,stat.st_mtime_ns).values()
     else:records=()
-    rows=[r for r in records if (system_filter=='all' or r['system_id']==system_filter) and (query.casefold() in ' '.join(r['labels']).casefold() or query.lower() in r['sha256'] or query.upper() in r['crc32'])]
+    rows=[r for r in records if (system_filter=='all' or r['system_id']==system_filter) and (query.casefold() in ' '.join(r['labels']).casefold() or query.lower() in r['sha256'] or query.lower() in r.get('sha1','') or query.upper() in r['crc32'])]
     rows=sorted(rows,key=lambda r:(r['labels'][0].casefold(),r['sha256']))
-    return {'ok':True,'total':len(rows),'page':page,'limit':limit,'samples':[{k:copy.deepcopy(r[k]) for k in ('sha256','crc32','size','system_id','format','labels')} for r in rows[page*limit:(page+1)*limit]],
+    return {'ok':True,'total':len(rows),'page':page,'limit':limit,'samples':[{k:copy.deepcopy(r[k]) for k in ('sha256','sha1','crc32','size','system_id','format','labels') if k in r} for r in rows[page*limit:(page+1)*limit]],
             'canonical_revision_verified':False,'write_authorized':False}
 

@@ -211,3 +211,12 @@ class VerifiedGameTests(unittest.TestCase):
         operation=next(r for r in result['operations'] if r['name']=='games.plan')
         self.assertEqual(operation['required_parameters'],['project_id','artifact_id','profile_id','values'])
         self.assertEqual(result['scope'],'Operation names, required and optional parameter names; value constraints are documented per operation.')
+
+
+def setUpModule():
+    # Exercise preserved development internals separately from the release boundary.
+    from unittest import addModuleCleanup
+    from unittest.mock import patch
+    feature = patch("romancer.release_scope.LEVEL_EDITOR_ENABLED", True)
+    feature.start()
+    addModuleCleanup(feature.stop)

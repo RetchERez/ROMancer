@@ -31,4 +31,7 @@ def checked_formats(raw, sha, descriptors):
                 result['features'].append({'id': ident, 'name': name, 'status': 'declared_layout' if available else 'needs_investigation', 'page': 'levels', 'action': 'Open layout' if available else 'Investigate the layout', 'detail': 'Declared layout can be edited; gameplay meaning requires independent evidence.' if available else 'No supported mapping is saved for this feature.'})
         except (ValueError, KeyError, TypeError):
             pass
+    from .release_scope import LEVEL_EDITOR_ENABLED
+    if not LEVEL_EDITOR_ENABLED:
+        result['features'] = [item for item in result['features'] if item['page'] != 'levels']
     return result

@@ -83,3 +83,12 @@ class StudioAPITests(unittest.TestCase):
                 doc=api.dispatch('levels.inspect',{'project_id':example['project_id'],'artifact_id':source['artifact_id'],'definition':source['descriptors']['levels']})
                 self.assertTrue(doc['ok'],doc);self.assertEqual(doc['rooms'][0]['width'],16)
             finally:api.close()
+
+
+def setUpModule():
+    # Exercise preserved development internals separately from the release boundary.
+    from unittest import addModuleCleanup
+    from unittest.mock import patch
+    feature = patch("romancer.release_scope.LEVEL_EDITOR_ENABLED", True)
+    feature.start()
+    addModuleCleanup(feature.stop)

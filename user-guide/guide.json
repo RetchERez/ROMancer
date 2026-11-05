@@ -2,7 +2,7 @@
   "schema_version": 1,
   "product": "ROMancer v1.0",
   "subtitle": "A practical guide to the current editing tools: small first edits, advanced workflows, actual editing and appearance examples, a glossary and an alphabetical index.",
-  "scope": "Investigate unfamiliar cartridges without a game definition, review exact edits, create separate builds, playtest and verify patches. Named game workflows require their exact supported revision. Observations, candidate layouts and unknown behavior remain distinct. Basic Master System support covers validated Sega headers, checksums, literal row-planar graphics, declared edits, patches and measured playtesting. It does not infer every game resource.",
+  "scope": "This v1.0 guide covers the six-system cartridge workbench. Visual level editing is coming soon. Game identification uses exact offline file measurements and editing uses source-bound definitions.",
   "basic_summary": "Start the application, choose saved preferences, identify a source, make a focused edit, preserve progress and export a checked patch. These procedures build the habits used throughout the guide.",
   "advanced_summary": "Use explicit definitions for graphics, text, tables, connected-room layouts, audio and bounded automation. Follow declared ranges to exact bytes, and keep editor metadata, native observations and unknown game semantics separate.",
   "attribution": "By RetchEWretched. ROMancer code and original fixtures use the project MIT license. Instructional screenshots show third-party games, including Castlevania, Chrono Trigger, The Immortal, Final Fantasy Legend II, Deja Vu I & II and Rastan. Their imagery and trademarks remain those of their respective rights holders and are separate from the code license. No ROM files, game saves, emulator states, firmware dumps or authentication data are included. PDF and HTML work offline; PDF rebuilding optionally uses ReportLab.",
@@ -268,19 +268,17 @@
       "title": "Practice real edits in Mossy Hollow",
       "part": "Basic",
       "kicker": "Original playable example / normal editing tools",
-      "intro": "Choose Try the editing studio. This original NES program has animated actors, solid walls, damage floors, contact combat, editable hitboxes and a short melody. Use the normal editors; no in-app lesson is required.",
+      "intro": "Choose Try the editing studio to open the original NES practice game. Use its graphics, text, numbers and music layouts, then run the build in Playtest.",
       "steps": [
         "Graphics: open <b>Graphics &amp; fonts</b>, set Tiles across and Tiles down to 2, then Assemble tiles. Paint the first four hero tiles, try Undo and Redo, review and create a separate graphics build. Edit the second hero animation too for a consistent result.",
         "Dialogue: select the Original again and open <b>Text &amp; layout</b>. Replace HELLO, EXPLORER! with WELCOME, ROM HACKER! Check capacity, review and build. The character table supports uppercase letters.",
         "Movement: in <b>Numbers &amp; stats</b>, change Hero speed from 2 to 3, review and build. Compare equal Right input frames in Playtest. Zero stops movement; the checked limit is8 pixels per frame.",
-        "Levels: choose Terrain to paint the visible room, Collision to paint movement rules, or Move object to reposition an actor. Starting hitboxes shows independent contact rectangles. Follow the linked collision procedure for a complete wall edit.",
         "Music: in <b>Music &amp; sound</b>, click a melody note or choose its Event, change Note number and choose Stage note edit. Inspect the note view and Original/Edited waveform previews. Review, build and listen in Playtest.",
         "Playtest controls: arrows move, A attacks an overlapping enemy and chirps, Start restarts. HP0 stops the hero; an enemy with0 health disappears. Save/load states belong to that exact build. Export and verify a patch from its Original."
       ],
-      "result": "The original program supports these declared fields. Native tests checked collision, contact damage, movement, attacks, changed music and save-state replay. The included examples were created and verified through ROMancer.",
-      "note": "This is a small original practice game, not a decoder for another game. Level colors are authored reference RGB colors. Starting sprites and hitboxes are editor previews; Playtest produces the live scene. Open test layout under Advanced practice remains the separate Hillside navigation exercise.",
+      "result": "Review your edits, save a separate build, playtest it and verify its patch export.",
+      "note": "Mossy Hollow is an original practice game. Use Playtest for the live scene.",
       "related": [
-        "collision-actors",
         "known-music",
         "levels",
         "first-edit"
@@ -292,7 +290,7 @@
         "term-hitbox"
       ],
       "image": "220-five-editing-tools-ready",
-      "caption": "The original studio has checked editing layouts for graphics, text, numbers, levels and music.",
+      "caption": "The original practice studio has checked layouts for graphics, text, numbers and music.",
       "extra_images": []
     },
     {
@@ -623,7 +621,7 @@
       "title": "Use the offline ROM facts database",
       "part": "Basic",
       "kicker": "Recorded samples / exact file identity",
-      "intro": "ROMancer includes 1,052 measured cartridge samples and a 1,052-source research inventory across six systems. Exact SHA-256 and size connect the selected file to its measured facts and recorded relationships.",
+      "intro": "The offline catalog recognizes all 1,052 supplied cartridge revisions. Exact SHA-256 and file size select a record. CRC32 and SHA-1 can help cross-check your copy.",
       "steps": [
         "Import your ROM and let automatic deep scan finish. Open <b>Advanced &gt; Resources</b>, then find <b>ROM investigation</b>. A recorded match uses the file hash and size; the sample name comes from its supplied filename.",
         "Expand <b>Measured file facts &amp; locations</b> for header numbers and candidates. Open <b>Related source evidence</b> for shared byte blocks, captured sound contexts and reference input matches. These are investigation leads, not inherited game editors.",
@@ -631,7 +629,7 @@
         "Review, build and playtest normally. A changed build can be unrecorded even though its original remains matched. A sample match never creates a game-specific editor by itself."
       ],
       "result": "You can begin with measured addresses and format facts while keeping candidates, trusted game meanings and actual gameplay observations separate.",
-      "note": "The inventory contains 1,052 distinct uploaded ROMs in 76 cartridge/header classes. All passed the generic byte-edit/build/export pipeline; this is separate from game-specific formats and level editing. QuackShot now uses a checked scattered file/bus map and a separate native mapped view.",
+      "note": "Each supplied ROM was read in full. Header fields and checks describe the exact file. Sampled graphics, possible text and bounded compression results retain their evidence labels.",
       "details": [
         {
           "title": "What is recorded",
@@ -644,6 +642,10 @@
         {
           "title": "Redistribution basis",
           "text": "The packaged indexes contain measured facts, reference identifiers and hashes of private verification receipts. No game code, decoded images, sound payloads, save states or personal paths are included. Reference inventory matches do not authorize redistribution of source games or separate chip firmware. Nintendo and other marks remain their owners’ property."
+        },
+        {
+          "title": "Measured structures",
+          "text": "Red and Blue include measured map and tileset table locations. The Immortal includes measured background grid, block dictionary, tile and palette ranges. Inspect bytes opens the location in Resources."
         }
       ],
       "related": [
@@ -657,11 +659,9 @@
         "term-offset",
         "term-checksum"
       ],
-      "image": "263-related-source-evidence",
-      "caption": "Actual ROMancer investigation of Castlevania: shared bytes, runtime sound contexts and scoped reference matches. Inspect bytes opens a measured source location; no edit is created.",
-      "visual_page": {
-        "title": "Compare related sources"
-      }
+      "image": "265-recognized-game-structures",
+      "caption": "The Immortal is matched by its exact file identity. The measured grid, dictionary, tiles and palette locations open in the byte inspector.",
+      "image_alt": "ROMancer shows the matched Immortal cartridge, measured structures and disabled Levels entry"
     },
     {
       "id": "drafts",
@@ -868,33 +868,6 @@
         "term-encoding",
         "term-control",
         "term-allocation"
-      ]
-    },
-    {
-      "id": "room",
-      "title": "Move a documented room object",
-      "kicker": "GAME BOY / FINAL FANTASY LEGEND II",
-      "image": "07-ffl2-room",
-      "steps": [
-        "On the matched source, open <b>Opening-bedroom stool</b> on Overview or open its matched room in <b>Levels</b>. Compare the actual ROM-decoded original and edited terrain.",
-        "In <b>Layers</b>, toggle <b>Terrain</b>, <b>Objects</b>, <b>Collision values</b>, <b>Tile grid</b> and <b>Allowed floor tiles</b>. Keep Objects visible to edit the stool.",
-        "Drag the stool onto a highlighted floor tile, click an allowed tile or use arrow keys while the map has focus. The stool-position dropdown is an alternative. The status reminds you to create a build to keep the previewed change.",
-        "Review the source-bound command, create a separate build and visit the bedroom. Check the stool, surrounding movement and protected doorway in Playtest."
-      ],
-      "result": "Original and edited maps use actual decoded opening-bedroom data. The five supported stool positions are (12, 31), (14, 31), (12, 32), (13, 32) and (14, 32).",
-      "note": "The doorway at (13, 33) and other room commands are protected. Preview details contains technical bounds and raw collision information. Actors and dialogue are excluded from this terrain preview. Hiding Objects prevents stool edits.",
-      "part": "Basic",
-      "intro": "This is an actual ROM-decoded bedroom on a matched commercial-game revision. Change only the documented stool command, then check its appearance and surrounding movement in native Playtest.",
-      "related": [
-        "levels",
-        "checks",
-        "regression"
-      ],
-      "caption": "Actual ROMancer interface. The HTML edition links to the full-resolution capture.",
-      "terms": [
-        "term-metatile",
-        "term-collision",
-        "term-layer"
       ]
     },
     {
@@ -1587,7 +1560,7 @@
         "To share a build, open <b>Export</b>, select its original revision and target build, and create a verified patch. Keep the original ROM private."
       ],
       "result": "The exact before/after byte change is reviewed, stored in a separate build and can be exported as an independently verified patch.",
-      "note": "The 1,052-ROM pipeline check used controlled test mutations, not gameplay-approved hacks. A hex editor can change bytes without knowing their meaning. Level, script and music edits still require checked definitions.",
+      "note": "The corpus check used controlled byte changes to verify file operations. Use a checked definition or trace before assigning gameplay meaning to a byte.",
       "part": "Advanced",
       "intro": "Inspect exact stored bytes and create a separate reviewed build. Use a known location or higher-level editor when its definition describes the intended change.",
       "related": [
@@ -1640,7 +1613,6 @@
       "related": [
         "hex-editor",
         "debug",
-        "connections",
         "resources"
       ],
       "terms": [
@@ -2061,194 +2033,26 @@
     },
     {
       "id": "levels",
-      "title": "Edit declared terrain, objects and collision",
+      "title": "Visual level editing is coming soon",
       "part": "Advanced",
-      "kicker": "Levels and bounded game definitions",
-      "intro": "Levels opens checked storage for the selected revision. Super Mario Land has 12 terrain presets; FFL II has a terrain-command browser. Declared rectangular and isometric layouts use the same reviewed-build workflow.",
+      "kicker": "Release features",
+      "intro": "The Levels entry is disabled in this release. Game and revision support will roll out as layouts, palettes and editing behavior are verified.",
       "steps": [
-        "Open <b>Levels</b>. When <b>Checked level</b> appears, choose a level and select <b>Open level</b>. Otherwise use the supported game browser or a checked definition in Advanced level setup. <b>No supported level map</b> means this source still needs investigation.",
-        "Choose a room and a thumbnail brush. <b>Terrain brush range</b> pages large palettes in groups of 64. Pick from room samples a tile. Terrain, Collision and Elevation appear only when their stored layers are defined; visible terrain is not proof of movement rules.",
-        "Use <b>Undo stroke</b> and <b>Redo stroke</b>. Switching checked levels preserves their staged drafts. Expand <b>Other uses</b> before changing shared screens. A repeated stored value may change several highlighted cells at once. Move object appears only for defined coordinates.",
-        "Choose <b>Review level changes</b>, inspect the exact changes, then <b>Create level build</b>. Visit the room and test walking, collision, boundaries and transitions."
+        "Use <b>Advanced &gt; Resources</b> to inspect ROM identification, measured locations and source evidence.",
+        "Use the text, graphics, stats and sound tools for the checked layouts they support."
       ],
-      "result": "The preview and checked changes stay within declared grid/object ranges. Test the built game to establish movement, collision, boundaries and transitions; the static preview alone does not certify them.",
-      "note": "Super Mario Land: checked 64 KiB revision only, 114 distinct stage screens across 12 levels. Presets cover stored terrain and baseline signed tile graphics, not collision, interactive metadata or arbitrary new cells. Canonical grayscale follows stored BGP; host captures can use a different display palette.",
-      "details": [
-        {
-          "title": "Stored cells and shared uses",
-          "text": "A compressed terrain operand can paint several cells. All linked cells preview and build together; implicit blanks without an operand cannot be inserted. Interactive tile values and stream growth are protected. A shared screen changes every listed reference, including uses outside the selected level. Checked presets remain available on owned builds only while protected layout bindings still match."
-        },
-        {
-          "title": "Optional practice is not your game",
-          "text": "The artificial Hillside/Courtyard layouts demonstrate checked storage and declared relationships. Only Hillside graphics and music are rendered by the native test program. Their other room, objects and connections are editor practice data, not implemented doors or events. Actual game-room editing requires a verified definition for that game and revision."
-        },
-        {
-          "title": "Isometric layouts and elevation",
-          "text": "Advanced level setup lets a definition specify projection, projected cell width/height and height step. An optional stored elevation grid adds the Elevation paint layer. Advanced brush value selects the height to paint. Object z, layer and order bindings are explicit definition fields; a field called z is not inferred. The editor projects individual source cells and sprites, rather than stretching a complete room screenshot."
-        },
-        {
-          "title": "Adapter checks cover declared storage",
-          "text": "Levels inspection re-encodes the declared tiles, palette, grids and object fields and checks byte equality. Reserved palette bits, object padding and other opaque bytes are preserved. Review reports dependent resources affected by an edit. This is not a complete game inventory or proof that an edit works in gameplay."
-        },
-        {
-          "title": "FFL II stored terrain commands",
-          "text": "Browse game maps covers 219 headers sharing 164 stored streams on the matched USA revision. Select a room, choose any required Story-state preview and Apply. Inspect terrain command edits existing drawing operands; conditions and command widths stay protected. Switching preview state keeps staged records and undo history. Review checks every encoded state outcome and sharing header for collision, region bits, marker order and trigger bindings. NPC and arrival writes remain limited to room 486B. Build separately and test doors and story routes."
-        }
-      ],
+      "result": "Measured level-related locations can be inspected as bytes from the matched source.",
+      "note": "Generic graphics tilemaps remain available. They describe declared graphics storage.",
       "related": [
-        "connections",
-        "room",
         "tilemaps",
         "regression",
-        "collision-actors",
         "checks"
       ],
       "terms": [
         "term-metatile",
         "term-collision",
         "term-layer"
-      ],
-      "image": "264-sml-checked-terrain-editor",
-      "image_layout": "following-page",
-      "image_alt": "Actual checked Super Mario Land terrain editor with original and staged grayscale room previews and sixteen changed linked cells",
-      "caption": "Actual ROMancer edit: one stored repeated wall value is replaced by the empty tile, previewing all 16 affected cells. Undo, redo, level switching, review and a separate build passed. This is a staged visual preview, not a played frame.",
-      "visual_page": {
-        "title": "Edit checked terrain and preview declared scene geometry",
-        "kicker": "Advanced / actual application capture",
-        "intro": "The first capture edits checked compressed terrain. The second tests declared isometric geometry using original authored data.",
-        "panels": [
-          {
-            "image": "264-sml-checked-terrain-editor",
-            "title": "Checked Super Mario Land terrain / actual editor",
-            "x": 48,
-            "top": 846,
-            "width": 1200,
-            "crop": [
-              190,
-              65,
-              1385,
-              965
-            ],
-            "caption": "Actual ROMancer edit: one stored repeated wall value is replaced by the empty tile, previewing all 16 affected cells. Undo, redo, level switching, review and a separate build passed. This is a staged visual preview, not a played frame."
-          },
-          {
-            "image": "259-declared-isometric-editor",
-            "title": "Declared isometric geometry fixture (original test data)",
-            "x": 48,
-            "top": 460,
-            "width": 1200,
-            "crop": [
-              0,
-              0,
-              1213,
-              722
-            ],
-            "caption": "Actual editor capture using authored test data. Height painting, keyboard editing and object dragging were built through ROMancer. This is a framework test, not a commercial game map."
-          }
-        ]
-      },
-      "extra_images": [
-        {
-          "image": "261-ffl2-stateful-terrain-editor",
-          "alt": "Actual FFL II terrain-command original and staged preview",
-          "caption": "The matched USA revision also provides its separate checked terrain-command workflow.",
-          "title": "FFL II terrain commands"
-        },
-        {
-          "image": "259-declared-isometric-editor",
-          "alt": "Original geometry fixture: elevation and object movement with before and edited previews",
-          "caption": "Actual editor capture using authored test data. Height painting, keyboard editing and object dragging were built through ROMancer. This is a framework test, not a commercial game map.",
-          "title": "Declared isometric geometry fixture (original test data)"
-        }
       ]
-    },
-    {
-      "id": "connections",
-      "title": "Advanced practice: objects and room connections",
-      "part": "Advanced",
-      "kicker": "Optional practice / synthetic editor-layout data",
-      "intro": "This optional Advanced practice uses original synthetic test terrain and declared records to demonstrate the editor format. It is not a decoded commercial-game level. For an actual supported game-room edit, start with the matched Final Fantasy Legend II bedroom example.",
-      "steps": [
-        "Open <b>Advanced practice > Open test layout</b> only to learn the declared format. Read the Practice layout warning. Under <b>Choose a room</b>, choose Hillside or Courtyard: these are synthetic test layouts, not decoded commercial levels.",
-        "Keep <b>Named objects</b> selected in Overlay. Select a named map label or use <b>Selected object</b> under <b>Objects</b>. Choose <b>Move object</b> and drag its label within the guarded room bounds.",
-        "For a declared exit, select <b>Destination room</b> and choose <b>Update preview</b>. X/Y positions stay visible; raw fields are inside <b>Other values · Advanced</b>. Unnamed raw slots appear only with <b>All records (Advanced)</b>.",
-        "Inspect the staged room link, follow its destination button and use Undo stroke to undo a grouped edit. Review and build only the intended stored changes; the workshop's room links and records still do not run as gameplay."
-      ],
-      "result": "The practice inspector stages bounded declared fields, and editor navigation follows an explicit stored-value mapping. These checks demonstrate data handling, not an executable level or door system.",
-      "note": "This is editor-format practice, not normal beginner game editing. The native test program renders Hillside and plays music only. Courtyard, object records and declared connections are not executed as actors, doors or events. Use the real FFL II bedroom example for a native-supported room edit.",
-      "details": [
-        {
-          "title": "What a connection declares",
-          "text": "An optional per-slot annotation supplies its index, name and role. A declared exit names a stored integer field and lists allowed value/room-ID pairs. Unmapped current values, duplicate destination values, unknown rooms and out-of-range edits are rejected."
-        },
-        {
-          "title": "Existing definitions still work",
-          "text": "The optional object metadata does not replace the fixed-record storage layout or require a new schema version. Older definitions remain usable; unnamed slots stay unnamed, and objects without established X/Y coordinates are not given invented positions."
-        },
-        {
-          "title": "Workshop versus game engine",
-          "text": "Hillside and Courtyard demonstrate source-bound layouts, named fields and declared navigation in the editor. These data do not provide a game-authoring engine, executable door events or an event compiler. Verify a real game's consumers before claiming an edited destination works in native play."
-        }
-      ],
-      "related": [
-        "room",
-        "levels",
-        "investigation",
-        "recipes",
-        "regression"
-      ],
-      "terms": [
-        "term-connection",
-        "term-metadata",
-        "term-declared"
-      ],
-      "image": "16-connected-rooms",
-      "image_layout": "following-page",
-      "image_alt": "Clearly labelled Advanced editor-layout practice with artificial test terrain and declared room connections",
-      "caption": "Optional Advanced practice with synthetic test terrain. Declared room connections do not establish native doors, actors or events.",
-      "extra_images": [
-        {
-          "image": "17-object-inspector",
-          "title": "Advanced practice inspector / declared record fields"
-        }
-      ],
-      "appearance_title": "Rooms / connections and object inspector",
-      "appearance_kicker": "Advanced / original editor-layout workshop",
-      "appearance_intro": "Actual checked workshop layouts. Hillside renders and plays music natively; Courtyard, objects and connections remain editor practice data.",
-      "visual_page": {
-        "title": "Advanced practice / synthetic layouts and records",
-        "kicker": "Optional practice / not a decoded commercial-game level",
-        "intro": "Artificial test data for learning the editor format. Only Hillside graphics and music run natively; these records do not execute doors, actors or events.",
-        "panels": [
-          {
-            "image": "16-connected-rooms",
-            "title": "Advanced practice / staged synthetic room records",
-            "x": 48,
-            "top": 846,
-            "width": 1200,
-            "crop": [
-              180,
-              60,
-              1390,
-              500
-            ],
-            "caption": "Synthetic editor-format exercise. Use the FFL II bedroom procedure for a supported real-game room change."
-          },
-          {
-            "image": "17-object-inspector",
-            "title": "Advanced practice / selected declared record",
-            "x": 48,
-            "top": 350,
-            "width": 900,
-            "crop": [
-              180,
-              210,
-              1390,
-              430
-            ]
-          }
-        ]
-      }
     },
     {
       "id": "sound",
@@ -2427,7 +2231,6 @@
         }
       ],
       "related": [
-        "connections",
         "investigation",
         "tables",
         "mcp"
@@ -2462,7 +2265,7 @@
         },
         {
           "title": "The same current tools",
-          "text": "Read editing.readiness before choosing an editor. sound.system returns known music definitions read-only; select one song before sound.inspect to stay within the response budget. With explicit writes, sound.plan or levels.plan followed by build.apply uses the same checked services as the GUI. These paths reproduced the native-tested targets. Query system.operations and the MCP tool list for current schemas. levels.presets lists checked layout choices; levels.preset returns a source-bound definition for a selected preset_id. Both are read-only. They do not grant write permission or full-game certification."
+          "text": "Read editing.readiness before choosing an editor. sound.system returns known music definitions. With explicit writes, sound.plan followed by build.apply uses the same service as the GUI. levels.presets, levels.preset and levels.inspect provide read-only layout research. Query system.operations and the MCP tool list for the available operations."
         },
         {
           "title": "New investigation and editing operations",
@@ -2564,56 +2367,6 @@
           {
             "image": "21-game-knowledge",
             "title": "Use public knowledge without confusing it with proof",
-            "x": 48,
-            "top": 846,
-            "width": 1170,
-            "crop": [
-              180,
-              60,
-              1390,
-              860
-            ],
-            "caption": "Unaltered full-resolution capture is linked in the offline HTML edition."
-          }
-        ]
-      }
-    },
-    {
-      "id": "game-maps",
-      "title": "Browse real FFL2 maps and edit supported records",
-      "part": "Advanced",
-      "kicker": "GAME MAPS / SHARED DATA",
-      "intro": "The exact USA Final Fantasy Legend II profile includes a real room catalog. Numbered headers are used where scene names have not been established.",
-      "image": "20-ffl2-map-browser",
-      "steps": [
-        "Open <b>Levels</b>. The simple bedroom editor remains available; choose <b>Browse game maps</b> for actual map thumbnails and their arrival/object counts.",
-        "Select a map and an arrival or existing record. The editor shows a readable crop. Other maps can share the same drawing stream, so read the shared-use notice before changing terrain.",
-        "In the supported opening atlas, stage an existing command, unconditional NPC position or arrival position. Conditions, event references, facing bits, collision behavior and trigger ordering are protected. Mother is a story character even though her placement record is unconditional.",
-        "Review the changes to obtain the exact decoded terrain preview, then create a separate build. Walk the relevant route in Playtest, test interactions and both exits, and save a state only for its matching build."
-      ],
-      "result": "The selected supported record changes through a source-bound plan, with an original/edited map preview and a separate playable build.",
-      "note": "The catalog has 219 header variants and 164 drawing streams. Conditional branches require explicit state; unsupported decoding stays unavailable. Non-opening maps use clearly marked neutral color-index previews until a native palette is known. Object records are not a claim that every object is visible in the current game state. Destination changes remain inspection-only in this UI.",
-      "related": [
-        "room",
-        "play",
-        "regression",
-        "game-knowledge"
-      ],
-      "terms": [
-        "term-metatile",
-        "term-shared-resource",
-        "term-arrival"
-      ],
-      "caption": "Actual cartridge terrain and source-bound record editing; this is not the synthetic Advanced practice layout.",
-      "image_layout": "following-page",
-      "visual_page": {
-        "title": "Browse real FFL2 maps and edit supported records / actual interface",
-        "kicker": "Advanced / actual application capture",
-        "intro": "Actual cartridge terrain and source-bound record editing; this is not the synthetic Advanced practice layout.",
-        "panels": [
-          {
-            "image": "20-ffl2-map-browser",
-            "title": "Browse real FFL2 maps and edit supported records",
             "x": 48,
             "top": 846,
             "width": 1170,
@@ -3709,41 +3462,6 @@
       "terms": []
     },
     {
-      "id": "collision-actors",
-      "title": "Change collision, hitboxes and enemy movement",
-      "part": "Advanced",
-      "kicker": "Original runtime / layers and actor behavior",
-      "intro": "Open the original Mossy Hollow studio in Levels. These fields are consumed by its program; the same generic editor needs verified mappings before it can change another game’s behavior.",
-      "steps": [
-        "Choose <b>Collision</b> in Paint layer. Open floor0 allows movement, Solid wall1 blocks it, and Damage floor2 reduces hero health. Paint Open floor over the vertical wall at column16, rows18 through23. Undo and redo the stroke.",
-        "Choose <b>Terrain</b>, select brush0 and clear the same visible wall cells. Terrain and collision are separate edits: clearing one alone does not clear the other.",
-        "Choose <b>Starting hitboxes</b>. Select Hero start or Slime start. Width, height and offsets are pixels; X/Y are8-pixel cells. Change width, then Update preview. The artwork stays separate from the contact rectangle.",
-        "Try Starting health, Contact damage, Movement enabled, Left/Right movement limit and Damage cooldown. Movement enabled0 stops that actor’s movement, not its contact damage. Damage cooldown belongs to the actor receiving damage. Starting X must lie between its movement limits.",
-        "Review and create a level build. In Playtest, walk through the opened wall; compare equal input sequences from fresh starts. Test damage floors and enemy contact. A attacks only while rectangles overlap. Start resets health and positions. Export and verify the patch."
-      ],
-      "result": "Native checks observed a blocked hero at X114 and passage after opening the collision wall. Separate tests observed less damage with a narrower enemy hitbox, a stationary enemy, damage-floor health loss and a contact attack.",
-      "note": "Starting sprites and rectangles are static editor previews, not live actor positions. A drawing change does not change collision, damage, enemy logic or animation assembly. Other games can use different coordinate units, multiple hitboxes or compressed collision maps.",
-      "related": [
-        "levels",
-        "editing-studio",
-        "play",
-        "regression"
-      ],
-      "terms": [
-        "term-collision",
-        "term-hitbox",
-        "term-layer"
-      ],
-      "image": "258-collision-edit-preview",
-      "caption": "Current Levels editor: translucent collision shading, a labeled highlight key, visible object position and collapsed hitbox/behavior controls. One changed cell is staged; this image is an editor preview.",
-      "details": [
-        {
-          "title": "Read the editor colors",
-          "text": "Teal outlines the selected cell; amber outlines changed cells; purple marks starting hitboxes when that overlay is selected. Collision brushes carry their own label and color. Overlay shading does not edit ROM palette colors. Hidden technical fields remain available in Hitbox & behavior · Advanced."
-        }
-      ]
-    },
-    {
       "id": "known-music",
       "title": "Edit a verified music sequence",
       "part": "Advanced",
@@ -4318,7 +4036,6 @@
     {
       "term": "Actor hitboxes",
       "topics": [
-        "collision-actors",
         "levels"
       ]
     },
@@ -4334,12 +4051,6 @@
       "topics": [
         "debug",
         "hex-editor"
-      ]
-    },
-    {
-      "term": "Advanced synthetic layout practice",
-      "topics": [
-        "connections"
       ]
     },
     {
@@ -4383,12 +4094,6 @@
       "term": "Applying downloaded patches",
       "topics": [
         "apply-patch"
-      ]
-    },
-    {
-      "term": "Arrival records",
-      "topics": [
-        "game-maps"
       ]
     },
     {
@@ -4588,14 +4293,12 @@
     {
       "term": "Collision brushes",
       "topics": [
-        "collision-actors",
         "levels"
       ]
     },
     {
       "term": "Collision values and layers",
       "topics": [
-        "room",
         "levels"
       ]
     },
@@ -4647,12 +4350,6 @@
       "topics": [
         "connected-game-view",
         "connected-evidence"
-      ]
-    },
-    {
-      "term": "Connected rooms",
-      "topics": [
-        "connections"
       ]
     },
     {
@@ -4721,7 +4418,6 @@
     {
       "term": "Declared connections",
       "topics": [
-        "connections",
         "investigation"
       ]
     },
@@ -4734,7 +4430,6 @@
     {
       "term": "Decoded room terrain",
       "topics": [
-        "room",
         "levels"
       ]
     },
@@ -4742,8 +4437,7 @@
       "term": "Definitions",
       "topics": [
         "resources",
-        "recipes",
-        "connections"
+        "recipes"
       ]
     },
     {
@@ -4756,12 +4450,6 @@
       "term": "Destination ownership",
       "topics": [
         "compression"
-      ]
-    },
-    {
-      "term": "Destination room picker",
-      "topics": [
-        "connections"
       ]
     },
     {
@@ -4793,12 +4481,6 @@
       "topics": [
         "translation",
         "text-layout"
-      ]
-    },
-    {
-      "term": "Enemy movement and damage",
-      "topics": [
-        "collision-actors"
       ]
     },
     {
@@ -4837,12 +4519,6 @@
       "term": "Exports",
       "topics": [
         "patches"
-      ]
-    },
-    {
-      "term": "FFL2 real map catalog",
-      "topics": [
-        "game-maps"
       ]
     },
     {
@@ -4898,8 +4574,7 @@
     {
       "term": "Game-specific edits",
       "topics": [
-        "numbers",
-        "room"
+        "numbers"
       ]
     },
     {
@@ -4953,7 +4628,6 @@
     {
       "term": "Hillside and Courtyard Advanced practice",
       "topics": [
-        "connections",
         "levels"
       ]
     },
@@ -5017,7 +4691,6 @@
     {
       "term": "Layers and grid",
       "topics": [
-        "room",
         "levels"
       ]
     },
@@ -5130,12 +4803,6 @@
       ]
     },
     {
-      "term": "Named object inspector",
-      "topics": [
-        "connections"
-      ]
-    },
-    {
       "term": "Named operands",
       "topics": [
         "command-operands"
@@ -5165,12 +4832,6 @@
       "term": "Non-power-of-two SNES checksums",
       "topics": [
         "startup-verification"
-      ]
-    },
-    {
-      "term": "Object metadata and roles",
-      "topics": [
-        "connections"
       ]
     },
     {
@@ -5456,13 +5117,6 @@
       ]
     },
     {
-      "term": "Room objects",
-      "topics": [
-        "room",
-        "connections"
-      ]
-    },
-    {
       "term": "Save states",
       "topics": [
         "play",
@@ -5509,7 +5163,6 @@
     {
       "term": "Shared resources",
       "topics": [
-        "game-maps",
         "palettes"
       ]
     },
@@ -5767,12 +5420,10 @@
     "animation",
     "beginner-trial",
     "captured-edit-check",
-    "collision-actors",
     "command-operands",
     "compressed-capacity",
     "compression",
     "connected-game-view",
-    "connections",
     "debug",
     "debugger-setup",
     "editing-studio",

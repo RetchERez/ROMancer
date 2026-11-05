@@ -87,3 +87,12 @@ class GameAdapterTests(unittest.TestCase):
                 self.assertTrue(plan['ok'],plan);self.assertTrue(plan['resource_impact']);self.assertEqual(plan['adapter_sha256'],doc['adapter']['adapter_sha256'])
                 self.assertEqual(path.read_bytes(),bytes(data))
             finally:api.close()
+
+
+def setUpModule():
+    # Exercise preserved development internals separately from the release boundary.
+    from unittest import addModuleCleanup
+    from unittest.mock import patch
+    feature = patch("romancer.release_scope.LEVEL_EDITOR_ENABLED", True)
+    feature.start()
+    addModuleCleanup(feature.stop)

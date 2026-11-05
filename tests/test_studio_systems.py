@@ -20,3 +20,12 @@ class DeclaredStudioSystemsTests(unittest.TestCase):
      doc=api.dispatch('levels.inspect',{**sp,'definition':d});self.assertTrue(doc['ok'],doc)
      plan=api.dispatch('levels.plan',{**sp,'definition':d,'document_id':doc['document_id'],'changes':[{'kind':'collision','room_id':'room-0','index':1,'value':0}]});self.assertTrue(plan['ok'],plan);self.assertFalse(doc['game_semantics_verified'])
     finally:api.close()
+
+
+def setUpModule():
+    # Exercise preserved development internals separately from the release boundary.
+    from unittest import addModuleCleanup
+    from unittest.mock import patch
+    feature = patch("romancer.release_scope.LEVEL_EDITOR_ENABLED", True)
+    feature.start()
+    addModuleCleanup(feature.stop)

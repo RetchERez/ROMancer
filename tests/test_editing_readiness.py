@@ -13,8 +13,8 @@ class EditingReadinessTests(unittest.TestCase):
         r=self.api.dispatch(op,p);self.assertTrue(r['ok'],r);return r
     def test_readiness_checks_saved_layouts_without_inventing_game_knowledge(self):
         r=self.call('editing.readiness',self.p);by={x['kind']:x for x in r['areas']}
-        self.assertEqual(by['assets']['status'],'ready');self.assertEqual(by['levels']['status'],'needs_investigation')
-        self.assertFalse(r['game_semantics_inferred']);self.assertIn('definition',by['levels']['reason'].lower())
+        self.assertEqual(by['assets']['status'],'ready');self.assertNotIn('levels',by)
+        self.assertFalse(r['game_semantics_inferred'])
         project=Path(self.demo['path']);value=projects.read_project(project);value['sources'][0]['descriptors']['assets']['source_sha256']='0'*64;projects.write_json(project/'project.json',value)
         by={x['kind']:x for x in self.call('editing.readiness',self.p)['areas']};self.assertEqual(by['assets']['status'],'unsupported')
     def test_malformed_saved_table_is_reported_without_breaking_overview(self):
@@ -28,6 +28,6 @@ class EditingReadinessTests(unittest.TestCase):
         r=self.call('editing.readiness',self.p);area=next(a for a in r['areas'] if a['kind']=='assets')
         self.assertEqual(area['status'],'unsupported');self.assertIn('read-only',area['reason'].lower())
 
-    def test_empty_declared_definition_is_invalid_instead_of_missing(self):
+    def test_saved_levels_do_not_advertise_an_editor_in_the_release(self):
         project=Path(self.demo['path']);value=projects.read_project(project);value['sources'][0]['descriptors']['levels']={};projects.write_json(project/'project.json',value)
-        r=self.call('editing.readiness',self.p);self.assertEqual(next(a for a in r['areas'] if a['kind']=='levels')['status'],'unsupported')
+        r=self.call('editing.readiness',self.p);self.assertNotIn('levels', {a['kind'] for a in r['areas']})

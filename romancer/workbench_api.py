@@ -252,6 +252,10 @@ class WorkbenchAPI:
         for operation in tuple(self.routes):
             if operation.startswith('containers.') or operation in ('runtime.load_disc','route.run_disc','release.disc_set'):
                 del self.routes[operation]
+        from .release_scope import LEVEL_EDITOR_ENABLED, LEVEL_WRITE_OPERATIONS
+        if not LEVEL_EDITOR_ENABLED:
+            for operation in LEVEL_WRITE_OPERATIONS:
+                self.routes.pop(operation, None)
         self.jobs=JobManager(self.workspace,self.dispatch,set(self.routes)-{'system.capabilities','systems.list','projects.list','project.open','reports.list','reports.get','exports.list','drafts.list','drafts.get','drafts.save','drafts.move'})
         try:self.runtime=RuntimePool()
         except BaseException:self.jobs.close();raise
@@ -267,7 +271,11 @@ class WorkbenchAPI:
     def _game_inspect(self,p,c):
         from .verified_games import inspect
         project,row,path=self.source(p)
-        return inspect(project,row,path,cancelled=c)
+        result = inspect(project,row,path,cancelled=c)
+        from .release_scope import LEVEL_EDITOR_ENABLED
+        if not LEVEL_EDITOR_ENABLED and (result.get('profile') or {}).get('id') == 'ffl2-usa':
+            result.update(fields=[], visual=None, map_workbench=False)
+        return result
 
     def _game_maps(self,p,c,operation):
         from .verified_games import maps
