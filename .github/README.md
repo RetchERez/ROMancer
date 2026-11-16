@@ -12,7 +12,7 @@ By **RetchEWretched**. Edit ROMs, preview changes, playtest builds, and export p
 
 The ZIP includes the runtime, emulator engines, and offline user guide. Try an included practice ROM or choose **New project** to import your own. Open **Help → User guide** for a walkthrough. The launcher is unsigned, so Windows may show a SmartScreen warning.
 
-[User guide (PDF)](https://github.com/RetchERez/ROMancer/releases/download/v1.0.0/ROMancer-v1.0.0-User-Guide.pdf) · [Tested games](https://github.com/RetchERez/ROMancer/releases/download/v1.0.0/TESTED-GAMES.txt) · [Release and checksums](https://github.com/RetchERez/ROMancer/releases/tag/v1.0.0)
+[User guide (PDF)](https://github.com/RetchERez/ROMancer/releases/download/v1.0.0/ROMancer-v1.0.0-User-Guide.pdf) · [All 1,052 ROM revisions](../knowledge/ROM-CATALOG.md) · [Tested games](https://github.com/RetchERez/ROMancer/releases/download/v1.0.0/TESTED-GAMES.txt) · [Release and checksums](https://github.com/RetchERez/ROMancer/releases/tag/v1.0.0)
 
 ## Editors in action
 
@@ -36,6 +36,6 @@ Select a byte and see its ASCII character. Staged edits are underlined and can b
 
 ## Supported systems
 
-NES, SNES, Genesis / Mega Drive, Master System, Game Boy, and Game Boy Color. Structured editors use checked definitions for the selected ROM revision. See the tested games list for the exact edits and playtest routes verified. Visual level editing is coming soon.
+NES, SNES, Genesis / Mega Drive, Master System, Game Boy, and Game Boy Color. The [full ROM catalog](../knowledge/ROM-CATALOG.md) lists every recognized revision with CRC32 and SHA-256. Open **ROM Catalog.html** from the extracted ZIP to search and filter offline. All 1,052 cataloged revisions passed the byte-edit, undo/redo, build, and BPS workflow. Structured editors use checked definitions for the selected revision. The tested games list shows the game-specific edits and playtest routes verified. Visual level editing is coming soon.
 
 [Build and technical documentation](../README.txt) · [MIT license](../LICENSE)

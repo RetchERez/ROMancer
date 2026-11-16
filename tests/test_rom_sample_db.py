@@ -3,6 +3,20 @@ from pathlib import Path
 from romancer.boot_fixtures import make_boot_fixture
 
 class RomSampleDatabaseTests(unittest.TestCase):
+    def test_published_catalog_lists_every_bundled_revision(self):
+        import re
+        from tools.render_rom_catalog import render_html, render_markdown
+
+        db, _ = self.modules()
+        records = db.load_database()['records']
+        expected = [row['sha256'] for row in records]
+        markdown = render_markdown(records)
+        self.assertCountEqual(re.findall(r"`([0-9a-f]{64})`", markdown), expected)
+        self.assertCountEqual(re.findall(r"<code>([0-9a-f]{64})</code>", render_html(records)), expected)
+        public_list = db.DATABASE_PATH.with_name('ROM-CATALOG.md')
+        self.assertEqual(public_list.read_text(encoding='utf-8'), markdown,
+                         'Regenerate the public list when the bundled catalog changes.')
+
     def modules(self):
         from romancer import rom_sample_db,rom_archive_scan
         return rom_sample_db,rom_archive_scan
