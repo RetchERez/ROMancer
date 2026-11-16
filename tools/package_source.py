@@ -80,6 +80,8 @@ APPROVED_FILES = frozenset({
     '.gitattributes',
     '.github/ISSUE_TEMPLATE/bug_report.yml',
     '.github/README.md',
+    '.github/screenshots/sonic-green-hill-palette.png',
+    '.github/screenshots/top-gear-3000-playtest.png',
     '.github/workflows/ci.yml',
     '.gitignore',
     'LICENSE',

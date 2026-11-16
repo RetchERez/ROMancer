@@ -16,6 +16,12 @@ The ZIP includes the runtime, emulator engines, and offline user guide. Try an i
 
 ## Editors in action
 
+### Mega Drive palette editor
+
+Change palette colors and replay the same scene to see their effect. In **Sonic the Hedgehog**, six palette edits turn Green Hill Zone’s grass and palms purple and pink. The saved build reproduced the editor’s gameplay preview pixel for pixel.
+
+![ROMancer comparing the original and recolored Green Hill Zone, with palette swatches and a gameplay difference view](screenshots/sonic-green-hill-palette.png)
+
 ### Graphics & fonts
 
 Assemble tiles and paint the full sprite. Here, Rastan’s first humanoid enemy is being redrawn as a single blob alongside the original.
@@ -33,6 +39,12 @@ Edit dialogue, see how many bytes it needs, and preview a move to reserved space
 Select a byte and see its ASCII character. Staged edits are underlined and can be reviewed before creating a separate build.
 
 ![ROMancer hex editor showing one staged byte, its ASCII preview, and the review controls](../user-guide/screenshots/266-hex-selection-and-staged-edit.png)
+
+### Playtest and save states
+
+Play your ROM or a saved build, capture scenes, and resume from a save state. Here, **Top Gear 3000** has been restored mid-race in the built-in SNES playtest.
+
+![ROMancer Playtest showing a restored Top Gear 3000 race with the save-state controls visible](screenshots/top-gear-3000-playtest.png)
 
 ## Supported systems
 
