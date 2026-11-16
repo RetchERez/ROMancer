@@ -12,7 +12,7 @@ import zipfile
 
 if __package__ in (None,''):sys.path.insert(0,str(Path(__file__).resolve().parents[1]))
 from tools.package_source import APPROVED_FILES,MAX_MEMBER_BYTES,MAX_TOTAL_BYTES
-from tools.install_windows import safe_name
+from tools.install_windows import INSTALL_LAYOUT,safe_name
 
 PUBLIC_FILES={'LICENSE','README.txt','THIRD_PARTY_NOTICES.txt',
               '.gitignore','.gitattributes','.editorconfig','package.json','package-lock.json',
@@ -71,7 +71,7 @@ def audit_windows(path,source,downloads,*,cores=None,observers=None):
     native=observer_files(observers) if observers is not None else {}
     identity={'schema_version':1,'product':'ROMancer','version':ROMANCER_VERSION,
               'release_name':ROMANCER_RELEASE_NAME,'build_label':ROMANCER_BUILD_LABEL,
-              'credit':'By RetchEWretched','platform':'windows-amd64','runtime':PINS,
+              'credit':'By RetchEWretched','platform':'windows-amd64','install_layout':INSTALL_LAYOUT,'runtime':PINS,
               'engines':{'included':bool(engines),'systems':CORE_PINS if engines else {}}}
     if native:identity['observers']={'included':True,'families':['MesenCE 2.2.1 + physical-ppu-access-v2','MAME 0.289'],'source_included':True}
     if (type(manifest) is not dict or set(manifest)!=set(identity)|{'files'}

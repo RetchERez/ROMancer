@@ -19,7 +19,9 @@ def saved_traces(project,row):
 
 class GameplayTraceTools:
     def __init__(self,api):self.api=api
-    def routes(self):return {'traces.capture':('project_id artifact_id name frame_sha256 region offset length',self.capture),'traces.get':('project_id artifact_id trace_id',self.get),'traces.open':('project_id artifact_id trace_id matches',self.open)}
+    def routes(self):return {'traces.capture':('project_id artifact_id name frame_sha256 region offset length',self.capture),
+        'traces.checkpoint':('project_id artifact_id frame_sha256 region',self.checkpoint),
+        'traces.get':('project_id artifact_id trace_id',self.get),'traces.open':('project_id artifact_id trace_id matches',self.open)}
     def capture(self,p,c):
         from .visual_checks import _frame,_crop,_png,_region
         label(p['name'],80)
@@ -36,6 +38,34 @@ class GameplayTraceTools:
         try:report['replay']=self.api.runtime.replay_snapshot(project,frame)
         except (ValueError,KeyError):report['replay']={'status':'UNAVAILABLE','reason':'No acknowledged cold-start replay is available. Load the game again and capture a fresh trace.'}
         report.pop('evidence_id',None)
+        return self._save(p,c,project,row,path,report)
+
+    def checkpoint(self,p,c):
+        from .build_checks import validate_config,DEFAULT
+        from .release_scope import require_supported
+        from .visual_checks import _frame,_crop,_png,_region
+        project,row,path=self.api.source(p);require_supported(row)
+        with self.api.runtime.lock:
+            if self.api.runtime.session_selection(project)!={'id':row['artifact_id'],'sha256':row['sha256']}:
+                raise ValueError('Load this exact ROM or build and pause on the scene you want to test.')
+            frame=self.api.runtime.request(project,'capture',{},cancelled=c)
+            if frame['sha256']!=p['frame_sha256'] or frame['game_sha256']!=row['sha256']:
+                raise ValueError('The scene changed. Pause and capture it again.')
+            replay=self.api.runtime.replay_snapshot(project,frame)
+        if replay['status']!='READY':
+            raise ValueError(replay['reason'])
+        validate_config({**DEFAULT,'steps':replay['steps'],'region':p['region']})
+        width,height,rgb=_frame(frame)
+        region=p['region'] or {'x':0,'y':0,'width':min(256,width),'height':min(256,height)}
+        _region(region,width,height)
+        report={'scope':'gameplay_trace_v1','checkpoint_only':True,'name':f'Scene at frame {frame["index"]}',
+            'artifact_id':row['artifact_id'],'source_sha256':row['sha256'],'matches':[],
+            'frame':{k:frame[k] for k in ('sha256','width','height','index','core_sha256','game_sha256','runtime_identity_sha256')},
+            'source_transfer_observed':False,'region':region,'replay':replay,
+            'crop_png_base64':_png(_crop(rgb,width,region),region['width'],region['height'])}
+        return self._save(p,c,project,row,path,report)
+
+    def _save(self,p,c,project,row,path,report):
         with self.api.operation_locks_guard:lock=self.api.operation_locks.setdefault(p['project_id'],threading.RLock())
         with lock:
             self.api.project(p);projects._measure(path,row,cancelled=c)
@@ -65,5 +95,6 @@ class GameplayTraceTools:
         return result
     def open(self,p,c):
         report=self.get(p,c)
+        if report.get('checkpoint_only'):raise ValueError('A comparison scene has no graphics candidates. Trace a selected sprite to find its source.')
         if not report['runtime_trusted']:raise ValueError('This is historical imported evidence. Capture a fresh local trace before opening candidates for editing.')
         return self.api._graphics_declare({k:p[k] for k in ('project_id','artifact_id','matches')}|{'evidence_id':report['graphics_evidence_id']},c)

@@ -6,7 +6,7 @@ const doc={document_id:'music',songs:[song]};
 const changes=stageNote(doc,[],song.id,1,'note',62);assert.equal(changes[0].value,62);
 assert.deepEqual(sequenceNotes(song,changes).map(n=>[n.tick,n.duration,n.note]),[[0,4,50],[4,8,62]]);
 assert.throws(()=>stageNote(doc,[],song.id,1,'note',128),/range/);assert.throws(()=>stageNote(doc,[],song.id,0,'tempo',50),/range/);
-const html=musicSequenceControls({draft:(id,f)=>f},song,changes);assert.match(html,/music-note-canvas/);assert.match(html,/Transpose song/);assert.match(html,/Preview song &amp; edits/);
+const html=musicSequenceControls({draft:(id,f)=>f},song,changes);assert.match(html,/music-note-canvas/);assert.match(html,/data-number-input="sound-note-value" data-before="50"/);assert.match(html,/Transpose song/);assert.match(html,/Preview song &amp; edits/);
 assert.equal(stageNote(doc,changes,song.id,1,'note',55).length,0);
 assert.throws(()=>restoreSoundChanges(doc,JSON.stringify({document_id:'music',changes:[...changes,...changes]})),/duplicate/);
 const many={...song,events:Array.from({length:257},()=>song.events[0])};let staged=[];for(let i=0;i<256;i++)staged=stageNote({songs:[many]},staged,many.id,i,'note',62);

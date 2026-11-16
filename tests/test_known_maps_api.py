@@ -12,6 +12,63 @@ from tests.test_ffl2_maps import fixture
 
 
 class KnownMapsAPITests(unittest.TestCase):
+    def conditional_source(self):
+        from tests.test_ffl2_maps import xy
+        from romancer.verified_games import PROFILES
+        raw=bytearray(self.original);program=xy(7,1,1)+bytes((0xa2,0x2f))+xy(1,5,5)+b'\2\0'
+        raw[0x20000:0x20000+len(program)]=program
+        raw[0x14e:0x150]=bytes(2);raw[0x14e:0x150]=(sum(raw)&65535).to_bytes(2,'big')
+        path=self.root/'conditional.gb';path.write_bytes(raw)
+        row=projects.register_source(Path(self.project['path']),path,'Game Boy')
+        profile=copy.deepcopy(PROFILES[0]);profile['sha256']=hashlib.sha256(raw).hexdigest()
+        for target,value in [('romancer.verified_games.PROFILES',(profile,)),('romancer.ffl2_maps.ROOT_SHA256',profile['sha256'])]:
+            guard=patch(target,value);guard.start();self.addCleanup(guard.stop)
+        return {**self.params,'artifact_id':row['artifact_id']},path,bytes(raw)
+
+    def test_conditional_terrain_plan_accepts_optional_state_and_keeps_legacy_contract(self):
+        params,path,raw=self.conditional_source()
+        changes=[{'kind':'command','offset':0x20004,'x':6}]
+        plan=self.api.dispatch('games.maps.plan',{**params,'header':0x4800,'changes':changes,'state':{'2':0}})
+        self.assertTrue(plan['ok'],plan);self.assertEqual(plan['checked_state_variants'],2)
+        self.assertFalse(plan['native_verified']);self.assertTrue(plan['requires_native_playtest'])
+        built=self.api.dispatch('build.apply',{'project_id':params['project_id'],'plan_id':plan['plan_id']})
+        self.assertTrue(built['ok'],built)
+        view=self.api.dispatch('games.maps.inspect',{**params,'artifact_id':built['artifact_id'],'header':0x4800,'state':{'2':3}})
+        self.assertEqual(view['map']['cells'][5*64+6],2)
+        self.assertEqual(path.read_bytes(),raw)
+        omitted=self.api.dispatch('games.maps.plan',{**params,'header':0x4800,'changes':changes})
+        self.assertFalse(omitted['ok']);self.assertIn('state',omitted['error'])
+
+    def test_plan_optional_metadata_and_mcp_state_have_the_same_bounded_contract(self):
+        row=next(r for r in self.api.dispatch('system.operations',{})['operations'] if r['name']=='games.maps.plan')
+        self.assertNotIn('state',row['required_parameters']);self.assertEqual(row.get('optional_parameters'),['state'])
+        from romancer.mcp_server import MCPServer
+        writer=MCPServer(self.root/'state-writer',allow_writes=True);self.addCleanup(writer.close)
+        schema=next(t['inputSchema'] for t in writer.tools() if t['name']=='romancer_games_maps_plan')
+        self.assertIn('state',schema['properties']);self.assertNotIn('state',schema['required'])
+        self.assertEqual(schema['properties']['state']['maxProperties'],32)
+        params,_,_=self.conditional_source();base={**params,'header':0x4800,'changes':[{'kind':'command','offset':0x20004,'x':6}]}
+        for state in (True,{'2':16},{'2':True},{'not-a-nibble':0}):
+            with self.subTest(state=state):self.assertFalse(self.api.dispatch('games.maps.plan',{**base,'state':state})['ok'])
+        self.assertFalse(self.api.dispatch('games.maps.plan',{**base,'state':{'2':0},'extra':0})['ok'])
+
+    def test_state_inspection_and_plan_cross_the_real_http_json_boundary(self):
+        import http.client,json,threading
+        from romancer.workbench_server import create_server
+        params,_,_=self.conditional_source();server=create_server(self.api.workspace,0)
+        thread=threading.Thread(target=server.serve_forever,daemon=True);thread.start()
+        try:
+            for operation,extra in [('games.maps.inspect',{}),('games.maps.plan',{'changes':[{'kind':'command','offset':0x20004,'x':6}]})]:
+                connection=http.client.HTTPConnection('127.0.0.1',server.server_port,timeout=20)
+                try:
+                    body=json.dumps({'operation':operation,'parameters':{**params,'header':0x4800,'state':{'2':3},**extra}})
+                    connection.request('POST','/api/call',body,{'Authorization':'Bearer '+server.session_token,'Content-Type':'application/json'})
+                    response=connection.getresponse();data=json.loads(response.read())
+                    self.assertEqual(response.status,200,data);self.assertTrue(data['ok'],data)
+                    self.assertEqual(data.get('map',data)['preview_state'],{'2':3})
+                finally:connection.close()
+        finally:server.shutdown();thread.join(5);server.server_close();server.api.close()
+
     def setUp(self):
         from romancer.verified_games import PROFILES
         self.temp = tempfile.TemporaryDirectory(); self.addCleanup(self.temp.cleanup)
@@ -87,3 +144,12 @@ class KnownChronoRegistryTests(unittest.TestCase):
 
 
 if __name__=='__main__':unittest.main()
+
+
+def setUpModule():
+    # Exercise preserved development internals separately from the release boundary.
+    from unittest import addModuleCleanup
+    from unittest.mock import patch
+    feature = patch("romancer.release_scope.LEVEL_EDITOR_ENABLED", True)
+    feature.start()
+    addModuleCleanup(feature.stop)

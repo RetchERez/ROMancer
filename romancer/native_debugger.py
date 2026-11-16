@@ -84,10 +84,14 @@ def backend_capabilities(system):
 
 
 def portable_settings(system):
-    return {'Version':VERSION,'Debug':{'ScriptWindow':{'AllowIoOsAccess':True,'AllowNetworkAccess':False,'ScriptTimeout':5}},
+    settings={'Version':VERSION,'Debug':{'ScriptWindow':{'AllowIoOsAccess':True,'AllowNetworkAccess':False,'ScriptTimeout':5}},
         'Gameboy':{'Model':5 if system=='gbc' else 4,'Controller':{'Type':40}},
 
         'Nes':{'Port1':{'Type':9}},'Snes':{'Port1':{'Type':1}}}
+    # Lua snapshots create a fresh host video filter. Its default previous
+    # frame is black, so temporal blending halves otherwise correct colors.
+    if system in ('gb','gbc'):settings['Gameboy']['BlendFrames']=False
+    return settings
 
 
 def make_script(system,config,nonce):

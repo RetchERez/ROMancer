@@ -81,16 +81,33 @@ def _identity(profile):
     return digest(value)
 
 
-def load_profile(workspace,system_id):
+def load_profile(workspace,system_id,*,source_sha256=None):
     if system_id not in SYSTEM_IDS:raise ValueError('unknown system')
     path=checked_path(Path(workspace)/'runtime-profiles.json')
     value=load_script_json(path,max_bytes=1024**2) if path.exists() else {'schema_version':1,'profiles':{}}
     if value.get('schema_version')!=1:raise ValueError('unsupported runtime profile version')
     if system_id not in value['profiles']:
         from .bundled_cores import bundled_profile
-        default=bundled_profile(system_id)
+        default=bundled_profile(system_id,source_sha256=source_sha256)
         if default:return default
-    return {'ok':True,'status':'CONFIGURED' if system_id in value['profiles'] else 'NOT_CONFIGURED','profile':value['profiles'].get(system_id),'runtime_verified':False}
+    saved=value['profiles'].get(system_id)
+    if saved and source_sha256 and not saved.get('system_dir'):
+        from .bundled_cores import CORE_PINS,bundled_profile,cartridge_engine
+        default_engine,_=cartridge_engine(system_id)
+        _,compatibility=cartridge_engine(system_id,source_sha256)
+        if compatibility and saved['core_identity']['sha256']==CORE_PINS[default_engine]['sha256']:
+            validate_profile(saved)
+            selected=bundled_profile(system_id,source_sha256=source_sha256)
+            if selected:
+                profile=selected['profile']
+                if profile['core_identity']['sha256']==saved['core_identity']['sha256']:
+                    profile['options']={**profile['options'],**saved['options'],**compatibility}
+                profile['input_map']=saved['input_map']
+                if saved.get('controller_devices'):
+                    profile['controller_devices']=saved['controller_devices']
+                profile['identity']=_identity(profile)
+                return selected
+    return {'ok':True,'status':'CONFIGURED' if saved else 'NOT_CONFIGURED','profile':saved,'runtime_verified':False}
 
 
 def validate_profile(profile):

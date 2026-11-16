@@ -10,6 +10,37 @@ from tests.test_runtime_profiles import fake_core
 
 
 class BundledCoreTests(unittest.TestCase):
+    def test_exact_compatibility_profiles_leave_other_roms_on_their_defaults(self):
+        from romancer.bundled_cores import cartridge_engine
+
+        pilotwings = '03d0127f5de3237e22ad00de0c20763274da7b71142dde693240ac96d10983a3'
+        target_earth = '3fdb9dd4e1c98760ec2c57af08f1c172a9f964a695c3f07e8a28c4eb5819082d'
+        kirby = '6cf412aeb1ec60da1a401019d95dee1e76f0297154a7f06b55fb1657a71ed44f'
+        self.assertEqual(cartridge_engine('snes', pilotwings),
+                         ('snes', {'bsnes_violate_accuracy':'enabled', 'bsnes_chip_hle':'HLE'}))
+        top_gear = '6be49983976564f1fd9eff2f14f5bb41d3a0ff48573e39318088ecce286aca62'
+        self.assertEqual(cartridge_engine('snes', top_gear),
+                         ('snes-dsp4', {'bsnes_violate_accuracy':'enabled', 'bsnes_chip_hle':'HLE'}))
+        self.assertEqual(cartridge_engine('snes', '0'*64), ('snes', {}))
+        self.assertEqual(cartridge_engine('genesis', target_earth), ('genesis', {'blastem_system_type':'gen'}))
+        self.assertEqual(cartridge_engine('gbc', kirby), ('gbc-tilt', {'romancer_mbc7_tilt':'dpad-v1'}))
+        self.assertEqual(cartridge_engine('gbc', '0'*64), ('gb', {}))
+        self.assertEqual(cartridge_engine('gb', kirby), ('gb', {}))
+
+    def test_mbc7_sensor_uses_direction_or_neutral_without_touching_joypad(self):
+        from romancer.libretro_frontend import LibretroFrontend
+
+        frontend = LibretroFrontend.__new__(LibretroFrontend)
+        frontend._joypads = {0: frontend.buttons_to_mask(['right','up','a'])}
+        frontend._accelerometer_enabled = False
+        self.assertEqual(frontend._sensor_input(0, 0), 0.0)
+        self.assertTrue(frontend._set_sensor_state(0, 0, 60))
+        self.assertGreater(frontend._sensor_input(0, 0), 0.0)
+        self.assertLess(frontend._sensor_input(0, 1), 0.0)
+        self.assertEqual(frontend._sensor_input(1, 0), 0.0)
+        frontend._joypads[0] = frontend.buttons_to_mask(['right','left'])
+        self.assertEqual(frontend._sensor_input(0, 0), 0.0)
+        self.assertFalse(frontend._set_sensor_state(0, 4, 60))
     def test_packaged_frontend_refuses_unreviewed_core_before_loading_native_code(self):
         from romancer.bundled_cores import require_reviewed_release_core
         from romancer.libretro_frontend import LibretroFrontend

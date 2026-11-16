@@ -62,6 +62,25 @@ def translate(system_id, address, mapping, bank, source_size):
             if within < 32768 and (not (64 <= selected <= 125 or 192 <= selected <= 255)):
                 raise ValueError('address is outside a declared HiROM ROM window')
             offset = prefix + (selected & 63) * 65536 + within
+    elif system_id == 'genesis' and kind == 'genesis-scattered':
+        fields(mapping,'id segments')
+        if bank is not None or address>=0x400000:raise ValueError('Scattered Genesis mappings use explicit fixed bus windows, not a bank argument.')
+        segments=mapping['segments']
+        if type(segments)is not list or not 1<=len(segments)<=16:raise ValueError('Declare1..16 mapped segments.')
+        physical=[];logical=[];matches=[]
+        for segment in segments:
+            fields(segment,'cpu_start file_offset length')
+            cpu_start=number(segment['cpu_start'],0,0x3fffff)
+            file_start=number(segment['file_offset'],0,source_size-1)
+            length=number(segment['length'],1,source_size)
+            if cpu_start+length>0x400000 or file_start+length>source_size:raise ValueError('Mapped segment exceeds source or bus window.')
+            if any(cpu_start<end and cpu_start+length>start for start,end in logical):raise ValueError('Mapped bus segments overlap.')
+            if any(file_start<end and file_start+length>start for start,end in physical):raise ValueError('Mapped file segments overlap.')
+            physical.append((file_start,file_start+length));logical.append((cpu_start,cpu_start+length))
+            if cpu_start<=address<cpu_start+length:matches.append(file_start+address-cpu_start)
+        if sum(end-start for start,end in physical)!=source_size:raise ValueError('Scattered segments must account for the complete physical source.')
+        if len(matches)!=1:raise ValueError('Address is in an unmapped gap, not stored ROM bytes.')
+        offset=matches[0]
     elif system_id == 'genesis' and kind == 'linear':
         fields(mapping, 'id')
         if bank is not None or address >= 4194304:

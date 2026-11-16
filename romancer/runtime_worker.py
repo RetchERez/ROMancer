@@ -136,6 +136,7 @@ class Workspace:
         self._effective_core_options = {}
         self._system_files = None
         self._content_dependencies = []
+        self._content_view = None
 
     def _check_binding(self, snapshot, *, require_runtime=True):
         if (_hash(snapshot.get('core_sha256')) != self.core_hash
@@ -149,12 +150,13 @@ class Workspace:
         if type(options) is not dict:options=self._effective_core_options
         value={'core_sha256':self.core_hash,'game_sha256':self.game_hash,'core_options':options,
                'system_files':self._system_files,'game_dependencies':self._content_dependencies}
+        if self._content_view is not None:value['content_view']=self._content_view
         devices=getattr(self,'_controller_devices',{})
         if devices:value['controller_devices']=devices
         return hashlib.sha256(json.dumps(value,sort_keys=True,separators=(',',':')).encode('utf-8')).hexdigest()
 
     def _binding(self):
-        return {'core_sha256': self.core_hash, 'game_sha256': self.game_hash,
+        return {**({'content_view':dict(self._content_view)}if self._content_view else {}),'core_sha256': self.core_hash, 'game_sha256': self.game_hash,
                 'run_mode': self.run_mode, 'dependency_coverage': 'measured_system_files_and_declared_content' if self._system_files is not None else 'supplied_paths_only',
                 'runtime_identity_sha256':self._runtime_identity(),
                 'provenance': dict(self.provenance), 'natural_progress_verified': False}
@@ -269,6 +271,13 @@ class Workspace:
         for source, destination, expected_hash in copies:
             remaining -= _snapshot(source, destination, expected_hash, remaining)
         snapshot_core, snapshot_game = copies[0][1], copies[1][1]
+        if not dependencies and game_stat.st_size<=8*1024**2:
+            from .runtime_content import native_view
+            prepared=native_view(snapshot_game.read_bytes())
+            if prepared is not None:
+                image,self._content_view=prepared
+                mapped=session/'mapped-content';mapped.mkdir()
+                snapshot_game=mapped/content_name;_publish(snapshot_game,image)
         save_dir = session / 'working-save'
         save_dir.mkdir()
         if seed is not None:

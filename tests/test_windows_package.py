@@ -30,6 +30,41 @@ class WindowsPackageTests(unittest.TestCase):
             self.assertEqual(json.loads((destination/'active.json').read_text())['version'],'60.0.0')
             for version in ('60.0.0','60.0.1'):self.assertTrue(verify_tree(destination/'versions'/version)['ok'])
 
+    def test_release_can_replace_an_active_legacy_install_with_the_same_public_version(self):
+        require_directory_publication(self)
+        from tools.install_windows import install, rollback, verify_tree
+        with tempfile.TemporaryDirectory() as temp:
+            root = Path(temp)
+            destination = root / 'installed'
+            def prepare(name, content, **metadata):
+                payload = root / name
+                payload.mkdir()
+                launcher = payload / 'Open ROMancer.ps1'
+                launcher.write_bytes(content)
+                manifest = {'schema_version': 1, 'product': 'ROMancer', 'version': '1.0.0',
+                            'files': [{'path': launcher.name, 'size': len(content),
+                                       'sha256': hashlib.sha256(content).hexdigest()}], **metadata}
+                (payload / 'BUNDLE.json').write_text(json.dumps(manifest))
+                return payload
+            legacy = prepare('legacy', b'old prerelease')
+            install(legacy, destination)
+            workspace = destination / 'workspace'
+            workspace.mkdir()
+            (workspace / 'project.txt').write_text('my project')
+            release = prepare('release', b'public release', install_layout='manifest-sha256-v1')
+            install(release, destination)
+            active_path = destination / 'active.json'
+            active = json.loads(active_path.read_bytes())
+            self.assertEqual(active['version'], '1.0.0')
+            self.assertRegex(active['slot'], r'^1[.]0[.]0-[0-9a-f]{16}$')
+            self.assertEqual(verify_tree(destination / 'versions' / active['slot'])['manifest_sha256'],
+                             active['manifest_sha256'])
+            self.assertEqual((destination / 'versions/1.0.0/Open ROMancer.ps1').read_bytes(), b'old prerelease')
+            install(release, destination)
+            rollback(destination)
+            self.assertEqual(json.loads(active_path.read_bytes())['manifest_sha256'], verify_tree(legacy)['manifest_sha256'])
+            self.assertEqual((workspace / 'project.txt').read_text(), 'my project')
+
     def test_runtime_archives_require_exact_pins_and_safe_positive_paths(self):
         from tools.package_windows import runtime_members
         with tempfile.TemporaryDirectory() as folder:

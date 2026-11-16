@@ -22,7 +22,7 @@ MAX_BODY=1024**2
 MAX_UPLOAD=64*1024**2
 UI_ROOT=Path(__file__).parent/'ui'
 GUIDE_ROOT=Path(__file__).resolve().parent.parent/'user-guide'
-GUIDE_VIDEO='ROMancer-v1.0-Walkthrough.mp4'
+GUIDE_VIDEO='ROMancer-v1.0.0-Walkthrough.mp4'
 GUIDE_CAPTIONS='walkthrough.en.vtt'
 
 
@@ -191,7 +191,8 @@ def create_server(workspace:Path,port:int=0):
 
 def serve(workspace:Path,port:int=0,open_browser:bool=True):
     server=create_server(workspace,port);url='http://127.0.0.1:'+str(server.server_port)+'/#token='+server.session_token
-    write_json(Path(workspace)/'connection.json',{'url':url,'pid':os.getpid(),'port':server.server_port})
+    write_json(Path(workspace)/'connection.json',{'url':url,'pid':os.getpid(),'port':server.server_port,
+               'application_root':str(Path(__file__).resolve().parents[1])})
     print(ROMANCER_RELEASE_NAME+' • By RetchEWretched',flush=True)
     print(url,flush=True)
     if open_browser:webbrowser.open(url)

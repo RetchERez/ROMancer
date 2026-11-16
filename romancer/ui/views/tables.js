@@ -83,7 +83,7 @@ export async function render(ctx){const setupReview=useResearchSetup(ctx,'tables
    if(JSON.stringify(collectVisible())!==JSON.stringify(state.pending.changes)){state.pending=null;throw new Error('Table values changed after review. Review the changes again.');}
    const reviewed=state.pending;await ctx.run('build.apply',{...ctx.projectParams(),plan_id:reviewed.plan_id},{render:false});
    if(state.pending!==reviewed||JSON.stringify(collectVisible())!==JSON.stringify(reviewed.changes)){ctx.notify('Build created. Your newer table edits are still staged.');return;}
-   state.pending=null;ctx.setDraft('table-changes','null');resetCells();await ctx.render();ctx.notify('Build created. Choose it in the source/build selector to playtest.');
+   state.pending=null;ctx.setDraft('table-changes','null');resetCells();await ctx.render();ctx.notify('Build saved. Choose Playtest saved build.');
   },
   'table-batch':async()=>{
    if(!model)throw new Error('Load a table definition first.');const current=collectVisible();

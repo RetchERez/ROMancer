@@ -47,7 +47,7 @@ def load_content(folder):
         if chapter['part'] not in ('Basic', 'Advanced'):
             raise ValueError('Every chapter needs a Basic or Advanced part')
         if chapter.get('video'):
-            movie=folder/'ROMancer-v1.0-Walkthrough.mp4';captions=folder/'walkthrough.en.vtt'
+            movie=folder/'ROMancer-v1.0.0-Walkthrough.mp4';captions=folder/'walkthrough.en.vtt'
             if chapter['video'] is not True or not movie.is_file() or not captions.is_file():
                 raise ValueError('The walkthrough needs its approved local video and captions')
             if not 32<=movie.stat().st_size<=16*1024*1024 or captions.stat().st_size>128*1024:
@@ -136,7 +136,7 @@ def build_html(data, folder, pages):
         for row in rows:
             movie=''
             if row.get('video'):
-                movie='<figure class="walkthrough-video"><video controls playsinline preload="none" poster="screenshots/38-sprite-preview.png" aria-label="Original NES workshop editing walkthrough"><source src="ROMancer-v1.0-Walkthrough.mp4" type="video/mp4"><track kind="captions" src="walkthrough.en.vtt" srclang="en" label="English"><p>Open ROMancer-v1.0-Walkthrough.mp4 in a local video player.</p></video><figcaption>Actual application recording with instructional captions and a pointer highlight. <a href="ROMancer-v1.0-Walkthrough.mp4" download>Download MP4</a> · <a href="walkthrough.en.vtt" download>English captions</a>. The steps below are the text alternative.</figcaption></figure>'
+                movie='<figure class="walkthrough-video"><video controls playsinline preload="none" poster="screenshots/38-sprite-preview.png" aria-label="Original NES workshop editing walkthrough"><source src="ROMancer-v1.0.0-Walkthrough.mp4" type="video/mp4"><track kind="captions" src="walkthrough.en.vtt" srclang="en" label="English"><p>Open ROMancer-v1.0.0-Walkthrough.mp4 in a local video player.</p></video><figcaption>Actual application recording with instructional captions and a pointer highlight. <a href="ROMancer-v1.0.0-Walkthrough.mp4" download>Download MP4</a> · <a href="walkthrough.en.vtt" download>English captions</a>. The steps below are the text alternative.</figcaption></figure>'
             steps = ''.join('<li>' + text + '</li>' for text in row['steps'])
             details = ''.join(f'<h3>{esc(block["title"])}</h3><p>{block["text"]}</p>' for block in row.get('details', []))
             result = '<aside><b>Check the result</b><p>' + row['result'] + '</p></aside>'
@@ -159,8 +159,8 @@ def build_html(data, folder, pages):
     terms = ''.join(f'<div class="term" id="{row["id"]}"><dt>{esc(row["term"])}</dt><dd>{row["definition"]}</dd></div>' for row in sorted(data['glossary'], key=lambda row: row['term'].casefold()))
     index = ''.join('<li><strong>' + esc(row['term']) + '</strong>' + ' | '.join(f'<a href="#{topic}">{esc(titles[topic])} <span class="page-ref">(PDF {pages[topic]})</span></a>' for topic in row['topics']) + '</li>' for row in sorted(data['index'], key=lambda row: row['term'].casefold()))
     page = f'''<!doctype html>
-<html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>ROMancer v1.0 User Guide</title><link rel="stylesheet" href="guide.css"><script src="guide.js" defer></script></head>
-<body><a class="skip" href="#contents">Skip to guide contents</a><nav aria-label="Guide contents"><strong>ROMancer v1.0</strong><p>By RetchEWretched</p><a href="#guide-search">Search guide</a><a href="#contents">Contents</a>{''.join(navigation)}<h2>Reference</h2><a href="#glossary">Glossary</a><a href="#index">Alphabetical index</a><a href="guide.pdf">PDF edition</a></nav><main><header id="contents"><p class="eyebrow">OFFLINE USER GUIDE / BASIC + ADVANCED</p><h1>Make a change.<br>Understand it. Test it.</h1><p class="lead">{esc(data['subtitle'])}</p><p>NES / SNES / Genesis / Master System / Game Boy / Game Boy Color</p><p><a class="pill" href="#basic">Start with Basic</a> <a class="pill" href="#advanced">Advanced workflows</a> <a class="pill" href="#glossary">Glossary</a> <a class="pill" href="#index">Index</a></p><p>{esc(data['scope'])}</p><section id="guide-search" aria-labelledby="guide-search-title"><h2 id="guide-search-title">Find help</h2><form id="guide-search-form"><label for="guide-query">Search topics, tools or terms</label><div class="guide-search-controls"><input id="guide-query" type="search" maxlength="200" placeholder="Try palette, save states or undo" autocomplete="off"><button type="submit">Search</button><button type="button" id="guide-search-clear">Clear</button></div></form><p class="note">Works offline. For an exact phrase on this page, use your browser’s Find command.</p><p id="guide-search-status" role="status" aria-live="polite"></p><ol id="guide-results"></ol><noscript><p>Enable JavaScript for topic search, or use the contents, glossary and index below.</p></noscript></section><div class="toc-grid">{''.join(toc)}</div><p><a href="#glossary">Glossary</a> (PDF {pages['glossary']}) | <a href="#index">Alphabetical index</a> (PDF {pages['index']}) | <a href="guide.pdf">Download PDF</a></p></header>{''.join(sections)}<section class="chapter" id="glossary"><p class="eyebrow">REFERENCE / A-Z</p><h2>Glossary</h2><dl class="terms">{terms}</dl><a class="back" href="#contents">Back to contents</a></section><section class="chapter" id="index"><p class="eyebrow">REFERENCE / FIND A TOPIC</p><h2>Alphabetical index</h2><p>Links open the relevant topic. Page numbers refer to the bundled PDF edition.</p><ul class="index-list">{index}</ul><a class="back" href="#contents">Back to contents</a></section><footer>{esc(data['attribution'])}</footer></main></body></html>
+<html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>{esc(data['product'])} User Guide</title><link rel="stylesheet" href="guide.css"><script src="guide.js" defer></script></head>
+<body><a class="skip" href="#contents">Skip to guide contents</a><nav aria-label="Guide contents"><strong>{esc(data['product'])}</strong><p>By RetchEWretched</p><a href="#guide-search">Search guide</a><a href="#contents">Contents</a>{''.join(navigation)}<h2>Reference</h2><a href="#glossary">Glossary</a><a href="#index">Alphabetical index</a><a href="guide.pdf">PDF edition</a></nav><main><header id="contents"><p class="eyebrow">OFFLINE USER GUIDE / BASIC + ADVANCED</p><h1>Make a change.<br>Understand it. Test it.</h1><p class="lead">{esc(data['subtitle'])}</p><p>NES / SNES / Genesis / Master System / Game Boy / Game Boy Color</p><p><a class="pill" href="#basic">Start with Basic</a> <a class="pill" href="#advanced">Advanced workflows</a> <a class="pill" href="#glossary">Glossary</a> <a class="pill" href="#index">Index</a></p><p>{esc(data['scope'])}</p><section id="guide-search" aria-labelledby="guide-search-title"><h2 id="guide-search-title">Find help</h2><form id="guide-search-form"><label for="guide-query">Search topics, tools or terms</label><div class="guide-search-controls"><input id="guide-query" type="search" maxlength="200" placeholder="Try palette, save states or undo" autocomplete="off"><button type="submit">Search</button><button type="button" id="guide-search-clear">Clear</button></div></form><p class="note">Works offline. For an exact phrase on this page, use your browser’s Find command.</p><p id="guide-search-status" role="status" aria-live="polite"></p><ol id="guide-results"></ol><noscript><p>Enable JavaScript for topic search, or use the contents, glossary and index below.</p></noscript></section><div class="toc-grid">{''.join(toc)}</div><p><a href="#glossary">Glossary</a> (PDF {pages['glossary']}) | <a href="#index">Alphabetical index</a> (PDF {pages['index']}) | <a href="guide.pdf">Download PDF</a></p></header>{''.join(sections)}<section class="chapter" id="glossary"><p class="eyebrow">REFERENCE / A-Z</p><h2>Glossary</h2><dl class="terms">{terms}</dl><a class="back" href="#contents">Back to contents</a></section><section class="chapter" id="index"><p class="eyebrow">REFERENCE / FIND A TOPIC</p><h2>Alphabetical index</h2><p>Links open the relevant topic. Page numbers refer to the bundled PDF edition.</p><ul class="index-list">{index}</ul><a class="back" href="#contents">Back to contents</a></section><footer>{esc(data['attribution'])}</footer></main></body></html>
 '''
     ids = re.findall(r'\bid="([^"]+)"', page)
     if len(ids) != len(set(ids)):
@@ -185,7 +185,7 @@ def build_pdf(data, folder, pages, glossary_groups, index_groups):
     width, height = 1440, 1080
     ink, muted, accent, paper, line = '#143038', '#526b72', '#14705e', '#f4f8f6', '#cfddda'
     pdf = canvas.Canvas(str(folder / 'guide.pdf'), pagesize=(width, height), invariant=1, pageCompression=1)
-    pdf.setTitle('ROMancer v1.0 User Guide - Basic and Advanced')
+    pdf.setTitle(data['product'] + ' User Guide - Basic and Advanced')
     pdf.setAuthor('By RetchEWretched')
     pdf.setSubject('Offline procedures, actual interface examples, glossary and alphabetical index')
     body = ParagraphStyle('body', fontName='Helvetica', fontSize=18, leading=26, textColor=HexColor(ink))
@@ -216,7 +216,7 @@ def build_pdf(data, folder, pages, glossary_groups, index_groups):
         label(kicker.upper(), 102, height - 55, 13, accent, True)
         title_bottom = para(html.escape(title), 48, height - 86, width - 96, 36)
         pdf.setStrokeColor(HexColor(line)); pdf.line(48, 60, width - 48, 60)
-        label('ROMancer v1.0 / By RetchEWretched', 48, 35, 12)
+        label(data['product'] + ' / By RetchEWretched', 48, 35, 12)
         pdf.linkRect('', 'contents', (width - 240, 23, width - 103, 51), relative=0, thickness=0)
         label('Back to contents', width - 240, 35, 12, accent)
         label(str(pdf.getPageNumber()), width - 74, 35, 12, ink, True)
@@ -226,7 +226,7 @@ def build_pdf(data, folder, pages, glossary_groups, index_groups):
         stats.append({'page': pdf.getPageNumber(), 'kind': kind})
         pdf.showPage()
 
-    y = frame('ROMancer v1.0', 'User guide / Basic + Advanced', 'cover')
+    y = frame(data['product'], 'User guide / Basic + Advanced', 'cover')
     y = para('Make a change.<br/>Understand it. Test it.', 48, y - 45, 1170, 68)
     y = para(html.escape(data['subtitle']), 52, y - 42, 1120, 27)
     y = para('NES / SNES / Genesis / Master System / Game Boy / Game Boy Color', 52, y - 38, 1160, 20, accent)

@@ -40,3 +40,14 @@ assert.deepEqual(restoreCalls,['runtime.load_state','runtime.advance','runtime.c
 console.log('Save/load controls stay visible and loading refreshes a real paused frame.');
 const otherSetup={...ready,state:{...ready.state,runtime:{session_dir:'loaded',game_sha256:sha,core_sha256:core,loaded:{runtime_identity_sha256:'actual-setup'}}}};
 assert.doesNotMatch(await render(otherSetup),/value="matching"/,'actual nested runtime load identity must hide states from different setup/BIOS');
+
+const sceneActions={},sceneCalls=[];
+const sceneCtx={...running,state:{...running.state,page:'playtest',frame:{sha256:'frame',index:40}},
+ use:handlers=>Object.assign(sceneActions,handlers),notify(){},render:async()=>{},
+ run:async(op,p)=>{sceneCalls.push([op,p]);return {frame:{index:40},trace_id:'capture'};}};
+assert.match(await render(sceneCtx),/Save comparison scene/);
+await sceneActions['runtime-save-scene']();
+assert.deepEqual(sceneCalls[0],['traces.checkpoint',{project_id:'p',artifact_id:'a',frame_sha256:'frame',region:null}]);
+assert.match(await render(sceneCtx),/Comparison saved at frame 40/);
+sceneCtx.state.playing=true;
+await assert.rejects(sceneActions['runtime-save-scene'](),/pause/i);

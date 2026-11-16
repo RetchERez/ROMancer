@@ -14,6 +14,29 @@ PROFILES=({'id': 'rastan-sms', 'name': 'Rastan', 'system': 'sms', 'size': 262144
 BYTE_NOTES={'rastan-sms': [{'storage': '60 literal 8×8 row-planar 4bpp tiles, 32 bytes each', 'meaning': 'The first humanoid enemy graphics occupy this checked range. An observed pose joins tiles 30,32,31,33,52,54,53,55 as two columns and four rows. Palette bytes, collision and AI are not in this definition.', 'example': 'Open first enemy sprites to edit the assembled pose. Stored color indices are shown in labeled grayscale until a palette is declared.', 'evidence': 'ROMancer native original/build frame comparison at frame841 changed only enemy pixels in the measured opening scene. The guide retains the source/build hashes and actual editor captures.'}], 'ffl2-usa': [{'storage': 'Three-byte packed point command', 'meaning': 'Places tile1D (stool) in map0265. 17 CE encodes (14,31); 18 0E encodes (14,32). Exit, story window and collision values are preserved.', 'example': '17 CE 1D to 18 0E 1D.', 'evidence': 'Original room header486B, map0265 and tileset0B were observed in native WRAM. Each edited build needs its own playtest.'}], 'dejavu-casebooks-usa': [{'storage': 'Four little-endian RGB555 colors', 'meaning': 'Startup palette7 used by the casebook interface. This is stored color data.', 'example': 'Original or parchment interface palette.', 'evidence': 'The 64-byte native target palette matches the original startup and first-scene ROM blocks.'}, {'storage': 'Four little-endian RGB555 colors', 'meaning': 'First Case Book 1 scene palette7. Updated with the startup copy; later scene palettes remain unchanged.', 'example': 'Original or parchment interface palette.', 'evidence': 'Scene loading replaces all64 colors, so both observed copies are changed together.'}], 'castlevania-usa': [{'storage': 'Unsigned 8-bit counter', 'meaning': 'Initialization counter includes the current life. Spare lives = stored value minus 1. Both initialization constants must agree.', 'example': '04 = 3 spare lives; 0A = 9 spare lives.', 'evidence': 'Native HUD changed from P-03 to P-09 after a new start.'}, {'storage': 'Unsigned 8-bit counter', 'meaning': 'Second guarded initialization constant for the same life counter. Keep it equal to 0x1C836.', 'example': '04 to 0A in both locations.', 'evidence': 'Both code locations were checked against the exact original and tested together.'}], 'chrono-trigger-usa': [{'storage': 'Unsigned 8-bit weapon power', 'meaning': 'Wood Sword base weapon power. This is an input to the game formula, not the final displayed attack stat.', 'example': '03 = power 3; 1E = power 30.', 'evidence': "The tested build changed displayed attack from 8 to 23 on Crono's equipment screen."}], 'immortal-ue': [{'storage': 'Fixed 9-byte ASCII text slot', 'meaning': 'New-game prompt. Shorter text is padded with spaces. The following % delimiter at 0x4E24 is preserved.', 'example': 'New game? to New hack?; neither text changes the slot length.', 'evidence': 'The changed prompt was visible after native boot with the required integrity adjustment.'}, {'storage': '68000 opcode word, 2-byte patch', 'meaning': 'Game-specific ROM check adjustment: replace the guarded instruction start with RTS (4E 75). The named plan also repairs the standard Genesis checksum.', 'example': '0C 80 to 4E 75 at this exact guarded revision.', 'evidence': 'Standard header checksum repair alone produced a black screen; the explicit adjustment allowed the tested menu edit to boot.'}]}
 
 
+POKEMON_REFERENCE = 'https://github.com/pret/pokered/blob/171e2c204f9c1ff8e577ca387a4bbb009e130843/constants/pokemon_data_constants.asm'
+POKEMON_TABLE = 0x383de
+POKEMON_COUNT = 150
+POKEMON_STRIDE = 28
+POKEMON_PROFILES = {
+    'pokemon-red-ue': ('Pokémon Red', '5ca7ba01642a3b27b0cc0b5349b52792795b62d3ed977e98a09390659af96b7b'),
+    'pokemon-blue-ue': ('Pokémon Blue', '2a951313c2640e8c2cb21f25d1db019ae6245d9c7121f754fa61afd7bee6452d'),
+}
+PROFILES += tuple({
+    'id': identifier, 'name': title, 'system': 'gb', 'size': 1048576, 'sha256': digest,
+    'reference': POKEMON_REFERENCE,
+    'scope': '150 named base-stat records. Five base stats, catch rate and experience yield are editable. Species IDs, types, sprites, moves and Mew are outside this table editor.',
+    'offsets': [(POKEMON_TABLE + 1, 1, 'Bulbasaur base HP')],
+} for identifier, (title, digest) in POKEMON_PROFILES.items())
+for _identifier in POKEMON_PROFILES:
+    BYTE_NOTES[_identifier] = [{
+        'storage': 'Unsigned 8-bit base HP',
+        'meaning': 'Bulbasaur base HP. The game combines it with level and individual modifiers to calculate the displayed HP.',
+        'example': '2D = base HP 45; 64 = base HP 100.',
+        'evidence': 'The exact Red and Blue originals contain the same 28-byte record spacing and sequential species IDs for the 150 entries.',
+    }]
+
+
 def _resolve(project,row,cancelled):
     current=row;seen=set()
     for _ in range(64):
@@ -37,6 +60,10 @@ def _read(path,offset,length):
 
 def _model(profile,root,path):
     identifier=profile['id']
+    if identifier in POKEMON_PROFILES:
+        table = _pokemon_table(path)
+        return [{'id':'bulbasaur_hp', 'label':'Bulbasaur base HP', 'type':'integer',
+                 'min':1, 'max':255, 'value':table[1]}]
     if identifier=='rastan-sms':return []
     if identifier=='ffl2-usa':
         from .verified_room import room_visual
@@ -81,7 +108,30 @@ def palette_visuals(profile,root,path):
     return {'kind':'rgb555-palettes','palettes':rows,'scope':'Literal stored colors; native scene rendering is not predicted.'}
 
 
+def _pokemon_table(path):
+    table = _read(path, POKEMON_TABLE, POKEMON_COUNT * POKEMON_STRIDE)
+    if table[::POKEMON_STRIDE] != bytes(range(1, POKEMON_COUNT + 1)):
+        raise ValueError('Base-stat species IDs differ. Inspect this build before reusing the layout.')
+    return table
+
+
 def resource_definitions(profile):
+    if profile['id'] in POKEMON_PROFILES:
+        from .documented_names import SPECIES_NAMES
+        columns = (('Base HP', 1), ('Attack', 2), ('Defense', 3), ('Speed', 4), ('Special', 5),
+                   ('Catch rate', 8), ('Experience yield', 9))
+        return [{
+            'id': 'species-base-stats', 'name': 'Species base stats', 'kind': 'tables',
+            'reference': POKEMON_REFERENCE, 'scope': profile['scope'],
+            'definition': {
+                'schema_version': 1, 'name': 'Species base stats', 'offset': POKEMON_TABLE,
+                'count': POKEMON_COUNT, 'stride': POKEMON_STRIDE, 'row_id_base': 1,
+                'row_names': list(SPECIES_NAMES[:POKEMON_COUNT]),
+                'fields': [{'name': name, 'offset': offset, 'type': 'u8', 'endian': 'little',
+                            'pointer_base': None, 'minimum': int(offset <= 5), 'maximum': 255}
+                           for name, offset in columns],
+            },
+        }]
     if profile['id']=='rastan-sms':return [{'id':'first-enemy-sprites','name':'first enemy sprites','kind':'assets',
         'reference':profile['reference'],'scope':profile['scope'],
         'config':{'system_id':'sms','offset':0x10000,'count':60,'codec':'tile8-rowplanar4-msb-v1','width':8,'height':8},
@@ -108,7 +158,7 @@ def maps(api,parameters,operation,*,cancelled=lambda:False):
     elif operation=='inspect':
         result=ffl2_maps.inspect_room(path,root['path'],parameters['header'],state=parameters['state'],cancelled=cancelled)
     else:
-        result=ffl2_maps.plan_edits(path,root['path'],parameters['header'],parameters['changes'],cancelled=cancelled)
+        result=ffl2_maps.plan_edits(path,root['path'],parameters['header'],parameters['changes'],state=parameters.get('state'),cancelled=cancelled)
         planned=api._integrity_plan({'project_id':parameters['project_id'],'artifact_id':row['artifact_id'],
                                      'edits':result['edits']},cancelled)
         result={**result,**planned}
@@ -121,6 +171,8 @@ def configure_resource(api,parameters,*,cancelled=lambda:False):
     if profile is None:raise ValueError('no verified resource definitions for this exact source revision')
     resource=next((r for r in resource_definitions(profile) if r['id']==parameters['resource_id']),None)
     if resource is None:raise ValueError('unknown verified resource definition')
+    if profile['id'] in POKEMON_PROFILES:
+        _pokemon_table(path)
     if resource.get('kind')=='assets':
         result=api._declare_resource({'project_id':parameters['project_id'],'artifact_id':row['artifact_id'],'config':resource['config']},cancelled,'assets')
         return {**result,'resource_kind':'assets','sprite_layout':resource['sprite_layout'],'reference':resource['reference'],'definition_scope':resource['scope']}
@@ -163,7 +215,9 @@ def plan(api,parameters,*,cancelled=lambda:False):
         if before!=after:edits.append({'offset':offset,'before':before.hex(),'after':after.hex()})
     identifier=profile['id'];field=model[0];value=values[field['id']]
     if field['type']=='integer':number(value,field['min'],field['max'])
-    if identifier=='ffl2-usa':
+    if identifier in POKEMON_PROFILES:
+        edit(POKEMON_TABLE + 1, bytes([value]));name=f'Bulbasaur base HP {value}'
+    elif identifier=='ffl2-usa':
         from .verified_room import encode_move
         edit(0x20375,encode_move(path,root['path'],value));name='Bedroom stool - '+value
     elif identifier=='dejavu-casebooks-usa':

@@ -33,6 +33,6 @@ console.log('Saving, failure/retry, pending-close protection and exact source/bu
 
 const mapState={project:{project_id:'p'},artifact:{artifact_id:'a',sha256:'sha'},drafts:{},results:{}};
 mapState.drafts['p:a:levels:game-map-changes']=JSON.stringify({source_sha256:'sha',changes_by_header:{18539:[{kind:'npc',offset:80,x:15}]}});
-assert.equal(hasStagedChanges(mapState),true,'Restored map drafts still need a separate build.');
+assert.equal(hasStagedChanges(mapState),false,'Archived map drafts do not activate the disabled editor.');
 mapState.drafts['p:a:levels:game-map-changes']=JSON.stringify({source_sha256:'other',changes_by_header:{18539:[{kind:'npc',offset:80,x:15}]}});
 assert.equal(hasStagedChanges(mapState),false,'Stale map drafts do not belong to the current source.');

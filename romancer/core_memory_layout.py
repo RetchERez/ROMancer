@@ -9,8 +9,12 @@ from .core_pins import CORE_PINS
 
 
 def memory_probe(system, snapshot, offset, width):
-    pin = CORE_PINS.get('gb' if system == 'gbc' else 'genesis' if system == 'sms' else system)
-    if pin is None or snapshot.get('core_sha256') != pin['sha256'] or snapshot.get('region') != 2:
+    engine = 'gb' if system == 'gbc' else 'genesis' if system == 'sms' else system
+    core_sha256 = snapshot.get('core_sha256')
+    if system == 'snes' and core_sha256 == CORE_PINS['snes-dsp4']['sha256']:
+        engine = 'snes-dsp4'
+    pin = CORE_PINS.get(engine)
+    if pin is None or core_sha256 != pin['sha256'] or snapshot.get('region') != 2:
         raise ValueError('This core buffer layout is not verified; use an observed CPU address instead.')
     size = snapshot.get('region_size')
     number(width, 1, 4)

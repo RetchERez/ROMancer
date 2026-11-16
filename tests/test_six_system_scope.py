@@ -20,9 +20,11 @@ class SixSystemScopeTests(unittest.TestCase):
         self.assertEqual(set(SYSTEMS),self.systems)
         self.assertEqual({p['id'] for p in system_inventory()['systems']},self.systems)
         self.assertEqual(set(ADAPTER_IDS),self.systems)
-        # GB Color and Master System share the reviewed GB and Genesis engines.
-        self.assertEqual(set(CORE_PINS),{'nes','snes','genesis','gb'})
+        # The alternate DSP-4 binary is a checked SNES profile, within the same six systems.
+        self.assertEqual(set(CORE_PINS),{'nes','snes','snes-dsp4','genesis','gb','gbc-tilt'})
+        self.assertIn(CORE_PINS['snes-dsp4']['file'],CORE_FILES)
         self.assertNotIn('mgba_libretro.dll',CORE_FILES)
+        self.assertIn('mgba_gbc_libretro.dll',CORE_FILES)
 
     def test_excluded_saved_identity_is_not_a_supported_system(self):
         with self.assertRaises(ValueError):get_system('gba')

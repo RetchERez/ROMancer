@@ -7,14 +7,13 @@ import shutil
 from pathlib import Path
 from typing import Any
 
+from . import ROMANCER_VERSION
 from .diffing import byte_diff
 from .ips import create_ips
 from .rom_ident import identify_rom
 from .trace_parser import parse_trace
 from .workflow import correlate_trace, resolve_pc
 from .util import read_bytes, sha1, sha256, crc32_hex, write_json, read_json, parse_int
-
-ROMANCER_VERSION = "31.0.0"
 
 
 def _hex_bytes(s: str) -> bytes:

@@ -72,10 +72,35 @@ def _verify_cached(root,stamp):
     return True
 
 
-def bundled_profile(system_id):
+TOP_GEAR_3000_DSP4_SHA256 = '6be49983976564f1fd9eff2f14f5bb41d3a0ff48573e39318088ecce286aca62'
+
+SNES_CHIP_CARTRIDGES = frozenset({
+    '03d0127f5de3237e22ad00de0c20763274da7b71142dde693240ac96d10983a3',
+    '2ada8919688087be60a6a48cace8f877add60c45d2e5d09e2442faa55be62a49',
+    '65b03268afac296330e8ff8d60dd0825879e13ed658b37713c034a3bd074f1d7',
+    'f3246755f608a1e1dc9c848b61da3b824c7853b29b3be40df6fc7f2793a887ed',
+})
+
+
+def cartridge_engine(system_id, source_sha256=None):
+    """Select checked compatibility settings for specific cartridge revisions."""
+    if system_id == 'snes' and source_sha256 == TOP_GEAR_3000_DSP4_SHA256:
+        return 'snes-dsp4', {'bsnes_violate_accuracy': 'enabled', 'bsnes_chip_hle': 'HLE'}
+    if system_id == 'snes' and source_sha256 in SNES_CHIP_CARTRIDGES:
+        # Mercury ignores its HLE option unless the accuracy gate is enabled.
+        return 'snes', {'bsnes_violate_accuracy': 'enabled', 'bsnes_chip_hle': 'HLE'}
+    if system_id == 'genesis' and source_sha256 == '3fdb9dd4e1c98760ec2c57af08f1c172a9f964a695c3f07e8a28c4eb5819082d':
+        # Target Earth has a leading space in the system field.
+        return 'genesis', {'blastem_system_type': 'gen'}
+    if system_id == 'gbc' and source_sha256 == '6cf412aeb1ec60da1a401019d95dee1e76f0297154a7f06b55fb1657a71ed44f':
+        return 'gbc-tilt', {'romancer_mbc7_tilt': 'dpad-v1'}
+    return {'gbc': 'gb', 'sms': 'genesis'}.get(system_id, system_id), {}
+
+
+def bundled_profile(system_id, *, source_sha256=None):
     root=pack_root()
     if not host_supported() or not root.exists():return None
-    engine_id='gb' if system_id=='gbc' else 'genesis' if system_id=='sms' else system_id
+    engine_id, compatibility = cartridge_engine(system_id, source_sha256)
     if engine_id not in CORE_PINS:return None
     stamp=_fingerprint(root);_verify_cached(str(root),stamp)
     pin=CORE_PINS[engine_id]
@@ -83,9 +108,9 @@ def bundled_profile(system_id):
     binary=_binary(root/pin['file'])
     if binary['sha256']!=pin['sha256']:raise ValueError('bundled engine identity differs; reinstall this version')
     profile={'schema_version':1,'system_id':system_id,'core':str(root/pin['file']),
-             'core_identity':binary,'options':dict(pin['options']),'system_dir':None,
+             'core_identity':binary,'options':{**pin['options'], **compatibility},'system_dir':None,
              'system_files':[],'input_map':dict(DEFAULT_KEYS)}
     if system_id=='sms':profile['options'].update({'blastem_system_type':'sms','blastem_io_1':'gamepad2.1','blastem_io_2':'gamepad2.2'})
-    if system_id=='gbc':profile['options']['gambatte_gb_hwmode']='GBC'
+    if system_id=='gbc' and engine_id=='gb':profile['options']['gambatte_gb_hwmode']='GBC'
     profile['identity']=_identity(profile)
     return {'ok':True,'status':'BUNDLED','profile':profile,'engine':pin['name'],'runtime_verified':False}

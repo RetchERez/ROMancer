@@ -25,8 +25,23 @@ function setup(){const actions={},drafts=new Map(),elements=new Map([['asset-sch
 }
 {
  const t=setup();hexEditor(t.ctx,{artifact_id:'a',sha256:'s',offset:0,length:4,hex:'01020304',text:'....'});t.state.hexDraft.set(0,'05');
- const signature=JSON.stringify(t.state.hexDraft.edits(t.state));t.state.hexReview={scope:'p:a:s',signature,plan:{plan_id:'plan'}};
+ const signature=JSON.stringify(t.state.hexDraft.edits(t.state));t.state.hexReview={scope:'p:a:s',signature,checksumPolicy:'maintain',plan:{plan_id:'plan'}};
  const building=t.actions['hex-apply']();t.state.hexDraft.set(1,'06');t.state.hexReview=null;t.finish({ok:true,artifact_id:'new'});await building;
  assert.equal(t.state.hexDraft?.changes.get(1),'06','hex publishing preserves later edits');assert.equal(t.state.switched,undefined);
+}
+{
+ const t=setup(),visited=[];
+ t.state.navigationRevision=1;
+ t.ctx.setArtifact=async id=>{
+  t.state.artifact={artifact_id:id,sha256:'build'};
+  t.state.page='gameview';
+  t.state.navigationRevision++;
+ };
+ t.ctx.navigate=async page=>visited.push(page);
+ hexEditor(t.ctx,{artifact_id:'a',sha256:'s',offset:0,length:4,hex:'01020304'});
+ t.state.hexDraft.set(0,'05');
+ t.state.hexReview={scope:'p:a:s',signature:JSON.stringify(t.state.hexDraft.edits(t.state)),checksumPolicy:'maintain',plan:{plan_id:'plan'}};
+ const building=t.actions['hex-apply']();t.finish({ok:true,artifact_id:'new'});await building;
+ assert.deepEqual(visited,[],'Hex build completion must preserve newer Check my hack navigation.');
 }
 console.log('Publishing assets, tables and hex builds preserves edits made while the operation was running.');

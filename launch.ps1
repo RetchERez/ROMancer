@@ -49,7 +49,7 @@ if (Test-Path -LiteralPath $romancerConnection) {
     try {
         $romancerExisting = Get-Content -LiteralPath $romancerConnection -Raw | ConvertFrom-Json
         $romancerExistingUrl = [uri]$romancerExisting.url
-        if ($romancerExistingUrl.Host -eq '127.0.0.1' -and $romancerExistingUrl.Scheme -eq 'http') {
+        if ($romancerExisting.application_root -ieq $romancerRoot -and $romancerExistingUrl.Host -eq '127.0.0.1' -and $romancerExistingUrl.Scheme -eq 'http') {
             $romancerExistingToken = $romancerExistingUrl.Fragment.Replace('#token=','')
             $romancerResponse = Invoke-RestMethod -Uri ($romancerExistingUrl.GetLeftPart('Authority') + '/api/call') -Method Post -ContentType 'application/json' -Headers @{Authorization=('Bearer ' + $romancerExistingToken)} -Body '{"operation":"system.capabilities","parameters":{}}' -TimeoutSec 2
             if ($romancerResponse.ok -and $romancerResponse.product -eq 'ROMancer' -and $romancerResponse.version -eq $romancerProductVersion) {

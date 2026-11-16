@@ -54,10 +54,44 @@ class BuildCheckTests(unittest.TestCase):
         with patch.object(api,'_profile_load_config',return_value=cfg),patch('romancer.build_checks.run_sample',return_value=sample) as run:
             result=api.dispatch('checks.from_trace',args)
         self.assertTrue(result['ok'],result);self.assertEqual(result['trace_id'],trace['evidence_id']);self.assertEqual(run.call_args.args[3],[{'frames':10,'buttons':['a'],'port':0}])
-        other=api.dispatch('project.demo_system',{'system_id':'nes'})
+        rules=[{'name':'Held value','region':2,'offset':0,'length':1,'endian':'little','mode':'same','original':None,'build':None}]
+        with patch.object(api,'_profile_load_config',return_value=cfg),patch('romancer.build_checks.run_sample',return_value={**sample,'values':[1]}):
+            checked=api.dispatch('checks.from_trace',{**args,'expectations':rules})
+        self.assertTrue(checked['gameplay_verified'],checked)
+        self.assertTrue(checked['replay_verified'],checked)
+        saved=api.dispatch('discoveries.save',{**sp,'evidence_id':checked['evidence_id'],'kind':'byte','name':'Test byte','offset':4096,'resource':None})
+        self.assertEqual(saved['status'],'REPLAY_CHECKED',saved)
+        opened=api.dispatch('discoveries.open',{**sp,'discovery_id':saved['discovery_id']})
+        self.assertEqual(opened['inspection']['rows'][0]['cells'][0]['value'],raw[4096])
+        wrong=api.dispatch('discoveries.save',{**sp,'evidence_id':checked['evidence_id'],'kind':'byte','name':'Unused','offset':4098,'resource':None})
+        self.assertFalse(wrong['ok'])
+        forged={**opened['document'],'source_sha256':'0'*64}
+        self.assertFalse(api.dispatch('discoveries.import',{**sp,'document':forged})['ok'])
+        again=api.dispatch('discoveries.import',{**sp,'document':opened['document']})
+        self.assertEqual(again['status'],'REPLAY_CHECKED')
+        release=api.dispatch('release.proof',{**args,'evidence_id':checked['evidence_id'],'title':'Replay','description':'', 'screenshots':False})
+        self.assertFalse(release['ok'])  # Extra parameters must not enter the public serializer.
+        release=api.dispatch('release.proof',{'project_id':sp['project_id'],'source_id':source['artifact_id'],'target_id':target['artifact_id'],
+            'evidence_id':checked['evidence_id'],'title':'Replay','description':'','screenshots':False})
+        self.assertTrue(release['ok'],release)
+        self.assertEqual(release['proof']['observed_values'],[[1],[1]])
         with patch.object(api,'_profile_load_config',return_value=cfg):
             rejected=api.dispatch('checks.from_trace',{**args,'target_id':source['artifact_id']})
         self.assertFalse(rejected['ok'])
         with patch.object(api,'_profile_load_config',return_value={**cfg,'core_options':{'changed':'yes'}}):
             rejected=api.dispatch('checks.from_trace',args)
         self.assertFalse(rejected['ok']);self.assertRegex(rejected['error'],'context|setup')
+
+    def test_gameplay_values_distinguish_expected_delta_unchanged_and_unstable_repeats(self):
+        from romancer.build_checks import evaluate_expectations, validate_expectations
+
+        rules = validate_expectations([
+            {'name':'Distance','region':2,'offset':1,'length':1,'endian':'little','mode':'delta','original':24,'build':48},
+            {'name':'Health','region':2,'offset':8,'length':1,'endian':'little','mode':'same','original':None,'build':None},
+        ])
+        self.assertEqual(evaluate_expectations(rules,[[24,5],[24,5],[48,5]])['status'],'PASS')
+        self.assertEqual(evaluate_expectations(rules,[[24,5],[24,5],[47,5]])['status'],'FAIL')
+        self.assertEqual(evaluate_expectations(rules,[[24,5],[23,5],[48,5]])['status'],'INCONCLUSIVE')
+        self.assertEqual(evaluate_expectations(rules,[[24,5],[24,5],[48,4]])['status'],'FAIL')
+        with self.assertRaises(ValueError):
+            validate_expectations([{**rules[0],'length':3}])

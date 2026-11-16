@@ -1,5 +1,7 @@
 """Editing readiness from checked definitions for the exact selected revision."""
 from .research_tools import _definition
+from .discoveries import discovery_summaries
+from .catalog_playtest import lookup as playtest_lookup
 AREAS={'assets':('Graphics','assets'),'script':('Text & dialogue','scripts'),'tables':('Numbers & stats','tables'),'levels':('Levels & objects','levels'),'sound':('Music & sound','sound')}
 class EditingReadinessTools:
 
@@ -12,7 +14,10 @@ class EditingReadinessTools:
     def readiness(self, p, c):
         project, row, path = self.api.source(p)
         areas = []
+        from .release_scope import LEVEL_EDITOR_ENABLED
         for kind, (title, page) in AREAS.items():
+            if kind == 'levels' and not LEVEL_EDITOR_ENABLED:
+                continue
             if c():
                 raise KeyboardInterrupt
             status = 'needs_investigation'
@@ -47,4 +52,9 @@ class EditingReadinessTools:
                     reason = 'Saved definition cannot be used: ' + str(error)[:200]
                     action = 'Repair or replace the definition'
             areas.append({'kind': kind, 'title': title, 'page': page, 'status': status, 'reason': reason, 'action': action, 'scope': scope})
-        return {'ok': True, 'artifact_id': row['artifact_id'], 'source_sha256': row['sha256'], 'areas': areas, 'game_semantics_inferred': False}
+        try:
+            playtest = playtest_lookup(row['sha256'], row['size'], row.get('system_id'))
+        except (OSError, ValueError):
+            playtest = {'status': 'report_unavailable'}
+        return {'ok': True, 'artifact_id': row['artifact_id'], 'source_sha256': row['sha256'],
+                'areas': areas, 'playtest': playtest, 'discoveries': discovery_summaries(project, row), 'game_semantics_inferred': False}

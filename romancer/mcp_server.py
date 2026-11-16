@@ -19,13 +19,13 @@ from romancer.workbench_api import WorkbenchAPI
 PROTOCOL='2025-11-25'
 MAX_MESSAGE=1024*1024
 MAX_RESULT=256*1024
-READ_OPERATIONS=frozenset('''assets.preview_scene.get assets.preview_scene.find editing.readiness objects.scene objects.list objects.get graphics.accesses.list graphics.accesses.tiles graphics.accesses.get graphics.accesses.memory gameview.graph gameview.detail traces.get traces.verification traces.origin checks.status checks.get symbols.preview symbols.search references.catalog references.template research.note_get research.inspect research.preview system.capabilities system.operations projects.list project.open
+READ_OPERATIONS=frozenset('''assets.preview_scene.get assets.preview_scene.find editing.readiness discoveries.open objects.scene objects.list objects.get graphics.accesses.list graphics.accesses.tiles graphics.accesses.get graphics.accesses.memory gameview.graph gameview.detail traces.get traces.verification traces.origin checks.status checks.get symbols.preview symbols.search references.catalog references.template research.note_get research.inspect research.preview system.capabilities system.operations projects.list project.open
 games.inspect games.maps.catalog games.maps.inspect cheats.catalog cheats.inspect systems.reference systems.classify_address rom.check catalog.list resource.inspect resources.explain resources.relationships
 hex.search hex.numbers hex.bookmarks builds.timeline builds.compare project.validate investigations.get investigations.probe debugger.capabilities debugger.get structures.survey structures.definition relocation.table_definition
 assets.inspect script.inspect tables.inspect tables.batch levels.inspect sound.inspect sound.system revision.lookup
 profiles.get profiles.validate runtime.checkpoints reports.list exports.list jobs.get
 systems.address resources.address_uses watches.compare debug.inspect compression.inspect compression.preview_reinsert'''.split())
-WRITE_OPERATIONS=frozenset('''assets.preview_scene project.studio objects.create objects.open objects.delete graphics.accesses.capture gameview.link gameview.unlink traces.capture traces.open traces.verify traces.open_verified checks.configure checks.run checks.from_trace compression.plan_relocate symbols.import research.note_save research.note_delete research.export research.apply project.create project.demo project.demo_system source.import inputs.import
+WRITE_OPERATIONS=frozenset('''assets.preview_scene project.studio objects.create objects.open objects.delete graphics.accesses.capture gameview.link gameview.unlink traces.capture traces.checkpoint traces.open traces.verify traces.open_verified checks.configure checks.run checks.from_trace discoveries.save discoveries.export discoveries.import discoveries.remove release.proof release.replay compression.plan_relocate symbols.import research.note_save research.note_delete research.export research.apply project.create project.demo project.demo_system source.import inputs.import
 games.plan games.configure games.maps.plan cheats.import systems.plan_edits assets.plan script.plan tables.plan levels.plan sound.plan
 build.apply structured.apply builds.annotate hex.bookmark catalog.index rom.scan.start
 rom.scan.run release.prepare release.verify resources.declare_assets resources.declare_script tables.save_definition patches.preview patches.apply revision.import
@@ -38,12 +38,17 @@ READ_OPERATIONS=READ_OPERATIONS|{'debugger.follow','definitions.preview','refere
 READ_OPERATIONS=READ_OPERATIONS|{'formats.list','formats.create','formats.preview'}
 READ_OPERATIONS=READ_OPERATIONS|{'text.grow.preview','text.grow.definition'}
 READ_OPERATIONS=READ_OPERATIONS|{'commands.rewrite.preview','commands.rewrite.definition'}
-READ_OPERATIONS=READ_OPERATIONS|{'rom.samples'}
+READ_OPERATIONS=READ_OPERATIONS|{'rom.samples','rom.evidence'}
+READ_OPERATIONS=READ_OPERATIONS|{'coverage.status','levels.presets','levels.preset'}
 WRITE_OPERATIONS=WRITE_OPERATIONS|{'definitions.save','commands.plan','animations.save','animations.delete'}
 WRITE_OPERATIONS=WRITE_OPERATIONS|{'formats.install','formats.apply','formats.delete','formats.export'}
 WRITE_OPERATIONS=WRITE_OPERATIONS|{'text.grow.plan'}
 WRITE_OPERATIONS=WRITE_OPERATIONS|{'commands.rewrite.plan'}
 DESCRIPTIONS={
+ 'coverage.status':'Read the frozen exact-revision target ledger and unfinished acceptance status. Catalog or preflight success never grants full editing acceptance or write authority.',
+ 'levels.presets':'List checked stored-terrain presets for this exact source or protected owned lineage; no full-game acceptance or edit authority.',
+ 'levels.preset':'Read a checked source-bound level definition. Opening a preset does not write a ROM.',
+ 'rom.evidence':'Read exact-source corpus relationships and scoped reference associations. Candidate similarities never authorize edits or establish full game support.',
  'rom.samples':'Search independently measured ROM sample hashes, sizes, formats and filename labels. No ROM payload, canonical authenticity, gameplay semantics or edit authority is supplied.',
  'commands.rewrite.preview':'Preview insert/remove/reorder of fully declared linear commands inside a confirmed fixed allocation. Requires no-interior-consumers acknowledgement. Branches, pointer operands, unmodelled bytes and overflow refuse. No ROM changes.',
  'commands.rewrite.plan':'Plan exactly previewed linear command sequence with source/document/review guards and cartridge checksum maintenance. Game semantics require playtesting.',
@@ -72,7 +77,11 @@ DESCRIPTIONS={
  'objects.create':'Save a whole-object layout from explicitly selected fresh verified parts belonging to one exact frame and execution context. Recovers flips from measured pixel origins; shared tiles and holes remain explicit.',
  'graphics.accesses.list':'List source-bound native graphics capture IDs without raw memory.',
  'graphics.accesses.tiles':'Decode at most64 complete tiles from recorded video memory with an explicitly chosen tested codec. Stored indices only; no ROM source or palette is inferred.',
- 'checks.from_trace':'Test a saved descendant build with a fresh authenticated cold-start trace. Requires unchanged execution context and captured-frame reproduction on two original runs. Does not overwrite automatic test setup.',
+ 'checks.from_trace':'Replay a captured scene on two fresh original runs and a descendant build. Optionally check final RAM values, last-input changes or values that should stay the same.',
+ 'discoveries.save':'Save a named byte, numeric table or graphics layout on the exact original revision using passing local replay evidence.',
+ 'discoveries.import':'Open a portable discovery on the exact matching ROM. Imported evidence remains historical until reproduced locally.',
+ 'release.proof':'Export verified BPS, an exact-revision replay manifest and optional comparison pictures from a passing replay.',
+ 'release.replay':'Independently verify an imported BPS and reproduce a shared replay with the matching original, patched build and engine.',
  'compression.preview_reinsert':'Independently verify recompression and report packed size, free bytes and overflow without creating a plan.',
  'compression.plan_relocate':'Plan a checked recompressed stream move into author-reserved space, with all declared external start references, same-bank constraints and before-byte checks. Original stream remains. No completeness is inferred.',
  'objects.list':'List saved exact-revision object layouts. Names are author labels, not inferred game roles.',
@@ -85,6 +94,7 @@ DESCRIPTIONS={
  'gameview.graph':'Browse source-bound resources, declared relationships, named records and native gameplay pixel candidates across all six systems. Shared storage is not semantic ownership.',
  'gameview.detail':'Inspect a current connected resource, decoded fields, bounded byte preview, neighbors and visual preview. Labels and pixel candidates retain their evidence levels.',
  'traces.capture':'Save a paused native frame region and bounded system-codec ROM matches. Inputs cannot supply pixels. Competing offsets and coverage remain explicit; no source transfer is inferred.',
+ 'traces.checkpoint':'Save a bounded paused cold-start scene and its acknowledged input sequence for checks.from_trace. Does not scan ROM graphics or accept caller-generated pixels.',
  'traces.get':'Read an authenticated saved gameplay trace and its candidates. Restored evidence is historical and cannot authorize candidate editing.',
  'traces.open':'Explicitly choose saved native pixel candidates for the existing graphics editor. Validates current source, trusted evidence and a bounded tile layout; does not modify ROM bytes.',
  'traces.verify':'Verify literal source locations using coded pixel probes and two independent validation patterns, exact original replay controls and a restored-ROM control. Bounded causal visual dependency only; CPU/DMA transfers are not observed.',
@@ -106,7 +116,7 @@ DESCRIPTIONS={
  'games.plan':'Preview named game edits; returns a source-bound plan, not a modified ROM.',
  'games.maps.catalog':'Browse bounded real map thumbnails and references for the exact supported game revision. Structural decoding is not gameplay certification.',
  'games.maps.inspect':'Decode a real room, arrival and object definitions. Conditional map branches require explicit observed or selected state; object visibility is not inferred.',
- 'games.maps.plan':'Review fixed-width edits in the supported opening atlas, preserving collision, trigger bindings and packed flags. Returns a plan; every build needs playtesting.',
+ 'games.maps.plan':'Review fixed-width terrain commands in source-bound rooms, preserving collision and triggers across every encoded story-state outcome and sharing header. Optional state selects the preview. Object/arrival/link writes remain limited to the opening atlas; every build needs playtesting.',
  'cheats.catalog':'Inspect the local code-reference catalog. Source publication labels are separate from gameplay verification.',
  'cheats.inspect':'Decode matching local code references into source-bound investigation clues. Unconfirmed banks, unsupported codes and revision mismatches do not authorize edits or activate cheats.',
  'cheats.import':'Import a bounded project-owned catalog input. Preserves code combinations, revision alternatives and provenance; does not modify ROM bytes.',
@@ -199,6 +209,8 @@ def _investigation_properties(operation):
     if operation=='gameview.link':return {**source,'from_id':string(32),'to_id':string(32),'relation':enum(['uses_graphics','uses_palette','uses_script','uses_sound','uses_table','uses_collision','uses_animation','triggers','destination','reference']),'note':string(256)}
     if operation=='gameview.unlink':return {**source,'link_id':string(32)}
     if operation=='traces.capture':return {**source,'name':string(80),'frame_sha256':string(64),'region':obj({'x':integer(0,2047),'y':integer(0,2047),'width':integer(8,256),'height':integer(8,256)}),'offset':integer(),'length':integer(1)}
+    if operation=='traces.checkpoint':return {**source,'frame_sha256':string(64),'region':{'anyOf':[
+        obj({'x':integer(0,2047),'y':integer(0,2047),'width':integer(1,256),'height':integer(1,256)}),{'type':'null'}]}}
     if operation=='traces.get':return {**source,'trace_id':string(32)}
     if operation=='traces.open':return {**source,'trace_id':string(32),'matches':array(integer(0,255),64,1)}
     if operation=='objects.create':return {**source,'name':string(80),'parts':array(obj({'verification_id':string(32),'match_id':integer(0,255)}),64,1)}
@@ -221,7 +233,24 @@ def _investigation_properties(operation):
     if operation=='traces.open_verified':return {**source,'verification_id':string(32),'matches':array(integer(0,255),1,1)}
     if operation=='checks.status':return source
     if operation=='checks.get':return {**source,'evidence_id':string(32)}
-    if operation=='checks.from_trace':return {'project_id':string(),'source_id':string(),'target_id':string(),'trace_id':string(32)}
+    pair={'project_id':string(),'source_id':string(32),'target_id':string(32)}
+    if operation=='checks.from_trace':
+        rule=obj({'name':string(80),'region':integer(0,3),'offset':integer(0,256*1024**2-1),
+                  'length':{'type':'integer','enum':[1,2,4]},'endian':enum(['little','big']),
+                  'mode':enum(['value','delta','same']),'original':nullable(integer(-(2**32-1),2**32-1)),
+                  'build':nullable(integer(-(2**32-1),2**32-1))})
+        return {**pair,'trace_id':string(32),'expectations':array(rule,8)}
+    if operation=='release.proof':
+        return {**pair,'evidence_id':string(32),'title':string(120),'description':string(500),'screenshots':{'type':'boolean'}}
+    if operation=='release.replay':
+        return {**pair,'input_id':string(32),'proof':{'type':'object'}}
+    if operation in ('discoveries.open','discoveries.export','discoveries.remove'):
+        return {**source,'discovery_id':string(64)}
+    if operation=='discoveries.import':
+        return {**source,'document':{'type':'object'}}
+    if operation=='discoveries.save':
+        return {**source,'evidence_id':string(32),'name':string(80),'kind':enum(['byte','table','graphics']),
+                'offset':nullable(integer()),'resource':nullable(string(80))}
     if operation=='checks.run':return {'project_id':string(),'source_id':string(32),'target_id':string(32)}
     if operation=='checks.configure':
         step=obj({'frames':integer(1,600),'buttons':array(enum(['up','down','left','right','a','b','x','y','l','r','l2','r2','l3','r3','start','select']),16),'port':integer(0,3)})
@@ -232,7 +261,11 @@ def _investigation_properties(operation):
         return {**base,'review_id':string(64),'acknowledged':{'type':'boolean'}} if operation=='symbols.import' else base
     if operation=='symbols.search':return {**source,'query':string(128),'page':integer(0,1311)}
     if operation=='references.catalog':return {'query': string(128), 'system_filter': enum(['all', 'nes', 'snes', 'genesis', 'sms', 'gb', 'gbc'])}
+    if operation=='levels.presets':return source
+    if operation=='levels.preset':return {**source,'preset_id':string(64)}
+    if operation=='rom.evidence':return {'sha256':{'type':'string','pattern':'^[0-9a-f]{64}$'},'size':integer(1,64*1024**2)}
     if operation=='rom.samples':return {'query':string(128),'system_filter':enum(['all','nes','snes','genesis','sms','gb','gbc']),'page':integer(0,1000),'limit':integer(1,50)}
+    if operation=='coverage.status':return {'query':string(128),'system_filter':enum(['all','nes','snes','genesis','sms','gb','gbc']),'page':integer(0,1052),'limit':integer(1,100)}
     if operation=='references.template':return {**source, 'template_id': enum(['pokemon-red-blue', 'pokemon-crystal']), 'offset': integer(), 'count': integer(1, 65536), 'stride': integer(1, 65536)}
     if operation=='research.inspect':return {**source,'query':string(128),'kind':enum(['all','notes','assets','script','tables','levels','sound','commands']),'page':integer(0,4096)}
     if operation=='research.note_get':return {**source,'note_id':string(32)}
@@ -285,8 +318,9 @@ def _investigation_properties(operation):
     if operation=='systems.reference':return {'system_id': enum(['nes', 'snes', 'genesis', 'gb', 'gbc', 'sms'])}
     if operation=='systems.classify_address':return {'system_id': enum(['nes', 'snes', 'genesis', 'gb', 'gbc', 'sms']), 'address': integer(0, 4294967295), 'domain': enum(['cpu', 'ppu', 'vram', 'apu'])}
     if operation=='games.maps.catalog':return {**source,'offset':integer(0,10000),'limit':integer(1,24),'query':string(128)}
-    if operation=='games.maps.inspect':return {**source,'header':integer(0x4800,0x6f7f),
-        'state':{'type':['object','null'],'maxProperties':32,'propertyNames':{'pattern':'^(?:[0-9]|[12][0-9]|3[01])$'},'additionalProperties':integer(0,15)}}
+    if operation in ('games.maps.inspect','games.maps.plan'):
+        map_state={'type':['object','null'],'maxProperties':32,'propertyNames':{'pattern':'^(?:[0-9]|[12][0-9]|3[01])$'},'additionalProperties':integer(0,15)}
+    if operation=='games.maps.inspect':return {**source,'header':integer(0x4800,0x6f7f),'state':map_state}
     if operation=='games.maps.plan':
         optional_coordinate={'x':integer(0,63),'y':integer(0,63)}
         variants=[]
@@ -297,7 +331,7 @@ def _investigation_properties(operation):
             ('link',{'index':integer(0,31),'arrival_id':integer(0,510)},['index','arrival_id'])]:
             variants.append({'type':'object','properties':{'kind':enum([kind]),**properties},
                 'required':['kind',*required],'additionalProperties':False})
-        return {**source,'header':integer(0x4800,0x6f7f),'changes':array({'oneOf':variants},64,1)}
+        return {**source,'header':integer(0x4800,0x6f7f),'state':map_state,'changes':array({'oneOf':variants},64,1)}
     codecs=enum(['lz10','rle','snes-lz2']);kinds=enum(['script','assets','tables','levels','sound','commands'])
     if operation=='systems.address':
         variants=[]

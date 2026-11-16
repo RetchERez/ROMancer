@@ -5,7 +5,7 @@ globalThis.document={getElementById:id=>({value:values[id]||'',checked:false})};
 const definition={source_sha256:'s',name:'Known original format'},doc={ok:true,source_sha256:'s',document_id:'d',definition,scripts:[{id:'door',name:'Door event',editable:true,issues:[],commands:[{index:0,offset:4096,name:'Set health',role:'action',fields:[{name:'Health',value:8,minimum:1,maximum:99,offset:4097}]}]}]};
 const state={project:{project_id:'p'},artifact:{artifact_id:'a',sha256:'s',descriptors:{commands:definition}},results:{}};let calls=[];
 const ctx={state,use:r=>Object.assign(actions,r),draft:(k,d)=>drafts[k]??d,setDraft:(k,v)=>drafts[k]=v,sourceParams:()=>({project_id:'p',artifact_id:'a'}),projectParams:()=>({project_id:'p'}),render:async()=>{},notify:()=>{},api:{call:async()=>doc},run:async(op,p)=>{calls.push([op,p]);return {ok:true,plan_id:'plan'};}};
-let html=await commandEditor(ctx);assert.match(html,/Set health/);await actions['command-stage']();html=await commandEditor(ctx);assert.match(html,/8.*12/s);
+let html=await commandEditor(ctx);assert.match(html,/Set health/);await actions['command-stage']();html=await commandEditor(ctx);assert.match(html,/8.*12/s);assert.match(html,/data-number-input="command-value" data-before="8"/);assert.match(html,/Preview updated/);
 await actions['command-review']();assert.equal(calls[0][0],'commands.plan');assert.equal(calls[0][1].changes[0].before,8);assert.equal(calls[0][1].changes[0].after,12);
 values['command-value']='100';await assert.rejects(async()=>actions['command-stage'](),/1.*99/);
 await actions['command-discard']();assert.equal(JSON.parse(drafts['command-changes']).changes.length,0);

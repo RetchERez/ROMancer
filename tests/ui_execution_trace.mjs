@@ -65,3 +65,12 @@ console.log('Native trace UI uses authenticated candidates, clear replay scope, 
  assert.doesNotMatch(html,/<option value="exec"/,'Genesis has instruction samples, not an execution-range watch.');
  assert.match(html,/instruction sampling/);
 }
+{
+ const {ctx,state,actions,calls}=fixture();
+ const steps=[{frames:90,buttons:[],port:0},{frames:12,buttons:['right'],port:0}];
+ state.nativeProbe={scope:selectionKey(state),result:{source_sha256:'sha',artifact_id:'a',
+  investigation_id:'i',candidate:{candidate_id:'c',offset:1,width:1},playtest_replay:{steps,start_frame:90,frames:102}}};
+ assert.match(await executionTrace(ctx),/Replay last Playtest change/);
+ await actions['trace-replay-playtest']();
+ assert.deepEqual(calls[0][1].replay,{steps,start_frame:90,event_limit:200,instruction_limit:20000000,timeout:30});
+}

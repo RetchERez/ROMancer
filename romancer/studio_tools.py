@@ -14,7 +14,7 @@ class StudioTools:
         self.search_lock = threading.RLock()
 
     def routes(self):
-        return {'studio.example': ('', self.example), 'resources.relationships': ('project_id artifact_id', self.relationships), 'resources.explain': ('project_id artifact_id offset', self.explain), 'values.start': ('project_id artifact_id region offset length width endian signed target', self.values_start), 'values.narrow': ('project_id artifact_id search_id relation target', self.values_narrow), 'video.inspect': ('project_id artifact_id offset length codec', self.video_inspect), 'studio.definition': ('project_id artifact_id kind definition', self.definition), 'levels.inspect': ('project_id artifact_id definition', self.levels_inspect), 'levels.plan': ('project_id artifact_id definition document_id changes', self.levels_plan), 'sound.system': ('project_id artifact_id', self.sound_system), 'sound.inspect': ('project_id artifact_id definition', self.sound_inspect), 'sound.plan': ('project_id artifact_id definition document_id changes', self.sound_plan), 'sound.preview': ('project_id artifact_id definition kind resource_id changes', self.sound_preview), 'sound.export': ('project_id artifact_id definition kind resource_id changes', self.sound_export), 'sound.capture': ('project_id artifact_id frames', self.sound_capture)}
+        return {'levels.presets': ('project_id artifact_id', self.level_presets), 'levels.preset': ('project_id artifact_id preset_id', self.level_preset), 'studio.example': ('', self.example), 'resources.relationships': ('project_id artifact_id', self.relationships), 'resources.explain': ('project_id artifact_id offset', self.explain), 'values.start': ('project_id artifact_id region offset length width endian signed target', self.values_start), 'values.narrow': ('project_id artifact_id search_id relation target', self.values_narrow), 'video.inspect': ('project_id artifact_id offset length codec', self.video_inspect), 'studio.definition': ('project_id artifact_id kind definition', self.definition), 'levels.inspect': ('project_id artifact_id definition', self.levels_inspect), 'levels.plan': ('project_id artifact_id definition document_id changes', self.levels_plan), 'sound.system': ('project_id artifact_id', self.sound_system), 'sound.inspect': ('project_id artifact_id definition', self.sound_inspect), 'sound.plan': ('project_id artifact_id definition document_id changes', self.sound_plan), 'sound.preview': ('project_id artifact_id definition kind resource_id changes', self.sound_preview), 'sound.export': ('project_id artifact_id definition kind resource_id changes', self.sound_export), 'sound.capture': ('project_id artifact_id frames', self.sound_capture)}
 
     def relationships(self, p, c):
         from .studio_discovery import resource_relationships
@@ -115,16 +115,28 @@ class StudioTools:
             projects.write_json(project / 'project.json', value)
         return {'ok': True, 'status': 'SAVED', 'source_sha256': row['sha256'], 'kind': kind}
 
+    def level_presets(self,p,c):
+        from .level_presets import catalog
+        project,row,path=self.api.source(p)
+        return catalog(project,row,path,cancelled=c)
+
+    def level_preset(self,p,c):
+        from .level_presets import definition
+        project,row,path=self.api.source(p)
+        return definition(project,row,path,p['preset_id'],cancelled=c)
+
     def levels_inspect(self, p, c):
-        from .level_design import inspect_level
+        from .adapters.registry import adapter_for
         _, row, raw = self.source(p, c)
-        return inspect_level(raw, p['definition'], row['sha256'])
+        return adapter_for('levels',raw,p['definition'],row['sha256']).inspect()
 
     def levels_plan(self, p, c):
-        from .level_design import plan_level
+        from .adapters.registry import adapter_for
         _, row, raw = self.source(p, c)
-        result = plan_level(raw, p['definition'], p['document_id'], p['changes'], row['sha256'])
-        return {**self.plan(p, result['edits'], c), 'affected_rooms': result['affected_rooms'], 'document_id': result['document_id']}
+        result = adapter_for('levels',raw,p['definition'],row['sha256']).plan(p['document_id'],p['changes'])
+        return {**self.plan(p, result['edits'], c), 'affected_rooms': result['affected_rooms'], 'document_id': result['document_id'],
+                'adapter_id':result['adapter_id'],'adapter_sha256':result['adapter_sha256'],'resource_impact':result['resource_impact'],
+                **({'affected_cells':result['affected_cells']}if 'affected_cells'in result else {})}
 
     def plan(self, p, edits, c):
         merged = []

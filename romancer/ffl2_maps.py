@@ -9,6 +9,7 @@ integrity planner; this module never writes a game file.
 import hashlib
 import base64
 import io
+import itertools
 from collections import Counter
 from pathlib import Path
 
@@ -18,6 +19,10 @@ ROOT_SHA256 = '2d89231f9e264a024d634bcf7d00de5a66d8a45f6f4ca33e1fc1602a35b9840b'
 REFERENCE = 'https://github.com/daid/FFL2-Disassembly/tree/a5c17a90d87d102a9a45d287042c9a36ffd06f97'
 SIZE = 262144
 EDITABLE_HEADER = 0x486b
+FIELD_PALETTE_DRIVER_SHA256 = 'c3bc43259c7e3529a81a99a538b61960110c60b9e3aecce7379c5bcba3f0ab90'
+TERRAIN_OPS = frozenset(range(1,10))
+MAX_STATE_VARIANTS = 256
+MAX_VALIDATION_CELLS = 4*1024*1024
 OP_NAMES = ('End', 'Point', 'Anchor', 'Rectangle outline', 'Rectangle fill',
             'Circle', 'Line', 'Checker background', 'Anchor span fill',
             'Continue line', 'State condition')
@@ -117,7 +122,7 @@ def _graph(raw, cancelled):
                       'tileset': tileset, 'flags': flags, 'links': links,
                       'sprite_pages': sprites, 'objects': objects,
                       'arrival_count': sum(a['header'] == header for a in arrivals),
-                      'editable': header == EDITABLE_HEADER})
+                      'editable': header == EDITABLE_HEADER, 'terrain_editable': True})
     starts = sorted({r['map_start'] for r in rooms})
     ends = {p: starts[i+1] if i+1 < len(starts) else 0x28000 for i, p in enumerate(starts)}
     for room in rooms:
@@ -186,24 +191,101 @@ def _commands(raw, start, end, cancelled):
     raise ValueError('map command budget exceeded')
 
 
+def encode_map_commands(commands):
+    """Rebuild the stored grammar; preserve only explicitly reserved operand bits.
+
+    No allocation or ROM mutation occurs. Opaque bytes after End are not emitted.
+    Decoding and serializing a stream does not prove its gameplay semantics.
+    """
+    if type(commands) is not list or not 1 <= len(commands) <= 4096:
+        raise ValueError('map command count exceeds its budget')
+    output=bytearray();expected=None
+    for index,command in enumerate(commands):
+        if type(command) is not dict:raise ValueError('map command must be a record')
+        op=number(command.get('op'),0,10);offset=number(command.get('offset'),0,SIZE-1)
+        text=command.get('raw')
+        if type(text) is not str or len(text) not in (2,4,6,8) or any(c not in '0123456789abcdef' for c in text):raise ValueError('invalid stored map command bytes')
+        original=bytes.fromhex(text)
+        if original[0]>>4!=op or number(command.get('size'),1,4)!=len(original):raise ValueError('map command layout differs')
+        if expected is not None and offset!=expected:raise ValueError('map command offsets have gaps or overlap')
+        if op==0:
+            if len(original)!=1 or index!=len(commands)-1:raise ValueError('map End must be the last single-byte record')
+            data=bytes([original[0]&15])
+        elif op==10:
+            data=bytes([0xa0|number(command.get('state_index'),0,15),
+                        number(command.get('minimum'),0,15)<<4|number(command.get('maximum'),0,15)])
+        else:
+            x=number(command.get('x'),0,63);y=number(command.get('y'),0,63)
+            data=bytes([(op<<4)|(y>>2),((y&3)<<6)|x])
+            if op in (1,3,4,5,6,9):
+                if len(original)<3:raise ValueError('map tile operand is missing')
+                flags=original[2]&192;data+=bytes([flags|number(command.get('tile'),0,63)])
+                if op!=1 and flags:data+=bytes([number(command.get('second_tile'),0,63)])
+                elif 'second_tile' in command:raise ValueError('map command has no alternate tile operand')
+        if len(data)!=len(original):raise ValueError('map command serialization changed its width')
+        output+=data;expected=offset+len(data)
+    if commands[-1]['op']!=0:raise ValueError('map stream is missing End')
+    return bytes(output)
+
+
+def check_map_storage(raw,start,end,*,cancelled=lambda:False):
+    """Independent no-op encoding check within an existing catalog-bounded range."""
+    if type(raw) not in (bytes,bytearray) or len(raw)>SIZE:raise ValueError('map source exceeds the revision storage budget')
+    commands,used_end=_commands(raw,start,end,cancelled)
+    encoded=encode_map_commands(commands);_check(cancelled)
+    original=bytes(raw[start:used_end])
+    if encoded!=original:raise ValueError('map command storage failed its lossless roundtrip')
+    return {'status':'byte_identical','codec':'ffl2-map-command-stream-v1','offset':start,
+            'used_bytes':len(encoded),'command_count':len(commands),'range_bound_bytes':end-start,
+            'protected_trailing_bytes':end-used_end,'stored_sha256':hashlib.sha256(original).hexdigest(),
+            'encoded_sha256':hashlib.sha256(encoded).hexdigest(),'native_verified':False,'write_authorized':False}
+
+
+def _state_values(state):
+    if state is None:return None
+    if type(state) is not dict or len(state)>32:
+        raise ValueError('state must map nibble indexes to values 0..15')
+    result={}
+    for key,value in state.items():
+        if type(key) is str and key in {str(i) for i in range(32)}:key=int(key)
+        if type(key) is not int or not 0<=key<32 or type(value) is not int or not 0<=value<16 or key in result:
+            raise ValueError('state must map nibble indexes to values 0..15')
+        result[key]=value
+    return result
+
+
+def _state_document(state):
+    return None if state is None else {str(index):value for index,value in state.items()}
+
+
+def _state_variants(commands,cancelled):
+    # A state affects drawing only through these finite inclusive comparisons.
+    # One value per interval covers every encoded comparison outcome, including
+    # branches not executed by the user's currently selected preview.
+    partitions={}
+    for command in commands:
+        _check(cancelled)
+        if command['op']==10:
+            points=partitions.setdefault(command['state_index'],{0})
+            points.add(command['minimum'])
+            if command['maximum']<15:points.add(command['maximum']+1)
+    count=1
+    for points in partitions.values():
+        count*=len(points)
+        if count>MAX_STATE_VARIANTS:raise ValueError('map story-state validation budget exceeded')
+    indexes=sorted(partitions)
+    return [dict(zip(indexes,values)) for values in itertools.product(*(sorted(partitions[i]) for i in indexes))]
+
+
 def decode_map(raw, start, end, *, state=None, cancelled=lambda: False):
     """Decode terrain, original command provenance, and exact owned byte extent.
 
     State is an explicit mapping of state-nibble index to captured/selected value.
-    Large circles are intentionally unsupported. Opcode8 matches the game's
-    fixed-column span fill; it is not a general connected-region flood fill.
+    Circle rendering uses the game's small-radius table and signed 16-bit
+    recurrence for larger/zero radii. Opcode8 is fixed-column span fill,
+    not a general connected-region flood fill.
     """
-    if state is not None:
-        if type(state) is not dict or len(state) > 32:
-            raise ValueError('state must map nibble indexes to values 0..15')
-        normalized = {}
-        for key, value in state.items():
-            if type(key) is str and key in {str(i) for i in range(32)}:
-                key = int(key)
-            if type(key) is not int or not 0 <= key < 32 or type(value) is not int or not 0 <= value < 16 or key in normalized:
-                raise ValueError('state must map nibble indexes to values 0..15')
-            normalized[key] = value
-        state = normalized
+    state=_state_values(state)
     commands, owned_end = _commands(raw, start, end, cancelled)
     cells, provenance = [0]*4096, [None]*4096
     anchor, previous = (0, 0), (0, 0)
@@ -249,7 +331,20 @@ def decode_map(raw, start, end, *, state=None, cancelled=lambda: False):
         elif op == 5:
             sx, sy = anchor; radius = abs(x-sx)+abs(y-sy)
             if not 1 <= radius < 8:
-                raise ValueError('large or zero-radius circle requires an unsupported decoder path')
+                # Original fixed-point rotation, including its integer rounding,
+                # word wrapping and zero-divisor quotient. The sampled routine
+                # draws after updating both vector components, not before.
+                vx=((x-sx)&255)<<8;vy=((y-sy)&255)<<8
+                def quotient(value):
+                    negative=bool(value&32768);magnitude=(-value)&65535 if negative else value
+                    result=magnitude//radius if radius else 65535
+                    return (-result if negative else result)&65535
+                for _ in range(radius*8+1):
+                    _check(cancelled)
+                    vx=(vx+quotient(vy))&65535;vy=(vy-quotient(vx))&65535
+                    xx=(sx+(vx>>8))&255;yy=(sy+(vy>>8))&255
+                    if xx<64 and yy<64:put(xx,yy,t,offset)
+                continue
             table = 0x2670+2*(radius-1)
             if table+2 > len(raw):
                 raise ValueError('circle table exceeds source')
@@ -349,7 +444,7 @@ def catalog(path, original_path, *, offset=0, limit=24, query='', cancelled=lamb
     raw, _, rooms, arrivals, _ = _load(path, original_path, cancelled)
     filtered = [r for r in rooms if query.lower() in (r['label']+f" map {r['map_pointer']:04X}").lower()]
     summaries = [{k: r[k] for k in ('header', 'label', 'map_pointer', 'tileset', 'flags',
-                                   'arrival_count', 'shared_headers', 'editable')}
+                                   'arrival_count', 'shared_headers', 'editable', 'terrain_editable')}
                  | {'object_count': len(r['objects']), 'link_count': len(r['links'])}
                  for r in filtered[offset:offset+limit]]
     for summary, room in zip(summaries, filtered[offset:offset+limit]):
@@ -365,12 +460,20 @@ def catalog(path, original_path, *, offset=0, limit=24, query='', cancelled=lamb
             'reference': REFERENCE, 'native_verified': False}
 
 
+def _field_palette(raw):
+    """Normal field phase only; fades and effects require captured runtime colors."""
+    if hashlib.sha256(raw[0x3cf8:0x3d14]).hexdigest()!=FIELD_PALETTE_DRIVER_SHA256:
+        return None,'unverified palette; tile indexes decoded'
+    # Original phase3 writes BGP/OBP0/OBP1=D2. Two bits select each DMG shade.
+    shades=(255,170,85,0)
+    return [[shades[(0xd2>>(2*i))&3]]*3 for i in range(4)],'checked normal field palette; fades and effects excluded'
+
+
 def _thumbnail(raw, room, cells, cancelled):
     from PIL import Image
     tiles = _tiles(raw, room['tileset'])
-    # Noncertified rooms use explicit grayscale color-index visualization.
-    # This is an inspection aid; no unobserved hardware palette is asserted.
-    shades = (85, 255, 170, 0) if room['header'] == EDITABLE_HEADER else (255, 170, 85, 0)
+    palette,status=_field_palette(raw)
+    shades=tuple(color[0] for color in palette) if palette else (255,170,85,0)
     pixels = []
     for y in range(96):
         _check(cancelled)
@@ -383,7 +486,7 @@ def _thumbnail(raw, room, cells, cancelled):
     buffer = io.BytesIO(); image.save(buffer, format='PNG')
     return {'status': 'available', 'width': 96, 'height': 96,
             'data_url': 'data:image/png;base64,'+base64.b64encode(buffer.getvalue()).decode('ascii'),
-            'palette_status': 'opening-atlas palette' if room['header'] == EDITABLE_HEADER else 'color-index grayscale; game palette unverified'}
+            'palette_status': status}
 
 
 def inspect_room(path, original_path, header, *, state=None, cancelled=lambda: False):
@@ -394,20 +497,27 @@ def inspect_room(path, original_path, header, *, state=None, cancelled=lambda: F
         link['destination'] = next((a for a in arrivals if ref['kind'] == 'arrival'
                                     and a['table'] == ref['table'] and a['id'] == ref['id']), None)
     result = {'room': room, 'objects': room['objects'], 'links': room['links'],
-              'arrivals': [a for a in arrivals if a['header'] == header], 'reference': REFERENCE}
+              'arrivals': [a for a in arrivals if a['header'] == header], 'reference': REFERENCE,
+              'required_state_indexes':[]}
+    try:
+        result['storage']=check_map_storage(raw,room['map_start'],room['map_bound'],cancelled=cancelled)
+        commands,_=_commands(raw,room['map_start'],room['map_bound'],cancelled)
+        result['required_state_indexes']=sorted({c['state_index'] for c in commands if c['op']==10})
+    except ValueError as error:result['storage']={'status':'unsupported','reason':str(error),'write_authorized':False,'native_verified':False}
     try:
         decoded = decode_map(raw, room['map_start'], room['map_bound'], state=state, cancelled=cancelled)
         counts = Counter(decoded['provenance'])
         for command in decoded['commands']:
             command['final_cells'] = counts[command['offset']]
-            command['editable'] = header == EDITABLE_HEADER and command['op'] in (1, 2, 3, 4, 6, 9)
+            command['editable'] = command['op'] in TERRAIN_OPS
         marked, markers = _markers(decoded['cells'], room['flags'])
         behavior = list(raw[0x1f000+32*room['tileset']:0x1f020+32*room['tileset']])
+        palette,palette_status=_field_palette(raw)
         result['map'] = {**decoded, 'status': 'decoded', 'size': [64, 64], 'tile_size': 16,
+                         'preview_state':_state_document(_state_values(state)),
                          'tiles': _tiles(raw, room['tileset']), 'behavior': behavior,
                          'marked_cells': marked, 'marker_cells': markers,
-                         'palette': [[85]*3, [255]*3, [170]*3, [0]*3] if header == EDITABLE_HEADER else None,
-                         'palette_status': 'opening-atlas native palette' if header == EDITABLE_HEADER else 'unverified palette; tile indexes decoded'}
+                         'palette': palette,'palette_status':palette_status}
     except ValueError as error:
         result['map'] = {'status': 'unsupported', 'reason': str(error), 'native_verified': False}
     return result
@@ -422,19 +532,34 @@ def _coord(change, key, current):
     return number(change[key], 0, 63) if key in change else current
 
 
-def plan_edits(path, original_path, header, changes, *, cancelled=lambda: False):
+def _validate_terrain_contexts(raw,contexts,before,after,baseline,cancelled):
+    for context in contexts:
+        _check(cancelled)
+        table=raw[0x1f000+context['tileset']*32:0x1f020+context['tileset']*32]
+        root_markers=_markers(baseline,context['flags'])[1]
+        root_triggers=[(i,t,table[t&31]) for i,t in enumerate(baseline) if table[t&31]&192==192]
+        for label,candidate in (('current',before),('edited',after)):
+            if any(table[a&31]!=table[b&31] or (a&32)!=(b&32) for a,b in zip(baseline,candidate)):
+                raise ValueError(label+' terrain changes collision or region bits in a shared map header')
+            if _markers(candidate,context['flags'])[1]!=root_markers:
+                raise ValueError(label+' terrain changes shared map interaction marker ordering')
+            if [(i,t,table[t&31]) for i,t in enumerate(candidate) if table[t&31]&192==192]!=root_triggers:
+                raise ValueError(label+' terrain changes a shared map trigger cell')
+
+
+def plan_edits(path, original_path, header, changes, *, state=None, cancelled=lambda: False):
     """Return exact byte edits; no mutation. Every resulting build needs playtest.
 
-    Initial terrain edits preserve all behavior values, tile region bits and
-    trigger marker bindings. Conditional/story NPCs and saved-return links stay
-    locked. Arrival coordinates may change only within the initial atlas.
+    Terrain edits preserve all behavior values, tile region bits and trigger
+    bindings across every encoded story-state outcome and sharing header.
+    Object, arrival and link edits remain limited to the initial atlas.
     """
     if type(changes) is not list or not 1 <= len(changes) <= 64:
         raise ValueError('choose 1 to 64 bounded map edits')
     raw, original, rooms, arrivals, roots = _load(path, original_path, cancelled)
     room, root = _room(rooms, header), _room(roots, header)
-    if header != EDITABLE_HEADER:
-        raise ValueError('writable primitive scope is currently room 486B')
+    if header!=EDITABLE_HEADER and any(type(change) is not dict or change.get('kind')!='command' for change in changes):
+        raise ValueError('only terrain commands are writable here; object/arrival/link scope remains room 486B')
     for p, length in ((0x1f000+room['tileset']*32, 32),
                       (0x1f800+room['tileset']*32, 32), (0x2670, 0x65),
                       (0x1bb9, 0x26d5-0x1bb9), (0x338a, 0x344b-0x338a)):
@@ -444,9 +569,17 @@ def plan_edits(path, original_path, header, changes, *, cancelled=lambda: False)
         if (a['condition'], a['range'], a['event'], a['flags'], a['x_flags'], a['y_flags']) != (
                 b['condition'], b['range'], b['event'], b['flags'], b['x_flags'], b['y_flags']):
             raise ValueError('NPC conditions, references and packed flags are protected')
-    before = decode_map(raw, room['map_start'], room['map_bound'], cancelled=cancelled)
-    baseline = decode_map(original, root['map_start'], root['map_bound'], cancelled=cancelled)
+    state=_state_values(state)
+    commands,_=_commands(raw,room['map_start'],room['map_bound'],cancelled)
+    required={c['state_index'] for c in commands if c['op']==10}
+    if required-set(state or {}):raise ValueError('choose an explicit story state for every required map nibble')
+    variants=_state_variants(commands,cancelled)
+    before = decode_map(raw, room['map_start'], room['map_bound'], state=state,cancelled=cancelled)
+    check_map_storage(raw,room['map_start'],room['map_bound'],cancelled=cancelled)
+    baseline = decode_map(original, root['map_start'], root['map_bound'], state=state,cancelled=cancelled)
     shared_contexts=[r for r in rooms if r['map_start']==room['map_start']]
+    if len(variants)*len(shared_contexts)*4096>MAX_VALIDATION_CELLS:
+        raise ValueError('map shared-room/state validation work budget exceeded')
     for context in shared_contexts:
         for p in (0x1f000+context['tileset']*32,0x1f800+context['tileset']*32):
             if raw[p:p+32]!=original[p:p+32]:
@@ -454,8 +587,9 @@ def plan_edits(path, original_path, header, changes, *, cancelled=lambda: False)
     if [(c['offset'], c['op'], c['size']) for c in before['commands']] != [(c['offset'], c['op'], c['size']) for c in baseline['commands']]:
         raise ValueError('map command structure differs from original')
     for a, b in zip(before['commands'], baseline['commands']):
-        if a['op'] not in (1, 2, 3, 4, 6, 9) and a['raw'] != b['raw']:
+        if a['op'] not in TERRAIN_OPS and a['raw'] != b['raw']:
             raise ValueError('unsupported map command operands are protected')
+        if a['op']==8 and a['y']!=b['y']:raise ValueError('span fill unused Y operand is protected')
         if 'tile' in a and ((bytes.fromhex(a['raw'])[2] & 192) != (bytes.fromhex(b['raw'])[2] & 192)
                             or a.get('second_tile') != b.get('second_tile')):
             raise ValueError('alternate tile flags and operands are protected')
@@ -482,11 +616,12 @@ def plan_edits(path, original_path, header, changes, *, cancelled=lambda: False)
             _fields(change, 'kind offset x y tile', 'kind offset')
             number(change['offset'], 0, SIZE-1)
             c = next((c for c in before['commands'] if c['offset'] == change['offset']), None)
-            if c is None or c['op'] not in (1, 2, 3, 4, 6, 9):
-                raise ValueError('select an existing editable point, anchor, rectangle or line')
-            if 'tile' in change and c['op'] == 2:
-                raise ValueError('anchor commands have no tile operand')
+            if c is None or c['op'] not in TERRAIN_OPS:
+                raise ValueError('select an existing editable terrain command')
+            if 'tile' in change and 'tile' not in c:
+                raise ValueError('this command has no tile operand')
             x, y = _coord(change, 'x', c['x']), _coord(change, 'y', c['y'])
+            if c['op']==8 and y!=c['y']:raise ValueError('span fill unused Y operand is protected')
             data = bytearray.fromhex(c['raw'])
             data[0] = (data[0] & 240) | (y >> 2)
             data[1] = ((y & 3) << 6) | x
@@ -529,42 +664,11 @@ def plan_edits(path, original_path, header, changes, *, cancelled=lambda: False)
             edit(link['offset'], word.to_bytes(2, 'little'), f"Interaction {link['index']} destination")
         else:
             raise ValueError('unsupported map edit kind')
-    after = decode_map(work, room['map_start'], room['map_bound'], cancelled=cancelled)
+    after = decode_map(work, room['map_start'], room['map_bound'], state=state,cancelled=cancelled)
+    check_map_storage(work,room['map_start'],room['map_bound'],cancelled=cancelled)
     behavior = raw[0x1f000+32*room['tileset']:0x1f020+32*room['tileset']]
-    if any(behavior[a & 31] != behavior[b & 31] or (a & 32) != (b & 32)
-           for a, b in zip(before['cells'], baseline['cells'])):
-        raise ValueError('current map collision differs from the verified original context')
-    if any(behavior[a & 31] != behavior[b & 31] or (a & 32) != (b & 32)
-           for a, b in zip(before['cells'], after['cells'])):
-        raise ValueError('initial primitive editing must preserve collision behavior and region bits')
-    _, markers = _markers(before['cells'], room['flags'])
-    _, new_markers = _markers(after['cells'], room['flags'])
-    _, root_markers = _markers(baseline['cells'], root['flags'])
-    if markers != root_markers:
-        raise ValueError('current trigger marker ordering differs from original')
-    if markers != new_markers:
-        raise ValueError('terrain edit changes generated interaction marker ordering')
-    def triggers(cells):
-        return [(i, t, behavior[t & 31]) for i, t in enumerate(cells) if behavior[t & 31] & 192 == 192]
-    if triggers(before['cells']) != triggers(baseline['cells']):
-        raise ValueError('current trigger cells differ from the original context')
-    if triggers(before['cells']) != triggers(after['cells']):
-        raise ValueError('terrain edit changes an existing trigger cell')
-    # Each header can use a different tileset/behavior table for the same stream.
-    # Preserving only the selected room would silently change another room's
-    # walkability, triggers or generated instance numbering.
-    for context in shared_contexts:
-        table=raw[0x1f000+context['tileset']*32:0x1f020+context['tileset']*32]
-        for candidate in (before['cells'],after['cells']):
-            if any(table[a&31]!=table[b&31] or (a&32)!=(b&32)
-                   for a,b in zip(baseline['cells'],candidate)):
-                raise ValueError('terrain edit changes collision in a shared map header')
-            if _markers(candidate,context['flags'])[1]!=_markers(baseline['cells'],context['flags'])[1]:
-                raise ValueError('terrain edit changes shared map interaction marker ordering')
-            if [(i,t) for i,t in enumerate(candidate) if table[t&31]&192==192] != [
-                    (i,t) for i,t in enumerate(baseline['cells']) if table[t&31]&192==192]:
-                raise ValueError('terrain edit changes a shared map trigger cell')
     # Proven walkable floor is behavior01. Other movement modes stay opaque.
+    positions=[]
     for change in changes:
         if change['kind'] in ('npc', 'arrival'):
             if change['kind'] == 'npc':
@@ -573,8 +677,15 @@ def plan_edits(path, original_path, header, changes, *, cancelled=lambda: False)
             else:
                 a = next(a for a in arrivals if a['table'] == change['table'] and a['id'] == change['id'])
                 x, y = _coord(change, 'x', a['x']), _coord(change, 'y', a['y'])
-            if behavior[after['cells'][y*64+x] & 31] != 1:
-                raise ValueError('position must be on proven walkable behavior01 terrain')
+            positions.append((x,y))
+    for variant in variants:
+        _check(cancelled)
+        initial=decode_map(original,root['map_start'],root['map_bound'],state=variant,cancelled=cancelled)
+        current=decode_map(raw,room['map_start'],room['map_bound'],state=variant,cancelled=cancelled)
+        changed=decode_map(work,room['map_start'],room['map_bound'],state=variant,cancelled=cancelled)
+        _validate_terrain_contexts(raw,shared_contexts,current['cells'],changed['cells'],initial['cells'],cancelled)
+        if any(behavior[changed['cells'][y*64+x]&31]!=1 for x,y in positions):
+            raise ValueError('position must be on proven walkable behavior01 terrain in every story state')
     if not edits:
         raise ValueError('no map changes to build')
     preview_rooms,preview_arrivals=_graph(work,cancelled)
@@ -583,5 +694,7 @@ def plan_edits(path, original_path, header, changes, *, cancelled=lambda: False)
             'preview_objects':_room(preview_rooms,header)['objects'],
             'preview_arrivals':[a for a in preview_arrivals if a['header']==header],
             'header': header, 'shared_headers': room['shared_headers'],
+            'preview_state':_state_document(state),'checked_state_variants':len(variants),
+            'state_coverage':'every encoded condition outcome across all sharing headers',
             'changed_cells': sum(a != b for a, b in zip(before['cells'], after['cells'])),
             'requires_native_playtest': True, 'native_verified': False, 'reference': REFERENCE}

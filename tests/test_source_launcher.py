@@ -41,15 +41,15 @@ class SourceLauncherTests(unittest.TestCase):
                 self.assertEqual(first['pid'],second['pid'],'normal py.exe discovery started a duplicate same-version server')
             finally:self.stop_owned()
 
-    def test_different_product_version_does_not_reuse_server(self):
+    def test_same_version_with_a_different_application_root_is_not_reused(self):
         class Handler(http.server.BaseHTTPRequestHandler):
             def do_POST(self):
-                self.rfile.read(int(self.headers.get('Content-Length','0')));raw=b'{"ok":true,"product":"ROMancer","version":"0.0.0"}';self.send_response(200);self.send_header('Content-Type','application/json');self.send_header('Content-Length',str(len(raw)));self.end_headers();self.wfile.write(raw)
+                self.rfile.read(int(self.headers.get('Content-Length','0')));raw=b'{"ok":true,"product":"ROMancer","version":"1.0.0"}';self.send_response(200);self.send_header('Content-Type','application/json');self.send_header('Content-Length',str(len(raw)));self.end_headers();self.wfile.write(raw)
             def log_message(self,*args):pass
         server=http.server.ThreadingHTTPServer(('127.0.0.1',0),Handler);thread=threading.Thread(target=server.serve_forever,daemon=True);thread.start()
         try:
             with tempfile.TemporaryDirectory() as folder:
                 try:
-                    workspace=Path(folder);(workspace/'connection.json').write_text(json.dumps({'pid':0,'url':f'http://127.0.0.1:{server.server_port}/#token=fixture'}),encoding='utf-8');value=self.launch(workspace);self.assertNotEqual(value['pid'],0)
+                    workspace=Path(folder);(workspace/'connection.json').write_text(json.dumps({'pid':0,'application_root':str(workspace/'other-app'),'url':f'http://127.0.0.1:{server.server_port}/#token=fixture'}),encoding='utf-8');value=self.launch(workspace);self.assertNotEqual(value['pid'],0)
                 finally:self.stop_owned()
         finally:server.shutdown();server.server_close()

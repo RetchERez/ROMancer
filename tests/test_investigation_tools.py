@@ -98,6 +98,23 @@ class InvestigationAPITests(unittest.TestCase):
         quarantine_restored_evidence(self.api.project(p))
         self.assertFalse(self.api.dispatch('investigations.probe',p)['ok'])
 
+    def test_probe_carries_acknowledged_playtest_input_at_observation(self):
+        from romancer.core_pins import CORE_PINS
+        inputs=[{'frames':90,'buttons':[],'port':0},{'frames':12,'buttons':['right'],'port':0}]
+        packet=self.packet(2,950)
+        packet.update(frame_index=102,core_sha256=CORE_PINS['nes']['sha256'],region_size=2048)
+        before=self.packet(1,1000)
+        before.update(frame_index=90,core_sha256=CORE_PINS['nes']['sha256'],region_size=2048)
+        with patch.object(self.api.studio,'observe',return_value=before):started=self.start()
+        with (patch.object(self.api.studio,'observe',return_value=packet),
+              patch.object(self.api.runtime,'replay_snapshot',return_value={'status':'READY','frames':102,'steps':inputs})):
+            after=self.api.dispatch('investigations.capture',{**self.params,'investigation_id':started['investigation_id'],
+                'label':'After','value':950,'relation':'decreased','delta':None})
+        candidate=next(c for c in after['candidates'] if c['offset']==17 and c['width']==2 and c['model']=='exact')
+        proposal=self.api.dispatch('investigations.probe',{**self.params,'investigation_id':after['investigation_id'],
+                                     'candidate_id':candidate['candidate_id']})
+        self.assertEqual(proposal['playtest_replay'],{'steps':inputs,'frames':102,'start_frame':90})
+
     def test_native_investigation_derives_probe_server_side_and_retains_provenance(self):
         p=self.correlated();replay={'steps':[{'frames':8,'buttons':[],'port':0}],
             'start_frame':4,'event_limit':30,'instruction_limit':100000,'timeout':10}

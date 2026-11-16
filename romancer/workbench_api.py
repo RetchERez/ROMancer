@@ -21,6 +21,8 @@ from .workbench_jobs import JobManager
 from .workbench_runtime import RuntimePool
 from . import ROMANCER_VERSION,ROMANCER_RELEASE_NAME,ROMANCER_BUILD_LABEL
 
+OPTIONAL_PARAMETERS={'games.maps.plan':{'state':None},'checks.from_trace':{'expectations':None}}
+
 
 class WorkbenchAPI:
     def __init__(self,workspace):
@@ -55,6 +57,8 @@ class WorkbenchAPI:
             'project.undelete':('trash_id',self._project_undelete),
             'rom.check':('project_id artifact_id expected_crc32 crc_scope',self._rom_check),
             'rom.samples':('query system_filter page limit',self._sample_catalog),
+            'rom.evidence':('sha256 size',self._corpus_evidence),
+            'coverage.status':('query system_filter page limit',self._coverage_status),
             'system.ui_ready':('launch_id',lambda p,c:self._ui_startup(p,True)),
             'system.ui_status':('launch_id',lambda p,c:self._ui_startup(p,False)),
             'recipes.list':('project_id artifact_id',self._recipes_list),
@@ -236,6 +240,10 @@ class WorkbenchAPI:
         self.graphics_access=GraphicsAccessTools(self);self.routes.update(self.graphics_access.routes())
         from .build_checks import BuildCheckTools
         self.checks=BuildCheckTools(self);self.routes.update(self.checks.routes())
+        from .replay_proof import ReplayProofTools
+        self.routes.update(ReplayProofTools(self).routes())
+        from .discoveries import DiscoveryTools
+        self.routes.update(DiscoveryTools(self).routes())
         from .popular_references import catalog as reference_catalog,inspect_template
         self.routes['references.catalog']=('query system_filter',lambda p,c:reference_catalog(p['query'],p['system_filter']))
         self.routes['references.template']=('project_id artifact_id template_id offset count stride',lambda p,c:inspect_template(self,p,c))
@@ -248,6 +256,10 @@ class WorkbenchAPI:
         for operation in tuple(self.routes):
             if operation.startswith('containers.') or operation in ('runtime.load_disc','route.run_disc','release.disc_set'):
                 del self.routes[operation]
+        from .release_scope import LEVEL_EDITOR_ENABLED, LEVEL_WRITE_OPERATIONS
+        if not LEVEL_EDITOR_ENABLED:
+            for operation in LEVEL_WRITE_OPERATIONS:
+                self.routes.pop(operation, None)
         self.jobs=JobManager(self.workspace,self.dispatch,set(self.routes)-{'system.capabilities','systems.list','projects.list','project.open','reports.list','reports.get','exports.list','drafts.list','drafts.get','drafts.save','drafts.move'})
         try:self.runtime=RuntimePool()
         except BaseException:self.jobs.close();raise
@@ -263,7 +275,11 @@ class WorkbenchAPI:
     def _game_inspect(self,p,c):
         from .verified_games import inspect
         project,row,path=self.source(p)
-        return inspect(project,row,path,cancelled=c)
+        result = inspect(project,row,path,cancelled=c)
+        from .release_scope import LEVEL_EDITOR_ENABLED
+        if not LEVEL_EDITOR_ENABLED and (result.get('profile') or {}).get('id') == 'ffl2-usa':
+            result.update(fields=[], visual=None, map_workbench=False)
+        return result
 
     def _game_maps(self,p,c,operation):
         from .verified_games import maps
@@ -293,8 +309,9 @@ class WorkbenchAPI:
 
 
     def _operations(self,p,c):
-        return {'ok':True,'operations':[{'name':name,'required_parameters':entry[0].split()} for name,entry in sorted(self.routes.items())],
-                'scope':'Operation names and required parameter names; value constraints are documented per operation.'}
+        return {'ok':True,'operations':[{'name':name,'required_parameters':entry[0].split(),
+                **({'optional_parameters':sorted(OPTIONAL_PARAMETERS[name])} if name in OPTIONAL_PARAMETERS else {})} for name,entry in sorted(self.routes.items())],
+                'scope':'Operation names, required and optional parameter names; value constraints are documented per operation.'}
 
     def _settings_get(self,p,c):
         from .app_settings import get_settings
@@ -416,9 +433,12 @@ class WorkbenchAPI:
             if operation=='jobs.cancel':fields(parameters,'job_id');return {'ok':True,**self.jobs.cancel(parameters['job_id'])}
             if operation=='jobs.list':fields(parameters,'');return {'ok':True,'jobs':self.jobs.list()}
             if operation not in self.routes:raise ValueError('unknown workbench operation')
-            names,handler=self.routes[operation];fields(parameters,names)
+            names,handler=self.routes[operation]
+            defaults=OPTIONAL_PARAMETERS.get(operation,{})
+            if defaults:parameters={**defaults,**parameters}
+            fields(parameters,names+' '+' '.join(defaults))
             if cancelled():raise KeyboardInterrupt
-            if operation in ('rom.scan.run','graphics.observe','traces.capture','traces.verify','checks.run','checks.from_trace','graphics.accesses.capture','assets.preview_scene'):return handler(parameters,cancelled)
+            if operation in ('rom.scan.run','graphics.observe','traces.capture','traces.verify','checks.run','checks.from_trace','release.replay','graphics.accesses.capture','assets.preview_scene'):return handler(parameters,cancelled)
             if 'project_id' in parameters:
                 project_id=projects.identifier(parameters['project_id'])
                 with self.operation_locks_guard:lock=self.operation_locks.setdefault(project_id,threading.RLock())
@@ -457,7 +477,7 @@ class WorkbenchAPI:
     def _capabilities(self,p,c):
         from .contracts import adapter_inventory
         from .system_registry import system_inventory
-        return {'ok': True, 'product': 'ROMancer', 'version': ROMANCER_VERSION, 'display_version': ROMANCER_BUILD_LABEL, 'release_name': ROMANCER_RELEASE_NAME, 'build_label': ROMANCER_BUILD_LABEL, 'target_version': '1.0', 'credit': 'By RetchEWretched', 'release_status': 'RELEASE', 'python': platform.python_version(), 'platform': platform.system(), 'pillow': importlib.util.find_spec('PIL') is not None, 'native_dialog': os.name == 'nt' or importlib.util.find_spec('tkinter') is not None, 'adapters': {**adapter_inventory(), 'adapters': [a for a in adapter_inventory()['adapters'] if a['id'] in ('nes', 'snes', 'genesis', 'gb', 'gbc', 'sms')]}, 'systems': system_inventory(), 'runtime_note': 'The full Windows release includes engines for all six systems. Source installations can use compatible local libretro cores. Gameplay evidence applies to the exact ROM and tested setup.'}
+        return {'ok': True, 'product': 'ROMancer', 'version': ROMANCER_VERSION, 'display_version': ROMANCER_BUILD_LABEL, 'release_name': ROMANCER_RELEASE_NAME, 'build_label': ROMANCER_BUILD_LABEL, 'target_version': ROMANCER_VERSION, 'credit': 'By RetchEWretched', 'release_status': 'RELEASE', 'python': platform.python_version(), 'platform': platform.system(), 'pillow': importlib.util.find_spec('PIL') is not None, 'native_dialog': os.name == 'nt' or importlib.util.find_spec('tkinter') is not None, 'adapters': {**adapter_inventory(), 'adapters': [a for a in adapter_inventory()['adapters'] if a['id'] in ('nes', 'snes', 'genesis', 'gb', 'gbc', 'sms')]}, 'systems': system_inventory(), 'runtime_note': 'The full Windows release includes engines for all six systems. Source installations can use compatible local libretro cores. Gameplay evidence applies to the exact ROM and tested setup.'}
 
     def _agent_config(self,p,c):
         if type(p['allow_writes']) is not bool or type(p['read_roots']) is not list or len(p['read_roots'])>8:raise ValueError('choose agent access and up to eight import folders')
@@ -681,8 +701,10 @@ class WorkbenchAPI:
         project,row,path=self.source(p);inspection=inspect_table(path,row['sha256'],p['definition'],0,1)
         if p['document_id']!=inspection['document_id']:raise ValueError('table definition or source changed; inspect it again')
         edits=table_edits(path,row['sha256'],p['definition'],p['changes'])
+        annotations={'kind':'reviewed-table-changes-v1','changes':[
+            {key: change[key] for key in ('field','row','before','after')} for change in p['changes'][:32]]}
         if row.get('system_id') in ('nes', 'snes', 'genesis', 'gb', 'gbc', 'sms'):
-            return self._integrity_plan({'project_id':p['project_id'],'artifact_id':p['artifact_id'],'edits':edits},c)
+            return self._integrity_plan({'project_id':p['project_id'],'artifact_id':p['artifact_id'],'edits':edits},c,annotations=annotations)
         return projects.plan_byte_edits(project,row['artifact_id'],edits)
 
     def _tables_batch(self,p,c):
@@ -946,8 +968,26 @@ class WorkbenchAPI:
             validate_profile(profile)
             return save_profile(self.workspace,p['system_id'],profile['core'],profile['options'],profile['system_dir'],profile['input_map'],controller_devices=devices)
 
-    def _profile_load_config(self,system_id):
-        checked=self._profile_validate({'system_id':system_id},lambda:False)
+    def _profile_load_config(self,system_id,row=None,project=None):
+        from .bundled_cores import cartridge_engine
+        from .runtime_profiles import load_profile,validate_profile
+        source_sha256=None
+        if row is not None:
+            ancestor=row
+            seen=set()
+            while ancestor.get('system_id')==system_id and ancestor['size']==row['size'] and not ancestor.get('layout_changed'):
+                _,compatibility=cartridge_engine(system_id,ancestor['sha256'])
+                if compatibility:
+                    source_sha256=ancestor['sha256']
+                    break
+                parent=ancestor.get('source_id')
+                if project is None or not parent or parent in seen or len(seen)>=128:
+                    break
+                seen.add(parent)
+                ancestor=projects.artifact(project,parent)
+        profile=load_profile(self.workspace,system_id,source_sha256=source_sha256)['profile']
+        if profile is None:raise ValueError('configure this system first')
+        checked=validate_profile(profile)
         result={k:checked[k] for k in ('core','expected_core_sha256','core_options','system_dir','system_files')}
         if checked.get('controller_devices'):result['controller_devices']=checked['controller_devices']
         return result
@@ -958,7 +998,7 @@ class WorkbenchAPI:
         import hashlib
         project,row,path=self.source(p)
         if row.get('system_id') not in ('nes', 'snes', 'genesis', 'gb', 'gbc', 'sms') or row['system_id']!=p['system_id']:raise ValueError('select an identified cartridge and its matching saved system setup')
-        checked=self._profile_load_config(p['system_id']);config={**checked,'game':str(path),'expected_game_sha256':row['sha256'],'session_dir':str(project/'sessions'/('check-'+uuid.uuid4().hex))}
+        checked=self._profile_load_config(p['system_id'],row,project);config={**checked,'game':str(path),'expected_game_sha256':row['sha256'],'session_dir':str(project/'sessions'/('check-'+uuid.uuid4().hex))}
         load=preflight_load(config,project)
         with OwnedRuntime(load,30,cancelled=c) as runtime:
             runtime.request('advance', frames=120, buttons=[], port=0);frame=runtime.request('capture');audio=runtime.request('audio')
@@ -976,13 +1016,13 @@ class WorkbenchAPI:
     def _runtime_profile(self,p,c):
         project,row,path=self.source(p)
         if row.get('system_id') and row['system_id']!=p['system_id']:raise ValueError('selected system differs from source identification')
-        config=self._profile_load_config(p['system_id'])
+        config=self._profile_load_config(p['system_id'],row,project)
         return self.runtime.load(project,row['artifact_id'],config['core'],config['core_options'],configuration=config,cancelled=c)
 
     def _runtime_saved_game(self,p,c):
         project,row,path=self.source(p);save_id=projects.identifier(p['save_id']);snapshot=load_script_json(project/'sessions'/(save_id+'.json'),max_bytes=12*1024**2)
         if 'save_ram_base64' not in snapshot:raise ValueError('choose a captured game-save record')
-        config=self._profile_load_config(p['system_id']);config['game_save']=snapshot
+        config=self._profile_load_config(p['system_id'],row,project);config['game_save']=snapshot
         return self.runtime.load(project,row['artifact_id'],config['core'],config['core_options'],configuration=config,cancelled=c)
 
     def _runtime_disc(self,p,c):
@@ -1058,9 +1098,17 @@ class WorkbenchAPI:
         evidence=store_evidence(project,'runtime',{'scope':'native_memory_snapshot','origin':'owned_native_worker',**result})
         return {**result,'evidence_id':evidence['evidence_id']}
 
+    def _corpus_evidence(self,p,c):
+        from .corpus_evidence import lookup
+        return lookup(p['sha256'],p['size'])
+
     def _sample_catalog(self,p,c):
         from .rom_sample_db import catalog
         return catalog(p['query'],p['system_filter'],p['page'],p['limit'])
+
+    def _coverage_status(self,p,c):
+        from .game_coverage import status
+        return status(p['query'],p['system_filter'],p['page'],p['limit'])
 
     def _rom_check(self,p,c):
         from .rom_health import check_rom
@@ -1328,7 +1376,7 @@ class WorkbenchAPI:
         if 'container_id' in p:raise ValueError('Choose a supported cartridge source.')
         project,row,path=self.source(p);require_supported(row)
         if 'system_id' in p:
-            config=self._profile_load_config(p['system_id'])
+            config=self._profile_load_config(p['system_id'],row,project)
             if row.get('system_id') and row['system_id']!=p['system_id']:raise ValueError('configured system differs from selected image')
             return project,{**config,'game':str(path),'expected_game_sha256':row['sha256'],'session_dir':str(project/'sessions'/uuid.uuid4().hex)}
         project,row,_=self.source(p);core=checked_path(Path(p['core']));identity=projects._measure(core)

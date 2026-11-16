@@ -51,4 +51,16 @@ globalThis.document={getElementById:id=>({value:({'series-title':'A number','ser
  ctx.state.runtime=null;assert.match(await investigationSeries(ctx),/Playtest/);
  releaseProjectResources(ctx.state);assert.equal(ctx.state.investigationSeries,null,'Closing a project releases investigation UI data.');
 }
+{
+ const {ctx,state,actions}=fixture();state.page='playtest';let page='';
+ ctx.navigate=async target=>page=target;
+ const html=await investigationSeries(ctx,{compact:true});
+ assert.match(html,/Track a value/);assert.doesNotMatch(html,/Memory range/);
+ await actions['series-start']();
+ const captured=await investigationSeries(ctx,{compact:true});
+ assert.match(captured,/Open investigation/);assert.doesNotMatch(captured,/Correlated hypotheses/);
+ await actions['series-open-investigation']();assert.equal(page,'debug');
+ state.playing=true;
+ await assert.rejects(actions['series-capture'](),/pause/i);
+}
 console.log('Universal investigation UI preserves evidence, scope, history and native-session boundaries.');

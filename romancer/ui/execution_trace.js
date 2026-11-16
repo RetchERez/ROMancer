@@ -10,6 +10,7 @@ export async function executionTrace(ctx){
  if(entry?.scope!==scope)state.nativeTrace=entry={scope,generation:0,result:null,steps:[{}]};
  const current=()=>selectionKey(state)===scope&&state.nativeTrace===entry;
  const proposal=state.nativeProbe?.scope===scope&&identity(state,state.nativeProbe.result)?state.nativeProbe.result:null;
+ const playtestReplay=proposal?.playtest_replay;
  if(!entry.checked){
   entry.checked=true;
   try{const r=await ctx.api.call('debugger.capabilities',params);if(current()){
@@ -35,6 +36,20 @@ export async function executionTrace(ctx){
   entry.result=r;entry.loaded=true;ctx.setDraft('native-trace-id',r.evidence_id);await ctx.render();
  };
  ctx.use({
+  'trace-replay-playtest':()=>{
+   if(!current()||!playtestReplay)throw Error('Capture a new Playtest observation before replaying it.');
+   if(!available)throw Error(reason);
+   const {steps,start_frame}=playtestReplay;
+   return accept('debugger.investigate',{investigation_id:proposal.investigation_id,
+    candidate_id:proposal.candidate.candidate_id,replay:{steps,start_frame,event_limit:200,instruction_limit:20000000,timeout:30}});
+  },
+  'trace-replay-read':()=>{
+   if(!current()||!playtestReplay)throw Error('Capture a new Playtest observation before replaying it.');
+   if(!available)throw Error(reason);
+   const {steps,start_frame}=playtestReplay,start=integer('trace-read-address',0,0xffffff),length=integer('trace-read-length',1,256);
+   return accept('debugger.capture',{config:{steps,start_frame,event_limit:200,instruction_limit:20000000,timeout:30,
+    probes:[{kind:'read',start,end:start+length-1}]}});
+  },
   'trace-capture':()=>{
    if(!current())throw Error('The selected source changed.');if(!available)throw Error(reason);
    const replay={steps:steps(),start_frame:integer('trace-start',0,3599),event_limit:integer('trace-limit',1,2000),instruction_limit:20000000,timeout:30};
@@ -71,7 +86,10 @@ export async function executionTrace(ctx){
  const instructions=!result?.instruction_samples?.length?'':`<details><summary>Native instruction samples · ${esc(result.total_instruction_samples)}</summary><p>Ordered within this instruction sample only. The memory-access sequence has separate ordering.</p><div class="table-wrap"><table><thead><tr><th>Sample</th><th>CPU PC</th><th>Disassembly</th></tr></thead><tbody>${result.instruction_samples.map(row=>`<tr><td>${esc(row.id)}</td><td><code>${hex(row.pc)}</code></td><td><code>${esc(row.assembly)}</code></td></tr>`).join('')}</tbody></table></div></details>`;
  const budget=state.artifact.system_id==='genesis'?'At most 3,600 frames and 30 seconds. Global instruction sampling is separate from read/write watches and stops after at most 2,000 records; it does not count every instruction executed during the rest of the replay.':'At most 3,600 frames, 20 million instruction callbacks and 30 seconds.';
  const download=entry.capabilities?.download,preparation=!available&&download?.preparable?`<div class="notice"><p>Prepare the official debugger once · ${(download.download_bytes/1048576).toFixed(1)} MiB download. Later captures work offline. No ROM data is uploaded.</p><p>External tool license: ${esc(download.license)} · <a href="${esc(download.source_url)}" target="_blank" rel="noopener noreferrer">Upstream source and notices</a></p>${button('Prepare debugger','trace-prepare',{primary:true})}</div>`:'';
- return `<section class="card native-execution-trace" id="native-accesses"><div class="card-heading"><h2>Trace actual accesses</h2>${button('Check debugger','trace-recheck')}</div><p>Replay from power on with normal controller input. Record accesses and their execution context, then inspect mapped source bytes. This is a separate session; it does not resume Playtest.</p>${!available?`<p class="notice warm">${esc(reason)}</p>`:''}${entry.error?`<p class="notice warm">${esc(entry.error)}</p>`:''}${preparation}${watched}${route}${button(proposal?'Replay & investigate this value':'Replay & capture accesses','trace-capture',{primary:true,disabled:!available,reason})}<p class="subtle">${budget} Context is a lead; DMA ownership and the meaning of a value remain unproven.</p>${evidence}${investigationFollow(ctx,result,entry)}${instructions}</section>`;
+ const manual=route+button(proposal?'Replay & investigate this value':'Replay & capture accesses','trace-capture',{primary:!playtestReplay,disabled:!available,reason});
+ const recorded=playtestReplay?`<div class="actions">${button('Replay last Playtest change','trace-replay-playtest',{primary:true,disabled:!available,reason})}<span>Frames ${playtestReplay.start_frame}–${playtestReplay.frames}</span></div>`:'';
+ const reads=playtestReplay&&result?`<details><summary>Watch a ROM read during this replay</summary><p>Use a CPU address you identified in the writer code. The capture reports any read that maps to ROM bytes.</p><div class="field-row">${field('trace-read-address','CPU read address',ctx.draft('trace-read-address',''),{placeholder:'For example 0x9700'})}${field('trace-read-length','Address bytes',ctx.draft('trace-read-length','1'))}</div>${button('Replay and capture reads','trace-replay-read',{disabled:!available,reason})}</details>`:'';
+ return `<section class="card native-execution-trace" id="native-accesses"><div class="card-heading"><h2>Trace actual accesses</h2>${button('Check debugger','trace-recheck')}</div><p>Replay from power on to record accesses in a separate debugger session, then inspect mapped source bytes.</p>${!available?`<p class="notice warm">${esc(reason)}</p>`:''}${entry.error?`<p class="notice warm">${esc(entry.error)}</p>`:''}${preparation}${watched}${recorded}${playtestReplay?'<details><summary>Set up a custom replay</summary>'+manual+'</details>':manual}<p class="subtle">${budget}</p>${evidence}${investigationFollow(ctx,result,entry)}${reads}${instructions}</section>`;
 }
 
 export async function observedSourceContext(ctx){

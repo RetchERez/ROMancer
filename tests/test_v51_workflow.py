@@ -34,7 +34,7 @@ class FoundationAPITests(unittest.TestCase):
                 fresh=api.dispatch('systems.identify',params);self.assertEqual(fresh['source']['sha256'],row['sha256'])
                 self.assertFalse(fresh['write_authorized']);self.assertFalse(fresh['runtime_verified'])
                 caps=api.dispatch('system.capabilities',{});self.assertEqual(caps['version'],__import__('romancer').ROMANCER_VERSION)
-                self.assertEqual(caps['target_version'],'1.0');self.assertIn('adapters',caps)
+                self.assertEqual(caps['target_version'],ROMANCER_VERSION);self.assertIn('adapters',caps)
                 inventory=api.dispatch('systems.list',{});self.assertEqual(len(inventory['systems']),6)
                 with self.assertRaises(ValueError):api.jobs.submit('systems.list',{})
                 self.assertFalse(api.dispatch('systems.identify',{**params,'path':str(fixture)})['ok'])

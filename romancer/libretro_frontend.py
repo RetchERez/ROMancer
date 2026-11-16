@@ -97,6 +97,7 @@ RETRO_ENVIRONMENT_GET_VARIABLE = 15
 RETRO_ENVIRONMENT_SET_VARIABLES = 16
 RETRO_ENVIRONMENT_GET_VARIABLE_UPDATE = 17
 RETRO_ENVIRONMENT_GET_LIBRETRO_PATH = 19
+RETRO_ENVIRONMENT_GET_SENSOR_INTERFACE = 25 | 0x10000
 RETRO_ENVIRONMENT_GET_CORE_ASSETS_DIRECTORY = 30
 RETRO_ENVIRONMENT_GET_SAVE_DIRECTORY = 31
 RETRO_ENVIRONMENT_SET_SYSTEM_AV_INFO = 32
@@ -191,6 +192,12 @@ AudioCB = ctypes.CFUNCTYPE(None, ctypes.c_int16, ctypes.c_int16)
 AudioBatchCB = ctypes.CFUNCTYPE(ctypes.c_size_t, ctypes.POINTER(ctypes.c_int16), ctypes.c_size_t)
 InputPollCB = ctypes.CFUNCTYPE(None)
 InputStateCB = ctypes.CFUNCTYPE(ctypes.c_int16, ctypes.c_uint, ctypes.c_uint, ctypes.c_uint, ctypes.c_uint)
+SetSensorStateCB = ctypes.CFUNCTYPE(ctypes.c_bool, ctypes.c_uint, ctypes.c_int, ctypes.c_uint)
+GetSensorInputCB = ctypes.CFUNCTYPE(ctypes.c_float, ctypes.c_uint, ctypes.c_uint)
+
+
+class RetroSensorInterface(ctypes.Structure):
+    _fields_ = [('set_sensor_state', SetSensorStateCB), ('get_sensor_input', GetSensorInputCB)]
 
 
 def _decode_cstr(value: bytes | None) -> str:
@@ -310,6 +317,11 @@ class LibretroFrontend:
         self.frame_index = 0
         self.last_frame: Frame | None = None
         self._joypads: dict[int, int] = {0: 0}
+        self._accelerometer_enabled = False
+        self._sensor_interface = None
+        if self._user_core_options.get('romancer_mbc7_tilt') == 'dpad-v1':
+            self._sensor_interface = RetroSensorInterface(
+                SetSensorStateCB(self._set_sensor_state), GetSensorInputCB(self._sensor_input))
         self._game_buffer = None
         self._game_path_b: bytes | None = None
         self._loaded = False
@@ -676,8 +688,26 @@ class LibretroFrontend:
         return bool(self._disk_control.set_eject_state(bool(ejected)))
 
     # ----------------------------- callbacks -----------------------------
+    def _set_sensor_state(self, port: int, action: int, rate: int) -> bool:
+        if port != 0 or action not in (0, 1):  # Accelerometer enable or disable
+            return False
+        self._accelerometer_enabled = action == 0
+        return True
+
+    def _sensor_input(self, port: int, axis: int) -> float:
+        if port != 0 or not self._accelerometer_enabled or axis not in (0, 1):
+            return 0.0
+        positive, negative = (('right', 'left'), ('down', 'up'))[axis]
+        mask = self._joypads.get(0, 0)
+        return float(bool(mask & (1 << BUTTON_IDS[positive])) - bool(mask & (1 << BUTTON_IDS[negative])))
+
     def _environment(self, cmd: int, data: int) -> bool:
         try:
+            if cmd == RETRO_ENVIRONMENT_GET_SENSOR_INTERFACE:
+                if not data or self._sensor_interface is None:
+                    return False
+                ctypes.cast(data, ctypes.POINTER(RetroSensorInterface))[0] = self._sensor_interface
+                return True
             if cmd == RETRO_ENVIRONMENT_GET_CAN_DUPE:
                 ctypes.cast(data, ctypes.POINTER(ctypes.c_bool))[0] = True
                 return True

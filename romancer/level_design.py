@@ -1,9 +1,11 @@
 """Declared fixed-capacity level data. No inferred game semantics or allocation."""
 import hashlib
 from .asset_schema import fields,number,label
-from .asset_codecs import cell_size,decode_cell,CODECS
 from .script_schema import canonical_bytes
 from .level_semantics import collision_types,validate_hitbox,validate_changed_hitboxes,validate_sprite
+from .scene_schema import normalize_scene,validate_scene
+from .level_palette import storage_length,decode_palette
+from .level_tiles import decode_tiles
 
 
 def _identity(raw,definition,source_sha256):
@@ -57,7 +59,7 @@ def inspect_level(raw,definition,source_sha256):
     from .studio_runtime import validate_studio_data
     validate_studio_data(raw)
     d=__import__('json').loads(canonical_bytes(definition,max_bytes=256*1024))
-    fields(d,'schema_version source_sha256 name tiles metatiles rooms');number(d['schema_version'],1,1);label(d['name'])
+    fields(d,'schema_version source_sha256 name tiles metatiles rooms'+(' scene' if 'scene' in d else ''));number(d['schema_version'],1,1);label(d['name'])
     ranges=[]
     def storage(offset,length,name):
         number(offset,0,len(raw)-1);number(length,1,len(raw))
@@ -69,32 +71,48 @@ def inspect_level(raw,definition,source_sha256):
         if g['endian'] not in ('little','big'):raise ValueError('invalid integer byte order')
         storage(g['offset'],count*g['entry_bytes'],name)
         return [int.from_bytes(raw[g['offset']+i*g['entry_bytes']:g['offset']+(i+1)*g['entry_bytes']],g['endian']) for i in range(count)]
-    t=d['tiles'];fields(t,'offset count codec palette_offset palette_format');number(t['count'],1,1024)
-    unit=cell_size(t['codec'],8,8);storage(t['offset'],t['count']*unit,'tiles')
-    tiles=[decode_cell(raw[t['offset']+i*unit:t['offset']+(i+1)*unit],codec=t['codec'],width=8,height=8) for i in range(t['count'])]
-    colors=2**CODECS[t['codec']]
-    if t['palette_format'] not in ('rgb888','rgb555-le','rgb555-be'):raise ValueError('unsupported declared level palette')
-    n=3 if t['palette_format']=='rgb888' else 2;storage(t['palette_offset'],colors*n,'palette');palette=[]
-    for i in range(colors):
-        data=raw[t['palette_offset']+i*n:t['palette_offset']+(i+1)*n]
-        if n==3:palette.append(list(data))
-        else:
-            value=int.from_bytes(data,'little' if t['palette_format'].endswith('le') else 'big')
-            palette.append([round(((value>>shift)&31)*255/31) for shift in (0,5,10)])
-    m=d['metatiles'];fields(m,'offset count width height entry_bytes endian');number(m['count'],1,1024);number(m['width'],1,8);number(m['height'],1,8)
-    parts=m['width']*m['height'];flat=format_grid({k:m[k] for k in ('offset','entry_bytes','endian')},m['count']*parts,'metatiles')
-    if any(v>=len(tiles) for v in flat):raise ValueError('metatile references an undeclared tile')
-    blocks=[flat[i*parts:(i+1)*parts] for i in range(m['count'])]
+    t=d['tiles'];tiles,colors,segments=decode_tiles(raw,t,storage)
+    length=storage_length(t['palette_format'],colors);storage(t['palette_offset'],length,'palette')
+    palette=decode_palette(raw[t['palette_offset']:t['palette_offset']+length],t['palette_format'],colors)
+    m=d['metatiles']
+    if type(m) is not dict:raise ValueError('metatile definition must be an object')
+    stored=m.get('kind')!='identity'
+    if not stored:
+        fields(m,'kind');block_width=block_height=parts=1;blocks=[[i] for i in range(len(tiles))]
+    else:
+        fields(m,'offset count width height entry_bytes endian');number(m['count'],1,1024);number(m['width'],1,8);number(m['height'],1,8)
+        block_width=m['width'];block_height=m['height'];parts=block_width*block_height
+        flat=format_grid({k:m[k] for k in ('offset','entry_bytes','endian')},m['count']*parts,'metatiles')
+        if any(v>=len(tiles) for v in flat):raise ValueError('metatile references an undeclared tile')
+        blocks=[flat[i*parts:(i+1)*parts] for i in range(m['count'])]
     if type(d['rooms']) is not list or not 1<=len(d['rooms'])<=32:raise ValueError('declare 1 to 32 rooms')
-    rooms=[];ids=set();uses={str(i):[] for i in range(m['count'])};total=0
+    rooms=[];ids=set();uses={str(i):[] for i in range(len(blocks))};total=0
     for r in d['rooms']:
-        fields(r,'id name width height terrain collision objects'+''.join(' '+key for key in ('object_metadata','collision_types') if type(r) is dict and key in r));label(r['id']);label(r['name'])
+        fields(r,'id name width height terrain collision objects'+''.join(' '+key for key in ('object_metadata','collision_types','elevation','references') if type(r) is dict and key in r));label(r['id']);label(r['name'])
+        if 'references' in r:
+            if type(r['references'])is not list or len(r['references'])>256:raise ValueError('too many declared room references')
+            for name in r['references']:label(name,128)
+            if len(set(r['references']))!=len(r['references']):raise ValueError('duplicate declared room reference')
         if r['id'] in ids:raise ValueError('duplicate room ID')
         ids.add(r['id']);number(r['width'],1,128);number(r['height'],1,128);count=r['width']*r['height'];total+=count
         if total>32768 or count*parts*64>4*1024**2:raise ValueError('level preview exceeds pixel budget')
-        terrain=format_grid(r['terrain'],count,r['id']+' terrain')
+        terrain_storage=None
+        g=r['terrain']
+        if type(g) is dict and 'codec' in g:
+            from .column_terrain import decode_stream,INTERACTIVE
+            fields(g,'codec offset length')
+            if g['codec']!='sml-column-segments-v1' or (r['width'],r['height'])!=(20,16):
+                raise ValueError('unsupported encoded terrain layout or dimensions')
+            number(g['length'],20,0x4000);storage(g['offset'],g['length'],r['id']+' terrain')
+            encoded=decode_stream(raw[g['offset']:g['offset']+g['length']],base=g['offset'])
+            if encoded.consumed!=g['length']:raise ValueError('encoded terrain length includes undeclared trailing bytes')
+            terrain=list(encoded.tiles)
+            terrain_storage={'codec':g['codec'],'origins':list(encoded.origins),'overlaps':encoded.overlaps,
+                'protected_values':sorted(INTERACTIVE),'operands':[{'offset':o.offset,'tile':o.tile,'repeat':o.repeat,'cells':list(o.cells)}for o in encoded.operands]}
+        else:terrain=format_grid(g,count,r['id']+' terrain')
         if any(v>=len(blocks) for v in terrain):raise ValueError('room references an undeclared metatile')
         collision=format_grid(r['collision'],count,r['id']+' collision') if r['collision'] is not None else None
+        elevation=format_grid(r['elevation'],count,r['id']+' elevation') if r.get('elevation') is not None else None
         objects=[];o=r['objects']
         if o is not None:
             fields(o,'offset count stride fields');number(o['count'],1,256);number(o['stride'],1,128);storage(o['offset'],o['count']*o['stride'],r['id']+' objects')
@@ -114,10 +132,14 @@ def inspect_level(raw,definition,source_sha256):
                     number(value,f.get('minimum',0),maximum);obj[f['name']]=value
                 objects.append(obj)
         for i,value in enumerate(terrain):uses[str(value)].append({'room_id':r['id'],'cell':i})
-        rooms.append({'id':r['id'],'name':r['name'],'width':r['width'],'height':r['height'],'terrain':terrain,'collision':collision,'collision_types':collision_types(r),'objects':objects})
+        rooms.append({'id':r['id'],'name':r['name'],'width':r['width'],'height':r['height'],'terrain':terrain,'collision':collision,'elevation':elevation,'collision_types':collision_types(r),'objects':objects})
+        if terrain_storage is not None:rooms[-1]['terrain_storage']=terrain_storage
+        if 'references' in r:rooms[-1]['references']=list(r['references'])
+    scene=normalize_scene(d.get('scene'),block_width*8,block_height*8)
+    if 'scene' in d or any(r['elevation'] is not None for r in rooms):validate_scene(scene,rooms,d['rooms'])
     connections=_connections(rooms,d['rooms'],len(tiles),colors)
     document_id=hashlib.sha256(canonical_bytes(d,max_bytes=256*1024)).hexdigest()
-    result={'ok':True,'document_id':document_id,'source_sha256':source_sha256,'definition':d,'tiles':tiles,'palette':palette,'metatiles':blocks,'block_width':m['width'],'block_height':m['height'],'rooms':rooms,'connections':connections,'uses':uses,'ranges':[{'offset':a,'length':b-a,'name':name} for a,b,name in ranges],'game_semantics_verified':False}
+    result={'ok':True,'document_id':document_id,'source_sha256':source_sha256,'definition':d,'scene':scene,'tiles':tiles,'tile_segments':segments,'palette':palette,'metatiles':blocks,'metatiles_stored':stored,'block_width':block_width,'block_height':block_height,'rooms':rooms,'connections':connections,'uses':uses,'ranges':[{'offset':a,'length':b-a,'name':name} for a,b,name in ranges],'game_semantics_verified':False}
     try:canonical_bytes(result,max_bytes=2*1024**2)
     except ValueError as exc:raise ValueError('combined level preview budget exceeded; declare fewer rooms, cells or tiles') from exc
     return result
@@ -127,15 +149,16 @@ def plan_level(raw,definition,document_id,changes,source_sha256):
     doc=inspect_level(raw,definition,source_sha256)
     if doc['document_id']!=document_id:raise ValueError('level review document is stale')
     if type(changes) is not list or not 1<=len(changes)<=8192:raise ValueError('review 1 to 8192 level changes')
-    d=doc['definition'];writes={};seen=set();affected=set()
+    d=doc['definition'];writes={};seen=set();seen_after={};affected=set();encoded_changes=False
     for change in changes:
         if type(change) is not dict:raise ValueError('level changes must be JSON objects')
-        kind=change.get('kind')
+        kind=change.get('kind');encoded_change=False
         if kind=='metatile':
+            if not doc['metatiles_stored']:raise ValueError('identity tile blocks are derived, not a stored metatile table')
             fields(change,'kind index part value');m=d['metatiles'];number(change['index'],0,m['count']-1);number(change['part'],0,m['width']*m['height']-1);number(change['value'],0,len(doc['tiles'])-1)
             offset=m['offset']+(change['index']*m['width']*m['height']+change['part'])*m['entry_bytes'];width=m['entry_bytes'];endian=m['endian']
             affected.update(use['room_id'] for use in doc['uses'][str(change['index'])])
-        elif kind in ('terrain','collision','object'):
+        elif kind in ('terrain','collision','elevation','object'):
             r=next((r for r in d['rooms'] if r['id']==change.get('room_id')),None)
             if r is None:raise ValueError('unknown room')
             affected.add(r['id'])
@@ -149,13 +172,28 @@ def plan_level(raw,definition,document_id,changes,source_sha256):
                 if metadata and metadata['role']=='exit' and metadata['reference']['field']==f['name'] and change['value'] not in [target['value'] for target in metadata['reference']['targets']]:raise ValueError('exit destination is not mapped')
                 number(change['value'],f.get('minimum',0),maximum);offset=o['offset']+change['index']*o['stride']+f['offset'];width=f['bytes'];endian=f['endian']
             else:
-                fields(change,'kind room_id index value');number(change['index'],0,r['width']*r['height']-1);g=r[kind]
-                if g is None:raise ValueError('collision is not declared')
-                width=g['entry_bytes'];endian=g['endian'];number(change['value'],0,len(doc['metatiles'])-1 if kind=='terrain' else (1<<(8*width))-1);offset=g['offset']+change['index']*width
+                fields(change,'kind room_id index value');number(change['index'],0,r['width']*r['height']-1);g=r.get(kind)
+                if g is None:raise ValueError('requested room layer is not declared')
+                if kind=='terrain' and 'codec' in g:
+                    from .column_terrain import edit_operands
+                    room_doc=next(v for v in doc['rooms']if v['id']==r['id'])
+                    number(change['value'],0,len(doc['metatiles'])-1)
+                    offset=room_doc['terrain_storage']['origins'][change['index']]
+                    if offset is None:
+                        if change['value']==room_doc['terrain'][change['index']]:continue
+                        raise ValueError('This implicit blank has no stored operand; growing the stream is not supported.')
+                    edit_operands(raw[g['offset']:g['offset']+g['length']],base=g['offset'],edits=[{'offset':offset,'tile':change['value']}])
+                    width=1;endian='little';encoded_change=True;encoded_changes=True
+                else:
+                    width=g['entry_bytes'];endian=g['endian'];maximum=len(doc['metatiles'])-1 if kind=='terrain' else min(1024,(1<<(8*width))-1) if kind=='elevation' else (1<<(8*width))-1
+                    number(change['value'],0,maximum);offset=g['offset']+change['index']*width
         else:raise ValueError('unknown level change')
         key=(offset,width)
-        if key in seen:raise ValueError('duplicate level edit')
-        seen.add(key);after=change['value'].to_bytes(width,endian);before=raw[offset:offset+width]
+        after=change['value'].to_bytes(width,endian)
+        if key in seen:
+            if encoded_change and seen_after[key]==after:continue
+            raise ValueError('shared operand has conflicting edits' if encoded_change else 'duplicate level edit')
+        seen.add(key);seen_after[key]=after;before=raw[offset:offset+width]
         if before!=after:writes[offset]={'offset':offset,'before':before.hex(),'after':after.hex()}
     if not writes:raise ValueError('no changed level bytes')
     shadow=bytearray(raw)
@@ -163,4 +201,10 @@ def plan_level(raw,definition,document_id,changes,source_sha256):
     validate_changed_hitboxes(shadow,d['rooms'])
     from .studio_runtime import validate_studio_data
     validate_studio_data(bytes(shadow))
-    return {'ok':True,'edits':[writes[k] for k in sorted(writes)],'affected_rooms':sorted(affected),'document_id':document_id,'source_sha256':source_sha256}
+    if encoded_changes or 'scene' in d or any(r.get('elevation') is not None for r in d['rooms']):
+        shadow_definition=__import__('copy').deepcopy(d);shadow_sha=hashlib.sha256(shadow).hexdigest();shadow_definition['source_sha256']=shadow_sha
+        inspect_level(bytes(shadow),shadow_definition,shadow_sha)
+    result={'ok':True,'edits':[writes[k] for k in sorted(writes)],'affected_rooms':sorted(affected),'document_id':document_id,'source_sha256':source_sha256}
+    if encoded_changes:
+        result['affected_cells']=[{'room_id':r['id'],'cells':[i for i,offset in enumerate(r['terrain_storage']['origins'])if offset in writes]}for r in doc['rooms']if r.get('terrain_storage') and any(offset in writes for offset in r['terrain_storage']['origins'])]
+    return result

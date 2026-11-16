@@ -19,12 +19,20 @@ Master System playtesting reuses the same separately licensed BlastEm engine;
 its original notices and corresponding source remain included.
 
 The full Windows release includes separately licensed FCEUmm, bsnes-mercury Balanced,
-BlastEm and Gambatte engines. Their licenses, original notices, source commits,
+BlastEm, Gambatte and a Game Boy Color build of mGBA. The mGBA component's
+MPL-2.0 and retained component notices are provided with the source and
+the documented Game Boy-only build changes. Engine licenses, original
+notices, source commits,
 DLL hashes and corresponding-source archive are retained under cores/. The engines
 are third-party code; ROMancer does not claim authorship or relicense them as MIT.
 ROMancer's MIT grant applies to its own project code. The runtime worker source and
 bridge are included in the ROMancer source package. Redistribute the corresponding
 source and component notices alongside the engine binaries.
+
+The GPL-3.0 bsnes-mercury DSP-4 build includes ROMancer's serializer fix for
+the verified Top Gear 3000 cartridge. Its corresponding source, exact patch
+and original license are in the engine pack. Other SNES cartridges use the
+original pinned bsnes-mercury build.
 
 The source-only archive contains ROMancer code and engine metadata/build recipes;
 it does not embed upstream emulator implementations. The separate engine pack includes

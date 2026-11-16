@@ -12,7 +12,7 @@ import zipfile
 
 if __package__ in (None,''):sys.path.insert(0,str(Path(__file__).resolve().parents[1]))
 
-from tools.install_windows import safe_name,verify_tree
+from tools.install_windows import INSTALL_LAYOUT,safe_name,verify_tree
 
 PINS={
     'python':{'file':'python-3.14.9-embed-amd64.zip','sha256':'3c01d7cfc666f746a6f064f60fb2156ab0ec464d3d738ab796371a46a9bb24a2','url':'https://www.python.org/ftp/python/3.14.9/python-3.14.9-embed-amd64.zip','version':'3.14.9','license':'PSF-2.0 and bundled notices'},
@@ -54,7 +54,7 @@ try {
         try {
             $romancerOld=Get-Content -LiteralPath $romancerConnection -Raw|ConvertFrom-Json
             $romancerUri=[uri]$romancerOld.url
-            if ($romancerUri.Host -eq '127.0.0.1' -and $romancerUri.Scheme -eq 'http') {
+            if ($romancerOld.application_root -ieq (Join-Path $PSScriptRoot 'app') -and $romancerUri.Host -eq '127.0.0.1' -and $romancerUri.Scheme -eq 'http') {
                 $romancerCheck=Invoke-RestMethod -Uri ($romancerUri.GetLeftPart('Authority')+'/api/call') -Method Post -ContentType 'application/json' -Headers @{Authorization=('Bearer '+$romancerUri.Fragment.Replace('#token=',''))} -Body '{"operation":"system.capabilities","parameters":{}}' -TimeoutSec 2
                 if ($romancerCheck.product -eq 'ROMancer' -and $romancerCheck.version -eq $romancerVersion) {
                     if (-not $NoBrowser) {Open-ROMancerWindow -Url $romancerOld.url -Workspace $Workspace};Write-Output 'ROMancer reopened.';exit 0
@@ -136,7 +136,7 @@ def build_bundle(app_root,downloads,destination,*,cores=None,observers=None):
             if path.is_file():
                 with path.open('rb') as stream:sha=hashlib.file_digest(stream,'sha256').hexdigest()
                 rows.append({'path':path.relative_to(stage).as_posix(),'size':path.stat().st_size,'sha256':sha})
-        manifest={'schema_version':1,'product':'ROMancer','version':ROMANCER_VERSION,'release_name':ROMANCER_RELEASE_NAME,'build_label':ROMANCER_BUILD_LABEL,'credit':'By RetchEWretched','platform':'windows-amd64','runtime':PINS,'engines':{'included':bool(engines),'systems':CORE_PINS if engines else {}},'files':rows}
+        manifest={'schema_version':1,'product':'ROMancer','version':ROMANCER_VERSION,'release_name':ROMANCER_RELEASE_NAME,'build_label':ROMANCER_BUILD_LABEL,'credit':'By RetchEWretched','platform':'windows-amd64','install_layout':INSTALL_LAYOUT,'runtime':PINS,'engines':{'included':bool(engines),'systems':CORE_PINS if engines else {}},'files':rows}
         if native:manifest['observers']={'included':True,'families':['MesenCE 2.2.1 + physical-ppu-access-v2','MAME 0.289'],'source_included':True}
         (stage/'BUNDLE.json').write_text(json.dumps(manifest,indent=2)+'\n',encoding='utf-8');verify_tree(stage)
         from romancer.patch_sets import _publish_directory

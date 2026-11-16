@@ -7,13 +7,14 @@ import argparse
 import hashlib
 import json
 import os
+import re
 from pathlib import Path
 import subprocess
 import sys
 import tempfile
 
 if __package__ in (None,''):sys.path.insert(0,str(Path(__file__).resolve().parents[1]))
-from tools.install_windows import verify_tree
+from tools.install_windows import bundle_slot,verify_tree
 
 NSIS_PIN={'file':'nsis-3.13.zip','sha256':'ba63dffc4410ee89193e1cb5a41989991bd77c61068da17e3156d136b7b0b3d8',
           'url':'https://downloads.sourceforge.net/project/nsis/NSIS%203/3.13/nsis-3.13.zip'}
@@ -25,21 +26,24 @@ def literal(value):
     return value.replace('$','$$').replace('"','$\\"')
 
 
-def installer_script(payload,output,version):
+def installer_script(payload,output,version,*,slot=None):
     payload=literal(Path(payload).absolute());output=literal(Path(output).absolute())
-    if not __import__('re').fullmatch(r'\d+\.\d+\.\d+',version):raise ValueError('installer requires an immutable numeric build revision')
+    if not re.fullmatch(r'[0-9]+[.][0-9]+[.][0-9]+',version):raise ValueError('installer requires a numeric release version')
+    slot = version if slot is None else slot
+    if not re.fullmatch(re.escape(version)+r'(?:-[0-9a-f]{16})?',slot):raise ValueError('installer package slot differs from its release')
     return r'''Unicode true
 RequestExecutionLevel user
 SetCompressor /SOLID zlib
 SetDatablockOptimize on
-Name "ROMancer"
+Name "ROMancer v@VERSION@"
 OutFile "@OUTPUT@"
 InstallDir "$LOCALAPPDATA\ROMancer"
 InstallDirRegKey HKCU "Software\ROMancer" "InstallDir"
 BrandingText "By RetchEWretched"
 VIProductVersion "@VERSION@.0"
 VIAddVersionKey "ProductName" "ROMancer"
-VIAddVersionKey "FileDescription" "ROMancer v1.0 Setup"
+VIAddVersionKey "FileDescription" "ROMancer v@VERSION@ Setup"
+VIAddVersionKey "ProductVersion" "@VERSION@"
 VIAddVersionKey "FileVersion" "@VERSION@"
 VIAddVersionKey "LegalCopyright" "RetchEWretched and credited component authors"
 !include "MUI2.nsh"
@@ -99,15 +103,15 @@ Section "Install"
  WriteUninstaller "$INSTDIR\Uninstall ROMancer.exe"
  ${If} $NoIntegration == 0
   CreateDirectory "$SMPROGRAMS\ROMancer"
-  CreateShortcut "$DESKTOP\ROMancer.lnk" "$SYSDIR\WindowsPowerShell\v1.0\powershell.exe" '-NoProfile -ExecutionPolicy Bypass -WindowStyle Hidden -File $\"$INSTDIR\Open ROMancer.ps1$\"' "$INSTDIR\versions\@VERSION@\ROMancer.ico"
-  CreateShortcut "$SMPROGRAMS\ROMancer\ROMancer.lnk" "$SYSDIR\WindowsPowerShell\v1.0\powershell.exe" '-NoProfile -ExecutionPolicy Bypass -WindowStyle Hidden -File $\"$INSTDIR\Open ROMancer.ps1$\"' "$INSTDIR\versions\@VERSION@\ROMancer.ico"
+  CreateShortcut "$DESKTOP\ROMancer.lnk" "$SYSDIR\WindowsPowerShell\v1.0\powershell.exe" '-NoProfile -ExecutionPolicy Bypass -WindowStyle Hidden -File $\"$INSTDIR\Open ROMancer.ps1$\"' "$INSTDIR\versions\@SLOT@\ROMancer.ico"
+  CreateShortcut "$SMPROGRAMS\ROMancer\ROMancer.lnk" "$SYSDIR\WindowsPowerShell\v1.0\powershell.exe" '-NoProfile -ExecutionPolicy Bypass -WindowStyle Hidden -File $\"$INSTDIR\Open ROMancer.ps1$\"' "$INSTDIR\versions\@SLOT@\ROMancer.ico"
   CreateShortcut "$SMPROGRAMS\ROMancer\Uninstall ROMancer.lnk" "$INSTDIR\Uninstall ROMancer.exe"
   WriteRegStr HKCU "Software\ROMancer" "InstallDir" "$INSTDIR"
   WriteRegStr HKCU "Software\Microsoft\Windows\CurrentVersion\Uninstall\ROMancer" "DisplayName" "ROMancer"
   WriteRegStr HKCU "Software\Microsoft\Windows\CurrentVersion\Uninstall\ROMancer" "DisplayVersion" "@VERSION@"
   WriteRegStr HKCU "Software\Microsoft\Windows\CurrentVersion\Uninstall\ROMancer" "Publisher" "RetchEWretched"
   WriteRegStr HKCU "Software\Microsoft\Windows\CurrentVersion\Uninstall\ROMancer" "InstallLocation" "$INSTDIR"
-  WriteRegStr HKCU "Software\Microsoft\Windows\CurrentVersion\Uninstall\ROMancer" "DisplayIcon" "$INSTDIR\versions\@VERSION@\ROMancer.ico"
+  WriteRegStr HKCU "Software\Microsoft\Windows\CurrentVersion\Uninstall\ROMancer" "DisplayIcon" "$INSTDIR\versions\@SLOT@\ROMancer.ico"
   WriteRegStr HKCU "Software\Microsoft\Windows\CurrentVersion\Uninstall\ROMancer" "UninstallString" '$\"$INSTDIR\Uninstall ROMancer.exe$\"'
   WriteRegStr HKCU "Software\Microsoft\Windows\CurrentVersion\Uninstall\ROMancer" "QuietUninstallString" '$\"$INSTDIR\Uninstall ROMancer.exe$\" /S'
   WriteRegDWORD HKCU "Software\Microsoft\Windows\CurrentVersion\Uninstall\ROMancer" "NoModify" 1
@@ -132,7 +136,7 @@ Function un.onInit
 FunctionEnd
 
 Section "Uninstall"
- ExecWait '$\"$INSTDIR\versions\@VERSION@\python\python.exe$\" -I -B $\"$INSTDIR\versions\@VERSION@\app\tools\install_windows.py$\" --install-root $\"$INSTDIR$\" --uninstall' $0
+ ExecWait '$\"$INSTDIR\versions\@SLOT@\python\python.exe$\" -I -B $\"$INSTDIR\versions\@SLOT@\app\tools\install_windows.py$\" --install-root $\"$INSTDIR$\" --uninstall' $0
  ${If} $0 != 0
   SetErrorLevel 1
   Quit
@@ -148,7 +152,7 @@ Section "Uninstall"
  Delete "$INSTDIR\Uninstall ROMancer.exe"
  ; Version folders and workspace are deliberately retained for recovery.
 SectionEnd
-'''.replace('@PAYLOAD@',payload).replace('@OUTPUT@',output).replace('@VERSION@',version)
+'''.replace('@PAYLOAD@',payload).replace('@OUTPUT@',output).replace('@VERSION@',version).replace('@SLOT@',slot)
 
 
 def build_installer(payload,compiler_archive,output):
@@ -169,7 +173,7 @@ def build_installer(payload,compiler_archive,output):
         temp=Path(temp)
         with zipfile.ZipFile(compiler_archive) as z:z.extractall(temp/'compiler') # Exact trusted archive hash checked above.
         compiler=temp/'compiler/nsis-3.13/makensis.exe';target=temp/'Setup.exe';script=temp/'setup.nsi'
-        script.write_text(installer_script(payload,target,verified['manifest']['version']),encoding='utf-8-sig',newline='\n')
+        script.write_text(installer_script(payload,target,verified['manifest']['version'],slot=bundle_slot(verified)),encoding='utf-8-sig',newline='\n')
         result=subprocess.run([str(compiler),'/V2',str(script)],capture_output=True,text=True,creationflags=subprocess.CREATE_NO_WINDOW,timeout=300)
         if result.returncode:raise RuntimeError('NSIS compiler failed: '+result.stdout[-8000:]+result.stderr[-8000:])
         if verify_tree(payload)['manifest_sha256']!=verified['manifest_sha256']:raise ValueError('payload changed while building installer')

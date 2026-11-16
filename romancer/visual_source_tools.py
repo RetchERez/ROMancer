@@ -72,11 +72,12 @@ class VisualSourceTools:
 
     def verify(self,p,c):
         project,row,path=self.api.source(p);trace=self.api.traces.get(p,c);replay=trace.get('replay',{})
+        if trace.get('checkpoint_only'):raise ValueError('Trace a sprite or tile selection before verifying its ROM source.')
         if not trace['runtime_trusted'] or replay.get('status')!='READY':raise ValueError('Source verification needs a fresh authenticated cold-start replay. Close and load the game again, then capture the object.')
         steps=replay['steps']
         for step in steps:validate_steps([step])
         if len(steps)>2048 or not 0<sum(s['frames'] for s in steps)<=36000 or sum(s['frames'] for s in steps)!=replay['frames']:raise ValueError('The replay exceeds its bounded frame or step budget.')
-        config=self.api._profile_load_config(row['system_id'])
+        config=self.api._profile_load_config(row['system_id'],row,project)
         if execution_context(config)!=replay['context']:raise ValueError('Core options, controllers or system-file context changed. Restore the captured setup or capture a fresh trace.')
         groups=group_candidates(trace,p['start'],p['limit']);result={'scope':'visual_source_v2','source_sha256':row['sha256'],'artifact_id':row['artifact_id'],'system_id':row['system_id'],'trace_id':p['trace_id'],'context':replay['context'],'replay_sha256':digest(replay),'frame':trace['frame'],
             'status':'NOT_VERIFIED','verified_matches':[],'groups':[],'coverage':{k:v for k,v in groups.items() if k!='groups'},'original_reproduced_twice':False,'source_transfer_observed':False,'proof_method':'coded_romancer_build_replay','original_preserved':True,

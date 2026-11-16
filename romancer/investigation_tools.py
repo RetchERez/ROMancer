@@ -63,8 +63,32 @@ class InvestigationTools:
             validate_observations(observations)
             analyze_series(observations,cancelled=c)
             if c():raise KeyboardInterrupt
-            record=store_evidence(project,'runtime',{**report,'parent_evidence_id':record['evidence_id'],'observations':observations})
+            replay=self._playtest_replay(project,row['system_id'],observations[-2]['snapshot'],packet)
+            record=store_evidence(project,'runtime',{**report,'parent_evidence_id':record['evidence_id'],
+                'observations':observations,'playtest_replay':replay})
         return self._public(record,c)
+
+    def _playtest_replay(self,project,system,previous,current):
+        from .debugger_protocol import BUTTONS
+        start,end=previous.get('frame_index'),current.get('frame_index')
+        if type(start) is not int or type(end) is not int or not 0<=start<end<=3600:
+            return None
+        try:
+            replay=self.api.runtime.replay_snapshot(project,{'index':end,'game_sha256':current['game_sha256'],
+                'core_sha256':current['core_sha256']})
+        except (ValueError,KeyError):
+            return None
+        steps=replay.get('steps',[])
+        if replay['status']!='READY' or replay['frames']!=end or not 1<=len(steps)<=64 or any(s['port']!=0 for s in steps):
+            return None
+        if any(device!=1 for device in replay.get('context',{}).get('controller_devices',{}).values()):
+            return None
+        # The debugger uses console button names; the frontend records RetroPad inputs.
+        names={'genesis':{'a':'b','b':'a','r':'c'},'sms':{'a':'one','b':'two','start':'pause'}}.get(system,{})
+        steps=[{**step,'buttons':[names.get(key,key) for key in step['buttons']]} for step in steps]
+        if any(set(step['buttons'])-BUTTONS[system] for step in steps):
+            return None
+        return {'steps':steps,'frames':end,'start_frame':start}
 
     def get(self,p,c):
         _,_,record=self._load(p);return self._public(record,c)
@@ -81,4 +105,5 @@ class InvestigationTools:
         proposed=memory_probe(row['system_id'],observations[0]['snapshot'],candidate['offset'],candidate['width'])
         return {**proposed,'source_sha256':row['sha256'],'artifact_id':row['artifact_id'],
             'investigation_id':record['evidence_id'],'candidate':candidate,'causation_proven':False,
+            'playtest_replay':report.get('playtest_replay'),
             'replay_scope':'A new debugger replay starts from power on. It does not resume the Playtest worker or convert its save state.'}

@@ -4,6 +4,7 @@ from pathlib import Path
 from .asset_schema import fields,label,number
 from .assets import digest
 from .script_schema import canonical_bytes
+from .replay_journal import execution_context
 from .runtime_session import OwnedRuntime,preflight_load,validate_steps
 from .visual_checks import _frame,_crop,_region,_png
 from .workbench_evidence import store_evidence,load_evidence
@@ -27,6 +28,56 @@ def validate_config(value):
     return value
 
 
+def validate_expectations(value):
+    value = json.loads(canonical_bytes(value, max_bytes=8 * 1024))
+    if type(value) is not list or len(value) > 8:
+        raise ValueError('Choose up to eight gameplay expectations.')
+    for rule in value:
+        fields(rule, 'name region offset length endian mode original build')
+        label(rule['name'], 80)
+        number(rule['region'], 0, 3)
+        number(rule['offset'], 0, 256 * 1024**2 - 1)
+        width = rule['length']
+        if type(width) is not int or width not in (1, 2, 4) or rule['endian'] not in ('little', 'big'):
+            raise ValueError('Gameplay watches must read 1, 2 or 4 bytes in a supported byte order.')
+        mode = rule['mode']
+        if mode not in ('value', 'delta', 'same'):
+            raise ValueError('Choose a final value, last-step change or unchanged value.')
+        maximum = (1 << (8 * width)) - 1
+        for key in ('original', 'build'):
+            if mode == 'same':
+                if rule[key] is not None:
+                    raise ValueError('An unchanged check compares the measured values directly.')
+            else:
+                number(rule[key], -maximum if mode == 'delta' else 0, maximum)
+    return value
+
+
+def evaluate_expectations(rules, samples):
+    results = []
+    for rule, (original, repeated, build) in zip(rules, zip(*samples, strict=True), strict=True):
+        if original != repeated:
+            status = 'INCONCLUSIVE'
+        elif rule['mode'] == 'same':
+            status = 'PASS' if original == build else 'FAIL'
+        else:
+            status = 'PASS' if (original, build) == (rule['original'], rule['build']) else 'FAIL'
+        results.append({'rule':rule, 'original':original, 'repeat':repeated, 'build':build, 'status':status})
+    statuses = {row['status'] for row in results}
+    status = next((value for value in ('INCONCLUSIVE', 'FAIL') if value in statuses), 'PASS')
+    return {'status':status, 'results':results}
+
+
+def _memory_value(runtime, rule, frame, row, configuration):
+    from .debug_runtime import _observation
+    target = {key: rule[key] for key in ('region', 'offset', 'length')}
+    observation = _observation(runtime.request('read_memory', **target), target)
+    if (observation.get('frame_index') != frame or observation.get('game_sha256') != row['sha256']
+            or observation.get('core_sha256') != configuration['expected_core_sha256']):
+        raise ValueError('Gameplay memory measurement has a different frame or worker identity.')
+    return int.from_bytes(bytes.fromhex(observation['raw_hex']), rule['endian'])
+
+
 def compare_frames(first,repeated,candidate,region,mode):
     if mode not in ('review_changes','unchanged'):raise ValueError('Choose an available comparison mode.')
     w,h,a=_frame(first);ww,hh,repeat=_frame(repeated);cw,ch,b=_frame(candidate)
@@ -42,18 +93,26 @@ def compare_frames(first,repeated,candidate,region,mode):
         'difference_png_base64':_png(difference,chosen['width'],chosen['height'])},'reason':'Selected pixels are unchanged.' if not changed else 'Pixels changed. Review whether this was intended.'}
 
 
-def run_sample(project,row,configuration,steps,cancelled,*,state_check=True):
+def run_sample(project,row,configuration,steps,cancelled,*,state_check=True,expectations=()):
     projects._measure(row['path'],row,cancelled=cancelled)
     core=projects._measure(configuration['core'],cancelled=cancelled)
     if core['sha256']!=configuration['expected_core_sha256']:raise ValueError('Configured engine revision changed before the test.')
     load=preflight_load({**configuration,'game':row['path'],'expected_game_sha256':row['sha256'],'session_dir':str(project/'sessions'/('test-'+uuid.uuid4().hex))},project)
     with OwnedRuntime(load,30,cancelled=cancelled) as runtime:
         expected=0
-        for step in steps:
+        before = {}
+        for index, step in enumerate(steps):
+            if index == len(steps) - 1:
+                before = {i: _memory_value(runtime, rule, expected, row, configuration)
+                          for i, rule in enumerate(expectations) if rule['mode'] == 'delta'}
             if cancelled():raise KeyboardInterrupt
             r=runtime.request('advance',**step);expected+=step['frames']
             if r.get('frame_index')!=expected or r.get('game_sha256')!=row['sha256'] or r.get('core_sha256')!=configuration['expected_core_sha256']:raise ValueError('Test frame cadence or worker identity differs.')
+        values = [_memory_value(runtime, rule, expected, row, configuration) - before.get(i, 0)
+                  for i, rule in enumerate(expectations)]
         frame=runtime.request('capture');_frame(frame)
+        if frame.get('index') != expected:
+            raise ValueError('The captured test frame differs from the acknowledged route length.')
         if state_check:
             snapshot=runtime.request('save_state');runtime.request('advance',frames=1,buttons=[],port=0);next_frame=runtime.request('capture')
             runtime.request('load_state',snapshot=snapshot);runtime.request('advance',frames=1,buttons=[],port=0);replayed=runtime.request('capture')
@@ -63,7 +122,7 @@ def run_sample(project,row,configuration,steps,cancelled,*,state_check=True):
         identity={'core_sha256':configuration['expected_core_sha256'],'options':runtime.load_result.get('loaded',{}).get('core_options',{}),'controller_devices':configuration.get('controller_devices',{}),'system_files':configuration.get('system_files',[])}
     projects._measure(row['path'],row,cancelled=cancelled)
     projects._measure(configuration['core'],core,cancelled=cancelled)
-    return {'frame':frame,'state_replay':bool(state_check),'worker_exit_code':exit_code,'execution_sha256':digest(identity)}
+    return {'frame':frame,'state_replay':bool(state_check),'worker_exit_code':exit_code,'execution_sha256':digest(identity), 'values':values}
 
 
 class BuildCheckTools:
@@ -113,7 +172,10 @@ class BuildCheckTools:
         results=row.get('build_check_results',[])
         if type(results) is not list or len(results)>32:raise ValueError('Saved test history exceeds its budget.')
         for r in results:
-            fields(r,'evidence_id status target_id target_sha256');projects.identifier(r['evidence_id']);projects.identifier(r['target_id']);projects.identifier(r['target_sha256']);label(r['status'],32)
+            fields(r,'evidence_id status target_id target_sha256'+(' replay_verified' if 'replay_verified' in r else ''))
+            if 'replay_verified' in r and r['replay_verified'] is not True:
+                raise ValueError('Saved replay marker is malformed.')
+            projects.identifier(r['evidence_id']);projects.identifier(r['target_id']);projects.identifier(r['target_sha256']);label(r['status'],32)
         if pending and pending.get('job_id'):
             job=self.api.jobs.get(pending['job_id']);progress={k:job[k] for k in ('job_id','status','message')}
             if job.get('result'):progress['outcome']={k:v for k,v in job['result'].items() if k in ('status','error','evidence_id','reason')}
@@ -129,7 +191,6 @@ class BuildCheckTools:
         if r.get('scope')!='automatic_build_check_v1' or row['sha256'] not in (r.get('source_sha256'),r.get('target_sha256')):raise ValueError('Choose a check for this source or build.')
         return {'ok':True,**r,'evidence_id':p['evidence_id'],'runtime_trusted':record['runtime_trusted']}
     def from_trace(self,p,c):
-        from .replay_journal import execution_context
         project=self.api.project(p);source=projects.artifact(project,p['source_id']);target=projects.artifact(project,p['target_id'])
         if target.get('kind')!='build' or target['artifact_id']==source['artifact_id']:raise ValueError('Create a separate edited build before testing this edit.')
         node=target;seen=set()
@@ -143,13 +204,13 @@ class BuildCheckTools:
         if not trace['runtime_trusted'] or replay.get('status')!='READY':raise ValueError('Capture a fresh authenticated cold-start trace before testing an edit.')
         config=validate_config({'name':'Captured edit check','automatic':False,'mode':'review_changes','steps':replay['steps'],'region':trace['region'],'route_ids':[]})
         if sum(s['frames'] for s in config['steps'])!=replay['frames']:raise ValueError('Recorded replay frame count differs.')
-        current=self.api._profile_load_config(source['system_id'])
+        current=self.api._profile_load_config(source['system_id'],source,project)
         if execution_context(current)!=replay['context']:raise ValueError('The captured execution setup or core context changed. Capture a fresh trace.')
-        return self._run(p,c,config,trace)
+        return self._run(p,c,config,trace,expectations=validate_expectations([] if p.get('expectations') is None else p['expectations']))
 
     def run(self,p,c):return self._run(p,c)
 
-    def _run(self,p,c,config=None,trace=None):
+    def _run(self,p,c,config=None,trace=None,*,expectations=(),proof=None):
         project=self.api.project(p);source=projects.artifact(project,p['source_id']);target=projects.artifact(project,p['target_id']);from .release_scope import require_supported
         require_supported(source);require_supported(target)
         if source['system_id']!=target['system_id']:raise ValueError('Build tests require the same cartridge system.')
@@ -159,11 +220,16 @@ class BuildCheckTools:
         result={'ok':True,'scope':'automatic_build_check_v1','project_id':p['project_id'],'source_id':source['artifact_id'],'target_id':target['artifact_id'],'source_sha256':source['sha256'],'target_sha256':target['sha256'],'system_id':source['system_id'],'name':config['name'],'configuration':config,'configuration_sha256':digest(config),'status':'BLOCKED','gameplay_verified':False}
         if trace is not None:result.update(trace_id=p['trace_id'],captured_frame_sha256=trace['frame']['sha256'])
         try:
-            checked=self.api._profile_load_config(source['system_id'])
-            if trace is not None:
-                from .replay_journal import execution_context
-                if execution_context(checked)!=trace['replay']['context']:raise ValueError('Captured execution context changed before replay.')
-            runs=[run_sample(project,row,checked,config['steps'],c) for row in (source,source,target)]
+            checked=self.api._profile_load_config(source['system_id'],source,project)
+            context = execution_context(checked)
+            if trace is not None and context != trace['replay']['context']:
+                raise ValueError('Captured execution context changed before replay.')
+            if proof is not None and context != proof['context']:
+                raise ValueError('The proof requires the same pinned engine and controller setup.')
+            options = {'expectations':expectations} if expectations else {}
+            runs=[run_sample(project,row,checked,config['steps'],c,**options) for row in (source,source,target)]
+            if trace is not None or proof is not None:
+                result['replay_context'] = context
             if len({r['execution_sha256'] for r in runs})!=1:raise ValueError('Core options or controller/system context changed between test runs.')
             result.update(compare_frames(*(r['frame'] for r in runs),config['region'],config['mode']))
             if trace is not None and any(r['frame']['sha256']!=trace['frame']['sha256'] or r['frame']['index']!=trace['replay']['frames'] for r in runs[:2]):
@@ -175,10 +241,31 @@ class BuildCheckTools:
             result['integrity']=[{'source_sha256':row['sha256'],'status':report['status'],'failures':[r['name'] if 'name' in r else r.get('id','Check') for r in report['checks'] if r['status']=='FAIL']} for row,report in zip((source,target),health)]
             if health[0]['status']=='ISSUES_FOUND':result.update(status='INCONCLUSIVE',reason='Original cartridge integrity checks report issues. Inspect the original before treating this as a regression baseline.')
             elif health[1]['status']=='ISSUES_FOUND':result.update(status='REGRESSION',reason='Build cartridge integrity checks report failures.')
+            if expectations:
+                gameplay = evaluate_expectations(expectations, [run['values'] for run in runs])
+                result['gameplay'] = gameplay
+                if gameplay['status'] == 'INCONCLUSIVE' and result['status'] != 'REGRESSION':
+                    result.update(status='INCONCLUSIVE', reason='The original did not repeat its measured gameplay values.')
+                if gameplay['status'] == 'FAIL' and result['status'] in ('PASS','REVIEW'):
+                    result.update(status='REGRESSION', reason='A measured gameplay value did not match its expectation.')
+            if proof is not None:
+                if runs[0]['execution_sha256'] != proof['execution_sha256']:
+                    raise ValueError('Effective engine settings differ from the proof.')
+                expected_frames = (proof['original_frame'],) * 2 + (proof['build_frame'],)
+                if any(run['frame']['sha256'] != expected for run, expected in zip(runs, expected_frames)):
+                    if result['status'] in ('PASS', 'REVIEW'):
+                        result.update(status='INCONCLUSIVE', reason='The original or patched frame did not match the shared proof.')
+                if expectations and [runs[0]['values'], runs[2]['values']] != proof['observed_values']:
+                    if result['status'] in ('PASS', 'REVIEW'):
+                        result.update(status='REGRESSION', reason='Measured gameplay values differ from the shared proof.')
             if config['route_ids']:
                 suite=self.api._regression_suite({**p,'definition_ids':config['route_ids'],'timeout':30},c);result['suite']={k:v for k,v in suite.items() if k not in ('tests',)};result['suite_tests']=suite['tests']
                 if suite['status']!='PASS' and result['status']!='REGRESSION':result.update(status=suite['status'],reason='Saved assertion routes need attention; inspect their measured results.')
         except (ValueError,OSError,RuntimeError) as error:result.update(status='BLOCKED',reason=str(error)[:1024])
+        if trace is not None or proof is not None:
+            result['replay_verified'] = (result['status'] in ('PASS', 'REVIEW')
+                                         and (not expectations or result['gameplay']['status'] == 'PASS'))
+            result['gameplay_verified'] = result['replay_verified'] and bool(expectations)
         if c():raise KeyboardInterrupt
         with self.api.operation_locks_guard:lock=self.api.operation_locks.setdefault(p['project_id'],threading.RLock())
         with lock:
@@ -186,7 +273,7 @@ class BuildCheckTools:
             evidence=store_evidence(project,'regression',result);result['evidence_id']=evidence['evidence_id']
             with projects.locked(project) as store:
                 for row in store['sources']+store['builds']:
-                    if row['artifact_id'] in (source['artifact_id'],target['artifact_id']):row['build_check_results']=(row.get('build_check_results',[])+[{'evidence_id':evidence['evidence_id'],'status':result['status'],'target_id':target['artifact_id'],'target_sha256':target['sha256']}])[-32:]
+                    if row['artifact_id'] in (source['artifact_id'],target['artifact_id']):row['build_check_results']=(row.get('build_check_results',[])+[{'evidence_id':evidence['evidence_id'],'status':result['status'],'target_id':target['artifact_id'],'target_sha256':target['sha256'],**({'replay_verified':True} if result.get('replay_verified') else {})}])[-32:]
                 projects.write_json(project/'project.json',store)
         return result
 

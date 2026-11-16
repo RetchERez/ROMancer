@@ -76,8 +76,9 @@ def inspect_sound(raw, definition, source_sha256):
             raise ValueError('Original music driver code, vectors or pitch table differs')
         if (song['offset'], song['count'], song['stride'], song['tempo'], song['ticks_per_beat'], song['channels']) != (sequence, 16, 6, 150, 24, 1):
             raise ValueError('Original music driver layout differs from its verified format')
-        if any((a < 16 + length and b > 16 or (a < pitch_end and b > pitch) for a, b, _ in ranges)):
-            raise ValueError('sound allocation overlaps identified driver code')
+        protected = ((0, 16 + length), (16394, 16400), (pitch, pitch_end))
+        if any(a < end and b > start for a, b, _ in ranges for start, end in protected):
+            raise ValueError('sound allocation overlaps identified driver header, code, vectors or pitch table')
         storage(song['offset'], song['count'] * song['stride'], song['id'])
         events = []
         for i in range(song['count']):

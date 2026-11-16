@@ -19,8 +19,13 @@ class ReleaseEngineSourceTests(unittest.TestCase):
         for name,row in declared.items():
             self.assertEqual(len(files[name]),row['size'],name);self.assertEqual(hashlib.sha256(files[name]).hexdigest(),row['sha256'],name)
         self.assertEqual(files['BUILD-CORES.py'],(Path(__file__).resolve().parents[1]/'tools/build_cores.py').read_bytes())
-        self.assertFalse(any(name.startswith('mgba/') for name in files))
-        self.assertNotIn('mGBA',files['README.txt'].decode('utf-8'))
+        self.assertIn('mgba/ROMANCER_GB_ONLY.patch', files)
+        self.assertIn('bsnes-mercury/ROMANCER_DSP4_STATE.patch', files)
+        self.assertIn(b'if(cartridge.has_dsp4()) dsp4.serialize(s);',
+                      files['bsnes-mercury/sfc/system/serialization.cpp'])
+        self.assertIn(b'-DROMANCER_DSP4_STATE', files['BUILD-CORES.py'])
+        self.assertIn('-DM_CORE_GBA=OFF', files['BUILD-CORES.py'].decode('utf-8'))
+        self.assertIn('mGBA', files['README.txt'].decode('utf-8'))
     @unittest.skipUnless(os.name=='nt' and (OBSERVER/'Mesen.exe').is_file(),'reviewed Windows native observer not supplied')
     def test_generated_lua_executes_in_each_retained_mesen_machine(self):
         from romancer.boot_fixtures import make_boot_fixture

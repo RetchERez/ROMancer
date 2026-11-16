@@ -8,9 +8,14 @@ export function traceControls(ctx){
  const {state}=ctx,a=state.artifact;if(!a)return '';
  const scope=selectionKey(state),params={...ctx.sourceParams()},current=()=>scope===selectionKey(state)&&ctx.isCurrentRender?.()!==false;
  const selected=state.visualRegion?.scope===scope&&state.visualRegion.frame_sha256===state.frame?.sha256&&state.visualRegion.region.width>=8&&state.visualRegion.region.height>=8?state.visualRegion:null;
- const result=state.savedGameplayTrace?.scope===scope?state.savedGameplayTrace.result:null,partHeight=result?.matches.some(m=>m.height===16)?16:8,groups=candidateGroups(result,partHeight).slice(0,16);
+ const saved=state.savedGameplayTrace?.scope===scope?state.savedGameplayTrace.result:null;
+ const result=saved?.checkpoint_only?null:saved,partHeight=result?.matches.some(m=>m.height===16)?16:8,groups=candidateGroups(result,partHeight).slice(0,16);
  const save=async(offset,length)=>{if(!current()||!selected)throw Error('Pause, capture a frame and select a current region first.');stopPlayback(state);const r=await ctx.run('traces.capture',{...params,name:read('trace-name').trim(),frame_sha256:selected.frame_sha256,region:selected.region,offset,length},{render:false});if(!current())return;state.savedGameplayTrace={scope,result:r};return ctx.render();};
  ctx.use({'trace-save':()=>save(Number(read('trace-offset')),Number(read('trace-length'))),
+ 'trace-save-quick':async()=>{
+  await save(0,a.size);
+  if(current()&&state.page==='playtest')globalThis.document?.getElementById('saved-gameplay-trace')?.scrollIntoView?.({block:'start'});
+ },
  'trace-next':()=>{if(!result?.coverage||!current())return;return save(result.coverage.next_offset,a.size-result.coverage.next_offset);},
  'trace-gameview':()=>{if(!current())return;state.connectedTraceFocus={scope,trace_id:result?.trace_id};return ctx.navigate('gameview');},
  'trace-open':async()=>{if(!current()||!result?.trace_id)throw Error('Save a fresh source-bound trace first.');const matches=groups.map((g,i)=>read('trace-part-'+i)).filter(v=>v!=='').map(Number);if(!matches.length)throw Error('Choose the source offset for a matching part.');const r=await ctx.run('traces.open',{...params,trace_id:result.trace_id,matches},{render:false});if(!current())return;state.connectedAssetSetup={scope,result:r};state.researchOpen={scope,kind:'assets'};return ctx.navigate('assets');}});

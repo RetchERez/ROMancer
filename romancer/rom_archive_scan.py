@@ -116,7 +116,7 @@ def _record(raw,label,path):
             encoded=raw[offset:offset+decoded['consumed']]
             if not verify_encoded(encoded,item['format'],decoded['data'])['verified']:raise ValueError('Independent compression parser disagrees.')
             compressed.append(_found('compression',offset,decoded['consumed'],item['format'],'validated-encoding',decoded['data']))
-    record={'sha256':sha,'crc32':f'{zlib.crc32(raw):08X}','size':len(raw),'system_id':system,'format':selected['format'],'labels':[label],
+    record={'sha256':sha,'sha1':hashlib.sha1(raw).hexdigest(),'crc32':f'{zlib.crc32(raw):08X}','size':len(raw),'system_id':system,'format':selected['format'],'labels':[label],
         'header_offset':selected['header_offset'],'regions':[{k:r[k] for k in ('id','kind','offset','length')} for r in selected['regions']],
         'header_numbers':{k:v for k,v in selected['metadata'].items() if type(v) in (int,bool) and v>=0},'checks':checks,
         'discoveries':sorted(text+graphics+compressed,key=lambda r:(r['offset'],r['kind'])),

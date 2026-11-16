@@ -7,6 +7,35 @@ from romancer.graphics_discovery import SYSTEM_CODECS
 from romancer.workbench_api import WorkbenchAPI
 
 class GameplayTraceTests(unittest.TestCase):
+    def test_scene_checkpoint_saves_owned_cold_replay_without_scanning_tiles(self):
+        with tempfile.TemporaryDirectory() as temp:
+            api=WorkbenchAPI(Path(temp)/'work');self.addCleanup(api.close)
+            project=api.dispatch('project.demo_system',{'system_id':'nes'})
+            source=project['sources'][0]
+            params={'project_id':project['project_id'],'artifact_id':source['artifact_id']}
+            rgb=bytes(range(192))
+            frame={'ok':True,'width':8,'height':8,'index':60,'sha256':hashlib.sha256(rgb).hexdigest(),
+                   'rgb24_base64':base64.b64encode(rgb).decode(),'game_sha256':source['sha256'],
+                   'core_sha256':'c'*64,'runtime_identity_sha256':'d'*64}
+            replay={'status':'READY','steps':[{'frames':60,'buttons':['a'],'port':0}],'frames':60,'context':{}}
+            request={**params,'frame_sha256':frame['sha256'],'region':None}
+            with (patch.object(api,'_graphics_observe',side_effect=AssertionError('checkpoint scans ROM')),
+                  patch.object(api.runtime,'request',return_value=frame),
+                  patch.object(api.runtime,'session_selection',return_value={'id':source['artifact_id'],'sha256':source['sha256']}),
+                  patch.object(api.runtime,'replay_snapshot',return_value=replay) as snapshot):
+                captured=api.dispatch('traces.checkpoint',request)
+                self.assertTrue(captured['ok'],captured)
+                self.assertEqual(captured['matches'],[])
+                self.assertEqual(captured['replay']['steps'],replay['steps'])
+                self.assertTrue(captured['checkpoint_only'])
+                snapshot.return_value={'status':'UNAVAILABLE','reason':'State loaded'}
+                self.assertFalse(api.dispatch('traces.checkpoint',request)['ok'])
+                snapshot.return_value=replay
+                self.assertFalse(api.dispatch('traces.checkpoint',{**request,'frame_sha256':'0'*64})['ok'])
+            saved=api.dispatch('traces.get',{**params,'trace_id':captured['trace_id']})
+            self.assertEqual(saved['frame']['sha256'],frame['sha256'])
+            self.assertFalse(api.dispatch('traces.open',{**params,'trace_id':saved['trace_id'],'matches':[0]})['ok'])
+
     def test_every_system_records_native_region_and_connects_candidates_without_claiming_rom_ownership(self):
         folder=self.enterContext(tempfile.TemporaryDirectory());root=Path(folder);api=WorkbenchAPI(root/'work');self.addCleanup(api.close)
         pixels=[1+(x+y)%3 for y in range(8) for x in range(8)];colors=[(0,0,0),(255,10,20),(10,255,20),(10,20,255)];rgb=bytes(c for i in pixels for c in colors[i])

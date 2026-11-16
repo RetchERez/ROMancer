@@ -5,6 +5,7 @@ import {PixelHistory,pixelBuffer} from './pixel_history.js';
 import {stageCurrentPaint} from './asset_controls.js';
 import {mergeCellChanges} from './pixel_tools.js';
 import {editorPalette} from './edit_preview.js';
+import {previewPaletteBank,paletteColor} from './preview_palette.js';
 import {esc,button,field,select,read} from './common.js';
 
 export function spritePreviewSize(width,height,zoom='fit',available=384){
@@ -58,7 +59,7 @@ export function spriteAssembly(ctx,doc,bitmap,palette=null){
  if(!doc?.ok||!bitmap)return '';
  const scope=selectionKey(ctx.state),current=()=>selectionKey(ctx.state)===scope,layout=layoutFor(ctx,doc,bitmap),image=layout&&imageFor(ctx,doc,bitmap,layout),undo=image&&history(ctx,doc,bitmap,layout,image);
  const checkHistory=()=>{if(JSON.stringify(imageFor(ctx,doc,bitmap,layout).pixels)!==JSON.stringify(undo.current))throw Error('Tiles changed in another editor. Start a fresh sprite stroke before undo or redo.');};
- const colors=brushColors(bitmap,editorPalette(ctx,palette),layout);
+ const colors=brushColors(bitmap,editorPalette(ctx,palette),layout,previewPaletteBank(ctx,palette));
  const connectedObject=!!layout&&ctx.state.objectWorkbench?.scope===scope;
  ctx.use({
   'sprite-brush':node=>{if(!current())return;const index=Number(node.dataset.id);if(!colors.some(c=>c.index===index))throw Error('Choose a declared brush index.');ctx.setDraft('sprite-color',String(index));const input=document.getElementById('sprite-color');if(input)input.value=String(index);document.querySelectorAll('[data-brush-index]').forEach(button=>button.setAttribute('aria-pressed',String(Number(button.dataset.brushIndex)===index)));},
@@ -76,7 +77,7 @@ export function mountSprite(ctx,doc,bitmap,palette){
  const image=imageFor(ctx,doc,bitmap,layout),undo=history(ctx,doc,bitmap,layout,image);let pixels=[...image.pixels],pointer=null,cursor={x:0,y:0};
  const bits={'mono-row-msb-v1':1,'tile8-paired2-msb-v1':2,'tile8-planar2-msb-v1':2,'tile8-rowplanar4-msb-v1':4,'tile8-paired4-msb-v1':4,'tile8-packed4-high-v1':4,'tile8-packed4-low-v1':4}[bitmap.codec],count=Math.min(2**bits,palette?.colors_per_bank||256);
  const beforeCanvas=document.getElementById('sprite-original'),original=assemblePixels(bitmap,layout,index=>bitmap.cells[index].pixels);
- const rgba=(values,colors)=>{const data=new Uint8ClampedArray(values.length*4);values.forEach((value,i)=>{const part=Math.floor(Math.floor(i/image.width)/bitmap.height)*layout.columns+Math.floor((i%image.width)/bitmap.width),observed=layout.colors?.[part]?.[value],color=colors?.entries.find(e=>e.index===value&&e.bank===0)?.rgb,shade=Math.round(18+value/Math.max(1,count-1)*216);data.set([color?.r??observed?.[0]??shade,color?.g??observed?.[1]??shade,color?.b??observed?.[2]??shade,255],i*4);});return data;};
+ const rgba=(values,colors)=>{const data=new Uint8ClampedArray(values.length*4);values.forEach((value,i)=>{const part=Math.floor(Math.floor(i/image.width)/bitmap.height)*layout.columns+Math.floor((i%image.width)/bitmap.width),observed=layout.colors?.[part]?.[value],color=paletteColor(colors,value,previewPaletteBank(ctx,palette)),shade=Math.round(18+value/Math.max(1,count-1)*216);data.set([color?.r??observed?.[0]??shade,color?.g??observed?.[1]??shade,color?.b??observed?.[2]??shade,255],i*4);});return data;};
  const originalPixels=rgba(original.pixels,palette);
  if(beforeCanvas){beforeCanvas.width=image.width;beforeCanvas.height=image.height;const c=beforeCanvas.getContext('2d'),frame=c.createImageData(image.width,image.height);frame.data.set(originalPixels);c.putImageData(frame,0,0);rememberPreview(beforeCanvas,image.width,image.height,frame.data);}
  const draw=()=>{const context=canvas.getContext('2d'),frame=context.createImageData(image.width,image.height);frame.data.set(rgba(pixels,editorPalette(ctx,palette)));context.putImageData(frame,0,0);rememberPreview(canvas,image.width,image.height,frame.data);let changed=0;for(let i=0;i<frame.data.length;i+=4)if([0,1,2].some(c=>frame.data[i+c]!==originalPixels[i+c]))changed++;const n=document.getElementById('sprite-difference-count');if(n)n.textContent=(changed?'Preview updated · '+changed+(changed===1?' pixel differs':' pixels differ')+' · not built':'Unchanged sprite preview');};
@@ -84,7 +85,7 @@ export function mountSprite(ctx,doc,bitmap,palette){
  const paint=(x,y)=>{const color=Number(read('sprite-color'));if(!Number.isInteger(color)||color<0||color>=count)throw Error('Choose a palette index inside the declared color count.');paintAssemblyPixel(bitmap,layout,pixels,x,y,color);draw();};
  const at=event=>{const rect=canvas.getBoundingClientRect(),x=Math.floor((event.clientX-rect.left)/rect.width*image.width),y=Math.floor((event.clientY-rect.top)/rect.height*image.height);if(x>=0&&y>=0&&x<image.width&&y<image.height){cursor={x,y};paint(x,y);}};
  const begin=()=>{pixels=[...imageFor(ctx,doc,bitmap,layout).pixels];undo.begin(pixels);};
- const updateSwatches=()=>{const host=document.getElementById('sprite-brush-palette');if(host)host.innerHTML=brushSwatches(brushColors(bitmap,editorPalette(ctx,palette),layout),document.getElementById('sprite-color')?.value??ctx.draft('sprite-color','1'));};
+ const updateSwatches=()=>{const host=document.getElementById('sprite-brush-palette');if(host)host.innerHTML=brushSwatches(brushColors(bitmap,editorPalette(ctx,palette),layout,previewPaletteBank(ctx,palette)),document.getElementById('sprite-color')?.value??ctx.draft('sprite-color','1'));};
  document.getElementById('sprite-color')?.addEventListener('input',updateSwatches);
  const resize=()=>{if(!current())return;const panes=[beforeCanvas,canvas].filter(Boolean).map(node=>node.parentElement),width=Math.min(...panes.map(node=>Math.max(1,(node?.clientWidth||416)-32)));const size=spritePreviewSize(image.width,image.height,ctx.draft('sprite-zoom','fit'),width);for(const node of [beforeCanvas,canvas].filter(Boolean)){node.style.width=size.width+'px';node.style.height=size.height+'px';}const label=document.getElementById('sprite-zoom-label');if(label)label.textContent=size.scale+'× preview';};
  document.getElementById('sprite-zoom')?.addEventListener('change',event=>{if(!current())return;ctx.setDraft('sprite-zoom',event.target.value);resize();});

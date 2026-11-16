@@ -1,6 +1,5 @@
 import assert from 'node:assert/strict';
 import {mountSprite} from '../romancer/ui/sprite_assembly.js';
-import {changedRoomCells,LevelDraft} from '../romancer/ui/level_canvas.js';
 import {mountPaletteEditor} from '../romancer/ui/palette_editor.js';
 import {mountAnimation} from '../romancer/ui/animation_studio.js';
 const cell=Array(64).fill(0);cell[1]=1;
@@ -14,10 +13,7 @@ mountSprite(ctx,{document_id:'d'},bitmap,palette);
 assert.deepEqual(original.pixels.slice(0,4),[0,0,0,255]);assert.deepEqual(edited.pixels.slice(0,4),[255,0,0,255]);
 const changes=JSON.parse(drafts.get('asset-changes'));changes.push({kind:'palette',palette_id:'p',index:1,bank:0,before:{r:31,g:0,b:0},after:{r:0,g:31,b:0}});drafts.set('asset-changes',JSON.stringify(changes));edited.events['sprite-refresh']();
 assert.deepEqual(edited.pixels.slice(0,4),[0,255,0,255]);assert.deepEqual(original.pixels.slice(4,8),[255,0,0,255]);assert.deepEqual(bitmap.cells[0].pixels,cell);
-const doc={tiles:[Array(64).fill(0),Array(64).fill(1)],metatiles:[[0],[1]],rooms:[{id:'room',width:2,height:2,terrain:[0,1,0,0],collision:[0,0,0,0],objects:[]}]};
-const model=new LevelDraft(doc);model.set({kind:'terrain',room_id:'room',index:0,value:1});assert.deepEqual(changedRoomCells(doc,model,'room'),[0]);model.set({kind:'metatile',index:1,part:0,value:0});assert.deepEqual(changedRoomCells(doc,model,'room'),[0,1]);
-assert.deepEqual(doc.rooms[0].terrain,[0,1,0,0]);
-console.log('Original sprite pixels stay fixed while edited pixels and staged palettes update; room markers follow direct and shared-block changes.');
+console.log('Original sprite pixels stay fixed while edited pixels and staged palettes update.');
 const picker={value:'#00ff00',events:{},addEventListener(name,fn){this.events[name]=fn;}},status={textContent:''};nodes.set('palette-picker',picker);nodes.set('palette-index',{value:'0',addEventListener(){}});nodes.set('palette-preview-status',status);nodes.set('palette-comparison',{});ctx.state.results={'assets.inspect':{document_id:'d'}};let redraws=0,notifications=0;ctx.notify=()=>notifications++;
 mountPaletteEditor(ctx,{document_id:'d'},palette,()=>redraws++);picker.events.input();assert.equal(redraws,1);assert.match(status.textContent,/Preview updated/);assert.equal(JSON.parse(drafts.get('asset-changes')).find(c=>c.kind==='palette'&&c.index===0).after.g,31);assert.equal(palette.entries[0].components.g,0);
 nodes.get('palette-index').value='1';const priorDraft=drafts.get('asset-changes');picker.events.input();assert.equal(drafts.get('asset-changes'),priorDraft,'changing the selector cannot redirect an old picker');nodes.get('palette-index').value='-1';picker.events.change();assert.equal(notifications,0);assert.match(status.textContent,/unavailable/);

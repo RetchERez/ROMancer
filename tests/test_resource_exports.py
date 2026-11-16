@@ -1,4 +1,5 @@
 from romancer.boot_fixtures import make_boot_fixture
+from contextlib import ExitStack
 import hashlib
 import importlib.util
 import io
@@ -81,8 +82,9 @@ class ResourceExportTests(unittest.TestCase):
 
     def test_explicit_definition_reuse_on_a_byte_build_rechecks_current_bytes(self):
         from romancer.workbench_api import WorkbenchAPI
-        with tempfile.TemporaryDirectory() as folder:
-            root=Path(folder);raw=bytearray(1024);raw[:8]=b'HELLO\0\xff\xff';raw[0x100:0x110]=b'SEGA MEGA DRIVE ';raw[0x1a4:0x1a8]=(1023).to_bytes(4,'big');path=root/'source';path.write_bytes(raw);api=WorkbenchAPI(root/'workspace');self.addCleanup(api.close)
+        with ExitStack() as stack:
+            folder=stack.enter_context(tempfile.TemporaryDirectory())
+            root=Path(folder);raw=bytearray(1024);raw[:8]=b'HELLO\0\xff\xff';raw[0x100:0x110]=b'SEGA MEGA DRIVE ';raw[0x1a4:0x1a8]=(1023).to_bytes(4,'big');path=root/'source';path.write_bytes(raw);api=WorkbenchAPI(root/'workspace');stack.callback(api.close)
             project=api.dispatch('project.create',{'name':'Reuse'});p={'project_id':project['project_id']};source=api.dispatch('source.import',{**p,'path':str(path),'system':None});src={**p,'artifact_id':source['artifact_id']}
             api.dispatch('resources.declare_script',{**src,'config':{'system_id':'gb','offset':0,'capacity':8,'count':1}})
             plan=api.dispatch('bytes.plan',{**src,'edits':[{'offset':0,'before':'48','after':'4a'}]});built=api.dispatch('build.apply',{**p,'plan_id':plan['plan_id']})

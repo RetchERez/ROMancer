@@ -1,4 +1,9 @@
 -- Original bounded observer. Never returns replacement bus data or writes memory.
+-- Long snapshot captures intermittently crashed in the pinned native observer
+-- when automatic Lua collection was enabled. Suspend it before creating any
+-- handles; stopping at snapshot time was too late. Requests are bounded to
+-- 3600 frames/2000 events; the parent always reaps this dedicated child process.
+collectgarbage('stop')
 local output=assert(io.open('trace.tsv','wb'))
 local cpu=assert(manager.machine.devices[':maincpu'])
 local space=assert(cpu.spaces['program'])
@@ -94,10 +99,6 @@ _G.romancer_memory_map_subscription=space:add_change_notifier(function()
 end)
 local function graphicsSnapshot()
  if not @GRAPHICS_SNAPSHOT@ then return end
- -- The pinned item reader can corrupt its Lua state if collection runs during
- -- this large native callback. This bounded snapshot is the child's final
- -- operation; defer collection to state close, then reap the entire worker.
- collectgarbage('stop')
  local device=assert(manager.machine.devices[':gen_vdp'])
  local function words(domain,key,count,allocated)
   local item=emu.item(assert(device.items[key]))

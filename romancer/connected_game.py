@@ -227,7 +227,8 @@ class ConnectedGameTools:
             location=node['locator']['location'];preview={'text':location.get('meaning',''),'caption':location.get('storage',''),'fields':[{'name':'Stored example','value':location.get('example','')}]}
         if node['kind'] in ('trace','candidate'):
             trace=self.api.traces.get({**p,'trace_id':node['locator']['trace_id']},c)
-            preview={'png_base64':trace['crop_png_base64'],'caption':'Measured gameplay region. Pixel matches are candidates; source transfers were not observed.','runtime_trusted':trace['runtime_trusted'],'trace_id':trace['trace_id'],'frame':trace['frame'],'region':trace['region'],'coverage':trace['coverage']}
+            caption='Saved gameplay scene for build comparison.' if trace.get('checkpoint_only') else 'Measured gameplay region. Pixel matches are candidates; source transfers were not observed.'
+            preview={'png_base64':trace['crop_png_base64'],'caption':caption,'runtime_trusted':trace['runtime_trusted'],'trace_id':trace['trace_id'],'frame':trace['frame'],'region':trace['region'],'coverage':trace.get('coverage')}
         if node['kind'] in ('verification','verified_source'):
             proof=self.api.visual_sources.get({**p,'verification_id':node['locator']['verification_id']},c)
             chosen=next((m for m in proof['verified_matches'] if m['match_id']==node['locator'].get('match_id')),proof['verified_matches'][0] if proof['verified_matches'] else None)

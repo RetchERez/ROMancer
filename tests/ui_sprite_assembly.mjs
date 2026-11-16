@@ -33,6 +33,12 @@ events.pointerdown(event(2));await events.pointerup(event(2));
 const rebased=JSON.parse(drafts['asset-changes']);assert.equal(rebased.find(c=>c.cell_index===0).after_pixels[0],2,'a group stroke preserves a newer single-tile edit');
 setPixelBuffer(ctx,doc,bitmap,0,[1,0,0,0]);
 assert.throws(()=>actions['sprite-undo'](),/changed in another editor/,'undo must not overwrite independent newer edits');
+let previewRGBA;
+canvas.getContext=()=>({createImageData:(w,h)=>({data:new Uint8ClampedArray(w*h*4)}),putImageData:frame=>previewRGBA=[...frame.data]});
+drafts['asset-preview-bank']='1';
+const bankPalette={banks:2,colors_per_bank:4,entries:[0,1].flatMap(bank=>[0,1,2,3].map(index=>({bank,index,rgb:bank?{r:0,g:0,b:255}:{r:255,g:0,b:0}})))};
+mountSprite(ctx,doc,bitmap,bankPalette);
+assert.deepEqual(previewRGBA.slice(0,4),[0,0,255,255],'assembled sprite uses the selected ROM palette bank');
 
 const mappedBitmap={id:'parts',width:2,height:2,count:3,cells:[{pixels:[0,1,2,3]},{pixels:[3,2,1,0]},{pixels:[1,0,3,2]}]};
 const scattered=makeAssembly(mappedBitmap,{first:0,columns:2,rows:2,order:'rows',indices:[2,0,null,1],flips:[1,2,0,3]});

@@ -1,10 +1,10 @@
 {
   "schema_version": 1,
-  "product": "ROMancer v1.0",
+  "product": "ROMancer v1.0.0",
   "subtitle": "A practical guide to the current editing tools: small first edits, advanced workflows, actual editing and appearance examples, a glossary and an alphabetical index.",
-  "scope": "Investigate unfamiliar cartridges without a game definition, review exact edits, create separate builds, playtest and verify patches. Named game workflows require their exact supported revision. Observations, candidate layouts and unknown behavior remain distinct. Basic Master System support covers validated Sega headers, checksums, literal row-planar graphics, declared edits, patches and measured playtesting. It does not infer every game resource.",
+  "scope": "This guide covers the six supported cartridge systems. The offline catalog identifies 1,052 exact revisions. Recognized ROM formats can be inspected and edited as bytes without a catalog match. Game-specific editors use checked definitions.",
   "basic_summary": "Start the application, choose saved preferences, identify a source, make a focused edit, preserve progress and export a checked patch. These procedures build the habits used throughout the guide.",
-  "advanced_summary": "Use explicit definitions for graphics, text, tables, connected-room layouts, audio and bounded automation. Follow declared ranges to exact bytes, and keep editor metadata, native observations and unknown game semantics separate.",
+  "advanced_summary": "Use checked definitions for graphics, text, tables and audio. Trace a resource to its stored bytes, compare builds and automate bounded checks.",
   "attribution": "By RetchEWretched. ROMancer code and original fixtures use the project MIT license. Instructional screenshots show third-party games, including Castlevania, Chrono Trigger, The Immortal, Final Fantasy Legend II, Deja Vu I & II and Rastan. Their imagery and trademarks remain those of their respective rights holders and are separate from the code license. No ROM files, game saves, emulator states, firmware dumps or authentication data are included. PDF and HTML work offline; PDF rebuilding optionally uses ReportLab.",
   "chapters": [
     {
@@ -20,11 +20,11 @@
         "Open <b>Help</b> for this guide. Start a workshop or import a ROM you supply. No AI account, subscription or API key is required."
       ],
       "result": "ROMancer opens its local interface and your project list. The full Windows edition selects a matching included engine when you load a supported system.",
-      "note": "Keep the complete folder when moving a portable copy. Moving the program does not by itself move the workspace or its projects.",
+      "note": "Keep the portable folder intact. Projects are stored separately. Game-specific editors use checked definitions for the selected revision.",
       "details": [
         {
           "title": "Update and recovery",
-          "text": "Install a new build revision rather than replacing files inside an old verified version. Rollback changes the active application version while preserving projects; an older application may not understand newer project features."
+          "text": "Close ROMancer before running Setup. Setup keeps earlier installations and the workspace, including if you tested an earlier copy labeled 1.0.0. Rollback restores the previous application. Older applications may have limited support for newer project features."
         },
         {
           "title": "Offline guide",
@@ -32,7 +32,7 @@
         },
         {
           "title": "Choose your route",
-          "text": "Beginner: use the included original workshop and follow Your first edit. To try an existing hack, start with the six-example ZIP: one each for NES, SNES, Genesis, Master System, Game Boy and Game Boy Color. The optional 41-patch archive is extra research material, not required reading. Experienced users and AI clients use the same reviewed plans through the editor or local API/MCP."
+          "text": "Start with Your first edit and the included practice game. The release also includes three BPS examples for Chrono Trigger, The Immortal and Rastan. Each requires its matching original ROM. Advanced users and AI clients can use the same review and build operations through the local API or MCP."
         }
       ],
       "related": [
@@ -208,7 +208,7 @@
       "details": [
         {
           "title": "Known formats and reviewed engines",
-          "text": "Import accepts recognized supported cartridge layouts. Unknown, ambiguous or unsupported layouts are blocked. The full Windows runtime checks emulator binaries against the included open-source pins before native loading. A known console header does not identify every game resource; unavailable level, sound or compression interpretations cannot be treated as editable definitions."
+          "text": "Import accepts recognized supported cartridge layouts. Unknown, ambiguous or unsupported layouts are blocked. The full Windows runtime checks emulator binaries against the included open-source pins before native loading. A known console header does not identify every game resource; unavailable sound or compression interpretations cannot be treated as editable definitions."
         },
         {
           "title": "Useful byte explanations",
@@ -220,10 +220,10 @@
       "id": "start",
       "title": "Start with a project",
       "kicker": "YOUR FIRST FIVE MINUTES",
-      "image": "211-what-can-i-edit",
+      "image": "267-practice-studio-readiness",
       "steps": [
         "Click <b>New project</b>. Give this piece of work a useful name, then import your ROM into that project.",
-        "Check the ROM or build selected at the top. On Overview, read <b>What can I edit in this ROM?</b>. Open a ready editor, or follow the area's action to find graphics, investigate values, or check text, level and sound setup.",
+        "Check the ROM or build selected at the top. On Overview, read <b>What can I edit in this ROM?</b>. Choose Edit graphics, Edit text, Edit stats or Edit sound when ready. Follow a setup action when a checked layout is needed. Choose Inspect ROM bytes for offsets, search and comparisons.",
         "Make one small edit, review it, create a separate <a href=\"#term-build\">build</a>, then playtest that build. Export its patch after checking the result."
       ],
       "result": "A project holds owned source copies, editing setup, builds and evidence. Start a new project for unrelated work.",
@@ -247,11 +247,11 @@
       "details": [
         {
           "title": "Choose an editing tool",
-          "text": "What do you want to change? opens graphics, text, numbers, levels, sound, investigation, playtesting or patches. Ready to edit means a working editing setup is saved for this ROM; it does not certify every game behavior or identify an unsupported music or level format."
+          "text": "The editor cards open graphics, text, numbers or sound. Inspect, test and share links to raw bytes, investigation, Playtest and Export. Ready to edit means a checked layout is available for this ROM."
         },
         {
           "title": "Find help without reading every page",
-          "text": "Use Find help in the offline HTML guide to search tasks, tool names, glossary definitions and index aliases. Results link directly to a topic. The PDF retains its linked contents, glossary, index and ordinary Find command. A system match does not promise a decoded game-specific level or music format."
+          "text": "Use Find help in the offline HTML guide to search tasks, tool names, glossary definitions and index aliases. Results link directly to a topic. The PDF retains its linked contents, glossary, index and ordinary Find command. A system match does not promise a decoded game-specific music format."
         },
         {
           "title": "Readiness is per ROM and area",
@@ -259,7 +259,7 @@
         },
         {
           "title": "Basic first, Advanced when needed",
-          "text": "Text, graphics, levels, stats, music, playtesting and export stay in the main navigation. Open Advanced for Game view, Resources, native investigation, reusable definitions, routes or regression checks. The offline guide contains both levels."
+          "text": "Text, graphics, stats, music, playtesting and export stay in the main navigation. Open Advanced for Game view, Resources, native investigation, reusable definitions, routes or regression checks. The offline guide has Basic and Advanced sections."
         }
       ]
     },
@@ -268,21 +268,18 @@
       "title": "Practice real edits in Mossy Hollow",
       "part": "Basic",
       "kicker": "Original playable example / normal editing tools",
-      "intro": "Choose Try the editing studio. This original NES program has animated actors, solid walls, damage floors, contact combat, editable hitboxes and a short melody. Use the normal editors; no in-app lesson is required.",
+      "intro": "Choose Try the editing studio to open the original NES practice game. Use its graphics, text, numbers and music layouts, then run the build in Playtest.",
       "steps": [
         "Graphics: open <b>Graphics &amp; fonts</b>, set Tiles across and Tiles down to 2, then Assemble tiles. Paint the first four hero tiles, try Undo and Redo, review and create a separate graphics build. Edit the second hero animation too for a consistent result.",
         "Dialogue: select the Original again and open <b>Text &amp; layout</b>. Replace HELLO, EXPLORER! with WELCOME, ROM HACKER! Check capacity, review and build. The character table supports uppercase letters.",
-        "Movement: in <b>Numbers &amp; stats</b>, change Hero speed from 2 to 3, review and build. Compare equal Right input frames in Playtest. Zero stops movement; the checked limit is8 pixels per frame.",
-        "Levels: choose Terrain to paint the visible room, Collision to paint movement rules, or Move object to reposition an actor. Starting hitboxes shows independent contact rectangles. Follow the linked collision procedure for a complete wall edit.",
+        "Movement: choose <b>Edit stats</b> on Overview. Change Hero speed from 2 to 3, review and build. Compare equal Right input frames in Playtest. Zero stops movement; the checked limit is 8 pixels per frame.",
         "Music: in <b>Music &amp; sound</b>, click a melody note or choose its Event, change Note number and choose Stage note edit. Inspect the note view and Original/Edited waveform previews. Review, build and listen in Playtest.",
         "Playtest controls: arrows move, A attacks an overlapping enemy and chirps, Start restarts. HP0 stops the hero; an enemy with0 health disappears. Save/load states belong to that exact build. Export and verify a patch from its Original."
       ],
-      "result": "The original program supports these declared fields. Native tests checked collision, contact damage, movement, attacks, changed music and save-state replay. The included examples were created and verified through ROMancer.",
-      "note": "This is a small original practice game, not a decoder for another game. Level colors are authored reference RGB colors. Starting sprites and hitboxes are editor previews; Playtest produces the live scene. Open test layout under Advanced practice remains the separate Hillside navigation exercise.",
+      "result": "Review your edits, save a separate build, playtest it and verify its patch export.",
+      "note": "Mossy Hollow is an original practice game. Use Playtest for the live scene.",
       "related": [
-        "collision-actors",
         "known-music",
-        "levels",
         "first-edit"
       ],
       "terms": [
@@ -291,8 +288,8 @@
         "term-build",
         "term-hitbox"
       ],
-      "image": "220-five-editing-tools-ready",
-      "caption": "The original studio has checked editing layouts for graphics, text, numbers, levels and music.",
+      "image": "267-practice-studio-readiness",
+      "caption": "The original practice studio has checked layouts for graphics, text, numbers and music.",
       "extra_images": []
     },
     {
@@ -357,7 +354,7 @@
       "intro": "Watch an actual local application recording, then try the same steps yourself. The video has instructional captions and a highlighted pointer, with no commercial game content.",
       "video": true,
       "steps": [
-        "Open the HTML guide chapter <b>Watch the first-edit walkthrough</b> and use the video controls. The adjacent ROMancer-v1.0-Walkthrough.mp4 also opens in an ordinary local video player.",
+        "Open the HTML guide chapter <b>Watch the first-edit walkthrough</b> and use the video controls. The adjacent ROMancer-v1.0.0-Walkthrough.mp4 also opens in an ordinary local video player.",
         "Follow the original NES workshop: assemble a tile, select brush swatch 1, paint one pixel, compare Changes only with Side by side, then undo and redo the stroke.",
         "Review graphics changes and optionally name the build. Choose Playtest saved build, Load game, Play and Pause. Save and load a state for that exact output.",
         "Export and download the readable First-sprite-edit.bps patch. Close and reopen the project, then check that its source and named build remain available.",
@@ -391,12 +388,12 @@
       "kicker": "Open / edit / build / test / export",
       "intro": "Use the included original drawing program to learn the full workflow without finding offsets or supplying a commercial game.",
       "steps": [
-        "Save existing work; choose the blank <b>Choose a project</b> entry if needed. On the empty Overview, click <b>NES workshop</b>.",
+        "Save existing work and return to the empty Overview. Expand <b>More practice ROMs</b>, then click <b>NES workshop</b>.",
         "Open <b>Graphics &amp; fonts</b>. Keep First tile 0, Tiles across 1 and Tiles down 1; click <b>Assemble tiles</b>. Leave Preview size on Fit and click brush swatch <b>1</b>.",
-        "Focus the <b>Editing</b> canvas. Press Right Arrow once, then Space. Expect <b>1 pixel differs</b>; the Original picture stays unchanged. Undo sprite stroke reverses the experiment.",
+        "Focus the <b>Editing</b> canvas. Press Right Arrow once, then Space. Expect <b>1 pixel differs</b>. Choose <b>Undo sprite stroke</b> to restore the pixel and <b>Redo sprite stroke</b> to stage the change again.",
         "Click <b>Review graphics changes</b>, read the byte summary, then <b>Create graphics build</b>. Name and notes are optional. Click <b>Playtest saved build</b> in the bottom bar to select that output and open Playtest.",
         "Choose <b>Load game</b>, then Play. Pause to inspect the result. The full Windows edition supplies the engine; the source edition may require core setup.",
-        "Open <b>Export</b>. Choose the original revision and your asset build, then <b>Create verified patch</b>. Download the prepared BPS. Continue with Apply a downloaded patch to check a fresh reconstruction."
+        "Choose <b>Check my hack</b> to compare original and build bytes. Then choose <b>Export saved build</b> and <b>Create verified patch</b>. Continue with Apply a downloaded patch to check a fresh reconstruction."
       ],
       "result": "The tested exercise changed exactly file offset 16400 (0x4010), from 81 to C1. Native original/build frames differed, a save/load roundtrip restored the view, and reapplying the exported patch recreated the same build hash.",
       "note": "Those byte values belong only to this original workshop. Its drawing program reuses the tile, so one edited pixel can repeat in gameplay. A saved draft or preview is not a built ROM.",
@@ -457,7 +454,7 @@
       "details": [
         {
           "title": "What a difference picture measures",
-          "text": "Changes only compares clean decoded pixels or palette colors. Cursors, selection outlines and editor highlights are excluded. A terrain comparison does not measure object records or collision values; its scope note identifies those separate overlays. Unsupported or oversized previews keep their existing view."
+          "text": "Changes only compares clean decoded pixels or palette colors. Cursors, selection outlines and editor highlights are excluded. Unsupported or oversized previews keep their existing view."
         },
         {
           "title": "What a review summary counts",
@@ -623,27 +620,31 @@
       "title": "Use the offline ROM facts database",
       "part": "Basic",
       "kicker": "Recorded samples / exact file identity",
-      "intro": "ROMancer includes 1,035 measured cartridge samples across the six supported systems. A matching SHA-256 connects your selected file to recorded header facts, checks and resource locations.",
+      "intro": "The offline catalog recognizes all 1,052 supplied cartridge revisions. Exact SHA-256 and file size select a record. CRC32 and SHA-1 can help cross-check your copy.",
       "steps": [
-        "Import your ROM and let automatic deep scan finish. A recorded sample match uses the file hash and size; the displayed sample name comes from its supplied filename.",
-        "Expand <b>Measured file facts &amp; locations</b>. Header-declared graphics have format evidence. Possible text or tiles are candidates; valid compression syntax does not prove that the game uses the stream.",
+        "Import your ROM. In <b>Overview</b>, expand <b>Playtest audit</b> to see the Windows engine's observations for that exact file. Seven previously refused revisions now show a verified title and opening gameplay. Test changes to your own build in Playtest.",
+        "In <b>Overview</b>, use <b>What can I edit in this ROM?</b> to open an available named edit. For file details, open <b>Advanced &gt; Resources</b>, then <b>ROM investigation</b>. Expand <b>Measured file facts &amp; locations</b> or <b>Related source evidence</b>.",
         "Choose <b>Inspect bytes</b> to open a location in the selected source. Confirm its role with a checked definition or native investigation before planning an edit.",
-        "Review, build and playtest normally. A changed build can be unrecorded even though its original remains matched. A sample match never creates a game-specific editor by itself."
+        "Review the preview, create a build, then use <b>Check my hack</b> and <b>Export saved build</b> in the footer. Your build has a new file hash and needs a fresh playtest."
       ],
       "result": "You can begin with measured addresses and format facts while keeping candidates, trusted game meanings and actual gameplay observations separate.",
-      "note": "The scanner processed 1,048 cartridge files. 1,035 met current layout admission checks; 13 did not. Two FDS disks and a save file were outside scope. No ROM payload is shipped in the factual catalog.",
+      "note": "Each supplied ROM was read in full. Header fields and checks describe the exact file. Sampled graphics, possible text and bounded compression results retain their evidence labels.",
       "details": [
         {
           "title": "What is recorded",
-          "text": "Standard layout numbers, SHA-256/CRC32/size, numeric check results, offset/length hypotheses and explicit scan coverage. The database excludes code bytes, dialogue excerpts, graphics, audio, decoded payloads and personal paths."
+          "text": "The facts catalog stores hashes, sizes, header numbers, numeric checks and bounded candidate ranges. The separate source-evidence index records 4,228 directly measured relationships; 640 files have at least one. Reference associations cover 906 files. NES comparisons match PRG/CHR input inventories and exclude the container header. Entire-file comparisons on other systems describe named ROM inputs, not complete gameplay validity."
         },
         {
           "title": "Maintenance and automation · Advanced",
-          "text": "Source developers can run tools/scan_rom_archives.py with --archives, --output, --report, --journal and --jobs. It validates ZIPs, bounds work and can resume. Review new facts before rebuilding; do not replace files in an installed verified version. AI clients use rom.samples and the recorded_facts field on rom.check or rom.scan.run."
+          "text": "AI clients can query rom.evidence with sha256 and size without creating a project or loading a ROM. Results show at most eight relationships and eight exact BRR segment locations, plus total counts. rom.scan.run exposes source_evidence and recorded_facts; altered builds need their own investigation. Sound-context matches and driver-pattern candidates do not supply sequence formats, pointers, ownership or editing permissions."
         },
         {
           "title": "Redistribution basis",
-          "text": "The catalog contains independently measured facts, not another author’s database or expressive guide text. US Copyright Office guidance distinguishes plain facts from protected expression and original compilations. This policy does not grant rights over original game content or establish every jurisdiction’s legal position."
+          "text": "The packaged indexes contain measured facts, reference identifiers and hashes of private verification receipts. No game code, decoded images, sound payloads, save states or personal paths are included. Reference inventory matches do not authorize redistribution of source games or separate chip firmware. Nintendo and other marks remain their owners’ property."
+        },
+        {
+          "title": "Try a named edit",
+          "text": "On the matched Pokémon Red or Blue original, choose Edit Bulbasaur base HP. This changes a stored input to the game's HP formula. Open Species base stats under Game edits to work with the 150 named records. Mew has separate storage."
         }
       ],
       "related": [
@@ -657,8 +658,9 @@
         "term-offset",
         "term-checksum"
       ],
-      "image": "253-recorded-rom-facts",
-      "caption": "Actual packaged ROMancer: an exact archive sample match, numeric header facts and source-bound locations. Possible tiles remain candidates."
+      "image": "265-recognized-game-structures",
+      "caption": "The Immortal is matched by its exact file identity. The measured grid, dictionary, tiles and palette locations open in the byte inspector.",
+      "image_alt": "ROMancer shows the matched Immortal cartridge, measured structures and disabled Levels entry"
     },
     {
       "id": "drafts",
@@ -668,7 +670,7 @@
       "intro": "Editing changes the proposal shown in the editor. A build is a separate playable output created from a reviewed plan.",
       "steps": [
         "Watch the <b>Saving</b> or <b>Saved</b> status as you work. Ctrl+S requests draft saving. A saved draft still needs review and a build.",
-        "Use the active editor's Undo and Redo controls. Pixel and room editors group a stroke; text fields retain ordinary text editing undo. The shortcut help explains the current context.",
+        "Use the active editor's Undo and Redo controls. Pixel editing groups a stroke; text fields retain ordinary text editing undo. The shortcut help explains the current context.",
         "Choose <b>Review changes</b> or the tool's equivalent. Read expected original bytes, proposed values, shared consumers and any integrity updates. Changing an input invalidates an older review.",
         "Create the separate build. <b>Playtest saved build</b> in the bottom bar selects that output and opens Playtest; choose Load game. <b>Export saved build</b> selects that output and its ancestral original. A newer staged edit needs a new build."
       ],
@@ -770,7 +772,7 @@
       "kicker": "Resource browser / user research",
       "intro": "A useful discovery should be easy to find again. Research notes name a byte range and record what you observed without turning a theory into a verified game format.",
       "steps": [
-        "Open Resources and use Resource browser & research to search saved graphics, text, numbers, levels, sound or notes. Bytes opens the exact range; Editor opens the saved layout.",
+        "Open Resources and use Resource browser & research to search saved graphics, text, numbers, sound or notes. Bytes opens the exact range; Editor opens the saved layout.",
         "Expand Research note. Choose New note at selected byte, enter a short name, file offset and byte length, then record what you found and its evidence reference.",
         "Choose Save note. The note belongs to this exact source revision and does not change the ROM. Select Edit note to load its complete text, or Remove to delete it after confirmation.",
         "In the hex editor, choose Explain selected bytes. Matching notes appear under User research, separately from decoded storage facts.",
@@ -868,33 +870,6 @@
       ]
     },
     {
-      "id": "room",
-      "title": "Move a documented room object",
-      "kicker": "GAME BOY / FINAL FANTASY LEGEND II",
-      "image": "07-ffl2-room",
-      "steps": [
-        "On the matched source, open <b>Opening-bedroom stool</b> on Overview or open its matched room in <b>Levels</b>. Compare the actual ROM-decoded original and edited terrain.",
-        "In <b>Layers</b>, toggle <b>Terrain</b>, <b>Objects</b>, <b>Collision values</b>, <b>Tile grid</b> and <b>Allowed floor tiles</b>. Keep Objects visible to edit the stool.",
-        "Drag the stool onto a highlighted floor tile, click an allowed tile or use arrow keys while the map has focus. The stool-position dropdown is an alternative. The status reminds you to create a build to keep the previewed change.",
-        "Review the source-bound command, create a separate build and visit the bedroom. Check the stool, surrounding movement and protected doorway in Playtest."
-      ],
-      "result": "Original and edited maps use actual decoded opening-bedroom data. The five supported stool positions are (12, 31), (14, 31), (12, 32), (13, 32) and (14, 32).",
-      "note": "The doorway at (13, 33) and other room commands are protected. Preview details contains technical bounds and raw collision information. Actors and dialogue are excluded from this terrain preview. Hiding Objects prevents stool edits.",
-      "part": "Basic",
-      "intro": "This is an actual ROM-decoded bedroom on a matched commercial-game revision. Change only the documented stool command, then check its appearance and surrounding movement in native Playtest.",
-      "related": [
-        "levels",
-        "checks",
-        "regression"
-      ],
-      "caption": "Actual ROMancer interface. The HTML edition links to the full-resolution capture.",
-      "terms": [
-        "term-metatile",
-        "term-collision",
-        "term-layer"
-      ]
-    },
-    {
       "id": "gbc-colors",
       "title": "Edit a Game Boy Color palette",
       "kicker": "GAME BOY COLOR / DEJA VU CASEBOOKS",
@@ -926,23 +901,31 @@
       "image": "213-paused-game-save-state",
       "steps": [
         "Check that the top selector shows the source or build you intend to test, then open <b>Playtest</b> and click <b>Load game</b>.",
-        "Choose <b>Play</b> and focus the game for controller input. Use <b>Pause</b> before inspecting a frame. Controller & frame tools exposes manual stepping and input devices.",
+        "Choose <b>Play</b> and focus the game for controller input. Pause on a useful scene. Use <b>Inspect graphics</b>, <b>Track a value</b>, or <b>Save comparison scene</b>.",
         "Choose <b>Save state</b>. Select a saved state and click <b>Load state</b> to return to it. Ordinary battery saves are managed separately below."
       ],
-      "result": "The original Chrono Trigger cartridge is visibly running at its name-entry screen. Live Play/Pause, input, save/load and repeated native state replay passed on this source. The earlier black transition frame was rejected as visual load proof.",
+      "result": "The screenshot shows a paused session of the included Mossy Hollow practice game. For the verified Kirby Tilt ’n’ Tumble revision, confirm calibration with the game’s A button, then hold a direction to tilt and release it to return to neutral.",
       "note": "Save states are bound to the exact ROM, engine and runtime setup. Do not assume a state from the original will load on a modified build. Loading refreshes one paused frame. Unload game closes only the current emulator session. Builds, saved states and ordinary game saves remain in the project.",
       "part": "Basic",
-      "intro": "Choose the ROM or edited build you want to test. Load game prepares it; Play runs it. Game paused and Game running describe the current session.",
+      "intro": "Choose the ROM or build to test. Load game selects the bundled engine and the settings for a recognized cartridge. Play starts the session.",
       "related": [
         "saves",
         "regression",
-        "sound"
+        "sound",
+        "universal-values",
+        "captured-edit-check"
       ],
-      "caption": "Actual ROMancer Playtest with Chrono Trigger USA, frame993. A running worker alone does not prove a visibly loaded scene.",
+      "caption": "Mossy Hollow paused in Playtest after a save state was loaded.",
       "terms": [
         "term-core",
         "term-frame",
         "term-state"
+      ],
+      "details": [
+        {
+          "title": "Top Gear 3000 save states",
+          "text": "Load the verified cartridge with Load game and create a new state. ROMancer v1.0.0 saves the DSP-4 chip state needed to resume the race. States made with the older engine lack that data and cannot be repaired. Verify by reloading a new state and repeating an input from the same point."
+        }
       ]
     },
     {
@@ -1008,11 +991,38 @@
       "details": []
     },
     {
+      "id": "portable-replay-proof",
+      "title": "Save a discovery and share a replay proof",
+      "part": "Advanced",
+      "kicker": "Exact revisions / portable proof",
+      "intro": "A discovery saves an editable layout for the exact original. A replay proof lets a recipient rebuild your patch and rerun the same checks on their own original.",
+      "steps": [
+        "After an original-to-build replay passes, expand <b>Save a reusable discovery</b>. Give a changed byte, saved table or saved graphics resource a clear name. Numeric discoveries require passing gameplay expectations.",
+        "Select the original again. Open <b>Overview</b> and expand <b>Saved discoveries</b>. Open the editor or choose <b>Prepare JSON export</b>. Find the file under Export. Import discoveries on the exact matching ROM. To mark an imported discovery as locally checked, reproduce its replay and save the same discovery again.",
+        "In <b>Export</b>, select the original and build used in the check. Under <b>Share a patch with replay proof</b>, pick the completed replay and create the ZIP. Screenshots are optional.",
+        "On the receiving copy, extract the ZIP and apply <b>Patch.bps</b> to the exact original. Select the original and patched build in Export, then load <b>Patch.bps</b> and <b>Replay.json</b> under <b>Verify a shared replay</b>. Choose <b>Run shared replay</b>."
+      ],
+      "result": "ROMancer verifies the BPS output, repeats the two original runs and one build run, and compares the frames and any saved gameplay measurements using the recorded engine settings.",
+      "note": "The ZIP includes the patch, written instructions and replay data. Leave screenshots unchecked when you only intend to share those files. If verification rejects the package, compare the original hash, patched hash and engine settings in the README.",
+      "related": [
+        "gameplay-expectations",
+        "patches",
+        "saved-gameplay-traces"
+      ],
+      "terms": [
+        "term-bps",
+        "term-sha",
+        "term-replay-proof"
+      ],
+      "image": "265-reusable-discovery",
+      "caption": "A saved Mossy Hollow discovery reopened on the original ROM."
+    },
+    {
       "id": "apply-patch",
       "title": "Apply a downloaded BPS or IPS patch safely",
       "part": "Basic",
       "kicker": "Exact source / compatibility preview / separate build",
-      "intro": "A patch requires an exact source revision. Start with ROMancer-v1.0-Hack-Examples.zip: six examples, one per supported system. Its README lists each change and original hash; the separate 41-patch archive is optional.",
+      "intro": "A patch requires an exact source revision. ROMancer-v1.0.0-Hack-Examples.zip includes three BPS examples. Its README lists each change and the matching original hash.",
       "steps": [
         "On Export, expand <b>Apply a patch downloaded from someone else</b>. Choose the exact ROM the patch requires in the top bar, then select or drop its BPS or IPS patch.",
         "Under <b>Apply a downloaded patch</b>, choose or drop one BPS or IPS file. For IPS, enter the author's full-file reference: eight hexadecimal CRC32 digits or 64 SHA-256 digits. BPS checks embedded checksums.",
@@ -1257,17 +1267,18 @@
       "kicker": "Investigate / record / narrow",
       "intro": "ROMancer can gather evidence from an unfamiliar ROM. Start with one number or a controlled change rather than guessing a game property from byte values.",
       "steps": [
-        "Load and pause the selected ROM in <b>Playtest</b>, then open <b>Investigation</b>. Name the experiment and enter the visible number, or leave it blank for change-only tests.",
-        "Choose <b>Capture before</b>. Perform one controlled action, pause and capture again. Record whether the target increased, decreased, changed, or changed by an exact amount.",
+        "Load the selected ROM in <b>Playtest</b>, pause, and choose <b>Track a value</b>. Name what you want to change. Enter the number you see, or leave it blank to track change only.",
+        "Choose <b>Capture before</b>. Perform one controlled action, pause, mark what happened, and choose <b>Capture after</b>. Choose <b>Open investigation</b> to see the matches.",
         "Add an unchanged control while unrelated activity continues. This helps reject background counters. Keep before, changed and control observations together.",
         "Compare surviving RAM offsets, widths, byte order, signed/BCD encoding and display relationships. Additional observations help separate equally fitting hypotheses.",
-        "Use <b>Add watch</b> to retain a range or <b>Investigate accesses</b> for a native physical watch. Continue with the native capture chapter."
+        "Choose <b>Investigate accesses</b> for a promising RAM result. If the inputs were recorded from power on, <b>Replay last Playtest change</b> repeats that route in the native debugger."
       ],
       "result": "A source-bound observation history and tested numeric hypotheses, without a game-specific profile or a memory write.",
       "note": "Each observation covers at most 4096 bytes; an experiment keeps at most 32 observations. A new worker, reset or loaded state requires a fresh series. Restored project evidence remains historical and cannot supply fresh native proof.",
       "related": [
         "native-accesses",
-        "debug"
+        "debug",
+        "captured-edit-check"
       ],
       "terms": [
         "term-control-observation",
@@ -1304,18 +1315,15 @@
       "title": "Follow connected game resources",
       "part": "Basic",
       "kicker": "Game view / resources and editors",
-      "intro": "Game view connects saved graphics, palettes, text, named records, rooms, objects, sound, research notes and measured gameplay. It works across NES, SNES, Genesis, Master System, GB and GBC; it does not require a Pokemon profile.",
+      "intro": "Game view connects saved graphics, palettes, text, named records, sound, research notes and measured gameplay across all six systems.",
       "steps": [
-        "Choose a source or build in the top bar, then open Game view. Find a resource by name or use Show to focus on graphics, rooms, named records or gameplay traces.",
-        "Select an entry. Read its preview, decoded fields or text and its exact byte range. The confidence label distinguishes a checked layout, a known revision, your note and a measured frame.",
-        "Follow a connection to inspect related storage. Uses tiles and Uses palette come from a saved declaration. Shares byte storage only means overlapping file ranges; it does not establish a game behavior.",
-        "Choose Open editor to continue in the existing editor, or Inspect exact bytes to inspect its file location. Keep current draft preserves work when another setup is offered.",
-        "Rooms show the declared map and object outlines. Named records show decoded fields. A missing preview or connection means that format or relationship still needs a checked declaration or measured evidence.",
-        "Filter to Collision layers, Event scripts, Commands, Songs, Music events or Saved animations. Open the selected resource to reach its source-bound editor and the corresponding room, command or song.",
-        "Connect declared triggers, destinations, collision and animation resources with an evidence note when their relationship is established. These author links stay distinct from native execution evidence."
+        "Choose a source or build in the top bar, then open Game view. Search a resource by name or filter to graphics, named records or gameplay traces.",
+        "Select an entry. Read its preview and byte range. The confidence label tells you whether the entry comes from a checked definition, your notes or a measured frame.",
+        "Follow a connection to inspect related storage. Uses tiles and Uses palette come from a saved declaration. An overlap shows shared bytes.",
+        "Choose Open editor where available, or Inspect exact bytes to open the file location. Keep current draft preserves your work when another setup is offered."
       ],
       "result": "Navigate between a visual resource, its declared dependencies and its exact storage without repeatedly entering offsets.",
-      "note": "An index of checked data is not a universal decompiler. Game-specific maps, music and scripts still need supported readers. A source change invalidates stale declarations and evidence. Music-event indexing shows at most128 events per song; use Music & sound for the full decoded sequence. Byte overlap is shared storage, not ownership or causation.",
+      "note": "A missing connection can be researched and saved as a declaration. A source change invalidates stale definitions and evidence. Music-event indexing shows at most 128 events per song. Open Music & sound for the full decoded sequence.",
       "related": [
         "research-notes",
         "numbers"
@@ -1323,30 +1331,7 @@
       "terms": [
         "term-connected-resource",
         "term-evidence"
-      ],
-      "image": "80-connected-room-preview",
-      "image_layout": "following-page",
-      "caption": "Follow connected game resources",
-      "visual_page": {
-        "title": "Follow connected game resources",
-        "kicker": "Actual ROMancer interface",
-        "intro": "A measured workflow, captured without controlling the desktop.",
-        "panels": [
-          {
-            "image": "80-connected-room-preview",
-            "title": "Follow connected game resources",
-            "x": 48,
-            "top": 850,
-            "width": 1120,
-            "crop": [
-              0,
-              0,
-              1800,
-              1100
-            ]
-          }
-        ]
-      }
+      ]
     },
     {
       "id": "saved-gameplay-traces",
@@ -1404,7 +1389,8 @@
       "kicker": "Game view / Build checks",
       "intro": "Compare a separate build with two fresh runs of its original using identical inputs and a reviewed emulator core. A saved test can run after each descendant build or imported patch.",
       "steps": [
-        "In Game view open Automatic check setup. Give the check a name, choose the frame count and select whether visual changes need review or identical pixels are required.",
+        "After creating a build, choose <b>Check my hack</b> in the footer. The review pairs the build with its exact original. Choose <b>Compare original and build</b> to see changed bytes and open a range in hex.",
+        "Use <b>Run checks</b> to replay the configured inputs. Original, build and difference frames show the selected checkpoint. A named edit describes its latest build step.",
         "Leave Run after new builds selected to queue this check automatically. Save test setup for this revision. For button sequences or a fixed comparison region, expand Advanced inputs and comparison region.",
         "Create a build normally, or choose an existing Build to check and Run checks. The application shows progress and lets you cancel the job. It remains usable while separate workers run.",
         "Open a recent result. Compare Original, Build and Difference. Read cartridge integrity, state replay and worker closure results alongside the visual result.",
@@ -1527,17 +1513,19 @@
       "kicker": "Connected editing / step by step",
       "intro": "Use your actual captured input history to check a separate build, with no custom test JSON. ROMancer checks that the original still reproduces the recorded scene before showing the edit comparison.",
       "steps": [
-        "Capture a fresh cold-start trace of the scene you will edit. Keep the same engine, options, controller setup and system-file identities.",
-        "Make the edit in an appropriate visual or structured editor. Review the change and create a separate build. Staged pixels or unsaved form values are previews; they cannot be replayed as a ROM build.",
-        "Expand Test this edit in Graphics, Text, Tables, Levels, Sound or Resources. Select the descendant build and the saved capture, then choose Test this edit.",
-        "ROMancer runs the original twice and the edited build once with the captured inputs. It checks the original frame, engine setup, cartridge integrity and next-frame save-state replay. The original, build and difference pictures show what changed in the captured region.",
-        "Read the outcome. REVIEW means pixels changed and you must assess whether the change was intended. PASS covers the configured checks, not the whole game. INCONCLUSIVE means the captured original was not reproduced. BLOCKED names a missing or incompatible prerequisite."
+        "Load the original from power on. Play to the scene, pause, then choose <b>Save comparison scene</b>. It uses a selected frame region when available. The default uses up to 256 × 256 pixels from the top left.",
+        "If you started with a sprite, choose <b>Inspect graphics</b>, drag around it and choose <b>Find ROM source for selection</b>. A saved graphics trace can also supply the comparison. Review the edit and create a build.",
+        "Choose <b>Check my hack</b> in the bottom bar. Under <b>Compare a captured scene</b>, choose the capture, then <b>Test captured scene</b>.",
+        "ROMancer checks that two runs of the original reproduce the saved frame, then compares the build using the same inputs. Review the original, build and difference pictures.",
+        "Look for the change you intended. <b>REVIEW</b> means pixels changed. <b>INCONCLUSIVE</b> means the comparison could not establish a stable baseline. <b>BLOCKED</b> shows the failed prerequisite."
       ],
       "result": "The scene check is repeatable and tied to its exact source, descendant build and execution setup. It does not replace your saved automatic test policy.",
       "note": "This shortcut allows up to 2400 frames and 20 input steps. Longer or state-based scenarios belong in Routes and Regression. A different game revision, unrelated build, historical imported trace, battery-save start or changed core setup cannot silently reuse the capture.",
       "related": [
         "automatic-build-checks",
-        "saved-gameplay-traces"
+        "saved-gameplay-traces",
+        "verified-practice-edits",
+        "gameplay-expectations"
       ],
       "terms": [
         "term-edit-check"
@@ -1573,50 +1561,115 @@
       ]
     },
     {
+      "id": "gameplay-expectations",
+      "title": "Check what should happen in gameplay",
+      "part": "Basic",
+      "kicker": "Check my hack / measured results",
+      "intro": "Set a clear expectation for what should change in the game and what should stay the same. ROMancer runs the recorded input sequence twice on the original and once on your build.",
+      "steps": [
+        "Open the original ROM. In <b>Advanced</b>, open <b>Investigation</b>. Under <b>Memory watches</b>, enter a name, region and offset, choose 1, 2 or 4 bytes, then select <b>Add watch</b>.",
+        "In <b>Playtest</b>, start from power on, play to the comparison point and choose <b>Save comparison scene</b>. Create a separate build from the original.",
+        "Select the build and open <b>Check my hack</b>. In <b>Compare a captured scene</b>, expand <b>What should happen?</b> and choose the saved watch.",
+        "Choose <b>Final value</b> for a raw number or <b>Change during last input</b> for the difference across the last recorded input step. Fill in the original and build numbers. For <b>Same as original</b>, leave those fields blank.",
+        "Add another check to verify a value that should stay the same. Choose <b>Test captured scene</b> and review the measured numbers and the three pictures."
+      ],
+      "result": "In Mossy Hollow, 75 idle frames and 12 frames holding Right produced 24 pixels of movement in the original and 48 in the faster build. Health stayed at 5. Both gameplay checks passed.",
+      "note": "When the original measurements disagree, the test is inconclusive. A stable result outside your expectations is a regression. The picture can still need review when all numeric checks pass.",
+      "image": "264-gameplay-expectations",
+      "caption": "Actual ROMancer result for Mossy Hollow showing distance, health and a side-by-side scene comparison.",
+      "related": [
+        "captured-edit-check",
+        "verified-practice-edits",
+        "portable-replay-proof"
+      ],
+      "terms": [
+        "term-edit-check",
+        "term-gameplay-expectation"
+      ]
+    },
+    {
+      "id": "verified-practice-edits",
+      "title": "Try three verified practice edits",
+      "part": "Basic",
+      "kicker": "Practice ROMs / measured in-game results",
+      "intro": "Use the ROMs created by the included workshops. Each edit starts from its original, produces a separate build and has a reproducible gameplay comparison.",
+      "steps": [
+        "Open <b>Try the editing studio</b> for Mossy Hollow. In <b>Stats &amp; data</b>, set <b>Hero speed</b> from 2 to 4. Review and create a build. For the captured reference, wait 75 frames from power on and hold Right for 12 frames. The original moved 24 pixels and the build moved 48.",
+        "Select the original Mossy Hollow source again. In <b>Text &amp; layout</b>, change <b>HELLO, EXPLORER!</b> to <b>READY, EXPLORER!</b> and create a separate text build. Compare the greeting at frame 90.",
+        "On the Overview start screen, open <b>More practice ROMs</b> and choose <b>Game Boy Color workshop</b>. In <b>Graphics &amp; fonts</b>, choose palette entry 1 and set it to blue (<b>#0000FF</b>). Compare at frame 120. The red diamonds turn blue."
+      ],
+      "result": "All three comparisons reproduced the original twice and showed the intended change in the new build. The three BPS examples independently reconstruct their respective builds.",
+      "note": "Use Controller &amp; frame tools in Playtest for exact counts. Set Frames to advance for a wait. Set Frames per input and click an arrow for a held direction.",
+      "image": "263-playtest-practice-results",
+      "caption": "Actual original and edited emulator frames from the three practice projects.",
+      "related": [
+        "captured-edit-check",
+        "editing-studio",
+        "palettes"
+      ],
+      "terms": [
+        "term-frame",
+        "term-edit-check"
+      ]
+    },
+    {
       "id": "hex-editor",
       "title": "Inspect bytes with useful context",
       "kicker": "RESOURCES / HEX EDITOR",
-      "image": "11-hex-inspection",
+      "image": "266-hex-selection-and-staged-edit",
       "steps": [
-        "Use a <b>Known locations > View 0x...</b> button to jump to a documented offset, or open <b>Resources</b> and enter an offset.",
-        "Search bytes such as AB ?? CD, UTF-8 text or an integer with explicit byte order. Inspect signed/unsigned numbers, read nearby verified notes and bookmark the selected offset before editing.",
-        "Edit a byte using two hex digits. Choose <b>Review byte edits</b>, inspect the plan, then <b>Create separate build</b>."
+        "Open <b>Advanced &gt; Resources</b>. Choose a documented location or enter a decimal or 0x hexadecimal offset and choose <b>Go</b>.",
+        "Read the file offset on the left, hex bytes in the middle and printable ASCII on the right. A centered dot stands for a nonprintable byte. The outline follows the selected byte in both columns. Underlined values are staged edits. Below the grid, Original and Draft show the exact selected byte.",
+        "Search AB ?? CD, UTF-8 or an integer with an explicit byte order. Open <b>Number inspector &amp; bookmarks</b> to inspect or bookmark the selected offset.",
+        "Edit a byte using two hex digits. Use the footer <b>Undo</b> and <b>Redo</b> to check the staged change, then choose <b>Review byte edits</b> and <b>Create separate build</b>. Your original remains unchanged.",
+        "To share a build, open <b>Export</b>, select its original revision and target build, and create a verified patch. Keep the original ROM private."
       ],
-      "result": "The editor is opened at The Immortal's documented menu bytes rather than an arbitrary location.",
-      "note": "Hexadecimal is a way to write numbers; it does not tell you what a byte means. Unknown data stays unknown until evidence establishes its structure and purpose.",
+      "result": "The exact before/after byte change is reviewed, stored in a separate build and can be exported as an independently verified patch.",
+      "note": "An uncatalogued ROM can use the same byte workflow when its cartridge layout is recognized. Before changing gameplay, find a checked definition or trace that connects the bytes to the intended behavior. The ASCII column shows standard characters. Custom game text may use a different encoding.",
       "part": "Advanced",
-      "intro": "Inspect exact stored bytes with a known purpose and an explicit address scope. Use higher-level tools when their definitions describe the change.",
+      "intro": "Inspect exact stored bytes and create a separate reviewed build. Use a known location or higher-level editor when its definition describes the intended change.",
       "related": [
         "investigation",
         "debug",
         "checks",
         "tables"
       ],
-      "caption": "Actual ROMancer interface. The HTML edition links to the full-resolution capture.",
+      "caption": "Original NES workshop. The staged byte and its ASCII character are underlined. The outline shows the selected pair.",
       "terms": [
         "term-hex",
         "term-offset",
         "term-byte-order"
-      ]
+      ],
+      "details": [
+        {
+          "title": "Checksum policy · Advanced",
+          "text": "Automatic checksum maintenance is the default. Under Advanced byte options, Preserve checksum fields explicitly requests byte-exact edits without repairing cartridge fields. Use it only when you understand the convention. One supplied Trials of Mana revision needs this explicit choice because its stored checksum differs from the supported algorithm. A mismatch is reported; it is not silently repaired or certified. Changing policy requires a new review."
+        },
+        {
+          "title": "Name a confirmed byte",
+          "text": "Use a controlled edit and a matching replay to check what a byte does. Select that byte on the original ROM, open Number inspector & bookmarks, enter a name and choose Preview named field. Stats & data opens the unsigned one-byte field. Save this layout makes it reusable for this exact source when no table layout is already saved."
+        }
+      ],
+      "image_alt": "Selected hex byte and its ASCII character outlined, with the staged byte underlined"
     },
     {
       "id": "investigation",
       "title": "Trace a declared range to the exact bytes",
       "part": "Advanced",
       "kicker": "Resources / catalog, relationships and explanations",
-      "intro": "Follow a named room, object field, table or sound range into the selected source. Explanations describe established encodings and declared relationships, while unknown byte purposes remain unknown.",
+      "intro": "Follow a named table field, graphics resource or sound range into the selected source. Explanations show the encoding and meaning when a checked definition is available.",
       "steps": [
-        "In Resources, open <b>Declared resource catalog</b>, choose <b>Index declared resources</b> and search a name. Checked definitions can expose rooms, object slots, table ranges, samples and songs. Use <b>Inspect</b> on the intended range.",
+        "In Resources, open <b>Declared resource catalog</b>, choose <b>Index declared resources</b> and search a name. Choose <b>Inspect</b> to open the bytes.",
         "Select a byte in the hex editor. Open <b>Number inspector & bookmarks</b>, then <b>Explain selected bytes</b>. Read its source-bound name, offset, stored bytes, numeric value, byte order and declared bounds when available.",
-        "For room data, compare the cell X/Y or object slot and field. For a mapped exit field, read the declared destination. Use <b>Declared resource relationships</b> to follow named source ranges; these relationships do not establish arbitrary code references.",
+        "Use <b>Declared resource relationships</b> to follow related source ranges. Check the evidence for each relationship before using it to plan an edit.",
         "In Troubleshooting, use <b>Find declared references</b> or <b>Resolve address</b>, then <b>Inspect mapped bytes</b>. Confirm the current source, mapping and bank. Recompute after switching sources; do not reuse a stale result."
       ],
       "result": "The hex selection belongs to the intended artifact and declared file offset. The explanation identifies its bounded stored meaning, or explicitly reports that no interpretation has been established.",
-      "note": "A declared room target is not a measured traversal. Raw collision values are not inferred walkability labels. Sound samples and identified sequence fields do not establish an unknown commercial driver, and imported traces do not establish native instruction events.",
+      "note": "Use a checked declaration or runtime evidence before assigning gameplay meaning to stored bytes. Sound samples and known sequence fields each have their own scope.",
       "details": [
         {
           "title": "What a declaration can explain",
-          "text": "A terrain/collision cell can identify its room and coordinates; an object field can identify the named slot, value and declared target. Metatile parts, table fields, samples and supported song events retain their own range and format context."
+          "text": "A table definition can identify the record, field, encoding and accepted range. Graphics and sound definitions identify the codec and storage bounds."
         },
         {
           "title": "Use the matching kind of tool",
@@ -1630,62 +1683,13 @@
       "related": [
         "hex-editor",
         "debug",
-        "connections",
         "resources"
       ],
       "terms": [
         "term-offset",
         "term-metadata",
         "term-evidence"
-      ],
-      "image": "18-byte-explanation",
-      "image_alt": "Actual source-bound hex byte explanation for a declared room cell or object field",
-      "caption": "Actual declared-byte explanation. Names, coordinates and destinations retain their declaration scope.",
-      "image_layout": "following-page",
-      "visual_page": {
-        "title": "Bytes / a declared object field explained",
-        "kicker": "Advanced / actual source-bound inspection",
-        "intro": "The selected source byte has a declared slot, field, value and numeric range. A declaration is separate from observed game behavior.",
-        "panels": [
-          {
-            "image": "18-byte-explanation",
-            "title": "Current source / selected offset and declaration",
-            "x": 48,
-            "top": 846,
-            "width": 780,
-            "crop": [
-              180,
-              60,
-              920,
-              860
-            ],
-            "caption": "Actual hex-editor detail. The HTML edition links to the complete capture."
-          }
-        ],
-        "notes": [
-          {
-            "title": "Read the stored value",
-            "text": "This capture selects 0x3515 and explains the Hillside / Courtyard connection / x field as an 8-bit declared value of 12, bounded from 0 to 15. The separate byte-reference panel correctly does not claim verified game semantics.",
-            "x": 900,
-            "y": 846,
-            "width": 490
-          },
-          {
-            "title": "Drafts and source bytes differ",
-            "text": "An inspector can show a staged X position of 13 while the selected original source still stores 12. Create and select the separate build before expecting a byte explanation to describe that built edit.",
-            "x": 900,
-            "y": 603,
-            "width": 490
-          },
-          {
-            "title": "Keep navigation current",
-            "text": "Go selects the visible byte cursor. After moving or switching sources, request the explanation again. A previous number interpretation or reference result does not describe a newly selected byte automatically.",
-            "x": 900,
-            "y": 360,
-            "width": 490
-          }
-        ]
-      }
+      ]
     },
     {
       "id": "resources",
@@ -1708,7 +1712,7 @@
         },
         {
           "title": "Six supported modes",
-          "text": "NES, SNES, Genesis, GB, GBC and Master System are separate user choices. Bank switching, enhancement hardware and game-specific data need their own supported mapping or verified definition. Unrecognized cartridge layouts are rejected on import. Stored resource interpretations still need their supported codec and source-bound definition. The declared catalog also exposes checked level and sound ranges; it does not discover arbitrary room identities or music-driver commands."
+          "text": "NES, SNES, Genesis, GB, GBC and Master System are separate user choices. Bank switching, enhancement hardware and game-specific data need their own supported mapping or verified definition. Unrecognized cartridge layouts are rejected on import. Stored resource interpretations still need their supported codec and source-bound definition. A checked sound range can identify stored data for a supported sound format."
         },
         {
           "title": "Automatic versus manual investigation",
@@ -1759,8 +1763,8 @@
       "kicker": "Color indices and shared uses",
       "intro": "A pixel usually stores a color index. A palette supplies the RGB color for that index. Changing the palette can recolor many uses at once.",
       "steps": [
-        "Load a declared graphics resource and inspect <b>Palette colors</b>. Select the bank and entry before editing. Confirm the original swatch matches the intended resource.",
-        "Use <b>Choose color</b> for an RGB proposal, or <b>Color storage values</b> for the declared channels. Read the Original/Edited comparison as the change is staged.",
+        "Load declared graphics. If <b>Preview colors > ROM palette bank</b> appears, choose the bank used by the graphic. Tiles, assembled sprites and animation use it together. This selector changes the view only.",
+        "In <b>Palette colors</b>, select a bank and entry. Choosing an entry also selects its preview bank. Use <b>Choose color</b> or <b>Color storage values</b>; the edited views update while the original stays fixed.",
         "Review the channel limits and shared consumers. RGB555 stores 5-bit channels, so a chosen screen color is quantized to a representable value.",
         "Review graphics changes, create the build and inspect every scene known to share that palette. Verify the color in the actual game, not just the swatch."
       ],
@@ -1769,15 +1773,15 @@
       "details": [
         {
           "title": "Shared entries",
-          "text": "One index can be referenced by multiple tiles, objects or frames. A correct local swatch can cause an unintended global recolor. Inspect declared consumers and compare an unchanged neighboring object."
+          "text": "One stored entry may color many tiles, objects or frames. Preview-bank selection does not change pixels or palette bytes. Tilemap cells retain their encoded per-cell bank. Confirm shared consumers and compare an unchanged neighboring object."
         },
         {
           "title": "Original versus edited",
           "text": "The original view remains the reference while the edited view follows staged values. Saving the editor draft does not modify the playable source. Build and reload before judging the in-game effect."
         },
         {
-          "title": "Master System Mode 4 colors",
-          "text": "Choose Master System RGB222 for declared Mode 4 color bytes: one byte stores two bits per channel. Tilemap entries use the SMS index, flip and palette masks; priority and unused bits remain preserved. The reference color preview does not emulate analog display differences."
+          "title": "Native palette storage",
+          "text": "Declared graphics palettes support Genesis RGB333, Master System RGB222 and RGB555 in either byte order. ROMancer decodes the channel bits and preserves unused bits. Game Boy monochrome uses four hardware shades. Missing palette evidence is labeled; index grayscale is not claimed as natural game color."
         },
         {
           "title": "See the actual captured scene",
@@ -1795,7 +1799,15 @@
       "image": "08-dejavu-colors",
       "image_layout": "following-page",
       "image_alt": "Compare palette colors before building",
-      "caption": "Actual Game Boy Color interface palette, original and edited colors."
+      "caption": "Actual Game Boy Color interface palette, original and edited colors.",
+      "extra_images": [
+        {
+          "image": "262-native-palette-workshop-preview",
+          "alt": "Actual SMS workshop sprite preview with original green and staged cyan colors",
+          "title": "Practice: stored colors update the assembled preview",
+          "caption": "Actual editor capture using the original authored SMS workshop. A stored palette entry is staged from green to cyan; the original remains fixed. This is a preview exercise, not a commercial game support claim."
+        }
+      ]
     },
     {
       "id": "native-draft-preview",
@@ -1886,7 +1898,6 @@
         }
       ],
       "related": [
-        "levels",
         "sprites",
         "palettes"
       ],
@@ -2040,156 +2051,6 @@
         "term-glyph",
         "term-pointer"
       ]
-    },
-    {
-      "id": "levels",
-      "title": "Edit declared terrain, objects and collision",
-      "part": "Advanced",
-      "kicker": "Levels and bounded game definitions",
-      "intro": "Levels needs a checked game-specific definition. The matched FFL II bedroom is a bounded real-game example. An unsupported source has no level definition; optional Advanced practice teaches the declared format without pretending to decode that game.",
-      "steps": [
-        "Open <b>Levels</b> for the selected source. If it says <b>No supported level map for this ROM yet</b>, investigate the source or supply a checked map definition through Advanced level setup. The separate collapsed <b>Advanced practice > Open test layout</b> is a learning exercise, not your game.",
-        "Choose <b>Paint layer</b>: Terrain changes appearance; Collision edits a separately declared grid. Choose a named collision brush or a raw value. Pick from room samples existing data; Paint, Fill and rectangle copy/paste stay inside the declared bounds.",
-        "Use Undo stroke and Redo stroke. With Move object, drag a named label. When a starting sprite is declared, its preview moves too. Starting hitboxes shows declared rectangles. Pixel hitbox dimensions are separate from cell-based positions; use Update preview before reviewing.",
-        "Choose <b>Review level changes</b>, inspect the exact changes, then <b>Create level build</b>. Visit the room and test walking, collision, boundaries and transitions."
-      ],
-      "result": "The preview and checked changes stay within declared grid/object ranges. Test the built game to establish movement, collision, boundaries and transitions; the static preview alone does not certify them.",
-      "note": "A visible wall is not automatically a collision wall. Labels, sprite assemblies and hitboxes come from a checked declaration; generic declarations do not prove gameplay behavior. If collision is not mapped, the editor says so. Only the implemented original runtime has the collision/combat behavior described in the linked practice procedure.",
-      "details": [
-        {
-          "title": "Shared metatiles",
-          "text": "A block can be used in many cells or rooms. Changing its component tile changes every declared use; changing one terrain cell selects a different block for that cell."
-        },
-        {
-          "title": "Optional practice is not your game",
-          "text": "The artificial Hillside/Courtyard layouts demonstrate checked storage and declared relationships. Only Hillside graphics and music are rendered by the native test program. Their other room, objects and connections are editor practice data, not implemented doors or events. Actual game-room editing requires a verified definition for that game and revision."
-        }
-      ],
-      "related": [
-        "connections",
-        "room",
-        "tilemaps",
-        "regression",
-        "collision-actors"
-      ],
-      "terms": [
-        "term-metatile",
-        "term-collision",
-        "term-layer"
-      ],
-      "image": "20-ffl2-map-browser",
-      "image_layout": "following-page",
-      "image_alt": "Find a real room before editing it",
-      "caption": "Use a supported room preview and its declared fields. Unsupported map commands remain unavailable; a rendered image alone does not establish collision, events or a working exit.",
-      "visual_page": {
-        "title": "Find a real room before editing it",
-        "kicker": "Advanced / actual application capture",
-        "intro": "Actual Final Fantasy Legend II map browser and decoded room preview, bound to the matched original revision.",
-        "panels": [
-          {
-            "image": "20-ffl2-map-browser",
-            "title": "Find a real room before editing it",
-            "x": 48,
-            "top": 846,
-            "width": 1200,
-            "crop": [
-              180,
-              80,
-              1390,
-              700
-            ],
-            "caption": "Use a supported room preview and its declared fields. Unsupported map commands remain unavailable; a rendered image alone does not establish collision, events or a working exit."
-          }
-        ]
-      }
-    },
-    {
-      "id": "connections",
-      "title": "Advanced practice: objects and room connections",
-      "part": "Advanced",
-      "kicker": "Optional practice / synthetic editor-layout data",
-      "intro": "This optional Advanced practice uses original synthetic test terrain and declared records to demonstrate the editor format. It is not a decoded commercial-game level. For an actual supported game-room edit, start with the matched Final Fantasy Legend II bedroom example.",
-      "steps": [
-        "Open <b>Advanced practice > Open test layout</b> only to learn the declared format. Read the Practice layout warning. Under <b>Choose a room</b>, choose Hillside or Courtyard: these are synthetic test layouts, not decoded commercial levels.",
-        "Keep <b>Named objects</b> selected in Overlay. Select a named map label or use <b>Selected object</b> under <b>Objects</b>. Choose <b>Move object</b> and drag its label within the guarded room bounds.",
-        "For a declared exit, select <b>Destination room</b> and choose <b>Update preview</b>. X/Y positions stay visible; raw fields are inside <b>Other values · Advanced</b>. Unnamed raw slots appear only with <b>All records (Advanced)</b>.",
-        "Inspect the staged room link, follow its destination button and use Undo stroke to undo a grouped edit. Review and build only the intended stored changes; the workshop's room links and records still do not run as gameplay."
-      ],
-      "result": "The practice inspector stages bounded declared fields, and editor navigation follows an explicit stored-value mapping. These checks demonstrate data handling, not an executable level or door system.",
-      "note": "This is editor-format practice, not normal beginner game editing. The native test program renders Hillside and plays music only. Courtyard, object records and declared connections are not executed as actors, doors or events. Use the real FFL II bedroom example for a native-supported room edit.",
-      "details": [
-        {
-          "title": "What a connection declares",
-          "text": "An optional per-slot annotation supplies its index, name and role. A declared exit names a stored integer field and lists allowed value/room-ID pairs. Unmapped current values, duplicate destination values, unknown rooms and out-of-range edits are rejected."
-        },
-        {
-          "title": "Existing definitions still work",
-          "text": "The optional object metadata does not replace the fixed-record storage layout or require a new schema version. Older definitions remain usable; unnamed slots stay unnamed, and objects without established X/Y coordinates are not given invented positions."
-        },
-        {
-          "title": "Workshop versus game engine",
-          "text": "Hillside and Courtyard demonstrate source-bound layouts, named fields and declared navigation in the editor. These data do not provide a game-authoring engine, executable door events or an event compiler. Verify a real game's consumers before claiming an edited destination works in native play."
-        }
-      ],
-      "related": [
-        "room",
-        "levels",
-        "investigation",
-        "recipes",
-        "regression"
-      ],
-      "terms": [
-        "term-connection",
-        "term-metadata",
-        "term-declared"
-      ],
-      "image": "16-connected-rooms",
-      "image_layout": "following-page",
-      "image_alt": "Clearly labelled Advanced editor-layout practice with artificial test terrain and declared room connections",
-      "caption": "Optional Advanced practice with synthetic test terrain. Declared room connections do not establish native doors, actors or events.",
-      "extra_images": [
-        {
-          "image": "17-object-inspector",
-          "title": "Advanced practice inspector / declared record fields"
-        }
-      ],
-      "appearance_title": "Rooms / connections and object inspector",
-      "appearance_kicker": "Advanced / original editor-layout workshop",
-      "appearance_intro": "Actual checked workshop layouts. Hillside renders and plays music natively; Courtyard, objects and connections remain editor practice data.",
-      "visual_page": {
-        "title": "Advanced practice / synthetic layouts and records",
-        "kicker": "Optional practice / not a decoded commercial-game level",
-        "intro": "Artificial test data for learning the editor format. Only Hillside graphics and music run natively; these records do not execute doors, actors or events.",
-        "panels": [
-          {
-            "image": "16-connected-rooms",
-            "title": "Advanced practice / staged synthetic room records",
-            "x": 48,
-            "top": 846,
-            "width": 1200,
-            "crop": [
-              180,
-              60,
-              1390,
-              500
-            ],
-            "caption": "Synthetic editor-format exercise. Use the FFL II bedroom procedure for a supported real-game room change."
-          },
-          {
-            "image": "17-object-inspector",
-            "title": "Advanced practice / selected declared record",
-            "x": 48,
-            "top": 350,
-            "width": 900,
-            "crop": [
-              180,
-              210,
-              1390,
-              430
-            ]
-          }
-        ]
-      }
     },
     {
       "id": "sound",
@@ -2368,7 +2229,6 @@
         }
       ],
       "related": [
-        "connections",
         "investigation",
         "tables",
         "mcp"
@@ -2403,11 +2263,19 @@
         },
         {
           "title": "The same current tools",
-          "text": "Read editing.readiness before choosing an editor. sound.system returns known music definitions read-only; select one song before sound.inspect to stay within the response budget. With explicit writes, sound.plan or levels.plan followed by build.apply uses the same checked services as the GUI. These paths reproduced the native-tested targets. Query system.operations and the MCP tool list for current schemas."
+          "text": "Read editing.readiness before choosing an editor. sound.system returns known music definitions. With explicit writes, sound.plan followed by build.apply uses the same service as the GUI. Query system.operations and the MCP tool list for the available operations."
         },
         {
           "title": "New investigation and editing operations",
           "text": "debugger.follow summarizes authenticated full captures; definitions.preview/save uses source/research-bound review digests; references.survey reports exact numeric candidates; commands.inspect/plan protects opcode bytes; animations.list/get/preview/save/delete manages declared arrangements. Read-only mode exposes inspections, not saving or plan operations. Writes retain explicit --allow-writes and allowed import roots."
+        },
+        {
+          "title": "Read-only coverage status",
+          "text": "coverage.status lists the frozen 1,052 exact target identities with bounded query, system_filter, page and limit arguments. Current accepted revisions: zero. A catalog match is not a decoded game. Evidence metadata preflight cannot certify a revision or authorize ROM writes."
+        },
+        {
+          "title": "Generic editing acceptance",
+          "text": "The same source-bound inspect, draft history, plan, build and independently verified patch export path passed all 1,052 frozen inputs. This verifies file operations for the supplied revisions. A game-specific edit still needs evidence about the selected data."
         }
       ],
       "related": [
@@ -2497,56 +2365,6 @@
           {
             "image": "21-game-knowledge",
             "title": "Use public knowledge without confusing it with proof",
-            "x": 48,
-            "top": 846,
-            "width": 1170,
-            "crop": [
-              180,
-              60,
-              1390,
-              860
-            ],
-            "caption": "Unaltered full-resolution capture is linked in the offline HTML edition."
-          }
-        ]
-      }
-    },
-    {
-      "id": "game-maps",
-      "title": "Browse real FFL2 maps and edit supported records",
-      "part": "Advanced",
-      "kicker": "GAME MAPS / SHARED DATA",
-      "intro": "The exact USA Final Fantasy Legend II profile includes a real room catalog. Numbered headers are used where scene names have not been established.",
-      "image": "20-ffl2-map-browser",
-      "steps": [
-        "Open <b>Levels</b>. The simple bedroom editor remains available; choose <b>Browse game maps</b> for actual map thumbnails and their arrival/object counts.",
-        "Select a map and an arrival or existing record. The editor shows a readable crop. Other maps can share the same drawing stream, so read the shared-use notice before changing terrain.",
-        "In the supported opening atlas, stage an existing command, unconditional NPC position or arrival position. Conditions, event references, facing bits, collision behavior and trigger ordering are protected. Mother is a story character even though her placement record is unconditional.",
-        "Review the changes to obtain the exact decoded terrain preview, then create a separate build. Walk the relevant route in Playtest, test interactions and both exits, and save a state only for its matching build."
-      ],
-      "result": "The selected supported record changes through a source-bound plan, with an original/edited map preview and a separate playable build.",
-      "note": "The catalog has 219 header variants and 164 drawing streams. Conditional branches require explicit state; unsupported decoding stays unavailable. Non-opening maps use clearly marked neutral color-index previews until a native palette is known. Object records are not a claim that every object is visible in the current game state. Destination changes remain inspection-only in this UI.",
-      "related": [
-        "room",
-        "play",
-        "regression",
-        "game-knowledge"
-      ],
-      "terms": [
-        "term-metatile",
-        "term-shared-resource",
-        "term-arrival"
-      ],
-      "caption": "Actual cartridge terrain and source-bound record editing; this is not the synthetic Advanced practice layout.",
-      "image_layout": "following-page",
-      "visual_page": {
-        "title": "Browse real FFL2 maps and edit supported records / actual interface",
-        "kicker": "Advanced / actual application capture",
-        "intro": "Actual cartridge terrain and source-bound record editing; this is not the synthetic Advanced practice layout.",
-        "panels": [
-          {
-            "image": "20-ffl2-map-browser",
-            "title": "Browse real FFL2 maps and edit supported records",
             "x": 48,
             "top": 846,
             "width": 1170,
@@ -2685,7 +2503,6 @@
         "translation",
         "sprites",
         "palettes",
-        "levels",
         "sound"
       ],
       "terms": [
@@ -2897,10 +2714,10 @@
       "steps": [
         "Open <b>Advanced > Investigation > Trace actual accesses</b>, or investigate a captured value. A value investigation derives a supported physical watch from authenticated core memory. Manual watches use an explicit CPU address and read/write/execution kind; Genesis supports read/write watches and separately ordered instruction samples.",
         "The full Windows package is ready to capture. In a source-only or smaller build, choose <b>Prepare debugger</b> if needed. Pinned tools are downloaded and checked once; no ROM is uploaded.",
-        "Set a short route of frames and held buttons. It replays from power on in a separate debugger; Playtest and libretro save states are not resumed.",
+        "Choose <b>Replay last Playtest change</b> when an observation includes compatible cold-start inputs, or set up a custom replay. The debugger starts from power on in a separate session.",
         "Choose <b>Capture route</b> for a bounded sample, or <b>Stop at a watched access</b> and set <b>Watched access number</b>. The focused mode uses one explicit watch and stops after that occurrence inside the requested recording window.",
         "Inspect access address, value, execution context and registers. A source button opens its recorded file location; Resources explains the association and links back.",
-        "Choose <b>Explain this capture</b> to summarize the whole retained capture, not only its current page. Writer code and source reads are separate lists. Open a source read in Resources to inspect its bytes or build an editor from a confirmed layout.",
+        "Choose <b>Explain this capture</b>. Use a mapped writer to find a ROM address to watch. Under <b>Watch a ROM read during this replay</b>, enter that address and capture reads. <b>Inspect ROM bytes</b> opens a mapped read with its recorded context.",
         "A focused result says <b>Stopped at requested access</b> only after the native protocol confirms the occurrence. Inspect that event’s registers and execution context. No matching occurrence, truncation and a budget stop are different outcomes."
       ],
       "result": "A durable native capture with mapped writer context, separate source-read locations, resource overlaps and a concrete next experiment. Historical and partial status remain visible.",
@@ -3065,7 +2882,17 @@
             "caption": "Actual headless application capture. The offline HTML edition links the full-resolution image."
           }
         ]
-      }
+      },
+      "details": [
+        {
+          "title": "If an observer exits unexpectedly",
+          "text": "A native observer failure is reported as a failed capture; a partially written file is not accepted. The bounded Genesis observer now suspends automatic Lua collection before creating native handles and is closed after its capture. If a failure remains, keep the exact ROM identity and request settings in a sanitized support report. A successful capture or black frame alone does not establish that gameplay or a game format was verified."
+        },
+        {
+          "title": "GB and GBC capture brightness",
+          "text": "Owned native workers disable Game Boy frame blending. A fresh capture no longer blends its frame with a black previous frame. This worker-only setting does not change personal emulator settings. The native host palette and canonical editor grayscale remain separate rendering contexts."
+        }
+      ]
     },
     {
       "id": "data-relocation",
@@ -3151,7 +2978,7 @@
         },
         {
           "title": "Scope of Master System support",
-          "text": "This build supports conservative Sega headers, their additive checksum, literal SMS row-planar4 tiles, declared text/byte editing, BPS workflows and the tested included BlastEm setup. Active mapper state, complete level/music formats and automatic enemy meanings remain unknown. The bundled setup selects a two-button pad; raw libretro input names differ from console button labels."
+          "text": "This build supports conservative Sega headers, their additive checksum, literal SMS row-planar4 tiles, declared text/byte editing, BPS workflows and the tested included BlastEm setup. Active mapper state, complete music formats and automatic enemy meanings remain unknown. The bundled setup selects a two-button pad; raw libretro input names differ from console button labels."
         }
       ],
       "related": [
@@ -3216,7 +3043,7 @@
         "Capture the original scene. Save states belong to that exact ROM and core setup; do not load the original state into a different build.",
         "Close the worker, select the edited build and repeat the same route from a cold start. Capture the scene at the matching frame.",
         "Check the changed enemy and the surrounding scene. Use Play and Pause to inspect animation, then save a state for the edited build.",
-        "Export a patch after review. Its checked reconstruction proves the exact target bytes; it does not prove every level or gameplay outcome."
+        "Export a patch after review. Its checked reconstruction proves the exact target bytes; it does not prove every gameplay outcome."
       ],
       "result": "The paired Rastan captures show the original humanoid enemies and the single-blob reskin at the same opening checkpoint. ROMancer rendered the measured native frames in its own Playtest canvas.",
       "note": "These are real application captures. A loading message is not gameplay evidence. The first humanoid enemy type was edited; other enemies and collision behavior were not redesigned.",
@@ -3632,41 +3459,6 @@
       "terms": []
     },
     {
-      "id": "collision-actors",
-      "title": "Change collision, hitboxes and enemy movement",
-      "part": "Advanced",
-      "kicker": "Original runtime / layers and actor behavior",
-      "intro": "Open the original Mossy Hollow studio in Levels. These fields are consumed by its program; the same generic editor needs verified mappings before it can change another game’s behavior.",
-      "steps": [
-        "Choose <b>Collision</b> in Paint layer. Open floor0 allows movement, Solid wall1 blocks it, and Damage floor2 reduces hero health. Paint Open floor over the vertical wall at column16, rows18 through23. Undo and redo the stroke.",
-        "Choose <b>Terrain</b>, select brush0 and clear the same visible wall cells. Terrain and collision are separate edits: clearing one alone does not clear the other.",
-        "Choose <b>Starting hitboxes</b>. Select Hero start or Slime start. Width, height and offsets are pixels; X/Y are8-pixel cells. Change width, then Update preview. The artwork stays separate from the contact rectangle.",
-        "Try Starting health, Contact damage, Movement enabled, Left/Right movement limit and Damage cooldown. Movement enabled0 stops that actor’s movement, not its contact damage. Damage cooldown belongs to the actor receiving damage. Starting X must lie between its movement limits.",
-        "Review and create a level build. In Playtest, walk through the opened wall; compare equal input sequences from fresh starts. Test damage floors and enemy contact. A attacks only while rectangles overlap. Start resets health and positions. Export and verify the patch."
-      ],
-      "result": "Native checks observed a blocked hero at X114 and passage after opening the collision wall. Separate tests observed less damage with a narrower enemy hitbox, a stationary enemy, damage-floor health loss and a contact attack.",
-      "note": "Starting sprites and rectangles are static editor previews, not live actor positions. A drawing change does not change collision, damage, enemy logic or animation assembly. Other games can use different coordinate units, multiple hitboxes or compressed collision maps.",
-      "related": [
-        "levels",
-        "editing-studio",
-        "play",
-        "regression"
-      ],
-      "terms": [
-        "term-collision",
-        "term-hitbox",
-        "term-layer"
-      ],
-      "image": "258-collision-edit-preview",
-      "caption": "Current Levels editor: translucent collision shading, a labeled highlight key, visible object position and collapsed hitbox/behavior controls. One changed cell is staged; this image is an editor preview.",
-      "details": [
-        {
-          "title": "Read the editor colors",
-          "text": "Teal outlines the selected cell; amber outlines changed cells; purple marks starting hitboxes when that overlay is selected. Collision brushes carry their own label and color. Overlay shading does not edit ROM palette colors. Hidden technical fields remain available in Hitbox & behavior · Advanced."
-        }
-      ]
-    },
-    {
       "id": "known-music",
       "title": "Edit a verified music sequence",
       "part": "Advanced",
@@ -3869,7 +3661,7 @@
     {
       "id": "term-collision",
       "term": "Collision",
-      "definition": "Data or game behavior controlling movement and contact. Visual terrain does not by itself establish collision semantics. Colored editor overlays describe declared collision values; they do not change the game palette."
+      "definition": "Data or game behavior controlling movement and contact. Visual terrain does not by itself establish collision semantics."
     },
     {
       "id": "term-compare-byte",
@@ -3914,7 +3706,7 @@
     {
       "id": "term-connection",
       "term": "Declared connection",
-      "definition": "An explicit mapping from one stored exit-field value to a declared room ID. It supports editor navigation; it does not prove a game executes a door transition."
+      "definition": "An explicit mapping from one stored exit-field value to a declared room ID. A gameplay trace can separately check the transition."
     },
     {
       "id": "term-declared",
@@ -4009,7 +3801,7 @@
     {
       "id": "term-layer",
       "term": "Layer",
-      "definition": "A selectable view or declared editing plane. Terrain, raw collision values and object slots describe different information; hiding a visual overlay does not establish new game semantics."
+      "definition": "A separately shown part of a preview, such as background tiles or sprites."
     },
     {
       "id": "term-mapping",
@@ -4235,16 +4027,19 @@
       "id": "term-workspace",
       "term": "Workspace",
       "definition": "The local folder that owns projects and workspace preferences. It is separate from the installed application version."
+    },
+    {
+      "id": "term-gameplay-expectation",
+      "term": "Gameplay expectation",
+      "definition": "A value read from emulator memory and checked after the saved route, compared across its final input step or held equal across the two ROMs."
+    },
+    {
+      "id": "term-replay-proof",
+      "term": "Replay proof",
+      "definition": "A ZIP with a verified BPS patch, exact ROM and engine hashes, and the inputs and checks needed to reproduce a recorded comparison."
     }
   ],
   "index": [
-    {
-      "term": "Actor hitboxes",
-      "topics": [
-        "collision-actors",
-        "levels"
-      ]
-    },
     {
       "term": "Address domains",
       "topics": [
@@ -4257,12 +4052,6 @@
       "topics": [
         "debug",
         "hex-editor"
-      ]
-    },
-    {
-      "term": "Advanced synthetic layout practice",
-      "topics": [
-        "connections"
       ]
     },
     {
@@ -4306,12 +4095,6 @@
       "term": "Applying downloaded patches",
       "topics": [
         "apply-patch"
-      ]
-    },
-    {
-      "term": "Arrival records",
-      "topics": [
-        "game-maps"
       ]
     },
     {
@@ -4503,26 +4286,6 @@
       ]
     },
     {
-      "term": "Collision",
-      "topics": [
-        "levels"
-      ]
-    },
-    {
-      "term": "Collision brushes",
-      "topics": [
-        "collision-actors",
-        "levels"
-      ]
-    },
-    {
-      "term": "Collision values and layers",
-      "topics": [
-        "room",
-        "levels"
-      ]
-    },
-    {
       "term": "Color picker",
       "topics": [
         "palettes"
@@ -4570,12 +4333,6 @@
       "topics": [
         "connected-game-view",
         "connected-evidence"
-      ]
-    },
-    {
-      "term": "Connected rooms",
-      "topics": [
-        "connections"
       ]
     },
     {
@@ -4644,7 +4401,6 @@
     {
       "term": "Declared connections",
       "topics": [
-        "connections",
         "investigation"
       ]
     },
@@ -4655,18 +4411,10 @@
       ]
     },
     {
-      "term": "Decoded room terrain",
-      "topics": [
-        "room",
-        "levels"
-      ]
-    },
-    {
       "term": "Definitions",
       "topics": [
         "resources",
-        "recipes",
-        "connections"
+        "recipes"
       ]
     },
     {
@@ -4679,12 +4427,6 @@
       "term": "Destination ownership",
       "topics": [
         "compression"
-      ]
-    },
-    {
-      "term": "Destination room picker",
-      "topics": [
-        "connections"
       ]
     },
     {
@@ -4716,12 +4458,6 @@
       "topics": [
         "translation",
         "text-layout"
-      ]
-    },
-    {
-      "term": "Enemy movement and damage",
-      "topics": [
-        "collision-actors"
       ]
     },
     {
@@ -4760,12 +4496,6 @@
       "term": "Exports",
       "topics": [
         "patches"
-      ]
-    },
-    {
-      "term": "FFL2 real map catalog",
-      "topics": [
-        "game-maps"
       ]
     },
     {
@@ -4821,8 +4551,7 @@
     {
       "term": "Game-specific edits",
       "topics": [
-        "numbers",
-        "room"
+        "numbers"
       ]
     },
     {
@@ -4871,13 +4600,6 @@
       "term": "Hex search and bookmarks",
       "topics": [
         "hex-editor"
-      ]
-    },
-    {
-      "term": "Hillside and Courtyard Advanced practice",
-      "topics": [
-        "connections",
-        "levels"
       ]
     },
     {
@@ -4938,13 +4660,6 @@
       ]
     },
     {
-      "term": "Layers and grid",
-      "topics": [
-        "room",
-        "levels"
-      ]
-    },
-    {
       "term": "Layouts and pointers",
       "topics": [
         "text-layout",
@@ -4955,12 +4670,6 @@
       "term": "LC_LZ2",
       "topics": [
         "compression"
-      ]
-    },
-    {
-      "term": "Level editing",
-      "topics": [
-        "levels"
       ]
     },
     {
@@ -4998,18 +4707,6 @@
       "term": "Metasprites",
       "topics": [
         "sprites"
-      ]
-    },
-    {
-      "term": "Metatile brush thumbnails",
-      "topics": [
-        "levels"
-      ]
-    },
-    {
-      "term": "Metatiles",
-      "topics": [
-        "levels"
       ]
     },
     {
@@ -5053,12 +4750,6 @@
       ]
     },
     {
-      "term": "Named object inspector",
-      "topics": [
-        "connections"
-      ]
-    },
-    {
       "term": "Named operands",
       "topics": [
         "command-operands"
@@ -5088,12 +4779,6 @@
       "term": "Non-power-of-two SNES checksums",
       "topics": [
         "startup-verification"
-      ]
-    },
-    {
-      "term": "Object metadata and roles",
-      "topics": [
-        "connections"
       ]
     },
     {
@@ -5379,13 +5064,6 @@
       ]
     },
     {
-      "term": "Room objects",
-      "topics": [
-        "room",
-        "connections"
-      ]
-    },
-    {
       "term": "Save states",
       "topics": [
         "play",
@@ -5432,7 +5110,6 @@
     {
       "term": "Shared resources",
       "topics": [
-        "game-maps",
         "palettes"
       ]
     },
@@ -5509,12 +5186,6 @@
       "term": "Temporary diagnostic builds",
       "topics": [
         "source-proof-method"
-      ]
-    },
-    {
-      "term": "Terrain and collision",
-      "topics": [
-        "levels"
       ]
     },
     {
@@ -5657,6 +5328,53 @@
         "recorded-rom-facts",
         "mcp"
       ]
+    },
+    {
+      "term": "Coverage status",
+      "topics": [
+        "mcp",
+        "release-checks"
+      ]
+    },
+    {
+      "term": "Related source evidence",
+      "topics": [
+        "recorded-rom-facts"
+      ]
+    },
+    {
+      "term": "Practice edits with measured results",
+      "topics": [
+        "verified-practice-edits",
+        "captured-edit-check"
+      ]
+    },
+    {
+      "term": "Gameplay expectations, RAM watches and unchanged values",
+      "topics": [
+        "gameplay-expectations",
+        "captured-edit-check"
+      ]
+    },
+    {
+      "term": "Saved discoveries, exact revision",
+      "topics": [
+        "portable-replay-proof"
+      ]
+    },
+    {
+      "term": "Replay proof ZIP, share or verify",
+      "topics": [
+        "portable-replay-proof",
+        "patches"
+      ]
+    },
+    {
+      "term": "Top Gear 3000, replacing older states",
+      "topics": [
+        "play",
+        "saves"
+      ]
     }
   ],
   "compact_pdf": true,
@@ -5665,19 +5383,18 @@
     "animation",
     "beginner-trial",
     "captured-edit-check",
-    "collision-actors",
     "command-operands",
     "compressed-capacity",
     "compression",
     "connected-game-view",
-    "connections",
     "debug",
+    "debugger-setup",
     "editing-studio",
     "editor-builder",
     "everyday-controls",
+    "hex-editor",
     "investigation",
     "known-music",
-    "levels",
     "mcp",
     "native-accesses",
     "native-graphics-trails",

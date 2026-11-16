@@ -45,6 +45,14 @@ def _level_details(raw,doc,offset):
         for key in ('terrain','collision'):
             g=room[key]
             if g is None:continue
+            if key=='terrain' and g.get('codec')=='sml-column-segments-v1':
+                observed=next(r for r in doc['rooms']if r['id']==room['id'])['terrain_storage']
+                operand=next((o for o in observed['operands']if o['offset']==offset),None)
+                if operand:
+                    value(room['name']+' / stored terrain operand','terrain-operand',offset,1,'little',len(doc['metatiles'])-1,
+                        room_id=room['id'],affected_cells=operand['cells'],repeated=operand['repeat'],
+                        description='One stored byte supplies '+str(len(operand['cells']))+' visible cells. Interaction and collision meaning need separate evidence.')
+                continue
             width=g['entry_bytes'];index=(offset-g['offset'])//width
             if 0<=index<room['width']*room['height']:
                 x,y=index%room['width'],index//room['width']
@@ -66,7 +74,9 @@ def _level_details(raw,doc,offset):
             value(room['name']+' / '+name+' / '+field['name'],'object-field',at,width,field['endian'],min(field['maximum'],bounds.get(field['name'],field['maximum'])),
                   room_id=room['id'],object_index=index,field=field['name'],target_room_id=target,
                   description=('Declared '+metadata['role']+' slot.' if metadata else 'Declared integer field; gameplay meaning is unknown.')+(' Destination room: '+target+'.' if target else ''))
-    m=d['metatiles'];width=m['entry_bytes'];flat=(offset-m['offset'])//width;parts=m['width']*m['height']
+    m=d['metatiles']
+    if m.get('kind')=='identity':return rows
+    width=m['entry_bytes'];flat=(offset-m['offset'])//width;parts=m['width']*m['height']
     if 0<=flat<m['count']*parts:
         value('Metatile '+str(flat//parts)+' / part '+str(flat%parts),'metatile-part',m['offset']+flat*width,width,m['endian'],len(doc['tiles'])-1,
               metatile_index=flat//parts,part=flat%parts,description='Tile index shared by every room cell using this metatile.')

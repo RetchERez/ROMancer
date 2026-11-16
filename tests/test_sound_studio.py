@@ -57,6 +57,35 @@ class SoundResourceTests(unittest.TestCase):
         from romancer.studio_examples import make_studio_example
         f=make_studio_example();return f['raw'],f['sound'],hashlib.sha256(f['raw']).hexdigest()
 
+    def test_original_song_refuses_sample_writes_into_its_header_or_vectors(self):
+        from romancer.sound_studio import inspect_sound,plan_sound
+        from romancer.studio_runtime import make_collision_studio_rom,runtime_definitions
+        from romancer.script_schema import canonical_bytes
+        mossy=make_collision_studio_rom();raw=mossy['data'];sha=hashlib.sha256(raw).hexdigest()
+        fixtures=[self.fixture(),(raw,runtime_definitions(mossy,sha)['sound'],sha)]
+        for raw,definition,sha in fixtures:
+            for offset,length in [(0,16),(15,2),(16393,2),(16394,6),(16399,1)]:
+                with self.subTest(driver=definition['songs'][0]['driver'],offset=offset,length=length):
+                    d=copy.deepcopy(definition)
+                    d['samples'].append({'id':'unsafe-sample','name':'Protected region','offset':offset,'length':length,'codec':'pcm-u8','sample_rate':8000,'initial_level':64})
+                    document_id=hashlib.sha256(canonical_bytes(d,max_bytes=128*1024)).hexdigest()
+                    with self.assertRaisesRegex(ValueError,'overlap'):
+                        inspect_sound(raw,d,sha)
+                    with self.assertRaisesRegex(ValueError,'overlap'):
+                        plan_sound(raw,d,document_id,[{'kind':'sample','sample_id':'unsafe-sample','operation':'silence','value':0,'wav_base64':None}],sha)
+
+    def test_original_song_keeps_sample_ranges_adjacent_to_vectors_available(self):
+        from romancer.sound_studio import inspect_sound
+        from romancer.studio_runtime import make_collision_studio_rom,runtime_definitions
+        mossy=make_collision_studio_rom();raw=mossy['data'];sha=hashlib.sha256(raw).hexdigest()
+        fixtures=[self.fixture(),(raw,runtime_definitions(mossy,sha)['sound'],sha)]
+        for raw,definition,sha in fixtures:
+            for offset,length in [(16390,4),(16400,1)]:
+                with self.subTest(driver=definition['songs'][0]['driver'],offset=offset):
+                    d=copy.deepcopy(definition)
+                    d['samples'].append({'id':'adjacent-sample','name':'Adjacent region','offset':offset,'length':length,'codec':'pcm-u8','sample_rate':8000,'initial_level':64})
+                    self.assertTrue(inspect_sound(raw,d,sha)['ok'])
+
     def test_practice_song_decodes_and_note_edit_changes_only_expected_byte(self):
         from romancer.sound_studio import inspect_sound,plan_sound
         raw,d,sha=self.fixture();doc=inspect_sound(raw,d,sha);self.assertEqual(doc['songs'][0]['events'][0]['note'],60)

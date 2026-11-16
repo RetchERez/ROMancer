@@ -3,6 +3,9 @@ from . import workbench_projects as projects
 from .script_schema import load_script_json
 
 SYSTEMS=('nes', 'snes', 'genesis', 'gb', 'gbc', 'sms')
+LEVEL_EDITOR_ENABLED = False
+LEVEL_WRITE_OPERATIONS = frozenset(('levels.plan', 'games.maps.plan'))
+LEVEL_EDITOR_MESSAGE = 'Visual level editing is coming soon.'
 
 
 def require_supported(row):
@@ -30,6 +33,8 @@ def require_editable(project,row):
 
 
 def guard_request(api,operation,p):
+    if not LEVEL_EDITOR_ENABLED and operation == 'games.plan' and p.get('profile_id') == 'ffl2-usa':
+        raise ValueError(LEVEL_EDITOR_MESSAGE)
     if 'system_id' in p and p['system_id'] not in SYSTEMS:raise ValueError('This release supports only the six cartridge systems listed in Settings.')
     if operation.startswith('containers.') and operation!='containers.inventory':raise ValueError('This operation is outside the six-system cartridge release.')
     writes=operation.endswith('.plan') or operation in (

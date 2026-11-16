@@ -35,6 +35,7 @@ async function openBuild(ctx,id,page){
  }
  return ctx.navigate(page);
 }
+export const checkCreatedBuild=(ctx,id)=>openBuild(ctx,id,'gameview');
 export const exportCreatedBuild=(ctx,id)=>openBuild(ctx,id,'release');
 export async function editBuildInput(ctx,id){
  const build=continuedBuild(ctx.state),project=ctx.state.project?.project_id,navigation=ctx.state.navigationRevision;

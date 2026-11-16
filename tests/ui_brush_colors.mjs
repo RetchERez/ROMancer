@@ -5,4 +5,6 @@ let colors=brushColors(bitmap,null,null);assert.equal(colors.length,4);assert(co
 colors=brushColors(bitmap,{colors_per_bank:4,entries:[{bank:0,index:1,rgb:{r:200,g:10,b:40}}]},null);assert.equal(colors[1].origin,'declared');assert.deepEqual(colors[1].rgb,[200,10,40]);assert.equal(colors[0].origin,'grayscale');
 colors=brushColors(bitmap,null,{colors:[{1:[255,0,0]},{1:[0,255,0]}]});assert.equal(colors[1].origin,'observed');assert.equal(colors[1].colors.length,2);
 assert.equal(brushColors({codec:'unknown'},null,null).length,0);
+const banks={banks:2,colors_per_bank:4,entries:[{bank:0,index:1,rgb:{r:240,g:0,b:0}},{bank:1,index:1,rgb:{r:0,g:80,b:240}}]};
+assert.deepEqual(brushColors(bitmap,banks,null,1)[1].rgb,[0,80,240],'brush colors must use the selected stored palette bank');
 console.log('Brush swatches distinguish declared, observed and unknown grayscale colors and preserve stored indices.');

@@ -10,6 +10,36 @@ import subprocess
 import tempfile
 import uuid
 
+INSTALL_LAYOUT = 'manifest-sha256-v1'
+VERSION_PATTERN = r'[0-9]+\.[0-9]+\.[0-9]+(?:[.a-z0-9-]*)'
+SHA256_PATTERN = r'[0-9a-f]{64}'
+
+
+def _manifest_slot(version, digest):
+    if type(digest) is not str or not re.fullmatch(SHA256_PATTERN, digest):
+        raise ValueError('invalid installation manifest hash')
+    return f'{version}-{digest[:16]}'
+
+
+def bundle_slot(verified):
+    manifest = verified['manifest']
+    version = manifest['version']
+    if manifest.get('install_layout') == INSTALL_LAYOUT:
+        return _manifest_slot(version, verified['manifest_sha256'])
+    return version
+
+
+def _active_slot(record):
+    version = record.get('version')
+    if type(version) is not str or not re.fullmatch(VERSION_PATTERN, version):
+        raise ValueError('invalid installed version')
+    if 'slot' not in record:
+        return version
+    slot = _manifest_slot(version, record.get('manifest_sha256'))
+    if record['slot'] != slot:
+        raise ValueError('installed slot differs from its manifest identity')
+    return slot
+
 
 def safe_name(name):
     if type(name) is not str or not name or len(name)>256 or '\\' in name or ':' in name or name.startswith('/') or any(p in ('','.','..') or p.rstrip(' .')!=p or p.split('.')[0].upper() in {'CON','PRN','AUX','NUL',*[f'COM{i}' for i in range(10)],*[f'LPT{i}' for i in range(10)]} for p in name.split('/')):raise ValueError('unsafe bundle member')
@@ -37,7 +67,8 @@ def verify_tree(root):
     root=Path(root).absolute();manifest_path=_ordinary(root/'BUNDLE.json')
     if manifest_path.stat().st_size>4*1024**2:raise ValueError('bundle manifest too large')
     manifest=json.loads(manifest_path.read_text(encoding='utf-8'))
-    if type(manifest) is not dict or manifest.get('schema_version')!=1 or manifest.get('product')!='ROMancer' or not re.fullmatch(r'[0-9]+\.[0-9]+\.[0-9]+(?:[.a-z0-9-]*)',manifest.get('version','')):raise ValueError('invalid bundle manifest')
+    if type(manifest) is not dict or manifest.get('schema_version')!=1 or manifest.get('product')!='ROMancer' or type(manifest.get('version')) is not str or not re.fullmatch(VERSION_PATTERN,manifest['version']):raise ValueError('invalid bundle manifest')
+    if 'install_layout' in manifest and manifest['install_layout'] != INSTALL_LAYOUT:raise ValueError('invalid bundle installation layout')
     rows=manifest.get('files');names=set();expected={'BUNDLE.json'};total=0
     if type(rows) is not list or not 1<=len(rows)<=8192:raise ValueError('invalid bundle inventory')
     for row in rows:
@@ -70,7 +101,13 @@ ROOT_LAUNCHER='''param([switch]$NoBrowser,[switch]$Check,[string]$Workspace='')
 $ErrorActionPreference='Stop'
 $romancerActive=Get-Content -LiteralPath (Join-Path $PSScriptRoot 'active.json') -Raw | ConvertFrom-Json
 if ($romancerActive.version -notmatch '^[0-9]+[.][0-9]+[.][0-9]+[.a-z0-9-]*$') { throw 'Invalid installed version' }
-$romancerLauncher=Join-Path $PSScriptRoot ('versions\\'+$romancerActive.version+'\\Open ROMancer.ps1')
+$romancerSlot=$romancerActive.version
+if ($romancerActive.PSObject.Properties.Name -contains 'slot') {
+    if ($romancerActive.manifest_sha256 -cnotmatch '^[0-9a-f]{64}$') { throw 'Invalid installation manifest hash' }
+    $romancerSlot=$romancerActive.version+'-'+$romancerActive.manifest_sha256.Substring(0,16)
+    if ($romancerActive.slot -cne $romancerSlot) { throw 'Invalid installed package slot' }
+}
+$romancerLauncher=Join-Path $PSScriptRoot ('versions\\'+$romancerSlot+'\\Open ROMancer.ps1')
 if (-not $Workspace) { $Workspace=Join-Path $PSScriptRoot 'workspace' }
 & $romancerLauncher -Workspace $Workspace -NoBrowser:$NoBrowser -Check:$Check
 '''
@@ -82,7 +119,7 @@ def install(payload,destination):
     for part in (destination,*destination.parents):
         if part.is_symlink() or part.is_junction():raise ValueError('linked installation directory')
     destination.mkdir(parents=True,exist_ok=True);versions=destination/'versions';versions.mkdir(exist_ok=True)
-    target=versions/version
+    slot=bundle_slot(verified);target=versions/slot
     if target.exists():
         if verify_tree(target)['manifest_sha256']!=verified['manifest_sha256']:raise ValueError('installed version differs; preserve it and use a new version')
     else:
@@ -97,16 +134,17 @@ def install(payload,destination):
     legacy=None;launcher=destination/'Open ROMancer.ps1'
     if previous is None and launcher.exists():
         legacy='Open ROMancer-before-v60-'+uuid.uuid4().hex+'.ps1';shutil.copyfile(_ordinary(launcher),destination/legacy)
-    active={'schema_version':1,'version':version,'manifest_sha256':verified['manifest_sha256'],'previous':previous if previous and previous.get('version')!=version else (previous or {}).get('previous'),'legacy_launcher':legacy or (previous or {}).get('legacy_launcher')}
+    active={'schema_version':1,'version':version,'manifest_sha256':verified['manifest_sha256'],'previous':previous if previous and _active_slot(previous)!=slot else (previous or {}).get('previous'),'legacy_launcher':legacy or (previous or {}).get('legacy_launcher')}
+    if slot!=version:active['slot']=slot
     # Existing versions/workspaces remain intact; switching the small pointer is reversible.
     _atomic(active_path,(json.dumps(active,indent=2)+'\n').encode());_atomic(launcher,ROOT_LAUNCHER.encode())
-    return {'ok':True,'status':'INSTALLED','version':version,'root':str(destination),'workspace':str(destination/'workspace')}
+    return {'ok':True,'status':'INSTALLED','version':version,'slot':slot,'root':str(destination),'workspace':str(destination/'workspace')}
 
 
 def rollback(destination):
     destination=Path(destination).absolute();active=json.loads((destination/'active.json').read_text())
     if active.get('previous'):
-        previous=active['previous'];verified=verify_tree(destination/'versions'/previous['version'])
+        previous=active['previous'];verified=verify_tree(destination/'versions'/_active_slot(previous))
         if verified['manifest_sha256']!=previous['manifest_sha256']:raise ValueError('previous version changed')
         _atomic(destination/'active.json',(json.dumps(previous,indent=2)+'\n').encode())
     elif active.get('legacy_launcher'):
@@ -134,7 +172,9 @@ def desktop_shortcut(destination):
     if os.name!='nt':raise ValueError('desktop entry requires Windows')
     # Pass paths as environment data, never as interpolated PowerShell source.
     env=os.environ.copy();env['ROMANCER_INSTALL_ROOT']=str(destination)
-    script="$w=New-Object -ComObject WScript.Shell;$p=Join-Path ($w.SpecialFolders.Item('Desktop')) 'ROMancer.lnk';$s=$w.CreateShortcut($p);$s.TargetPath=Join-Path $env:SystemRoot 'System32\\WindowsPowerShell\\v1.0\\powershell.exe';$s.Arguments='-NoProfile -ExecutionPolicy Bypass -WindowStyle Hidden -File '+[char]34+(Join-Path $env:ROMANCER_INSTALL_ROOT 'Open ROMancer.ps1')+[char]34;$s.WorkingDirectory=$env:ROMANCER_INSTALL_ROOT;$s.WindowStyle=7;$a=Get-Content -LiteralPath (Join-Path $env:ROMANCER_INSTALL_ROOT 'active.json') -Raw|ConvertFrom-Json;$s.IconLocation=(Join-Path $env:ROMANCER_INSTALL_ROOT ('versions\\'+$a.version+'\\ROMancer.ico'));$s.Description='ROMancer — By RetchEWretched';$s.Save()"
+    active = json.loads((Path(destination) / 'active.json').read_text())
+    env['ROMANCER_INSTALL_SLOT'] = _active_slot(active)
+    script="$w=New-Object -ComObject WScript.Shell;$p=Join-Path ($w.SpecialFolders.Item('Desktop')) 'ROMancer.lnk';$s=$w.CreateShortcut($p);$s.TargetPath=Join-Path $env:SystemRoot 'System32\\WindowsPowerShell\\v1.0\\powershell.exe';$s.Arguments='-NoProfile -ExecutionPolicy Bypass -WindowStyle Hidden -File '+[char]34+(Join-Path $env:ROMANCER_INSTALL_ROOT 'Open ROMancer.ps1')+[char]34;$s.WorkingDirectory=$env:ROMANCER_INSTALL_ROOT;$s.WindowStyle=7;$s.IconLocation=(Join-Path $env:ROMANCER_INSTALL_ROOT ('versions\\'+$env:ROMANCER_INSTALL_SLOT+'\\ROMancer.ico'));$s.Description='ROMancer — By RetchEWretched';$s.Save()"
     subprocess.run(['powershell.exe','-NoProfile','-WindowStyle','Hidden','-Command',script],env=env,check=True,creationflags=subprocess.CREATE_NO_WINDOW)
 
 

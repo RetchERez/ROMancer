@@ -40,7 +40,7 @@ class DraftSceneTools:
         return project,row,path,envelope,plan,repaired,trace,config
     def preview(self,p,c):
         project,row,path,envelope,plan,edits,trace,config=self._plan(p,c)
-        configuration=self.api._profile_load_config(row['system_id'])
+        configuration=self.api._profile_load_config(row['system_id'],row,project)
         if execution_context(configuration)!=trace['replay']['context']:raise ValueError('The captured execution setup changed. Restore it or capture a fresh trace.')
         if not self.capacity.acquire(blocking=False):raise ValueError('A draft scene preview is already running. Wait for it or cancel that job.')
         try:

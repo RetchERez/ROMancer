@@ -27,6 +27,13 @@ class GenesisObserverLifetimeTests(unittest.TestCase):
 
 
 class GenesisDebuggerTests(unittest.TestCase):
+    def test_bounded_observer_suspends_collection_before_creating_native_handles(self):
+        from romancer.genesis_debugger import make_script
+        script=make_script(self.request(),'lifetime-test')
+        self.assertLess(script.index("collectgarbage('stop')"),script.index('manager.machine'))
+        self.assertEqual(script.count("collectgarbage('stop')"),1)
+        self.assertNotIn("collectgarbage('restart')",script)
+
     def module(self):
         self.assertIsNotNone(importlib.util.find_spec('romancer.genesis_debugger'),'Genesis native access capture is missing')
         from romancer import genesis_debugger

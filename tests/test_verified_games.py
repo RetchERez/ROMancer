@@ -9,6 +9,53 @@ from romancer import workbench_projects as projects
 
 
 class VerifiedGameTests(unittest.TestCase):
+    def test_red_and_blue_share_a_guarded_named_table(self):
+        from romancer.boot_fixtures import make_boot_fixture
+        from romancer.verified_games import PROFILES
+
+        for identifier in ('pokemon-red-ue', 'pokemon-blue-ue'):
+            with self.subTest(identifier=identifier):
+                profile = copy.deepcopy(next(p for p in PROFILES if p['id'] == identifier))
+                raw = bytearray(make_boot_fixture('gb')['data'])
+                raw.extend(bytes(profile['size'] - len(raw)))
+                raw[0x148] = 5
+                for index in range(150):
+                    offset = 0x383de + index * 28
+                    raw[offset:offset+6] = bytes((index + 1, 45, 49, 49, 45, 65))
+                raw[0x14d] = (-sum(raw[0x134:0x14d])-25)&255
+                raw[0x14e:0x150] = bytes(2)
+                raw[0x14e:0x150] = (sum(raw)&65535).to_bytes(2,'big')
+                source = self.root / (identifier + '.gb')
+                source.write_bytes(raw)
+                row = projects.register_source(Path(self.project['path']), source, None)
+                profile['sha256'] = row['sha256']
+                params = {**self.params, 'artifact_id': row['artifact_id']}
+                with patch('romancer.verified_games.PROFILES', (profile,)):
+                    inspected = self.api.dispatch('games.inspect', params)
+                    self.assertTrue(inspected['ok'], inspected)
+                    self.assertEqual(inspected['fields'][0]['label'], 'Bulbasaur base HP')
+                    opened = self.api.dispatch('games.configure', {**params, 'resource_id': 'species-base-stats'})
+                    self.assertTrue(opened['ok'], opened)
+                    self.assertEqual(opened['inspection']['row_catalog'][149]['label'], 'Mewtwo')
+                    plan = self.api.dispatch('games.plan', {
+                        **params, 'profile_id': identifier, 'values': {'bulbasaur_hp': 100},
+                    })
+                    self.assertTrue(plan['ok'], plan)
+                    built = self.api.dispatch('build.apply', {'project_id': params['project_id'], 'plan_id': plan['plan_id']})
+                    self.assertTrue(built['ok'], built)
+                    self.assertEqual(Path(built['path']).read_bytes()[0x383df], 100)
+                    self.assertEqual(source.read_bytes(), raw)
+                    bad = self.api.dispatch('systems.plan_edits', {**params, 'edits': [
+                        {'offset': 0x383de + 149 * 28, 'before': '96', 'after': '95'},
+                    ]})
+                    self.assertTrue(bad['ok'], bad)
+                    bad_build = self.api.dispatch('build.apply', {'project_id': params['project_id'], 'plan_id': bad['plan_id']})
+                    self.assertTrue(bad_build['ok'], bad_build)
+                    misaligned = self.api.dispatch('games.configure', {
+                        **params, 'artifact_id': bad_build['artifact_id'], 'resource_id': 'species-base-stats',
+                    })
+                    self.assertFalse(misaligned['ok'], misaligned)
+
     def test_rastan_exact_revision_opens_verified_first_enemy_graphics(self):
         from romancer.verified_games import PROFILES
         profile=copy.deepcopy(next(p for p in PROFILES if p['id']=='rastan-sms'))
@@ -199,7 +246,7 @@ class VerifiedGameTests(unittest.TestCase):
 
     def test_public_registry_contains_only_small_sourced_definitions(self):
         from romancer.verified_games import PROFILES
-        self.assertEqual(len(PROFILES),6)
+        self.assertEqual(len(PROFILES),8)
         for p in PROFILES:
             self.assertRegex(p['sha256'],r'^[a-f0-9]{64}$')
             self.assertTrue(p['reference'].startswith('https://github.com/') or p['id']=='rastan-sms' and p['reference']=='/user-guide/index.html#rastan-blobs')
@@ -210,4 +257,13 @@ class VerifiedGameTests(unittest.TestCase):
         self.assertTrue(result['ok'],result)
         operation=next(r for r in result['operations'] if r['name']=='games.plan')
         self.assertEqual(operation['required_parameters'],['project_id','artifact_id','profile_id','values'])
-        self.assertEqual(result['scope'],'Operation names and required parameter names; value constraints are documented per operation.')
+        self.assertEqual(result['scope'],'Operation names, required and optional parameter names; value constraints are documented per operation.')
+
+
+def setUpModule():
+    # Exercise preserved development internals separately from the release boundary.
+    from unittest import addModuleCleanup
+    from unittest.mock import patch
+    feature = patch("romancer.release_scope.LEVEL_EDITOR_ENABLED", True)
+    feature.start()
+    addModuleCleanup(feature.stop)

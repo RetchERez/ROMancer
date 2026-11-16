@@ -55,18 +55,52 @@ jobs:
       - uses: actions/setup-python@6d4fd22b20465ccc0f7354476588e8df7c9ca0e0 # v7
         with:
           python-version: '3.14'
-      - run: python -m pip install -r requirements.txt
-      - run: python -B tools/fetch_runtime.py --downloads work_private/runtime-downloads
-      - name: Download the reviewed engine pack
+      - name: Find the pinned release engine asset
+        id: engines
         shell: pwsh
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-        run: gh release download v1.0.0 --repo $env:GITHUB_REPOSITORY --pattern ROMancer-v1.0-Engines.zip --dir work_private/runtime-downloads
-      - run: python -B tools/fetch_cores.py --downloads work_private/runtime-downloads --archive work_private/runtime-downloads/ROMancer-v1.0-Engines.zip
-      - run: python -B tools/fetch_installer.py --downloads work_private/runtime-downloads
-      - run: python -B tools/package_windows.py --app . --downloads work_private/runtime-downloads --cores work_private/runtime-downloads/cores --output work_private/windows-bundle --zip work_private/windows.zip
-      - run: python -B tools/package_installer.py --payload work_private/windows-bundle --compiler work_private/runtime-downloads/nsis-3.13.zip --output work_private/Setup.exe
+        run: |
+          $ErrorActionPreference = 'Stop'
+          $name = python -c "from romancer.core_pins import CORE_ARCHIVE; print(CORE_ARCHIVE['file'])"
+          if ($LASTEXITCODE -ne 0) { throw 'Could not read the pinned engine archive name' }
+          $assets = @(gh api --paginate "repos/$env:GITHUB_REPOSITORY/releases?per_page=100" --jq '.[].assets[] | [.id,.name] | @tsv')
+          if ($LASTEXITCODE -ne 0) { throw 'Could not list release assets' }
+          $matchesByName = @($assets | ForEach-Object { $id, $assetName = $_ -split "`t", 2
+            if ($assetName -ceq $name) { $id } })
+          if ($matchesByName.Count -gt 1) { throw 'Multiple release assets use the pinned engine archive name' }
+          if ($matchesByName.Count -eq 0) {
+            Write-Output "The pinned engine archive has not been attached. Source checks run in the test job."
+            exit 0
+          }
+          "id=$($matchesByName[0])" | Out-File -LiteralPath $env:GITHUB_OUTPUT -Encoding utf8 -Append
+          "name=$name" | Out-File -LiteralPath $env:GITHUB_OUTPUT -Encoding utf8 -Append
+      - if: steps.engines.outputs.id != ''
+        run: python -m pip install -r requirements.txt
+      - if: steps.engines.outputs.id != ''
+        run: python -B tools/fetch_runtime.py --downloads work_private/runtime-downloads
+      - name: Download and verify the engine pack
+        if: steps.engines.outputs.id != ''
+        shell: pwsh
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          ROMANCER_ENGINE_ASSET: ${{ steps.engines.outputs.id }}
+          ROMANCER_ENGINE_NAME: ${{ steps.engines.outputs.name }}
+        run: |
+          $ErrorActionPreference = 'Stop'
+          $archive = Join-Path 'work_private/runtime-downloads' $env:ROMANCER_ENGINE_NAME
+          gh api -H 'Accept: application/octet-stream' "repos/$env:GITHUB_REPOSITORY/releases/assets/$env:ROMANCER_ENGINE_ASSET" > $archive
+          if ($LASTEXITCODE -ne 0) { throw 'Reviewed engine asset download failed' }
+          python -B tools/fetch_cores.py --downloads work_private/runtime-downloads --archive $archive
+          if ($LASTEXITCODE -ne 0) { throw 'Reviewed engine asset verification failed' }
+      - if: steps.engines.outputs.id != ''
+        run: python -B tools/fetch_installer.py --downloads work_private/runtime-downloads
+      - if: steps.engines.outputs.id != ''
+        run: python -B tools/package_windows.py --app . --downloads work_private/runtime-downloads --cores work_private/runtime-downloads/cores --output work_private/windows-bundle --zip work_private/windows.zip
+      - if: steps.engines.outputs.id != ''
+        run: python -B tools/package_installer.py --payload work_private/windows-bundle --compiler work_private/runtime-downloads/nsis-3.13.zip --output work_private/Setup.exe
       - name: Install and check with bundled runtime
+        if: steps.engines.outputs.id != ''
         shell: pwsh
         run: |
           $ErrorActionPreference = 'Stop'
@@ -78,9 +112,10 @@ jobs:
           $setup = Start-Process -FilePath (Join-Path $PWD 'work_private/Setup.exe') -ArgumentList @('/S', ('/D=' + $target)) -WindowStyle Hidden -Wait -PassThru
           if ($setup.ExitCode -ne 0) { throw 'Setup executable failed' }
           $entry = Get-ItemProperty -LiteralPath 'HKCU:/Software/Microsoft/Windows/CurrentVersion/Uninstall/ROMancer'
-          if ($entry.InstallLocation -ne $target) { throw 'Apps registration differs' }
+          if ($entry.InstallLocation -ne $target -or $entry.DisplayVersion -ne '1.0.0') { throw 'Apps registration differs' }
           $active = Get-Content -LiteralPath (Join-Path $target 'active.json') -Raw | ConvertFrom-Json
-          $version = Join-Path $target ('versions/' + $active.version)
+          if ($active.slot -notmatch '^1[.]0[.]0-[0-9a-f]{16}$') { throw 'Package slot differs' }
+          $version = Join-Path $target ('versions/' + $active.slot)
           $installedPython = Join-Path $version 'python/python.exe'
           $env:PATH = (Join-Path $version 'python') + ';' + $env:SystemRoot + '/System32;' + $env:SystemRoot + '/System32/WindowsPowerShell/v1.0'
           $launcher = Join-Path $target 'Open ROMancer.ps1'
@@ -96,7 +131,7 @@ jobs:
             $body = @{ operation = 'system.capabilities'; parameters = @{} } | ConvertTo-Json -Compress
             $capabilities = Invoke-RestMethod -Uri ($parts[0] + '/api/call') -Method Post -Headers $headers -ContentType 'application/json' -Body $body
             if ($capabilities.version -ne $active.version) { throw 'Installed server version differs' }
-            foreach ($guideFile in @('index.html', 'guide.css', 'guide.pdf', 'screenshots/07-ffl2-room.png', 'screenshots/249-readable-theme-and-advanced-settings.png')) {
+            foreach ($guideFile in @('index.html', 'guide.css', 'guide.pdf', 'screenshots/265-recognized-game-structures.png', 'screenshots/249-readable-theme-and-advanced-settings.png')) {
               $download = Join-Path $PWD ('work_private/guide-' + ($guideFile -replace '/', '-'))
               Invoke-WebRequest -Uri ($parts[0] + '/user-guide/' + $guideFile) -OutFile $download
               $included = Join-Path $version ('app/user-guide/' + $guideFile)

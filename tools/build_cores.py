@@ -17,12 +17,20 @@ if __package__ in (None,''):sys.path.insert(0,str(Path(__file__).resolve().paren
 from tools.install_windows import safe_name
 from romancer.core_pins import CORE_FILES,CORE_PINS
 
+SNES_MAKE = ['make','platform=win','PROFILE=balanced','CC=gcc','CXX=g++','LIBS=-static','-j3']
+
 MAKE_RECIPES={
     'nes':['make','-f','Makefile.libretro','platform=win','CC=gcc','CXX=g++','-j3'],
-    'snes':['make','platform=win','PROFILE=balanced','CC=gcc','CXX=g++','LIBS=-static','-j3'],
+    'snes':SNES_MAKE,
+    'snes-dsp4':[*SNES_MAKE,'TARGET=bsnes_mercury_dsp4_libretro.dll','EXTRA_INCLUDES=-DROMANCER_DSP4_STATE'],
     'genesis':['make','-f','Makefile.libretro','CC=gcc','OPT=-O2 -flto=4','-j4'],
     'gb':['make','-f','Makefile.libretro','platform=win','CC=gcc','CXX=g++','LDFLAGS=-static -lws2_32','-j3'],
 }
+GBC_CONFIG = ['cmake','-S','.','-B','build-romancer','-G','Ninja','-DCMAKE_BUILD_TYPE=Release',
+    '-DBUILD_LIBRETRO=ON','-DBUILD_QT=OFF','-DBUILD_SDL=OFF','-DBUILD_SHARED=OFF',
+    '-DBUILD_STATIC=OFF','-DSKIP_LIBRARY=ON','-DDISABLE_DEPS=ON','-DENABLE_SCRIPTING=OFF',
+    '-DUSE_PTHREADS=OFF','-DCMAKE_SHARED_LINKER_FLAGS=-static-libgcc -static-libstdc++',
+    '-DM_CORE_GBA=OFF','-DM_CORE_GB=ON']
 
 
 def extract_sources(archive,destination):
@@ -72,8 +80,24 @@ def rebuild(archive, destination, msys):
             if text.count(old) != 1:
                 raise ValueError('SNES UCRT compatibility patch precondition differs')
             header.write_text(text.replace(old, ''), encoding='utf-8', newline='\n')
-        run(MAKE_RECIPES[system], directory)
-        binary = directory / pin['file']
+        if system == 'snes-dsp4':
+            # Both SNES DLLs share source. Recompile with the DSP-4 serializer enabled.
+            run([*SNES_MAKE,'clean'], directory)
+        if system == 'gbc-tilt':
+            args = [*GBC_CONFIG, '-DCMAKE_C_COMPILER='+str(paths[0]/'gcc.exe'),
+                    '-DCMAKE_CXX_COMPILER='+str(paths[0]/'g++.exe'),
+                    '-DCMAKE_MAKE_PROGRAM='+str(paths[0]/'ninja.exe')]
+            run(args, directory)
+            run(['cmake','--build','build-romancer','--target','mgba_libretro','-j','6'], directory)
+            binary = directory / 'build-romancer' / 'mgba_libretro.dll'
+        else:
+            run(MAKE_RECIPES[system], directory)
+            binary = directory / pin['file']
+            if system == 'snes':
+                # Keep the default output intact when cleaning the shared object tree.
+                preserved = root / pin['file']
+                binary.replace(preserved)
+                binary = preserved
         with binary.open('rb') as stream:
             sha = hashlib.file_digest(stream, 'sha256').hexdigest()
         result[system] = {'path': str(binary), 'sha256': sha, 'matches_release_binary': sha == pin['sha256']}

@@ -57,7 +57,7 @@ def build_compact_pdf(data,folder,pages,glossary_groups,index_groups,contents_gr
     from reportlab.lib.utils import ImageReader
     W,H=1440,1080;ink='#143038';muted='#526b72';accent='#14705e';line='#cfddda'
     pdf=canvas.Canvas(str(folder/'guide.pdf'),pagesize=(W,H),invariant=1,pageCompression=1)
-    pdf.setTitle('ROMancer v1.0 User Guide - Basic and Advanced');pdf.setAuthor('By RetchEWretched')
+    pdf.setTitle(data['product'] + ' User Guide - Basic and Advanced');pdf.setAuthor('By RetchEWretched')
     pdf.setSubject('Compact illustrated procedures, original workshop, glossary and index')
     stats=[];active='cover';style=ParagraphStyle('guide',fontName='Helvetica',fontSize=18,leading=24.5,textColor=HexColor(ink),linkUnderline=True)
     titles={r['id']:r['title'] for r in data['chapters']};terms={r['id']:r['term'] for r in data['glossary']}
@@ -76,7 +76,7 @@ def build_compact_pdf(data,folder,pages,glossary_groups,index_groups,contents_gr
         pdf.setFillColor(HexColor(accent));pdf.rect(48,H-53,40,5,fill=1,stroke=0);label(kicker.upper(),102,H-55,13,accent,True)
         bottom=paragraph(html.escape(title),48,H-86,W-96,31)
         pdf.setStrokeColor(HexColor(line));pdf.line(48,60,W-48,60)
-        label('ROMancer v1.0 / By RetchEWretched',48,35,12);label('Back to contents',W-240,35,12,accent)
+        label(data['product'] + ' / By RetchEWretched',48,35,12);label('Back to contents',W-240,35,12,accent)
         pdf.linkRect('','contents',(W-245,23,W-99,51),relative=0,thickness=0);label(str(pdf.getPageNumber()),W-74,35,12,ink,True)
         return bottom-24
     def end(kind):stats.append({'page':pdf.getPageNumber(),'kind':kind});pdf.showPage()

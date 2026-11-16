@@ -2,6 +2,7 @@
 from .asset_schema import fields,label
 from .runtime_session import snapshot_json
 from .workbench_evidence import load_evidence
+from .game_coverage import MANIFEST_PATH,validate_manifest,load_manifest,status,assess_evidence
 
 
 def build_coverage(project,route_reports:list[dict],objectives:dict)->dict:

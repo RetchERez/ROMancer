@@ -3,7 +3,7 @@ import unittest
 
 
 class GameKnowledgeTests(unittest.TestCase):
-    def test_references_cover_six_exact_profiles_without_bulk_game_data(self):
+    def test_references_cover_exact_profiles_without_bulk_game_data(self):
         from romancer.game_knowledge import reference_knowledge
         from romancer.verified_games import PROFILES
         for profile in PROFILES:

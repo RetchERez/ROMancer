@@ -11,15 +11,32 @@ import zipfile
 
 
 class PublicReleaseTests(unittest.TestCase):
-    def test_public_release_and_build_labels_match_the_requested_final_name(self):
+    def test_public_version_identity(self):
         from romancer.workbench_api import WorkbenchAPI
         with tempfile.TemporaryDirectory() as folder:
             api=WorkbenchAPI(Path(folder))
             try:
                 value=api.dispatch('system.capabilities',{})
-                self.assertEqual(value['release_name'],'ROMancer v1.0 final')
-                self.assertEqual(value['build_label'],'v1.0 final')
+                self.assertEqual(value['release_name'],'ROMancer v1.0.0')
+                self.assertEqual(value['version'],'1.0.0')
+                self.assertEqual(value['target_version'],'1.0.0')
+                self.assertEqual(value['build_label'],'v1.0.0')
             finally:api.close()
+
+    def test_level_editing_is_excluded_from_the_release(self):
+        from romancer.mcp_server import MCPServer
+        with tempfile.TemporaryDirectory() as folder:
+            server = MCPServer(Path(folder), allow_writes=True)
+            try:
+                operations = {row['name'] for row in server.api.dispatch('system.operations', {})['operations']}
+                for operation in ('levels.plan','games.maps.plan'):
+                    self.assertNotIn(operation, operations)
+                    self.assertNotIn(operation, server.operations)
+                self.assertIn('levels.inspect', operations)
+                self.assertIn('bytes.plan', operations)
+                self.assertIn('release.prepare', operations)
+            finally:
+                server.close()
 
     def test_public_metadata_is_in_the_explicit_source_inventory(self):
         from tools.package_source import APPROVED_FILES
@@ -91,7 +108,18 @@ class PublicReleaseTests(unittest.TestCase):
             def git(*args):
                 return subprocess.run(['git','-c','core.autocrlf=false',*args],cwd=export,check=True,capture_output=True).stdout
             git('init');git('add','--all')
-            staged=set(git('ls-files','-z').decode().strip('\0').split('\0'))
+            # Read every index object ID in one Git process. The previous
+            # per-file rev-parse loop spent minutes on Windows process startup.
+            indexed={}
+            for entry in git('ls-files','--stage','-z').split(b'\0'):
+                if not entry:continue
+                metadata,name=entry.split(b'\t',1)
+                _mode,object_id,stage=metadata.split(b' ')
+                self.assertEqual(stage,b'0')
+                name=name.decode('utf-8')
+                self.assertNotIn(name,indexed)
+                indexed[name]=object_id.decode('ascii')
+            staged=set(indexed)
             self.assertEqual(staged,APPROVED_FILES)
             # Generated bundle metadata hashes literal source bytes. Git's LF
             # normalization must not silently change those inputs on upload.
@@ -99,7 +127,7 @@ class PublicReleaseTests(unittest.TestCase):
                 if name.endswith(('.py','.js','.mjs','.json','.css','.html','.txt','.yml','.patch')):
                     raw=(export/name).read_bytes()
                     expected=hashlib.sha1(b'blob '+str(len(raw)).encode()+b'\0'+raw).hexdigest()
-                    self.assertEqual(git('rev-parse',':'+name).decode().strip(),expected,name)
+                    self.assertEqual(indexed[name],expected,name)
 
     def test_source_audit_requires_the_complete_runnable_buildable_inventory(self):
         from tools.package_source import package
@@ -142,7 +170,7 @@ class PublicReleaseTests(unittest.TestCase):
                         with zipfile.ZipFile(windows,'w') as z:
                             for member,raw in altered.items():z.writestr(member,raw)
                         with self.assertRaises(ValueError):audit_windows(windows,source,root)
-                for field in ['schema_version','product','version','release_name','build_label']:
+                for field in ['schema_version','product','version','release_name','build_label','install_layout']:
                     with self.subTest(field=field):
                         altered=dict(original);manifest=json.loads(altered['BUNDLE.json']);manifest[field]='wrong';altered['BUNDLE.json']=json.dumps(manifest).encode()
                         with zipfile.ZipFile(windows,'w') as z:
