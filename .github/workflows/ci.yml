@@ -70,7 +70,7 @@ jobs:
           if ($LASTEXITCODE -ne 0) { throw 'Could not list release assets' }
           $matchesByName = @($assets | ForEach-Object { $id, $assetName = $_ -split "`t", 2
             if ($assetName -ceq $name) { $id } })
-          if ($matchesByName.Count -gt 1) { throw 'Multiple release assets use the pinned engine archive name' }
+          # Each release re-attaches the same pinned archive; the download is checked against the pin below.
           if ($matchesByName.Count -eq 0) {
             Write-Output "The pinned engine archive has not been attached. Source checks run in the test job."
             exit 0

@@ -57,7 +57,7 @@ the tracing engines across the catalog; 938 of the 942 entries have a result.
 - Colors and pictures that the game works out while it runs can be locked.
 - Super NES replays are slow. With many recorded scenes, Show what changes
   and Review and save can take minutes.
-- Game Boy Advance is not supported; no mGBA tracing engine is included.
+- Kirby - Tilt 'n' Tumble: Scenes & colors is not available, because its tracing engine is not included.
 Playtest every build before sharing it.
 
 To edit Phantasy Star II's battle background, open the USA/Europe Rev A ROM
