@@ -14,6 +14,7 @@ import threading
 
 if __package__ in (None,''):sys.path.insert(0,str(Path(__file__).resolve().parents[1]))
 from romancer import ROMANCER_VERSION
+from romancer.game_coverage import TARGET_COUNT
 from romancer.workbench_api import WorkbenchAPI
 
 PROTOCOL='2025-11-25'
@@ -273,7 +274,7 @@ def _investigation_properties(operation):
     if operation=='levels.preset':return {**source,'preset_id':string(64)}
     if operation=='rom.evidence':return {'sha256':{'type':'string','pattern':'^[0-9a-f]{64}$'},'size':integer(1,64*1024**2)}
     if operation=='rom.samples':return {'query':string(128),'system_filter':enum(['all','nes','snes','genesis','sms','gb','gbc']),'page':integer(0,1000),'limit':integer(1,50)}
-    if operation=='coverage.status':return {'query':string(128),'system_filter':enum(['all','nes','snes','genesis','sms','gb','gbc']),'page':integer(0,1052),'limit':integer(1,100)}
+    if operation=='coverage.status':return {'query':string(128),'system_filter':enum(['all','nes','snes','genesis','sms','gb','gbc']),'page':integer(0,TARGET_COUNT),'limit':integer(1,100)}
     if operation=='references.template':return {**source, 'template_id': enum(['pokemon-red-blue', 'pokemon-crystal']), 'offset': integer(), 'count': integer(1, 65536), 'stride': integer(1, 65536)}
     if operation=='research.inspect':return {**source,'query':string(128),'kind':enum(['all','notes','assets','script','tables','levels','sound','commands']),'page':integer(0,4096)}
     if operation=='research.note_get':return {**source,'note_id':string(32)}

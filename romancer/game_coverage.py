@@ -13,9 +13,13 @@ from .asset_schema import fields,label,number
 from .script_schema import canonical_bytes,load_script_json
 
 MANIFEST_PATH=Path(__file__).resolve().parents[1]/'knowledge/game_support.json'
-TARGET_SET_ID='romancer-v1.0-uploaded-1052'
-TARGET_COUNT=1052
-TARGET_PIN='a3ad822c054ecd69151ffd72675264fa6352315c4bc383b9a365f6778f6e550b'
+TARGET_SET_ID='romancer-v1.1-catalog-942'
+TARGET_COUNT=942
+CATALOG_COUNT=938
+SHOWCASE_COUNT=6
+# Showcase targets that are not also catalog entries.
+ADDITIONAL_SHOWCASE_COUNT=4
+TARGET_PIN='d8b6f21380bc8eb55b7959a42e1d63f689b1b2f43c95ecf46c74620938bcc391'
 SYSTEMS=('nes','snes','genesis','sms','gb','gbc')
 OPERATIONS=frozenset(('inspect','noop','edit','undo_redo','reopen','native','patch'))
 
@@ -45,7 +49,7 @@ def validate_manifest(value):
         identities.append([r['sha256'],r['system_id'],r['size'],sorted(r['origin'])])
     identities.sort(key=lambda r:r[0])
     pin=hashlib.sha256(json.dumps(identities,separators=(',',':'),ensure_ascii=True).encode('ascii')).hexdigest()
-    if pin!=TARGET_PIN or catalog!=1048 or showcase!=6:raise ValueError('coverage target identities changed')
+    if pin!=TARGET_PIN or catalog!=CATALOG_COUNT or showcase!=SHOWCASE_COUNT:raise ValueError('coverage target identities changed')
     return copy.deepcopy(rows)
 
 
@@ -65,7 +69,7 @@ def status(query='',system_filter='all',page=0,limit=25):
     result=[{**r,'status':'not_verified','full_editing_verified':False,'limited_profile':legacy.get(r['sha256'])}
             for r in filtered[page*limit:(page+1)*limit]]
     return {'ok':True,'target_set_id':TARGET_SET_ID,'target_set_sha256':TARGET_PIN,
-            'target_count':TARGET_COUNT,'catalog_count':1048,'additional_showcase_count':4,
+            'target_count':TARGET_COUNT,'catalog_count':CATALOG_COUNT,'additional_showcase_count':ADDITIONAL_SHOWCASE_COUNT,
             'accepted_count':0,'release_ready':False,'write_authorized':False,
             'total':len(filtered),'page':page,'limit':limit,'revisions':result,
             'scope':'Exact target inventory. Catalog, boot, declared layouts and report preflight do not establish full editing acceptance.',

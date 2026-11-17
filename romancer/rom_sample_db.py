@@ -34,7 +34,7 @@ def validate_record(row):
     if type(row['system_id']) is not str or row['system_id'] not in SYSTEMS:raise ValueError('Sample system is outside this release.')
     if row['format'] not in formats[row['system_id']]:raise ValueError('Sample format does not match its system.')
     if type(row['labels']) is not list or not 1<=len(row['labels'])<=8:raise ValueError('Invalid sample labels.')
-    for label in row['labels']:_name(label)
+    for label in row['labels']:_name(label,256)
     _int(row['header_offset'],0,row['size']-1)
     if type(row['regions']) is not list or not 1<=len(row['regions'])<=16:raise ValueError('Invalid file-region facts.')
     for region in row['regions']:

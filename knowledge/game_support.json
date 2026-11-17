@@ -1,6 +1,6 @@
 {
   "schema_version": 1,
-  "target_set_id": "romancer-v1.0-uploaded-1052",
+  "target_set_id": "romancer-v1.1-catalog-942",
   "targets": [
     {
       "sha256": "000f4534a0376958edcc7ae3e6c5a7ea0dd6a775646207f60ad3923e27f110f3",
@@ -91,39 +91,6 @@
       ]
     },
     {
-      "sha256": "01cb87b2564e2eb917d81bf7f77c42455f30c8cfd24692e9f5823d8b76ec3b20",
-      "system_id": "snes",
-      "size": 3145728,
-      "labels": [
-        "Ganpuru - Gunman's Proof (Japan) [T-En by Aeon Genesis v1.03]"
-      ],
-      "origin": [
-        "catalog"
-      ]
-    },
-    {
-      "sha256": "01fa55c772e544ed19c3c169e8bbce3eefc74d2f4229420fa6d05d4b9d89fe66",
-      "system_id": "nes",
-      "size": 393232,
-      "labels": [
-        "Digital Devil Story - Megami Tensei (Japan) [T-En by EsperKnight & Stardust Crus"
-      ],
-      "origin": [
-        "catalog"
-      ]
-    },
-    {
-      "sha256": "027dbc3846b4e1b36ae41f9d11aebcd4ecc520f1e0ce33e59dc19d90d91960b1",
-      "system_id": "nes",
-      "size": 262160,
-      "labels": [
-        "Wai Wai World (Japan) [T-En by Zynk Oxhyde v2.2] [n]"
-      ],
-      "origin": [
-        "catalog"
-      ]
-    },
-    {
       "sha256": "02a5d53336729ad41881ea97c66018da92152d9cef65fd46d6965730cb57af04",
       "system_id": "genesis",
       "size": 3145728,
@@ -195,17 +162,6 @@
       "size": 524288,
       "labels": [
         "Clue (USA)"
-      ],
-      "origin": [
-        "catalog"
-      ]
-    },
-    {
-      "sha256": "0411fe67803ed068e08f8b03df7b2d3d383c5972fac93f5056f41d2e5b390d80",
-      "system_id": "genesis",
-      "size": 1048576,
-      "labels": [
-        "Advanced Busterhawk Gleylancer (Japan) [T-En by M.I.J.E.T. v061023]"
       ],
       "origin": [
         "catalog"
@@ -488,17 +444,6 @@
       ]
     },
     {
-      "sha256": "09884c751c04d0467a08c714ad8149ee7bff9a2e6fd2b632f77b665b93ea2067",
-      "system_id": "nes",
-      "size": 131088,
-      "labels": [
-        "Life Force (USA) (Rev 1)"
-      ],
-      "origin": [
-        "catalog"
-      ]
-    },
-    {
       "sha256": "099986c26910a80494e2bc1f9c102e4320983368a5684e75b0fa94dcc85d6582",
       "system_id": "nes",
       "size": 262160,
@@ -580,7 +525,7 @@
       "system_id": "sms",
       "size": 262144,
       "labels": [
-        "Ninja Gaiden (Europe, Brazil)"
+        "Ninja Gaiden (Europe, Brazil) (En)"
       ],
       "origin": [
         "catalog"
@@ -675,17 +620,6 @@
       ]
     },
     {
-      "sha256": "0b76ecaa496c3d2bb893bd5004b90b81b9b0d4c7297ee604934fadbab16f2799",
-      "system_id": "gb",
-      "size": 65536,
-      "labels": [
-        "Painter Momopie (Japan) [T-En by Stardust Crusaders v1.00]"
-      ],
-      "origin": [
-        "catalog"
-      ]
-    },
-    {
       "sha256": "0c6822e4f11ccf67619493fb50cc44660bc9b4d516e38d43cf4281d7300c4746",
       "system_id": "gbc",
       "size": 1048576,
@@ -730,17 +664,6 @@
       ]
     },
     {
-      "sha256": "0cc43e7550e87e9d0f9a4e8736beb4f48af46c03bf5c5cc39d847aa3cbd17a4f",
-      "system_id": "snes",
-      "size": 1048576,
-      "labels": [
-        "Dragon Ball Z - Super Saiya Densetsu (Japan) (Rev 1) [T-En by Klepto Software v1"
-      ],
-      "origin": [
-        "catalog"
-      ]
-    },
-    {
       "sha256": "0d479d68a4ac800ab9fde8b3db016af718c13a979163b3eb34b00af96550cd3e",
       "system_id": "gb",
       "size": 262144,
@@ -778,7 +701,7 @@
       "system_id": "gb",
       "size": 65536,
       "labels": [
-        "Lock n' Chase ~ Lock 'n' Chase (World)"
+        "Lock n' Chase (World)"
       ],
       "origin": [
         "catalog"
@@ -800,7 +723,7 @@
       "system_id": "genesis",
       "size": 1048576,
       "labels": [
-        "Lost Vikings, The (USA) (October, 1995)"
+        "Lost Vikings, The (USA) (Rev 1)"
       ],
       "origin": [
         "catalog"
@@ -895,17 +818,6 @@
       ]
     },
     {
-      "sha256": "0ef2c29b42524e984206f46dc5601d7b60c9d1773942a469000d0cb45a5d5c72",
-      "system_id": "snes",
-      "size": 4194304,
-      "labels": [
-        "Mysterious Dungeon 2 - Shiren the Wanderer (Japan) [T-En by Aeon Genesis v1.00] "
-      ],
-      "origin": [
-        "catalog"
-      ]
-    },
-    {
       "sha256": "0ef6f4cce5a2273fa49fe1ce724e0048a8e39c91da6b00dbb693fe1ba909177d",
       "system_id": "snes",
       "size": 1048576,
@@ -972,17 +884,6 @@
       ]
     },
     {
-      "sha256": "0fb82b0ce12bb0e411775185982fd5c0af74e1e460738798ef3de9afff7de9cf",
-      "system_id": "snes",
-      "size": 4194304,
-      "labels": [
-        "Fire Emblem - Mystery of the Emblem (Japan) [T-En by RPGuy96 & VincentASM v0.98]"
-      ],
-      "origin": [
-        "catalog"
-      ]
-    },
-    {
       "sha256": "0fc7b0da6c42fe3b7e942607dae48f6344973127e6e51f2c6ca040d6c7e24044",
       "system_id": "genesis",
       "size": 3145728,
@@ -1010,17 +911,6 @@
       "size": 131088,
       "labels": [
         "QIX (USA)"
-      ],
-      "origin": [
-        "catalog"
-      ]
-    },
-    {
-      "sha256": "10b28118d30cba3f057792e528c1289c7818003dc07f440a78231a57a60f6cd1",
-      "system_id": "nes",
-      "size": 393232,
-      "labels": [
-        "Fire Emblem - Shadow Dragon and the Blade of Light (Japan) [T-En by Polinym v1.2"
       ],
       "origin": [
         "catalog"
@@ -1097,7 +987,7 @@
       "system_id": "sms",
       "size": 262144,
       "labels": [
-        "Master of Darkness (Europe, Brazil)"
+        "Master of Darkness (Europe, Brazil) (En)"
       ],
       "origin": [
         "catalog"
@@ -1120,17 +1010,6 @@
       "size": 131088,
       "labels": [
         "Side Pocket (USA)"
-      ],
-      "origin": [
-        "catalog"
-      ]
-    },
-    {
-      "sha256": "1258ef7d7def19678708c0dce794e96f93240204124fc3be979f3b8839ba6b2d",
-      "system_id": "gbc",
-      "size": 2097152,
-      "labels": [
-        "Super Robot Pinball (Japan) [T-En by Kurenaikurai & Luis16bits & Marc_max v1.0]"
       ],
       "origin": [
         "catalog"
@@ -1164,28 +1043,6 @@
       "size": 262160,
       "labels": [
         "Journey to Silius (USA)"
-      ],
-      "origin": [
-        "catalog"
-      ]
-    },
-    {
-      "sha256": "12f675bf9868b88388f7a23dd5a12afe2cdcf1262ca0c87762967499c17d7826",
-      "system_id": "snes",
-      "size": 6291456,
-      "labels": [
-        "Trials of Mana (World) (Rev 1) (Collection of Mana)"
-      ],
-      "origin": [
-        "catalog"
-      ]
-    },
-    {
-      "sha256": "12fc0b062b9d9c6265a9ce776b248d5a33e4d4d5943f2dd62500d9b5446b9713",
-      "system_id": "nes",
-      "size": 262160,
-      "labels": [
-        "Splatter House - Super Deformed (Japan) [T-En by Spinner 8 and friends v2.00] [n"
       ],
       "origin": [
         "catalog"
@@ -1269,17 +1126,6 @@
       ]
     },
     {
-      "sha256": "14ab1538cbbd65f7810884dc16bf5f50e46c23e9d635b742cd142db41d2bf6ff",
-      "system_id": "nes",
-      "size": 262160,
-      "labels": [
-        "Go Go! Nekketu Hockey Club - Multi-Sport Battle (Japan) [T-En by Disconnected Tr"
-      ],
-      "origin": [
-        "catalog"
-      ]
-    },
-    {
       "sha256": "14d3ece30898587eda20c661a4a55ec595ba6352ca1f0bfc177542aa0eef0039",
       "system_id": "snes",
       "size": 524288,
@@ -1296,17 +1142,6 @@
       "size": 524288,
       "labels": [
         "Spanky's Quest (USA)"
-      ],
-      "origin": [
-        "catalog"
-      ]
-    },
-    {
-      "sha256": "1512bff638d672206d4b359861c899ea5057a6e1f25f99f7ec768c04441e82c2",
-      "system_id": "gb",
-      "size": 262144,
-      "labels": [
-        "Noobow (Japan) [T-En by Stardust Crusaders v1.00]"
       ],
       "origin": [
         "catalog"
@@ -1372,7 +1207,7 @@
       "system_id": "sms",
       "size": 262144,
       "labels": [
-        "Golden Axe Warrior (USA, Europe, Brazil)"
+        "Golden Axe Warrior (USA, Europe, Brazil) (En)"
       ],
       "origin": [
         "catalog"
@@ -1384,17 +1219,6 @@
       "size": 2097152,
       "labels": [
         "Aero the Acro-Bat 2 (USA)"
-      ],
-      "origin": [
-        "catalog"
-      ]
-    },
-    {
-      "sha256": "169bd28fe5fe3964922084ac65c1e11e3a93d9f9432bc7dfbce710bed50a9a60",
-      "system_id": "snes",
-      "size": 4194304,
-      "labels": [
-        "Rockman & Forte (Japan) [T-En by Aeon Genesis v1.00]"
       ],
       "origin": [
         "catalog"
@@ -1472,17 +1296,6 @@
       "size": 262160,
       "labels": [
         "Low G Man - The Low Gravity Man (USA)"
-      ],
-      "origin": [
-        "catalog"
-      ]
-    },
-    {
-      "sha256": "183a8450822ef0750117de44e690627956112d924d8059a5dad0c536035817fa",
-      "system_id": "nes",
-      "size": 262160,
-      "labels": [
-        "Banana Prince (Germany) [T-En by KingMike's Translations v1.1a] [Add by Elbobelo"
       ],
       "origin": [
         "catalog"
@@ -1676,22 +1489,11 @@
       ]
     },
     {
-      "sha256": "1ccb321496417c3e71b963b0cde817d9e602b47d944e4b4bbd874762d1dfb796",
-      "system_id": "nes",
-      "size": 393232,
-      "labels": [
-        "Legend of Fuma, The [Japan] [T-En by Nebulous Translations v1.01] [n]"
-      ],
-      "origin": [
-        "catalog"
-      ]
-    },
-    {
       "sha256": "1d28f2a3742ab6d4745af05f73119dfbadd6691c595c553455c0736e8e0dfa41",
       "system_id": "sms",
       "size": 262144,
       "labels": [
-        "Kenseiden (USA, Europe, Brazil)"
+        "Kenseiden (USA, Europe, Brazil) (En)"
       ],
       "origin": [
         "catalog"
@@ -1790,7 +1592,7 @@
       "system_id": "genesis",
       "size": 524288,
       "labels": [
-        "Michael Jackson's Moonwalker (Japan, USA)"
+        "Michael Jackson's Moonwalker (Japan, USA) (En)"
       ],
       "origin": [
         "catalog"
@@ -1812,7 +1614,7 @@
       "system_id": "sms",
       "size": 262144,
       "labels": [
-        "Castle of Illusion Starring Mickey Mouse (USA, Europe, Brazil) (Rev 1)"
+        "Castle of Illusion Starring Mickey Mouse (USA, Europe, Brazil) (En) (Rev 1)"
       ],
       "origin": [
         "catalog"
@@ -1911,7 +1713,7 @@
       "system_id": "snes",
       "size": 2097152,
       "labels": [
-        "Hammer Lock Wrestling (USA)"
+        "Hammerlock Wrestling (USA)"
       ],
       "origin": [
         "catalog"
@@ -1962,22 +1764,11 @@
       ]
     },
     {
-      "sha256": "2267d2665fb8cd23c4d66b437e43f2267c99ecbdc322daa7d630ee23d942d90c",
-      "system_id": "nes",
-      "size": 524304,
-      "labels": [
-        "Moon Crystal (Japan) [T-En by Alex W. Jackson v1.0]"
-      ],
-      "origin": [
-        "catalog"
-      ]
-    },
-    {
       "sha256": "2275213352411a23df7428496ad03991348ddee3034ac6db83d2d16f0d1f8554",
       "system_id": "nes",
       "size": 40976,
       "labels": [
-        "Kung Fu (Japan, USA)"
+        "Kung Fu (Japan, USA) (En)"
       ],
       "origin": [
         "catalog"
@@ -1989,17 +1780,6 @@
       "size": 4194304,
       "labels": [
         "Donkey Kong Country 3 - Dixie Kong's Double Trouble! (USA) (En,Fr)"
-      ],
-      "origin": [
-        "catalog"
-      ]
-    },
-    {
-      "sha256": "228424d4ee5e3c6279912a2507a50070fb0e3da7e559a2b432e1013a5d7a04c7",
-      "system_id": "genesis",
-      "size": 1048576,
-      "labels": [
-        "Undead Line (Japan) [T-En by M.I.J.E.T. v070903]"
       ],
       "origin": [
         "catalog"
@@ -2171,17 +1951,6 @@
       ]
     },
     {
-      "sha256": "26653f52ad4018977c17a71f1ee693d1429a82430acae1c68f1221ab9308dda1",
-      "system_id": "snes",
-      "size": 2621440,
-      "labels": [
-        "Shin Megami Tensei II (Japan) [T-En by Aeon Genesis v1.00]"
-      ],
-      "origin": [
-        "catalog"
-      ]
-    },
-    {
       "sha256": "266bcbd902fb4a23ae4fa44099cb5de8cfdbc367b36a933fc2c88a7628dd7990",
       "system_id": "nes",
       "size": 393232,
@@ -2219,7 +1988,7 @@
       "system_id": "gb",
       "size": 524288,
       "labels": [
-        "Donkey Kong (Japan, USA) (SGB Enhanced)"
+        "Donkey Kong (Japan, USA) (En) (SGB Enhanced)"
       ],
       "origin": [
         "catalog"
@@ -2230,7 +1999,7 @@
       "system_id": "gbc",
       "size": 4194304,
       "labels": [
-        "Harry Potter and the Chamber of Secrets (USA, Europe) (En,Fr,De,Es,It,Nl,Pt,Sv,D"
+        "Harry Potter and the Chamber of Secrets (USA, Europe) (En,Fr,De,Es,It,Nl,Pt,Sv,Da)"
       ],
       "origin": [
         "catalog"
@@ -2252,7 +2021,7 @@
       "system_id": "gb",
       "size": 131072,
       "labels": [
-        "Vattle Giuce (Japan)"
+        "Vattle Giuce (Japan) (En)"
       ],
       "origin": [
         "catalog"
@@ -2275,17 +2044,6 @@
       "size": 1048576,
       "labels": [
         "Super Star Wars (USA) (Rev 1)"
-      ],
-      "origin": [
-        "catalog"
-      ]
-    },
-    {
-      "sha256": "2a4c16465b75907de77bd56def61fc6375b90bc165828fd629fa4c676fae9c5e",
-      "system_id": "snes",
-      "size": 2097152,
-      "labels": [
-        "Mobile Suit Gundam Wing - Endless Duel (Japan) [T-En by Aeon Genesis v1.00] [n]"
       ],
       "origin": [
         "catalog"
@@ -2319,17 +2077,6 @@
       "size": 524288,
       "labels": [
         "Super Mario Kart (USA)"
-      ],
-      "origin": [
-        "catalog"
-      ]
-    },
-    {
-      "sha256": "2b058e3aacdd6deb12d09d6702f34743ef5aaafd571e1ef79c0c5b617bd688c6",
-      "system_id": "snes",
-      "size": 2097152,
-      "labels": [
-        "Dragon Quest V - Tenkuu no Hanayome (Japan) [T-En by DeJap & Partial Translation"
       ],
       "origin": [
         "catalog"
@@ -2373,7 +2120,7 @@
       "system_id": "genesis",
       "size": 1048576,
       "labels": [
-        "ToeJam & Earl (USA, Europe, Korea)"
+        "ToeJam & Earl (USA, Europe, Korea) (En)"
       ],
       "origin": [
         "catalog"
@@ -2440,17 +2187,6 @@
       "size": 524288,
       "labels": [
         "Castle of Illusion Starring Mickey Mouse (USA, Europe)"
-      ],
-      "origin": [
-        "catalog"
-      ]
-    },
-    {
-      "sha256": "2d870994dcd24f18498fd0413257e9ed48d347c9385aece6aa56d4a4edb36fee",
-      "system_id": "gbc",
-      "size": 4194304,
-      "labels": [
-        "Mobile Golf (Japan) [T-En by ProstatePunch & Darkshade & REON Dev Team & Marc_Ma"
       ],
       "origin": [
         "catalog"
@@ -2590,39 +2326,6 @@
       ]
     },
     {
-      "sha256": "31e74a16aa9f4a13e44dfdd7ca69a96b598bbb38676174a1e12710a442e1a795",
-      "system_id": "snes",
-      "size": 2621440,
-      "labels": [
-        "Live A Live (Japan) [T-En by Aeon Genesis v2.00 Deluxe]"
-      ],
-      "origin": [
-        "catalog"
-      ]
-    },
-    {
-      "sha256": "320aa47ae868261b5dacb7fcac658c3c1f293ab0d6d5800333db3a8f27fe3c58",
-      "system_id": "snes",
-      "size": 1572864,
-      "labels": [
-        "King of Demons (Japan) [T-En by Aeon Genesis v1.01] [n]"
-      ],
-      "origin": [
-        "catalog"
-      ]
-    },
-    {
-      "sha256": "32402004d0ab4a21c870dbf4a042e4767f51561e7ed4c0d0d8e5350ed5a05907",
-      "system_id": "nes",
-      "size": 524304,
-      "labels": [
-        "Final Fantasy III (Japan) [T-En by Chaos Rush v1.3]"
-      ],
-      "origin": [
-        "catalog"
-      ]
-    },
-    {
       "sha256": "3285b58b5aa8c0ab1b9a52402425f5ad0351dfaf09e71594562ec3fdeea03ce6",
       "system_id": "nes",
       "size": 262160,
@@ -2733,17 +2436,6 @@
       ]
     },
     {
-      "sha256": "34ce850141cfb29b396b30e580ec598a87931cb2a791bec0d305002aedee2cfa",
-      "system_id": "gbc",
-      "size": 1048576,
-      "labels": [
-        "Survival Kids 2 - Dasshutsu!! Futago-Jima! (Japan) (SGB Enhanced) (GB Compatible"
-      ],
-      "origin": [
-        "catalog"
-      ]
-    },
-    {
       "sha256": "34e1af0642c85148c5a3dc3c7ab4bcbda13a9fea190934b5526c555fff035651",
       "system_id": "snes",
       "size": 3145728,
@@ -2815,17 +2507,6 @@
       "size": 2097152,
       "labels": [
         "Castlevania - Dracula X (USA)"
-      ],
-      "origin": [
-        "catalog"
-      ]
-    },
-    {
-      "sha256": "36f832e6bb9ec7878a4850670846a2a40c9b0cc04aaeb99e886767f8fd1720e5",
-      "system_id": "snes",
-      "size": 2097152,
-      "labels": [
-        "Amazing Spider-Man, The - Lethal Foes (Japan) [T-En by Gorgyrip v1.0]"
       ],
       "origin": [
         "catalog"
@@ -2946,7 +2627,7 @@
       "system_id": "snes",
       "size": 524288,
       "labels": [
-        "Wild Snake (USA)"
+        "WildSnake (USA)"
       ],
       "origin": [
         "catalog"
@@ -2968,7 +2649,7 @@
       "system_id": "sms",
       "size": 524288,
       "labels": [
-        "Golden Axe (USA, Europe, Brazil)"
+        "Golden Axe (USA, Europe, Brazil) (En)"
       ],
       "origin": [
         "catalog"
@@ -3111,18 +2792,7 @@
       "system_id": "nes",
       "size": 65552,
       "labels": [
-        "Krazy Kreatures (USA) (Rev A) (Unl)"
-      ],
-      "origin": [
-        "catalog"
-      ]
-    },
-    {
-      "sha256": "3efb87c76485420af3feaf82a2c31866802bb36ecaa47782b38f4b3e6c88e050",
-      "system_id": "nes",
-      "size": 262160,
-      "labels": [
-        "Pizza Pop! (Japan) [T-En by Pacnsacdave v1.0]"
+        "Krazy Kreatures (USA) (NINA-06) (Unl)"
       ],
       "origin": [
         "catalog"
@@ -3338,17 +3008,6 @@
       ]
     },
     {
-      "sha256": "42c08c72ffff8a8c0bb6dc6e53ba2cc1e12c95f59c02461914c136030bcd8f7b",
-      "system_id": "sms",
-      "size": 131072,
-      "labels": [
-        "Alex Kidd in Miracle World (World) (Sega Ages)"
-      ],
-      "origin": [
-        "catalog"
-      ]
-    },
-    {
       "sha256": "42e6bf3b26f186f1ddf23d2ab0e78dea423c55562119f1988ffab906e8f86fe6",
       "system_id": "gbc",
       "size": 2097152,
@@ -3408,7 +3067,7 @@
       "system_id": "sms",
       "size": 262144,
       "labels": [
-        "Golvellius - Valley of Doom (USA, Europe, Brazil)"
+        "Golvellius - Valley of Doom (USA, Europe, Brazil) (En)"
       ],
       "origin": [
         "catalog"
@@ -3419,7 +3078,7 @@
       "system_id": "genesis",
       "size": 524288,
       "labels": [
-        "QuackShot Starring Donald Duck (World) (Rev A)"
+        "QuackShot Starring Donald Duck (World) (En,Ja) (Rev A)"
       ],
       "origin": [
         "catalog"
@@ -3573,7 +3232,7 @@
       "system_id": "sms",
       "size": 262144,
       "labels": [
-        "Battle Out Run (Europe, Brazil)"
+        "Battle Out Run (Europe, Brazil) (En)"
       ],
       "origin": [
         "catalog"
@@ -3617,7 +3276,7 @@
       "system_id": "genesis",
       "size": 1048576,
       "labels": [
-        "Ecco the Dolphin (USA, Europe, Korea)"
+        "Ecco the Dolphin (USA, Europe, Korea) (En)"
       ],
       "origin": [
         "catalog"
@@ -3639,7 +3298,7 @@
       "system_id": "nes",
       "size": 24592,
       "labels": [
-        "Ice Climber (USA, Europe, Korea)"
+        "Ice Climber (USA, Europe, Asia) (En)"
       ],
       "origin": [
         "catalog"
@@ -3706,17 +3365,6 @@
       "size": 2097152,
       "labels": [
         "Streets of Rage 2 (USA)"
-      ],
-      "origin": [
-        "catalog"
-      ]
-    },
-    {
-      "sha256": "4a6957d54c6a7175ed3261431fac421ad0026a79fc904885ce9d117ed967d8ec",
-      "system_id": "genesis",
-      "size": 2097152,
-      "labels": [
-        "Monster World IV (USA) (Genesis Mini)"
       ],
       "origin": [
         "catalog"
@@ -3811,17 +3459,6 @@
       ]
     },
     {
-      "sha256": "4cf04879a03e24f82afeb8cb1540f40ff2b63e85eca97b3366c07dcccc9fab62",
-      "system_id": "snes",
-      "size": 2097152,
-      "labels": [
-        "Torneco no Daibouken - Fushigi no Dungeon (Japan) [T-En by Dynamic Designs v0.99"
-      ],
-      "origin": [
-        "catalog"
-      ]
-    },
-    {
       "sha256": "4d1a12eb1ee02096f794719de6d70a6315ffc3b8826c7db5f6324636b98a8f44",
       "system_id": "nes",
       "size": 262160,
@@ -3860,17 +3497,6 @@
       "size": 2097152,
       "labels": [
         "R-Type III (USA)"
-      ],
-      "origin": [
-        "catalog"
-      ]
-    },
-    {
-      "sha256": "4d980ae439a9288769d0f1e4d98ad61ecfd575b55c154abdfc88c2cb2fbc9401",
-      "system_id": "gb",
-      "size": 524288,
-      "labels": [
-        "Chalvo 55 - Super Puzzle Action (Japan) [T-En by Lame Boy v1.0]"
       ],
       "origin": [
         "catalog"
@@ -3932,17 +3558,6 @@
       ]
     },
     {
-      "sha256": "4e4a2c0c8aab6363bd248308f46b25b5e1e97c5eaa7cd37c0e63b3ece0e66986",
-      "system_id": "snes",
-      "size": 4194304,
-      "labels": [
-        "Front Mission (Japan) [T-En by FH v1.0b]"
-      ],
-      "origin": [
-        "catalog"
-      ]
-    },
-    {
       "sha256": "4e624ad741077f574c1d0b57cbc45171ed4ca9f23fa89dfd8f282897aa53ab9a",
       "system_id": "gb",
       "size": 32768,
@@ -3991,7 +3606,7 @@
       "system_id": "nes",
       "size": 24592,
       "labels": [
-        "Excitebike (Japan, USA)"
+        "Excitebike (Japan, USA) (En)"
       ],
       "origin": [
         "catalog"
@@ -4025,17 +3640,6 @@
       "size": 32768,
       "labels": [
         "Dr. Mario (World) (Rev 1)"
-      ],
-      "origin": [
-        "catalog"
-      ]
-    },
-    {
-      "sha256": "5088e25563c154f59a14ccb578e70dc79b02515945f45f6c1ee1f884ae06aac1",
-      "system_id": "snes",
-      "size": 4194304,
-      "labels": [
-        "Tactics Ogre - Let Us Cling Together (Japan) (Rev 2) [T-En by Aeon Genesis v1.00"
       ],
       "origin": [
         "catalog"
@@ -4112,7 +3716,7 @@
       "system_id": "genesis",
       "size": 1048576,
       "labels": [
-        "World of Illusion Starring Mickey Mouse and Donald Duck (USA, Korea)"
+        "World of Illusion Starring Mickey Mouse and Donald Duck (USA, Korea) (En)"
       ],
       "origin": [
         "catalog"
@@ -4135,17 +3739,6 @@
       "size": 2097152,
       "labels": [
         "Mutant League Hockey (USA, Europe)"
-      ],
-      "origin": [
-        "catalog"
-      ]
-    },
-    {
-      "sha256": "5360eecfb49a3a46c4b81c99415db92dbb50e6e03557f27ef6b9ac06ea759ff6",
-      "system_id": "nes",
-      "size": 262160,
-      "labels": [
-        "Nekketsu! Street Basket - Go for it, Dunk Heroes! (Japan) [T-En by Farid v1.2] ["
       ],
       "origin": [
         "catalog"
@@ -4196,17 +3789,6 @@
       ]
     },
     {
-      "sha256": "54fdf98b9bb6878e6931d54cca8bde8dcaf098ed612ad82d9236eaa85020325f",
-      "system_id": "nes",
-      "size": 786448,
-      "labels": [
-        "Digital Devil Story - Megami Tensei II (Japan) (Rev A) [T-En by Stardust Crusade"
-      ],
-      "origin": [
-        "catalog"
-      ]
-    },
-    {
       "sha256": "54fe95af5ded33631db84b6ba4ecc4a86f9f7528c9c56ca678150a3246d49623",
       "system_id": "gbc",
       "size": 1048576,
@@ -4229,17 +3811,6 @@
       ]
     },
     {
-      "sha256": "5577a3a73929790d92c2d0f311d7674142de9555ce0c713020a08a894550441e",
-      "system_id": "snes",
-      "size": 3145728,
-      "labels": [
-        "Dragon Ball Z - Hyper Dimension (Japan) [T-En by Twilight Translations v1.00]"
-      ],
-      "origin": [
-        "catalog"
-      ]
-    },
-    {
       "sha256": "558b437e10915c2ca79f376634fa4623c87efdb9292a5878b886c7a6fbef61e2",
       "system_id": "snes",
       "size": 1048576,
@@ -4255,7 +3826,7 @@
       "system_id": "nes",
       "size": 131088,
       "labels": [
-        "Castlevania"
+        "Castlevania (USA)"
       ],
       "origin": [
         "showcase"
@@ -4299,7 +3870,7 @@
       "system_id": "genesis",
       "size": 1048576,
       "labels": [
-        "Sonic The Hedgehog 2 (World) (Rev B)"
+        "Sonic The Hedgehog 2 (World) (Rev B) (Sonic Compilation ~ Sonic Classics)"
       ],
       "origin": [
         "catalog"
@@ -4398,7 +3969,7 @@
       "system_id": "sms",
       "size": 262144,
       "labels": [
-        "California Games ~ Jogos de Verao (USA, Europe, Brazil)"
+        "California Games (USA, Europe, Brazil) (En)"
       ],
       "origin": [
         "catalog"
@@ -4410,17 +3981,6 @@
       "size": 1048576,
       "labels": [
         "Gauntlet IV (USA, Europe) (En,Ja)"
-      ],
-      "origin": [
-        "catalog"
-      ]
-    },
-    {
-      "sha256": "58a9c365670b7274712459b93b8e442d18f5da7362c0fa1f6cc4bc9761a1ad2c",
-      "system_id": "gb",
-      "size": 262144,
-      "labels": [
-        "Booby Boys (Japan) [T-En by HTI v1.00]"
       ],
       "origin": [
         "catalog"
@@ -4476,17 +4036,6 @@
       "size": 262144,
       "labels": [
         "Final Fantasy Adventure (USA)"
-      ],
-      "origin": [
-        "catalog"
-      ]
-    },
-    {
-      "sha256": "5a5156ad72e99ccf66cdf448b215309e5576bf42581ee4f6e2a2dd97e7b1ba61",
-      "system_id": "nes",
-      "size": 262160,
-      "labels": [
-        "Perman - Return the Space Saucer! (Japan) [T-En by Zynk Oxhyde v2.0] [n]"
       ],
       "origin": [
         "catalog"
@@ -4574,7 +4123,7 @@
       "system_id": "gbc",
       "size": 1048576,
       "labels": [
-        "Legend of Zelda, The - Link's Awakening DX (USA, Europe) (Rev 2) (SGB Enhanced) "
+        "Legend of Zelda, The - Link's Awakening DX (USA, Europe) (Rev 2) (SGB Enhanced) (GB Compatible)"
       ],
       "origin": [
         "catalog"
@@ -4651,7 +4200,7 @@
       "system_id": "nes",
       "size": 65552,
       "labels": [
-        "Dr. Mario (Japan, USA) (Rev 1)"
+        "Dr. Mario (Japan, USA) (En) (Rev 1)"
       ],
       "origin": [
         "catalog"
@@ -4717,7 +4266,7 @@
       "system_id": "sms",
       "size": 262144,
       "labels": [
-        "Lucky Dime Caper Starring Donald Duck, The (Europe, Brazil)"
+        "Lucky Dime Caper Starring Donald Duck, The (Europe, Brazil) (En)"
       ],
       "origin": [
         "catalog"
@@ -4773,28 +4322,6 @@
       "size": 4194304,
       "labels": [
         "Donkey Kong Country (USA) (Rev 2)"
-      ],
-      "origin": [
-        "catalog"
-      ]
-    },
-    {
-      "sha256": "629ceb8b61902098d438482aedbc850194f8eff474cc4a34930821e486b4070a",
-      "system_id": "snes",
-      "size": 3145728,
-      "labels": [
-        "Front Mission Series - Gun Hazard (Japan) [T-En by Aeon Genesis v1.01]"
-      ],
-      "origin": [
-        "catalog"
-      ]
-    },
-    {
-      "sha256": "62d3e2075a4edd203f37667ef09fe14df77d016c4cdf589102778dcbd642e412",
-      "system_id": "nes",
-      "size": 393232,
-      "labels": [
-        "Hudson's Adventure Island IV (Japan) [T-En by Zynk Oxhyde v1.0] [n]"
       ],
       "origin": [
         "catalog"
@@ -4959,7 +4486,7 @@
       "system_id": "gb",
       "size": 65536,
       "labels": [
-        "Astro Rabby (Japan)"
+        "Astro Rabby (Japan) (En)"
       ],
       "origin": [
         "catalog"
@@ -5048,17 +4575,6 @@
       "size": 262144,
       "labels": [
         "Bionic Commando (USA)"
-      ],
-      "origin": [
-        "catalog"
-      ]
-    },
-    {
-      "sha256": "6931218ca343e5b3a1ccd19a43701091d0353817e2b5711a4a1354a646aaa209",
-      "system_id": "gb",
-      "size": 262144,
-      "labels": [
-        "Makai Mura Gaiden - The Demon Darkness [T-En by Bailli v1.0] [n]"
       ],
       "origin": [
         "catalog"
@@ -5157,7 +4673,7 @@
       "system_id": "sms",
       "size": 262144,
       "labels": [
-        "Lord of the Sword (USA, Europe, Brazil)"
+        "Lord of the Sword (USA, Europe, Brazil) (En)"
       ],
       "origin": [
         "catalog"
@@ -5168,7 +4684,7 @@
       "system_id": "sms",
       "size": 262144,
       "labels": [
-        "Sonic The Hedgehog (USA, Europe, Brazil)"
+        "Sonic The Hedgehog (USA, Europe, Brazil) (En)"
       ],
       "origin": [
         "catalog"
@@ -5208,17 +4724,6 @@
       ]
     },
     {
-      "sha256": "6b5f0af995908100984307dd01def4f386aadffd7a530e26380adb6496de098e",
-      "system_id": "nes",
-      "size": 262160,
-      "labels": [
-        "Final Fantasy II (Japan) [T-En by Demiforce v1.03] [Add by Chaos Rush v2.2b]"
-      ],
-      "origin": [
-        "catalog"
-      ]
-    },
-    {
       "sha256": "6b63a96d5dc898544eea9fd8db637b60dd666f35158b14fb7293be9ac02738f8",
       "system_id": "nes",
       "size": 65552,
@@ -5235,17 +4740,6 @@
       "size": 1048576,
       "labels": [
         "Aerobiz Supersonic (USA)"
-      ],
-      "origin": [
-        "catalog"
-      ]
-    },
-    {
-      "sha256": "6be10840109a457e8f6ce7333352a91bf2104ca171097682c1d8b54111c5e3bc",
-      "system_id": "nes",
-      "size": 393232,
-      "labels": [
-        "Chronicle of the Radia War (Japan) [T-En by Dreamless & Jair & [cx] v1.00] [n]"
       ],
       "origin": [
         "catalog"
@@ -5301,28 +4795,6 @@
       "size": 1048576,
       "labels": [
         "Kirby - Tilt 'n' Tumble (USA)"
-      ],
-      "origin": [
-        "catalog"
-      ]
-    },
-    {
-      "sha256": "6d17e05ed9b509de201915e3245cccdc522a59792e22564bb05a1de2ba16ac3a",
-      "system_id": "gbc",
-      "size": 4194304,
-      "labels": [
-        "Pokemon Card GB2 - GR Dan Sanjou! (Japan)"
-      ],
-      "origin": [
-        "catalog"
-      ]
-    },
-    {
-      "sha256": "6d734fb24f0f9d45a9329f902be20b195ea8b0dd64fe03f0c8bb26171f75f3f9",
-      "system_id": "snes",
-      "size": 2621440,
-      "labels": [
-        "Final Fantasy V (Japan) [T-En by RPGe v1.10] [Add by Spooniest v2.1] [Legend of "
       ],
       "origin": [
         "catalog"
@@ -5494,17 +4966,6 @@
       ]
     },
     {
-      "sha256": "7083a0f4f5d3ae189cd2cf9ff27b6c7b7f89b1495f0558a4ec6ff71ce8cf01dd",
-      "system_id": "nes",
-      "size": 1572880,
-      "labels": [
-        "Metal Slader Glory (Japan) [T-En by Stardust Crusaders v1.0]"
-      ],
-      "origin": [
-        "catalog"
-      ]
-    },
-    {
       "sha256": "70846fff7a4da8cd8b280b60e7d9c5009c73e968d8cd63a70b630a24705185f5",
       "system_id": "genesis",
       "size": 2097152,
@@ -5659,17 +5120,6 @@
       ]
     },
     {
-      "sha256": "73df6686b89388fedd894ac93d044793ed13b87a791108f59143853d81e3a27c",
-      "system_id": "gbc",
-      "size": 2097152,
-      "labels": [
-        "Shin Megami Tensei Devil Children - Kuro no Sho (Japan) (SGB Enhanced) (GB Compa"
-      ],
-      "origin": [
-        "catalog"
-      ]
-    },
-    {
       "sha256": "740646f3535bfb365ca44e70d46ab433467b142bd84010393070bd0b141af853",
       "system_id": "snes",
       "size": 4194304,
@@ -5729,7 +5179,7 @@
       "system_id": "genesis",
       "size": 524288,
       "labels": [
-        "Granada (Japan, USA) (Rev A)"
+        "Granada (Japan, USA) (En) (Rev A)"
       ],
       "origin": [
         "catalog"
@@ -5741,17 +5191,6 @@
       "size": 4194304,
       "labels": [
         "Ultimate Mortal Kombat 3 (USA)"
-      ],
-      "origin": [
-        "catalog"
-      ]
-    },
-    {
-      "sha256": "762649b99d04f72852a04b62161fc42a9ca8db21ce7e89e622c1dd9b5b93f057",
-      "system_id": "nes",
-      "size": 393232,
-      "labels": [
-        "Samurai Pizza Cats (Japan) [T-En by Vice Translations v1.01] [US adaptation] [n]"
       ],
       "origin": [
         "catalog"
@@ -5813,39 +5252,6 @@
       ]
     },
     {
-      "sha256": "774efc6da20934f120ff13f019aa53739d02e7ddf60985316553d5996a6d9d24",
-      "system_id": "snes",
-      "size": 4194304,
-      "labels": [
-        "Dragon Quest VI - Realms of Revelation (Japan) [T-En by NoPrgress v0.90b2] [n]"
-      ],
-      "origin": [
-        "catalog"
-      ]
-    },
-    {
-      "sha256": "776f36a33b1a60b464d4d56ca1cecb6ca65ad2b84822a42bc89772d8b934f97a",
-      "system_id": "snes",
-      "size": 2621440,
-      "labels": [
-        "Magical Pop'n (Japan) [T-En by Aeon Genesis v1.01]"
-      ],
-      "origin": [
-        "catalog"
-      ]
-    },
-    {
-      "sha256": "787ac71adf7ffe593202f94b0181588d08eda7ee56f35adb18da7c6d690cd58e",
-      "system_id": "snes",
-      "size": 8388608,
-      "labels": [
-        "Bahamut Lagoon (Japan) [T-En by Tom & Near v1.2]"
-      ],
-      "origin": [
-        "catalog"
-      ]
-    },
-    {
       "sha256": "78bf9d79fb2ff3f9d03ecc1176d070e53ddaca2c6b0cda69e74c19a4e50b195b",
       "system_id": "snes",
       "size": 1048576,
@@ -5879,17 +5285,6 @@
       ]
     },
     {
-      "sha256": "79efb41763e141b9115981c013cc2d4c1bdb5e8d8b8f904051d3f40daf97b07f",
-      "system_id": "snes",
-      "size": 6291456,
-      "labels": [
-        "Dragon Quest III - And into the Legend... (Japan) [T-En by DQ Translations v1.1]"
-      ],
-      "origin": [
-        "catalog"
-      ]
-    },
-    {
       "sha256": "7a108770a7c1ad592b52d0c46d7ead422d0a20961abaafca3d40086e3f2f588f",
       "system_id": "gb",
       "size": 524288,
@@ -5905,7 +5300,7 @@
       "system_id": "genesis",
       "size": 2097152,
       "labels": [
-        "Ballz 3D - Fighting at Its Ballziest ~ Ballz 3D - The Battle of the Ballz (USA, "
+        "Ballz 3D - The Battle of the Ballz (USA, Europe)"
       ],
       "origin": [
         "catalog"
@@ -6004,7 +5399,7 @@
       "system_id": "sms",
       "size": 262144,
       "labels": [
-        "Rastan"
+        "Rastan (USA, Europe, Brazil) (En)"
       ],
       "origin": [
         "showcase"
@@ -6022,17 +5417,6 @@
       ]
     },
     {
-      "sha256": "7e7c9bccfbe6595d0817db7a4a0b832e06d4f24fb992f2b01e92593eb8a8a01d",
-      "system_id": "snes",
-      "size": 4194304,
-      "labels": [
-        "Clock Tower (Japan) [T-En by Aeon Genesis v1.01]"
-      ],
-      "origin": [
-        "catalog"
-      ]
-    },
-    {
       "sha256": "7f37e676473a3fd46b20a993f0e0b14709a5b4827293c69424226d90cd26b9de",
       "system_id": "nes",
       "size": 262160,
@@ -6044,22 +5428,11 @@
       ]
     },
     {
-      "sha256": "7f38a086d304960f9d0f194b1cf71512bbef486fcef0eb48e93389c3a86f507d",
-      "system_id": "snes",
-      "size": 4194304,
-      "labels": [
-        "Ganbare Goemon 3 - Shishi Juurokubee no Karakuri Manjigatame (Japan) [T-En by DD"
-      ],
-      "origin": [
-        "catalog"
-      ]
-    },
-    {
       "sha256": "7f6cbedd52eab56724c422ec8f40c421befba3ed58e5c9f1767721da57344176",
       "system_id": "genesis",
       "size": 524288,
       "labels": [
-        "Bonanza Bros. (USA, Europe, Korea) (Rev B)"
+        "Bonanza Bros. (USA, Europe, Korea) (En) (Rev B)"
       ],
       "origin": [
         "catalog"
@@ -6297,28 +5670,6 @@
       ]
     },
     {
-      "sha256": "84de0cb5bc051bdb8b11037a215ad96d10d7d7c584a56c04828547bbdb769f4d",
-      "system_id": "nes",
-      "size": 393232,
-      "labels": [
-        "Ganbare Goemon 2 (Japan) [T-En by Stardust Crusaders v2.00] [n]"
-      ],
-      "origin": [
-        "catalog"
-      ]
-    },
-    {
-      "sha256": "84e9f52266d36dee9fab12211ded5d0ad6db59d98b652a5eb1e5bd9933aef0c3",
-      "system_id": "snes",
-      "size": 2097152,
-      "labels": [
-        "Super Famicom Wars (Japan) (NP) [T-En by Optiroc v1.1]"
-      ],
-      "origin": [
-        "catalog"
-      ]
-    },
-    {
       "sha256": "8510491f99400115ccf33570269bc4e484fb56370f7ac36f12e73eec19d342da",
       "system_id": "snes",
       "size": 1572864,
@@ -6341,17 +5692,6 @@
       ]
     },
     {
-      "sha256": "85789044954db6c55f9b88452e76cfe3362c2de12b2af6c68808093ce85888d0",
-      "system_id": "nes",
-      "size": 262160,
-      "labels": [
-        "Crisis Force (Japan) [T-En by Stardust Crusaders v1.0]"
-      ],
-      "origin": [
-        "catalog"
-      ]
-    },
-    {
       "sha256": "85831d4f7d35bf233b5581c3ed8c05bac64721f65713426bfa00d2f9a792a7aa",
       "system_id": "genesis",
       "size": 1048576,
@@ -6363,22 +5703,11 @@
       ]
     },
     {
-      "sha256": "8599966abc51c09c58e878f1e5fbbcbdd185260df14c79f39e620f6f2c4fdad9",
-      "system_id": "nes",
-      "size": 262160,
-      "labels": [
-        "Cocoron (Japan) [T-En by Akujin & Dynamic Designs v1.0]"
-      ],
-      "origin": [
-        "catalog"
-      ]
-    },
-    {
       "sha256": "859bbc0fc5fa31dad15a4d24cd1df19140b55a2c4b4b5936eec439f035166cf7",
       "system_id": "nes",
       "size": 262160,
       "labels": [
-        "Gradius II (Japan)"
+        "Gradius II (Japan) (En)"
       ],
       "origin": [
         "catalog"
@@ -6401,17 +5730,6 @@
       "size": 1048576,
       "labels": [
         "Legend of Zelda, The - Oracle of Seasons (USA, Australia)"
-      ],
-      "origin": [
-        "catalog"
-      ]
-    },
-    {
-      "sha256": "8637b08e68003de126324be3153e30ecfc09c9fac4908d57eb989dd205e2a6b4",
-      "system_id": "genesis",
-      "size": 2097152,
-      "labels": [
-        "Alien Soldier (USA) (Virtual Console)"
       ],
       "origin": [
         "catalog"
@@ -6539,28 +5857,6 @@
       ]
     },
     {
-      "sha256": "8ae8fdd745e009fcf4de4ceb96ab419d4eeafc976ea0a6a10430fc36faaac832",
-      "system_id": "snes",
-      "size": 6291456,
-      "labels": [
-        "Fire Emblem - Thracia 776 (Japan) [T-En by Cirosan v1.04] [Add by Miacis v1.08]"
-      ],
-      "origin": [
-        "catalog"
-      ]
-    },
-    {
-      "sha256": "8b40664962c515f333db3cfd549d259eb11debc3420d4005011a95445e1c8dfc",
-      "system_id": "nes",
-      "size": 262160,
-      "labels": [
-        "TwinBee 3 - The Aimless Demon King (Japan) [T-En by Demiforce & Stardust Crusade"
-      ],
-      "origin": [
-        "catalog"
-      ]
-    },
-    {
       "sha256": "8b75ab4bb1b63c45a56e7a4c5a37c0864f14375ab3131edc33489764426ad888",
       "system_id": "snes",
       "size": 524288,
@@ -6609,7 +5905,7 @@
       "system_id": "gbc",
       "size": 1048576,
       "labels": [
-        "Pokemon - Yellow Version - Special Pikachu Edition (USA, Europe) (CGB+SGB Enhanc"
+        "Pokemon - Yellow Version - Special Pikachu Edition (USA, Europe) (CGB+SGB Enhanced)"
       ],
       "origin": [
         "catalog"
@@ -6697,7 +5993,7 @@
       "system_id": "genesis",
       "size": 1048576,
       "labels": [
-        "Ooze, The (Japan, USA)"
+        "Ooze, The (Japan, USA) (En)"
       ],
       "origin": [
         "catalog"
@@ -6741,18 +6037,7 @@
       "system_id": "gbc",
       "size": 4194304,
       "labels": [
-        "Harry Potter and the Sorcerer's Stone (USA, Europe) (En,Fr,De,Es,It,Nl,Pt,Sv,No,"
-      ],
-      "origin": [
-        "catalog"
-      ]
-    },
-    {
-      "sha256": "8eba8d39953024f7deea14b9f3df064a7ffd3e2d1c607cce032925e982bf972d",
-      "system_id": "nes",
-      "size": 393232,
-      "labels": [
-        "Fire Emblem Gaiden (Japan) [T-En by Artemis251 v1.01]"
+        "Harry Potter and the Sorcerer's Stone (USA, Europe) (En,Fr,De,Es,It,Nl,Pt,Sv,No,Da,Fi)"
       ],
       "origin": [
         "catalog"
@@ -6785,7 +6070,7 @@
       "system_id": "nes",
       "size": 24592,
       "labels": [
-        "Door Door (Japan)"
+        "Door Door (Japan) (En)"
       ],
       "origin": [
         "catalog"
@@ -6851,7 +6136,7 @@
       "system_id": "genesis",
       "size": 655360,
       "labels": [
-        "Daimakaimura ~ Ghouls'n Ghosts (Japan, USA)"
+        "Ghouls'n Ghosts (Japan, USA) (En,Ja)"
       ],
       "origin": [
         "catalog"
@@ -6874,17 +6159,6 @@
       "size": 65552,
       "labels": [
         "Adventures of Lolo 2 (USA)"
-      ],
-      "origin": [
-        "catalog"
-      ]
-    },
-    {
-      "sha256": "90f535b8b51125418fab5d53e6d2a26742253d6802408026276fb6f1d0a8c5d5",
-      "system_id": "nes",
-      "size": 262160,
-      "labels": [
-        "Rolling Thunder (World) (Namcot Collection, Namco Museum Archives Vol 2)"
       ],
       "origin": [
         "catalog"
@@ -6929,17 +6203,6 @@
       "size": 4194304,
       "labels": [
         "Mickey's Speedway USA (USA, Europe) (En,Fr,De,Es)"
-      ],
-      "origin": [
-        "catalog"
-      ]
-    },
-    {
-      "sha256": "927fb5900ed168856f49f5fc08e9c957b9d1b418e114d1a703b5df5c70523c0c",
-      "system_id": "gbc",
-      "size": 1048576,
-      "labels": [
-        "Gen the Carpenter (Japan) (SGB Enhanced) (GB Compatible) [T-En by PentarouZero v"
       ],
       "origin": [
         "catalog"
@@ -7071,7 +6334,7 @@
       "system_id": "genesis",
       "size": 524288,
       "labels": [
-        "Bare Knuckle - Ikari no Tekken ~ Streets of Rage (World) (Rev A)"
+        "Streets of Rage (World) (En,Ja) (Rev A)"
       ],
       "origin": [
         "catalog"
@@ -7160,17 +6423,6 @@
       "size": 262160,
       "labels": [
         "Nintendo World Cup (USA) (Rev 1)"
-      ],
-      "origin": [
-        "catalog"
-      ]
-    },
-    {
-      "sha256": "987cbd63642dd709548d724ae86e735d923f6248b5503549f8e4d485ef7569f8",
-      "system_id": "nes",
-      "size": 262160,
-      "labels": [
-        "Ganbare Goemon! (Japan) [T-En by Spinner 8 and friends v1.01] [n]"
       ],
       "origin": [
         "catalog"
@@ -7302,7 +6554,7 @@
       "system_id": "sms",
       "size": 262144,
       "labels": [
-        "Psycho Fox (USA, Europe, Brazil)"
+        "Psycho Fox (USA, Europe, Brazil) (En)"
       ],
       "origin": [
         "catalog"
@@ -7314,17 +6566,6 @@
       "size": 4194304,
       "labels": [
         "Rayman (USA) (En,Fr,De,Es,It,Nl)"
-      ],
-      "origin": [
-        "catalog"
-      ]
-    },
-    {
-      "sha256": "9cd8fec24465995509e2a7433570214e6ba7b91c9218f28a4281b5100672b8d4",
-      "system_id": "snes",
-      "size": 1572864,
-      "labels": [
-        "Violinist of Hameln, The (Japan) [T-En by J2e Translations v1.00] [n]"
       ],
       "origin": [
         "catalog"
@@ -7551,22 +6792,11 @@
       ]
     },
     {
-      "sha256": "a0c9ea9c9b48d2e41af512fd2454c846b043760cde284650d6a7311ee7a9fee4",
-      "system_id": "snes",
-      "size": 6291456,
-      "labels": [
-        "Star Ocean (Japan) [T-En by DeJap v1.0]"
-      ],
-      "origin": [
-        "catalog"
-      ]
-    },
-    {
       "sha256": "a13fa8164a0ab2d549d9a9bb3f998907c3f64b42eab9f4fae3d666abab510fdd",
       "system_id": "sms",
       "size": 131072,
       "labels": [
-        "Wonder Boy (USA, Europe, Brazil) (Rev 1)"
+        "Wonder Boy (USA, Europe, Brazil) (En) (Rev 1)"
       ],
       "origin": [
         "catalog"
@@ -7610,7 +6840,7 @@
       "system_id": "snes",
       "size": 1048576,
       "labels": [
-        "RoboCop versus The Terminator (USA)"
+        "RoboCop Versus The Terminator (USA)"
       ],
       "origin": [
         "catalog"
@@ -7716,17 +6946,6 @@
       ]
     },
     {
-      "sha256": "a3f5be801504fe3e8aaa0f11fc48136215645de389996bbce5ffc6c68970f970",
-      "system_id": "gb",
-      "size": 131072,
-      "labels": [
-        "Cave Noire (Japan) [T-En by Aeon Genesis v1.00]"
-      ],
-      "origin": [
-        "catalog"
-      ]
-    },
-    {
       "sha256": "a41d3ab34e91fccdf6b4e3a203dbf606d1097b702039fdf2f252cb18c4c9f925",
       "system_id": "gb",
       "size": 65536,
@@ -7743,17 +6962,6 @@
       "size": 1048576,
       "labels": [
         "Skyblazer (USA)"
-      ],
-      "origin": [
-        "catalog"
-      ]
-    },
-    {
-      "sha256": "a54050909c28b8497444183ccbc1b702b5286a3ce405f992df4157ce2d629144",
-      "system_id": "nes",
-      "size": 262160,
-      "labels": [
-        "Star Wars (Japan) (Namco) [T-En by Gil Galad v1.10]"
       ],
       "origin": [
         "catalog"
@@ -7782,44 +6990,11 @@
       ]
     },
     {
-      "sha256": "a62aed1c660c0a194eb06b047a20765f12f8ba6330984942ba36ea0e89fe18a6",
-      "system_id": "nes",
-      "size": 262160,
-      "labels": [
-        "Raging Fire - Recca (Japan) [T-En by Aeon Genesis v1.00] [n]"
-      ],
-      "origin": [
-        "catalog"
-      ]
-    },
-    {
-      "sha256": "a68008d87a26e93da9761831e7cbb74a064311ac64d7243abd7480ca0123ef4b",
-      "system_id": "nes",
-      "size": 393232,
-      "labels": [
-        "Wai Wai World 2 - SOS!! Paseri Jou (Japan) [T-En by Vice Translations v1.01] [Ad"
-      ],
-      "origin": [
-        "catalog"
-      ]
-    },
-    {
-      "sha256": "a6a567d6060b831632a605e6cb97d0c465dc356b344219c1702cb655455e08cb",
-      "system_id": "snes",
-      "size": 2097152,
-      "labels": [
-        "Shin Megami Tensei (Japan) [T-En by Aeon Genesis v1.00] [Add by Orden v1.0]"
-      ],
-      "origin": [
-        "catalog"
-      ]
-    },
-    {
       "sha256": "a70d7224609fb97f752515a177dcc8a4f9e5d9530b3011373b093eb613b64e4e",
       "system_id": "genesis",
       "size": 2097152,
       "labels": [
-        "Battletech - A Game of Armored Combat (USA)"
+        "BattleTech - A Game of Armored Combat (USA)"
       ],
       "origin": [
         "catalog"
@@ -7914,17 +7089,6 @@
       ]
     },
     {
-      "sha256": "aa64e015aafc9bfa24a4e8e96862b45a65a03c5a73892e77ce0d7bf5ad46bef1",
-      "system_id": "genesis",
-      "size": 2621440,
-      "labels": [
-        "Panorama Cotton (Japan) [T-En by Malias v1.0.1]"
-      ],
-      "origin": [
-        "catalog"
-      ]
-    },
-    {
       "sha256": "aa768b8b00123717c8d49f2c6731cdbfd80ab6a54128bae7594e93f45e38a19e",
       "system_id": "snes",
       "size": 1310720,
@@ -7995,7 +7159,7 @@
       "system_id": "genesis",
       "size": 1048576,
       "labels": [
-        "Pepenga Pengo (Japan)"
+        "Pepenga Pengo (Japan) (En)"
       ],
       "origin": [
         "catalog"
@@ -8112,17 +7276,6 @@
       ]
     },
     {
-      "sha256": "b07295db9ad344dddec80909d964e049d082364682b69a15dca28b78084f99a7",
-      "system_id": "genesis",
-      "size": 2097152,
-      "labels": [
-        "Langrisser II (Japan) (Rev B) [T-En by M.I.J.E.T. v110701]"
-      ],
-      "origin": [
-        "catalog"
-      ]
-    },
-    {
       "sha256": "b0a1019b6199c923a6a764c15e7bf6d1bb0bef8a042c383f3e3ead74ab171ede",
       "system_id": "gb",
       "size": 262144,
@@ -8171,7 +7324,7 @@
       "system_id": "nes",
       "size": 262160,
       "labels": [
-        "Felix the Cat (USA)"
+        "Felix the Cat (USA) (Hudson)"
       ],
       "origin": [
         "catalog"
@@ -8237,7 +7390,7 @@
       "system_id": "sms",
       "size": 524288,
       "labels": [
-        "Sonic Spinball (Europe, Brazil)"
+        "Sonic Spinball (Europe, Brazil) (En)"
       ],
       "origin": [
         "catalog"
@@ -8255,22 +7408,11 @@
       ]
     },
     {
-      "sha256": "b3870a15ecf202ac79e956c1a6c8358ed6f288b89d716ac6221f0eeb2cfbd4e9",
-      "system_id": "nes",
-      "size": 262160,
-      "labels": [
-        "Sweet Home (Japan) [T-En by TheSiege v2.0] [n]"
-      ],
-      "origin": [
-        "catalog"
-      ]
-    },
-    {
       "sha256": "b3ca745829e018513eae8d760484140a031c0f031e1881fca3374a9194e3ecac",
       "system_id": "gbc",
       "size": 1048576,
       "labels": [
-        "Deja Vu I & II - The Casebooks of Ace Harding"
+        "Deja Vu I & II - The Casebooks of Ace Harding (USA)"
       ],
       "origin": [
         "showcase"
@@ -8281,7 +7423,7 @@
       "system_id": "sms",
       "size": 131072,
       "labels": [
-        "Aztec Adventure ~ Nazca '88 - The Golden Road to Paradise (World)"
+        "Aztec Adventure (World)"
       ],
       "origin": [
         "catalog"
@@ -8293,17 +7435,6 @@
       "size": 262160,
       "labels": [
         "Tecmo Bowl (USA) (Rev 1)"
-      ],
-      "origin": [
-        "catalog"
-      ]
-    },
-    {
-      "sha256": "b40d3d5833a7a305fbb1548d2b5390698a441501ae83be967d05df1d367454bc",
-      "system_id": "nes",
-      "size": 262160,
-      "labels": [
-        "Technos Samurai - Downtown Special! (Japan) [T-En by Technos Samurai Translation"
       ],
       "origin": [
         "catalog"
@@ -8369,7 +7500,7 @@
       "system_id": "genesis",
       "size": 1048576,
       "labels": [
-        "The Immortal"
+        "Immortal, The (USA, Europe)"
       ],
       "origin": [
         "showcase"
@@ -8446,7 +7577,7 @@
       "system_id": "sms",
       "size": 524288,
       "labels": [
-        "Sonic The Hedgehog 2 (Europe, Brazil) (Rev 1)"
+        "Sonic The Hedgehog 2 (Europe, Brazil) (En) (Rev 1)"
       ],
       "origin": [
         "catalog"
@@ -8508,33 +7639,11 @@
       ]
     },
     {
-      "sha256": "b9733a9b7bf79bf1c4e02d65b41d2ad2d7f9d02b6834bd003592dd33a95c7dcb",
-      "system_id": "snes",
-      "size": 4194304,
-      "labels": [
-        "Go for it! Goemon - The Twinkling Journey - The Reason I became a Dancer (Japan)"
-      ],
-      "origin": [
-        "catalog"
-      ]
-    },
-    {
       "sha256": "b9909506f566ea7998d6170e9610bad62dbda7d38e42830cd187592e262acfed",
       "system_id": "gb",
       "size": 131072,
       "labels": [
         "Battle Unit Zeoth (USA, Europe)"
-      ],
-      "origin": [
-        "catalog"
-      ]
-    },
-    {
-      "sha256": "b9dd2455a46469ddc935106fbcde1ddbc127b9000b097fa98b5984718102c62e",
-      "system_id": "snes",
-      "size": 6291456,
-      "labels": [
-        "Tales of Phantasia (Japan) [T-En by DeJap v1.2]"
       ],
       "origin": [
         "catalog"
@@ -8629,33 +7738,11 @@
       ]
     },
     {
-      "sha256": "bcb65518c832d11b4df104ff888887f2b4fab3bf7af576483f13726600a6ce7c",
-      "system_id": "sms",
-      "size": 540672,
-      "labels": [
-        "Phantasy Star (World) (Sega Ages)"
-      ],
-      "origin": [
-        "catalog"
-      ]
-    },
-    {
       "sha256": "bcced1be76ef920b562a555696bcb4583d1c8cea4d4b057cab6e0e09be8ef8c4",
       "system_id": "snes",
       "size": 1048576,
       "labels": [
         "Super Double Dragon (USA)"
-      ],
-      "origin": [
-        "catalog"
-      ]
-    },
-    {
-      "sha256": "bcef31bd31117c05975d5665719b8371d9b185f2aac539e457cdc51aa617c3bc",
-      "system_id": "gb",
-      "size": 524288,
-      "labels": [
-        "For the Frog the Bell Tolls (Japan) [T-En by Ryanbgstl v1.0] [n]"
       ],
       "origin": [
         "catalog"
@@ -8733,17 +7820,6 @@
       "size": 1048576,
       "labels": [
         "Wario's Woods (USA)"
-      ],
-      "origin": [
-        "catalog"
-      ]
-    },
-    {
-      "sha256": "be87dbb880328a6766197486d0da6b12af303915346dc579b988fabc83c554b1",
-      "system_id": "gbc",
-      "size": 4194304,
-      "labels": [
-        "Grandia - Parallel Trippers (Japan) [T-En by Adventurous Translations v1.03]"
       ],
       "origin": [
         "catalog"
@@ -8842,7 +7918,7 @@
       "system_id": "gbc",
       "size": 1048576,
       "labels": [
-        "Super Mario Bros. Deluxe (USA, Europe) (Rev 2)"
+        "Super Mario Bros. Deluxe (Europe) (Rev 2)"
       ],
       "origin": [
         "catalog"
@@ -8853,7 +7929,7 @@
       "system_id": "genesis",
       "size": 524288,
       "labels": [
-        "DEcapAttack (USA, Europe, Korea)"
+        "DEcapAttack (USA, Europe, Korea) (En)"
       ],
       "origin": [
         "catalog"
@@ -8893,33 +7969,11 @@
       ]
     },
     {
-      "sha256": "c2cb34b5ac3f386689c95a465004b480b74614df4d33d510c2f6c5629573a978",
-      "system_id": "snes",
-      "size": 2097152,
-      "labels": [
-        "Dragon Quest I & II (Japan) [T-En by RPGOne v2.0 DQ] [Add by Mziab v1.0]"
-      ],
-      "origin": [
-        "catalog"
-      ]
-    },
-    {
       "sha256": "c36cba4fd0cb894bc3202f995d00bb62993d6ec92ca0e038512f542bd2c90157",
       "system_id": "nes",
       "size": 24592,
       "labels": [
         "Bomberman (USA)"
-      ],
-      "origin": [
-        "catalog"
-      ]
-    },
-    {
-      "sha256": "c3e5e56c1252de5a1ff3bb68b47366120f2c85d333a9ca0eb6df3dab1b03e583",
-      "system_id": "genesis",
-      "size": 2097152,
-      "labels": [
-        "Mega Man - The Wily Wars (USA) (Genesis Mini)"
       ],
       "origin": [
         "catalog"
@@ -9007,7 +8061,7 @@
       "system_id": "genesis",
       "size": 1048576,
       "labels": [
-        "Road Rash II (USA, Europe) (RR206)"
+        "Road Rash II (USA, Europe) (Rev 1)"
       ],
       "origin": [
         "catalog"
@@ -9161,18 +8215,7 @@
       "system_id": "genesis",
       "size": 786432,
       "labels": [
-        "Phantasy Star III - Generations of Doom (USA, Europe, Korea)"
-      ],
-      "origin": [
-        "catalog"
-      ]
-    },
-    {
-      "sha256": "cbbcb8b445bbd344fcddc761eb115ca8b94d31f58cd63872654ee120063fb50a",
-      "system_id": "genesis",
-      "size": 1048576,
-      "labels": [
-        "Twinkle Tale (Japan) [T-En by M.I.J.E.T. v070328]"
+        "Phantasy Star III - Generations of Doom (USA, Europe, Korea) (En)"
       ],
       "origin": [
         "catalog"
@@ -9190,22 +8233,11 @@
       ]
     },
     {
-      "sha256": "cbe72fc61219532247734acebf042d4d640117a0519c8f764d2441ae3837a549",
-      "system_id": "nes",
-      "size": 262160,
-      "labels": [
-        "Mitsume ga Tooru (Japan) [T-En by The Spoony Bard v1.01]"
-      ],
-      "origin": [
-        "catalog"
-      ]
-    },
-    {
       "sha256": "cbe8baeab2efe531a674f53bfddd0c7944cfe2dcda6446ef300f98254f8e80bc",
       "system_id": "genesis",
       "size": 524288,
       "labels": [
-        "Altered Beast (USA, Europe)"
+        "Altered Beast (USA, Europe) (Rev 2)"
       ],
       "origin": [
         "catalog"
@@ -9228,17 +8260,6 @@
       "size": 1572864,
       "labels": [
         "Pocky & Rocky 2 (USA)"
-      ],
-      "origin": [
-        "catalog"
-      ]
-    },
-    {
-      "sha256": "cc72375c2ced934bd55b5a001f4a014d7e92deec6a23aea7f18b92c83e118ea5",
-      "system_id": "snes",
-      "size": 4194304,
-      "labels": [
-        "Fire Emblem - Seisen no Keifu (Japan) [T-En by Dark Twilkitri Net v0.87g] [Add b"
       ],
       "origin": [
         "catalog"
@@ -9289,22 +8310,11 @@
       ]
     },
     {
-      "sha256": "cde7491f8f065168c476e77604fa55544f3bb12a4c93e0839436fbf3219d3013",
-      "system_id": "nes",
-      "size": 786448,
-      "labels": [
-        "Just Breed (Japan) [T-En by Stealth Translations v1.00]"
-      ],
-      "origin": [
-        "catalog"
-      ]
-    },
-    {
       "sha256": "cdf3cf49fdc1d2af7c4afee566ee0178cac8c6225782419290878e4f359f8579",
       "system_id": "genesis",
       "size": 524288,
       "labels": [
-        "Wonder Boy III - Monster Lair (Japan, Europe)"
+        "Wonder Boy III - Monster Lair (Japan, Europe) (En)"
       ],
       "origin": [
         "catalog"
@@ -9322,33 +8332,11 @@
       ]
     },
     {
-      "sha256": "ce89d047d0bd8c937710f1ccb4ecc70848daaffb39fa03ee31e94fb08a7996dd",
-      "system_id": "nes",
-      "size": 393232,
-      "labels": [
-        "Captain Tsubasa Vol. II - Super Striker (Japan) [T-En by Hayabusakun v1.0]"
-      ],
-      "origin": [
-        "catalog"
-      ]
-    },
-    {
       "sha256": "cef0fe040f4149f2aeddc5706b5d032e5769a55e27cf3fa696e808ff3496598e",
       "system_id": "nes",
       "size": 131088,
       "labels": [
         "Jackal (USA)"
-      ],
-      "origin": [
-        "catalog"
-      ]
-    },
-    {
-      "sha256": "cf16c7b52f07c9318af4e19b92a22b0f0491d7eb4dc1b96460933e73579d1f78",
-      "system_id": "gb",
-      "size": 524288,
-      "labels": [
-        "Picross 2 (Japan) (SGB Enhanced) [T-En by Zed v1.0]"
       ],
       "origin": [
         "catalog"
@@ -9762,17 +8750,6 @@
       ]
     },
     {
-      "sha256": "da3981562721db98dbb306ccb9d22b49ce5f3be75f6a9be629298ef23f29df37",
-      "system_id": "nes",
-      "size": 262160,
-      "labels": [
-        "Kid Dracula (World) (Castlevania Anniversary Collection)"
-      ],
-      "origin": [
-        "catalog"
-      ]
-    },
-    {
       "sha256": "da72b44e4023672bd79b063be100e569d629a542d809fe898a4da27682d0473f",
       "system_id": "gbc",
       "size": 1048576,
@@ -9795,22 +8772,11 @@
       ]
     },
     {
-      "sha256": "dab5ac0c7940c3fa95ff315e80b39b3392c58c74a5d524992026bdcfee85fcbc",
-      "system_id": "snes",
-      "size": 4194304,
-      "labels": [
-        "Go for it! Goemon 2 - The Strange General McGuinness (Japan) [T-En by DDSTransla"
-      ],
-      "origin": [
-        "catalog"
-      ]
-    },
-    {
       "sha256": "dac4f1dcb41193cb42a96950444a87c5f2952ea66474c59a38c07b10ac411e47",
       "system_id": "sms",
       "size": 262144,
       "labels": [
-        "Shinobi (USA, Europe, Brazil) (Rev 1)"
+        "Shinobi (USA, Europe, Brazil) (En) (Rev 1)"
       ],
       "origin": [
         "catalog"
@@ -9954,17 +8920,6 @@
       "size": 49168,
       "labels": [
         "Tetris (USA)"
-      ],
-      "origin": [
-        "catalog"
-      ]
-    },
-    {
-      "sha256": "ddc386d1017bc9455d963059c025e2c4d9521d83d3681f300f238c0f1423feb9",
-      "system_id": "nes",
-      "size": 393232,
-      "labels": [
-        "Perman 2 - Down with the Secret Madou Society! (Japan) [T-En by KingMike's Trans"
       ],
       "origin": [
         "catalog"
@@ -10136,17 +9091,6 @@
       ]
     },
     {
-      "sha256": "e134f20f6ee7d422d06faea6b1ae1e4101d1d0a200a0571d715d1cf23d959e8c",
-      "system_id": "snes",
-      "size": 1048576,
-      "labels": [
-        "Star Fox 2 (USA, Europe)"
-      ],
-      "origin": [
-        "catalog"
-      ]
-    },
-    {
       "sha256": "e146eda1cee7a29ae9628727c4739fc28bc9ba1b6b3c9771d882c36fcfe454b5",
       "system_id": "genesis",
       "size": 2097152,
@@ -10217,7 +9161,7 @@
       "system_id": "nes",
       "size": 262160,
       "labels": [
-        "Mike Tyson's Punch-Out!! (Japan, USA) (Rev 1)"
+        "Mike Tyson's Punch-Out!! (Japan, USA) (En) (Rev 1)"
       ],
       "origin": [
         "catalog"
@@ -10295,17 +9239,6 @@
       "size": 1048576,
       "labels": [
         "Mega Man Xtreme 2 (USA, Europe)"
-      ],
-      "origin": [
-        "catalog"
-      ]
-    },
-    {
-      "sha256": "e38772bef85f2cc75092854d12c70b03dcec530dd40203ee913735e8ee5da595",
-      "system_id": "nes",
-      "size": 524304,
-      "labels": [
-        "Ganbare Goemon Gaiden 2 - Treasures of the World (Japan) [T-En by Adventurous Tr"
       ],
       "origin": [
         "catalog"
@@ -10444,28 +9377,6 @@
       ]
     },
     {
-      "sha256": "e518328b0cd25ef4a74d268d747a31a3316d78d698aca7c6622a43982f5b09a6",
-      "system_id": "nes",
-      "size": 262160,
-      "labels": [
-        "Famicom Wars (Japan) [T-En by Aka Translations v1.11]"
-      ],
-      "origin": [
-        "catalog"
-      ]
-    },
-    {
-      "sha256": "e51d36c8f4f62729f3e7184d09c2cafb3b49fb7c751d451ca3492d657f6a4860",
-      "system_id": "gb",
-      "size": 524288,
-      "labels": [
-        "Magic Knight Rayearth (Japan) (SGB Enhanced) [T-En by LIPEMCO! Translations v1.0"
-      ],
-      "origin": [
-        "catalog"
-      ]
-    },
-    {
       "sha256": "e59f95a80497779b861daa26e1b890929fd2f9939e78003898d9bff3ea3f6db2",
       "system_id": "nes",
       "size": 262160,
@@ -10482,17 +9393,6 @@
       "size": 131072,
       "labels": [
         "Final Fantasy Legend, The (USA)"
-      ],
-      "origin": [
-        "catalog"
-      ]
-    },
-    {
-      "sha256": "e672bd85dcdabe2e0ce24f719e810d90c2b22b7d79fd507f1e40f82a24458757",
-      "system_id": "nes",
-      "size": 524304,
-      "labels": [
-        "EarthBound Beginnings (USA, Europe) (Virtual Console)"
       ],
       "origin": [
         "catalog"
@@ -10537,17 +9437,6 @@
       "size": 1048576,
       "labels": [
         "Shadowrun (USA)"
-      ],
-      "origin": [
-        "catalog"
-      ]
-    },
-    {
-      "sha256": "e75d2e5327e3a066c8d830342d0d64d1c9ee4402ac8c177cc2e878d8b51f2a5c",
-      "system_id": "genesis",
-      "size": 1048576,
-      "labels": [
-        "Dahna - Goddess' Birth (Japan) [T-En by Cccmar v1.0] [n]"
       ],
       "origin": [
         "catalog"
@@ -10653,22 +9542,11 @@
       ]
     },
     {
-      "sha256": "ea1c94bbef3f8aedf125332d4169f026d02477ed5a380a5a4046c0adcf5ec84a",
-      "system_id": "nes",
-      "size": 524304,
-      "labels": [
-        "Ganbare Goemon Gaiden - The Missing Golden Pipe (Japan) [T-En by Adventurous Tra"
-      ],
-      "origin": [
-        "catalog"
-      ]
-    },
-    {
       "sha256": "ea2ac534bf14ac6e75100ec29429db29e77b3f3ca80134def14a35c0eb0d387c",
       "system_id": "genesis",
       "size": 524288,
       "labels": [
-        "Tatsujin ~ Truxton (World)"
+        "Truxton (World)"
       ],
       "origin": [
         "catalog"
@@ -10723,7 +9601,7 @@
       "system_id": "sms",
       "size": 524288,
       "labels": [
-        "Sonic Chaos (Europe, Brazil)"
+        "Sonic Chaos (Europe, Brazil) (En)"
       ],
       "origin": [
         "catalog"
@@ -10811,7 +9689,7 @@
       "system_id": "sms",
       "size": 524288,
       "labels": [
-        "Land of Illusion Starring Mickey Mouse (Europe, Brazil)"
+        "Land of Illusion Starring Mickey Mouse (Europe, Brazil) (En)"
       ],
       "origin": [
         "catalog"
@@ -10833,7 +9711,7 @@
       "system_id": "sms",
       "size": 262144,
       "labels": [
-        "Cyber Shinobi, The (Europe, Brazil)"
+        "Cyber Shinobi, The (Europe, Brazil) (En)"
       ],
       "origin": [
         "catalog"
@@ -10844,7 +9722,7 @@
       "system_id": "sms",
       "size": 262144,
       "labels": [
-        "Alex Kidd in Shinobi World (USA, Europe, Brazil)"
+        "Alex Kidd in Shinobi World (USA, Europe, Brazil) (En)"
       ],
       "origin": [
         "catalog"
@@ -10950,17 +9828,6 @@
       ]
     },
     {
-      "sha256": "f10e2e161b102d7499a9f6ec531b509f08b9f367250145d4ccb17c50c1f8f602",
-      "system_id": "nes",
-      "size": 393232,
-      "labels": [
-        "Kid Niki 3 (Japan) [T-En by Suicidal Translations v1.00] [Add by MottZilla v1.0]"
-      ],
-      "origin": [
-        "catalog"
-      ]
-    },
-    {
       "sha256": "f177810ce614be21c1a9214c0ca4d8f8d357b04a497c02fae185e4b2f97b6b87",
       "system_id": "genesis",
       "size": 1048576,
@@ -10983,33 +9850,11 @@
       ]
     },
     {
-      "sha256": "f224f08f8b545d4fc9e3890055699fccd132bb28cc51f630067479956f0570b7",
-      "system_id": "nes",
-      "size": 262160,
-      "labels": [
-        "Bio Miracle Baby Upa!! (Japan) [T-En by Vice Translations v1.00] [n]"
-      ],
-      "origin": [
-        "catalog"
-      ]
-    },
-    {
       "sha256": "f292598ac462fdfcd32ad9b6b35ac01d4bab020391dff92bfe94780ec604289a",
       "system_id": "snes",
       "size": 1048576,
       "labels": [
         "Musya - The Classic Japanese Tale of Horror (USA)"
-      ],
-      "origin": [
-        "catalog"
-      ]
-    },
-    {
-      "sha256": "f2be3ea2798f981a22276944693eb16f11404fa1cef8198d3e2d43d1e31c4aca",
-      "system_id": "genesis",
-      "size": 2097152,
-      "labels": [
-        "Pulseman (Japan) [T-En by M.I.J.E.T. v070226]"
       ],
       "origin": [
         "catalog"
@@ -11053,7 +9898,7 @@
       "system_id": "sms",
       "size": 262144,
       "labels": [
-        "Fantasy Zone II (USA, Europe, Brazil)"
+        "Fantasy Zone II (USA, Europe, Brazil) (En)"
       ],
       "origin": [
         "catalog"
@@ -11192,28 +10037,6 @@
       ]
     },
     {
-      "sha256": "f755ce4d9f3a0639b508c96bcd307696ccb01c7cc4024befd3d1b90b5e977887",
-      "system_id": "nes",
-      "size": 524304,
-      "labels": [
-        "Joy Mech Fight (Japan) [T-En by AlanMidas joy.mech] [n]"
-      ],
-      "origin": [
-        "catalog"
-      ]
-    },
-    {
-      "sha256": "f7780b7663731e13be2d395bec26e0d4fe3c765d9a839b81c27e301a6ae47d9d",
-      "system_id": "nes",
-      "size": 262160,
-      "labels": [
-        "Kaiketsu Yancha Maru 2 - Karakuri Land (Japan) [T-En by Derrick Sobodash v1.2]"
-      ],
-      "origin": [
-        "catalog"
-      ]
-    },
-    {
       "sha256": "f7df5cd16ce6624567d1a24e9b9c0b9050ea9b6a9fe5a7973484589637756596",
       "system_id": "snes",
       "size": 2097152,
@@ -11230,17 +10053,6 @@
       "size": 786432,
       "labels": [
         "Road Rash (USA, Europe)"
-      ],
-      "origin": [
-        "catalog"
-      ]
-    },
-    {
-      "sha256": "f84bb359e21da7f9c5256c74267cc7bcc2f11f6d891d6a4c0c32411698ced6a8",
-      "system_id": "gb",
-      "size": 262144,
-      "labels": [
-        "X (Japan) [T-En by Anthropogon v0.9]"
       ],
       "origin": [
         "catalog"
@@ -11284,18 +10096,7 @@
       "system_id": "genesis",
       "size": 2097152,
       "labels": [
-        "Contra - Hard Corps (USA, Korea)"
-      ],
-      "origin": [
-        "catalog"
-      ]
-    },
-    {
-      "sha256": "f9e2a43c226b98497856029c36dd78641d24eb34613079792f78f0aa54138406",
-      "system_id": "genesis",
-      "size": 1048576,
-      "labels": [
-        "Battle Mania Daiginjou (Japan, Korea) [T-En by M.I.J.E.T. v061029]"
+        "Contra - Hard Corps (USA, Korea) (En)"
       ],
       "origin": [
         "catalog"
@@ -11394,7 +10195,7 @@
       "system_id": "genesis",
       "size": 4194304,
       "labels": [
-        "Sonic & Knuckles + Sonic The Hedgehog 3 (USA)"
+        "Sonic & Knuckles + Sonic The Hedgehog 3 (USA) (Lock-On)"
       ],
       "origin": [
         "catalog"
@@ -11427,7 +10228,7 @@
       "system_id": "gbc",
       "size": 4194304,
       "labels": [
-        "Dragon Warrior Monsters 2 - Tara's Adventure (USA) (SGB Enhanced) (GB Compatible"
+        "Dragon Warrior Monsters 2 - Tara's Adventure (USA) (SGB Enhanced) (GB Compatible)"
       ],
       "origin": [
         "catalog"
@@ -11450,17 +10251,6 @@
       "size": 1048576,
       "labels": [
         "Blade (USA, Europe)"
-      ],
-      "origin": [
-        "catalog"
-      ]
-    },
-    {
-      "sha256": "fd4a49338bf20557275290002c2a3e6aead3345c13fb69d715edaaaed7307fb6",
-      "system_id": "nes",
-      "size": 262160,
-      "labels": [
-        "Holy Diver (Japan) [T-En by Monaco v1.0] [Add by MottZilla R1]"
       ],
       "origin": [
         "catalog"
@@ -11504,7 +10294,7 @@
       "system_id": "sms",
       "size": 131072,
       "labels": [
-        "Action Fighter (USA, Europe, Brazil) (Rev 1)"
+        "Action Fighter (USA, Europe, Brazil) (En) (Rev 1)"
       ],
       "origin": [
         "catalog"
@@ -11570,7 +10360,7 @@
       "system_id": "nes",
       "size": 262160,
       "labels": [
-        "Micro Machines (USA) (Unl)"
+        "Micro Machines (USA) (v1.1) (Unl)"
       ],
       "origin": [
         "catalog"

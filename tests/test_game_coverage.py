@@ -7,7 +7,7 @@ import sys
 import tempfile
 import unittest
 
-from romancer import coverage
+from romancer import coverage,game_coverage
 
 
 class GameCoverageTests(unittest.TestCase):
@@ -16,11 +16,13 @@ class GameCoverageTests(unittest.TestCase):
 
     def test_frozen_target_set_preserves_every_catalog_and_showcase_identity(self):
         rows=coverage.validate_manifest(self.manifest)
-        self.assertEqual(len(rows),1052)
-        self.assertEqual(sum('catalog' in r['origin'] for r in rows),1048)
-        self.assertEqual(sum('showcase' in r['origin'] for r in rows),6)
+        self.assertEqual(len(rows),game_coverage.TARGET_COUNT)
+        self.assertEqual(sum('catalog' in r['origin'] for r in rows),game_coverage.CATALOG_COUNT)
+        self.assertEqual(sum('showcase' in r['origin'] for r in rows),game_coverage.SHOWCASE_COUNT)
+        self.assertEqual(game_coverage.TARGET_COUNT-game_coverage.CATALOG_COUNT,game_coverage.ADDITIONAL_SHOWCASE_COUNT)
+        self.assertEqual(game_coverage.TARGET_SET_ID,f'romancer-v1.1-catalog-{len(rows)}')
         report=coverage.status(limit=1)
-        self.assertEqual(report['target_count'],1052)
+        self.assertEqual(report['target_count'],len(rows))
         self.assertEqual(report['accepted_count'],0)
         self.assertFalse(report['release_ready'])
         self.assertFalse(report['write_authorized'])
@@ -100,7 +102,7 @@ class GameCoverageTests(unittest.TestCase):
             api=WorkbenchAPI(Path(temp)/'work')
             try:
                 r=api.dispatch('coverage.status',{'query':'','system_filter':'all','page':0,'limit':2})
-                self.assertTrue(r['ok'],r);self.assertEqual(r['target_count'],1052)
+                self.assertTrue(r['ok'],r);self.assertEqual(r['target_count'],game_coverage.TARGET_COUNT)
                 self.assertFalse(r['release_ready']);self.assertFalse(r['write_authorized'])
                 self.assertIn('coverage.status',READ_OPERATIONS)
                 self.assertIn('system_filter',_investigation_properties('coverage.status'))
@@ -126,4 +128,4 @@ class GameCoverageTests(unittest.TestCase):
             self.assertEqual(packet['total'],1,packet)
             self.assertEqual(packet['revisions'][0]['sha256'],source)
             self.assertFalse(packet['revisions'][0]['full_editing_verified'])
-        self.assertEqual(len(coverage.status(page=1051,limit=1)['revisions']),1)
+        self.assertEqual(len(coverage.status(page=game_coverage.TARGET_COUNT-1,limit=1)['revisions']),1)

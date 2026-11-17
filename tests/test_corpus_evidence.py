@@ -2,6 +2,7 @@ from pathlib import Path
 import tempfile
 import unittest
 from unittest.mock import patch
+from romancer.game_coverage import TARGET_COUNT
 from romancer.workbench_api import WorkbenchAPI
 
 
@@ -25,7 +26,7 @@ class CorpusEvidenceTests(unittest.TestCase):
                 self.assertTrue(any(r['shared_file_bytes']>=128 for r in result['record']['related']))
                 self.assertFalse(result['write_authorized'])
                 self.assertFalse(result['full_editing_verified'])
-                self.assertEqual(result['source_count'],1052)
+                self.assertEqual(result['source_count'],TARGET_COUNT)
                 self.assertEqual(list(api.projects.iterdir()),[])
             finally:api.close()
 
@@ -71,7 +72,7 @@ class CorpusEvidenceTests(unittest.TestCase):
         packet=evidence.lookup(SOURCE,131088)
         self.assertTrue(all(r['scope']=='prg_chr' for r in packet['record']['references']))
         self.assertFalse(packet['full_editing_verified'])
-        self.assertEqual(packet['source_count'],1052)
+        self.assertEqual(packet['source_count'],TARGET_COUNT)
 
     def test_deep_scan_cache_changes_when_corpus_database_changes(self):
         from romancer import corpus_evidence as evidence,rom_scan

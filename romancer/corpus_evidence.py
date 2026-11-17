@@ -6,11 +6,12 @@ import json
 from pathlib import Path
 import re
 from .asset_schema import fields, label, number
+from .game_coverage import TARGET_COUNT
 from .script_schema import _unique_object, _nonfinite
 
 DATABASE_PATH=Path(__file__).resolve().parents[1]/'knowledge/corpus_evidence.json'
-DATABASE_PIN='f1f65c7f13c372f7bb6bbc5cec92c51bf567bb4cfef6669235454a4451c451d9'
-IDENTITY_PIN='0bbda17287ad0d324fc405014d2f0837ffd73c2544b1f73c84ef158c861dd370'
+DATABASE_PIN='eca158a2ac1a8fde6eda8406a6a87d765d7b3f480014d881875cf7fc900ae9a5'
+IDENTITY_PIN='a1eabe006fc66143562e204c97210bc5ddcc9db6e7b71579148210f9f0414deb'
 MAX_DATABASE=8*1024**2
 
 
@@ -21,10 +22,10 @@ def _hash(value,length=64):
 
 def validate_database(data):
     fields(data,'schema_version source_count source_identity_sha256 provenance records')
-    if type(data['schema_version']) is not int or data['schema_version']!=1 or type(data['source_count']) is not int or data['source_count']!=1052:
+    if type(data['schema_version']) is not int or data['schema_version']!=1 or type(data['source_count']) is not int or data['source_count']!=TARGET_COUNT:
         raise ValueError('Unsupported corpus evidence inventory.')
     rows=data['records']
-    if type(rows) is not list or len(rows)!=1052:raise ValueError('Incomplete corpus evidence inventory.')
+    if type(rows) is not list or len(rows)!=TARGET_COUNT:raise ValueError('Incomplete corpus evidence inventory.')
     by={}
     for r in rows:
         fields(r,'sha256 size system_id label related samples references driver_candidates')
@@ -39,7 +40,7 @@ def validate_database(data):
     if identities!=sorted([[r['sha256'],r['system_id'],r['size']] for r in load_manifest()]):
         raise ValueError('Corpus evidence differs from the coverage inventory.')
     for r in rows:
-        for name,maximum in (('related',1051),('samples',2048),('references',32),('driver_candidates',20)):
+        for name,maximum in (('related',TARGET_COUNT-1),('samples',2048),('references',32),('driver_candidates',20)):
             if type(r[name]) is not list or len(r[name])>maximum:raise ValueError('Corpus evidence exceeds bounds.')
         seen=set()
         for e in r['related']:

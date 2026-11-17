@@ -2,7 +2,7 @@
 
 ## Goal
 
-Palette and background editing for all 1,052 supported revisions, with no
+Palette and background editing for all 942 supported revisions, with no
 per-game maps. Before anything is saved, the person editing sees every place
 the change shows up.
 
