@@ -35,9 +35,10 @@ SYSTEM_CORES = {
     'genesis': ('blastem_libretro',),
     'sms': ('blastem_libretro',),
 }
-# Reviewed tracing builds for packaged releases: {sha256: {'name', 'source_url', 'source_commit', 'license'}}.
-# Empty while v1.1 is a preview; a source checkout loads any tracing build it is pointed at.
-TRACE_CORE_PINS: dict[str, dict] = {}
+# Reviewed tracing builds for packaged releases: {sha256: {'name', 'source_url', 'source_commit', 'license', ...}}
+# for Windows and Linux together, and each platform's complete trace-cores folder inventory. Both are
+# written by tools/pin_trace_cores.py. A source checkout loads any tracing build it is pointed at.
+from .trace_core_pins import TRACE_CORE_FILES, TRACE_CORE_PINS  # noqa: E402
 
 
 class TraceCoreMissing(ValueError):
@@ -94,10 +95,13 @@ def trace_core_for(system_id: str, source_sha256: str | None = None) -> Path:
         if not root.is_dir():
             continue
         for base in names:
-            found = [c for c in _candidates(root, base + _suffix()) if _is_tracing_build(c)]
-            if found:   # nearest to the folder first; among equals, the newest build
-                depth = lambda c: len(c.relative_to(root).parts)
-                return min(found, key=lambda c: (depth(c), -c.stat().st_mtime)).resolve()
+            # Released packs name the library *_trace_libretro so it cannot be mistaken for the
+            # playtest engine; a developer's own build may keep the makefile's name.
+            for file in (base.replace('_libretro', '_trace_libretro') + _suffix(), base + _suffix()):
+                found = [c for c in _candidates(root, file) if _is_tracing_build(c)]
+                if found:   # nearest to the folder first; among equals, the newest build
+                    depth = lambda c: len(c.relative_to(root).parts)
+                    return min(found, key=lambda c: (depth(c), -c.stat().st_mtime)).resolve()
     label = SYSTEM_LABELS[system_id]
     raise TraceCoreMissing(f'The tracing engine is not installed for {label}. Scene editing for {label} games '
                            'becomes available when its tracing engine is added to the trace-cores folder.')
@@ -130,6 +134,41 @@ def require_reviewed_trace_core(path) -> dict | None:
         return pin
     raise ValueError('This release runs only reviewed tracing engines. Reinstall the tracing engine pack; '
                      'an unknown or changed engine is blocked.')
+
+
+def trace_pack_members(root, platform_id: str | None = None) -> dict[str, bytes]:
+    """Every file of a reviewed trace-cores folder, or ValueError when it differs from the pinned inventory.
+
+    Used when a release is built and audited: the folder must hold exactly the
+    pinned libraries with their origins, notices and source changes.
+    """
+    root = Path(root)
+    if platform_id is None:
+        import json
+        try:
+            platform_id = json.loads((root / 'TRACE-BUILD-INFO.json').read_text(encoding='utf-8'))['platform']
+        except (OSError, ValueError, KeyError, TypeError):
+            raise ValueError('tracing engine pack has no build record') from None
+    expected = TRACE_CORE_FILES.get(platform_id)
+    if not expected:
+        raise ValueError('tracing engines have no reviewed inventory for ' + str(platform_id))
+    actual = set()
+    for path in root.rglob('*'):
+        if path.is_symlink():
+            raise ValueError('linked file in the tracing engine pack')
+        if path.is_file():
+            actual.add(path.relative_to(root).as_posix())
+    if actual != set(expected):
+        raise ValueError('tracing engine pack has unlisted or missing files: ' + ', '.join(sorted(actual ^ set(expected))[:6]))
+    result = {}
+    for name, row in sorted(expected.items()):
+        raw = (root / name).read_bytes()
+        if len(raw) != row['size'] or hashlib.sha256(raw).hexdigest() != row['sha256']:
+            raise ValueError('tracing engine pack identity differs: ' + name)
+        if name.endswith(('.dll', '.so')) and hashlib.sha256(raw).hexdigest() not in TRACE_CORE_PINS:
+            raise ValueError('tracing engine is not pinned: ' + name)
+        result[name] = raw
+    return result
 
 
 def core_options(system_id: str, source_sha256: str | None = None) -> dict[str, str]:

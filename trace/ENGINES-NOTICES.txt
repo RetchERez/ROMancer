@@ -1,0 +1,63 @@
+ROMancer tracing engines
+These engines are third-party code, not authored by ROMancer, in builds that
+ROMancer has modified. The MIT license for ROMancer does not replace the
+licenses below. Each engine retains its upstream copyright and license notices.
+
+What they are
+The "Scenes & colors" editor uses a second build of four of the playtest
+engines. A tracing build records, for every byte of palette and video memory,
+which ROM byte its value came from. Playtest never loads these builds; it
+keeps using the unmodified pinned engines in the cores folder.
+
+Modified by ROMancer (RetchEWretched), 2026. The change to each engine is the
+hook script named below, applied to the same pinned source as the playtest
+engine and compiled with -DROMANCER_TRACE. Every hook is inside
+#ifdef ROMANCER_TRACE (BlastEm's two interpreter descriptions gain calls that
+are empty macros otherwise). No emulation logic is changed.
+
+Corresponding source
+  1. CORE-SOURCES.zip in the cores folder beside this one: the complete pinned
+     source of every engine, with all upstream notices. Its SHA-256 is recorded
+     in TRACE-BUILD-INFO.json.
+  2. source-changes/ in this folder: the hook scripts, the shared header
+     romancer_trace.h and the build recipe build_trace_cores.py. The same files
+     are in the ROMancer source as trace/ and tools/build_trace_cores.py.
+  To rebuild: python build_trace_cores.py --sources CORE-SOURCES.zip --output <new folder>
+
+FCEUmm (tracing build) - GPL-2.0
+Upstream: https://github.com/libretro/libretro-fceumm/tree/ac0d00a7fc01166f84c7bac01d1084ebfd2b865e
+Change: source-changes/patch_fceumm.py
+License: licenses/fceumm.txt
+
+bsnes-mercury Balanced (tracing build, and its DSP-4 state variant) - GPL-3.0
+Upstream: https://github.com/libretro/bsnes-mercury/tree/79d7f9de218b6ffa65a80bbdc5828532bc239232
+Change: source-changes/patch_bsnes.py, on top of the DSP-4 state change already in CORE-SOURCES.zip
+License: licenses/bsnes-mercury.txt
+
+BlastEm (tracing build) - GPL-3.0
+Upstream: https://github.com/libretro/blastem/tree/ab743653ed110eeb7b1fe64d00cc5f9279c2bfec
+Change: source-changes/patch_blastem.py, on top of the Master System input and state change already in CORE-SOURCES.zip.
+The tracing build uses BlastEm's interpreter cores instead of its x86 translator.
+License: licenses/blastem.txt
+
+Gambatte (tracing build) - GPL-2.0
+Upstream: https://github.com/libretro/gambatte-libretro/tree/d9d6cd06382d1ced30de34d56d3609452323dab1
+Change: source-changes/patch_gambatte.py
+License: licenses/gambatte.txt
+
+Toolchains
+Windows: MSYS2 UCRT64 GCC/G++, statically linked runtime. The GCC runtime
+exception, MinGW-w64 and winpthreads licenses are in licenses/toolchain-*.txt.
+Linux: Zig 0.13.0 (clang/LLVM 18) targeting glibc 2.28; the LLVM runtime
+license is licenses/toolchain-llvm-runtime-LICENSE.txt. The Linux BlastEm build
+also applies source-changes/blastem-linux-cpuid.patch. When TRACE-BUILD-INFO.json
+lists generated_interpreters_compiler for BlastEm, that host GCC compiled the
+three generated interpreter sources (m68k.c, sh2.c and z80.c) and Zig compiled
+the rest and linked; no GCC runtime library is linked in.
+Each pack carries only its own platform's toolchain notices. The compilers
+themselves are not bundled. The exact toolchain is in TRACE-BUILD-INFO.json.
+
+Rebuilt binaries may differ with compiler version, paths and timestamps. The
+reviewed library identities are pinned in ROMancer (romancer/trace_core_pins.py)
+and a packaged release loads only those.
+No commercial games, firmware dumps or user data are included.

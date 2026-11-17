@@ -5,6 +5,42 @@ ROMancer is a local ROM editing, investigation and playtesting workbench.
 It supports NES, SNES, Genesis / Mega Drive, Master System, Game Boy and
 Game Boy Color cartridge formats. Everyday work runs offline.
 
+NEW IN v1.1.0 PREVIEW
+
+Scenes & colors. Change a color and see every scene it touches before you
+save. Open Scenes & colors with your ROM selected.
+- Record scenes. A scene is a moment of the game that ROMancer has watched.
+  Record more scenes lets the game play by itself for a few minutes. Play
+  and capture a moment lets you play to the screen you want.
+- Change a color. Click a pixel in a scene or choose a swatch, then pick the
+  new color. Only colors the console can show are offered.
+- See what else changes. The Also changes strip shows every recorded scene
+  that uses the same data, replayed in the real engine with your change.
+- Know the limits. "Used in N scenes" counts recorded scenes only. Scenes
+  you haven't recorded can't be shown, so record the places you care about.
+- Review, then save. Kept changes wait in the Change list. Review and save
+  replays everything together and writes a separate build. Your original
+  ROM is unchanged.
+- Locked colors say why: the game works them out while it runs, or ROMancer
+  has not seen where they come from.
+It works for NES, Super NES, Mega Drive, Master System, Game Boy and Game Boy
+Color games without a game-specific definition. Help has a Scenes & colors
+topic and the guide has a chapter. Recorded scenes are kept in the project
+and are part of a complete private project backup.
+
+The editor runs tracing builds of FCEUmm, bsnes-mercury, BlastEm and Gambatte:
+the same pinned sources as the playtest engines, with hooks that record which
+ROM byte each palette and video-memory byte came from. They live in the
+trace-cores folder of the Windows and Linux packages with their licenses,
+hashes and source changes. Playtest keeps using the unmodified engines. A
+packaged release loads only the pinned tracing builds.
+
+Also new: a battle background editor for Phantasy Star II (below).
+
+This is a preview. Scenes & colors has been measured across the supplied
+catalog (see trace/COVERAGE.md in the source for per-system results); it has
+not had a public release cycle. Playtest every build before sharing it.
+
 To edit Phantasy Star II's battle background, open the USA/Europe Rev A ROM
 and choose Graphics & fonts. In Battle background, paint on the draft or
 import a 320 x 128 PNG. The draft shows whether the image fits. Save playable
@@ -15,13 +51,13 @@ Visual level editing is coming soon. The Levels entry is disabled in this
 release. Read-only layout research and measured locations remain available.
 Generic graphics tilemaps remain available as graphics resources.
 
-The built-in catalog recognizes all 1,052 supplied exact ROM revisions.
+The built-in catalog recognizes all 942 supplied exact ROM revisions.
 See knowledge/ROM-CATALOG.md for the full list. The portable Windows ZIP
 includes ROM Catalog.html for offline search by title, system or hash.
 A full-file rescan confirmed each SHA-256, size, system and CRC32. Records
 include SHA-1, numerical cartridge header facts, file regions, checksum
-results and bounded text, graphics and compression findings. Names come
-from supplied filenames. The separate source-evidence index retains
+results and bounded text, graphics and compression findings. Names follow
+the No-Intro reference lists. The separate source-evidence index retains
 measured relationships and source reference metadata. Red and Blue and
 The Immortal also have measured structure locations.
 
@@ -29,9 +65,8 @@ The catalog contains factual metadata. It stores no game ROMs, extracted
 art, music, scripts or save data. Candidate results retain their evidence
 labels. An exact file match identifies a supplied revision.
 
-All 1,052 ROMs passed controlled byte editing, undo/redo, separate build
+All 942 ROMs passed controlled byte editing, undo/redo, separate build
 and independent BPS reconstruction in the v1.0.0 corpus acceptance run.
-One supplied SNES revision uses explicit checksum preservation.
 Recognized cartridge formats can use the same byte workflow without a
 catalog match. The hex editor outlines the selected byte and its ASCII
 character. Staged changes are underlined. Named
@@ -40,7 +75,7 @@ source-bound definitions. Playtest the intended behavior before sharing
 a patch.
 
 Open Overview > Playtest audit for recorded results for an exact ROM.
-The original Windows audit loaded 1,045 of the 1,052 exact revisions.
+The original Windows audit loaded 935 of the 942 exact revisions.
 The current build fixes the seven recorded load refusals. Each of those
 seven reached its title screen and responded to input during opening
 gameplay in a separate test. Confirm the behavior you need in Playtest.
@@ -52,7 +87,7 @@ available. The supplied Pokemon Red and Blue revisions share a
 
 START ON WINDOWS
 
-1. Extract ROMancer-v1.0.1-Windows.zip in Windows File Explorer.
+1. Extract ROMancer-v1.1.0-Windows.zip in Windows File Explorer.
 2. Double-click ROMancer.exe in the extracted folder.
    Keep ROMancer.exe, ROM Catalog.html and the ROMancer Files folder together.
 3. Open an original workshop or choose New project and import your own cartridge image.
@@ -73,12 +108,13 @@ SHA-256 is checked and later captures work offline. No ROM data is uploaded.
 
 START ON LINUX
 
-1. Extract ROMancer-v1.0.1-Linux-x86_64.tar.gz:  tar xf ROMancer-v1.0.1-Linux-x86_64.tar.gz
-2. Run ./ROMancer-v1.0.1-Linux-x86_64/ROMancer.sh
+1. Extract ROMancer-v1.1.0-Linux-x86_64.tar.gz:  tar xf ROMancer-v1.1.0-Linux-x86_64.tar.gz
+2. Run ./ROMancer-v1.1.0-Linux-x86_64/ROMancer.sh
    (./ROMancer.sh --install-desktop adds ROMancer to your application menu).
 
 The Linux x86-64 package includes Python, Pillow and the same six engines built
-from the same pinned sources. It needs glibc 2.28 or newer and a web browser.
+from the same pinned sources, and the same tracing engines for Scenes & colors.
+It needs glibc 2.28 or newer and a web browser.
 Native debugger captures are Windows-only.
 
 The full Windows runtime blocks changed or unreviewed core binaries before loading
@@ -90,6 +126,9 @@ reviewed settings when it recognizes the cartridge. For Kirby, use the
 direction controls to tilt. SHA-256 pins, source revisions and
 component licenses are included. Source development retains synthetic test-core
 support; custom builds require their own source/license and compatibility review.
+The tracing engines for Scenes & colors are pinned the same way, separately, in
+the trace-cores folder. A source checkout has no tracing engines until you build
+them (see BUILD AND CHECK) or set ROMANCER_TRACE_CORES to a folder that has them.
 
 Installed projects: %LOCALAPPDATA%\ROMancer\workspace
 Upgrades retain projects and prior versions. Rollback restores the previous
@@ -162,6 +201,18 @@ Run from the source folder:
 For the Windows bundle:
   python -B tools/fetch_runtime.py --downloads work_private/runtime-downloads
   python -B tools/package_windows.py --help
+
+For the Scenes & colors tracing engines (Windows: MSYS2 UCRT64; Linux: Zig 0.13):
+  python -B tools/build_trace_cores.py --sources CORE-SOURCES.zip --output <new folder>
+  python -B tools/pin_trace_cores.py --licenses <cores/licenses> <that folder>
+  python -B tools/verify_trace_engines.py --workspace <new folder> --output <report.json>
+build_trace_cores.py applies trace/patch_*.py to the pinned engine sources.
+On WSL1 add --generated-cc gcc: Zig's compiler needs hours there for BlastEm's
+three generated interpreter files, and the host GCC compiles just those three.
+pin_trace_cores.py completes the trace-cores pack and writes
+romancer/trace_core_pins.py; run it again after any rebuild. Pass the pack to
+tools/package_windows.py --trace-cores, or as the fourth argument of
+linux/package_linux.sh.
 
 The Windows packager uses pinned Python/Pillow archives and verifies their
 SHA-256 identities. GitHub CI covers Windows and Linux with Python 3.13 and

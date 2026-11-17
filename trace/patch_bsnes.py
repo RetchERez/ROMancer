@@ -284,7 +284,12 @@ edit(MM, '''void PPU::mmio_w2122(uint8 value) {
 skip = False
 if '--chip-readers-only' in sys.argv:
     edit('sfc/memory/memory.cpp', '  rt_ptr[id] = fastptr;', RT_PTR)
-edit('sfc/sfc.hpp', '    bool dma = false;         /* a DMA/HDMA write is in progress */\n',
+# A pristine tree has this line as RTRACE above wrote it. A tree patched by the earlier version
+# of this script (the --chip-readers-only upgrade) has one space fewer before the comment.
+_dma = '    bool dma = false;          /* a DMA/HDMA write is in progress */\n'
+if '--chip-readers-only' in sys.argv and _dma.strip() not in (root / 'sfc/sfc.hpp').read_text(encoding='utf-8'):
+    _dma = _dma.replace(';          /*', ';         /*')
+edit('sfc/sfc.hpp', _dma,
      '    bool dma = false;          /* a DMA/HDMA write is in progress */\n'
      '    const uint8 *last_mapped = nullptr;  /* byte last read through MappedRAM::read (chip ROM handlers) */\n')
 edit('sfc/memory/memory-inline.hpp', 'uint8 MappedRAM::read(unsigned addr) { return data_[addr]; }\n',

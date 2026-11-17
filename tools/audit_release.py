@@ -57,7 +57,7 @@ def audit_source(path):
     return {'ok':True,'kind':'source','license':'MIT','members':len(files),'sha256':hashlib.sha256(Path(path).read_bytes()).hexdigest()}
 
 
-def audit_windows(path,source,downloads,*,cores=None,observers=None):
+def audit_windows(path,source,downloads,*,cores=None,observers=None,trace_cores=None):
     from tools.package_windows import PINS,runtime_members,generated_root_files
     from romancer import ROMANCER_VERSION,ROMANCER_RELEASE_NAME,ROMANCER_BUILD_LABEL
     with zipfile.ZipFile(source) as archive:source_files=_members(archive,limit=MAX_MEMBER_BYTES)
@@ -70,11 +70,21 @@ def audit_windows(path,source,downloads,*,cores=None,observers=None):
     from romancer.bundled_debuggers import observer_files
     from romancer.observer_pins import OBSERVER_FAMILIES
     native=observer_files(observers) if observers is not None else {}
+    from romancer.trace_cores import trace_pack_members
+    tracing=trace_pack_members(trace_cores,'windows-amd64') if trace_cores is not None else {}
     identity={'schema_version':1,'product':'ROMancer','version':ROMANCER_VERSION,
               'release_name':ROMANCER_RELEASE_NAME,'build_label':ROMANCER_BUILD_LABEL,
               'credit':'By RetchEWretched','platform':'windows-amd64','install_layout':INSTALL_LAYOUT,'runtime':PINS,
               'engines':{'included':bool(engines),'systems':CORE_PINS if engines else {}}}
     if native:identity['observers']={'included':True,'families':OBSERVER_FAMILIES,'source_included':True}
+    if tracing:
+        identity['trace_engines']={'included':True,'engines':json.loads(tracing['TRACE-ORIGINS.json']),'source_included':True}
+        if not engines:raise ValueError('tracing engines need the engine pack: their source is its CORE-SOURCES.zip')
+        # The shipped source changes must be the ones in the audited source archive.
+        for name,raw in tracing.items():
+            if name.startswith('source-changes/'):
+                member=('tools/' if name.endswith('build_trace_cores.py') else 'trace/')+name.split('/',1)[1]
+                if source_files.get(member)!=raw:raise ValueError('tracing engine source change differs from the source archive: '+name)
     if (type(manifest) is not dict or set(manifest)!=set(identity)|{'files'}
             or any(manifest.get(k)!=v or type(manifest.get(k)) is not type(v) for k,v in identity.items())
             or type(manifest.get('files')) is not list):raise ValueError('Windows manifest identity differs')
@@ -97,21 +107,22 @@ def audit_windows(path,source,downloads,*,cores=None,observers=None):
     expected['LICENSE']=source_files['LICENSE'];expected.update(generated_root_files(readme=source_files['README.txt']))
     expected.update({'cores/'+name:raw for name,raw in engines.items()})
     expected.update({'debuggers/'+name:p.read_bytes() for name,p in native.items()})
+    expected.update({'trace-cores/'+name:raw for name,raw in tracing.items()})
     if set(files)!=set(expected)|{'BUNDLE.json'}:raise ValueError('Windows package contains unexpected or missing files')
     for name,raw in expected.items():
         if files[name]!=raw:raise ValueError('Windows pinned/source bytes differ: '+name)
     if json.loads(files['RUNTIME-ORIGINS.json'])!=PINS or manifest.get('runtime')!=PINS:raise ValueError('runtime origin metadata differs')
     required=['python/LICENSE.txt','python/Lib/site-packages/pillow-12.3.0.dist-info/licenses/LICENSE']
     if any(name not in files for name in required):raise ValueError('missing runtime notices')
-    return {'ok':True,'kind':'windows','version':manifest['version'],'members':len(files),'pinned_runtime_verified':True,'engines_bundled':bool(engines),'sha256':hashlib.sha256(Path(path).read_bytes()).hexdigest()}
+    return {'ok':True,'kind':'windows','version':manifest['version'],'members':len(files),'pinned_runtime_verified':True,'engines_bundled':bool(engines),'trace_engines_bundled':bool(tracing),'sha256':hashlib.sha256(Path(path).read_bytes()).hexdigest()}
 
 
 def main():
-    parser=argparse.ArgumentParser();parser.add_argument('--source',type=Path,required=True);parser.add_argument('--windows',type=Path);parser.add_argument('--downloads',type=Path);parser.add_argument('--observers',type=Path);parser.add_argument('--cores',type=Path);args=parser.parse_args()
+    parser=argparse.ArgumentParser();parser.add_argument('--source',type=Path,required=True);parser.add_argument('--windows',type=Path);parser.add_argument('--downloads',type=Path);parser.add_argument('--observers',type=Path);parser.add_argument('--cores',type=Path);parser.add_argument('--trace-cores',type=Path);args=parser.parse_args()
     print(json.dumps(audit_source(args.source)))
     if args.windows:
         if not args.downloads:parser.error('--downloads is required to audit pinned Windows runtime bytes')
-        print(json.dumps(audit_windows(args.windows,args.source,args.downloads,cores=args.cores,observers=args.observers)))
+        print(json.dumps(audit_windows(args.windows,args.source,args.downloads,cores=args.cores,observers=args.observers,trace_cores=args.trace_cores)))
 
 
 if __name__=='__main__':main()

@@ -1,17 +1,20 @@
 #!/usr/bin/env bash
 # Build the portable ROMancer Linux x86-64 archive.
 #
-#   linux/package_linux.sh <engines-dir> <windows-cores-dir> <output-dir>
+#   linux/package_linux.sh <engines-dir> <windows-cores-dir> <output-dir> [<trace-engines-dir>]
 #
 # <engines-dir>        output of linux/build_cores_linux.sh (six *_libretro.so files)
 # <windows-cores-dir>  the Windows release "cores" folder (CORE-SOURCES.zip and licenses are reused unchanged)
 # <output-dir>         receives ROMancer-v<version>-Linux-x86_64.tar.gz
+# <trace-engines-dir>  optional: the pinned Linux tracing engine pack for "Scenes & colors"
+#                      (tools/build_trace_cores.py, then tools/pin_trace_cores.py)
 #
 # Run from a git checkout. Downloads are pinned by SHA-256 and cached in <output-dir>/cache.
 set -euo pipefail
 
 REPO="$(cd "$(dirname "$(readlink -f "${BASH_SOURCE[0]}")")/.." && pwd -P)"
 ENGINES="$(readlink -f "$1")"; WINCORES="$(readlink -f "$2")"; OUT="$(readlink -m "$3")"
+TRACE=""; [ $# -ge 4 ] && TRACE="$(readlink -f "$4")"
 
 PY_FILE="cpython-3.14.9+20261021-x86_64-unknown-linux-gnu-install_only_stripped.tar.gz"
 PY_URL="https://github.com/astral-sh/python-build-standalone/releases/download/20261021/cpython-3.14.9%2B20261021-x86_64-unknown-linux-gnu-install_only_stripped.tar.gz"
@@ -21,6 +24,7 @@ PIL_URL="https://files.pythonhosted.org/packages/5c/44/c85361f65dbe00eea8576ee46
 PIL_SHA="251bf95b67017e27b13d82f5b326234ca62d70f9cf4c2b9032de2358a3b12c7b"
 
 VERSION="$(python3 -c 'import re,sys;print(re.search(r"ROMANCER_VERSION = \"([^\"]+)\"",open(sys.argv[1]).read()).group(1))' "$REPO/romancer/__init__.py")"
+RELEASE="$(python3 -c 'import re,sys;print(re.search(r"ROMANCER_RELEASE_NAME = \"([^\"]+)\"",open(sys.argv[1]).read()).group(1))' "$REPO/romancer/__init__.py")"
 NAME="ROMancer-v$VERSION-Linux-x86_64"
 STAGE="$OUT/$NAME"; RT="$STAGE/ROMancer Files/Runtime"
 mkdir -p "$OUT/cache"; rm -rf "$STAGE"; mkdir -p "$RT"
@@ -48,6 +52,18 @@ mkdir -p "$RT/cores/linux-build-patches" && cp "$REPO/linux/patches/"*.patch "$R
 cp "$REPO/linux/ENGINES-NOTICES.txt" "$RT/cores/THIRD_PARTY_NOTICES.txt"
 python3 "$REPO/linux/write_linux_pins.py" "$REPO" "$RT/cores"
 
+if [ -n "$TRACE" ]; then
+    echo "== tracing engines: pins and inventory"
+    # The folder must be exactly the pinned pack: libraries, origins, notices and source changes.
+    (cd "$REPO" && python3 -B -c 'import sys;from romancer.trace_cores import trace_pack_members;print(len(trace_pack_members(sys.argv[1],"linux-x86_64")),"files verified")' "$TRACE")
+    mkdir -p "$RT/trace-cores" && cp -r "$TRACE"/. "$RT/trace-cores/"
+    for f in "$TRACE"/source-changes/*; do
+        n="$(basename "$f")"
+        case "$n" in build_trace_cores.py) s="$REPO/tools/$n";; *.patch) s="$REPO/linux/patches/$n";; *) s="$REPO/trace/$n";; esac
+        cmp -s "$f" "$s" || { echo "tracing engine source change differs from the checkout: $n" >&2; exit 1; }
+    done
+fi
+
 echo "== app"
 mkdir -p "$RT/app"
 (cd "$REPO" && git -c safe.directory='*' ls-files -z --cached --others --exclude-standard | grep -zv '^linux/' \
@@ -69,18 +85,22 @@ cp "$REPO/linux/README-LINUX.txt" "$STAGE/README.txt"
 cp "$REPO/LICENSE" "$RT/LICENSE"
 "$RT/python/bin/python3" -I -c 'import sys;from PIL import Image;Image.open(sys.argv[1]).save(sys.argv[2])' "$REPO/linux/romancer.ico" "$RT/romancer.png" 2>/dev/null \
     || cp "$REPO/linux/romancer.png" "$RT/romancer.png" 2>/dev/null || true
-python3 - "$RT" "$VERSION" "$PY_FILE" "$PY_URL" "$PY_SHA" "$PIL_FILE" "$PIL_URL" "$PIL_SHA" <<'PY'
+python3 - "$RT" "$VERSION" "$PY_FILE" "$PY_URL" "$PY_SHA" "$PIL_FILE" "$PIL_URL" "$PIL_SHA" "$RELEASE" <<'PY'
 import json, sys
-rt, version, pyf, pyu, pys, pf, pu, ps = sys.argv[1:]
+import os
+rt, version, pyf, pyu, pys, pf, pu, ps, release = sys.argv[1:]
 origins = {
     "python": {"file": pyf, "sha256": pys, "url": pyu, "version": "3.14.9",
                "license": "PSF-2.0 and bundled notices (python-build-standalone)"},
     "pillow": {"file": pf, "sha256": ps, "url": pu, "version": "12.3.0", "license": "MIT-CMU and bundled notices"},
 }
 json.dump(origins, open(f"{rt}/RUNTIME-ORIGINS.json", "w"), indent=2)
-bundle = {"schema_version": 1, "product": "ROMancer", "version": version, "release_name": f"ROMancer v{version}",
+bundle = {"schema_version": 1, "product": "ROMancer", "version": version, "release_name": release,
           "credit": "By RetchEWretched", "platform": "linux-x86_64", "runtime": origins,
           "engines": json.load(open(f"{rt}/cores/CORE-ORIGINS.json"))}
+if os.path.isfile(f"{rt}/trace-cores/TRACE-ORIGINS.json"):
+    bundle["trace_engines"] = {"included": True, "engines": json.load(open(f"{rt}/trace-cores/TRACE-ORIGINS.json")),
+                               "source_included": True}
 json.dump(bundle, open(f"{rt}/BUNDLE.json", "w"), indent=2)
 PY
 

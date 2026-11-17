@@ -13,7 +13,7 @@ if __package__ in (None, ''):
 
 from romancer.cd_patch import check_output_paths
 
-DIRECTORIES = {'romancer', 'examples', 'profiles', 'tests', 'tools', 'knowledge', '.github', 'user-guide', 'linux'}
+DIRECTORIES = {'romancer', 'examples', 'profiles', 'tests', 'tools', 'knowledge', '.github', 'user-guide', 'linux', 'trace'}
 ROOT_FILES = {'README.txt', 'run.sh', 'run.ps1', 'Launch ROMancer.cmd',
               'launch.ps1', 'desktop_window.ps1', 'requirements.txt', 'THIRD_PARTY_NOTICES.txt',
               'LICENSE', 'NSIS-LICENSE.txt', '.gitignore', '.gitattributes', '.editorconfig',
@@ -27,6 +27,49 @@ READ_CHUNK_BYTES = 64 * 1024
 # Release source selection is explicit. Adding a file or fixture requires review;
 # a text extension or placement under docs/tests never grants distribution approval.
 APPROVED_FILES = frozenset({
+    # v1.1 "Scenes & colors": the editor, its tracing-engine loader and pins, and trace/ (the
+    # GPL engines' hook scripts are the corresponding source changes and must ship).
+    'romancer/edit_session.py',
+    'romancer/gfx_codecs.py',
+    'romancer/gfx_families.py',
+    'romancer/gfx_overlay8.py',
+    'romancer/graphics_trace.py',
+    'romancer/palette_trace.py',
+    'romancer/provenance.py',
+    'romancer/scene_graphics.py',
+    'romancer/trace_core_pins.py',
+    'romancer/trace_cores.py',
+    'romancer/ui/scene_editor.js',
+    'romancer/ui/scene_graphics.js',
+    'romancer/ui/views/scenes.js',
+    'tests/test_edit_session.py',
+    'tests/test_gfx_codecs.py',
+    'tests/test_graphics_trace.py',
+    'tests/test_trace_packaging.py',
+    'tests/ui_scene_editor.mjs',
+    'tests/ui_scene_graphics.mjs',
+    # Catalog maintenance tools added during v1.1.
+    'tools/audit_catalog.py',
+    'tools/prune_catalog.py',
+    'tools/build_trace_cores.py',
+    'tools/pin_trace_cores.py',
+    'tools/verify_trace_engines.py',
+    'trace/COVERAGE.md',
+    'trace/DESIGN.md',
+    'trace/ENGINES-NOTICES.txt',
+    'trace/codec_show.py',
+    'trace/codec_survey.py',
+    'trace/coverage_report.py',
+    'trace/coverage_sweep.py',
+    'trace/graphics_sweep.py',
+    'trace/palette_state_check.py',
+    'trace/patch_blastem.py',
+    'trace/patch_bsnes.py',
+    'trace/patch_fceumm.py',
+    'trace/patch_gambatte.py',
+    'trace/patch_mgba.py',
+    'trace/romancer_trace.h',
+    'trace/trace_probe.py',
     'romancer/core_pins_linux.py',
     'linux/ROMancer.sh',
     'linux/package_linux.sh',
@@ -83,6 +126,8 @@ APPROVED_FILES = frozenset({
     'knowledge/rom_samples.json',
     'knowledge/ROM-CATALOG.md',
     'tools/render_rom_catalog.py',
+    'tools/prune_catalog.py',
+    'tools/audit_catalog.py',
     'tests/test_scope_compatibility.py',
     'tests/test_release_engine_sources.py',
     'tests/ui_six_system_scope.mjs',

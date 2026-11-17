@@ -101,7 +101,7 @@ def generated_root_files(*,readme=None):
     return files
 
 
-def build_bundle(app_root,downloads,destination,*,cores=None,observers=None):
+def build_bundle(app_root,downloads,destination,*,cores=None,observers=None,trace_cores=None):
     from tools.package_source import package
     from romancer import ROMANCER_VERSION,ROMANCER_RELEASE_NAME,ROMANCER_BUILD_LABEL
     app_root=Path(app_root).resolve();downloads=Path(downloads).resolve();destination=Path(destination).absolute()
@@ -110,6 +110,9 @@ def build_bundle(app_root,downloads,destination,*,cores=None,observers=None):
     from romancer.bundled_debuggers import observer_files
     from romancer.observer_pins import OBSERVER_FAMILIES
     native=observer_files(observers) if observers is not None else {}
+    # The "Scenes & colors" tracing engines: a complete, pinned trace-cores folder beside the app.
+    from romancer.trace_cores import trace_pack_members
+    tracing=trace_pack_members(trace_cores,'windows-amd64') if trace_cores is not None else {}
     if destination.exists():raise ValueError('bundle output already exists')
     destination.parent.mkdir(parents=True,exist_ok=True)
     with tempfile.TemporaryDirectory(prefix='.windows-bundle-',dir=destination.parent) as temp:
@@ -132,6 +135,8 @@ def build_bundle(app_root,downloads,destination,*,cores=None,observers=None):
             target=stage/'cores'/name;target.parent.mkdir(parents=True,exist_ok=True);target.write_bytes(raw)
         for name,path in native.items():
             target=stage/'debuggers'/name;target.parent.mkdir(parents=True,exist_ok=True);shutil.copyfile(path,target)
+        for name,raw in tracing.items():
+            target=stage/'trace-cores'/name;target.parent.mkdir(parents=True,exist_ok=True);target.write_bytes(raw)
         rows=[]
         for path in sorted(stage.rglob('*')):
             if path.is_file():
@@ -139,10 +144,11 @@ def build_bundle(app_root,downloads,destination,*,cores=None,observers=None):
                 rows.append({'path':path.relative_to(stage).as_posix(),'size':path.stat().st_size,'sha256':sha})
         manifest={'schema_version':1,'product':'ROMancer','version':ROMANCER_VERSION,'release_name':ROMANCER_RELEASE_NAME,'build_label':ROMANCER_BUILD_LABEL,'credit':'By RetchEWretched','platform':'windows-amd64','install_layout':INSTALL_LAYOUT,'runtime':PINS,'engines':{'included':bool(engines),'systems':CORE_PINS if engines else {}},'files':rows}
         if native:manifest['observers']={'included':True,'families':OBSERVER_FAMILIES,'source_included':True}
+        if tracing:manifest['trace_engines']={'included':True,'engines':json.loads(tracing['TRACE-ORIGINS.json']),'source_included':True}
         (stage/'BUNDLE.json').write_text(json.dumps(manifest,indent=2)+'\n',encoding='utf-8');verify_tree(stage)
         from romancer.patch_sets import _publish_directory
         _publish_directory(stage,destination)
-    return {'ok':True,'path':str(destination),'version':ROMANCER_VERSION,'members':len(rows),'runtime_bundled':True,'engines_bundled':bool(engines)}
+    return {'ok':True,'path':str(destination),'version':ROMANCER_VERSION,'members':len(rows),'runtime_bundled':True,'engines_bundled':bool(engines),'trace_engines_bundled':bool(tracing)}
 
 
 def package_bundle(bundle,destination):
@@ -164,6 +170,6 @@ def package_bundle(bundle,destination):
 
 
 if __name__=='__main__':
-    parser=argparse.ArgumentParser();parser.add_argument('--app',type=Path,required=True);parser.add_argument('--downloads',type=Path,required=True);parser.add_argument('--output',type=Path,required=True);parser.add_argument('--zip',type=Path);parser.add_argument('--observers',type=Path,help='Reviewed native observer pack with complete source and notices');parser.add_argument('--cores',type=Path,help='Verified engine pack, including corresponding source and licenses');args=parser.parse_args()
-    print(json.dumps(build_bundle(args.app,args.downloads,args.output,cores=args.cores,observers=args.observers)))
+    parser=argparse.ArgumentParser();parser.add_argument('--app',type=Path,required=True);parser.add_argument('--downloads',type=Path,required=True);parser.add_argument('--output',type=Path,required=True);parser.add_argument('--zip',type=Path);parser.add_argument('--observers',type=Path,help='Reviewed native observer pack with complete source and notices');parser.add_argument('--cores',type=Path,help='Verified engine pack, including corresponding source and licenses');parser.add_argument('--trace-cores',type=Path,help='Pinned tracing engine pack (tools/pin_trace_cores.py), including its source changes and notices');args=parser.parse_args()
+    print(json.dumps(build_bundle(args.app,args.downloads,args.output,cores=args.cores,observers=args.observers,trace_cores=args.trace_cores)))
     if args.zip:print(json.dumps(package_bundle(args.output,args.zip)))

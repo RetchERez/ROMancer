@@ -2,7 +2,7 @@
   "schema_version": 1,
   "product": "ROMancer v1.0.0",
   "subtitle": "A practical guide to the current editing tools: small first edits, advanced workflows, actual editing and appearance examples, a glossary and an alphabetical index.",
-  "scope": "This guide covers the six supported cartridge systems. The offline catalog identifies 1,052 exact revisions. Recognized ROM formats can be inspected and edited as bytes without a catalog match. Game-specific editors use checked definitions.",
+  "scope": "This guide covers the six supported cartridge systems. The offline catalog identifies 942 exact revisions. Recognized ROM formats can be inspected and edited as bytes without a catalog match. Game-specific editors use checked definitions.",
   "basic_summary": "Start the application, choose saved preferences, identify a source, make a focused edit, preserve progress and export a checked patch. These procedures build the habits used throughout the guide.",
   "advanced_summary": "Use checked definitions for graphics, text, tables and audio. Trace a resource to its stored bytes, compare builds and automate bounded checks.",
   "attribution": "By RetchEWretched. ROMancer code and original fixtures use the project MIT license. Instructional screenshots show third-party games, including Castlevania, Chrono Trigger, The Immortal, Final Fantasy Legend II, Deja Vu I & II and Rastan. Their imagery and trademarks remain those of their respective rights holders and are separate from the code license. No ROM files, game saves, emulator states, firmware dumps or authentication data are included. PDF and HTML work offline; PDF rebuilding optionally uses ReportLab.",
@@ -620,7 +620,7 @@
       "title": "Use the offline ROM facts database",
       "part": "Basic",
       "kicker": "Recorded samples / exact file identity",
-      "intro": "The offline catalog recognizes all 1,052 supplied cartridge revisions. Exact SHA-256 and file size select a record. CRC32 and SHA-1 can help cross-check your copy.",
+      "intro": "The offline catalog recognizes all 942 supplied cartridge revisions. Exact SHA-256 and file size select a record. CRC32 and SHA-1 can help cross-check your copy.",
       "steps": [
         "Import your ROM. In <b>Overview</b>, expand <b>Playtest audit</b> to see the Windows engine's observations for that exact file. Seven previously refused revisions now show a verified title and opening gameplay. Test changes to your own build in Playtest.",
         "In <b>Overview</b>, use <b>What can I edit in this ROM?</b> to open an available named edit. For file details, open <b>Advanced &gt; Resources</b>, then <b>ROM investigation</b>. Expand <b>Measured file facts &amp; locations</b> or <b>Related source evidence</b>.",
@@ -892,6 +892,57 @@
       "terms": [
         "term-palette",
         "term-bank"
+      ]
+    },
+    {
+      "id": "scenes-colors",
+      "title": "Change a color and see every scene it touches",
+      "part": "Basic",
+      "kicker": "SCENES AND COLORS / NEW IN v1.1",
+      "intro": "A color in a game is usually shared. The same few bytes can paint a title screen, a menu and a level. Scenes &amp; colors lets you change a color and look at every recorded moment of the game that changes with it, before anything is saved. It works with NES, Super NES, Mega Drive, Master System, Game Boy and Game Boy Color games, and needs no game-specific definition.",
+      "steps": [
+        "Select your ROM in the top bar and open <b>Scenes &amp; colors</b>. A <b>scene</b> is a moment of the game that ROMancer has watched. To collect scenes, choose <b>Record more scenes</b> and the game plays by itself for a few minutes, or choose <b>Play and capture a moment</b>, play to the screen you want and choose <b>Capture this moment</b>. <b>Stop recording</b> ends a recording early.",
+        "Choose a scene. Click a pixel in its picture, or choose a swatch under <b>Colors in this scene</b>. Pick the new color. The controls offer only colors the console can show: sliders on most systems, the console color chart on NES, and four shades on the original Game Boy.",
+        "Under <b>Where should it change?</b>, keep <b>Everywhere this color is used</b>, or choose <b>Only in this scene</b> when it is offered. Only in this scene gives that scene its own copy of the color data. ROMancer then checks by replay that the other scenes stay as they are.",
+        "Choose <b>Show what changes</b>. The <b>Also changes</b> strip fills with every recorded scene that uses the same data. Each picture is the real game replayed with your change, not a guess. Scenes marked <b>Looks different</b> come first. Choose a picture to compare before and after.",
+        "Choose <b>Keep this change</b> to add it to the <b>Change list</b>, or <b>Cancel</b> to drop it. Nothing is written yet. In the list, <b>Show scenes</b> brings the pictures back and <b>Undo</b> removes the change.",
+        "Choose <b>Review and save</b>. ROMancer replays every affected scene with all your changes together and lists everything that changes. <b>Save as a new build</b> writes a separate playable copy, then offers <b>Playtest saved build</b> and <b>Download patch</b>."
+      ],
+      "result": "The new build carries your colors, and the cartridge checksum is updated when the game has one. Your original ROM is unchanged. You saw every recorded scene that changed before you saved.",
+      "note": "<b>Used in N scenes</b> counts only the scenes you have recorded. Scenes you haven't recorded can't be shown. Before you save, record the places you care about, and playtest the build afterwards.",
+      "details": [
+        {
+          "title": "What \"seen in N scenes\" means",
+          "text": "ROMancer learns where a color is used by watching the game run. The count beside a color, and the pictures in the Also changes strip, cover the scenes recorded so far and nothing else. A color used in 3 recorded scenes may also be used in a level you have not reached. Recording more of the game makes the answer more complete; it never makes it guaranteed. A scene can also use the changed data without showing it at that moment. Those are listed as <b>Uses changed data; nothing visible at this moment</b>."
+        },
+        {
+          "title": "Locked colors",
+          "text": "A swatch with a lock cannot be changed here. Choose it to see why. There are two reasons. The game may work the color out while it runs, as in a fade or a blend, so there is no single stored color to change. Or ROMancer has not seen where the color comes from: it was set before recording started, or the slot is unused. A scene recorded at a different moment often shows the same color unlocked."
+        },
+        {
+          "title": "When a change is not confirmed",
+          "text": "After you choose Show what changes, the real engine replays the scene with the edited bytes. If the color on screen does not become the one you picked, the editor says so, and the change is marked <b>Not confirmed by replay</b> in the Change list. Undo it unless you have a reason to keep it."
+        },
+        {
+          "title": "Where scenes are kept",
+          "text": "Scenes, their replay savestates and the Change list are stored inside the project and are included in a complete private project backup. They belong to the original ROM. To make another version, keep editing the original and save again. <b>Forget this scene</b> removes one scene."
+        },
+        {
+          "title": "If the tracing engine is not installed",
+          "text": "Scenes &amp; colors uses a second, tracing build of each emulator engine, kept in the <b>trace-cores</b> folder beside the app. The full Windows and Linux packages include it. A copy without that folder shows a message naming the system instead of the editor. Playtest is not affected."
+        }
+      ],
+      "related": [
+        "gbc-colors",
+        "palettes",
+        "play",
+        "patches",
+        "projects"
+      ],
+      "terms": [
+        "term-palette",
+        "term-scene",
+        "term-build"
       ]
     },
     {
@@ -1643,7 +1694,7 @@
       "details": [
         {
           "title": "Checksum policy · Advanced",
-          "text": "Automatic checksum maintenance is the default. Under Advanced byte options, Preserve checksum fields explicitly requests byte-exact edits without repairing cartridge fields. Use it only when you understand the convention. One supplied Trials of Mana revision needs this explicit choice because its stored checksum differs from the supported algorithm. A mismatch is reported; it is not silently repaired or certified. Changing policy requires a new review."
+          "text": "Automatic checksum maintenance is the default. Under Advanced byte options, Preserve checksum fields explicitly requests byte-exact edits without repairing cartridge fields. Use it only when you understand the convention. A ROM whose stored checksum differs from the supported algorithm needs this explicit choice. A mismatch is reported; it is not silently repaired or certified. Changing policy requires a new review."
         },
         {
           "title": "Name a confirmed byte",
@@ -2271,11 +2322,11 @@
         },
         {
           "title": "Read-only coverage status",
-          "text": "coverage.status lists the frozen 1,052 exact target identities with bounded query, system_filter, page and limit arguments. Current accepted revisions: zero. A catalog match is not a decoded game. Evidence metadata preflight cannot certify a revision or authorize ROM writes."
+          "text": "coverage.status lists the frozen 942 exact target identities with bounded query, system_filter, page and limit arguments. Current accepted revisions: zero. A catalog match is not a decoded game. Evidence metadata preflight cannot certify a revision or authorize ROM writes."
         },
         {
           "title": "Generic editing acceptance",
-          "text": "The same source-bound inspect, draft history, plan, build and independently verified patch export path passed all 1,052 frozen inputs. This verifies file operations for the supplied revisions. A game-specific edit still needs evidence about the selected data."
+          "text": "The same source-bound inspect, draft history, plan, build and independently verified patch export path passed all 942 frozen inputs. This verifies file operations for the supplied revisions. A game-specific edit still needs evidence about the selected data."
         }
       ],
       "related": [
@@ -3964,6 +4015,11 @@
       "definition": "An exact-revision arrangement of verified literal source parts, including flips, gaps and shared uses. A user label is not an inferred actor identity. Imported layouts carry declarations rather than execution trust."
     },
     {
+      "id": "term-scene",
+      "term": "Scene",
+      "definition": "In Scenes &amp; colors, a recorded moment of the game: a picture, a savestate to replay it from, and the list of ROM bytes that fed its colors and graphics. Changes are checked against every recorded scene."
+    },
+    {
       "id": "term-scope",
       "term": "Scope",
       "definition": "The exact bytes, scene, route or format a claim covers. Whole-file and cartridge-payload hashes use different scopes."
@@ -4077,6 +4133,12 @@
       "topics": [
         "compression",
         "text-layout"
+      ]
+    },
+    {
+      "term": "Also changes strip",
+      "topics": [
+        "scenes-colors"
       ]
     },
     {
@@ -4252,6 +4314,12 @@
       "topics": [
         "translation",
         "compression"
+      ]
+    },
+    {
+      "term": "Change list (Scenes & colors)",
+      "topics": [
+        "scenes-colors"
       ]
     },
     {
@@ -4679,6 +4747,12 @@
       ]
     },
     {
+      "term": "Locked colors",
+      "topics": [
+        "scenes-colors"
+      ]
+    },
+    {
       "term": "Mario references",
       "topics": [
         "popular-references"
@@ -4984,6 +5058,12 @@
       ]
     },
     {
+      "term": "Recording scenes",
+      "topics": [
+        "scenes-colors"
+      ]
+    },
+    {
       "term": "Reduced motion",
       "topics": [
         "settings"
@@ -5084,6 +5164,12 @@
       ]
     },
     {
+      "term": "Scenes & colors",
+      "topics": [
+        "scenes-colors"
+      ]
+    },
+    {
       "term": "Screenshot checkpoints",
       "topics": [
         "regression"
@@ -5099,6 +5185,12 @@
       "term": "SHA-256",
       "topics": [
         "checks"
+      ]
+    },
+    {
+      "term": "Shared colors",
+      "topics": [
+        "scenes-colors"
       ]
     },
     {
@@ -5406,6 +5498,7 @@
     "release-checks",
     "research-packs",
     "resources",
+    "scenes-colors",
     "settings",
     "sound",
     "start",

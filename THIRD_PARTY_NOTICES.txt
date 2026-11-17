@@ -34,6 +34,24 @@ the verified Top Gear 3000 cartridge. Its corresponding source, exact patch
 and original license are in the engine pack. Other SNES cartridges use the
 original pinned bsnes-mercury build.
 
+The Scenes & colors editor uses tracing builds of FCEUmm (GPL-2.0), bsnes-mercury
+Balanced and its DSP-4 variant (GPL-3.0), BlastEm (GPL-3.0) and Gambatte (GPL-2.0).
+They are ROMancer-modified builds (2026) of the same pinned sources as the playtest
+engines: each adds hooks that record which ROM byte a palette or video-memory byte
+came from, and changes no emulation logic. The BlastEm tracing build runs its
+interpreter cores. The full Windows and Linux packages keep them under trace-cores/
+with their own THIRD_PARTY_NOTICES.txt, license texts, library hashes
+(TRACE-ORIGINS.json), build record and source-changes/. The corresponding source is
+CORE-SOURCES.zip under cores/ together with those source changes: the hook scripts
+trace/patch_fceumm.py, trace/patch_bsnes.py, trace/patch_blastem.py and
+trace/patch_gambatte.py, the header trace/romancer_trace.h and the build recipe
+tools/build_trace_cores.py, all included in the ROMancer source package. The hook
+scripts modify upstream GPL files; the resulting engine source keeps the upstream
+license and is not relicensed by ROMancer's MIT license. Playtest never loads a
+tracing build, and a packaged release loads only the pinned ones.
+trace/patch_mgba.py is a research hook set for mGBA's Game Boy side; no mGBA
+tracing build is distributed.
+
 The source-only archive contains ROMancer code and engine metadata/build recipes;
 it does not embed upstream emulator implementations. The separate engine pack includes
 its complete Windows libretro build inputs, documented CRT compatibility patch and

@@ -19,6 +19,7 @@ bios/
 roms/
 dist/
 downloads/
+trace-cores/
 browser-profile/
 connection.json
 runtime-profiles.json

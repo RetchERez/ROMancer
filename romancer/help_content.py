@@ -184,6 +184,17 @@ TOPICS=(
         'Check the DMG/CGB header flags and declared cartridge size.',
         'Game Boy tiles store two bitplanes per row; this differs from the NES tile layout.',
         'The fixed bank-zero window and selected ROM banks can be translated explicitly. Game Boy and Game Boy Color use separate hardware profiles. Original DMG and Color-only drawing programs have measured native state replay; game compatibility still needs its own tests.'], 'system gameboy bank checksum'),
+    _topic('scenes','Change colors in Scenes & colors','Record moments of the game, change a color, and look at every recorded scene that changes before anything is saved.',[
+        'Open Scenes & colors with your ROM selected. A scene is a moment of the game that ROMancer has watched. Record more scenes lets the game play by itself for a few minutes. Play and capture a moment lets you play to the screen you want, then choose Capture this moment.',
+        'Choose a scene, then click a pixel in its picture or a swatch under Colors in this scene. Pick the new color. The controls only offer colors the console can show: sliders for most systems, the console color chart on NES, four shades on the original Game Boy.',
+        'Under Where should it change?, choose Everywhere this color is used, or Only in this scene when it is offered. Only in this scene gives that scene its own copy of the color data, and ROMancer checks by replay that the other scenes stay as they are.',
+        'Choose Show what changes. The Also changes strip shows every recorded scene that uses the same data. Each picture is the real game replayed with your change. Scenes that look different come first; choose one to compare before and after.',
+        'Used in N scenes counts recorded scenes only. Scenes you have not recorded cannot be shown, so record the places you care about before you save. A color is often shared by menus, levels and battles.',
+        'Keep this change adds it to the Change list; Cancel drops it. Nothing is written yet. Undo removes a kept change, and Show scenes shows its pictures again. A change the replay could not confirm is marked Not confirmed by replay.',
+        'Review and save replays every affected scene with all your changes together and lists everything that changes. Save as a new build writes a separate playable copy and updates the cartridge checksum when the game has one. Your original ROM is unchanged.',
+        'A color with a lock cannot be changed here; choose it to see why. Either the game works the color out while it runs (a fade or a blend), or ROMancer has not seen where it comes from because it was set before recording started or the slot is unused. Try a scene recorded at a different moment.',
+        'Scenes are kept with the project and are included in a complete private project backup. They belong to the original ROM: to make another version, keep editing the original and save again.',
+        'If the screen says the tracing engine is not installed, this copy of ROMancer has no trace-cores folder for that system. The full Windows and Linux packages include it for NES, Super NES, Mega Drive, Master System, Game Boy and Game Boy Color.'], 'scene scenes color colour palette recolor record capture also changes change list review locked lock swatch tracing shared'),
 
 )
 

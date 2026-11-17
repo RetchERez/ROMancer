@@ -53,6 +53,9 @@ def backup_project(project,destination,roles):
             included|=rel.as_posix() in ('inputs.json','bookmarks.json','build-notes.json')
             included|=first=='inputs' and input_roles.get(rel.as_posix()) in roles
             included|=first=='saves' and 'sessions' in roles
+            # Scenes & colors: recorded scenes, their replay savestates and the pending change list.
+            # renders/ (preview pictures) and work/ (patched copies for replays) are rebuilt on demand.
+            included|=first=='trace-scenes' and 'sessions' in roles and not (len(rel.parts)>2 and rel.parts[2] in ('renders','work'))
             included|=first=='patch-previews' and 'builds' in roles
             included|=first=='.romancer-history' and 'builds' in roles
             included|=first=='.romancer-evidence' and 'captures' in roles

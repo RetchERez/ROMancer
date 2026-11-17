@@ -11923,7 +11923,7 @@ ${state2.artifact.system_id ? `<details><summary>Advanced byte options</summary>
         return render17();
       },
       "help-topic": (node) => {
-        state.helpTopic = node.dataset.id || ({ assets: "graphics", scenes: "graphics", scripts: "text", resources: "discovery", release: "export", settings: "recovery", overview: "start", help: "start" }[state.page] || state.page);
+        state.helpTopic = node.dataset.id || ({ assets: "graphics", scripts: "text", resources: "discovery", release: "export", settings: "recovery", overview: "start", help: "start" }[state.page] || state.page);
         document.getElementById("modal").close();
         return navigate("help");
       },
