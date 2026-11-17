@@ -22,6 +22,25 @@ HERE = Path(__file__).resolve().parent
 sys.path.insert(0, str(HERE)); sys.path.insert(0, str(HERE.parent))
 
 
+STEP = 900
+
+
+def explore(frame):
+    """Deterministic play: get through menus, then walk, jump and attack."""
+    if frame < 240:
+        return []
+    phase = frame % 600
+    if frame < 1800 or phase < 30:
+        return ['start'] if frame % 90 < 4 and (frame // 90) % 3 == 0 else ['a'] if frame % 45 < 4 else []
+    direction = ('right', 'down', 'left', 'up')[(frame // 600) % 4]
+    held = [direction] if phase < 480 else []
+    if frame % 40 < 6:
+        held.append('a')
+    if frame % 70 < 4:
+        held.append('b')
+    return held
+
+
 def one(sha, entry, core, system, frames, outdir):
     import trace_probe as tp
     from romancer import provenance as pv, palette_trace as pt
@@ -42,8 +61,21 @@ def one(sha, entry, core, system, frames, outdir):
             return fe
 
         s = pv.TraceSession(fe_for(rom), checkpoint_every=300)
-        s.start(); s.run(frames, tp.script)
-        scene = pv.scene_from_session(s); s.fe.close()
+        s.start()
+        scenes = []
+        for _ in range(frames // STEP):
+            s.run(STEP, explore)
+            scenes.append(pv.scene_from_session(s))
+        s.fe.close()
+        scene = scenes[-1]
+        # Union of ROM sources seen across all snapshots, per domain and kind.
+        seen = {}
+        for sc in scenes:
+            for name, d in sc.snapshot.domains.items():
+                for kind, label in ((pv.RT_ROM, 'rom'), (pv.RT_IMM, 'code'), (pv.RT_DERIVED, 'derived')):
+                    seen.setdefault(name, {}).setdefault(label, set()).update(d.sources((kind,)))
+        result['sources_union'] = {n: {k: len(v) for k, v in kinds.items()} for n, kinds in seen.items()}
+        result['distinct_screens'] = len({sc.screen_sha256 for sc in scenes})
         result['screen_sha256'] = scene.screen_sha256
         result['domains'] = scene.snapshot.kind_counts()
         sw = pt.swatches(scene, system)
@@ -61,7 +93,7 @@ def one(sha, entry, core, system, frames, outdir):
                 edited = bytearray(rom)
                 for o, _, n in writes:
                     edited[o] = n
-                r = pv.verify_edit(fe_for, rom, bytes(edited), scene, buttons_for=tp.script) if writes else {'verified': False}
+                r = pv.verify_edit(fe_for, rom, bytes(edited), scene, buttons_for=explore) if writes else {'verified': False}
                 result['causal'] = {'entry': target.entry, 'domain': target.domain, 'writes': len(writes), 'verified': r['verified'],
                                     'changed': {k: len(v) for k, v in r.get('changed', {}).items()}}
             except ValueError as e:
