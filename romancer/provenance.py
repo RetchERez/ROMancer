@@ -102,14 +102,26 @@ class TraceSession:
         self.checkpoints = [(self.frame, self.fe.serialize())]
 
     def run(self, frames: int, buttons_for: Callable[[int], Iterable[str]] = lambda f: ()):
-        for _ in range(frames):
-            self.fe.run_frame(list(buttons_for(self.frame)))
-            self.frame += 1
-            if self.frame % self.every == 0:
-                self.checkpoints.append((self.frame, self.fe.serialize()))
-                if len(self.checkpoints) > self.keep:
-                    del self.checkpoints[1]  # keep the boot checkpoint
-        return self.fe.last_frame
+        fe = self.fe
+        # Converting every frame to RGB costs far more than emulating it; only the
+        # last frame of a run is ever looked at, so let the frontend keep just that one.
+        batch = frames > 1 and hasattr(fe, '_publish_video') and not getattr(fe, '_batch_video', False)
+        if batch:
+            fe._batch_video, fe._pending_video = True, None
+        try:
+            for _ in range(frames):
+                fe.run_frame(list(buttons_for(self.frame)))
+                self.frame += 1
+                if self.frame % self.every == 0:
+                    self.checkpoints.append((self.frame, fe.serialize()))
+                    if len(self.checkpoints) > self.keep:
+                        del self.checkpoints[1]  # keep the boot checkpoint
+        finally:
+            if batch:
+                pending, fe._batch_video, fe._pending_video = fe._pending_video, False, None
+                if pending is not None:
+                    fe._publish_video(*pending)
+        return fe.last_frame
 
     def snapshot(self) -> Snapshot:
         domains = {}

@@ -7,18 +7,29 @@ the core's own arrays as `data`. Everything is under ROMANCER_TRACE, so the
 untraced build is unchanged. Only PROFILE=balanced (sfc/alt/ppu-balanced) is
 hooked; the accuracy/performance PPUs are not.
 
-TODO: coprocessors that read ROM through their own buses (SA-1, SuperFX,
-S-DD1, SPC7110, Cx4) are not traced: their ROM/RAM reads carry no tag, and
-SA-1 I-RAM / BW-RAM are not domains. DSP-1..4 / ST010 games work, since the
-S-CPU reads their ROM through the normal cartridge mapping.
+Coprocessor boards (SA-1, SuperFX, S-DD1, SPC7110, Cx4) serve the S-CPU's ROM
+reads through the chip's own bus handler instead of a plain mapping. Those
+reads are followed through MappedRAM::read: the byte the handler returned is
+tagged with its offset in the chip's ROM buffer when the value matches, and as
+derived when the handler changed it on the way (S-DD1 / SPC7110 decompression).
+
+TODO: what the coprocessor itself computes is still not traced: the SA-1 and
+SuperFX CPUs' own ROM reads carry no tag, and SA-1 I-RAM / BW-RAM and SuperFX
+RAM are not domains, so data they prepare reaches the S-CPU untagged.
+DSP-1..4 / ST010 games work, since the S-CPU reads their ROM through the
+normal cartridge mapping.
 """
 import sys
 from pathlib import Path
 
 root = Path(sys.argv[1])
+# --chip-readers-only upgrades a tree patched by an earlier version of this script.
+skip = '--chip-readers-only' in sys.argv
 
 
 def edit(rel, old, new, count=1):
+    if skip:
+        return
     p = root / rel
     t = p.read_text(encoding='utf-8', newline='')
     if '\r\n' in t:
@@ -102,8 +113,10 @@ edit('sfc/memory/memory.hpp', '  uint8 lookup[16 * 1024 * 1024];\n', '''#ifdef R
 #endif
   uint8 lookup[16 * 1024 * 1024];
 ''')
+# Function-mapped regions (coprocessor handlers) leave fastptr uninitialized: trust it only for fast mappings.
+RT_PTR = '  rt_ptr[id] = (fastmode != Cartridge::Mapping::fastmode_slow) ? fastptr : nullptr;'
 edit('sfc/memory/memory.cpp', '  unsigned id = idcount++;\n',
-     '  unsigned id = idcount++;\n' + T.format('  rt_ptr[id] = fastptr;'))
+     '  unsigned id = idcount++;\n' + T.format(RT_PTR))
 edit('sfc/memory/memory.cpp', '#include <sfc/sfc.hpp>\n',
      T.format('#define ROMANCER_TRACE_IMPLEMENTATION') + '#include <sfc/sfc.hpp>\n')
 edit('sfc/memory/memory.cpp', 'Bus bus;\n', '''Bus bus;
@@ -266,6 +279,52 @@ edit(MM, '''void PPU::mmio_w2122(uint8 value) {
     cgram_mmio_write((regs.cgram_addr & 0x01fe) + 1, value & 0x7f);
   }
 ''')
+
+# ---- coprocessor boards: follow S-CPU ROM reads through the chip's handler ----
+skip = False
+if '--chip-readers-only' in sys.argv:
+    edit('sfc/memory/memory.cpp', '  rt_ptr[id] = fastptr;', RT_PTR)
+edit('sfc/sfc.hpp', '    bool dma = false;         /* a DMA/HDMA write is in progress */\n',
+     '    bool dma = false;          /* a DMA/HDMA write is in progress */\n'
+     '    const uint8 *last_mapped = nullptr;  /* byte last read through MappedRAM::read (chip ROM handlers) */\n')
+edit('sfc/memory/memory-inline.hpp', 'uint8 MappedRAM::read(unsigned addr) { return data_[addr]; }\n',
+     'uint8 MappedRAM::read(unsigned addr) { RT_SFC(rtrace.last_mapped = data_ + addr;) return data_[addr]; }\n')
+edit('sfc/sfc.hpp', '''    const uint8 *b = cartridge.rom.data();
+    return (p && b && p >= b && p < b + cartridge.rom.size()) ? (uint32_t)(p - b) : RT_PC_NONE;
+''', '''    if(!p) return RT_PC_NONE;
+    /* Coprocessor boards keep the game ROM in the chip's own buffer. */
+    MappedRAM* roms[] = {&cartridge.rom, &sa1.rom, &superfx.rom, &sdd1.rom, &hitachidsp.rom, &spc7110.prom};
+    for(MappedRAM* m : roms) {
+      const uint8 *b = m->data();
+      if(b && p >= b && p < b + m->size()) return (uint32_t)(p - b);
+    }
+    const uint8 *d = spc7110.drom.data();  //data ROM follows the program ROM in the file
+    if(d && p >= d && p < d + spc7110.drom.size()) return (uint32_t)(spc7110.prom.size() + (p - d));
+    return RT_PC_NONE;
+''')
+edit('sfc/cpu/memory/memory.cpp', '  regs.mdr = bus.read(addr);\n',
+     '  RT_SFC(rtrace.last_mapped = nullptr;)\n  regs.mdr = bus.read(addr);\n')
+edit('sfc/cpu/memory/memory.cpp', '''  const uint8* p = bus.rt_resolve(addr);
+  uint32_t rom = rtrace.rom_offset(p);
+''', '''  const uint8* p = bus.rt_resolve(addr);
+  if(!p && rtrace.last_mapped) {  //served by a coprocessor's bus handler
+    uint32_t chip = rtrace.rom_offset(rtrace.last_mapped);
+    if(chip != RT_PC_NONE) {
+      if(*rtrace.last_mapped == v) p = rtrace.last_mapped;
+      else if(!(rt_fetch & 2)) { rt_read_tagged(RT_TAG(RT_DERIVED, chip), v); return; }  //decompressed on the way
+    }
+  }
+  uint32_t rom = rtrace.rom_offset(p);
+''')
+edit('sfc/cpu/memory/memory.cpp', '  return rtrace.tag_of(bus.rt_resolve(addr));\n', '''  const uint8* p = bus.rt_resolve(addr);
+  if(!p && rtrace.last_mapped) {  //served by a coprocessor's bus handler
+    uint32_t chip = rtrace.rom_offset(rtrace.last_mapped);
+    if(chip != RT_PC_NONE) return RT_TAG(*rtrace.last_mapped == regs.mdr ? RT_ROM : RT_DERIVED, chip);
+  }
+  return rtrace.tag_of(p);
+''')
+edit('sfc/cpu/dma/dma.cpp', '  if(dma_addr_valid(abus) == false) return 0x00;\n  return bus.read(abus);\n',
+     '  RT_SFC(rtrace.last_mapped = nullptr;)\n  if(dma_addr_valid(abus) == false) return 0x00;\n  return bus.read(abus);\n')
 
 # ---- export the tracing API -------------------------------------------------
 p = root / 'target-libretro' / 'link.T'

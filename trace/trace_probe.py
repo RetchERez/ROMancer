@@ -17,6 +17,7 @@ import argparse
 import ctypes
 import hashlib
 import io
+import re
 import json
 import random
 import sys
@@ -40,8 +41,8 @@ class Domain(ctypes.Structure):
 
 
 def read_rom(spec):
-    if '!' in spec:
-        archive, *members = spec.split('!')
+    if re.search(r'\.zip!', spec, re.I):
+        archive, *members = re.split(r'(?<=\.zip)!', spec, flags=re.I)  # names may contain '!'
         data = Path(archive).read_bytes()
         for member in members:  # nested ZIPs: outer.zip!inner.zip!game.gb
             with zipfile.ZipFile(io.BytesIO(data)) as z:
@@ -62,10 +63,10 @@ def script(frame):
     return ['start'] if (frame // 90) % 2 else ['a']
 
 
-def run(core, rom_bytes, suffix, frames, workdir):
+def run(core, rom_bytes, suffix, frames, workdir, options=None):
     path = Path(workdir) / ('game' + suffix)
     path.write_bytes(rom_bytes)
-    fe = LibretroFrontend(core, save_dir=Path(workdir) / 'rt')
+    fe = LibretroFrontend(core, save_dir=Path(workdir) / 'rt', core_options=dict(options or {}))
     lib = fe.lib
     lib.romancer_trace_domain.restype = ctypes.POINTER(Domain)
     lib.romancer_trace_writes.restype = ctypes.c_uint64
@@ -114,11 +115,13 @@ def main():
     ap.add_argument('--domains', default='palette')
     ap.add_argument('--seed', type=int, default=1)
     ap.add_argument('--out')
+    ap.add_argument('--option', action='append', default=[], help='core option key=value (repeatable)')
     a = ap.parse_args()
     rom, suffix = read_rom(a.rom)
     skip = header_skip(rom, suffix)
+    options = dict(o.split('=', 1) for o in a.option)
     with tempfile.TemporaryDirectory() as work:
-        domains, writes, frame = run(a.core, rom, suffix, a.frames, work)
+        domains, writes, frame = run(a.core, rom, suffix, a.frames, work, options)
         result = {'core': a.core, 'rom_sha256': hashlib.sha256(rom).hexdigest(), 'frames': a.frames,
                   'writes': writes, 'frame_sha256': frame, 'domains': summarize(domains, rom, skip)}
         if a.causal:
@@ -130,7 +133,7 @@ def main():
                 for i in rng.sample(candidates, min(a.causal, len(candidates))):
                     off = (d['tag'][i] & 0x0FFFFFFF) + skip
                     edited = bytearray(rom); edited[off] ^= 0x0E  # visible in every palette format
-                    again, _, _ = run(a.core, bytes(edited), suffix, a.frames, work)
+                    again, _, _ = run(a.core, bytes(edited), suffix, a.frames, work, options)
                     after = again[name]['data'][i]
                     trials.append({'domain': name, 'index': i, 'rom_offset': off - skip,
                                    'before': d['data'][i], 'after': after, 'changed': after != d['data'][i]})

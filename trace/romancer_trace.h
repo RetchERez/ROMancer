@@ -44,7 +44,10 @@ extern "C" {
 #define RT_RING 8
 #define RT_MAX_DOMAINS 16
 
-#if defined(_WIN32)
+#if defined(_WIN32) && defined(__GNUC__)
+/* spelled with underscores: bsnes/nall defines a `dllexport` macro */
+#define RT_EXPORT __attribute__((__dllexport__))
+#elif defined(_WIN32)
 #define RT_EXPORT __declspec(dllexport)
 #else
 #define RT_EXPORT __attribute__((visibility("default")))

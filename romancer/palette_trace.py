@@ -6,7 +6,7 @@ those offsets; romancer.provenance.verify_edit then confirms them.
 """
 from __future__ import annotations
 
-from dataclasses import dataclass, field
+from dataclasses import dataclass, field, replace
 
 from .level_palette import decode_palette, encode_palette
 from .provenance import RT_DERIVED, RT_IMM, RT_ROM, RT_WEAK, Scene, tag_kind, tag_offset
@@ -81,6 +81,16 @@ def swatches(scene: Scene, system: str) -> list[Swatch]:
     return out
 
 
+def encode_swatch(swatch: Swatch, rgb) -> bytes:
+    """The bytes palette RAM holds once this entry shows `rgb` (four shades for a DMG register)."""
+    if swatch.format == 'nes-index':
+        best = min(range(64), key=lambda i: sum((a - b) ** 2 for a, b in zip(NES_RGB[i], rgb)) + (i & 0x0F in (0x0D, 0x0E, 0x0F)) * 10**6)
+        return bytes([(swatch.stored[0] & 0xC0) | best])
+    if swatch.format == 'dmg-shades':
+        return bytes(encode_palette([list(c) for c in rgb], 'dmg-shades', swatch.stored))
+    return bytes(encode_palette([list(rgb)], swatch.format, swatch.stored))
+
+
 def plan_color_edit(swatch: Swatch, rgb, rom: bytes) -> list[tuple[int, int, int]]:
     """ROM writes [(offset, old, new)] that store `rgb` in this entry.
 
@@ -89,22 +99,56 @@ def plan_color_edit(swatch: Swatch, rgb, rom: bytes) -> list[tuple[int, int, int
     """
     if not swatch.editable:
         raise ValueError('This color is computed by the game; locate its source before editing.')
-    if swatch.format == 'nes-index':
-        best = min(range(64), key=lambda i: sum((a - b) ** 2 for a, b in zip(NES_RGB[i], rgb)) + (i & 0x0F in (0x0D, 0x0E, 0x0F)) * 10**6)
-        new = bytes([(swatch.stored[0] & 0xC0) | best])
-    elif swatch.format == 'dmg-shades':
-        new = encode_palette([list(c) for c in rgb], 'dmg-shades', swatch.stored)
-    else:
-        new = encode_palette([list(rgb)], swatch.format, swatch.stored)
+    new = encode_swatch(swatch, rgb)
     writes = []
+    # NES tags count from the end of the 16-byte iNES header; `rom` is the whole file.
+    skip = 16 if swatch.format == 'nes-index' and rom[:4] == b'NES\x1a' else 0
     for k, src in enumerate(swatch.sources):
         if new[k] == swatch.stored[k]:
             continue
-        off = src['offset']
+        off = src['offset'] + skip
         if off >= len(rom) or rom[off] != swatch.stored[k]:
             raise ValueError('ROM byte at the traced source differs from the stored color; take a new scene.')
         writes.append((off, rom[off], new[k]))
     return writes
+
+
+def plan_derived_edit(swatch: Swatch, rgb, rom: bytes, radius: int = 3) -> list[tuple[int, int, int]]:
+    """ROM writes for a 'derived' entry that the game is passing through unchanged right now.
+
+    Fade and brightness routines compute every color, so their output is tagged
+    derived even at full brightness, and a derived tag only names the last ROM
+    byte that went into the value (usually the high byte of the color). When
+    the stored bytes sit in the ROM at, or within `radius` bytes of, a traced
+    offset, that place is the palette data itself and can be written like a
+    direct source. This is a proposal: the entry counts as editable only after
+    verify_edit shows the planned color arriving in palette RAM.
+    """
+    if swatch.status != 'derived':
+        raise ValueError('This color is not computed; use plan_color_edit.')
+    skip = 16 if swatch.format == 'nes-index' and rom[:4] == b'NES' else 0
+    size = len(swatch.stored)
+    srcs = swatch.sources
+
+    def as_direct(offsets):
+        direct = [{'offset': o, 'kind': 'rom', 'weak': False, 'pc': None} for o in offsets]
+        return plan_color_edit(replace(swatch, status='rom', sources=direct), rgb, rom)
+
+    # Each byte still equals the ROM byte it was computed from.
+    if all(s and s['offset'] + skip < len(rom) and rom[s['offset'] + skip] == swatch.stored[k] for k, s in enumerate(srcs))             and len({s['offset'] for s in srcs}) == size:
+        return as_direct([s['offset'] for s in srcs])
+    # The whole entry sits next to a traced offset; prefer the place that ends on it.
+    places = set()
+    for s in srcs:
+        if not s:
+            continue
+        for start in range(max(0, s['offset'] - radius - size + 1), s['offset'] + radius + 1):
+            if rom[start + skip:start + skip + size] == swatch.stored:
+                places.add((abs(start + size - 1 - s['offset']), abs(start - s['offset']), start))
+    if not places:
+        raise ValueError('This color is not a plain copy of its source right now (mid-fade, recolored or compressed).')
+    start = min(places)[2]
+    return as_direct(list(range(start, start + size)))
 
 
 def locate_derived_source(verify, rom: bytes, swatch: Swatch, scene: Scene, radius: int = 3):
@@ -116,10 +160,12 @@ def locate_derived_source(verify, rom: bytes, swatch: Swatch, scene: Scene, radi
     """
     hits = []
     seen = set()
+    # NES tags count from the end of the 16-byte iNES header; `rom` may be the whole file.
+    skip = 16 if swatch.format == 'nes-index' and rom[:4] == b'NES\x1a' else 0
     for src in swatch.sources:
         if not src or src['kind'] != 'derived':
             continue
-        for off in range(max(0, src['offset'] - radius), min(len(rom), src['offset'] + radius + 1)):
+        for off in range(max(skip, src['offset'] + skip - radius), min(len(rom), src['offset'] + skip + radius + 1)):
             if off in seen:
                 continue
             seen.add(off)

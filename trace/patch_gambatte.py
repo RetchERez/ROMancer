@@ -22,6 +22,7 @@ T = '#ifdef ROMANCER_TRACE\n{}\n#endif\n'
 edit('mem/cartridge.h', '         unsigned char * vramdata() const\n',
      '         const unsigned char * romBase() const { return memptrs_.romdata(); }\n'
      '         const unsigned char * romEnd() const { return memptrs_.romdataend(); }\n'
+     '         unsigned rtWramSize() const { return (unsigned)(memptrs_.wramdataend() - memptrs_.wramdata(0)); }\n'
      '         unsigned char * vramdata() const\n')
 
 HOOKS = r'''
@@ -34,7 +35,8 @@ public:
 	void rtInit() {
 		uint32_t *t = rtTag_, *c = rtPc_;
 		rtVram_ = rt_register("vram", 0x4000, t, c, cart_.vramdata()); t += 0x4000; c += 0x4000;
-		rtWram_ = rt_register("wram", 0x8000, t, c, cart_.wramdata(0)); t += 0x8000; c += 0x8000;
+		/* DMG carts allocate 8 KB of work RAM, CGB carts 32 KB: never expose bytes past the allocation. */
+		rtWram_ = rt_register("wram", cart_.rtWramSize(), t, c, cart_.wramdata(0)); t += 0x8000; c += 0x8000;
 		rtHram_ = rt_register("hram", 0x80, t, c, ioamhram_ + 0x180); t += 0x80; c += 0x80;
 		rtOam_ = rt_register("oam", 0xA0, t, c, ioamhram_); t += 0xA0; c += 0xA0;
 		rtPal_ = rt_register("palette", 0x80, t, c, rtPalData_); t += 0x80; c += 0x80;
@@ -44,7 +46,7 @@ public:
 	uint32_t rtTagOfPtr(const unsigned char *q) const {
 		if (q >= cart_.romBase() && q < cart_.romEnd()) return RT_TAG(RT_ROM, q - cart_.romBase());
 		if (q >= cart_.vramdata() && q < cart_.vramdata() + 0x4000) return rt_tag_at(rtVram_, q - cart_.vramdata());
-		if (q >= cart_.wramdata(0) && q < cart_.wramdata(0) + 0x8000) return rt_tag_at(rtWram_, q - cart_.wramdata(0));
+		if (q >= cart_.wramdata(0) && q < cart_.wramdata(0) + cart_.rtWramSize()) return rt_tag_at(rtWram_, q - cart_.wramdata(0));
 		if (q >= ioamhram_ && q < ioamhram_ + 0xA0) return rt_tag_at(rtOam_, q - ioamhram_);
 		if (q >= ioamhram_ + 0x180 && q < ioamhram_ + 0x200) return rt_tag_at(rtHram_, q - ioamhram_ - 0x180);
 		return RT_NONE;
@@ -78,7 +80,7 @@ public:
 	void rtStore(unsigned char *q, unsigned value) {
 		if (!romancer_trace.enabled) return;
 		if (q >= cart_.vramdata() && q < cart_.vramdata() + 0x4000) rt_write(rtVram_, q - cart_.vramdata(), value);
-		else if (q >= cart_.wramdata(0) && q < cart_.wramdata(0) + 0x8000) rt_write(rtWram_, q - cart_.wramdata(0), value);
+		else if (q >= cart_.wramdata(0) && q < cart_.wramdata(0) + cart_.rtWramSize()) rt_write(rtWram_, q - cart_.wramdata(0), value);
 		else if (q >= ioamhram_ && q < ioamhram_ + 0xA0) rt_write(rtOam_, q - ioamhram_, value);
 		else if (q >= ioamhram_ + 0x180 && q < ioamhram_ + 0x200) rt_write(rtHram_, q - ioamhram_ - 0x180, value);
 	}
