@@ -1,0 +1,59 @@
+ROMancer bundled emulator engines (Linux x86-64)
+These engines are third-party code, not authored by ROMancer.
+The MIT license for ROMancer does not replace the licenses below.
+Each engine retains its upstream copyright and license notices.
+Corresponding source and original notices: CORE-SOURCES.zip in this folder.
+Source build recipe: linux/build_cores_linux.sh in the ROMancer source repository.
+The source archive omits unused standalone profile data, mobile-platform links and upstream cinema test ROMs; all libretro build inputs are retained.
+No commercial games, separately supplied firmware dumps or user data are included.
+
+FCEUmm - GPL-2.0
+Upstream: https://github.com/libretro/libretro-fceumm/tree/ac0d00a7fc01166f84c7bac01d1084ebfd2b865e
+License: licenses/fceumm.txt
+All copyright statements and component-specific notices remain in fceumm/ in CORE-SOURCES.zip.
+
+bsnes-mercury Balanced - GPL-3.0
+Upstream: https://github.com/libretro/bsnes-mercury/tree/79d7f9de218b6ffa65a80bbdc5828532bc239232
+License: licenses/bsnes-mercury.txt
+All copyright statements and component-specific notices remain in bsnes-mercury/ in CORE-SOURCES.zip.
+
+BlastEm - GPL-3.0
+Upstream: https://github.com/libretro/blastem/tree/ab743653ed110eeb7b1fe64d00cc5f9279c2bfec
+License: licenses/blastem.txt
+All copyright statements and component-specific notices remain in blastem/ in CORE-SOURCES.zip.
+
+Gambatte - GPL-2.0
+Upstream: https://github.com/libretro/gambatte-libretro/tree/d9d6cd06382d1ced30de34d56d3609452323dab1
+License: licenses/gambatte.txt
+All copyright statements and component-specific notices remain in gambatte/ in CORE-SOURCES.zip.
+
+
+
+mGBA Game Boy Color tilt core - MPL-2.0
+Upstream: https://github.com/libretro/mgba/tree/7a12d6d4b9acb14c0ae62c9166b6a2f3d08007f6
+License: licenses/mgba.txt
+The Game Boy-only build includes the modified libretro source and the
+ROMANCER_GB_ONLY.patch in CORE-SOURCES.zip. All upstream component
+notices are retained there. The core is selected for the checked MBC7 cartridge.
+
+Linux toolchain: Zig 0.13.0 (clang/LLVM) targeting x86_64-linux-gnu with glibc 2.28 symbol versions.
+The C++ engines statically include LLVM libc++, libc++abi and libunwind, and all engines include LLVM compiler-rt;
+these are Apache-2.0 WITH LLVM-exception, retained in licenses/toolchain-llvm-runtime-LICENSE.txt.
+The compiler itself is not bundled. The Windows-only SNES MSVCRT build patch is not applied on Linux;
+the Linux engines build the CORE-SOURCES.zip sources with one build patch:
+BlastEm (GPL-3.0) Linux build patch: linux-build-patches/blastem-linux-cpuid.patch in this folder.
+It reads the SSE2/POPCNT CPUID bits through <cpuid.h> instead of __builtin_cpu_supports, which the
+Zig linker cannot relocate inside a shared library. Emulation logic is unchanged. The patch is inert
+unless ROMANCER_CPUID_H is defined. BlastEm's embedded rom.db/systems.cfg C data is generated with
+carriage returns removed (the config parser treats them as whitespace).
+Rebuilt binaries may differ with compiler version, paths and timestamps. Release library identities are pinned independently for each platform.
+
+
+ROMancer modification to BlastEm: SMS two-button/console Pause mapping, accurate descriptors and per-content input reset; serialize at a Z80 instruction boundary; refuse serialization before execution; guard missing instruction-size metadata when invalidated banked ROM code is retranslated after state restore. Genesis controller mappings retained. The three modified files and exact patches/blastem-sms-input.patch are in CORE-SOURCES.zip. Build with linux/build_cores_linux.sh (Linux) or tools/build_cores.py (Windows). Native regression checks both buttons, Pause NMI, next-frame image and RAM equality after save/load state.
+
+ROMancer DSP-4 state fix for bsnes-mercury Balanced (GPL-3.0)
+The separate DSP-4 core serializes the chip command buffers and projection
+state. It is used for the checked Top Gear 3000 cartridge. The default SNES
+core is kept for other cartridges and their existing saved states. The
+modified sources and ROMANCER_DSP4_STATE.patch are in CORE-SOURCES.zip.
+Both builds retain the bsnes-mercury license and original notices.

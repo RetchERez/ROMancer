@@ -1,0 +1,25 @@
+--- a/blastem/gen_x86.c
++++ b/blastem/gen_x86.c
+@@ -4,6 +4,9 @@
+  BlastEm is free software distributed under the terms of the GNU General Public License version 3 or greater. See COPYING for full license text.
+ */
+ #include "gen_x86.h"
++#ifdef ROMANCER_CPUID_H
++#include <cpuid.h>
++#endif
+ #include "mem.h"
+ #include "util.h"
+ #include <stddef.h>
+@@ -2671,6 +2674,12 @@
+ 		has_sse2 = !!(info[3] & (1 << 26));
+ 		has_popcnt = !!(info[2] & (1 << 23));
+ 	}
++#elif defined(ROMANCER_CPUID_H)
++	unsigned int eax, ebx, ecx, edx;
++	if (__get_cpuid(1, &eax, &ebx, &ecx, &edx)) {
++		has_sse2 = !!(edx & (1 << 26));
++		has_popcnt = !!(ecx & (1 << 23));
++	}
+ #else
+ 	__builtin_cpu_init();
+ 	has_sse2 = __builtin_cpu_supports("sse2");

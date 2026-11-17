@@ -18,7 +18,9 @@ def pack_root():
 
 def packaged_release():
     app=Path(__file__).resolve().parents[1]
-    return app.name=='app' and (app.parent/'python/python314._pth').is_file()
+    if app.name!='app':return False
+    # Windows embeds python314._pth; the Linux release marks its engine folder.
+    return (app.parent/'python/python314._pth').is_file() or (app.parent/'cores/LINUX-ENGINES.json').is_file()
 
 
 def require_reviewed_release_core(path):
@@ -31,11 +33,12 @@ def require_reviewed_release_core(path):
     with checked_path(Path(path)).open('rb') as stream:sha=hashlib.file_digest(stream,'sha256').hexdigest()
     for pin in CORE_PINS.values():
         if sha==pin['sha256'] and pin.get('license') and pin.get('source_url') and pin.get('source_commit'):return pin
-    raise ValueError('This release runs only reviewed open-source emulator cores. Select an included engine or reinstall the full Windows package; an unknown or changed core is blocked.')
+    raise ValueError('This release runs only reviewed open-source emulator cores. Select an included engine or reinstall the full ROMancer package; an unknown or changed core is blocked.')
 
 
 def host_supported():
-    return os.name=='nt' and platform.machine().lower() in ('amd64','x86_64')
+    if platform.machine().lower() not in ('amd64','x86_64'):return False
+    return os.name=='nt' or (pack_root()/'LINUX-ENGINES.json').is_file()
 
 
 def _fingerprint(root):

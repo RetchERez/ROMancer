@@ -93,3 +93,21 @@ CORE_FILES = {'CORE-ORIGINS.json': {'size': 2575,
                                                 'sha256': '63263614cdd29f2f93cba85e992f041b31f9fc7b4033692f31269489a8a1b177'},
  'mgba_gbc_libretro.dll': {'size': 3179055,
                            'sha256': 'eae97901714894e39ef03c940d7c8498bc15a330aa7e92575f5d78f3699320c3'}}
+
+# The catalog's recorded playtest proofs were measured with the Windows engines.
+WINDOWS_CORE_PINS = CORE_PINS
+WINDOWS_CORE_FILES = CORE_FILES
+
+
+def _linux_engine_pack():
+    """True only inside the Linux x86-64 release, whose engine folder carries its own marker."""
+    import os
+    import platform
+    from pathlib import Path
+    if os.name == 'nt' or platform.machine().lower() not in ('x86_64', 'amd64'):
+        return False
+    return (Path(__file__).resolve().parents[2] / 'cores' / 'LINUX-ENGINES.json').is_file()
+
+
+if _linux_engine_pack():
+    from .core_pins_linux import CORE_PINS, CORE_FILES  # noqa: F811

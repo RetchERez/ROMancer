@@ -13,7 +13,7 @@ if __package__ in (None, ''):
 
 from romancer.cd_patch import check_output_paths
 
-DIRECTORIES = {'romancer', 'examples', 'profiles', 'tests', 'tools', 'knowledge', '.github', 'user-guide'}
+DIRECTORIES = {'romancer', 'examples', 'profiles', 'tests', 'tools', 'knowledge', '.github', 'user-guide', 'linux'}
 ROOT_FILES = {'README.txt', 'run.sh', 'run.ps1', 'Launch ROMancer.cmd',
               'launch.ps1', 'desktop_window.ps1', 'requirements.txt', 'THIRD_PARTY_NOTICES.txt',
               'LICENSE', 'NSIS-LICENSE.txt', '.gitignore', '.gitattributes', '.editorconfig',
@@ -27,6 +27,16 @@ READ_CHUNK_BYTES = 64 * 1024
 # Release source selection is explicit. Adding a file or fixture requires review;
 # a text extension or placement under docs/tests never grants distribution approval.
 APPROVED_FILES = frozenset({
+    'romancer/core_pins_linux.py',
+    'linux/ROMancer.sh',
+    'linux/package_linux.sh',
+    'linux/build_cores_linux.sh',
+    'linux/write_linux_pins.py',
+    'linux/README-LINUX.txt',
+    'linux/ENGINES-NOTICES.txt',
+    'linux/romancer.ico',
+    'linux/engine-licenses/toolchain-llvm-runtime-LICENSE.txt',
+    'linux/patches/blastem-linux-cpuid.patch',
     'romancer/catalog_playtest.py',
     'knowledge/catalog_playtest.json',
     'romancer/runtime_content.py',
