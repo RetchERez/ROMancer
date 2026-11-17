@@ -1009,14 +1009,17 @@ class Sm83:
 
     def __init__(self, rom, vram):
         self.rom, self.vram = rom, vram            # vram: two 0x2000 banks
+        self.bank = 1
         self.io = bytearray(0x100)
         self.stack = []
         self.r = dict(a=0, b=0, c=0, d=0, e=0, h=0, l=0, z=0, cy=0)
         self.steps = 0
 
     def rd(self, a):
-        if a < 0x8000:
+        if a < 0x4000:
             return self.rom[a]
+        if a < 0x8000:
+            return self.rom[self.bank * 0x4000 + a - 0x4000]
         if a < 0xA000:
             return self.vram[(self.io[0x4F] & 1) * 0x2000 + a - 0x8000]
         if a >= 0xFF00:
@@ -1028,6 +1031,8 @@ class Sm83:
             self.vram[(self.io[0x4F] & 1) * 0x2000 + a - 0x8000] = v
         elif a >= 0xFF00:
             self.io[a - 0xFF00] = v
+        elif 0x2000 <= a < 0x4000:
+            self.bank = v or 1
         else:
             raise AssertionError('write to ' + hex(a))
 
@@ -1043,7 +1048,7 @@ class Sm83:
         while pc != stop:
             self.steps += 1
             assert self.steps < 100000, 'runaway'
-            op = self.rom[pc]; n = self.rom[pc + 1]; nn = n | self.rom[pc + 2] << 8
+            op = self.rd(pc); n = self.rd(pc + 1); nn = n | self.rd(pc + 2) << 8
             rel = pc + 2 + (n - 256 if n & 0x80 else n)
             if op in (0xF5, 0xC5, 0xD5, 0xE5):
                 name = {0xF5: 'af', 0xC5: 'bc', 0xD5: 'de', 0xE5: 'hl'}[op]
@@ -1084,6 +1089,17 @@ class Sm83:
             elif op == 0x6F: r['l'] = r['a']; pc += 1
             elif op == 0x24: r['h'] = (r['h'] + 1) & 0xFF; r['z'] = int(r['h'] == 0); pc += 1
             elif op == 0xC3: pc = nn
+            elif op == 0xEA: self.wr(nn, r['a']); pc += 3
+            elif op == 0xFA: r['a'] = self.rd(nn); pc += 3
+            elif op == 0xCD: self.stack.append(('ret', pc + 3)); pc = nn
+            elif op == 0xC9: kind, pc = self.stack.pop(); assert kind == 'ret'
+            elif op == 0x67: r['h'] = r['a']; pc += 1
+            elif op == 0x11: r['d'], r['e'] = nn >> 8, nn & 0xFF; pc += 3
+            elif op == 0x13: v = (de() + 1) & 0xFFFF; r['d'], r['e'] = v >> 8, v & 0xFF; pc += 1
+            elif op == 0xBC: cp(r['h']); pc += 1
+            elif op == 0xBD: cp(r['l']); pc += 1
+            elif op == 0xE6: r['a'] &= n; r['z'], r['cy'] = int(r['a'] == 0), 0; pc += 2
+            elif op == 0x3D: r['a'] = (r['a'] - 1) & 0xFF; r['z'] = int(r['a'] == 0); pc += 1
             else:
                 raise AssertionError(f'opcode {op:02X} at {pc:04X}')
         return pc
@@ -1180,7 +1196,7 @@ class OverlayTests(unittest.TestCase):
             gt.plan_overlay_patch([(t, [0] * 64)], bytes(unused), 'gb')
         with self.assertRaisesRegex(ValueError, 'changes nothing'):
             gt.plan_overlay_patch([(t, t.pixels)], rom, 'gb')
-        with self.assertRaisesRegex(ValueError, 'not implemented'):
+        with self.assertRaisesRegex(ValueError, 'iNES'):
             gt.plan_overlay_patch([(t, [0] * 64)], rom, 'nes')
         self.assertEqual(set(gt.OVERLAY_STATUS), set(gt.CPU.values()))
 
@@ -1199,6 +1215,815 @@ class VerifyPlanTests(unittest.TestCase):
         plan = gt.EditPlan('direct', [(1, 2, 3)], 16, {'vram': {5: 9}})
         plan.verified = {'verified': True, 'as_planned': True, 'changed': {'vram': [5]}}
         json.dumps(plan.to_dict())
+
+
+class Mos6502:
+    """Just enough of the NES processor and picture chip to run the overlay routine."""
+
+    def __init__(self, prg, chr_ram):
+        self.mem = bytearray(0x10000)
+        self.mem[0x10000 - len(prg):] = prg
+        self.chr = chr_ram
+        self.a = self.x = self.y = 0
+        self.z = self.n = self.c = 0
+        self.sp = 0xFD
+        self.v = self.w = self.high = self.buffer = 0
+        self.port_writes = []
+        self.steps = 0
+
+    def rd(self, a):
+        if a == 0x2002:
+            self.w = 0
+            return 0x80
+        if a == 0x2007:
+            out, self.buffer = self.buffer, self.chr[self.v & 0x1FFF]
+            self.v = (self.v + 1) & 0x3FFF
+            return out
+        return self.mem[a]
+
+    def wr(self, a, v):
+        if a == 0x2006:
+            if self.w:
+                self.v = (self.high << 8 | v) & 0x3FFF
+            else:
+                self.high = v
+            self.w ^= 1
+        elif a == 0x2007:
+            self.chr[self.v & 0x1FFF] = v
+            self.v = (self.v + 1) & 0x3FFF
+        elif a in (0x2000, 0x2005):
+            self.port_writes.append((a, v))
+            if a == 0x2005:
+                self.w ^= 1
+        else:
+            assert a < 0x800, hex(a)
+            self.mem[a] = v
+
+    def run(self, pc, stop):
+        def nz(v):
+            self.z, self.n = int(v == 0), v >> 7
+            return v
+
+        def push(v):
+            self.mem[0x100 + self.sp] = v
+            self.sp = (self.sp - 1) & 0xFF
+
+        def pull():
+            self.sp = (self.sp + 1) & 0xFF
+            return self.mem[0x100 + self.sp]
+        while pc != stop:
+            self.steps += 1
+            assert self.steps < 100000, 'runaway'
+            op, n = self.mem[pc], self.mem[pc + 1]
+            nn = n | self.mem[pc + 2] << 8
+            rel = pc + 2 + (n - 256 if n & 0x80 else n)
+            if op == 0x48: push(self.a); pc += 1
+            elif op == 0x68: self.a = nz(pull()); pc += 1
+            elif op == 0x8A: self.a = nz(self.x); pc += 1
+            elif op == 0x98: self.a = nz(self.y); pc += 1
+            elif op == 0xA8: self.y = nz(self.a); pc += 1
+            elif op == 0xAA: self.x = nz(self.a); pc += 1
+            elif op == 0x2C: m = self.rd(nn); self.z, self.n = int(self.a & m == 0), m >> 7; pc += 3
+            elif op == 0xA2: self.x = nz(n); pc += 2
+            elif op == 0xA0: self.y = nz(n); pc += 2
+            elif op == 0xBC: self.y = nz(self.rd(nn + self.x)); pc += 3
+            elif op == 0xBD: self.a = nz(self.rd(nn + self.x)); pc += 3
+            elif op == 0xAD: self.a = nz(self.rd(nn)); pc += 3
+            elif op == 0xA5: self.a = nz(self.rd(n)); pc += 2
+            elif op == 0x29: self.a = nz(self.a & n); pc += 2
+            elif op == 0xDD: m = self.rd(nn + self.x); nz((self.a - m) & 0xFF); self.c = int(self.a >= m); pc += 3
+            elif op == 0x30: pc = rel if self.n else pc + 2
+            elif op == 0xD0: pc = rel if not self.z else pc + 2
+            elif op == 0xF0: pc = rel if self.z else pc + 2
+            elif op == 0x20: push((pc + 2) >> 8); push((pc + 2) & 0xFF); pc = nn
+            elif op == 0x60: lo = pull(); pc = (pull() << 8 | lo) + 1
+            elif op == 0xE8: self.x = nz((self.x + 1) & 0xFF); pc += 1
+            elif op == 0x88: self.y = nz((self.y - 1) & 0xFF); pc += 1
+            elif op == 0x8D: self.wr(nn, self.a); pc += 3
+            elif op == 0x18: self.c = 0; pc += 1
+            elif op == 0x69: t = self.a + n + self.c; self.c = int(t > 0xFF); self.a = nz(t & 0xFF); pc += 2
+            elif op == 0x4C: pc = nn
+            else:
+                raise AssertionError(f'opcode {op:02X} at {pc:04X}')
+        return pc
+
+
+class NesOverlayTests(unittest.TestCase):
+    def setup_game(self, free=0x400, mapper=2):
+        prg = bytearray(b'\x55' * 0x8000)
+        prg[0x7000:0x7000 + free] = b'\xFF' * free                 # free space in the fixed bank ($F000)
+        prg[0x4200:0x4214] = bytes.fromhex('A5108D0520A5118D0520' 'A5128D0020' 'A5138D0120')   # scroll, control, mask
+        prg[0x7FFA:0x7FFC] = b'\x00\xC1'                           # NMI handler at $C100
+        rom = b'NES\x1a' + bytes((2, 0, mapper << 4 & 0xF0, mapper & 0xF0)) + bytes(8) + bytes(prg)
+        chr_ram = bytes(random.Random(11).randrange(256) for _ in range(0x2000))
+        scene = make_scene({'chr': (chr_ram, [tag(pv.RT_DERIVED, 0x1000)] * 0x2000)})
+        return rom, scene, chr_ram
+
+    def run_nmi(self, rom, chr_ram, mask=0x1E):
+        cpu = Mos6502(rom[16:], chr_ram)
+        cpu.mem[0x10:0x14] = bytes((0x21, 0x43, 0x88, mask))
+        cpu.a, cpu.x, cpu.y = 0x12, 0x34, 0x56
+        self.assertEqual(cpu.run(cpu.mem[0xFFFA] | cpu.mem[0xFFFB] << 8, 0xC100), 0xC100)
+        self.assertEqual((cpu.a, cpu.x, cpu.y, cpu.sp), (0x12, 0x34, 0x56, 0xFD))
+        return cpu
+
+    def test_routine_rewrites_exactly_the_edited_tiles(self):
+        rom, scene, chr_ram = self.setup_game()
+        t1 = gt.tile_at(scene, 'nes', 5 * 16, domain='chr')
+        t2 = gt.tile_at(scene, 'nes', 0x1000 + 77 * 16, domain='chr')
+        new1, new2 = [3 - p for p in t1.pixels], [(p + 1) & 3 for p in t2.pixels]
+        plan = gt.plan_overlay_patch([(t1, new1), (t2, new2)], rom, 'nes')
+        self.assertEqual((plan.kind, plan.details['placement'], plan.details['copies']), ('overlay', 'fixed-bank', 1))
+        edited = plan.apply(rom)
+        hook = edited[16 + 0x7FFA] | edited[16 + 0x7FFB] << 8
+        self.assertTrue(0xF000 <= hook < 0xF400)
+        work = bytearray(chr_ram)
+        cpu = self.run_nmi(edited, work)
+        expected = bytearray(chr_ram)
+        expected[80:96] = gt.encode_tile(new1, 'nes-2bpp')
+        expected[0x1000 + 77 * 16:0x1000 + 78 * 16] = gt.encode_tile(new2, 'nes-2bpp')
+        self.assertEqual(work, expected)
+        self.assertEqual(plan.expect['chr'], {i: expected[i] for i in range(0x2000) if expected[i] != chr_ram[i]})
+        # the scroll is set the way the game's own code sets it, and the address latch ends up clear
+        self.assertEqual(cpu.port_writes, [(0x2000, 0x88), (0x2005, 0x21), (0x2005, 0x43)])
+        self.assertEqual(cpu.w, 0)
+        self.run_nmi(edited, work)                      # second frame: nothing more to do
+        self.assertEqual(work, expected)
+
+    def test_other_graphics_and_a_blanked_picture_are_left_alone(self):
+        rom, scene, chr_ram = self.setup_game()
+        t = gt.tile_at(scene, 'nes', 7 * 16, domain='chr')
+        edited = gt.plan_overlay_patch([(t, [3 - p for p in t.pixels])], rom, 'nes').apply(rom)
+        for changed_byte in (0, 7, 15):
+            work = bytearray(chr_ram)
+            work[7 * 16 + changed_byte] ^= 0x10
+            snapshot = bytes(work)
+            self.run_nmi(edited, work)
+            self.assertEqual(bytes(work), snapshot, changed_byte)
+        # the game's mask variable says the picture is off: the routine must not touch the address register
+        work = bytearray(chr_ram)
+        cpu = self.run_nmi(edited, work, mask=0x06)
+        self.assertEqual((bytes(work), cpu.v, cpu.port_writes), (chr_ram, 0, []))
+        # without the guard it works whatever the variable says
+        plain = gt.plan_overlay_patch([(t, [3 - p for p in t.pixels])], rom, 'nes', guard=False)
+        self.assertLess(plain.details['routine_size'], gt.plan_overlay_patch([(t, [0] * 64)], rom, 'nes').details['routine_size'])
+        work = bytearray(chr_ram)
+        self.run_nmi(plain.apply(rom), work, mask=0x06)
+        self.assertEqual(bytes(work[112:128]), gt.encode_tile([3 - p for p in t.pixels], 'nes-2bpp'))
+
+    def test_placement_and_refusals(self):
+        rom, scene, chr_ram = self.setup_game()
+        t = gt.tile_at(scene, 'nes', 16, domain='chr')
+        with self.assertRaisesRegex(ValueError, 'free bytes'):
+            gt.plan_overlay_patch([(t, [0] * 64)], self.setup_game(free=40)[0], 'nes')
+        with self.assertRaisesRegex(ValueError, 'CHR-ROM'):
+            gt.plan_overlay_patch([(t, [0] * 64)], rom[:5] + b'\x01' + rom[6:] + bytes(0x2000), 'nes')
+        with self.assertRaisesRegex(ValueError, 'iNES'):
+            gt.plan_overlay_patch([(t, [0] * 64)], bytes(0x8000), 'nes')
+        # a board that switches all 32 KB needs the routine and the vector in every bank
+        both = rom[:4] + b'\x04' + rom[5:6] + b'\x70' + rom[7:16] + rom[16:] * 2
+        plan = gt.plan_overlay_patch([(t, [0] * 64)], both, 'nes')
+        out = plan.apply(both)
+        self.assertEqual((plan.details['placement'], plan.details['copies']), ('every-bank', 2))
+        self.assertEqual(out[16 + 0x7FFA:16 + 0x7FFC], out[16 + 0xFFFA:16 + 0xFFFC])
+        self.assertEqual(out[16:16 + 0x8000][0x7000:0x7400], out[16 + 0x8000:][0x7000:0x7400])
+        hook = gt.plan_hook_only(rom, 'nes')
+        self.assertEqual((hook.kind, hook.expect), ('hook-only', {'chr': {}}))
+        cpu = Mos6502(hook.apply(rom)[16:], bytearray(chr_ram))
+        cpu.run(cpu.mem[0xFFFA] | cpu.mem[0xFFFB] << 8, 0xC100)
+        self.assertEqual(cpu.steps, 1)
+
+
+class Z80:
+    """Just enough of the Master System processor, mapper and video chip to run the overlay routine."""
+
+    def __init__(self, rom, vram, line=0xC1):
+        self.rom, self.vram, self.line = rom, vram, line
+        self.ram = bytearray(0x2000)
+        self.page = 2
+        self.r = dict(a=0, b=0, c=0, d=0, e=0, h=0, l=0, z=0, cy=0)
+        self.stack = []
+        self.first = None                 # first byte of a control word, when one is pending
+        self.address = self.code = self.buffer = 0
+        self.steps = 0
+
+    def rd(self, a):
+        if a < 0x8000:
+            return self.rom[a]
+        if a < 0xC000:
+            return self.rom[self.page * 0x4000 + a - 0x8000]
+        return self.ram[a & 0x1FFF]
+
+    def wr(self, a, v):
+        assert a >= 0xC000, 'write to ' + hex(a)
+        self.ram[a & 0x1FFF] = v
+        if a == 0xFFFF:
+            self.page = v % (len(self.rom) // 0x4000)
+
+    def port_in(self, n):
+        if n == 0x7E:
+            return self.line
+        if n == 0xBF:
+            self.first = None
+            return 0x80
+        assert n == 0xBE and self.code == 0, 'read in write mode'
+        out, self.buffer = self.buffer, self.vram[self.address]
+        self.address = (self.address + 1) & 0x3FFF
+        return out
+
+    def port_out(self, n, v):
+        if n == 0xBF:
+            if self.first is None:
+                self.first = v
+            else:
+                self.address, self.code, self.first = (v & 0x3F) << 8 | self.first, v >> 6, None
+                if self.code == 0:
+                    self.buffer = self.vram[self.address]
+                    self.address = (self.address + 1) & 0x3FFF
+        else:
+            assert n == 0xBE and self.code == 1 and self.first is None, 'write in read mode'
+            self.vram[self.address] = v
+            self.address = (self.address + 1) & 0x3FFF
+
+    def run(self, pc, stop):
+        r = self.r
+
+        def hl(): return r['h'] << 8 | r['l']
+        def cp(v): r['z'], r['cy'] = int(r['a'] == v), int(r['a'] < v)
+        pairs = {0xF5: 'af', 0xC5: 'bc', 0xD5: 'de', 0xE5: 'hl', 0xF1: 'af', 0xC1: 'bc', 0xD1: 'de', 0xE1: 'hl'}
+        while pc != stop:
+            self.steps += 1
+            assert self.steps < 100000, 'runaway'
+            op, n = self.rd(pc), self.rd(pc + 1)
+            nn = n | self.rd(pc + 2) << 8
+            rel = pc + 2 + (n - 256 if n & 0x80 else n)
+            if op in (0xF5, 0xC5, 0xD5, 0xE5):
+                name = pairs[op]
+                self.stack.append((name, (r['a'], r['z'], r['cy']) if name == 'af' else (r[name[0]], r[name[1]]))); pc += 1
+            elif op in (0xF1, 0xC1, 0xD1, 0xE1):
+                name = pairs[op]
+                pushed, value = self.stack.pop()
+                assert pushed == name, (pushed, name)
+                if name == 'af':
+                    r['a'], r['z'], r['cy'] = value
+                else:
+                    r[name[0]], r[name[1]] = value
+                pc += 1
+            elif op == 0xDB: r['a'] = self.port_in(n); pc += 2
+            elif op == 0xD3: self.port_out(n, r['a']); pc += 2
+            elif op == 0xFE: cp(n); pc += 2
+            elif op == 0x38: pc = rel if r['cy'] else pc + 2
+            elif op == 0x30: pc = rel if not r['cy'] else pc + 2
+            elif op == 0x28: pc = rel if r['z'] else pc + 2
+            elif op == 0x20: pc = rel if not r['z'] else pc + 2
+            elif op == 0x18: pc = rel
+            elif op == 0x10: r['b'] = (r['b'] - 1) & 0xFF; pc = rel if r['b'] else pc + 2
+            elif op == 0x79: r['a'] = r['c']; pc += 1
+            elif op == 0x00: pc += 1
+            elif op == 0x07: r['cy'] = r['a'] >> 7; r['a'] = (r['a'] << 1 | r['cy']) & 0xFF; pc += 1
+            elif op == 0x21: r['h'], r['l'] = nn >> 8, nn & 0xFF; pc += 3
+            elif op == 0x7E: r['a'] = self.rd(hl()); pc += 1
+            elif op == 0x57: r['d'] = r['a']; pc += 1
+            elif op == 0x23: v = (hl() + 1) & 0xFFFF; r['h'], r['l'] = v >> 8, v & 0xFF; pc += 1
+            elif op == 0xBE: cp(self.rd(hl())); pc += 1
+            elif op == 0x5E: r['e'] = self.rd(hl()); pc += 1
+            elif op == 0x56: r['d'] = self.rd(hl()); pc += 1
+            elif op == 0x7B: r['a'] = r['e']; pc += 1
+            elif op == 0x7A: r['a'] = r['d']; pc += 1
+            elif op == 0x78: r['a'] = r['b']; pc += 1
+            elif op == 0x06: r['b'] = n; pc += 2
+            elif op == 0x3E: r['a'] = n; pc += 2
+            elif op == 0xF6: r['a'] |= n; r['z'], r['cy'] = int(r['a'] == 0), 0; pc += 2
+            elif op == 0xC6: r['cy'] = int(r['a'] + n > 0xFF); r['a'] = (r['a'] + n) & 0xFF; r['z'] = int(r['a'] == 0); pc += 2
+            elif op == 0x85: r['cy'] = int(r['a'] + r['l'] > 0xFF); r['a'] = (r['a'] + r['l']) & 0xFF; r['z'] = int(r['a'] == 0); pc += 1
+            elif op == 0x6F: r['l'] = r['a']; pc += 1
+            elif op == 0x24: r['h'] = (r['h'] + 1) & 0xFF; r['z'] = int(r['h'] == 0); pc += 1
+            elif op == 0x3A: r['a'] = self.rd(nn); pc += 3
+            elif op == 0x32: self.wr(nn, r['a']); pc += 3
+            elif op == 0xCD: self.stack.append(('ret', pc + 3)); pc = nn
+            elif op == 0xC9: kind, pc = self.stack.pop(); assert kind == 'ret'
+            elif op == 0xC3: pc = nn
+            else:
+                raise AssertionError(f'opcode {op:02X} at {pc:04X}')
+        return pc
+
+
+class SmsOverlayTests(unittest.TestCase):
+    REGS = dict(a=0x12, b=0x34, c=0x56, d=0x78, e=0x9A, h=0xBC, l=0xDE, z=1, cy=0)
+
+    def setup_game(self, low_free=0x300, vector=b'\xF5\xDB\xBF\xB7'):
+        rom = bytearray(b'\x55' * 0x10000)
+        rom[0x38:0x38 + len(vector)] = vector
+        rom[0x66:0x68] = b'\xED\x45'
+        rom[0x100:0x100 + low_free] = b'\xFF' * low_free          # free space in bank 0
+        rom[0xC800:0xCC00] = b'\xFF' * 0x400                      # and in bank 3
+        vram = bytes(random.Random(12).randrange(256) for _ in range(0x4000))
+        scene = make_scene({'vram': (vram, [tag(pv.RT_DERIVED, 0x9000)] * 0x4000)})
+        return bytes(rom), scene, vram
+
+    def run_interrupt(self, rom, vram, stop=0x3B, **over):
+        cpu = Z80(rom, vram, over.pop('line', 0xC1))
+        cpu.r.update(self.REGS, **over)
+        before = dict(cpu.r)
+        cpu.wr(0xFFFF, 2)
+        self.assertEqual(cpu.run(0x38, stop), stop)
+        self.assertEqual({k: v for k, v in cpu.r.items() if k != 'a'}, {k: v for k, v in before.items() if k != 'a'})
+        self.assertEqual([name for name, _ in cpu.stack], ['af'])     # the handler's own push af, moved into the routine
+        self.assertEqual(cpu.stack[0][1][0], before['a'])
+        self.assertEqual((cpu.page, cpu.ram[0x1FFF], cpu.first), (2, 2, None))
+        return cpu
+
+    def test_routine_in_bank_0(self):
+        rom, scene, vram = self.setup_game()
+        t1, t2 = gt.tile_at(scene, 'sms', 5 * 32), gt.tile_at(scene, 'sms', 300 * 32)
+        new1, new2 = [15 - p for p in t1.pixels], [(p + 1) & 15 for p in t2.pixels]
+        plan = gt.plan_overlay_patch([(t1, new1), (t2, new2)], rom, 'sms')
+        self.assertEqual((plan.kind, plan.details['placement']), ('overlay', 'bank0'))
+        edited = plan.apply(rom)
+        self.assertEqual(edited[0x38], 0xC3)
+        work = bytearray(vram)
+        self.run_interrupt(edited, work)
+        expected = bytearray(vram)
+        expected[160:192] = gt.encode_tile(new1, 'sms-4bpp')
+        expected[9600:9632] = gt.encode_tile(new2, 'sms-4bpp')
+        self.assertEqual(work, expected)
+        self.assertEqual(plan.expect['vram'], {i: expected[i] for i in range(0x4000) if expected[i] != vram[i]})
+        self.run_interrupt(edited, work)
+        self.assertEqual(work, expected)
+        for changed_byte in (0, 13, 31):                 # any differing byte means "not our tile"
+            other = bytearray(vram)
+            other[160 + changed_byte] ^= 0x10
+            other[9600 + changed_byte] ^= 0x10
+            snapshot = bytes(other)
+            self.run_interrupt(edited, other)
+            self.assertEqual(bytes(other), snapshot, changed_byte)
+
+    def test_line_interrupts_and_block_transfers_are_left_alone(self):
+        rom, scene, vram = self.setup_game()
+        t = gt.tile_at(scene, 'sms', 64)
+        edited = gt.plan_overlay_patch([(t, [0] * 64)], rom, 'sms').apply(rom)
+        for over in ({'line': 0x60}, {'c': 0xBE}):
+            work = bytearray(vram)
+            cpu = self.run_interrupt(edited, work, **over)
+            self.assertEqual((bytes(work), cpu.address), (vram, 0), over)
+        unguarded = gt.plan_overlay_patch([(t, [0] * 64)], rom, 'sms', guard=False).apply(rom)
+        work = bytearray(vram)
+        self.run_interrupt(unguarded, work, c=0xBE)
+        self.assertEqual(bytes(work[64:96]), bytes(32))
+
+    def test_paged_routine_and_growth(self):
+        rom, scene, vram = self.setup_game(low_free=0x30)
+        t = gt.tile_at(scene, 'sms', 64)
+        plan = gt.plan_overlay_patch([(t, [0] * 64)], rom, 'sms')
+        self.assertEqual(plan.details['placement'], 'paged')
+        self.assertEqual(plan.details['routine_offset'] // 0x4000, 3)
+        self.assertTrue(0x100 <= plan.details['stub_offset'] < 0x130)
+        work = bytearray(vram)
+        self.run_interrupt(plan.apply(rom), work)             # run_interrupt checks that page 2 is mapped again
+        self.assertEqual(bytes(work[64:96]), bytes(32))
+        full = bytearray(rom); full[0xC800:0xCC00] = b'\x55' * 0x400
+        plan = gt.plan_overlay_patch([(t, [0] * 64)], bytes(full), 'sms')
+        self.assertEqual((plan.details['placement'], plan.rom_size), ('paged-added', 0x20000))
+        self.assertLess(len(plan.writes), 400)                 # the FF fill of the new half is not listed
+        work = bytearray(vram)
+        self.run_interrupt(plan.apply(bytes(full)), work)
+        self.assertEqual(bytes(work[64:96]), bytes(32))
+        with self.assertRaisesRegex(ValueError, 'free bytes for the overlay routine'):
+            gt.plan_overlay_patch([(t, [0] * 64)], bytes(full), 'sms', grow=False)
+        with self.assertRaisesRegex(ValueError, 'stub'):
+            gt.plan_overlay_patch([(t, [0] * 64)], self.setup_game(low_free=8)[0], 'sms')
+
+    def test_hook_and_displaced_code(self):
+        from romancer import gfx_overlay8 as o8
+        rom, scene, vram = self.setup_game(vector=b'\xC3\x00\x02')        # jp $0200: nothing to move, the jump is retargeted
+        t = gt.tile_at(scene, 'sms', 64)
+        edited = gt.plan_overlay_patch([(t, [0] * 64)], rom, 'sms').apply(rom)
+        cpu = Z80(edited, bytearray(vram)); cpu.r.update(self.REGS)
+        cpu.run(0x38, 0x200)
+        self.assertEqual((cpu.stack, bytes(cpu.vram[64:96])), ([], bytes(32)))
+        with self.assertRaisesRegex(ValueError, 'cannot be moved'):
+            gt.plan_overlay_patch([(t, [0] * 64)], self.setup_game(vector=b'\x20\x05\x00')[0], 'sms')
+        with self.assertRaisesRegex(ValueError, 'no interrupt handler'):
+            gt.plan_overlay_patch([(t, [0] * 64)], self.setup_game(vector=b'\xFF\xFF\xFF')[0], 'sms')
+        self.assertEqual([o8.z80_length(bytes.fromhex(h), 0) for h in ('F5', 'DBBF', 'C30000', 'ED4D', 'ED430000', '3E01', '21FCFF', 'CB7F', '18FE')],
+                         [1, 2, 3, 2, 4, 2, 3, 2, 2])
+        self.assertIsNone(o8.z80_length(b'\xDD\xE5', 0))
+        self.assertFalse(o8.sms_slot1_is_paged(b'\x3E\x01\x32\xFE\xFF' + bytes(64)))
+        self.assertTrue(o8.sms_slot1_is_paged(b'\x78\x32\xFE\xFF' + bytes(64)))
+        hook = gt.plan_hook_only(rom, 'sms')
+        cpu = Z80(hook.apply(rom), bytearray(vram))
+        cpu.run(0x38, 0x200)
+        self.assertEqual((hook.kind, cpu.steps), ('hook-only', 2))
+
+
+class GameBoyAfterHandlerTests(unittest.TestCase):
+    def test_work_runs_when_the_games_handler_has_returned(self):
+        for banked in (False, True):
+            if banked:
+                rom, scene, vram = BankProbeTests().setup_game()
+                rom = bytearray(rom); rom[0x3000:0x3030] = b'\xFF' * 0x30; rom = bytes(rom)
+            else:
+                rom, scene, vram = OverlayTests().setup_game()
+            rom = bytearray(rom); rom[0x200] = 0xC9; rom = bytes(rom)          # the game's handler: just ret
+            t = gt.tile_at(scene, 'gb', 5 * 16)
+            plan = gt.plan_overlay_patch([(t, [0] * 64)], rom, 'gb', after_handler=True)
+            self.assertEqual(plan.details['timing'], "after the game's handler")
+            for mode, applied in ((1, True), (3, False)):                       # only in the vertical blank
+                work = bytearray(vram)
+                cpu = Sm83(plan.apply(rom), work)
+                cpu.bank = 2 if banked else 1
+                cpu.io[0x41] = 0x80 | mode
+                cpu.stack.append(('ret', 0x1234))
+                visited = []
+                real_rd = cpu.rd
+                cpu.rd = lambda a: (visited.append(a), real_rd(a))[1]
+                cpu.run(0x40, 0x1234)
+                self.assertEqual((cpu.stack, cpu.bank), ([], 2 if banked else 1), (banked, mode))
+                self.assertEqual(bytes(work[80:96]) == bytes(16), applied, (banked, mode))
+                first_video = next((n for n, a in enumerate(visited) if 0x8000 <= a < 0xA000), len(visited))
+                self.assertLess(visited.index(0x200), first_video)               # the handler ran before any video access
+
+
+class SmsOtherHookTests(unittest.TestCase):
+    def setup_game(self):
+        rom = bytearray(b'\x55' * 0x10000)
+        rom[0x38:0x3D] = b'\xF5\xDB\xBF\xF1\xC9'                  # push af ; in a,($BF) ; pop af ; ret
+        rom[0x66:0x68] = b'\xED\x45'
+        rom[0x100:0x400] = b'\xFF' * 0x300
+        rom[0x200 + 0x400:0x205 + 0x400] = b'\xDB\xBF\x07\x30\xFB'   # at $0600: in a,($BF) ; rlca ; jr nc,*-3
+        vram = bytes(random.Random(12).randrange(256) for _ in range(0x4000))
+        scene = make_scene({'vram': (vram, [tag(pv.RT_DERIVED, 0x9000)] * 0x4000)})
+        return bytes(rom), gt.tile_at(scene, 'sms', 64), vram
+
+    def test_work_after_the_games_handler(self):
+        rom, t, vram = self.setup_game()
+        plan = gt.plan_overlay_patch([(t, [0] * 64)], rom, 'sms', after_handler=True)
+        self.assertEqual(plan.details['timing'], "after the game's handler")
+        work = bytearray(vram)
+        cpu = Z80(plan.apply(rom), work)
+        cpu.r.update(SmsOverlayTests.REGS)
+        before = dict(cpu.r)
+        cpu.stack.append(('ret', 0x1234))             # the interrupted program
+        order = []
+        real_in = cpu.port_in
+        cpu.port_in = lambda n: (order.append(('status' if n == 0xBF else 'data', cpu.steps)), real_in(n))[1]
+        self.assertEqual(cpu.run(0x38, 0x1234), 0x1234)
+        self.assertEqual((cpu.r, cpu.stack, bytes(work[64:96])), (before, [], bytes(32)))
+        kinds = [k for k, _ in order if k in ('status', 'data')]
+        self.assertEqual(kinds[0], 'status')           # the game's handler ran before the routine read video memory
+        self.assertIn('data', kinds)
+
+    def test_routine_called_from_the_games_own_wait(self):
+        rom, t, vram = self.setup_game()
+        plan = gt.plan_overlay_patch([(t, [0] * 64)], rom, 'sms', hook='poll')
+        out = plan.apply(rom)
+        self.assertEqual((plan.details['hook'], plan.details['hook_sites'], out[0x38:0x3B]), ('poll', 1, rom[0x38:0x3B]))
+        self.assertEqual((out[0x600], out[0x603:0x605]), (0xCD, bytes(2)))            # call routine ; nop ; nop
+        results = []
+        for image in (rom, out):
+            work = bytearray(vram)
+            cpu = Z80(image, work)
+            cpu.r.update(SmsOverlayTests.REGS)
+            cpu.run(0x600, 0x605)
+            results.append((dict(cpu.r), list(cpu.stack)))
+            self.assertEqual(bytes(work[64:96]) == bytes(32), image is out)
+        self.assertEqual(results[0], results[1])           # the wait leaves the registers as the game's own loop did
+        with self.assertRaisesRegex(ValueError, 'no loop that waits'):
+            gt.plan_overlay_patch([(t, [0] * 64)], rom.replace(b'\xDB\xBF\x07\x30\xFB', b'\x55' * 5), 'sms', hook='poll')
+        control = gt.plan_hook_only(rom, 'sms', hook='poll')
+        cpu = Z80(control.apply(rom), bytearray(vram))
+        cpu.run(0x600, 0x605)
+        self.assertEqual((control.kind, cpu.address, cpu.stack), ('hook-only', 0, []))
+
+
+class SnesPollHookTests(unittest.TestCase):
+    def test_the_wait_loop_calls_the_routine(self):
+        rom, t = SnesPlacementTests().setup_game()
+        rom[0x18000:0x18400] = b'\xFF' * 0x400
+        rom[0x9000:0x9005] = b'\xAD\x10\x42\x10\xFB'              # lda $4210 ; bpl *-3
+        rom[0xA000:0xA005] = b'\xAD\x10\x42\x10\xFB'
+        rom[0xB000:0xB005] = b'\x2C\x12\x42\x10\xFB'              # another form, found once: left alone
+        plan = gt.plan_overlay_patch([(t, [0] * 64)], bytes(rom), 'snes', hook='poll')
+        out = plan.apply(bytes(rom))
+        body = plan.details['routine_offset']
+        self.assertEqual((plan.details['hook'], plan.details['hook_sites']), ('poll', 2))
+        jsl = b'\x22' + bytes((body & 0xFF, 0x80 | (body >> 8 & 0x7F), 0x80 | body >> 15)) + b'\xEA'
+        self.assertEqual((out[0x9000:0x9005], out[0xA000:0xA005], out[0xB000:0xB005]), (jsl, jsl, bytes(rom[0xB000:0xB005])))
+        self.assertEqual(out[0x7FE0:0x8000], bytes(rom[0x7FE0:0x8000]))                 # no vector is touched
+        code = out[body:body + plan.details['routine_size']]
+        self.assertEqual(code[:5], b'\xAD\x10\x42\x10\xFB')                           # the game's wait comes first
+        self.assertIn(b'\x28\x6B\xEA\xEA\xEA', code)                                  # plp ; rtl
+        self.assertNotIn(b'\x5C', code[:code.index(b'\x6B\xEA\xEA\xEA')])
+        control = gt.plan_hook_only(bytes(rom), 'snes', hook='poll')
+        where = control.details['routine_offset']
+        self.assertEqual(control.apply(bytes(rom))[where:where + 6], b'\xAD\x10\x42\x10\xFB\x6B')
+        rom[0x9000] = rom[0xA000] = rom[0xB000] = 0x55
+        with self.assertRaisesRegex(ValueError, 'no loop that waits'):
+            gt.plan_overlay_patch([(t, [0] * 64)], bytes(rom), 'snes', hook='poll')
+
+
+class BankProbeTests(unittest.TestCase):
+    def test_probe_tells_banks_apart(self):
+        rom = gb_rom(0x10000, 0x55)
+        rom[0x147] = 0x19
+        for bank in range(4):
+            rom[bank * 0x4000 + 0x123] = 0x10 + bank
+        self.assertEqual(gt.gb_bank_probe(bytes(rom)), {'offsets': [0x123], 'table': [(0x10, 0), (0x11, 1), (0x12, 2), (0x13, 3)]})
+        rom[0x147] = 0x01                                  # MBC1 cannot map bank 0 at $4000
+        self.assertEqual([b for _, b in gt.gb_bank_probe(bytes(rom))['table']], [1, 2, 3])
+        same = gb_rom(0x10000, 0x55); same[0x147] = 0x01
+        self.assertEqual(gt.gb_bank_probe(bytes(same))['table'], [(0x55, 1)])     # identical banks count as one
+        two = gb_rom(0x10000, 0x55); two[0x147] = 0x01
+        two[0x4000 + 9], two[0x8000 + 9], two[0xC000 + 9] = 1, 1, 2
+        two[0x4000 + 20], two[0x8000 + 20], two[0xC000 + 20] = 7, 8, 7
+        probe = gt.gb_bank_probe(bytes(two))
+        self.assertEqual(len(probe['offsets']), 2)
+        self.assertEqual(len({row[:2] for row in probe['table']}), 3)
+
+    def setup_game(self):
+        rom = gb_rom(0x10000, 0x55)
+        rom[0x147], rom[0x148] = 0x01, 0x01
+        rom[0x40:0x43] = b'\xC3\x00\x02'
+        rom[0x3000:0x3020] = b'\xFF' * 0x20                 # room for a stub only
+        rom[0xC100:0xC400] = b'\xFF' * 0x300                # room for the routine in bank 3
+        for bank in range(4):
+            rom[bank * 0x4000 + 0x77] = 0x30 + bank
+        vram = bytearray(random.Random(9).randrange(256) for _ in range(0x4000))
+        scene = make_scene({'vram': (bytes(vram), [tag(pv.RT_DERIVED, 0x4000)] * 0x4000)})
+        return bytes(rom), scene, vram
+
+    def test_routine_in_another_bank_restores_the_games_bank(self):
+        rom, scene, vram = self.setup_game()
+        t = gt.tile_at(scene, 'gb', 5 * 16)
+        plan = gt.plan_overlay_patch([(t, [3 - p for p in t.pixels])], rom, 'gb')
+        self.assertEqual((plan.details['placement'], plan.details['bank_probe']), ('banked-probe', [0x4077]))
+        edited = plan.apply(rom)
+        for mapped in (1, 2):
+            cpu = Sm83(edited, bytearray(vram))
+            cpu.bank = mapped
+            cpu.r.update(dict(a=0x12, b=0x34, c=0x56, d=0x78, e=0x9A, h=0xBC, l=0xDE, z=1, cy=0))
+            before = dict(cpu.r)
+            cpu.run(0x40, 0x200)
+            self.assertEqual((cpu.bank, cpu.r, cpu.stack), (mapped, before, []))
+            self.assertEqual(bytes(cpu.vram[80:96]), gt.encode_tile([3 - p for p in t.pixels], 'gb-2bpp'))
+
+    def test_plain_cartridge_gets_a_mapper_and_a_second_half(self):
+        rom = gb_rom(0x8000, 0x55)
+        rom[0x40:0x43] = b'\xC3\x00\x02'
+        rom[0x147], rom[0x148] = 0x00, 0x00                 # no mapper, 32 KB
+        rom[0x3000:0x3020] = b'\xFF' * 0x20
+        vram = bytearray(random.Random(9).randrange(256) for _ in range(0x4000))
+        scene = make_scene({'vram': (bytes(vram), [tag(pv.RT_DERIVED, 0x4000)] * 0x4000)})
+        t = gt.tile_at(scene, 'gb', 5 * 16)
+        plan = gt.plan_overlay_patch([(t, [0] * 64)], bytes(rom), 'gb')
+        out = plan.apply(bytes(rom))
+        self.assertEqual((plan.details['placement'], len(out), out[0x147], out[0x148]), ('added-mapper', 0x10000, 0x01, 0x01))
+        # the added banks are copies of bank 1 (a stray write to the new mapper then changes nothing); the
+        # routine takes the place of the last bytes of the last copy only
+        size = plan.details['routine_size']
+        self.assertEqual(out[0x8000:0xC000], bytes(rom[0x4000:0x8000]))
+        self.assertEqual(out[0xC000:0x10000 - size], bytes(rom[0x4000:0x8000 - size]))
+        self.assertEqual(plan.details['routine_offset'], 0x10000 - size)
+        cpu = Sm83(out, bytearray(vram))
+        cpu.run(0x40, 0x200)
+        self.assertEqual((cpu.bank, bytes(cpu.vram[80:96])), (1, bytes(16)))
+        with self.assertRaisesRegex(ValueError, 'free bytes'):
+            gt.plan_overlay_patch([(t, [0] * 64)], bytes(rom), 'gb', grow=False)
+
+
+class SnesPlacementTests(unittest.TestCase):
+    def setup_game(self, size=0x40000):
+        rom = bytearray(b'\x55' * size)                   # LoROM, nothing free
+        rom[0x7FC0:0x7FD5] = b'TEST GAME            '
+        rom[0x7FD5], rom[0x7FD7] = 0x20, 0x08
+        rom[0x7FDC:0x7FE0] = b'\xFF\xFF\x00\x00'
+        rom[0x7FE0:0x8000] = b'\x11' * 0x20                # every vector slot holds something
+        rom[0x7FEA:0x7FEC] = b'\x34\x92'
+        rom[0x7FEE:0x7FF0] = b'\x78\x96'
+        vram = bytes(random.Random(3).randrange(1, 255) for _ in range(0x10000))
+        scene = make_scene({'vram': (vram, [tag(pv.RT_DERIVED, 0x9000)] * 0x10000)})
+        return rom, gt.tile_at(scene, 'snes', 0x4000)
+
+    def test_reserved_vector_slot_and_growth(self):
+        rom, t = self.setup_game()
+        plan = gt.plan_overlay_patch([(t, [15 - p for p in t.pixels])], bytes(rom), 'snes')
+        out = plan.apply(bytes(rom))
+        self.assertEqual((plan.details['stub'], plan.details['placement'], len(out)), ('unused vector slot', 'added-rom', 0x80000))
+        self.assertEqual(out[0x7FEA:0x7FEC], b'\xE0\xFF')                    # vector -> $00:FFE0, a slot the processor never reads
+        self.assertEqual(out[0x7FE0:0x7FE4], b'\x5C\x04\x80\x88')             # jml $88:8004, the first added bank
+        self.assertEqual(out[0x7FD7], 0x09)                                   # header: 512 KB
+        self.assertLess(len(plan.writes), 400)
+        self.assertEqual(out[0x40000:0x40004], b'\xFF' * 4)
+        with self.assertRaisesRegex(ValueError, 'cannot grow'):
+            gt.plan_overlay_patch([(t, [0] * 64)], bytes(rom) + b'\x55' * (0x400000 - len(rom)), 'snes')
+        with self.assertRaisesRegex(ValueError, 'free bytes'):
+            gt.plan_overlay_patch([(t, [0] * 64)], bytes(rom), 'snes', grow=False)
+
+    def test_irq_hook_and_handlers_in_ram(self):
+        rom, t = self.setup_game()
+        rom[0x18000:0x18400] = b'\xFF' * 0x400
+        plan = gt.plan_overlay_patch([(t, [0] * 64)], bytes(rom), 'snes', hook='irq')
+        out = plan.apply(bytes(rom))
+        self.assertEqual((out[0x7FEA:0x7FEC], out[0x7FEE:0x7FF0]), (b'\x34\x92', b'\xE0\xFF'))
+        code = out[plan.details['routine_offset']:][:plan.details['routine_size']]
+        self.assertIn(b'\xAF\x12\x42\x00', code)                              # works only in the vertical blank
+        self.assertIn(b'\x5C\x78\x96\x00', code)
+        rom[0x7FEA:0x7FEC] = b'\x00\x00'                                      # the game builds its handler jump at $0000
+        code = gt.plan_overlay_patch([(t, [0] * 64)], bytes(rom), 'snes').apply(bytes(rom))[0x18000:0x18400]
+        self.assertIn(b'\x5C\x00\x00\x00', code)
+        rom[0x7FE4:0x7FF0] = bytes(12)
+        with self.assertRaisesRegex(ValueError, 'no vertical-blank'):
+            gt.plan_overlay_patch([(t, [0] * 64)], bytes(rom), 'snes')
+
+    def test_controls(self):
+        rom, t = self.setup_game()
+        rom[0x18000:0x18400] = b'\xFF' * 0x400
+        hook = gt.plan_hook_only(bytes(rom), 'snes')
+        out = hook.apply(bytes(rom))
+        self.assertEqual((hook.kind, hook.expect, out[0x7FE0:0x7FE4]), ('hook-only', {}, b'\x5C\x34\x92\x00'))
+        real = gt.plan_overlay_patch([(t, [0] * 64)], bytes(rom), 'snes')
+        for cost in ('low', 'high'):
+            control = gt.plan_overlay_control([(t, [0] * 64)], bytes(rom), 'snes', cost=cost)
+            code = control.apply(bytes(rom))[control.details['routine_offset']:][:control.details['routine_size']]
+            self.assertEqual((control.kind, control.expect, len(code)), ('overlay-control', {'vram': {}}, real.details['routine_size'] + 4))
+            for register in (b'\x8F\x15\x21\x00', b'\x8F\x16\x21\x00', b'\x8F\x18\x21\x00', b'\xAF\x39\x21\x00'):
+                self.assertNotIn(register, code)                                 # no picture-chip register left
+                self.assertIn(register, real.apply(bytes(rom))[real.details['routine_offset']:][:real.details['routine_size']])
+        with self.assertRaisesRegex(ValueError, 'no cost-matched control'):
+            gt.plan_overlay_control([(t, [0] * 64)], bytes(rom), 'nes')
+
+    def test_game_boy_control_writes_back_what_it_reads(self):
+        rom, scene, vram = OverlayTests().setup_game()
+        t = gt.tile_at(scene, 'gb', 5 * 16)
+        real = gt.plan_overlay_patch([(t, [3 - p for p in t.pixels])], rom, 'gb')
+        for cost in ('high', 'low'):
+            control = gt.plan_overlay_control([(t, [3 - p for p in t.pixels])], rom, 'gb', cost=cost)
+            self.assertEqual((control.kind, control.expect, control.details['routine_size']),
+                             ('overlay-control', {'vram': {}}, real.details['routine_size']))
+            work = bytearray(vram)
+            cpu = Sm83(control.apply(rom), work)
+            cpu.run(0x40, 0x200)
+            self.assertEqual(work, vram)
+            if cost == 'high':
+                steps = cpu.steps
+        self.assertGreater(steps, cpu.steps)               # the 'high' control takes the longer path
+
+    def test_genesis_controls_and_idle_guard(self):
+        rom = bytearray(b'\x55' * 0x2000)
+        rom[0x78:0x7C] = (0x000200).to_bytes(4, 'big')
+        rom[0x1000:0x1400] = b'\xFF' * 0x400
+        vram = bytes(random.Random(4).randrange(1, 255) for _ in range(0x10000))
+        scene = make_scene({'vram': (vram, [tag(pv.RT_DERIVED, 0x900)] * 0x10000)})
+        t = gt.tile_at(scene, 'genesis', 0x8440)
+        hook = gt.plan_hook_only(bytes(rom), 'genesis')
+        where = hook.details['routine_offset']
+        self.assertEqual(hook.apply(bytes(rom))[where:where + 6], bytes.fromhex('4EF900000200'))
+        sizes = {}
+        for guard in (False, True, 'idle'):
+            plan = gt.plan_overlay_patch([(t, [0] * 64)], bytes(rom), 'genesis', guard=guard)
+            sizes[guard] = plan.details['routine_size']
+        self.assertEqual(sizes['idle'] - sizes[True], 52)
+        after = gt.plan_overlay_patch([(t, [0] * 64)], bytes(rom), 'genesis', guard='idle', after_handler=True)
+        code = after.apply(bytes(rom))[after.details['routine_offset']:][:after.details['routine_size']]
+        self.assertEqual(code[:12], bytes.fromhex('487A000A40E74EF900000200'))    # second frame, then the game's handler
+        self.assertNotIn(bytes.fromhex('4EF900000200'), code[12:])               # the work ends with rte, not a jump
+        self.assertIn(bytes.fromhex('4CDF07074E73'), code)
+        control = gt.plan_overlay_control([(t, [0] * 64)], bytes(rom), 'genesis', cost='high', guard='idle')
+        code = control.apply(bytes(rom))[control.details['routine_offset']:][:control.details['routine_size']]
+        self.assertNotIn(bytes.fromhex('43F900C00000'), code)
+        port = control.details['routine_offset'] + len(code) - 8
+        self.assertIn(bytes.fromhex('43F9') + port.to_bytes(4, 'big'), code)
+        self.assertEqual((control.expect, code[-8:-6]), ({'vram': {}}, b'\x5A\xA5'))
+
+
+class SegaRegisterTests(unittest.TestCase):
+    def state(self, regs, vdp_at=2):
+        body = bytes((1, 64)) + bytes(0x10000 + 128 + 128 + 320) + bytes(regs) + (0x1234).to_bytes(4, 'big') + bytes(4) + b'\x01' + bytes(40)
+        sections = b''
+        for ident in range(1, vdp_at + 2):
+            data = body if ident == 3 else bytes(10)
+            sections += ident.to_bytes(2, 'big') + len(data).to_bytes(4, 'big') + data
+        return bytes(8) + sections
+
+    def test_registers_are_read_from_a_blastem_state(self):
+        regs = [4, 0x64, 0x30, 0x34, 7, 0x6A] + [0] * 6 + [0x81, 0x36, 0, 2, 1] + [0] * 7
+        video = gt.blastem_video(self.state(regs), 'genesis')
+        self.assertEqual((video['regs'], video['address'], video['code'], video['source']), (regs, 0x1234, 1, 'savestate'))
+        self.assertIsNone(gt.blastem_video(self.state([0] * 24), 'genesis'))     # not in mode 5: not a Mega Drive game's state
+        self.assertIsNotNone(gt.blastem_video(self.state([0] * 24), 'sms'))
+        self.assertIsNone(gt.blastem_video(b'\x00' * 64, 'genesis'))
+        vram = bytearray(0x10000)
+        scene = make_scene({'vram': (bytes(vram), [0] * 0x10000)})
+        layers = gt.layers(scene, 'genesis', video)
+        self.assertEqual([(l.name, l.width, l.height, l.layout_source) for l in layers],
+                         [('plane A', 64, 32, 'registers'), ('plane B', 64, 32, 'registers'), ('window', 64, 32, 'registers')])
+        self.assertEqual(layers[0].cells[0].addresses, [0xC000, 0xC001])
+
+    def test_sprites_count_as_tiles_on_screen(self):
+        regs = [4, 0x64, 0x30, 0x34, 7, 0x6A] + [0] * 6 + [0x81, 0x36, 0, 2, 1] + [0] * 7
+        vram = bytearray(0x10000)
+        table = (0x6A & 0x7E) << 9
+        vram[table:table + 8] = bytes((0, 0x90, 0x05, 0, 0x01, 0x23, 0, 0x90))      # 2x2 sprite of tile $123 on screen
+        scene = make_scene({'vram': (bytes(vram), [0] * 0x10000)})
+        used = gt.used_tile_addresses(scene, 'genesis', {'regs': regs})
+        self.assertTrue({0x123 * 32, 0x124 * 32, 0x125 * 32, 0x126 * 32} <= used)
+        sms = bytearray(0x4000)
+        sms[0x3F00], sms[0x3F81], sms[0x3F01] = 0x40, 0x07, 0xD0
+        scene = make_scene({'vram': (bytes(sms), [0] * 0x4000)})
+        used = gt.used_tile_addresses(scene, 'sms', {'regs': [0x06, 0xE0, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF] + [0] * 17})
+        self.assertIn(0x2000 + 7 * 32, used)
+
+
+class SafestVariantTests(unittest.TestCase):
+    def setup_game(self):
+        rom = bytearray(b'\x55' * 0x2000)
+        rom[0x78:0x7C] = (0x000200).to_bytes(4, 'big')
+        rom[0x1000:0x1400] = b'\xFF' * 0x400
+        vram = bytes(random.Random(4).randrange(1, 255) for _ in range(0x10000))
+        scene = make_scene({'vram': (vram, [tag(pv.RT_DERIVED, 0x900)] * 0x10000)})
+        return bytes(rom), scene, gt.tile_at(scene, 'genesis', 0x8440)
+
+    def test_the_planner_goes_on_to_a_variant_that_is_clean_from_power_on(self):
+        rom, scene, t = self.setup_game()
+        ok = lambda plan: {'verified': True, 'as_planned': True}
+        first = gt.plan_derived_tile_edit(t, [0] * 64, rom, scene, verify=ok)
+        self.assertEqual(first.details['options'], gt.OVERLAY_VARIANTS['68000'][0])
+        asked = []
+
+        def safety(plan, edits, options):
+            asked.append(options)
+            return {'state': 'clean' if options == {'guard': True} else 'disturbed', 'hook_only': {'clean': True}}
+        plan = gt.plan_derived_tile_edit(t, [0] * 64, rom, scene, verify=ok, safety=safety)
+        self.assertEqual((plan.details['options'], plan.details['safety'], len(asked)),
+                         ({'guard': True}, 'clean', gt.OVERLAY_VARIANTS['68000'].index({'guard': True}) + 1))
+        # nothing clean: the best outcome is returned and the plan says what that means
+        plan = gt.plan_derived_tile_edit(t, [0] * 64, rom, scene, verify=ok,
+                                         safety=lambda p, e, o: {'state': 'timing' if o.get('after_handler') else 'disturbed',
+                                                                 'hook_only': {'clean': True}})
+        self.assertEqual((plan.details['safety'], plan.details['options']['after_handler']), ('timing', True))
+        self.assertTrue(any('changes course when any code is added' in n for n in plan.notes))
+        # a game that the bare hook already changes: one variant is enough
+        asked.clear()
+        gt.plan_derived_tile_edit(t, [0] * 64, rom, scene, verify=ok,
+                                  safety=lambda p, e, o: (asked.append(o), {'state': 'timing', 'hook_only': {'clean': False}})[1])
+        self.assertEqual(len(asked), 1)
+
+
+class RepointEveryUserTests(unittest.TestCase):
+    def test_references_of_other_scenes_move_with_the_block(self):
+        helper = CompressedBlockTests()
+        rom, scene, game, raw, stream, start = helper.build()
+        rom = bytearray(rom)
+        rom[0x1100] = 0x21                                   # a second place loads the same block, elsewhere in video memory
+        rom[0x1101:0x1103] = bytes([start & 0xFF, start >> 8])
+        rom = bytes(rom)
+        other = MiniGame('lz3', 0x1101, 0x1400)
+        tags = [0] * 0x4000
+        for i in range(len(raw)):
+            tags[0x1400 + i] = tag(pv.RT_DERIVED, start + min(len(stream) - 1, 1 + i * len(stream) // len(raw)))
+        scene2 = make_scene({'vram': (other.vram(rom), tags)}, frame=20)
+        block = gt.find_compressed_block(scene, rom, 'gb', 'vram', 0x800, 16)
+        block2 = gt.find_compressed_block(scene2, rom, 'gb', 'vram', 0x1400, 16)
+        self.assertEqual((block2.start, block2.domain_start), (block.start, 0x1400))
+        changes = {i: v for i, v in helper.grow_changes(raw).items() if v != raw[i - 0x800]}
+        # alone, only this scene's reference moves and the other scene keeps the old picture
+        alone = gt.plan_block_edit(block, changes, rom, 'gb', verify=game.verifier(rom, scene))
+        self.assertEqual(alone.details['repointed'], [0x1001])
+        self.assertEqual(other.vram(alone.apply(rom)), other.vram(rom))
+        # with the other scene named, its reference is found by its own replay and moved too
+        plan = gt.plan_block_edit(block, changes, rom, 'gb', verify=game.verifier(rom, scene),
+                                  also=[(block2, other.verifier(rom, scene2))])
+        self.assertEqual((sorted(plan.details['repointed']), plan.details['scenes_repointed']), ([0x1001, 0x1101], 1))
+        edited = plan.apply(rom)
+        for i, v in changes.items():
+            self.assertEqual(game.vram(edited)[i], v)
+            self.assertEqual(other.vram(edited)[i - 0x800 + 0x1400], v)
+        self.assertEqual(plan.details['pointer_search']['confirmed'], 1)
+
+
+class RelocationTests(unittest.TestCase):
+    def test_growth_is_not_listed_byte_by_byte(self):
+        self.assertEqual(gt._diff_writes(b'\x01\x02', b'\x01\x03\xFF\xFF\x07'), [(1, 2, 3), (4, None, 7)])
+        self.assertEqual(gt.apply_writes(b'\x01\x02', [(1, 2, 3), (4, None, 7)], 5), b'\x01\x03\xFF\xFF\x07')
+
+    def test_far_pointer_relocation_can_grow_a_game_boy_rom(self):
+        rom = gb_rom(0x10000, 0x55)
+        rom[0x147], rom[0x148] = 0x19, 0x01
+        block = bytes(range(1, 65))
+        rom[0x9000:0x9040] = block
+        rom[0x200:0x203] = b'\x02\x00\x50'                 # bank 2, $5000
+        cands = [c for c in gt.pointer_candidates(bytes(rom), 'gb', 0x9000) if c['encoding'] == 'gb-far-pre']
+        plan = gt.plan_relocation(bytes(rom), 'gb', 0x9000, 0x9040, block[::-1], cands[0])
+        out = plan.apply(bytes(rom))
+        self.assertEqual((len(out), out[0x148], plan.details['new_offset'], plan.details['repointed']), (0x20000, 0x02, 0x10000, [0x200]))
+        self.assertEqual((out[0x200:0x203], out[0x10000:0x10040]), (b'\x04\x00\x40', block[::-1]))
+        with self.assertRaisesRegex(ValueError, 'No free ROM space'):
+            gt.plan_relocation(bytes(rom), 'gb', 0x9000, 0x9040, block[::-1], cands[0], grow=False)
+
+    def test_pointer_search_says_why_it_found_nothing(self):
+        self.assertIn('computed', gt._no_pointer({'candidates': 0}))
+        self.assertIn('no free ROM space', gt._no_pointer({'candidates': 3, 'no_room': 3, 'replayed': 0}))
+        self.assertIn('none changed the scene', gt._no_pointer({'candidates': 3, 'no_room': 1, 'replayed': 2}))
 
 
 if __name__ == '__main__':

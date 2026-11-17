@@ -18,7 +18,9 @@ Editing, simplest first
                                                  fits, else relocate and repoint
     plan_overlay_patch                        -> EditPlan: codec-independent fallback; a small routine
                                                  on the vertical-blank interrupt rewrites the edited
-                                                 tile after the game's own loader has run
+                                                 tile after the game's own loader has run (every
+                                                 processor: see OVERLAY_STATUS; the 6502 and Z80
+                                                 routines live in romancer.gfx_overlay8)
     plan_private_copy                         -> EditPlan: "change only this one" by copying the data
                                                  and repointing the single reference
     plan_derived_tile_edit                    -> tries the three paths above in that order
@@ -26,6 +28,13 @@ Editing, simplest first
 Every plan ends in verify_plan, which replays the scene with the edited ROM
 (provenance.verify_edit) and reports whether the planned bytes took their
 planned values, and every other byte that changed.
+
+Two facts are kept apart for an overlay, because they are different facts:
+    verify_plan            the scene, replayed from a checkpoint shortly before it, comes out as planned
+    verify_from_power_on   the whole recorded run with the edited ROM reaches the scene changed only as planned
+overlay_safety runs the second and, when it fails, says whether the overlay
+is to blame: it compares with plan_hook_only (the interrupt hook alone) and
+plan_overlay_control (the routine's cost without its video access).
 
 Offsets: tags hold ROM offsets with the file header removed (16-byte iNES
 header, 512-byte SNES copier header). Every offset this module returns in a
@@ -344,6 +353,14 @@ def capture_video(session, system: str) -> dict | None:
                 io = ctypes.string_at(ctypes.addressof(d.data.contents) + 0x100, 0x80)
                 return {'system': system, 'source': 'registers', 'lcdc': io[0x40], 'scy': io[0x42], 'scx': io[0x43],
                         'wy': io[0x4A], 'wx': io[0x4B]}
+    if system in ('gb', 'gbc') and 'mgba' in core:
+        # mGBA Game Boy savestates are a fixed structure (gb/serialize.h): a version word whose upper half is
+        # $0040, and the I/O registers $FF00-$FF7F at offset $300.
+        state = session.fe.serialize()
+        if len(state) >= 0x380 and int.from_bytes(state[0:4], 'little') >> 16 == 0x0040:
+            io = state[0x300:0x380]
+            return {'system': system, 'source': 'savestate', 'lcdc': io[0x40], 'scy': io[0x42], 'scx': io[0x43],
+                    'wy': io[0x4A], 'wx': io[0x4B]}
     if system == 'nes':
         # FCEUmm savestates are tagged chunks; "PPUR" holds PPUCTRL, PPUMASK, PPUSTATUS, OAMADDR.
         state = session.fe.serialize()
@@ -376,6 +393,44 @@ def capture_video(session, system: str) -> dict | None:
                         'bg_scsize': list(state[r + 67:r + 71]), 'bg_tdaddr': u16(71, 4), 'bg_hofs': u16(84, 4),
                         'bg_vofs': u16(92, 4), 'oam_tdaddr': u16(37)[0], 'oam_nameselect': state[r + 36],
                         'display_disabled': state[r + 33]}
+    if system in ('genesis', 'sms', 'gg') and 'blastem' in core:
+        video = blastem_video(session.fe.serialize(), system)
+        if video:
+            return video
+    return None
+
+
+_BLASTEM_VDP_SECTION = 3
+
+
+def blastem_video(state: bytes, system: str) -> dict | None:
+    """Video chip registers from a BlastEm savestate (Mega Drive and Master System), or None.
+
+    The libretro state is a length word followed by sections, each a
+    two-byte id, a four-byte size and that many bytes (serialize.c). The
+    video chip's section holds: a version byte, the video memory size in KB,
+    64 KB of video memory, 64 colors and 64 scroll words of two bytes each,
+    a 320-byte copy of the sprite table, registers 0-23, the address the
+    next access goes to, the address of a serial transfer and the access
+    code (vdp_serialize in vdp.c). All numbers are big-endian.
+    """
+    at = 8
+    while at + 6 <= len(state):
+        ident = int.from_bytes(state[at:at + 2], 'big')
+        size = int.from_bytes(state[at + 2:at + 6], 'big')
+        body = at + 6
+        if ident > 0x40 or body + size > len(state):
+            return None
+        if ident == _BLASTEM_VDP_SECTION:
+            r = body + 2 + 0x10000 + 128 + 128 + 320
+            if state[body + 1] != 64 or r + 33 > body + size:
+                return None
+            regs = list(state[r:r + 24])
+            if system == 'genesis' and not regs[1] & 4:      # Mega Drive games run the chip in mode 5
+                return None
+            return {'system': system, 'source': 'savestate', 'regs': regs,
+                    'address': int.from_bytes(state[r + 24:r + 28], 'big'), 'code': state[r + 32]}
+        at = body + size
     return None
 
 
@@ -577,7 +632,9 @@ def _sms_layers(scene, system, video):
                                tile_address=(e & 0x1FF) * 32, hflip=bool(e & 0x200), vflip=bool(e & 0x400),
                                palette=e >> 11 & 1, priority=bool(e & 0x1000)))
     layer = Layer(system, 'background', 32, 28, 'sms-4bpp', 'vram', cells, 'registers' if video else 'assumed')
-    if not video:
+    if video:
+        layer.scroll_x, layer.scroll_y = (-video['regs'][8]) & 0xFF, video['regs'][9]
+    else:
         layer.notes.append('The name table position is the usual $3800, not read from the engine.')
     return [layer]
 
@@ -628,6 +685,39 @@ def used_tile_addresses(scene: Scene, system: str, video: dict | None = None) ->
                 n = o[i + 2]
                 high = (0x2000 + (video['oam_nameselect'] << 13)) if o[i + 3] & 1 else 0
                 used.add((base + high + n * 32) & 0xFFFF)
+    vram = doms.get('vram')
+    if video and 'regs' in video and vram is not None and vram.data is not None:
+        # Sega systems keep the sprite table in video memory; the registers say where.
+        regs, v = video['regs'], vram.data
+        if system == 'genesis':
+            table = (regs[5] & (0x7E if regs[12] & 1 else 0x7F)) << 9
+            link = 0
+            for _ in range(80):
+                a = (table + link * 8) & 0xFFFF
+                if a + 8 > len(v):
+                    break
+                wide, tall = (v[a + 2] >> 2 & 3) + 1, (v[a + 2] & 3) + 1
+                first = (v[a + 4] << 8 | v[a + 5]) & 0x7FF
+                y, x = (v[a] << 8 | v[a + 1]) & 0x3FF, (v[a + 6] << 8 | v[a + 7]) & 0x1FF
+                if 128 - 32 < y < 128 + 240 and 128 - 32 < x < 128 + 320:
+                    for k in range(wide * tall):
+                        used.add(((first + k) & 0x7FF) * 32)
+                link = v[a + 3] & 0x7F
+                if not link:
+                    break
+        elif len(v) >= 0x4000:
+            table = (regs[5] & 0x7E) << 7
+            high = 0x2000 if regs[6] & 4 else 0
+            tall = bool(regs[1] & 2)
+            for i in range(64):
+                y = v[(table + i) & 0x3FFF]
+                if y == 0xD0 and not regs[1] & 0x10:
+                    break
+                n = v[(table + 0x81 + i * 2) & 0x3FFF] & (0xFE if tall else 0xFF)
+                if y < 0xC0 or y > 0xF0:
+                    used.add(high + n * 32)
+                    if tall:
+                        used.add(high + (n + 1) * 32)
     return used
 
 
@@ -793,7 +883,8 @@ def apply_writes(rom: bytes, writes, size: int | None = None) -> bytes:
 
 def _diff_writes(before: bytes, after: bytes) -> list:
     out = [(i, before[i], after[i]) for i in range(min(len(before), len(after))) if before[i] != after[i]]
-    out += [(i, None, after[i]) for i in range(len(before), len(after))]
+    # Past the old end only bytes that are not FF are listed: apply_writes fills a grown ROM with FF first.
+    out += [(i, None, after[i]) for i in range(len(before), len(after)) if after[i] != 0xFF]
     return out
 
 
@@ -895,6 +986,137 @@ def verify_plan(make_frontend: Callable[[bytes], object], rom: bytes, plan, scen
     if isinstance(plan, EditPlan):
         plan.verified = result
     return result
+
+
+VIDEO_DOMAINS = ('vram', 'chr', 'vram4')
+
+
+def _live_domains(fe, names) -> dict:
+    """{domain: bytes} read from a tracing engine right now."""
+    lib = fe.lib
+    lib.romancer_trace_domain.restype = ctypes.POINTER(pv._Domain)
+    out = {}
+    for i in range(lib.romancer_trace_domain_count()):
+        d = lib.romancer_trace_domain(i).contents
+        if d.name.decode() in names and d.data:
+            out[d.name.decode()] = ctypes.string_at(d.data, d.size)
+    return out
+
+
+def verify_from_power_on(make_frontend: Callable[[bytes], object], rom: bytes, plan, scene: Scene, *, buttons_for=None,
+                         slack: int = 12, domains: Iterable[str] = VIDEO_DOMAINS) -> dict:
+    """Run the edited ROM from the scene's first checkpoint and look for the scene, changed only as planned.
+
+    verify_plan replays a scene from a checkpoint shortly before it, which
+    shows that an edit reaches the scene. This is the longer test: the whole
+    recorded run (from power-on, when the session was recorded from there)
+    with the edited ROM. It passes (`clean`) when, at some frame within
+    `slack` of the scene's, every video domain equals the scene's except
+    for the planned bytes holding their planned values. `slack` is there
+    because an added routine costs time, so a game can reach the same
+    moment a frame or two later.
+
+    Returns {'frames', 'clean', 'at_frame', 'closest_diff'}; closest_diff is
+    the smallest number of differing bytes seen. A run that is not clean
+    is not proof of damage: see overlay_safety.
+    """
+    edited = plan.apply(rom) if isinstance(plan, EditPlan) else apply_writes(rom, plan)
+    expect = plan.expect if isinstance(plan, EditPlan) else {}
+    buttons_for = buttons_for or (lambda f: ())
+    start, state = scene.checkpoints[0]
+    want = {}
+    for n in domains:
+        d = scene.snapshot.domains.get(n)
+        if d is None or d.data is None:
+            continue
+        w = bytearray(d.data)
+        for i, v in expect.get(n, {}).items():
+            w[int(i)] = v
+        want[n] = bytes(w)
+    fe = make_frontend(edited)
+    best = None
+    try:
+        fe.unserialize(state)
+        session = pv.TraceSession(fe, checkpoint_every=10 ** 9)
+        session.frame = start
+        session.start()
+        session.run(max(0, scene.frame - start - 2), buttons_for)
+        for _ in range(slack):
+            got = _live_domains(fe, want)
+            diff = sum(sum(a != b for a, b in zip(got.get(n, b''), want[n])) + abs(len(want[n]) - len(got.get(n, b''))) for n in want)
+            if best is None or diff < best[1]:
+                best = (session.frame, diff)
+            if diff == 0:
+                break
+            session.run(1, buttons_for)
+    finally:
+        fe.close()
+    return {'frames': scene.frame, 'clean': bool(best and best[1] == 0), 'at_frame': best[0] if best else None,
+            'closest_diff': best[1] if best else None}
+
+
+def overlay_safety(make_frontend: Callable[[bytes], object], rom: bytes, plan: EditPlan, scene: Scene, system: str, *,
+                   edits: list | None = None, options: dict | None = None, buttons_for=None, slack: int = 12,
+                   cache: dict | None = None) -> dict:
+    """Does an overlay plan leave the rest of the game alone over the whole run from power-on?
+
+    Returns {'state': ..., 'run': ..., 'hook_only': ..., 'control': ...}
+    (the last two only when they had to be run). `state` is one of
+
+    'clean'       the run from power-on reaches the scene changed only as planned.
+    'timing'      it does not, but neither does a run with the bare interrupt hook (plan_hook_only) or with a
+                  routine of the same cost that touches nothing (plan_overlay_control): any added code changes
+                  this game's course, so the original run is no reference and nothing can be laid at the
+                  overlay's door. (The scene replay, verify_plan, is then the evidence there is.)
+    'disturbed'   the controls reproduce the original run (or come far closer to it than the overlay does: the
+                  overlay's difference is more than four times theirs plus 64 bytes), so the overlay's own
+                  video access changes something else in this game.
+    'differs'     the bare hook reproduces the original run and the overlay does not, on a processor for which
+                  no cost-matched control exists: the cause is the routine's time or its video access, and
+                  this measurement cannot say which.
+    'unmeasured'  a control could not be built.
+
+    `edits` and `options` are what plan_overlay_patch was called with; they
+    are needed for the cost-matched control (Super NES and Mega Drive).
+    `cache` (a dict the caller keeps per ROM) saves repeating the hook-only
+    run for several plans.
+    """
+    options = dict(options or {})
+    run = verify_from_power_on(make_frontend, rom, plan, scene, buttons_for=buttons_for, slack=slack)
+    out = {'state': 'clean', 'run': run}
+    if run['clean']:
+        return out
+    cache = cache if cache is not None else {}
+    hook = options.get('hook', 'nmi')
+    if ('hook', hook) not in cache:
+        try:
+            cache['hook', hook] = verify_from_power_on(make_frontend, rom, plan_hook_only(rom, system, hook=hook), scene,
+                                                       buttons_for=buttons_for, slack=slack)
+        except ValueError as e:
+            cache['hook', hook] = {'error': str(e)}
+    out['hook_only'] = cache['hook', hook]
+    if 'error' in out['hook_only']:
+        out['state'] = 'unmeasured'
+        return out
+    reference = out['hook_only']['closest_diff']
+    if out['hook_only']['clean'] and not (edits and CPU[system] in ('65816', '68000', 'sm83')):
+        out['state'] = 'differs'
+        return out
+    if out['hook_only']['clean']:
+        control = {}
+        for cost in ('low', 'high'):
+            try:
+                c = plan_overlay_control(edits, rom, system, cost=cost,
+                                         **{k: v for k, v in options.items() if k in ('after_handler', 'guard', 'hook', 'grow')})
+                control[cost] = verify_from_power_on(make_frontend, rom, c, scene, buttons_for=buttons_for, slack=slack)
+            except ValueError as e:
+                control[cost] = {'error': str(e)}
+        out['control'] = control
+        diffs = [c['closest_diff'] for c in control.values() if 'error' not in c]
+        if diffs:
+            reference = max(diffs)
+    out['state'] = 'disturbed' if run['closest_diff'] > 4 * reference + 64 else 'timing'
+    return out
 
 
 def with_checksums(rom: bytes, writes, system: str) -> list:
@@ -1162,37 +1384,64 @@ def _repoint(rom: bytes, system: str, pointer: dict, target: int, new_target: in
     return [(pointer['offset'] + k, old[k], new[k]) for k in range(size) if old[k] != new[k]]
 
 
-def plan_relocation(rom: bytes, system: str, start: int, end: int, new_bytes: bytes, pointer: dict, *,
-                    avoid: Iterable[tuple[int, int]] = (), kind: str = 'relocate') -> EditPlan:
+def plan_relocation(rom: bytes, system: str, start: int, end: int, new_bytes: bytes, pointer, *,
+                    avoid: Iterable[tuple[int, int]] = (), kind: str = 'relocate', grow: bool = True) -> EditPlan:
     """Write `new_bytes` to free space and make `pointer` name it instead of [start, end).
 
-    The original bytes stay where they are, so every other reference keeps
-    the old data. Sega Genesis ROMs grow when no free space is left.
+    `pointer` is one pointer_candidates entry or a list of them (every
+    reference that should move). The original bytes stay where they are, so
+    every other reference keeps the old data.
+
+    When no free space is within reach and every pointer can name any bank
+    (a Game Boy far pointer, a 24-bit Super NES pointer, any Mega Drive
+    pointer), the ROM grows instead, unless `grow` is False: Mega Drive by
+    the size of the copy, Game Boy and Super NES to the next power-of-two
+    size with the header's size byte brought up to date.
     """
-    wide = pointer['size'] > 2
+    pointers = [pointer] if isinstance(pointer, dict) else list(pointer)
+    if not pointers:
+        raise ValueError('No pointer to move.')
+    wide = all(p['size'] > 2 for p in pointers)
     span = (0x4000, len(rom)) if wide and system in ('gb', 'gbc') else None
     dest = find_free_space(rom, system, len(new_bytes), near=start, same_bank=not wide, avoid=avoid, span=span)
-    edited = bytearray(rom)
+    base = rom
     notes = []
-    if dest is None and system == 'genesis' and len(rom) + len(new_bytes) + 2 <= 0x400000:
-        dest = len(rom) + (len(rom) & 1)
-        grow = dest + len(new_bytes)
-        grow += grow & 1
-        edited += b'\xFF' * (grow - len(rom))
-        notes.append(f'The ROM grows by {grow - len(rom)} bytes to hold the new copy.')
+    if dest is None and wide and grow:
+        if system == 'genesis' and len(rom) + len(new_bytes) + 2 <= 0x400000:
+            dest = len(rom) + (len(rom) & 1)
+            size = dest + len(new_bytes)
+            size += size & 1
+            base = rom + b'\xFF' * (size - len(rom))
+            notes.append(f'The ROM grows by {size - len(rom)} bytes to hold the new copy.')
+        elif system in ('gb', 'gbc') and len(rom) & (len(rom) - 1) == 0 and 0x8000 < len(rom) < 0x400000 \
+                and rom[0x148] < 8 and not (rom[0x147] in (0x01, 0x02, 0x03) and len(rom) >= 0x80000) \
+                and len(new_bytes) <= 0x4000:
+            grown = bytearray(rom) + b'\xFF' * len(rom)
+            grown[0x148] = rom[0x148] + 1
+            base, dest = bytes(grown), len(rom)
+        elif system == 'snes':
+            grown = _snes_grown(rom)
+            bank = 0x10000 if _snes_hirom(rom) else 0x8000
+            if grown is not None and len(new_bytes) <= bank:
+                base, dest = grown, len(rom)
+        if base is not rom and system != 'genesis':
+            notes.append(f'The ROM grows from {len(rom) >> 10} KB to {len(base) >> 10} KB to hold the new copy.')
     if dest is None:
         raise ValueError('No free ROM space within reach of the pointer for the new copy.')
+    edited = bytearray(base)
     edited[dest:dest + len(new_bytes)] = new_bytes
-    for o, _, n in _repoint(rom, system, pointer, start, dest):
-        edited[o] = n
+    for p in pointers:
+        for o, _, n in _repoint(base, system, p, start, dest):
+            edited[o] = n
     final = fix_checksums(bytes(edited), rom, system)
     return EditPlan(kind, _diff_writes(rom, final), len(final), notes=notes,
                     details={'old_range': [start, end], 'new_offset': dest, 'new_size': len(new_bytes),
-                             'pointer': dict(pointer)})
+                             'pointer': dict(pointers[0]), 'repointed': [p['offset'] for p in pointers]})
 
 
 def locate_pointer(verify: Callable[[EditPlan], dict], rom: bytes, system: str, start: int, end: int, probe: bytes,
-                   expect: dict, *, avoid: Iterable[tuple[int, int]] = (), max_candidates: int = 24) -> list[dict]:
+                   expect: dict, *, avoid: Iterable[tuple[int, int]] = (), max_candidates: int = 24,
+                   find_all: bool = False, report: dict | None = None) -> list[dict]:
     """Pointers to [start, end) that the scene really loads through.
 
     `probe` is a replacement block with a visible change and `expect` the
@@ -1201,19 +1450,44 @@ def locate_pointer(verify: Callable[[EditPlan], dict], rom: bytes, system: str, 
     verify_plan closure). The search stops at the first candidate whose
     replay comes out as planned; it is returned in a one-element list with
     the replay result under 'check' (an empty list when none is confirmed).
+    With `find_all` every candidate is replayed and every confirmed one is
+    returned (the same reference is sometimes stored in more than one form).
+
+    `report`, when given, receives why candidates fell away: 'candidates'
+    (byte patterns found), 'no_room' (no free space within the pointer's
+    reach), 'replayed', 'confirmed'.
     """
     hits = []
-    for cand in pointer_candidates(rom, system, start)[:max_candidates]:
+    cands = pointer_candidates(rom, system, start)[:max_candidates]
+    counts = {'candidates': len(cands), 'no_room': 0, 'replayed': 0, 'confirmed': 0}
+    for cand in cands:
         try:
             plan = plan_relocation(rom, system, start, end, probe, cand, avoid=avoid)
         except ValueError:
+            counts['no_room'] += 1
             continue
         plan.expect = expect
         result = verify(plan)
+        counts['replayed'] += 1
         if result.get('as_planned'):
+            counts['confirmed'] += 1
             hits.append({**cand, 'check': {'from_frame': result.get('from_frame'), 'unplanned': result.get('unplanned', {})}})
-            break
+            if not find_all:
+                break
+    if report is not None:
+        report.update(counts)
     return hits
+
+
+def _no_pointer(counts: dict) -> str:
+    """Why locate_pointer came back empty, in a sentence."""
+    if not counts.get('candidates'):
+        return 'nothing in the ROM looks like a pointer to it (the address is probably computed)'
+    if not counts.get('replayed'):
+        return (f'{counts["candidates"]} possible pointer(s) were found, but there is no free ROM space within their '
+                'reach for the copy')
+    return (f'{counts["replayed"]} possible pointer(s) were moved in turn and none changed the scene as planned'
+            + (f' ({counts["no_room"]} more had no free space within reach)' if counts.get('no_room') else ''))
 
 
 # ---------------------------------------------------------------------------
@@ -1427,18 +1701,33 @@ def find_compressed_block(scene: Scene, rom: bytes, system: str, domain: str, st
                     chain += 1
         if best and best[0][0]:
             break
+    if not (best and best[0][0]):
+        # gfx_codecs' own recogniser: data stored as it is with made-up planes, finer stream starts, more layouts
+        extra = gfx_codecs.recognise(d, rom, skip, system, start, length, codecs)
+        if extra and (extra['complete'] or best is None):
+            return CompressedBlock(extra['codec'], extra['start'], extra['size'], extra['decoded'], domain,
+                                   extra['domain_start'], extra['first'], extra['last'])
     return best[1] if best else None
 
 
 def plan_block_edit(block: CompressedBlock, changes: dict, rom: bytes, system: str, *,
                     verify: Callable[[EditPlan], dict] | None = None, avoid: Iterable[tuple[int, int]] = (),
-                    force_relocate: bool = False, max_candidates: int = 24) -> EditPlan:
+                    force_relocate: bool = False, max_candidates: int = 24,
+                    also: Iterable[tuple] = ()) -> EditPlan:
     """Re-encode a recognised block with `changes` ({domain index: new value}) applied.
 
     The new stream is written over the old one when it is no longer. When it
     is longer it goes to free space and the pointer to the block is moved;
     the pointer is found by replay, so `verify` (a closure over verify_plan
     taking an EditPlan) is required for that case.
+
+    A moved block is reached only through the references that were moved
+    with it. Every reference this scene's replay confirms is moved. `also`
+    names other scenes that load the same block: (CompressedBlock as
+    recognised in that scene, verify closure for that scene) pairs. The
+    reference each of them loads through is found by replaying that scene
+    and moved as well; `details['scenes_repointed']` says how many of them
+    were confirmed, and a scene that is not confirmed keeps the old picture.
     """
     raw = bytearray(block.decoded)
     for i, v in changes.items():
@@ -1454,16 +1743,49 @@ def plan_block_edit(block: CompressedBlock, changes: dict, rom: bytes, system: s
     if verify is None:
         raise ValueError(f'The re-encoded data is {len(stream) - block.size} bytes longer than the original; '
                          'pass verify so the pointer to the block can be found and moved.')
+    counts: dict = {}
     hits = locate_pointer(verify, rom, system, block.start, block.start + block.size, stream, expect, avoid=avoid,
-                          max_candidates=max_candidates)
+                          max_candidates=max_candidates, find_all=True, report=counts)
     if not hits:
-        raise ValueError('The re-encoded data does not fit in place and no pointer to the block was confirmed.')
-    plan = plan_relocation(rom, system, block.start, block.start + block.size, stream, hits[0], avoid=avoid)
+        raise ValueError('The re-encoded data does not fit in place and no pointer to the block was confirmed: '
+                         + _no_pointer(counts) + '.')
+    others = 0
+    also = list(also)
+    for other, other_verify in also:
+        if other.start != block.start or other.codec != block.codec:
+            continue
+        other_expect: dict = {}
+        for i, v in changes.items():       # the same decoded bytes, where that scene holds them
+            try:
+                k = block.decoded_index(int(i))
+            except ValueError:
+                continue
+            for j in range(other.domain_start, other.domain_start + other.last - other.first):
+                try:
+                    if other.decoded_index(j) == k:
+                        other_expect.setdefault(other.domain, {})[j] = v
+                except ValueError:
+                    pass
+        if not other_expect:
+            continue
+        found = locate_pointer(other_verify, rom, system, block.start, block.start + block.size, stream, other_expect,
+                               avoid=avoid, max_candidates=max_candidates)
+        if found:
+            others += 1
+            hits += [h for h in found if h['offset'] not in {x['offset'] for x in hits}]
+    plan = plan_relocation(rom, system, block.start, block.start + block.size, stream, hits, avoid=avoid)
     plan.expect = expect
     plan.details.update(details)
+    plan.details['pointer_search'] = counts
     plan.notes.append('The data no longer fits where it was; it was written to free space and its pointer moved.')
-    plan.notes.append('Only the reference this scene loads through was moved. If the game reaches the old data '
-                      'through another reference, that use keeps the old picture.')
+    if also:
+        plan.details['scenes_repointed'] = others
+        plan.notes.append(f'{len(hits)} reference(s) were moved: the one(s) this scene loads through and those of '
+                          f'{others} of the {len(also)} other scene(s) that use the same data. A use that was not '
+                          'confirmed keeps the old picture.')
+    else:
+        plan.notes.append('Only the reference(s) this scene loads through were moved. If the game reaches the old data '
+                          'through another reference, that use keeps the old picture.')
     return plan
 
 
@@ -1477,8 +1799,10 @@ OVERLAY_STATUS = {
              '$00:FFE0 -> routine in free ROM; it sets VMAIN/VMADD, which the game cannot read back',
     '68000': 'implemented and replay-verified (Mega Drive / Genesis): level-6 vector at $78 -> routine in free or '
              'added ROM; it sends its own VDP commands, which can collide with a command the game was halfway through',
-    '6502': 'not implemented: only applies to CHR-RAM games; NMI vector in the fixed bank, $2006/$2007 writes',
-    'z80': 'not implemented: hook at $0038 must not disturb the VDP control-port latch of the interrupted code',
+    '6502': 'implemented and replay-verified (NES, CHR-RAM cartridges; CHR-ROM tiles are edited in place): NMI vector '
+            '-> routine in the always-mapped part of the program ROM; it uses $2006/$2007, which also hold the scroll',
+    'z80': 'implemented and replay-verified (Master System): jump at $0038 -> routine in the first 32 KB, or a paging '
+           'stub there and the routine in any bank or in added ROM; works only in the vertical blank',
 }
 
 _SM83_LEN3 = {0x01, 0x11, 0x21, 0x31, 0x08, 0xC2, 0xC3, 0xCA, 0xD2, 0xDA, 0xC4, 0xCC, 0xCD, 0xD4, 0xDC, 0xEA, 0xFA}
@@ -1510,11 +1834,22 @@ def _assemble(items, origin: int) -> bytes:
     return bytes(out)
 
 
-def _sm83_overlay_routine(origin: int, tail: bytes, records: bytes) -> bytes:
-    """The overlay routine at `origin`; `tail` runs after every register is restored."""
-    items = [
+def _sm83_overlay_routine(origin: int, tail: bytes, records: bytes, after: bool = False, vblank_only: bool = False) -> bytes:
+    """The overlay routine at `origin`; `tail` runs after every register is restored.
+
+    With `after`, the routine first calls on into the game's handler (`tail`), which leaves the work below as
+    the address that handler returns to. The work then runs when the game's handler has finished (after any
+    tile the game itself writes each frame), only while the screen is still in its vertical blank, and its own
+    `ret` goes back to the interrupted program.
+    """
+    items = [b'\xCD', ('abs', 'handler')] if after else []
+    items += [
         b'\xF5\xC5\xD5\xE5',            # push af / bc / de / hl
         b'\xF0\x4F\xF5',                # ldh a,[$4F] ; push af        (current VRAM bank)
+    ]
+    if after or vblank_only:
+        items += [b'\xF0\x41\xE6\x03\x3D', ('jr', 0x20, 'done')]   # ldh a,[$41] ; and 3 ; dec a ; jr nz,done  (not mode 1)
+    items += [
         b'\x21', ('abs', 'table'),      # ld hl,table
         ('label', 'next'),
         b'\x2A\xFE\xFF', ('jr', 0x28, 'done'),   # ld a,[hl+] ; cp $FF ; jr z,done
@@ -1539,9 +1874,9 @@ def _sm83_overlay_routine(origin: int, tail: bytes, records: bytes) -> bytes:
         ('label', 'done'),
         b'\xF1\xE0\x4F',                # restore the VRAM bank
         b'\xE1\xD1\xC1\xF1',            # pop hl / de / bc / af
-        tail,
-        ('label', 'table'), records, b'\xFF',
     ]
+    items += [b'\xC9', ('label', 'handler'), tail] if after else [tail]
+    items += [('label', 'table'), records, b'\xFF']
     return _assemble(items, origin)
 
 
@@ -1590,84 +1925,46 @@ def gb_bank_shadow(rom: bytes) -> dict | None:
     return {'address': address, 'uses': uses, 'bank_writes': writes}
 
 
-def plan_overlay_patch(edits: list, rom: bytes, system: str, *, avoid: Iterable[tuple[int, int]] = (),
-                       max_tiles: int = 24, scene: Scene | None = None, after_handler: bool = False,
-                       guard: bool = True) -> EditPlan:
-    """Fallback for tiles no codec explains: rewrite them after the game has loaded them.
+def gb_bank_probe(rom: bytes) -> dict | None:
+    """One or two places in the switchable ROM area whose bytes tell every bank apart.
 
-    `edits` is [(Tile, new pixels)]. A routine is added on the vertical-blank
-    interrupt. Each frame, for each edited tile, it checks whether video
-    memory holds exactly the original tile and, if so, writes the edited one.
-    It does not depend on how the game stores or unpacks the tile, and it
-    leaves the slot alone when the game has loaded something else there.
-
-    Game Boy, Game Boy Color, Super NES and Mega Drive / Genesis
-    (OVERLAY_STATUS lists the other processors). The game must take the
-    vertical-blank interrupt.
-
-    Mega Drive / Genesis: the level-6 (vertical blank) vector at $78 is
-    pointed at the routine, which goes into free ROM or onto the end of the
-    ROM and ends by jumping to the game's own handler. Each frame it sends
-    one read command per edited tile, which would redirect data a game is
-    streaming into video memory from its main loop. With `guard` (the
-    default) it therefore skips any frame in which the interrupted program
-    holds a VDP port address in an address register, the usual sign of such
-    a stream; a game that keeps the port in a register all the time then
-    never gets the edit, and `guard=False` is the alternative to try.
-
-    Super NES: the native-mode NMI vector is pointed at a JML placed in the
-    four unused vector bytes at $00:FFE0 (or any four free bytes of bank 0);
-    the routine itself goes into free ROM anywhere and ends by jumping to the
-    game's own handler. It rewrites VMAIN and VMADD, which are write-only, so
-    a game that fills video memory from its main loop while NMI is enabled
-    could be disturbed; the replay shows that as unplanned changes. With
-    `after_handler` the work runs when the game's handler returns instead of
-    before it starts (see _snes_overlay_routine).
-
-    Game Boy: the routine (about 80 bytes plus 38 per tile) goes, in order of
-    preference:
-
-    * 'bank0': into free space in ROM bank 0, always mapped;
-    * 'fixed': anywhere in a 32 KB cartridge that has no bank switching;
-    * 'banked': into free space in another bank, behind a 25-byte stub in
-      bank 0 that maps that bank, calls the routine and restores the game's
-      bank from the game's own current-bank variable (gb_bank_shadow). Used
-      only when that variable is found and, given `scene`, holds a valid bank
-      number at that moment.
-
-    verify_plan then shows whether the tile really changes in the scene and
-    whether anything else did.
+    The cartridge's bank register cannot be read back, but the bank it
+    selects can be recognised by its contents. Returns {'offsets': [k, ...],
+    'table': [(byte at k, ..., bank number), ...]} with offsets counted from
+    $4000, or None when no one or two positions separate the banks. Banks
+    with identical contents count as one: mapping either is the same thing.
     """
-    cpu = CPU[system]
-    if cpu not in ('sm83', '65816', '68000'):
-        raise ValueError(f'The overlay fallback for this processor is {OVERLAY_STATUS[cpu]}.')
-    if not edits or len(edits) > max_tiles:
-        raise ValueError(f'The overlay handles 1 to {max_tiles} tiles at a time.')
-    if cpu == '65816':
-        return _snes_overlay_patch(edits, rom, system, avoid, after_handler)
-    if cpu == '68000':
-        return _genesis_overlay_patch(edits, rom, system, avoid, guard)
-    if len(rom) < 0x4000:
-        raise ValueError('Not a Game Boy ROM image.')
-    records = bytearray()
-    expect: dict[int, int] = {}
-    for tile, pixels in edits:
-        new = encode_tile(pixels, tile.format) if not isinstance(pixels, (bytes, bytearray)) else bytes(pixels)
-        if tile.domain != 'vram' or len(new) != 16:
-            raise ValueError('The overlay edits 16-byte tiles in video memory.')
-        diff = [k for k in range(16) if new[k] != tile.stored[k]]
-        if not diff:
-            continue
-        a = tile.addresses[0]
-        bank, addr = a >> 13, 0x8000 + (a & 0x1FFF)
-        key = diff[0]
-        records += bytes((bank, (addr + key) & 0xFF, (addr + key) >> 8, tile.stored[key], addr & 0xFF, addr >> 8))
-        records += tile.stored + new
-        expect.update({tile.addresses[k]: new[k] for k in diff})
-    if not records:
-        raise ValueError('The edit changes nothing.')
-    # Instructions at the interrupt vector that the jump will replace.
-    vec = 0x40
+    banks = len(rom) // 0x4000
+    first = 0 if rom[0x147] in range(0x19, 0x1F) else 1     # only MBC5 can map bank 0 there
+    seen: dict[bytes, int] = {}
+    for b in range(first, banks):
+        seen.setdefault(rom[b * 0x4000:(b + 1) * 0x4000], b)
+    numbers = sorted(seen.values())
+    if not numbers or len(numbers) > 255 or max(numbers) > 0xFF:
+        return None
+    cols = [rom[b * 0x4000:(b + 1) * 0x4000] for b in numbers]
+    best = (0, 0)
+    for k, col in enumerate(zip(*cols)):
+        distinct = len(set(col))
+        if distinct == len(cols):
+            return {'offsets': [k], 'table': [(c[k], b) for c, b in zip(cols, numbers)]}
+        if distinct > best[0]:
+            best = (distinct, k)
+    k1 = best[1]
+    firsts = [c[k1] for c in cols]
+    for k2, col in enumerate(zip(*cols)):
+        if len(set(zip(firsts, col))) == len(cols):
+            return {'offsets': [k1, k2], 'table': [(c[k1], c[k2], b) for c, b in zip(cols, numbers)]}
+    return None
+
+
+def _sm83_displaced(rom: bytes, vec: int) -> tuple[bytes, int]:
+    """(code that does what the instructions at `vec` did and then carries on after them, bytes covered).
+
+    The jump to the overlay routine replaces at least three bytes at the
+    interrupt vector; the instructions it covers run at the end of the
+    routine instead.
+    """
     if rom[vec] in (0xFF,) or rom[vec] in _SM83_INVALID:
         raise ValueError('This game has no vertical-blank interrupt handler to hook.')
     covered = 0
@@ -1689,68 +1986,273 @@ def plan_overlay_patch(edits: list, rom: bytes, system: str, *, avoid: Iterable[
         ended = op in _SM83_END
     if covered > 8:
         raise ValueError('The interrupt handler starts with code that cannot be moved.')
-    tail = bytes(displaced) + (b'' if ended else b'\xC3' + (vec + covered).to_bytes(2, 'little'))
+    return bytes(displaced) + (b'' if ended else b'\xC3' + (vec + covered).to_bytes(2, 'little')), covered
+
+
+# `guard` values that mean "only while the interrupted program is waiting", and the longest loop (in bytes)
+# each accepts as a wait. The wider test lets through games whose wait loop is longer, and more loops that
+# are not waits; the planner tries the narrow one first.
+_IDLE_BYTES = {'idle': 8, 'idle-wide': 16}
+
+
+def plan_overlay_patch(edits: list, rom: bytes, system: str, *, avoid: Iterable[tuple[int, int]] = (),
+                       max_tiles: int = 24, scene: Scene | None = None, after_handler: bool = False,
+                       guard: bool = True, hook: str = 'nmi', grow: bool = True, _control: str | None = None) -> EditPlan:
+    """Fallback for tiles no codec explains: rewrite them after the game has loaded them.
+
+    `edits` is [(Tile, new pixels)]. A routine is added on the vertical-blank
+    interrupt. Each frame, for each edited tile, it checks whether video
+    memory holds exactly the original tile and, if so, writes the edited one.
+    It does not depend on how the game stores or unpacks the tile, and it
+    leaves the slot alone when the game has loaded something else there.
+
+    Every processor ROMancer knows (OVERLAY_STATUS). The game must take the
+    vertical-blank interrupt (on Super NES the IRQ can stand in: `hook`).
+
+    The video chips' address registers cannot be read back, so the routine
+    cannot put back what it found. What keeps it from disturbing a transfer
+    the game has under way is `guard`, which makes it do nothing in a frame
+    that looks unsafe. Which test that is depends on the processor; where
+    one costs coverage (a game that never passes it never gets the edit)
+    the other values are the alternatives, and plan_derived_tile_edit tries
+    them from safest to least safe.
+
+    Mega Drive / Genesis: the level-6 (vertical blank) vector at $78 is
+    pointed at the routine, which goes into free ROM or onto the end of the
+    ROM and ends by jumping to the game's own handler. Each frame it sends
+    one read command per edited tile. `guard=True` (the default) skips a
+    frame in which the interrupted program holds a VDP port address in an
+    address register, the usual sign of a stream into video memory;
+    `guard='idle'` also requires that the interrupted program was waiting
+    (stopped, or in a loop of a few instructions; 'idle-wide' accepts loops
+    twice as long); `guard=False` always works. `after_handler` runs the
+    work when the game's handler returns.
+
+    Super NES: the native-mode NMI vector (`hook='irq'`: the IRQ vector, and
+    then only in the vertical blank; `hook='poll'`: no vector at all, the
+    routine is called from the loop in which a game without such an
+    interrupt waits for the vertical blank) is pointed at a JML in bank 0: in a
+    blank reserved vector slot, in any four free bytes, or in a reserved
+    slot whatever it holds (the processor never fetches those). The routine
+    itself goes into free ROM anywhere, or, with `grow`, into a ROM enlarged
+    to the next power-of-two size, and ends by jumping to the game's own
+    handler (which may be a jump the game keeps in RAM). It sets VMAIN and
+    VMADD. `guard='idle'` makes it work only while the interrupted program
+    was waiting (WAI, or a loop of at most eight bytes with no store to the
+    picture chip; 'idle-wide': sixteen bytes); other values of `guard` mean
+    no test. With
+    `after_handler` the work runs when the game's handler returns instead of
+    before it starts (see _snes_overlay_routine).
+
+    Game Boy: the routine (about 80 bytes plus 38 per tile) goes, in order of
+    preference:
+
+    * 'bank0': into free space in ROM bank 0, always mapped;
+    * 'fixed': anywhere in a 32 KB cartridge that has no bank switching;
+    * 'banked': into free space in another bank, behind a stub in bank 0
+      that maps that bank, calls the routine and restores the game's bank
+      from the game's own current-bank variable (gb_bank_shadow). Used only
+      when that variable is found and, given `scene`, holds a valid bank
+      number at that moment;
+    * 'banked-probe': the same, for games without such a variable: the stub
+      recognises the mapped bank by reading one or two bytes of it
+      (gb_bank_probe) and maps that bank again afterwards;
+    * 'added-mapper': a 32 KB cartridge without a mapper becomes a 64 KB
+      MBC1 cartridge with the routine in the added half (`grow`).
+
+    With `grow`, a banked cartridge with no room in any bank doubles in size.
+
+    NES (CHR-RAM cartridges) and Master System: see romancer.gfx_overlay8.
+    `guard` there means: NES, do nothing while the game's own mask variable
+    has the picture switched off; Master System, do nothing while the
+    interrupted program holds the video data port in register C.
+
+    verify_plan then shows whether the tile really changes in the scene and
+    whether anything else did; overlay_safety, whether the game is left
+    alone over the whole run from power-on.
+    """
+    cpu = CPU[system]
+    if not edits or len(edits) > max_tiles:
+        raise ValueError(f'The overlay handles 1 to {max_tiles} tiles at a time.')
+    if cpu == '65816':
+        return _snes_overlay_patch(edits, rom, system, avoid, after_handler, hook, grow, idle=_IDLE_BYTES.get(guard, 0))
+    if cpu == '68000':
+        return _genesis_overlay_patch(edits, rom, system, avoid, guard, after_handler)
+    if cpu == '6502':
+        from . import gfx_overlay8
+        return gfx_overlay8.nes_overlay_patch(edits, rom, system, avoid, guard=bool(guard))
+    if cpu == 'z80':
+        from . import gfx_overlay8
+        return gfx_overlay8.sms_overlay_patch(edits, rom, system, avoid, bool(guard), grow, scene=scene,
+                                              hook='poll' if hook == 'poll' else 'irq', after=after_handler)
+    if len(rom) < 0x4000:
+        raise ValueError('Not a Game Boy ROM image.')
+    records = bytearray()
+    expect: dict[int, int] = {}
+    for tile, pixels in edits:
+        new = encode_tile(pixels, tile.format) if not isinstance(pixels, (bytes, bytearray)) else bytes(pixels)
+        if tile.domain != 'vram' or len(new) != 16:
+            raise ValueError('The overlay edits 16-byte tiles in video memory.')
+        diff = [k for k in range(16) if new[k] != tile.stored[k]]
+        if not diff:
+            continue
+        a = tile.addresses[0]
+        bank, addr = a >> 13, 0x8000 + (a & 0x1FFF)
+        key = diff[0]
+        if _control:
+            # plan_overlay_control: the same routine and table, but it writes back the bytes it found ('high':
+            # the cost of a frame in which the tile is rewritten) or never gets past the first compare ('low').
+            # Video memory is plain memory on this system, so reading it has no effect of its own.
+            first = tile.stored[key] if _control == 'high' else tile.stored[key] ^ 0xFF
+            records += bytes((bank, (addr + key) & 0xFF, (addr + key) >> 8, first, addr & 0xFF, addr >> 8))
+            records += tile.stored + tile.stored
+            continue
+        records += bytes((bank, (addr + key) & 0xFF, (addr + key) >> 8, tile.stored[key], addr & 0xFF, addr >> 8))
+        records += tile.stored + new
+        expect.update({tile.addresses[k]: new[k] for k in diff})
+    if not records:
+        raise ValueError('The edit changes nothing.')
+    vec = 0x40
+    tail, covered = _sm83_displaced(rom, vec)
     records = bytes(records)
-    size = len(_sm83_overlay_routine(0, tail, records))
+    size = len(_sm83_overlay_routine(0, tail, records, after_handler))
     edited = bytearray(rom)
     notes = ['The game unpacks this tile in a way ROMancer does not decode, so the edit is applied '
              'by a small added routine each frame instead of changing the stored data.',
              'It applies wherever the game shows this exact tile in this tile slot.']
-    details = {'routine_size': size, 'hook_offset': vec, 'tiles': len(records) // 38, 'cpu': cpu}
+    details = {'routine_size': size, 'hook_offset': vec, 'tiles': len(records) // 38, 'cpu': cpu,
+               'timing': 'after the game\'s handler' if after_handler else 'before the game\'s handler'}
     where = find_free_space(rom, system, size, span=(0x68, 0x4000), avoid=avoid)
     if where is not None:
         details.update(placement='bank0', routine_offset=where)
     elif rom[0x147] == 0x00 and len(rom) == 0x8000:
         where = find_free_space(rom, system, size, span=(0x4000, 0x8000), avoid=avoid)
-        if where is None:
-            raise ValueError(f'The ROM has no {size} free bytes for the overlay routine.')
-        details.update(placement='fixed', routine_offset=where)
+        if where is not None:
+            details.update(placement='fixed', routine_offset=where)
     if where is not None:
-        code = _sm83_overlay_routine(where, tail, records)
+        code = _sm83_overlay_routine(where, tail, records, after_handler)
         edited[where:where + len(code)] = code
         edited[vec:vec + 3] = b'\xC3' + where.to_bytes(2, 'little')
     else:
-        shadow = gb_bank_shadow(rom)
+        # The routine goes into another bank, behind a stub that maps it and then maps the game's bank again.
         banks = len(rom) // 0x4000
-        if shadow is None:
-            raise ValueError(f'ROM bank 0 has no {size} free bytes for the overlay routine, and the game keeps no '
-                             'current-bank variable that would let the routine live in another bank.')
-        if rom[0x147] in (0x01, 0x02, 0x03) and banks > 32:
+        cart = rom[0x147]
+        if cart in (0x01, 0x02, 0x03) and banks > 32:
             raise ValueError(f'ROM bank 0 has no {size} free bytes for the overlay routine, and this cartridge type '
                              'splits its bank number over two registers.')
-        if scene is not None:
+        plain = cart == 0x00 and len(rom) == 0x8000      # no mapper at all: it gets one, and a second 32 KB
+        shadow = probe = None
+        problem = ''
+        if plain:
+            if not grow:
+                raise ValueError(f'The ROM has no {size} free bytes for the overlay routine.')
+        else:
+            shadow = gb_bank_shadow(rom)
+            if shadow is None:
+                problem = 'the game keeps no current-bank variable'
+            elif scene is not None:
+                a = shadow['address']
+                d = scene.snapshot.domains.get('hram' if a >= 0xFF80 else 'wram')
+                value = None
+                if d is not None and d.data is not None:
+                    value = d.data[a - 0xFF80] if a >= 0xFF80 else d.data[a - 0xC000] if a < 0xD000 else None
+                if value is not None and not 0 < value < banks:
+                    shadow, problem = None, 'the variable that looked like the current bank number does not hold one'
+            if shadow is None:
+                probe = gb_bank_probe(rom)
+                if probe is None:
+                    raise ValueError(f'ROM bank 0 has no {size} free bytes for the overlay routine, {problem}, and the '
+                                     'banks cannot be told apart by reading one or two bytes of them.')
+        # the stub: push af ; [remember which bank is mapped] ; map the routine ; call it ; map the game's bank ; pop af
+        if plain:
+            before, after = b'\xF5', b'\x3E\x01\xEA\x00\x21\xF1'                # ... ld a,1 ; ld [$2100],a ; pop af
+        elif shadow:
             a = shadow['address']
-            d = scene.snapshot.domains.get('hram' if a >= 0xFF80 else 'wram')
-            value = None
-            if d is not None and d.data is not None:
-                value = d.data[a - 0xFF80] if a >= 0xFF80 else d.data[a - 0xC000] if a < 0xD000 else None
-            if value is not None and not 0 < value < banks:
-                raise ValueError('The variable that looked like the current bank number does not hold one.')
-        body_size = len(_sm83_overlay_routine(0, b'\xC9', records))
-        body = find_free_space(rom, system, body_size, span=(0x4000, min(len(rom), 0x400000)), avoid=avoid)
-        a = shadow['address']
-        load = bytes((0xF0, a & 0xFF)) if a >= 0xFF00 else bytes((0xFA, a & 0xFF, a >> 8))
-        stub_size = 13 + len(load) + len(tail)
-        stub = find_free_space(rom, system, stub_size, span=(0x68, 0x4000), avoid=avoid)
-        if body is None or stub is None:
+            load = bytes((0xF0, a & 0xFF)) if a >= 0xFF00 else bytes((0xFA, a & 0xFF, a >> 8))
+            before, after = b'\xF5', load + b'\xEA\x00\x21\xF1'
+        else:
+            before = b'\xF5\xE5'                                                # push af ; push hl
+            for n, k in enumerate(probe['offsets']):
+                before += b'\xFA' + (0x4000 + k).to_bytes(2, 'little') + (b'\x67', b'\x6F')[n]   # ld a,[k] ; ld h,a / ld l,a
+            after = b'\xEA\x00\x21\xE1\xF1'                                     # ld [$2100],a ; pop hl ; pop af
+        stub_size = len(before) + 8 + len(after) + len(tail) + (4 if after_handler else 0)
+        stub = find_free_space(rom, system, stub_size, span=(0x68, 0x8000 if plain else 0x4000), avoid=avoid)
+        if stub is None:
             raise ValueError(f'ROM bank 0 has no {size} free bytes for the overlay routine, and there is no room for '
-                             + ('the routine in another bank.' if body is None else f'a {stub_size}-byte stub either.'))
+                             f'a {stub_size}-byte stub either.')
+
+        def body_code(entry):
+            if not probe:
+                return _sm83_overlay_routine(entry, b'\xC9', records, vblank_only=after_handler)
+            # Called with the probed bytes in H (and L); returns the bank they belong to in A.
+            two = len(probe['offsets']) == 2
+            items = [b'\xC5\xD5\x11', ('abs', 'banks'), b'\x06', bytes([len(probe['table'])]),   # push bc ; push de ; ld de,banks ; ld b,n
+                     ('label', 'find'), b'\x1A\x13\xBC']                                        # ld a,[de] ; inc de ; cp h
+            if two:
+                items += [('jr', 0x20, 'miss'), b'\x1A\xBD', ('jr', 0x28, 'hit'), ('label', 'miss'), b'\x13']
+            else:
+                items += [('jr', 0x28, 'found')]
+            items += [b'\x13\x05', ('jr', 0x20, 'find')]                                         # inc de ; dec b ; jr nz,find
+            if two:
+                items += [('jr', 0x18, 'found'), ('label', 'hit'), b'\x13']
+            items += [('label', 'found'), b'\x1A\xF5\xCD', ('abs', 'work'), b'\xF1\xD1\xC1\xC9',   # ld a,[de] ; push af ; call work ; pop af ; pop de ; pop bc ; ret
+                      ('label', 'banks'), b''.join(bytes(row) for row in probe['table']), b'\x01',   # (bank 1 when nothing matches)
+                      ('label', 'work')]
+            head = _assemble(items, entry)
+            return head + _sm83_overlay_routine(entry + len(head), b'\xC9', records, vblank_only=after_handler)
+        body_size = len(body_code(0x4000))
+        base = rom
+        placement = 'banked' if shadow else 'banked-probe' if probe else 'added-mapper'
+        body = None if plain else find_free_space(rom, system, body_size, span=(0x4000, min(len(rom), 0x400000)),
+                                                   avoid=list(avoid) + [(stub, stub + stub_size)])
+        if body is None:
+            if not grow or len(rom) & (len(rom) - 1) or len(rom) >= 0x400000 or (cart in (0x01, 0x02, 0x03) and banks >= 32):
+                raise ValueError(f'ROM bank 0 has no {size} free bytes for the overlay routine, and there is no room for '
+                                 'the routine in another bank.')
+            if plain:
+                # A cartridge without a mapper ignores writes to its ROM, and some games make them. Once it has
+                # a mapper, such a write maps another bank at $4000. So the added banks are copies of the one
+                # the game expects there, and the routine replaces only the last bytes of the last copy.
+                grown = bytearray(rom) + rom[0x4000:0x8000] * 2
+                grown[0x147] = 0x01
+                body = len(grown) - body_size
+            else:
+                grown = bytearray(rom) + b'\xFF' * len(rom)
+                body = len(rom)
+            grown[0x148] = rom[0x148] + 1 if rom[0x148] < 8 else rom[0x148]
+            base = bytes(grown)
+            edited = bytearray(base)
+            placement += '+added-rom' if not plain else ''
+            notes.append(f'The ROM grows from {len(rom) >> 10} KB to {len(base) >> 10} KB to hold the routine'
+                         + ('; the cartridge type becomes MBC1 so that the added part can be reached.' if plain else '.'))
         entry = 0x4000 + (body & 0x3FFF)
-        code = _sm83_overlay_routine(entry, b'\xC9', records)
+        code = body_code(entry)
         edited[body:body + len(code)] = code
-        edited[stub:stub + stub_size] = (b'\xF5\x3E' + bytes([body >> 14]) + b'\xEA\x00\x21'      # push af ; map the routine
-                                         + b'\xCD' + entry.to_bytes(2, 'little')                      # call it
-                                         + load + b'\xEA\x00\x21\xF1' + tail)                        # map the game's bank ; pop af
+        core = (before + b'\x3E' + bytes([body >> 14]) + b'\xEA\x00\x21'    # ld a,bank ; ld [$2100],a
+                + b'\xCD' + entry.to_bytes(2, 'little') + after)
+        if after_handler:   # call the game's handler first; it returns into the stub's work, whose ret ends the interrupt
+            core = b'\xCD' + (stub + 3 + len(core) + 1).to_bytes(2, 'little') + core + b'\xC9'
+        edited[stub:stub + stub_size] = core + tail
         edited[vec:vec + 3] = b'\xC3' + stub.to_bytes(2, 'little')
-        details.update(placement='banked', routine_offset=body, stub_offset=stub, stub_size=stub_size,
-                       bank_variable=a, bank_variable_uses=shadow['uses'])
-        notes.append(f'The routine sits in ROM bank {body >> 14}; after it runs, the game\'s bank is restored from '
-                     f'the game\'s own bank variable at ${a:04X}.')
+        details.update(placement=placement, routine_offset=body, routine_size=len(code), stub_offset=stub, stub_size=stub_size)
+        if shadow:
+            details.update(bank_variable=shadow['address'], bank_variable_uses=shadow['uses'])
+            notes.append(f'The routine sits in ROM bank {body >> 14}; after it runs, the game\'s bank is restored from '
+                         f'the game\'s own bank variable at ${shadow["address"]:04X}.')
+        elif probe:
+            details.update(bank_probe=[0x4000 + k for k in probe['offsets']], banks_told_apart=len(probe['table']))
+            notes.append(f'The routine sits in ROM bank {body >> 14}. The stub finds out which bank the game has mapped '
+                         f'by reading {len(probe["offsets"])} byte(s) of it, and maps that bank again afterwards.')
+        final = fix_checksums(bytes(edited), rom, system)
+        return EditPlan('overlay-control' if _control else 'overlay', _diff_writes(rom, final), len(final), {'vram': expect},
+                        notes=notes, details=details)
     final = fix_checksums(bytes(edited), rom, system)
-    return EditPlan('overlay', _diff_writes(rom, final), len(final), {'vram': expect}, notes=notes, details=details)
+    return EditPlan('overlay-control' if _control else 'overlay', _diff_writes(rom, final), len(final), {'vram': expect},
+                    notes=notes, details=details)
 
 
-def _snes_overlay_routine(origin: int, records: bytes, resume: int, after: bool = False) -> bytes:
+def _snes_overlay_routine(origin: int, records: bytes, resume: int, after: bool = False, vblank: bool = False,
+                          idle: int = 0) -> bytes:
     """65816 overlay routine at bank-local address `origin`.
 
     Normally the work is done first and the routine ends with JML to the
@@ -1759,6 +2261,20 @@ def _snes_overlay_routine(origin: int, records: bytes, resume: int, after: bool 
     handler's RTI then lands in the overlay work, whose own RTI returns to
     the interrupted program. The work then runs after the game's own
     video-memory transfers of that frame instead of before them.
+
+    With `vblank` the work is skipped unless the picture chip reports the
+    vertical blank ($4212 bit 7): needed when the routine hangs on the IRQ
+    vector, which a game may also fire in the middle of the picture.
+
+    With `idle` (a number of bytes: 8, or 16 for the wider test) the work is
+    skipped unless the interrupted program was waiting: stopped on WAI, or
+    inside a loop of at most that many bytes that stores nothing to a
+    picture-chip register (one of the bytes from the interrupted
+    instruction on is a branch back to it or before it, at most that many
+    bytes back, and no instruction in between is a store to $21xx). The address register of video memory cannot be read back, so a
+    transfer the game's main program has under way cannot be put right
+    after the routine has used the register; a game that is waiting for the
+    next frame has none under way.
     """
     items = []
     if after:
@@ -1768,6 +2284,40 @@ def _snes_overlay_routine(origin: int, records: bytes, resume: int, after: bool 
     items += [
         b'\x08\xC2\x30',                      # php ; rep #$30          (16-bit A, X, Y)
         b'\x48\xDA\x5A\x8B\x4B\xAB',          # pha ; phx ; phy ; phb ; phk ; plb
+    ]
+    if vblank:
+        # sep #$20 ; lda $004212 ; rep #$20 ; bmi + ; jmp done      (rep leaves the sign flag of the load)
+        items += [b'\xE2\x20\xAF\x12\x42\x00\xC2\x20\x30\x03\x4C', ('abs', 'done')]
+    if idle:
+        # Above the eight bytes saved here lies the interrupt frame: flags at 9,s, return address at 10,s, bank at 12,s.
+        items += [
+            b'\xA3\x0A\xAA',                          # lda 10,s ; tax          (x = return address)
+            b'\xE2\x20\xA3\x0C\x48\xAB',              # sep #$20 ; lda 12,s ; pha ; plb   (read the interrupted program's bank)
+            b'\xCA\xBD\x00\x00\xE8\xC9\xCB',          # dex ; lda 0,x ; inx ; cmp #$CB    (the instruction before was WAI)
+            ('jr', 0xF0, 'idle'),
+            b'\xA0\x02\x00',                          # ldy #2                  (y = bytes scanned + 2)
+            ('label', 'scan'),
+            b'\xBD\x00\x00\xC9\x80', ('jr', 0xF0, 'branch'),      # lda 0,x ; cmp #$80 ; beq branch        (bra)
+            b'\x29\x1F\xC9\x10', ('jr', 0xD0, 'nobranch'),        # and #$1F ; cmp #$10 ; bne nobranch     (bpl ... beq)
+            ('label', 'branch'),
+            b'\xBD\x01\x00\xC9' + bytes([256 - idle]), ('jr', 0x90, 'nobranch'),   # lda 1,x ; cmp #-n ; bcc nobranch  (forward, or more than n back)
+            b'\x98\x18\x7D\x01\x00',                              # tya ; clc ; adc 1,x    (zero or negative: it reaches the pc or before)
+            ('jr', 0xF0, 'loop'), ('jr', 0x30, 'loop'),
+            ('label', 'nobranch'),
+            b'\xE8\xC8\xC0' + bytes([idle + 2]) + b'\x00', ('jr', 0xD0, 'scan'),   # inx ; iny ; cpy #n+2 ; bne scan
+            ('label', 'busy'),
+            b'\xC2\x20\x4C', ('abs', 'done'),                     # rep #$20 ; jmp done    (busy: leave everything alone)
+            ('label', 'loop'),                                    # a short loop around the pc: does it store to $21xx?
+            b'\xA0' + bytes([idle]) + b'\x00',                    # ldy #n
+            ('label', 'body'),
+            b'\xCA\xBD\x02\x00\xC9\x21', ('jr', 0xD0, 'plain'),   # dex ; lda 2,x ; cmp #$21 ; bne plain
+            b'\xBD\x00\x00\x29\xEC\xC9\x8C', ('jr', 0xF0, 'busy'),  # lda 0,x ; and #$EC ; cmp #$8C ; beq busy   (sta/stx/sty/stz $21xx)
+            ('label', 'plain'),
+            b'\x88', ('jr', 0xD0, 'body'),                        # dey ; bne body
+            ('label', 'idle'),
+            b'\xC2\x20\x4B\xAB',                      # rep #$20 ; phk ; plb
+        ]
+    items += [
         b'\xE2\x20\xA9\x80\x8F\x15\x21\x00\xC2\x20',   # sep #$20 ; lda #$80 ; sta $002115 ; rep #$20
         b'\xA2', ('abs', 'table'),             # ldx #table
         ('label', 'next'),
@@ -1802,7 +2352,7 @@ def _snes_overlay_routine(origin: int, records: bytes, resume: int, after: bool 
     return _assemble(items, origin)
 
 
-def _genesis_overlay_routine(records: bytes, resume: int, guard: bool = True) -> bytes:
+def _genesis_overlay_routine(records: bytes, resume: int, guard=True, after: bool = False, port: int = 0xC00000) -> bytes:
     """Position-independent 68000 overlay routine; ends with JMP to `resume`.
 
     With `guard`, the routine does nothing in a frame in which any address
@@ -1810,8 +2360,24 @@ def _genesis_overlay_routine(records: bytes, resume: int, guard: bool = True) ->
     ($C00000-$C00007). Games keep the port in a register while they stream
     data into video memory from their main loop; sending a command of our
     own in the middle of that would redirect the rest of their data.
+
+    With `guard='idle'` it also does nothing unless the interrupted program
+    was waiting: stopped on a STOP instruction, or inside a loop of a few
+    instructions (one of the eight words from the interrupted instruction on
+    is a short branch back to it or before it, at most 16 bytes back). A
+    game that is waiting for the next frame is not in the middle of a
+    transfer of its own.
+
+    With `after`, the routine first pushes a second exception frame and
+    jumps to the game's handler; the handler's RTE then lands in the overlay
+    work, whose own RTE returns to the interrupted program. The game's
+    handler then starts on time and does its own transfers first.
     """
     code = bytearray()
+    if after:
+        code += bytes.fromhex('487A000A' '40E7') + b'\x4E\xF9' + resume.to_bytes(4, 'big')   # pea work(pc) ; move.w sr,-(sp) ; jmp handler
+    start_at = len(code)
+    leave = bytes.fromhex('4E73') + bytes(4) if after else b'\x4E\xF9' + resume.to_bytes(4, 'big')   # rte, or jmp handler
     code += bytes.fromhex('48E7E0E0')            # movem.l d0-d2/a0-a2,-(sp)
     if guard:
         checks = len(code)
@@ -1822,11 +2388,28 @@ def _genesis_overlay_routine(records: bytes, resume: int, guard: bool = True) ->
             code += bytes((0x61, chk - (len(code) + 2)))                 # bsr.s chk
             code += bytes((0x67, bail - (len(code) + 2)))                # beq.s bail
         code += bytes((0x60, 10 + 14))                                   # bra.s start
-        code += bytes.fromhex('4CDF0707') + b'\x4E\xF9' + resume.to_bytes(4, 'big')   # bail: restore ; jmp handler
+        code += bytes.fromhex('4CDF0707') + leave                        # bail: restore ; jmp handler (or rte)
         code += bytes.fromhex('028000FFFFF8' '0C8000C00000' '4E75')      # chk: andi.l #$FFFFF8,d0 ; cmpi.l #$C00000,d0 ; rts
+    if guard in _IDLE_BYTES:
+        code += bytes.fromhex('206F001A')                                # movea.l 26(sp),a0      (interrupted pc)
+        code += bytes.fromhex('0C684E72FFFC')                            # cmpi.w #$4E72,-4(a0)   (it was stopped)
+        idle_at = len(code)
+        code += bytes.fromhex('6700')                                    # beq.s idle
+        code += bytes.fromhex('7407')                                    # moveq #7,d2
+        scan = len(code)
+        code += bytes.fromhex('3018' '3200' '0241F080' '0C416080')       # move.w (a0)+,d0 ; move.w d0,d1 ; andi.w #$F080,d1 ; cmpi.w #$6080,d1
+        code += bytes.fromhex('6612')                                    # bne.s n               (not a short backward branch)
+        code += bytes.fromhex('0C0000') + bytes([256 - 2 * _IDLE_BYTES[guard]]) + bytes.fromhex('650C')   # cmpi.b #-n,d0 ; bcs.s n  (further back: not a wait loop)
+        code += bytes.fromhex('4880' '45F00000' 'B5EF001A')              # ext.w d0 ; lea (a0,d0.w),a2 ; cmpa.l 26(sp),a2
+        idle2_at = len(code)
+        code += bytes.fromhex('6300')                                    # bls.s idle            (it branches to the pc or before)
+        code += bytes((0x51, 0xCA)) + ((scan - (len(code) + 2)) & 0xFFFF).to_bytes(2, 'big')   # n: dbf d2,scan
+        code += bytes((0x60, (bail - (len(code) + 2)) & 0xFF))           # bra.s bail
+        code[idle_at + 1] = len(code) - (idle_at + 2)
+        code[idle2_at + 1] = len(code) - (idle2_at + 2)
     lea_at = len(code)
     code += bytes.fromhex('41FA0000')            # lea table(pc),a0
-    code += bytes.fromhex('43F900C00000')        # lea $C00000,a1          (data port; control port at 4(a1))
+    code += bytes.fromhex('43F9') + port.to_bytes(4, 'big')   # lea $C00000,a1          (data port; control port at 4(a1))
     nxt = len(code)
     code += bytes.fromhex('2018')                # move.l (a0)+,d0         (read command for the key word)
     bmi_at = len(code)
@@ -1851,7 +2434,7 @@ def _genesis_overlay_routine(records: bytes, resume: int, guard: bool = True) ->
     code += bytes([0x60, (nxt - (len(code) + 2)) & 0xFF])      # bra.s next
     done = len(code)
     code += bytes.fromhex('4CDF0707')            # movem.l (sp)+,d0-d2/a0-a2
-    code += b'\x4E\xF9' + resume.to_bytes(4, 'big')            # jmp handler
+    code += leave                                # jmp handler (or rte)
     table = len(code)
     code[bmi_at + 1] = done - (bmi_at + 2)
     code[bne1_at + 1] = skip - (bne1_at + 2)
@@ -1860,7 +2443,7 @@ def _genesis_overlay_routine(records: bytes, resume: int, guard: bool = True) ->
     return bytes(code) + records + b'\xFF\xFF\xFF\xFF'
 
 
-def _genesis_overlay_patch(edits, rom, system, avoid, guard=True) -> EditPlan:
+def _genesis_overlay_patch(edits, rom, system, avoid, guard=True, after=False, control=None) -> EditPlan:
     vector = 0x78
     if len(rom) < 0x200:
         raise ValueError('Not a Mega Drive ROM image.')
@@ -1887,7 +2470,18 @@ def _genesis_overlay_patch(edits, rom, system, avoid, guard=True) -> EditPlan:
         expect.update({a + k: new[k] for k in diff})
     if not records:
         raise ValueError('The edit changes nothing.')
-    code = _genesis_overlay_routine(bytes(records), handler, guard)
+    if control:
+        # Same routine and table shape, but every "port" access goes to eight ROM bytes behind the routine:
+        # reads return the word there, writes do nothing. 'high' makes every compare succeed (the cost of a
+        # frame in which the tile is rewritten), 'low' makes the first one fail (the cost of every other frame).
+        word = b'\x5A\xA5'
+        key = word if control == 'high' else b'\xA5\x5A'
+        n = len(records) // 78
+        records = bytearray((command(0, False) + key + command(0, False) + command(0, True) + word * 16 + bytes(32)) * n)
+        expect = {}
+        code = _genesis_overlay_routine(bytes(records), handler, guard, after) + word + bytes(6)
+    else:
+        code = _genesis_overlay_routine(bytes(records), handler, guard, after)
     edited = bytearray(rom)
     notes = ['The game unpacks this tile in a way ROMancer does not decode, so the edit is applied '
              'by a small added routine each frame instead of changing the stored data.',
@@ -1901,33 +2495,114 @@ def _genesis_overlay_patch(edits, rom, system, avoid, guard=True) -> EditPlan:
         edited += b'\xFF' * (where + len(code) + (len(code) & 1) - len(rom))
         placement = 'added-rom'
         notes.append(f'The ROM grows by {len(edited) - len(rom)} bytes to hold the routine.')
+    if control:
+        code = _genesis_overlay_routine(bytes(records), handler, guard, after, port=where + len(code) - 8) + word + bytes(6)
     edited[where:where + len(code)] = code
     edited[vector:vector + 4] = where.to_bytes(4, 'big')
     final = fix_checksums(bytes(edited), rom, system)
-    return EditPlan('overlay', _diff_writes(rom, final), len(final), {'vram': expect}, notes=notes,
+    return EditPlan('overlay-control' if control else 'overlay', _diff_writes(rom, final), len(final), {'vram': expect}, notes=notes,
                     details={'routine_size': len(code), 'routine_offset': where, 'hook_offset': vector, 'placement': placement,
                              'tiles': len(records) // 78, 'cpu': '68000', 'handler': handler,
-                             'guard': 'skips frames in which the interrupted program holds a VDP port in an '
-                                      'address register' if guard else 'none'})
+                             'guard': 'works only while the interrupted program is waiting in a short loop and holds '
+                                      'no VDP port in an address register' if guard in _IDLE_BYTES else
+                                      'skips frames in which the interrupted program holds a VDP port in an '
+                                      'address register' if guard else 'none',
+                             'timing': 'after the game\'s handler' if after else 'before the game\'s handler'})
+
+
+def _snes_exhirom(rom: bytes) -> bool:
+    """A HiROM image of more than 4 MB whose header sits in its second part ($40FFC0)."""
+    skip = rom_skip(rom, 'snes')
+    h = skip + 0x40FFC0
+    if len(rom) - skip <= 0x400000 or h + 0x20 > len(rom):
+        return False
+    return (rom[h + 0x15] & 0x0F) == 5 and all(0x20 <= c < 0x7F for c in rom[h:h + 21])
 
 
 def _snes_address(rom: bytes, file_offset: int) -> int:
-    """24-bit CPU address of a ROM file offset (LoROM or HiROM, fast mirror)."""
+    """24-bit CPU address of a ROM file offset (LoROM, HiROM or ExHiROM; fast mirror)."""
     o = file_offset - rom_skip(rom, 'snes')
+    if _snes_exhirom(rom):
+        return ((0xC0 + (o >> 16)) if o < 0x400000 else (0x40 + ((o - 0x400000) >> 16))) << 16 | (o & 0xFFFF)
     if _snes_hirom(rom):
         return (0xC0 | o >> 16) << 16 | (o & 0xFFFF)
     return (0x80 | o >> 15) << 16 | 0x8000 | (o & 0x7FFF)
 
 
-def _snes_overlay_patch(edits, rom, system, avoid, after=False) -> EditPlan:
+# Four bytes in ROM bank 0 that can hold a JML, best first: (offset from $00:8000, needs to be blank).
+# The processor never fetches the reserved vector slots ($FFE0-$FFE3, $FFF0-$FFF3, $FFF6-$FFF7) and the console
+# does not wire the ABORT pin ($FFF8-$FFF9), so those bytes are free whatever a cartridge happens to hold there.
+_SNES_STUB_SLOTS = ((0x7FE0, True), (0x7FF0, True), (0x7FE0, False), (0x7FF0, False), (0x7FF6, False))
+
+
+_SNES_POLL_IDIOMS = (b'\xAD\x10\x42\x10\xFB', b'\x2C\x10\x42\x10\xFB', b'\xAD\x12\x42\x10\xFB', b'\x2C\x12\x42\x10\xFB')
+
+
+def _snes_poll_sites(rom: bytes, most: int = 16) -> tuple[list, bytes]:
+    """Places where a game waits for the vertical blank by polling: (file offsets, the five-byte loop found there).
+
+    The loops looked for are `lda $4210 ; bpl *-3` and its variants with BIT
+    and with $4212. The form that occurs most often is returned; a ROM with
+    more than `most` such places is left alone (the bytes are then too
+    likely to be something else).
+    """
+    best: tuple[list, bytes] = ([], b'')
+    for idiom in _SNES_POLL_IDIOMS:
+        found = []
+        at = rom.find(idiom)
+        while at >= 0:
+            found.append(at)
+            at = rom.find(idiom, at + 1)
+        if len(best[0]) < len(found) <= most:
+            best = (found, idiom)
+    return best
+
+
+def _snes_stub_slot(rom: bytes, system: str, bank0: int, avoid=()) -> tuple[int, str]:
+    """Four bytes in ROM bank 0 for a JML: blank reserved vector slots, then any free bytes, then the reserved
+    slots whatever they hold (see _SNES_STUB_SLOTS). Returns (file offset, what it is)."""
+    for o, blank in _SNES_STUB_SLOTS:
+        if blank and rom[bank0 + o:bank0 + o + 4] in (bytes(4), b'\xFF' * 4):
+            return bank0 + o, 'blank vector slot'
+    stub = find_free_space(rom, system, 4, span=(bank0, bank0 + 0x7FB0), avoid=avoid)
+    if stub is not None:
+        return stub, 'free bytes in bank 0'
+    return bank0 + next(o for o, blank in _SNES_STUB_SLOTS if not blank), 'unused vector slot'
+
+
+def _snes_grown(rom: bytes) -> bytes | None:
+    """`rom` grown to the next power-of-two size (at most 4 MB), new part filled with FF, size byte updated."""
+    skip = rom_skip(rom, 'snes')
+    size = len(rom) - skip
+    if size >= 0x400000 or _snes_exhirom(rom):
+        return None
+    grown = min(0x400000, 1 << size.bit_length())     # a power of two doubles; an irregular size rounds up
+    out = bytearray(rom) + b'\xFF' * (grown - size)
+    h = skip + (0xFFC0 if _snes_hirom(rom) else 0x7FC0)
+    if 0x08 <= out[h + 0x17] <= 0x0D:               # header size byte: log2 of the size in KB
+        out[h + 0x17] = max(out[h + 0x17], ((grown >> 10) - 1).bit_length())
+    return bytes(out)
+
+
+def _snes_overlay_patch(edits, rom, system, avoid, after=False, hook='nmi', grow=True, control=None, idle=0) -> EditPlan:
     skip = rom_skip(rom, system)
-    bank0 = skip + (0x8000 if _snes_hirom(rom) else 0)     # file offset of $00:8000
-    vector = bank0 + 0x7FEA
+    exhi = _snes_exhirom(rom)
+    bank0 = skip + (0x408000 if exhi else 0x8000 if _snes_hirom(rom) else 0)     # file offset of $00:8000
+    if hook not in ('nmi', 'irq', 'poll'):
+        raise ValueError("hook is 'nmi', 'irq' or 'poll'")
+    vector = bank0 + (0x7FEA if hook == 'nmi' else 0x7FEE)
     if len(rom) < bank0 + 0x8000:
         raise ValueError('Not a Super NES ROM image.')
     handler = rom[vector] | rom[vector + 1] << 8
-    if handler in (0x0000, 0xFFFF):
-        raise ValueError('This game has no vertical-blank interrupt handler to hook.')
+    # A vector into RAM ($0000-$1FFF) is a game that builds its handler jump there at run time; that still works,
+    # the routine just ends by jumping to that RAM address. $FFFF, or $0000 with nothing else in the table, is no handler.
+    table = rom[bank0 + 0x7FE4:bank0 + 0x7FF0]
+    if hook != 'poll' and (handler == 0xFFFF or (handler == 0 and not any(table)) or 0x2000 <= handler < 0x8000):
+        raise ValueError('This game has no vertical-blank interrupt handler to hook.' if hook == 'nmi' else
+                         'This game has no IRQ handler to hook.')
+    sites, idiom = _snes_poll_sites(rom) if hook == 'poll' else ([], b'')
+    if hook == 'poll' and not sites:
+        raise ValueError('This game has no loop that waits for the vertical blank by reading $4210 or $4212.')
     records = bytearray()
     expect: dict[int, int] = {}
     for tile, pixels in edits:
@@ -1945,53 +2620,230 @@ def _snes_overlay_patch(edits, rom, system, avoid, after=False) -> EditPlan:
         expect.update({a + k: new[k] for k in diff})
     if not records:
         raise ValueError('The edit changes nothing.')
+    if control:
+        # Same routine and table shape, with the picture chip's registers replaced by four ROM bytes behind the
+        # routine: reads return the word there, writes do nothing. 'high' makes every compare succeed (the cost
+        # of a frame in which the tile is rewritten), 'low' makes the first one fail (every other frame).
+        word = b'\x5A\xA5'
+        made = bytearray()
+        for tile, _ in edits:
+            n = len(tile.stored)
+            made += bytes(2) + (word if control == 'high' else b'\xA5\x5A') + bytes(2) + (n // 2).to_bytes(2, 'little') + word * (n // 2) + bytes(n)
+        records, expect = made, {}
     records = bytes(records)
-    size = len(_snes_overlay_routine(0, records, handler, after))
-    # Four bytes for a JML in bank 0: the unused slots of the native ($FFE0) or emulation ($FFF0) vector table.
-    stub = next((bank0 + o for o in (0x7FE0, 0x7FF0) if rom[bank0 + o:bank0 + o + 4] in (bytes(4), b'\xFF' * 4)), None)
-    if stub is None:
-        stub = find_free_space(rom, system, 4, span=(bank0, bank0 + 0x7FB0), avoid=avoid)
-        if stub is None:
-            raise ValueError('ROM bank 0 has no four free bytes for the jump to the overlay routine.')
-    body = find_free_space(rom, system, size, near=bank0, same_bank=False, avoid=list(avoid) + [(stub, stub + 4)],
+    vblank = hook == 'irq'
+
+    def routine(origin, bank=0):
+        if hook == 'poll':
+            # the game's own wait, then the work, then back to the game (rtl in place of the jump to a handler)
+            code = bytearray(_snes_overlay_routine(origin + len(idiom), records, 0))
+            at = len(code) - len(records) - 6
+            code[at:at + 4] = b'\x6B\xEA\xEA\xEA'
+            return idiom + bytes(code)
+        code = _snes_overlay_routine(origin, records, handler, after, vblank, idle)
+        if not control:
+            return code
+        head = bytearray(code[:len(code) - len(records) - 2])
+        dummy = origin + len(code)
+        read = bytes((dummy & 0xFF, dummy >> 8 & 0xFF, bank))
+        write = bytes(((dummy + 2) & 0xFF, (dummy + 2) >> 8 & 0xFF, bank))
+        for old, new in ((b'\x8F\x15\x21\x00', b'\x8F' + write), (b'\x8F\x16\x21\x00', b'\x8F' + write),
+                         (b'\x8F\x18\x21\x00', b'\x8F' + write), (b'\xAF\x39\x21\x00', b'\xAF' + read)):
+            head = head.replace(old, new)
+        return bytes(head) + code[len(head):] + word + bytes(2)
+    size = len(routine(0))
+    notes = ['The game unpacks this tile in a way ROMancer does not decode, so the edit is applied '
+             'by a small added routine each frame instead of changing the stored data.',
+             'It applies wherever the game shows this exact tile in this tile slot.',
+             'The routine sets the video-memory address and increment registers each frame.']
+    stub, stub_kind = (None, None) if hook == 'poll' else _snes_stub_slot(rom, system, bank0, avoid)
+    taken = list(avoid) + ([(stub, stub + 4)] if stub is not None else [(s, s + 5) for s in sites])
+    base = rom
+    body = find_free_space(rom, system, size, near=bank0, same_bank=False, avoid=taken,
                            span=(skip, min(len(rom), skip + 0x400000)))
+    placement = 'free-rom'
+    if body is None and grow:
+        grown = _snes_grown(rom)
+        if grown is not None:
+            base = grown
+            body = len(rom) + 4
+            placement = 'added-rom'
+            notes.append(f'The ROM has no free space for the routine, so it grows from {(len(rom) - skip) >> 10} KB to '
+                         f'{(len(grown) - skip) >> 10} KB. A game that relies on its data repeating beyond its old size '
+                         'would be disturbed; the replay shows whether this one is.')
     if body is None:
-        raise ValueError(f'The ROM has no {size} free bytes for the overlay routine.')
-    address = _snes_address(rom, body)
-    code = _snes_overlay_routine(address & 0xFFFF, records, handler, after)
-    if (body - skip) // 0x8000 != (body + len(code) - 1 - skip) // 0x8000:
+        raise ValueError(f'The ROM has no {size} free bytes for the overlay routine' +
+                         (' and cannot grow.' if grow else '.'))
+    address = _snes_address(base, body)
+    code = routine(address & 0xFFFF, address >> 16)
+    bank = 0x10000 if _snes_hirom(rom) else 0x8000
+    if (body - skip) // bank != (body + len(code) - 1 - skip) // bank:
         raise ValueError('The free space found for the overlay routine crosses a bank boundary.')
-    edited = bytearray(rom)
+    edited = bytearray(base)
     edited[body:body + len(code)] = code
-    edited[stub:stub + 4] = b'\x5C' + address.to_bytes(3, 'little')
-    stub_address = 0x8000 + (stub - bank0)
-    edited[vector:vector + 2] = stub_address.to_bytes(2, 'little')
+    if hook == 'poll':
+        for s in sites:
+            edited[s:s + 5] = b'\x22' + address.to_bytes(3, 'little') + b'\xEA'     # jsl routine ; nop
+        notes.append(f'This game does not take a vertical-blank interrupt in this scene; it waits for the vertical '
+                     f'blank in a loop. The routine is called from that wait ({len(sites)} place(s) in the ROM).')
+    else:
+        edited[stub:stub + 4] = b'\x5C' + address.to_bytes(3, 'little')
+        stub_address = 0x8000 + (stub - bank0)
+        edited[vector:vector + 2] = stub_address.to_bytes(2, 'little')
     final = fix_checksums(bytes(edited), rom, system)
-    return EditPlan('overlay', _diff_writes(rom, final), len(final), {'vram': expect},
-                    notes=['The game unpacks this tile in a way ROMancer does not decode, so the edit is applied '
-                           'by a small added routine each frame instead of changing the stored data.',
-                           'It applies wherever the game shows this exact tile in this tile slot.',
-                           'The routine sets the video-memory address and increment registers each frame.'],
-                    details={'routine_size': len(code), 'routine_offset': body, 'stub_offset': stub, 'hook_offset': vector,
-                             'placement': 'free-rom', 'tiles': len(edits), 'cpu': '65816', 'handler': handler,
+    if hook == 'irq':
+        notes.append('The routine hangs on the IRQ vector (this game does not use the vertical-blank interrupt) and '
+                     'only works while the picture chip reports the vertical blank.')
+    return EditPlan('overlay-control' if control else 'overlay', _diff_writes(rom, final), len(final), {'vram': expect}, notes=notes,
+                    details={'routine_size': len(code), 'routine_offset': body, 'stub_offset': stub, 'stub': stub_kind,
+                             'hook_offset': sites[0] if hook == 'poll' else vector, 'hook': hook, 'hook_sites': len(sites) or 1,
+                             'placement': placement, 'tiles': len(edits),
+                             'cpu': '65816', 'handler': handler,
+                             'guard': f'works only while the interrupted program is waiting (WAI or a loop of at most {idle} bytes)'
+                                      if idle else 'none',
                              'timing': 'after the game\'s handler' if after else 'before the game\'s handler'})
+
+
+def plan_overlay_control(edits: list, rom: bytes, system: str, *, cost: str = 'high', avoid: Iterable[tuple[int, int]] = (),
+                         after_handler: bool = False, guard=True, hook: str = 'nmi', grow: bool = True) -> EditPlan:
+    """The overlay routine for `edits` with its video ports replaced by ROM bytes: a control that costs the
+    same processor time each frame but reads and writes nothing in the video chip.
+
+    plan_hook_only tells whether a game's run changes when a few cycles are
+    added; this tells whether it changes when the cycles of the real routine
+    are added. `cost='high'` takes the path of a frame in which the tile is
+    rewritten, `cost='low'` the path of every other frame. When a run with
+    the overlay differs from the original run and the runs with these
+    controls do not, the difference is the overlay's video access and not
+    its timing. Super NES, Mega Drive and Game Boy (where video memory is
+    plain memory, so the control simply writes back what it reads).
+    `expect` is empty.
+    """
+    cpu = CPU[system]
+    if cost not in ('high', 'low'):
+        raise ValueError("cost is 'high' or 'low'")
+    if not edits:
+        raise ValueError('The control is built for the tiles of an overlay.')
+    if cpu == '65816':
+        return _snes_overlay_patch(edits, rom, system, avoid, after_handler, hook, grow, control=cost,
+                                   idle=_IDLE_BYTES.get(guard, 0))
+    if cpu == '68000':
+        return _genesis_overlay_patch(edits, rom, system, avoid, guard, after_handler, control=cost)
+    if cpu == 'sm83':
+        return plan_overlay_patch(edits, rom, system, avoid=avoid, grow=grow, _control=cost)
+    raise ValueError('There is no cost-matched control for this processor; use plan_hook_only.')
+
+
+def plan_hook_only(rom: bytes, system: str, *, avoid: Iterable[tuple[int, int]] = (), hook: str = 'nmi') -> EditPlan:
+    """The overlay's interrupt hook with no work behind it: a control for measurements.
+
+    Adding any code to an interrupt handler makes a game run a few processor
+    cycles later, and some games then take a different course (a sound
+    handshake that completes a frame later, a random number seeded from a
+    counter). A run of the overlay that differs from the original run can
+    therefore be the overlay's doing or just that. Running this plan the
+    same way tells the two apart: when the hook alone already changes the
+    run, the original run is no reference for this game.
+
+    The plan expects no change anywhere (`expect` is empty).
+    """
+    cpu = CPU[system]
+    if cpu == '6502':
+        from . import gfx_overlay8
+        return gfx_overlay8.nes_overlay_patch([], rom, system, avoid, null=True)
+    if cpu == 'z80':
+        from . import gfx_overlay8
+        return gfx_overlay8.sms_overlay_patch([], rom, system, avoid, null=True, hook='poll' if hook == 'poll' else 'irq')
+    edited = bytearray(rom)
+    details = {'cpu': cpu}
+    if cpu == '65816' and hook == 'poll':
+        sites, idiom = _snes_poll_sites(rom)
+        if not sites:
+            raise ValueError('This game has no loop that waits for the vertical blank by reading $4210 or $4212.')
+        skip = rom_skip(rom, system)
+        where = find_free_space(rom, system, len(idiom) + 1, same_bank=False, avoid=list(avoid) + [(s, s + 5) for s in sites],
+                                span=(skip, min(len(rom), skip + 0x400000)))
+        if where is None:
+            raise ValueError('The ROM has no free bytes for the hook.')
+        edited[where:where + len(idiom) + 1] = idiom + b'\x6B'                   # the game's wait ; rtl
+        for s in sites:
+            edited[s:s + 5] = b'\x22' + _snes_address(rom, where).to_bytes(3, 'little') + b'\xEA'
+        details.update(hook_offset=sites[0], routine_offset=where, hook=hook, hook_sites=len(sites))
+    elif cpu == '65816':
+        skip = rom_skip(rom, system)
+        bank0 = skip + (0x408000 if _snes_exhirom(rom) else 0x8000 if _snes_hirom(rom) else 0)
+        vector = bank0 + (0x7FEA if hook == 'nmi' else 0x7FEE)
+        if len(rom) < bank0 + 0x8000:
+            raise ValueError('Not a Super NES ROM image.')
+        handler = rom[vector] | rom[vector + 1] << 8
+        if handler == 0xFFFF or (handler == 0 and not any(rom[bank0 + 0x7FE4:bank0 + 0x7FF0])) or 0x2000 <= handler < 0x8000:
+            raise ValueError('This game has no interrupt handler to hook.')
+        stub = _snes_stub_slot(rom, system, bank0, avoid)[0]
+        edited[stub:stub + 4] = b'\x5C' + handler.to_bytes(3, 'little')
+        edited[vector:vector + 2] = (0x8000 + (stub - bank0)).to_bytes(2, 'little')
+        details.update(hook_offset=vector, stub_offset=stub, hook=hook)
+    elif cpu == '68000':
+        vector = 0x78
+        handler = int.from_bytes(rom[vector:vector + 4], 'big')
+        if len(rom) < 0x200 or handler in (0, 0xFFFFFFFF) or handler & 1:
+            raise ValueError('This game has no vertical-blank interrupt handler to hook.')
+        where = find_free_space(rom, system, 6, same_bank=False, avoid=avoid, span=(0x200, min(len(rom), 0x400000)))
+        if where is None:
+            where = len(rom) + (len(rom) & 1)
+            edited += b'\xFF' * (where + 6 - len(rom))
+        edited[where:where + 6] = b'\x4E\xF9' + handler.to_bytes(4, 'big')
+        edited[vector:vector + 4] = where.to_bytes(4, 'big')
+        details.update(hook_offset=vector, routine_offset=where)
+    else:
+        tail, _ = _sm83_displaced(rom, 0x40)
+        where = find_free_space(rom, system, len(tail), span=(0x68, 0x4000), avoid=avoid)
+        if where is None:
+            raise ValueError('ROM bank 0 has no free bytes for the hook.')
+        edited[where:where + len(tail)] = tail
+        edited[0x40:0x43] = b'\xC3' + where.to_bytes(2, 'little')
+        details.update(hook_offset=0x40, routine_offset=where)
+    final = fix_checksums(bytes(edited), rom, system)
+    return EditPlan('hook-only', _diff_writes(rom, final), len(final), {}, details=details,
+                    notes=['Only the interrupt hook, with no work behind it: a control for timing.'])
 
 
 # ---------------------------------------------------------------------------
 # One entry point for tiles that cannot be written in place
 # ---------------------------------------------------------------------------
 
+# The overlay's variants per processor, from the most careful to the least: plan_overlay_patch keyword arguments.
+OVERLAY_VARIANTS = {
+    'sm83': [{}, {'after_handler': True}],
+    '6502': [{'guard': True}, {'guard': False}],
+    'z80': [{'guard': True}, {'guard': False}, {'after_handler': True}, {'hook': 'poll'}],
+    '68000': [{'guard': 'idle'}, {'guard': 'idle', 'after_handler': True}, {'guard': 'idle-wide'}, {'guard': True},
+              {'guard': False}, {'guard': False, 'after_handler': True}],
+    '65816': [{'guard': 'idle'}, {'guard': 'idle', 'after_handler': True}, {'guard': 'idle-wide'}, {'after_handler': False},
+              {'after_handler': True}, {'hook': 'irq'}, {'hook': 'irq', 'after_handler': True}, {'hook': 'poll'}],
+}
+_SAFETY_RANK = {'clean': 0, 'timing': 1, 'differs': 2, 'unmeasured': 3, 'disturbed': 4}
+
+
 def plan_derived_tile_edit(tile: Tile, pixels, rom: bytes, scene: Scene, *, verify: Callable[[EditPlan], dict],
                            avoid: Iterable[tuple[int, int]] = (), codecs: Iterable[str] | None = None,
-                           max_candidates: int = 24) -> EditPlan:
+                           max_candidates: int = 24, safety: Callable | None = None) -> EditPlan:
     """Plan and confirm an edit to a computed, unpacked or packed tile.
 
     Tries, in order: (1) a recognised codec, re-encoded in place or relocated
-    and repointed; (2) the overlay fallback (on Super NES at both timings,
-    on Mega Drive with and without its guard). `verify(plan)` must run
-    verify_plan; the first plan whose replay comes out as planned is
-    returned with `.verified` set. Raises ValueError, listing what was tried,
-    when nothing is confirmed.
+    and repointed; (2) the overlay fallback in each of its variants for the
+    processor (OVERLAY_VARIANTS), from the most careful guard to none (and,
+    on Super NES and Master System, from another hook when the
+    vertical-blank one never runs). `verify(plan)` must run verify_plan; the
+    first plan whose replay comes out as planned is returned with
+    `.verified` set. Raises ValueError, listing what was tried, when nothing
+    is confirmed.
+
+    `safety(plan, edits, options)`, when given, must run overlay_safety (it
+    needs the recorded run from power-on, which only the caller has) and
+    return its result. The search then goes on past an overlay that replays
+    as planned but is not clean from power-on, and returns the variant with
+    the best outcome ('clean' ends the search). The outcome is stored in
+    `details['safety']`; the options used are in `details['options']`.
     """
     new = encode_tile(pixels, tile.format)
     changes = {a: new[k] for k, a in enumerate(tile.addresses) if new[k] != tile.stored[k]}
@@ -2015,24 +2867,55 @@ def plan_derived_tile_edit(tile: Tile, pixels, rom: bytes, scene: Scene, *, veri
             except ValueError as e:
                 tried.append(f'{block.codec}: {e}')
     cpu = CPU[tile.system]
-    variants = [{}]
-    if cpu == '65816':
-        variants = [{'after_handler': False}, {'after_handler': True}]
-    elif cpu == '68000':
-        variants = [{'guard': True}, {'guard': False}]
-    for options in variants:
+    edits = [(tile, list(pixels))]
+    fired = False
+    best = None
+    for options in OVERLAY_VARIANTS[cpu]:
+        if options.get('hook') in ('irq', 'poll') and fired:
+            continue        # the vertical-blank hook does run in this game; hanging on another hook would not help
         try:
-            plan = plan_overlay_patch([(tile, list(pixels))], rom, tile.system, avoid=avoid, scene=scene, **options)
+            plan = plan_overlay_patch(edits, rom, tile.system, avoid=avoid, scene=scene, **options)
             result = verify(plan)
             plan.verified = result
-            if result.get('as_planned'):
-                if tried:
-                    plan.notes.append('Tried first: ' + '; '.join(tried) + '.')
-                return plan
-            tried.append('overlay did not replay as planned' + (f' ({options})' if options else ''))
+            plan.details['options'] = dict(options)
+            fired = fired or bool(result.get('verified'))
+            if not result.get('as_planned'):
+                tried.append('overlay did not replay as planned' + (f' ({options})' if options else ''))
+                continue
+            if safety is None:
+                best = (0, plan)
+                break
+            outcome = safety(plan, edits, options)
+            plan.details['safety'] = outcome['state']
+            rank = _SAFETY_RANK.get(outcome['state'], 3)
+            if best is None or rank < best[0]:
+                best = (rank, plan)
+            if rank == 0:
+                break
+            tried.append(f'overlay replays as planned but the run from power-on is "{outcome["state"]}"'
+                         + (f' ({options})' if options else ''))
+            hook_only = outcome.get('hook_only') or {}
+            if 'clean' in hook_only and not hook_only['clean']:
+                break       # even the bare hook changes this game's run: no variant can reproduce it
         except ValueError as e:
-            tried.append(f'overlay: {e}')
-            break
+            if f'overlay: {e}' not in tried:
+                tried.append(f'overlay: {e}')
+    if best is not None:
+        plan = best[1]
+        if tried:
+            plan.notes.append('Tried first: ' + '; '.join(tried) + '.')
+        state = plan.details.get('safety')
+        if state and state != 'clean':
+            plan.notes.append({
+                'timing': 'A run from power-on with this edit differs from the original run, but so does a run with '
+                          'an empty routine of the same cost: this game changes course when any code is added, so '
+                          'the difference cannot be laid at the edit\'s door.',
+                'differs': 'A run from power-on with this edit differs from the original run beyond the edit itself.',
+                'disturbed': 'A run from power-on with this edit differs from the original run beyond the edit itself, '
+                             'and controls show that the routine\'s use of the video chip is the cause. The edit '
+                             'holds in this scene; elsewhere in the game it may disturb graphics.',
+            }.get(state, 'The run from power-on could not be compared.'))
+        return plan
     raise ValueError('No confirmed way to edit this tile: ' + '; '.join(tried) + '.')
 
 
@@ -2111,12 +2994,16 @@ def plan_private_copy(item, new_stored: bytes, rom: bytes, scene: Scene, *, veri
         start, end = block.start, block.start + block.size
         new_block = gfx_codecs.encode(block.codec, bytes(raw), like=rom[start:end])
         how = block.codec
-    hits = locate_pointer(verify, rom, system, start, end, new_block, expect, avoid=avoid, max_candidates=max_candidates)
+    counts: dict = {}
+    hits = locate_pointer(verify, rom, system, start, end, new_block, expect, avoid=avoid, max_candidates=max_candidates,
+                          report=counts)
     if not hits:
-        raise ValueError('No pointer to this data was confirmed, so a private copy cannot be made.')
+        raise ValueError('No pointer to this data was confirmed, so a private copy cannot be made: '
+                         + _no_pointer(counts) + '.')
     plan = plan_relocation(rom, system, start, end, new_block, hits[0], avoid=avoid, kind='private-copy')
     plan.expect = expect
     plan.details['source'] = how
+    plan.details['pointer_search'] = counts
     plan.notes.append('The original data is unchanged; only the reference this scene loads through was moved.')
     plan.verified = verify(plan)
     return plan
