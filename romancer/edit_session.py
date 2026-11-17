@@ -41,6 +41,7 @@ from pathlib import Path
 
 from . import palette_trace as pt
 from . import provenance as pv
+from . import scene_graphics as sg
 from .libretro_frontend import BUTTON_IDS, LibretroError
 from .trace_cores import SYSTEM_LABELS, TraceCoreMissing, TraceFrontend, core_options, header_skip, trace_core_for
 
@@ -315,7 +316,9 @@ def read_scene(path: Path):
         domains[name] = pv.DomainSnapshot(name, data, tags, pcs)
     rgb = body[at:at + header['width'] * header['height'] * 3]
     snapshot = pv.Snapshot(header['frame'], domains, header['screen_sha256'])
-    return pv.Scene(header['id'], header['frame'], header['screen_sha256'], [], snapshot, header.get('label', '')), header, rgb
+    scene = pv.Scene(header['id'], header['frame'], header['screen_sha256'], [], snapshot, header.get('label', ''))
+    scene.video = header.get('video')       # the video registers, when the engine exposed them (graphics_trace.capture_video)
+    return scene, header, rgb
 
 
 # ----------------------------------------------------------------- the live engine (its own process)
@@ -382,9 +385,14 @@ class _Host:
         temporary = self.run_dir / 'inputs.tmp'
         temporary.write_bytes(self.inputs.tobytes())
         os.replace(temporary, self.run_dir / 'inputs.bin')
+        try:
+            from . import graphics_trace
+            video = graphics_trace.capture_video(self.session, self.cfg['system'])
+        except Exception:
+            video = None                                   # layers() then infers the layout and says so
         meta = {'id': scene.id, 'frame': scene.frame, 'screen_sha256': scene.screen_sha256, 'label': label,
                 'origin': origin, 'run': self.cfg['run'], 'created': time.time(), 'checkpoints': [f for f, _ in thin],
-                'palette_sources': palette_sources, 'fingerprint': fingerprint.hex()}
+                'palette_sources': palette_sources, 'fingerprint': fingerprint.hex(), 'video': video}
         if not path.exists():
             write_scene(path, scene, meta, frame.width, frame.height, frame.rgb)
             (self.store / 'scenes' / (scene.id + '.png')).write_bytes(png_bytes(frame.width, frame.height, frame.rgb))
@@ -439,7 +447,13 @@ def _host_main(conn, cfg: dict) -> None:
 
 # ----------------------------------------------------------------- replays (worker processes)
 
-def _replay(fe, state: bytes, start: int, scene: pv.Scene, buttons):
+def _replay(fe, state: bytes, start: int, scene: pv.Scene, buttons, settled=None, slack: int = 0):
+    """Replay to the scene's frame. With `settled`, run up to `slack` more frames until it accepts the snapshot.
+
+    A routine added to the game costs a little time each frame, so a patched
+    game may reach the same moment a frame or two late. Returns the snapshot,
+    the screen, and how many frames late it was (None when it never settled).
+    """
     if int(fe.lib.retro_serialize_size()) <= 0:
         fe.run_frame([])                # some engines accept a savestate only after their first frame
     fe.unserialize(state)
@@ -448,7 +462,15 @@ def _replay(fe, state: bytes, start: int, scene: pv.Scene, buttons):
     session.lib.romancer_trace_reset()
     session.lib.romancer_trace_enable(1)
     session.run(scene.frame - start, buttons)
-    return session.snapshot(), fe.last_frame
+    first = snapshot, frame = session.snapshot(), fe.last_frame
+    if settled is None or settled(snapshot):
+        return snapshot, frame, 0
+    for late in range(1, slack + 1):
+        session.run(1, buttons)
+        snapshot = session.snapshot()
+        if settled(snapshot):
+            return snapshot, fe.last_frame, late
+    return first[0], first[1], None
 
 
 class _Trail:
@@ -475,14 +497,17 @@ class _Trail:
     def state(self, start: int) -> bytes:
         return zlib.decompress((self.run_dir / f'{start}.st').read_bytes())
 
-    def replay(self, rom_path, start: int):
+    def replay(self, rom_path, start: int, want=None, slack: int = 0):
+        """(video memory, screen) after replaying `rom_path` from `start`; with `want`, also how many frames late it matched."""
+        video = lambda snapshot: {name: snapshot.domains[name].data for name in _video_domains(snapshot)
+                                  if snapshot.domains[name].data is not None}
+        settled = None if want is None else (lambda snapshot: all(video(snapshot).get(name) == value for name, value in want.items()))
         fe = _frontend(self.job, rom_path)
         try:
-            snapshot, frame = _replay(fe, self.state(start), start, self.scene, self.buttons)
+            snapshot, frame, late = _replay(fe, self.state(start), start, self.scene, self.buttons, settled, slack)
         finally:
             _close(fe)
-        data = {name: snapshot.domains[name].data for name in _video_domains(snapshot) if snapshot.domains[name].data is not None}
-        return data, frame
+        return (video(snapshot), frame) if want is None else (video(snapshot), frame, late)
 
     def baseline(self, start: int):
         """Video memory after replaying the unchanged ROM from `start`, or None if that does not redraw the recorded screen."""
@@ -551,13 +576,27 @@ def replay_task(job: dict) -> dict:
         if job.get('thorough'):
             starts = starts[-1:]          # from power-on: the whole truth, for edits that touch many bytes
         expected = {name: set(indices) for name, indices in job.get('expected', {}).items()}
+        plan = {name: {int(i): v for i, v in cells.items()} for name, cells in (job.get('plan_expect') or {}).items()}
         final = quiet = None
         for start in starts:
             base = trail.baseline(start)
             if base is None:
                 result['unfaithful'].append(start)
                 continue
-            data, frame = trail.replay(job['rom'], start)
+            if plan and all(name in base for name in plan):
+                # The edited scene: the planned bytes should hold their planned values and nothing else should move.
+                want = {name: bytearray(value) for name, value in base.items() if name in plan}
+                for name, cells in plan.items():
+                    for i, v in cells.items():
+                        want[name][i] = v
+                data, frame, late = trail.replay(job['rom'], start, {name: bytes(value) for name, value in want.items()}, 12)
+                moved = _differences(base, data)
+                result.update(as_planned=all(data[name][i] == v for name, cells in plan.items() for i, v in cells.items()),
+                              unplanned={name: count for name, indices in moved.items()
+                                         if (count := sum(i not in plan.get(name, ()) for i in indices))},
+                              late=late)
+            else:
+                data, frame = trail.replay(job['rom'], start)
             result['tried'].append(start)
             changed = _differences(base, data)
             pixels = _pixel_diff(rgb, frame.rgb)
@@ -687,6 +726,12 @@ class EditSession:
         self.review_state: dict | None = None
         self.renders: dict[tuple, dict] = {}
         self.pending: set = set()
+        self._graphics_cache: dict[str, sg.SceneGraphics] = {}
+        self._views: dict[tuple, dict] = {}
+        self._editable: dict[str, dict] = {}
+        self._chr_used: dict[str, set] = {}
+        self._checksum_bytes: set | None = None
+        self._read_ranges: tuple | None = None
         self.live = {'state': 'off', 'message': '', 'frame': 0, 'progress': None}
         self.recording: dict | None = None
         self._host = None
@@ -943,6 +988,9 @@ class EditSession:
             for scene in self.scenes.values():
                 self.impact.add(scene)
             self._sources = {k: v for k, v in self._sources.items() if k[0] != scene_id}
+            for cache in (self._graphics_cache, self._editable, self._chr_used):
+                cache.pop(scene_id, None)
+            self._views.clear()
             for change in self.changes:
                 change['affected'].pop(scene_id, None)
             self._persist()
@@ -994,11 +1042,15 @@ class EditSession:
                 pickers.setdefault(swatch.format, picker_for(swatch.format))
                 uses = self._uses(swatch) if swatch.status != 'unknown' else set()
                 reason = '' if swatch.editable else LOCK_REASONS.get(swatch.status, LOCK_REASONS['unknown'])
-                change = active.get(key) if swatch.editable else None
+                change = active.get(key) if swatch.editable else next(
+                    (c for c in active.values() if c.get('found') and c.get('swatch') == f'{swatch.domain}:{swatch.entry}'
+                     and c['scene_id'] == scene_id and not c.get('planning') and not c.get('error')), None)
                 swatches.append({
                     'id': f'{swatch.domain}:{swatch.entry}', 'domain': swatch.domain, 'entry': swatch.entry, 'group': swatch.group,
                     'name': _swatch_name(swatch, line.get(swatch.domain, 16)), 'format': swatch.format, 'colors': swatch.rgb,
                     'editable': swatch.editable, 'status': swatch.status, 'locked_reason': reason,
+                    'findable': swatch.status == 'derived' and bool(self.core),
+                    'elsewhere': [] if swatch.editable else self._elsewhere(scene_id, swatch),
                     'uses': len(uses), 'notes': list(swatch.notes),
                     'pending': change['to_rgb'] if change else None, 'pending_change': change['id'] if change else None,
                     'details': [{'file_offset': s['offset'] + self.skip, 'kind': s['kind'], 'code_address': s['pc']} if s else None
@@ -1007,6 +1059,22 @@ class EditSession:
                               'image': 'scene:' + scene_id, 'width': meta['width'], 'height': meta['height']},
                     'swatches': swatches, 'pickers': pickers, 'line': line, 'look': self._look(scene_id),
                     'recorded_scenes': len(self.scenes)}
+
+    def _elsewhere(self, scene_id: str, swatch: pt.Swatch) -> list[dict]:
+        """Other recorded scenes in which this same palette slot can be changed (a moment where it is not faded)."""
+        out = []
+        for sid in self.scenes:
+            if sid == scene_id:
+                continue
+            table = self._editable.get(sid)
+            if table is None:
+                table = self._editable[sid] = {(s.domain, s.entry): s.rgb for s in pt.swatches(self.scenes[sid], self.system) if s.editable}
+            colors = table.get((swatch.domain, swatch.entry))
+            if colors:
+                out.append({'scene_id': sid, 'label': self._label(sid), 'colors': colors, 'swatch': f'{swatch.domain}:{swatch.entry}'})
+                if len(out) == 3:
+                    break
+        return out
 
     def image(self, key: str) -> bytes:
         kind, _, name = str(key).partition(':')
@@ -1033,6 +1101,8 @@ class EditSession:
         cached = self._roms.get(key)
         if cached is None:
             rom = bytearray(self.rom)
+            size = max([len(rom)] + [change.get('rom_size') or 0 for change in changes])
+            rom += bytes([0xFF]) * (size - len(rom))             # a change that needs more room makes the ROM longer
             for change in changes:
                 for offset, _, new in change['writes']:
                     rom[offset] = new
@@ -1058,18 +1128,18 @@ class EditSession:
                 out[name] = indices
         return out
 
-    def _submit(self, scene_id: str, rom: bytes, offsets, sink, *, hint=None, fixed=False, thorough=False) -> str:
+    def _submit(self, scene_id: str, rom: bytes, offsets, sink, *, hint=None, fixed=False, thorough=False, plan_expect=None) -> str:
         rom_sha = hashlib.sha256(rom).hexdigest()
         cached = self.renders.get((scene_id, rom_sha))
-        if cached is not None:
+        if cached is not None and (not plan_expect or 'as_planned' in cached):
             sink(scene_id, cached)
             return cached['key']
         path = self.store / 'work' / (rom_sha[:24] + self.suffix)
         if not path.exists():
             path.write_bytes(rom)
-        key = hashlib.sha1(f'{scene_id}:{rom_sha}:{int(fixed)}:{hint}'.encode()).hexdigest()[:24]
+        key = hashlib.sha1(f'{scene_id}:{rom_sha}:{int(fixed)}:{hint}:{int(bool(plan_expect))}'.encode()).hexdigest()[:24]
         job = dict(self._cfg(), rom=str(path), base_rom=str(self.rom_path), scene_id=scene_id, key=key, rom_sha=rom_sha,
-                   expected=self._expected(scene_id, offsets), hint=hint, fixed=fixed, thorough=thorough)
+                   expected=self._expected(scene_id, offsets), hint=hint, fixed=fixed, thorough=thorough, plan_expect=plan_expect)
         self.pending.add(key)
         future = self._ensure_pool().submit(replay_task, job)
 
@@ -1099,7 +1169,11 @@ class EditSession:
                 change.update(id=uuid.uuid4().hex, state='preview', recorded_scenes=len(self.scenes), affected={}, created=time.time())
                 self.preview = change
                 job = dict(self._cfg(), base_rom=str(self.rom_path), **change.pop('plan_job'))
-                future = self._ensure_pool().submit(private_copy_task, job)
+                task = private_copy_task
+                if change.pop('plan_task', None) == 'graphics':
+                    task = sg.plan_task
+                    change['progress'] = job['progress'] = str(self.store / 'work' / f"plan-{change['id']}.json")
+                future = self._ensure_pool().submit(task, job)
 
                 def planned(done, change=change):
                     try:
@@ -1111,18 +1185,23 @@ class EditSession:
                         if 'error' in result:
                             change['error'] = result['error']
                             return
-                        change['writes'] = sorted(result['writes'])
-                        change['notes'] = result.get('notes', [])
+                        try:
+                            self._planned(change, result)
+                        except ValueError as error:
+                            change['error'] = str(error)
+                            return
                         if self.preview is change:
                             self._propose(change)
                 future.add_done_callback(planned)
                 return self._change_view(change)
             tracing = change.get('expect_offsets') or [offset - self.skip for offset, _, _ in change['writes']]
-            users = set()
+            users = set(change.get('extra_scenes', ()))
             for offset in tracing:
                 users.update(self.impact.users(offset, offset + 1))
             users.add(change['scene_id'])
             order = [change['scene_id']] + [sid for sid in self.scenes if sid in users and sid != change['scene_id']]
+            if change.get('every_scene'):          # an added routine runs everywhere, so every recorded scene is re-rendered
+                order += [sid for sid in self.scenes if sid not in users]
             change.update(id=change.get('id') or uuid.uuid4().hex, state='preview', recorded_scenes=len(self.scenes),
                           affected={sid: {'state': 'working'} for sid in order}, created=time.time())
             self.preview = change
@@ -1137,8 +1216,273 @@ class EditSession:
                 if change['state'] == 'kept' and all(e['state'] != 'working' for e in change['affected'].values()):
                     self._persist()
             for sid in order:
-                self._submit(sid, rom, tracing, sink, thorough=change['kind'] != 'color' or change.get('scope') != 'all')
+                self._submit(sid, rom, tracing, sink, thorough=change['kind'] != 'color' or change.get('scope') != 'all',
+                             plan_expect=change.get('expect') if sid == change['scene_id'] else None)
             return self._change_view(change)
+
+    def _planned(self, change: dict, result: dict) -> None:
+        """Take a finished plan into the change: its bytes, how it was made, and which scenes must be re-rendered."""
+        checksum = self._checksum_offsets()
+        writes = sorted(([int(o), None if a is None else int(a), int(b)] for o, a, b in result['writes'] if int(o) not in checksum),
+                        key=lambda w: w[0])
+        if not writes:
+            raise ValueError('This change leaves the ROM as it is.')
+        change['writes'] = writes
+        change['notes'] = result.get('notes', [])
+        if (result.get('rom_size') or 0) > len(self.rom):
+            change['rom_size'] = int(result['rom_size'])
+            if any((c.get('rom_size') or 0) > len(self.rom) for c in self.changes if c['key'] != change['key']
+                   and c.get('block') != result.get('block')):
+                raise ValueError('This change needs room added at the end of the ROM, and another change in your list already '
+                                 'added room there. ROMancer cannot combine the two yet. Undo the other change first.')
+        if change.get('plan_kind') == 'color':
+            change['key'] = 'color:' + ','.join(str(o) for o in result.get('place') or [o for o, _, _ in writes])
+            change['as_planned'] = bool(result.get('as_planned'))
+            change['shown_rgb'] = result.get('shown')
+            return
+        if 'method' not in result:
+            return                                   # a private copy of a color, planned by private_copy_task
+        change.update(method=result['method'], in_scene=result.get('in_scene'), expect=result.get('expect') or {},
+                      block=result.get('block'), decoded=result.get('decoded'), tried=result.get('tried', []))
+        offsets = set(change.get('expect_offsets') or ())
+        if result.get('block_range'):
+            first, last = result['block_range']
+            offsets.update(range(first - self.skip, last - self.skip))
+        change['expect_offsets'] = sorted(offsets) or None
+        others = [c for c in self.changes if c['key'] != change['key']]
+        merged = []
+        if change['method'] in ('reencode', 'relocate') and change.get('block') is not None:
+            merged = [c for c in others if c.get('block') == change['block'] and c.get('method') in ('reencode', 'relocate')]
+        elif change['method'] == 'overlay':
+            merged = [c for c in others if c.get('method') == 'overlay']
+        if merged:
+            mine = {(t['domain'], t['address']) for t in change['tiles']}
+            change['tiles'] = [t for c in merged for t in c['tiles'] if (t['domain'], t['address']) not in mine] + change['tiles']
+            change['replaces'] = [c['id'] for c in merged]
+            change['title'] = f"{len(change['tiles'])} pictures " + ('packed together' if change['method'] != 'overlay' else 'in one patch')
+            change['extra_scenes'] = sorted(set(change.get('extra_scenes', ())) | {sid for c in merged for sid in c['affected']})
+        if change['method'] == 'overlay':
+            change['every_scene'] = True
+        mine = {o for o, _, _ in writes}
+        clash = next((c for c in others if c not in merged and any(o in mine for o, _, _ in c['writes'])), None)
+        if clash is not None:
+            raise ValueError(f"This change needs the same place in the ROM as \u201c{clash['title']}\u201d, which is already in your "
+                             'change list. Undo that change first, then try this one again.')
+
+    def _checksum_offsets(self) -> set:
+        """File offsets of the cartridge checksum; the session brings them up to date itself, so plans leave them out."""
+        if self._checksum_bytes is None:
+            found = set()
+            for at in (len(self.rom) // 2, min(len(self.rom) - 1, 0x1000 + self.skip), len(self.rom) - 2):
+                probe = bytearray(self.rom)
+                probe[at] ^= 0x55
+                fixed = _with_checksums(bytes(probe), self.rom, self.system)
+                found.update(i for start in range(0, len(fixed), 4096) if fixed[start:start + 4096] != probe[start:start + 4096]
+                             for i in range(start, min(start + 4096, len(fixed))) if fixed[i] != probe[i])
+            if self.system == 'genesis':
+                found.update(range(0x1A4, 0x1A8))        # the header's "end of ROM" field follows the ROM's size
+            self._checksum_bytes = found
+        return self._checksum_bytes
+
+    def _avoid(self, key: str = '') -> list:
+        """File ranges a plan must not use as free space: bytes a recorded scene reads, and bytes other kept changes write."""
+        if self._read_ranges is None or self._read_ranges[0] != len(self.scenes):
+            self._read_ranges = (len(self.scenes), pv.merge_ranges((o + self.skip, o + self.skip + 1) for o in self.impact._by_offset))
+        taken = [(o, o + 1) for c in self.changes if c['key'] != key for o, _, _ in c['writes']]
+        return [list(r) for r in pv.merge_ranges(list(self._read_ranges[1]) + taken)]
+
+    # ---- pictures and backgrounds
+
+    def _graphics(self, scene_id: str) -> sg.SceneGraphics:
+        found = self._graphics_cache.get(scene_id)
+        if found is None:
+            meta = self.meta[scene_id]
+            found = sg.SceneGraphics(self._scene(scene_id), self.system, self.rom, self.rgb[scene_id], meta['width'], meta['height'])
+            while len(self._graphics_cache) >= 3:
+                self._graphics_cache.pop(next(iter(self._graphics_cache)))
+            self._graphics_cache[scene_id] = found
+        return found
+
+    def _chr_tiles(self, scene_id: str) -> set:
+        """ROM offsets (tracing) of the pictures a scene shows straight from the ROM (NES CHR-ROM)."""
+        found = self._chr_used.get(scene_id)
+        if found is None:
+            from . import graphics_trace as gt
+            found, scene = set(), self.scenes[scene_id]
+            table = scene.snapshot.domains.get('chr_map')
+            if table is not None and scene.snapshot.domains.get('chr') is None:
+                try:
+                    for address in gt.used_tile_addresses(scene, self.system):
+                        slot, k = address // 16 // 64, address // 16 % 64
+                        if 0 <= slot < len(table.tags) and pv.tag_kind(table.tags[slot]) == pv.RT_ROM:
+                            found.add(pv.tag_offset(table.tags[slot]) + k * 16)
+                except Exception:
+                    pass
+            self._chr_used[scene_id] = found
+        return found
+
+    def _tile_users(self, tile) -> set:
+        if tile.domain == 'chr_rom':
+            first = tile.sources[0]['offset']
+            return {sid for sid in self.scenes if first in self._chr_tiles(sid)}
+        users = set()
+        for source in tile.sources:
+            if source:
+                users.update(self.impact.users(source['offset'], source['offset'] + 1))
+        return users
+
+    def graphics_view(self, scene_id: str) -> dict:
+        """The scene's pictures (tiles) and background layers, each with its status and what is pending on it."""
+        with self.lock:
+            graphics = self._graphics(scene_id)
+            key = (scene_id, len(self.scenes))
+            base = self._views.get(key)
+            if base is None:
+                base = graphics.view(lambda tile: len(self._tile_users(tile)), {}, {})
+                if len(self._views) >= 3:
+                    self._views.pop(next(iter(self._views)))
+                self._views[key] = base
+            pending, cells = {}, {}
+            for change in self._active():
+                if change.get('planning') or change.get('error'):
+                    continue
+                for record in change.get('tiles', ()):
+                    pending[sg.tile_id(record['domain'], record['address'], record['format'])] = (record, change['id'])
+                if change['kind'] == 'background' and change['scene_id'] == scene_id:
+                    for cell in change.get('cells', ()):
+                        cells.setdefault(int(cell['layer']), []).append({**cell, 'change': change['id']})
+            tiles = []
+            for tile in base['tiles']:
+                hit = pending.get(tile['id'])
+                if hit and hit[0]['from'] == tile['pixels']:
+                    tile = {**tile, 'pending': {'pixels': hit[0]['pixels'], 'change': hit[1]}}
+                tiles.append(tile)
+            layers = [{**layer, 'pending': cells.get(layer['index'], [])} for layer in base['layers']]
+            return {**base, 'tiles': tiles, 'layers': layers, 'scene_id': scene_id, 'private_copy': _private_copy_support()}
+
+    def tile_at(self, scene_id: str, x: int, y: int) -> dict:
+        """The pictures the recorded screen shows at one pixel: a sprite and/or background cells, topmost first."""
+        with self.lock:
+            hits = self._graphics(scene_id).lookup(int(x), int(y))
+            return {'x': int(x), 'y': int(y), 'hits': hits,
+                    'message': '' if hits else 'ROMancer could not tell which picture is under that pixel. '
+                                               'Choose it from the list of pictures in this scene instead.'}
+
+    def propose_tile(self, scene_id: str, tile: str, pixels, scope: str = 'all') -> dict:
+        """Plan new pixels for one 8x8 picture. The way is chosen for it: in place, re-packed, or a swap-in patch.
+
+        The plan is made and replay-checked in a worker; then every scene that loads the picture is re-rendered.
+        """
+        with self.lock:
+            self._require_core()
+            graphics = self._graphics(scene_id)
+            domain, address, fmt = sg.parse_tile_id(tile)
+            item = graphics.tile(domain, address, fmt)
+            pixels = sg.parse_pixels(pixels, fmt)
+            how, can, reason = sg.tile_reason(item, self.system)
+            if not can:
+                raise ValueError(reason)
+            if pixels == list(item.pixels):
+                raise ValueError('That is the picture it already has. Draw something different first.')
+            if any('8 colors' in note for note in item.notes) and any(p > 7 for p in pixels):
+                raise ValueError('The ROM stores this picture with 8 colors, so only the first 8 colors of its palette can be used in it.')
+            only = scope != 'all'
+            if only:
+                support = _private_copy_support()
+                if not support['available']:
+                    raise ValueError(support['reason'])
+                if domain == 'chr_rom':
+                    raise ValueError("On this cartridge the game's picture chip reads pictures straight from the ROM, so one "
+                                     'scene cannot be given its own copy. Change it everywhere instead.')
+            record = {'domain': domain, 'address': address, 'format': fmt, 'stored': item.stored.hex(),
+                      'from': sg.pixel_text(item.pixels, fmt), 'pixels': sg.pixel_text(pixels, fmt)}
+            first = next((s['offset'] for s in item.sources if s), None)
+            key = (f'tile:{first}' if how == 'direct' and first is not None else 'tile:' + tile + ':' + item.stored.hex()[:16])
+            key += ('@' + scene_id) if only else ''
+            holders = []
+            if domain != 'chr_rom' and not only:      # scenes that hold this exact picture in this slot, however they loaded it
+                for sid, scene in self.scenes.items():
+                    memory = scene.snapshot.domains.get(domain)
+                    if memory is not None and memory.data is not None and item.addresses[-1] < len(memory.data) \
+                            and bytes(memory.data[a] for a in item.addresses) == item.stored:
+                        holders.append(sid)
+            companions = [{'block': c.get('block'), 'decoded': c.get('decoded'), 'method': c.get('method'), 'tiles': c.get('tiles', []),
+                           'expect': c.get('expect') if c['scene_id'] == scene_id else None}
+                          for c in self.changes if c['key'] != key and c.get('method') in ('reencode', 'relocate', 'overlay')]
+            change = {'kind': 'graphics', 'key': key, 'scene_id': scene_id, 'title': f'Picture {item.index}',
+                      'swatch': None, 'from_rgb': None, 'to_rgb': None, 'writes': [], 'scope': 'only_this' if only else 'all',
+                      'tiles': [record], 'planning': True, 'plan_task': 'graphics',
+                      'expect_offsets': [s['offset'] for s in item.sources if s] if domain != 'chr_rom' else None,
+                      'extra_scenes': sorted((self._tile_users(item) if not only else set()) | set(holders)),
+                      'plan_job': {'what': 'tile', 'scene_id': scene_id, 'domain': domain, 'address': address, 'format': fmt,
+                                   'pixels': record['pixels'], 'scope': 'only_this' if only else 'all',
+                                   'avoid': self._avoid(key), 'companions': companions}}
+            return self._propose(change)
+
+    def propose_cells(self, scene_id: str, cells) -> dict:
+        """Plan a change to background cells (which picture, flips, palette line), painted as one change."""
+        with self.lock:
+            self._require_core()
+            graphics = self._graphics(scene_id)
+            layers = graphics.layers()
+            clean, seen = [], set()
+            for cell in cells:
+                layer, x, y = int(cell['layer']), int(cell['x']), int(cell['y'])
+                if not 0 <= layer < len(layers) or not (0 <= x < layers[layer].layer.width and 0 <= y < layers[layer].layer.height):
+                    raise ValueError('A painted cell is outside the background.')
+                if (layer, x, y) in seen:
+                    continue
+                seen.add((layer, x, y))
+                current = layers[layer].layer.cell(x, y)
+                if current.status == 'unknown':
+                    raise ValueError(sg.CELL_REASONS['unknown'])
+                item = {'layer': layer, 'x': x, 'y': y}
+                if cell.get('tile') is not None:
+                    item['tile'] = str(cell['tile'])
+                    sg.hardware_tile(layers[layer], current, *sg.parse_tile_id(item['tile']))      # refuses plainly when it cannot be shown there
+                for name in ('hflip', 'vflip'):
+                    if cell.get(name) is not None:
+                        item[name] = bool(cell[name])
+                if cell.get('line') is not None:
+                    item['line'] = int(cell['line'])
+                item['from'] = {'tile': sg.tile_id(layers[layer].layer.tile_domain, current.tile_address, layers[layer].layer.tile_format),
+                                'hflip': current.hflip, 'vflip': current.vflip, 'line': current.palette}
+                clean.append(item)
+            if not clean:
+                raise ValueError('Paint at least one background cell first.')
+            if len(clean) > 2048:
+                raise ValueError('That is too many cells for one change. Paint a smaller area.')
+            key = 'cells:' + scene_id + ':' + hashlib.sha1(repr(sorted((c['layer'], c['x'], c['y']) for c in clean)).encode()).hexdigest()[:16]
+            count = len(clean)
+            offsets = sorted({s['offset'] for c in clean for s in layers[c['layer']].layer.cell(c['x'], c['y']).sources if s})
+            change = {'kind': 'background', 'key': key, 'scene_id': scene_id,
+                      'title': f'{count} background cell{"s" if count != 1 else ""}',
+                      'swatch': None, 'from_rgb': None, 'to_rgb': None, 'writes': [], 'scope': 'all', 'cells': clean,
+                      'planning': True, 'plan_task': 'graphics', 'expect_offsets': offsets or None,
+                      'plan_job': {'what': 'cells', 'scene_id': scene_id, 'cells': clean, 'avoid': self._avoid(key)}}
+            return self._propose(change)
+
+    def find_color(self, scene_id: str, domain: str, entry: int, colors) -> dict:
+        """For a color the game computes: search for the stored color behind it, and if a replay confirms it, change that."""
+        with self.lock:
+            self._require_core()
+            swatch = next((s for s in self._swatches(scene_id) if s.domain == domain and s.entry == entry), None)
+            if swatch is None:
+                raise ValueError('That color is not part of this scene.')
+            if swatch.status != 'derived':
+                raise ValueError(LOCK_REASONS['unknown'] if not swatch.editable else 'This color can be changed directly.')
+            colors = [[max(0, min(255, int(v))) for v in rgb] for rgb in colors]
+            if len(colors) != len(swatch.rgb) or any(len(rgb) != 3 for rgb in colors):
+                raise ValueError('Choose a color for every slot.')
+            wanted = pt.encode_swatch(swatch, colors if swatch.format == 'dmg-shades' else colors[0])
+            if wanted == swatch.stored:
+                raise ValueError('That is the color it already has. Choose a different color.')
+            line = {layout[0]: layout[3] for layout in pt.LAYOUTS.get(self.system, [])}.get(domain, 16)
+            change = {'kind': 'color', 'key': f'find:{domain}:{entry}@{scene_id}', 'scene_id': scene_id, 'title': _swatch_name(swatch, line),
+                      'swatch': f'{domain}:{entry}', 'from_rgb': swatch.rgb, 'to_rgb': _decode_stored(swatch.format, wanted),
+                      'writes': [], 'scope': 'all', 'found': True, 'planning': True, 'plan_task': 'graphics', 'plan_kind': 'color',
+                      'plan_job': {'what': 'color', 'scene_id': scene_id, 'domain': domain, 'entry': int(entry), 'colors': colors}}
+            return self._propose(change)
 
     def propose_color(self, scene_id: str, domain: str, entry: int, colors, scope: str = 'all') -> dict:
         """Plan a new color for one palette entry and start re-rendering every scene that uses it.
@@ -1224,7 +1568,8 @@ class EditSession:
             if change.get('planning') or change.get('error'):
                 raise ValueError('This change is not ready to keep.')
             if change is self.preview:
-                self.changes = [c for c in self.changes if c['key'] != change['key']] + [change]
+                gone = set(change.get('replaces', ()))
+                self.changes = [c for c in self.changes if c['key'] != change['key'] and c['id'] not in gone] + [change]
                 change['state'] = 'kept'
                 self.preview = None
                 self.revision += 1
@@ -1275,6 +1620,12 @@ class EditSession:
         done = [a for a in affected if a['state'] == 'done']
         verified = bool(done) and any(a['verified'] for a in done) and not working
         own = next((a for a in affected if a['edited_here']), None)
+        picture = change['kind'] in ('graphics', 'background') and 'method' in change
+        checks, method, progress = [], change.get('method'), None
+        if planning and change.get('progress'):
+            progress = sg.read_progress(change['progress'])
+        if picture and not failed:
+            checks, verified = self._checks(change, working)
         total = len(self.scenes)
         count = len(affected)
         visible = sum(1 for a in affected if a['visible'])
@@ -1288,12 +1639,69 @@ class EditSession:
                             + ('' if working else f'; {visible} look{"s" if visible == 1 else ""} different') +
                             ". Scenes you haven't recorded can't be shown.",
                 'planning': planning, 'error': failed, 'notes': change.get('notes', []),
-                'verdict': ('Finding where this scene loads the data from, so only this scene changes…' if planning else
+                'verdict': ((progress or {}).get('text') or ('Finding where this scene loads the data from, so only this scene changes…'
+                                                               if change.get('scope') == 'only_this' else
+                                                               'Looking for where the game keeps this color…' if change.get('found') else
+                                                               'Working out how to make this change…') if planning else
                             failed if failed else
+                            ' '.join(c['text'] for c in checks) if checks else
                             'Re-rendering every scene that uses this…' if working else
                             'Checked: the real game was replayed with this change and the color changed.' if verified else
                             'Not confirmed: the replay did not show this change. It may not do what you expect.'),
+                'checks': checks, 'method': method, 'method_text': sg.METHODS.get(method, '') if picture else '',
+                'progress': progress, 'found': bool(change.get('found')), 'shown_rgb': change.get('shown_rgb'),
+                'tiles': [{'id': sg.tile_id(t['domain'], t['address'], t['format']), 'from': t['from'], 'to': t['pixels']}
+                          for t in change.get('tiles', ())] if full else [],
+                'cells': change.get('cells', []) if full else [], 'cell_count': len(change.get('cells', ())),
+                'every_scene': bool(change.get('every_scene')), 'tried': change.get('tried', []) if full else [],
+                'grows': max(0, (change.get('rom_size') or 0) - len(self.rom)),
                 'details': [{'file_offset': o, 'before': a, 'after': b} for o, a, b in change['writes'][:64]] if full else []}
+
+    def _checks(self, change: dict, working: int) -> tuple[list, bool]:
+        """The two separate facts about a picture or background change: what the replay of this scene showed, and what a
+        replay of the whole game from power-on showed. Neither stands in for the other."""
+        here = change.get('in_scene') or {}
+        by_screen = here.get('by') == 'screen'
+        planned = bool(here.get('as_planned') or (by_screen and here.get('verified')))
+        what = 'background' if change['kind'] == 'background' else 'picture'
+        extra = sum(here.get('unplanned', {}).values())
+        text = ('Works in this scene: the game was replayed and the screen changed.' if planned and by_screen else
+                f'Works in this scene: the game was replayed and the {what} came out exactly as you made it.' if planned else
+                f'Not confirmed in this scene: the replay did not show the {what} as you made it.')
+        if planned and extra:
+            text += f' {extra} other byte{"s" if extra != 1 else ""} of video memory changed with it in this scene.'
+        checks = [{'name': 'In this scene', 'state': 'good' if planned and not extra else 'warn' if planned else 'bad', 'text': text}]
+        own = change['affected'].get(change['scene_id'], {})
+        lead = 'ROMancer also replayed the game from power-on: '
+        if own.get('state') == 'working' or not own:
+            power = {'state': 'working', 'text': 'Now replaying the game from power-on to see what else changes…'}
+        elif own.get('state') == 'failed':
+            power = {'state': 'bad', 'text': lead + 'that replay could not be done. ' + str(own.get('error', ''))}
+        elif by_screen or 'as_planned' not in own:
+            power = ({'state': 'good', 'text': lead + 'the change shows in this scene.'} if own.get('verified') and own.get('pixels') else
+                     {'state': 'bad', 'text': lead + 'the change did not show in this scene.'})
+        else:
+            others = sum(own.get('unplanned', {}).values())
+            late = own.get('late')
+            if own.get('as_planned') and not others:
+                power = {'state': 'good', 'text': lead + 'clean. Only what you changed is different'
+                         + (f' (the game reaches this moment {late} frame{"s" if late != 1 else ""} later).' if late else '.')}
+            elif own.get('as_planned'):
+                power = {'state': 'warn', 'text': lead + f'your change is there, and other things changed too ({others} other '
+                         f'byte{"s" if others != 1 else ""} of video memory). Look at the pictures below before keeping it.'}
+            else:
+                power = {'state': 'bad', 'text': lead + f'the {what} did not come out as you made it that way. '
+                         'It works from the moment before this scene, but not when the whole game is played up to it.'}
+        checks.append({'name': 'From power-on', **power})
+        other_scenes = [r for sid, r in change['affected'].items() if sid != change['scene_id'] and sid in self.scenes]
+        if other_scenes and not working:
+            seen = sum(1 for r in other_scenes if r.get('pixels'))
+            checks.append({'name': 'Other scenes', 'state': 'warn' if seen else 'good',
+                           'text': f'{seen} other recorded scene{"s" if seen != 1 else ""} look{"s" if seen == 1 else ""} different; '
+                                   f'{"it is" if seen == 1 else "they are"} shown below.' if seen else
+                                   f'The {len(other_scenes)} other recorded scene{"s" if len(other_scenes) != 1 else ""} that '
+                                   f'{"were" if len(other_scenes) != 1 else "was"} re-rendered look{"s" if len(other_scenes) == 1 else ""} the same.'})
+        return checks, planned and power['state'] in ('good', 'warn') and not working
 
     def change_list(self) -> dict:
         with self.lock:
@@ -1333,7 +1741,7 @@ class EditSession:
         """Everything that will be written and every scene it changes, rendered with all changes together."""
         with self.lock:
             if self.preview:
-                raise ValueError('Keep or cancel the color you are trying before reviewing.')
+                raise ValueError('Keep or cancel the change you are trying before reviewing.')
             if not self.changes:
                 raise ValueError('There are no changes to save yet.')
             views = [self._change_view(c, full=False) for c in self.changes]
@@ -1354,7 +1762,8 @@ class EditSession:
             self.review_state = {'revision': self.revision, 'ready': ready}
             count = len(views)
             return {'revision': self.revision, 'ready': ready, 'changes': views, 'scenes': scenes,
-                    'bytes': sum(len(e['after']) // 2 for e in edits), 'unverified': unverified,
+                    'bytes': sum(len(e['after']) // 2 for e in edits) + (grown := len(self._rom_with(self.changes)) - len(self.rom)),
+                    'grows': grown, 'unverified': unverified,
                     'details': [{'title': c['title'], 'writes': [{'file_offset': o, 'before': a, 'after': b} for o, a, b in c['writes'][:64]]}
                                 for c in self.changes],
                     'headline': f'{"These" if count != 1 else "This"} {count} change{"s" if count != 1 else ""} will be written. '
@@ -1369,7 +1778,7 @@ class EditSession:
     def _edits(self) -> list[dict]:
         """Merged byte edits (file offsets, lowercase hex) for every kept change."""
         final = self._rom_with(self.changes)
-        offsets = sorted({o for c in self.changes for o, _, _ in c['writes'] if final[o] != self.rom[o]})
+        offsets = sorted({o for c in self.changes for o, _, _ in c['writes'] if o < len(self.rom) and final[o] != self.rom[o]})
         edits, start = [], None
         for index, offset in enumerate(offsets):
             if start is None:
@@ -1393,9 +1802,11 @@ class EditSession:
             edits = self._edits()
             if not edits:
                 raise ValueError('These changes leave the ROM as it is.')
-            annotations = {'kind': 'traced-edit-v1', 'changes': [
+            final = self._rom_with(self.changes)
+            self.final_rom = final
+            annotations = {'kind': 'traced-edit-v1', 'grown_to': len(final) if len(final) != len(self.rom) else None, 'changes': [
                 {'title': c['title'], 'kind': c['kind'], 'bytes': len(c['writes']), 'scenes': len(c['affected']),
-                 'verified': any(r.get('verified') for r in c['affected'].values())} for c in self.changes]}
+                 'method': c.get('method', ''), 'verified': self._change_view(c, full=False)['verified']} for c in self.changes]}
             result = exporter(edits, annotations)
             saved = {'saved': time.time(), 'changes': self.changes, 'result': {k: result.get(k) for k in ('artifact_id', 'sha256', 'name')}}
             history = self.store / 'saved.json'
@@ -1518,6 +1929,14 @@ class EditSessionTools:
                 p['scene_id'], p['domain'], p['entry'], p['colors'], p['scope'])}),
             'edits.propose_writes': (base + ' scene_id title writes', lambda p, c: {'ok': True, 'change': self.session(p).propose_writes(
                 p['scene_id'], p['writes'], p['title'])}),
+            'edits.graphics': (base + ' scene_id', lambda p, c: {'ok': True, **sg.compact(self.session(p).graphics_view(p['scene_id']))}),
+            'edits.tile_at': (base + ' scene_id x y', lambda p, c: {'ok': True, **self.session(p).tile_at(p['scene_id'], p['x'], p['y'])}),
+            'edits.propose_tile': (base + ' scene_id tile pixels scope', lambda p, c: {'ok': True, 'change': self.session(p).propose_tile(
+                p['scene_id'], p['tile'], p['pixels'], p['scope'])}),
+            'edits.propose_cells': (base + ' scene_id cells', lambda p, c: {'ok': True, 'change': self.session(p).propose_cells(
+                p['scene_id'], p['cells'])}),
+            'edits.find_color': (base + ' scene_id domain entry colors', lambda p, c: {'ok': True, 'change': self.session(p).find_color(
+                p['scene_id'], p['domain'], p['entry'], p['colors'])}),
             'edits.change': (base + ' change_id', lambda p, c: {'ok': True, 'change': self.session(p).change(p['change_id'])}),
             'edits.keep': (base + ' change_id', lambda p, c: self._summary(self.session(p), self.session(p).keep(p['change_id']))),
             'edits.remove': (base + ' change_id', lambda p, c: self._summary(self.session(p), self.session(p).remove(p['change_id']))),
@@ -1557,6 +1976,18 @@ class EditSessionTools:
 
         def exporter(edits, annotations):
             from .system_integrity import integrity_edits
+            if annotations.get('grown_to'):
+                # A change needed more room than the ROM had, so the build is a longer file: write it whole.
+                from .workbench_files import register_completed_build
+                final = session.final_rom
+                target = project / 'builds' / (uuid.uuid4().hex + Path(row['path']).suffix)
+                target.parent.mkdir(exist_ok=True)
+                target.write_bytes(final)
+                note['checksum'] = ('The ROM is %d bytes longer, and its header and checksum were updated to match.'
+                                    % (len(final) - len(session.rom)))
+                number = len(projects.read_project(project)['builds']) + 1
+                return register_completed_build(project, row['artifact_id'], target, hashlib.sha256(final).hexdigest(),
+                                                'traced-edit', f'Build {number}', expected_parent_sha256=row['sha256'])
             try:
                 complete = integrity_edits(path, row['sha256'], row['system_id'], edits)
                 note['checksum'] = ('The cartridge checksum was updated to match.' if len(complete) > len(edits)
@@ -1571,7 +2002,7 @@ class EditSessionTools:
         try:
             name = projects.read_project(project)['name']
             patch = self.api._patch({'project_id': p['project_id'], 'source_id': row['artifact_id'], 'target_id': result['artifact_id'],
-                                     'title': name + ' colors', 'description': 'Made with ROMancer scene editing.'}, c)
+                                     'title': name + ' scene edits', 'description': 'Made with ROMancer scene editing.'}, c)
             result['patch_export'] = patch.get('export')
         except (ValueError, OSError, KeyError) as error:
             result['patch_export'] = None

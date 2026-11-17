@@ -112,6 +112,73 @@ class TraceCoreLookupTests(unittest.TestCase):
         self.assertEqual((nes['kind'], len(nes['colors'])), ('master', 64))
         self.assertEqual(picker_for('dmg-shades')['kind'], 'shades')
 
+    def test_scene_graphics_finds_a_scrolled_background_in_the_recorded_screen_and_names_the_picture_under_a_pixel(self):
+        """No engine needed: a Game Boy Color scene is built by hand, drawn scrolled, and found again from the picture."""
+        from array import array
+        from romancer import edit_session as es, graphics_trace as gt, provenance as pv, scene_graphics as sg
+        from romancer.level_palette import decode_palette
+        import random
+        rng = random.Random(7)
+        vram, tags = bytearray(0x4000), array('I', [0]) * 0x4000
+        for n in range(1, 40):                                   # 39 pictures with something in them
+            vram[n * 16:n * 16 + 16] = bytes(rng.randrange(256) for _ in range(16))
+        for i in range(0x400):                                   # a map of them, with palette lines 0-3 in bank 1
+            vram[0x1800 + i] = 1 + (i * 7 + i // 32) % 39
+            vram[0x3800 + i] = (i // 5) % 4
+        for a in list(range(16, 40 * 16)) + list(range(0x1800, 0x1C00)):
+            tags[a] = pv.RT_ROM << 28 | (0x4000 + a)             # plain copies from the ROM
+        for a in range(0x3800, 0x3C00):
+            tags[a] = pv.RT_DERIVED << 28 | 0x9000
+        palette = bytearray()
+        for i in range(64):
+            palette += ((i * 5 % 32) | (i * 11 % 32) << 5 | (31 - i % 32) << 10).to_bytes(2, 'little')
+        domains = {'vram': pv.DomainSnapshot('vram', bytes(vram), tags, array('I', [0]) * 0x4000),
+                   'palette': pv.DomainSnapshot('palette', bytes(palette), array('I', [pv.RT_ROM << 28 | (0x100 + i) for i in range(128)]), array('I', [0]) * 128),
+                   'oam': pv.DomainSnapshot('oam', bytes(160), array('I', [0]) * 160, array('I', [0]) * 160)}
+        scene = pv.Scene('0123456789abcdef', 600, 'ab', [], pv.Snapshot(600, domains, 'ab'))
+        scene.video = {'system': 'gbc', 'source': 'registers', 'lcdc': 0x91, 'scx': 0, 'scy': 0, 'wx': 7, 'wy': 144}   # registers say "not scrolled"
+        colors = decode_palette(bytes(palette), 'rgb555-le', 64)
+        rgb = bytearray()
+        for y in range(144):                                     # the screen, really scrolled 13 across and 21 down
+            for x in range(160):
+                mx, my = (x + 13) % 256, (y + 21) % 256
+                cell = (my // 8) * 32 + mx // 8
+                raw = vram[vram[0x1800 + cell] * 16:vram[0x1800 + cell] * 16 + 16]
+                rgb += bytes(colors[vram[0x3800 + cell] * 4 + gt.decode_tile(bytes(raw), 'gb-2bpp')[(my % 8) * 8 + mx % 8]])
+        rom = bytes(0x8000)
+        graphics = sg.SceneGraphics(scene, 'gbc', rom, bytes(rgb), 160, 144)
+        layer = graphics.layers()[0]
+        self.assertEqual((layer.source, graphics.bands(layer)), ('picture', [[0, 144, 13, 21]]), 'the picture, not the registers, places the layer')
+        hit = graphics.lookup(50, 60)[0]
+        cell = ((60 + 21) // 8) * 32 + (50 + 13) // 8
+        self.assertEqual((hit['kind'], hit['cell'], hit['tile']), ('background', [cell % 32, cell // 32], sg.tile_id('vram', vram[0x1800 + cell] * 16, 'gb-2bpp')))
+        self.assertEqual(hit['pixel'], [(50 + 13) % 8, (60 + 21) % 8])
+        self.assertEqual(hit['rect'], [50 - (50 + 13) % 8, 60 - (60 + 21) % 8, 8, 8])
+        view = graphics.view(lambda tile: 2, {}, {})
+        self.assertEqual(view['layers'][0]['seen'], 100)
+        self.assertEqual(view['layers'][0]['counts'], {'rom': 0, 'code': 0, 'derived': 1024, 'unknown': 0}, 'a cell with a computed byte is not plain')
+        shown = [t for t in view['tiles'] if t['on_screen']]
+        self.assertEqual(len(shown), 39)
+        self.assertTrue(all(t['how'] == 'direct' and t['editable'] and t['uses'] == 2 and 'plain picture data' in t['reason'] for t in shown))
+        empty = sg.tile_reason(graphics.tile('vram', 100 * 16, 'gb-2bpp'), 'gbc')
+        self.assertEqual(empty[:2], ('patch', True))
+        self.assertEqual(sg.tile_reason(graphics.tile('vram', 100 * 16, 'gb-2bpp'), 'nes')[:2] if not sg.overlay_available('nes') else ('locked', False), ('locked', False))
+        pixels = sg.parse_pixels(shown[0]['pixels'], 'gb-2bpp')
+        self.assertEqual(sg.pixel_text(pixels, 'gb-2bpp'), shown[0]['pixels'])
+        with self.assertRaisesRegex(ValueError, '8 by 8'):
+            sg.parse_pixels('0123', 'gb-2bpp')
+        first = layer.layer.cell(0, 0)
+        self.assertEqual(sg.hardware_tile(layer, first, 'vram', 5 * 16, 'gb-2bpp'), 5)
+        with self.assertRaisesRegex(ValueError, 'other picture bank'):
+            sg.hardware_tile(layer, first, 'vram', 0x2000 + 5 * 16, 'gb-2bpp')
+        # scene files keep the video registers
+        import tempfile as _t
+        with _t.TemporaryDirectory() as temp:
+            path = Path(temp) / 'a.scene'
+            es.write_scene(path, scene, {'id': scene.id, 'frame': 600, 'screen_sha256': 'ab', 'run': 'r', 'video': scene.video}, 160, 144, bytes(rgb))
+            self.assertEqual(es.read_scene(path)[0].video['lcdc'], 0x91)
+
+
     def test_scene_file_round_trip_and_checkpoint_thinning(self):
         from array import array
         from romancer import edit_session as es, provenance as pv
@@ -243,6 +310,111 @@ class EditSessionEndToEndTests(unittest.TestCase):
             self.assertEqual(reopened.scene_view(scene_id)['swatches'][target['entry']]['uses'], target['uses'] + 1, 'the captured moment uses it too')
         finally:
             reopened.close()
+
+    def test_a_picture_and_background_cells_are_planned_replayed_listed_and_saved(self):
+        from romancer import graphics_trace as gt, scene_graphics as sg
+        from romancer.edit_session import EditSession
+        store = self.temp / 'store-graphics'
+        session = EditSession(store, self.rom, 'gbc')
+
+        def settle(change):
+            deadline = time.monotonic() + 600
+            while time.monotonic() < deadline:
+                view = session.change(change['id'])
+                if not view['working']:
+                    return view
+                time.sleep(0.2)
+            self.fail('the change never settled')
+        try:
+            session.record(12, wait=True)
+            self.assertEqual(session.recording['state'], 'finished', session.recording)
+            # a scene whose background was found in the picture and holds plainly stored pictures and cells
+            for scene_id in session.scenes:
+                self.assertEqual(session.scenes[scene_id].video['source'], 'registers', 'the video registers are stored with the scene')
+                view = session.graphics_view(scene_id)
+                layer = max(view['layers'], key=lambda row: row['seen'])
+                plain = [t for t in view['tiles'] if t['on_screen'] and t['how'] == 'direct' and t['kind'] == 'bg' and not t['blank']]
+                if layer['placed_by'] == 'picture' and len(plain) > 4 and layer['cells']['status'].count('r') > 20:
+                    break
+            else:
+                self.fail('no scene with a placed background and plain pictures')
+            self.assertEqual(len(view['colors']), 64)
+            self.assertTrue(all(t['editable'] or t['reason'] for t in view['tiles']))
+            first, last, across, down = layer['bands'][0]
+            # the picture under a pixel: a cell fully on screen whose picture is stored plainly
+            target = None
+            for index, address in enumerate(layer['cells']['tile']):
+                tile = next((t for t in plain if t['address'] == address and t['domain'] == layer['tile_domain']), None)
+                x, y = (index % 32 * 8 - across) % 256, (index // 32 * 8 - down) % 256
+                if tile and x < 152 and first <= y < last - 8:
+                    target = (tile, x, y, index)
+                    break
+            self.assertIsNotNone(target)
+            tile, x, y, index = target
+            found = session.tile_at(scene_id, x + 3, y + 5)
+            self.assertEqual(found['hits'][0]['tile'], tile['id'])
+            self.assertEqual(found['hits'][0]['cell'], [index % 32, index // 32])
+            self.assertEqual(found['hits'][0]['rect'], [x, y, 8, 8])
+            with self.assertRaisesRegex(ValueError, 'already has'):
+                session.propose_tile(scene_id, tile['id'], tile['pixels'])
+            drawn = ''.join('%x' % (3 - int(c, 16)) for c in tile['pixels'])
+            change = session.propose_tile(scene_id, tile['id'], drawn)
+            self.assertTrue(change['planning'])
+            change = settle(change)
+            self.assertEqual((change['error'], change['method'], change['kind']), ('', 'direct', 'graphics'))
+            self.assertTrue(change['verified'])
+            here, power = change['checks'][0], change['checks'][1]
+            self.assertEqual((here['name'], here['state']), ('In this scene', 'good'))
+            self.assertIn('came out exactly as you made it', here['text'])
+            self.assertEqual((power['name'], power['state']), ('From power-on', 'good'))
+            self.assertIn('ROMancer also replayed the game from power-on: clean', power['text'])
+            self.assertGreaterEqual(change['scene_count'], tile['uses'], 'every scene that loads those ROM bytes is re-rendered')
+            self.assertTrue(all(a['state'] == 'done' and a['after'] for a in change['affected']))
+            self.assertTrue(change['affected'][0]['visible'])
+            self.assertEqual(change['tiles'], [{'id': tile['id'], 'from': tile['pixels'], 'to': drawn}])
+            self.assertFalse(any(row['file_offset'] in (0x14D, 0x14E, 0x14F) for row in change['details']), 'the checksum is the session\'s to update')
+            session.keep(change['id'])
+            pending = next(t for t in session.graphics_view(scene_id)['tiles'] if t['id'] == tile['id'])['pending']
+            self.assertEqual(pending['pixels'], drawn)
+            # background: two cells that are stored on their own take another picture, as one change
+            source = layer['cells']['source']
+            alone = [i for i, s in enumerate(layer['cells']['status']) if s == 'r' and source.count(source[i]) == 1
+                     and layer['cells']['tile'][i] != tile['address'] and layer['cells']['tile'][i] >> 13 == tile['address'] >> 13][:2]
+            self.assertEqual(len(alone), 2)
+            cells = [{'layer': layer['index'], 'x': i % 32, 'y': i // 32, 'tile': tile['id']} for i in alone]
+            painted = settle(session.propose_cells(scene_id, cells))
+            self.assertEqual((painted['error'], painted['method'], painted['kind'], painted['cell_count']), ('', 'cells', 'background', 2))
+            self.assertTrue(painted['verified'], painted['checks'])
+            self.assertIn('clean', painted['checks'][1]['text'])
+            self.assertEqual(painted['title'], '2 background cells')
+            session.keep(painted['id'])
+            self.assertEqual(len(session.graphics_view(scene_id)['layers'][layer['index']]['pending']), 2)
+            with self.assertRaisesRegex(ValueError, 'outside the background'):
+                session.propose_cells(scene_id, [{'layer': layer['index'], 'x': 99, 'y': 0, 'tile': tile['id']}])
+            review = session.review()
+            deadline = time.monotonic() + 300
+            while not review['ready'] and time.monotonic() < deadline:
+                time.sleep(0.2)
+                review = session.review()
+            self.assertTrue(review['ready'])
+            self.assertEqual((len(review['changes']), review['unverified'], review['grows']), (2, [], 0))
+            exported = []
+            session.save(lambda edits, notes: exported.append((edits, notes)) or {'artifact_id': 'x'}, review['revision'])
+            edits, notes = exported[0]
+            self.assertEqual([c['method'] for c in notes['changes']], ['direct', 'cells'])
+            self.assertTrue(all(c['verified'] for c in notes['changes']))
+            built = bytearray(session.rom)
+            for edit in edits:
+                self.assertEqual(session.rom[edit['offset']:edit['offset'] + len(edit['before']) // 2].hex(), edit['before'])
+                built[edit['offset']:edit['offset'] + len(edit['after']) // 2] = bytes.fromhex(edit['after'])
+            item = session._graphics(scene_id).tile(*sg.parse_tile_id(tile['id']))
+            at = item.sources[0]['offset']
+            self.assertEqual(bytes(built[at:at + 16]), gt.encode_tile(sg.parse_pixels(drawn, 'gb-2bpp'), 'gb-2bpp'))
+            for i in alone:
+                self.assertEqual(built[source[i]], (tile['address'] & 0x1FFF) // 16 % 256)
+        finally:
+            session.close()
+
 
     def test_workbench_operations_change_a_color_and_the_saved_build_boots_with_it(self):
         from romancer import palette_trace as pt, provenance as pv, trace_cores

@@ -77,7 +77,8 @@
     "romancer/ui/save_manager.js": "cff3bfedfed6888979d426349d0ccbfe3e69b499c47416fe2d5c5d5a99544318",
     "romancer/ui/saved_animations.js": "26db69498e0bfc43cc6e1f0a6bf53e9c180b4fc9ebaa635a49da215b3e5d54cf",
     "romancer/ui/saved_discoveries.js": "0aa4c8ecef0ba18afcc9e4d1fccf0ab6e2f307bb251cba175e3cabc01b618aa2",
-    "romancer/ui/scene_editor.js": "d131f3dd80f3355725c17aa2d00e6d12e820c101d70d8ceacbed76c5008e19c5",
+    "romancer/ui/scene_editor.js": "9c4b0a1cf2976a48c1e0d98e35b7f1fcb4fc6c042f86ba21ec1c5f04ab44ff99",
+    "romancer/ui/scene_graphics.js": "6969908d85accf4b31fc0af13294317b2694087d430b3c79727b82ee9d792e3e",
     "romancer/ui/shortcuts.js": "8f95a5eb596dffdda3b329b371d2c204c66769e2ad550828f1684fd2d063b764",
     "romancer/ui/sound_preview.js": "fd103a7a17ab4962827a3c5810cf7c3b283ceb9ee33a5fe61952727e64b38600",
     "romancer/ui/source_support.js": "f7b139bea4409b1622bf5fea67356be279d1c283c556594c3c447666ceff7a2d",
@@ -104,7 +105,7 @@
     "romancer/ui/views/release.js": "40cca5a494ac414328d09cf2579b7b43fc5a640eab2f2500114a7acbc507167f",
     "romancer/ui/views/resources.js": "21b6277f81d4d88e33d983995408298ef1e74885603160598fff57da756077c3",
     "romancer/ui/views/routes.js": "fa7948c7755fa32608253373d38327b9ba0cbcff1a0b852561a0a7fb665179cd",
-    "romancer/ui/views/scenes.js": "0296d2d994086cf15b812a6f0c66d2695202fa80d8707d89f5275e9889cc27ac",
+    "romancer/ui/views/scenes.js": "e7161cbd17abb58f01368818683fc434917e27a92b71d3c867fdd1198a8e6679",
     "romancer/ui/views/scripts.js": "c36f949922e8b75e73580a0390212d14f2dc1cf267e7c332b688586925fc75b4",
     "romancer/ui/views/settings.js": "64f7b86541b926be47de7c873d2791127eb96be5d599504320d4784e651667a7",
     "romancer/ui/views/sound.js": "fd73b565c6b748bdd72ebd2ab80bed7c469e787fcac5c65887cba29defa3643b",
@@ -116,5 +117,5 @@
     "romancer/ui/workspace_search.js": "ea65f3f0c59cd3d00f21943d51ffc69823ac3c75b08e3fcc36a550902c4a32da",
     "romancer/ui/workspace_status.js": "f26c21f3920e1bb958541eb6f36b38514e92b1fbe04d03397fe54a256fd4e53f"
   },
-  "sha256": "e8205a60195959623ce01289f18a20d0cfc0d96bdb7ddbc948ab66ce8f1e8d57"
+  "sha256": "91e7dee2237dd27d86cff2b99f4d2c9338d04ea2df1f294edaf86164d9816e1f"
 }
