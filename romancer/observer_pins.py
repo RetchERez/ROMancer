@@ -1,31 +1,10 @@
-"""Reviewed optional Windows native observers, complete source and notices."""
-OBSERVER_FILES = {'mame-0.289/backend.json': {'size': 336,
-                             'sha256': '59892502fc8168139ca6c3c0df08415c2ee50408c2f024e35d1e554724f7f985'},
- 'mame-0.289/BSD-2-Clause': {'size': 1307,
-                             'sha256': '3b50c5c18a9c5557618a30c1cfe7e70cd3dfa9227ec8f14df54f200bbbe1132e'},
- 'mame-0.289/BSD-3-Clause': {'size': 1509,
-                             'sha256': '13f9eb8c17572e626c11e2c5523594907973a4ecf3ab73030345879eef894775'},
- 'mame-0.289/BSL-1.0': {'size': 1304,
-                        'sha256': 'fbbd4ec0e2c5878ab05acc0248454537c3ea6e790d057cafc5558d4fab2a25af'},
- 'mame-0.289/CC0': {'size': 6762,
-                    'sha256': 'daa216b67f1f917d3d0f69c93d8b191e848a1cd10694b723ab61eab72d3ae9fd'},
- 'mame-0.289/COPYING': {'size': 11842,
-                        'sha256': '1bacfdc30348e82256ff7626ad8f5489b57b52c0da75e3572bec3b3c791f76a8'},
- 'mame-0.289/GPL-2.0': {'size': 18299,
-                        'sha256': '451337b1aa550e4dd838535c514a5e06f6a936887a3e7e7239e0d65a35a2772a'},
- 'mame-0.289/LGPL-2.1': {'size': 26932,
-                         'sha256': '9c430893db6b214c0c2d207fe7da097a0a3b036b0172010f25e01fd5774583ea'},
- 'mame-0.289/mame.exe': {'size': 316431360,
-                         'sha256': 'af6966108d9b52c22465c6d50f4e5d50cc371b50f2d27dc443935f287aad37a3'},
- 'mame-0.289/MIT': {'size': 1080,
-                    'sha256': '09fa29fbc395300ae6bcdd61be1a8d2995c2aa76214b25e96d95941d8270ae4c'},
- 'mame-0.289/README.txt': {'size': 819,
-                           'sha256': '84bdf69c0e47ce24cb9f0b9aba837425f28c96c78d6db9049bc7762f6615f705'},
- 'mame-0.289/source-snapshot.zip': {'size': 234376693,
-                                    'sha256': '760a1e8d22432bf212a48f80bad9062529b52011b6136e2bdcfbd512c58f61b6'},
- 'mame-0.289/Zlib': {'size': 919,
-                     'sha256': 'f3afb7c6441a05344d39c56738bf933ad5696ce815611c6d32fd94229d7e0116'},
- 'mesence-2.2.1/backend.json': {'size': 551,
+"""Reviewed optional Windows native observers, complete source and notices.
+
+Only the patched MesenCE observer is bundled. MAME 0.289 is the unmodified
+official build, so it is prepared on first use from its pinned upstream release
+(see debugger_provision.py) instead of being redistributed in the portable ZIP."""
+OBSERVER_FAMILIES = ['MesenCE 2.2.1 + physical-ppu-access-v2']
+OBSERVER_FILES = {'mesence-2.2.1/backend.json': {'size': 551,
                                 'sha256': '64ef0ba00af40504f9581b667a210bde12363cb03812ad58da5bd173ca0d170d'},
  'mesence-2.2.1/COPYING': {'size': 35147,
                            'sha256': '8ceb4b9ee5adedde47b31e975c1d90c73ad27b6b165a1dcd80c7c545eb65b903'},

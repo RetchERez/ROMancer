@@ -1,8 +1,8 @@
-ROMancer v1.0.0 for Linux x86-64
+ROMancer v1.0.1 for Linux x86-64
 By RetchEWretched
 
-1. Extract the archive:   tar xf ROMancer-v1.0.0-Linux-x86_64.tar.gz
-2. Start ROMancer:        ./ROMancer-v1.0.0-Linux-x86_64/ROMancer.sh
+1. Extract the archive:   tar xf ROMancer-v1.0.1-Linux-x86_64.tar.gz
+2. Start ROMancer:        ./ROMancer-v1.0.1-Linux-x86_64/ROMancer.sh
    (or double-click ROMancer.sh in your file manager and choose Run)
 3. Open the included practice game or import your ROM.
 
@@ -24,7 +24,7 @@ Other options:
   ./ROMancer.sh --check        verify the bundled runtime and exit
   ./ROMancer.sh --no-browser   start the local server only and print its address
 
-The native debuggers (MAME and Mesen captures) are Windows-only in v1.0.0;
+The native debuggers (MAME and Mesen captures) are Windows-only;
 everything else matches the Windows release.
 
 Keep ROMancer.sh and the "ROMancer Files" folder together.
