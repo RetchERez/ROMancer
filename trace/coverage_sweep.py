@@ -156,6 +156,9 @@ def _attempt(controls, scene, targets, writes, need=1):
     for off, _old, new in writes:
         edited[off] = new
     edited = bytes(edited)
+    if getattr(controls, 'system', None):  # the saved ROM carries a repaired header checksum; games that check it need it
+        from romancer import graphics_trace as gt
+        edited = gt.fix_checksums(edited, controls.rom, controls.system)
     best = {'entries_changed': 0, 'entries_exact': 0, 'screen_changed': False, 'from_frame': None, 'baseline': None}
     for cp in _checkpoints(scene):
         control, same = controls.get(scene, cp)
@@ -207,7 +210,7 @@ def one(sha, entry, core, system, frames, outdir, options=None):
         return sha, 'cached'
     t0 = time.perf_counter()
     result = {'sha256': sha, 'system': system, 'member': entry['member'], 'core': Path(core).name, 'frames': frames,
-              'options': options or {}, 'sweep_version': 6}
+              'options': options or {}, 'sweep_version': 7}
     work = Path(tempfile.mkdtemp(prefix='rt'))
     try:
         rom, suf = tp.read_rom(entry['zip'] + '!' + entry['member'])
@@ -260,7 +263,7 @@ def one(sha, entry, core, system, frames, outdir, options=None):
         result['best_scene_frame'] = best['scene'].frame
 
         # Control: an unedited replay must reproduce the scene, or "the screen changed" means nothing.
-        controls = _Controls(pv, fe_for, rom)
+        controls = _Controls(pv, fe_for, rom); controls.system = system
         control, _same = controls.get(scene, _checkpoints(scene)[0])
         result['deterministic'] = {'screen': bool(control) and control.screen_sha256 == scene.screen_sha256,
                                    'domains': bool(control) and all(not _diff(scene, control, n) for n in scene.snapshot.domains),
