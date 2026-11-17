@@ -44,7 +44,7 @@ class SourceLauncherTests(unittest.TestCase):
     def test_same_version_with_a_different_application_root_is_not_reused(self):
         class Handler(http.server.BaseHTTPRequestHandler):
             def do_POST(self):
-                self.rfile.read(int(self.headers.get('Content-Length','0')));raw=b'{"ok":true,"product":"ROMancer","version":"1.0.0"}';self.send_response(200);self.send_header('Content-Type','application/json');self.send_header('Content-Length',str(len(raw)));self.end_headers();self.wfile.write(raw)
+                self.rfile.read(int(self.headers.get('Content-Length','0')));raw=b'{"ok":true,"product":"ROMancer","version":"1.1.0"}';self.send_response(200);self.send_header('Content-Type','application/json');self.send_header('Content-Length',str(len(raw)));self.end_headers();self.wfile.write(raw)
             def log_message(self,*args):pass
         server=http.server.ThreadingHTTPServer(('127.0.0.1',0),Handler);thread=threading.Thread(target=server.serve_forever,daemon=True);thread.start()
         try:

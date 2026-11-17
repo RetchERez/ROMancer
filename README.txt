@@ -52,7 +52,7 @@ available. The supplied Pokemon Red and Blue revisions share a
 
 START ON WINDOWS
 
-1. Extract ROMancer-v1.0.0-Windows.zip in Windows File Explorer.
+1. Extract ROMancer-v1.0.1-Windows.zip in Windows File Explorer.
 2. Double-click ROMancer.exe in the extracted folder.
    Keep ROMancer.exe, ROM Catalog.html and the ROMancer Files folder together.
 3. Open an original workshop or choose New project and import your own cartridge image.
@@ -64,6 +64,22 @@ desktop window; Open in browser is available if the window cannot open.
 The launchers are unsigned. The full Windows release includes engines for
 NES, SNES, Genesis, Game Boy, Game Boy Color and supported Master System cartridges. Games, user saves and separately supplied
 firmware dumps are not distributed. Editing and patching also work without emulation.
+
+Native debugger captures use MesenCE for NES, SNES, Game Boy, Game Boy Color and
+Master System and MAME for Genesis. The reviewed MesenCE build with its graphics
+access patch is included. The first Genesis capture downloads the official,
+unmodified MAME 0.289 release once (about 84 MiB) after you confirm it; its
+SHA-256 is checked and later captures work offline. No ROM data is uploaded.
+
+START ON LINUX
+
+1. Extract ROMancer-v1.0.1-Linux-x86_64.tar.gz:  tar xf ROMancer-v1.0.1-Linux-x86_64.tar.gz
+2. Run ./ROMancer-v1.0.1-Linux-x86_64/ROMancer.sh
+   (./ROMancer.sh --install-desktop adds ROMancer to your application menu).
+
+The Linux x86-64 package includes Python, Pillow and the same six engines built
+from the same pinned sources. It needs glibc 2.28 or newer and a web browser.
+Native debugger captures are Windows-only.
 
 The full Windows runtime blocks changed or unreviewed core binaries before loading
 native code. Its included open-source engines are FCEUmm (NES), bsnes-mercury
@@ -99,7 +115,7 @@ Export can include the BPS patch and a replay file that someone else can
 verify against their own matching ROM and engine. Screenshots are optional.
 
 For Top Gear 3000, use Load game and create a fresh state in ROMancer
-v1.0.0. The bundled DSP-4 engine captures the race data needed to resume.
+v1.0.0 or later. The bundled DSP-4 engine captures the race data needed to resume.
 States made with the older engine cannot be converted into complete states.
 
 The Windows launcher is unsigned. Verify the portable ZIP against SHA256SUMS

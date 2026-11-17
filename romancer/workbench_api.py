@@ -7,6 +7,7 @@ from pathlib import Path
 import platform
 import re
 import subprocess
+import shutil
 import sys
 import time
 import threading
@@ -534,7 +535,7 @@ class WorkbenchAPI:
     def _capabilities(self,p,c):
         from .contracts import adapter_inventory
         from .system_registry import system_inventory
-        return {'ok': True, 'product': 'ROMancer', 'version': ROMANCER_VERSION, 'display_version': ROMANCER_BUILD_LABEL, 'release_name': ROMANCER_RELEASE_NAME, 'build_label': ROMANCER_BUILD_LABEL, 'target_version': ROMANCER_VERSION, 'credit': 'By RetchEWretched', 'release_status': 'PREVIEW', 'python': platform.python_version(), 'platform': platform.system(), 'pillow': importlib.util.find_spec('PIL') is not None, 'native_dialog': os.name == 'nt' or importlib.util.find_spec('tkinter') is not None, 'adapters': {**adapter_inventory(), 'adapters': [a for a in adapter_inventory()['adapters'] if a['id'] in ('nes', 'snes', 'genesis', 'gb', 'gbc', 'sms')]}, 'systems': system_inventory(), 'runtime_note': 'The full Windows release includes engines for all six systems. Source installations can use compatible local libretro cores. Gameplay evidence applies to the exact ROM and tested setup.'}
+        return {'ok': True, 'product': 'ROMancer', 'version': ROMANCER_VERSION, 'display_version': ROMANCER_BUILD_LABEL, 'release_name': ROMANCER_RELEASE_NAME, 'build_label': ROMANCER_BUILD_LABEL, 'target_version': ROMANCER_VERSION, 'credit': 'By RetchEWretched', 'release_status': 'PREVIEW', 'python': platform.python_version(), 'platform': platform.system(), 'pillow': importlib.util.find_spec('PIL') is not None, 'native_dialog': os.name == 'nt' or bool(shutil.which('zenity') or shutil.which('kdialog')) or importlib.util.find_spec('tkinter') is not None, 'adapters': {**adapter_inventory(), 'adapters': [a for a in adapter_inventory()['adapters'] if a['id'] in ('nes', 'snes', 'genesis', 'gb', 'gbc', 'sms')]}, 'systems': system_inventory(), 'runtime_note': 'The full Windows release includes engines for all six systems. Source installations can use compatible local libretro cores. Gameplay evidence applies to the exact ROM and tested setup.'}
 
     def _agent_config(self,p,c):
         if type(p['allow_writes']) is not bool or type(p['read_roots']) is not list or len(p['read_roots'])>8:raise ValueError('choose agent access and up to eight import folders')
@@ -1222,6 +1223,10 @@ class WorkbenchAPI:
         if os.name=='nt':
             code="[Console]::OutputEncoding=[System.Text.UTF8Encoding]::new($false);Add-Type -AssemblyName System.Windows.Forms;$d=[System.Windows.Forms.OpenFileDialog]::new();$d.Title='Select a ROMancer input file';if($d.ShowDialog() -eq 'OK'){[Console]::WriteLine($d.FileName)};$d.Dispose()"
             command=['powershell.exe','-NoProfile','-STA','-WindowStyle','Hidden','-Command',code]
+        elif shutil.which('zenity'):
+            command=['zenity','--file-selection','--title=Select a ROMancer input file']
+        elif shutil.which('kdialog'):
+            command=['kdialog','--title','Select a ROMancer input file','--getopenfilename']
         else:
             code="import tkinter as t;from tkinter.filedialog import askopenfilename;r=t.Tk();r.withdraw();print(askopenfilename(title='Select a ROMancer input file'));r.destroy()"
             command=[sys.executable,'-X','utf8','-I','-c',code]
@@ -1234,7 +1239,9 @@ class WorkbenchAPI:
                 if time.monotonic()>deadline:raise ValueError('file chooser timed out')
                 time.sleep(.05)
             raw=process.stdout.read(16385)
-            if process.returncode or len(raw)>16384:raise ValueError('native file chooser unavailable; use the file upload control or paste an absolute path')
+            # zenity and kdialog exit 1 with no output when the person cancels.
+            cancelled=command[0] in ('zenity','kdialog') and process.returncode==1 and not raw.strip()
+            if (process.returncode and not cancelled) or len(raw)>16384:raise ValueError('native file chooser unavailable; use the file upload control or paste an absolute path')
             path=raw.decode('utf-8').strip()
             return {'ok':True,'status':'SELECTED' if path else 'CANCELLED','path':path}
         finally:

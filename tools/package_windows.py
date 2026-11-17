@@ -108,6 +108,7 @@ def build_bundle(app_root,downloads,destination,*,cores=None,observers=None):
     from romancer.bundled_cores import core_members,CORE_PINS
     engines=core_members(cores) if cores is not None else {}
     from romancer.bundled_debuggers import observer_files
+    from romancer.observer_pins import OBSERVER_FAMILIES
     native=observer_files(observers) if observers is not None else {}
     if destination.exists():raise ValueError('bundle output already exists')
     destination.parent.mkdir(parents=True,exist_ok=True)
@@ -137,7 +138,7 @@ def build_bundle(app_root,downloads,destination,*,cores=None,observers=None):
                 with path.open('rb') as stream:sha=hashlib.file_digest(stream,'sha256').hexdigest()
                 rows.append({'path':path.relative_to(stage).as_posix(),'size':path.stat().st_size,'sha256':sha})
         manifest={'schema_version':1,'product':'ROMancer','version':ROMANCER_VERSION,'release_name':ROMANCER_RELEASE_NAME,'build_label':ROMANCER_BUILD_LABEL,'credit':'By RetchEWretched','platform':'windows-amd64','install_layout':INSTALL_LAYOUT,'runtime':PINS,'engines':{'included':bool(engines),'systems':CORE_PINS if engines else {}},'files':rows}
-        if native:manifest['observers']={'included':True,'families':['MesenCE 2.2.1 + physical-ppu-access-v2','MAME 0.289'],'source_included':True}
+        if native:manifest['observers']={'included':True,'families':OBSERVER_FAMILIES,'source_included':True}
         (stage/'BUNDLE.json').write_text(json.dumps(manifest,indent=2)+'\n',encoding='utf-8');verify_tree(stage)
         from romancer.patch_sets import _publish_directory
         _publish_directory(stage,destination)
