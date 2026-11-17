@@ -6,14 +6,17 @@ Every codec is a pair of pure functions:
     encode(decoded) -> stream bytes
 
 `decode` raises ValueError when the bytes at `start` are not a valid stream.
-`encode` output always round-trips through `decode`; it is a plain greedy
-encoder, so it may be larger than the original game's encoder produced.
+`encode` output always round-trips through `decode`. Some encoders find the
+cheapest parse and some are plain greedy ones, so a stream may come out larger
+than the original game's packer made it (the block is then moved).
 romancer.graphics_trace matches these decoders against traced video memory
 to recognise a compressed block, and re-encodes the block after an edit.
 
 Families:
   lz2, lz2-le      Nintendo LC_LZ2 (Super Mario World / Zelda 3 offset order)
   lz3              Nintendo LC_LZ3 (Pokemon Gold/Silver/Crystal and relatives)
+  lz5              Nintendo LC_LZ5 (Super Metroid)
+  konami-snes      Konami on the Super NES (Castlevania IV, Contra III, Gradius III, Turtles in Time, ...)
   hal              HAL Laboratory (Kirby, Adventures of Lolo, EarthBound)
   lzss-*           Okumura LZSS ring buffer, fill 00 or 20, optional 16-bit size
   kosinski         Sega Kosinski
@@ -22,10 +25,25 @@ Families:
   packbits         PackBits run-length
   rle-konami       Konami run-length (NES era)
   rle-pairs        (count, value) pairs, zero count ends
+  rle-escape       runs behind an escape byte named by the stream's first byte (Capcom, Game Boy)
+  comper           Sega Comper (word LZ)
+  kosinski-moduled Sega Kosinski in 4 KB modules (Sonic 3 & Knuckles)
+  saxman           Sega Saxman (Okumura LZSS behind a packed-size word)
+  rle-sega-planes  Sega Master System plane run-length (Phantasy Star and many more)
+  raw              stored as it is
+  lz~... rle~...   members of the parameterised families in gfx_families, named by their parameters
+  <codec>|<map>    any codec whose output the game lays into video memory with made-up
+                   planes (3bpp, 012Z, ...); see map_parse
+
+recognise() finds the block behind a traced tile; graphics_trace calls it when its
+own search finds nothing complete.
 """
 from __future__ import annotations
 
+import bisect
 from collections import Counter
+
+from . import gfx_families
 
 MAX_OUT = 0x10000
 
@@ -363,51 +381,337 @@ def _nintendo_encode(variant, raw, allowed=None, size=None):
     return bytes(out)
 
 
+# ---- Nintendo LC_LZ5 (Super Metroid) ------------------------------------------
+# The LC_LZ2 header, with other copies: 4 = from an absolute little-endian offset,
+# 6 = from 1-255 bytes back; 5 and 7 are the same with every byte inverted (7 only
+# exists behind the long header).
+
+def _lz5_decode(data, start=0, limit=MAX_OUT):
+    r = _Reader(data, start)
+    out = bytearray()
+    while True:
+        first = r.byte()
+        if first == 0xFF:
+            break
+        if first >= 0xE0:
+            cmd = (first >> 2) & 7
+            length = ((first & 3) << 8 | r.byte()) + 1
+        else:
+            cmd = first >> 5
+            length = (first & 31) + 1
+        if cmd == 0:
+            if r.pos + length > len(data):
+                raise ValueError('stream is truncated')
+            out += data[r.pos:r.pos + length]
+            r.pos += length
+        elif cmd == 1:
+            out += bytes([r.byte()]) * length
+        elif cmd == 2:
+            a, b = r.byte(), r.byte()
+            out += (bytes([a, b]) * ((length + 1) // 2))[:length]
+        elif cmd == 3:
+            a = r.byte()
+            out += bytes((a + i) & 0xFF for i in range(length))
+        else:
+            if cmd < 6:
+                origin = r.byte() | r.byte() << 8
+            else:
+                origin = len(out) - r.byte()
+            if origin < 0 or origin >= len(out):
+                raise ValueError('copy reaches outside the output')
+            flip = 0xFF if cmd & 1 else 0
+            for i in range(length):
+                out.append(out[origin + i] ^ flip)
+        if len(out) > limit:
+            raise ValueError('output exceeds the limit')
+    if not out:
+        raise ValueError('empty stream')
+    return bytes(out), r.pos - start
+
+
+def _lz5_encode(raw):
+    raw = bytes(raw)
+    n = len(raw)
+    if not n or n > 0x10000:
+        raise ValueError('data is too long for this codec')
+    out = bytearray()
+    lit = bytearray()
+
+    def head(cmd, length):
+        if length <= 32:
+            out.append(cmd << 5 | (length - 1))
+        else:
+            out.append(0xE0 | cmd << 2 | (length - 1) >> 8)
+            out.append((length - 1) & 0xFF)
+
+    def flush():
+        for q in range(0, len(lit), 1024):
+            chunk = lit[q:q + 1024]
+            head(0, len(chunk))
+            out.extend(chunk)
+        lit.clear()
+
+    index: dict[bytes, list[int]] = {}
+    indexed = 0
+    i = 0
+    while i < n:
+        while indexed < i:
+            index.setdefault(raw[indexed:indexed + 3], []).append(indexed)
+            indexed += 1
+        run = 1
+        while run < 1024 and i + run < n and raw[i + run] == raw[i]:
+            run += 1
+        two = 2
+        while two < 1024 and i + two < n and raw[i + two] == raw[i + two - 2]:
+            two += 1
+        inc = 1
+        while inc < 1024 and i + inc < n and raw[i + inc] == (raw[i] + inc) & 0xFF:
+            inc += 1
+        best_len, best_at = 0, 0
+        for at in reversed(index.get(raw[i:i + 3], [])[-48:]):
+            k = 3
+            while k < 1024 and i + k < n and raw[at + k] == raw[i + k]:
+                k += 1
+            if k > best_len:
+                best_len, best_at = k, at
+        # bytes saved by each choice (against literals)
+        options = [(run - 2, 1, run), (two - 3, 2, two), (inc - 2, 3, inc),
+                   (best_len - (2 if i - best_at <= 255 else 3), 4, best_len)]
+        saved, cmd, length = max(options)
+        if saved < 1 or length < 3:
+            lit.append(raw[i])
+            i += 1
+            continue
+        flush()
+        if cmd == 4 and i - best_at <= 255:
+            head(6, length)
+            out.append(i - best_at)
+        else:
+            head(cmd, length)
+            if cmd == 1 or cmd == 3:
+                out.append(raw[i])
+            elif cmd == 2:
+                out += raw[i:i + 2]
+            else:
+                out += bytes((best_at & 0xFF, best_at >> 8))
+        i += length
+    flush()
+    out.append(0xFF)
+    return bytes(out)
+
+
+# ---- Konami (Super NES) -----------------------------------------------------------
+# A little-endian size of the whole stream, then commands:
+#   00-7F  copy (b >> 2) + 2 bytes from a 1024-byte ring, position (b & 3) << 8 | next byte
+#          (the ring starts as zeros and is written from position 3DF)
+#   80-9F  b & 1F bytes as they are
+#   A0-BF  (b & 1F) + 2 bytes, each written after a 00
+#   C0-DF  the next byte (b & 1F) + 2 times
+#   E0-FF  (b & 1F) + 2 zeros
+
+def _konami_snes_decode(framed, data, start=0, limit=MAX_OUT):
+    n = len(data)
+    pos = start
+    if framed:
+        if pos + 2 > n:
+            raise ValueError('stream is truncated')
+        size = data[pos] | data[pos + 1] << 8
+        if size < 3 or start + size > n:
+            raise ValueError('size header is out of range')
+        end = start + size
+        pos += 2
+    else:
+        end = n
+    out = bytearray()
+    while pos < end:
+        if len(out) >= limit and not framed:
+            break
+        b = data[pos]
+        pos += 1
+        if b < 0x80:
+            if pos >= end:
+                raise ValueError('stream is truncated')
+            count = (b >> 2) + 2
+            here = len(out)
+            dist = (0x3DF + here - ((b & 3) << 8 | data[pos])) & 0x3FF or 0x400
+            pos += 1
+            src = here - dist
+            if src >= 0 and dist >= count:
+                out += out[src:src + count]
+            else:
+                for k in range(src, src + count):
+                    out.append(out[k] if k >= 0 else 0)
+        elif b < 0xC0:
+            count = (b & 0x1F) + (2 if b >= 0xA0 else 0)
+            if pos + count > end:
+                raise ValueError('stream is truncated')
+            if b < 0xA0:
+                out += data[pos:pos + count]
+            else:
+                for k in range(pos, pos + count):
+                    out.append(0)
+                    out.append(data[k])
+            pos += count
+        elif b < 0xE0:
+            if pos >= end:
+                raise ValueError('stream is truncated')
+            out += bytes([data[pos]]) * ((b & 0x1F) + 2)
+            pos += 1
+        else:
+            out += bytes((b & 0x1F) + 2)
+        if len(out) > limit and framed:
+            raise ValueError('output exceeds the limit')
+    if not out:
+        raise ValueError('empty stream')
+    return bytes(out), pos - start
+
+
+def _konami_snes_encode(framed, raw):
+    raw = bytes(raw)
+    n = len(raw)
+    if not n:
+        raise ValueError('nothing to pack')
+    # what can start at each position
+    index: dict[bytes, list[int]] = {}
+    INF = 1 << 30
+    closed = [INF] * (n + 2)        # cheapest stream for raw[:i] that does not end inside a literal block
+    lit = [INF] * (n + 2)           # ... that ends inside one
+    how = [None] * (n + 2)          # the command that reaches closed[i]: (start, kind, argument)
+    opened = [False] * (n + 2)
+    closed[0] = 0
+    for i in range(n):
+        if i >= 1:
+            index.setdefault(raw[i - 1:i + 1], []).append(i - 1)
+        here = min(closed[i], lit[i])
+        if here >= INF:
+            continue
+        if lit[i] + 1 <= closed[i] + 2:
+            if lit[i] + 1 < lit[i + 1]:
+                lit[i + 1], opened[i + 1] = lit[i] + 1, False
+        elif closed[i] + 2 < lit[i + 1]:
+            lit[i + 1], opened[i + 1] = closed[i] + 2, True
+        run = 1
+        while run < 33 and i + run < n and raw[i + run] == raw[i]:
+            run += 1
+        cost = 1 if raw[i] == 0 else 2
+        for k in range(2, run + 1):
+            if here + cost < closed[i + k]:
+                closed[i + k], how[i + k] = here + cost, (i, 'zero' if raw[i] == 0 else 'run', k)
+        pairs = 0
+        while pairs < 33 and i + 2 * pairs + 1 < n and raw[i + 2 * pairs] == 0:
+            pairs += 1
+            if pairs >= 2 and here + 1 + pairs < closed[i + 2 * pairs]:
+                closed[i + 2 * pairs], how[i + 2 * pairs] = here + 1 + pairs, (i, 'pairs', pairs)
+        top, at0 = 0, 0
+        for at in reversed(index.get(raw[i:i + 2], [])[-64:]):
+            if i - at > 0x3FF:
+                break
+            k = 2
+            while k < 33 and i + k < n and raw[at + k] == raw[i + k]:
+                k += 1
+            if k > top:
+                top, at0 = k, at
+                if k == 33:
+                    break
+        for k in range(2, top + 1):
+            if here + 2 < closed[i + k]:
+                closed[i + k], how[i + k] = here + 2, (i, 'copy', at0)
+    # walk back
+    cmds = []
+    i = n
+    in_lit = lit[n] < closed[n]
+    while i > 0:
+        if in_lit:
+            j = i
+            while not opened[j]:
+                j -= 1
+            j -= 1
+            cmds.append((j, 'lit', i - j))
+            i, in_lit = j, False
+        else:
+            start, kind, arg = how[i]
+            cmds.append((start, kind, arg if kind != 'copy' else (arg, i - start)))
+            i, in_lit = start, lit[start] < closed[start]
+    cmds.reverse()
+    out = bytearray()
+    for start, kind, arg in cmds:
+        if kind == 'lit':
+            for q in range(start, start + arg, 31):
+                chunk = raw[q:min(q + 31, start + arg)]
+                out.append(0x80 | len(chunk))
+                out += chunk
+        elif kind == 'zero':
+            out.append(0xE0 | (arg - 2))
+        elif kind == 'run':
+            out += bytes((0xC0 | (arg - 2), raw[start]))
+        elif kind == 'pairs':
+            out.append(0xA0 | (arg - 2))
+            out += raw[start + 1:start + 2 * arg:2]
+        else:
+            at, length = arg
+            ring = (0x3DF + at) & 0x3FF
+            out += bytes(((length - 2) << 2 | ring >> 8, ring & 0xFF))
+    if not framed:
+        return bytes(out)
+    size = len(out) + 2
+    if size > 0xFFFF:
+        raise ValueError('data is too long for this codec')
+    return bytes((size & 0xFF, size >> 8)) + bytes(out)
+
+
 # ---- Okumura LZSS --------------------------------------------------------
 
 def _lzss_decode(fill, header, data, start=0, limit=MAX_OUT):
-    r = _Reader(data, start)
+    # The 4096-byte ring is not kept: ring position p holds the output byte written when the
+    # write position was last p, or the fill before that, so a ring offset is a distance back.
+    n = len(data)
+    pos = start
     want = None
     if header == 'le16':
-        want = r.byte() | r.byte() << 8
+        if pos + 2 > n:
+            raise ValueError('stream is truncated')
+        want = data[pos] | data[pos + 1] << 8
+        pos += 2
         if not 0 < want <= limit:
             raise ValueError('size header is out of range')
-    ring = bytearray([fill]) * 4096
-    rp = 0xFEE
     out = bytearray()
     target = want if want is not None else limit
     while len(out) < target:
-        if r.pos >= len(data):
+        if pos >= n:
             if want is None and out:
                 break
             raise ValueError('stream is truncated')
-        flags = r.byte()
+        flags = data[pos]
+        pos += 1
         for bit in range(8):
-            if len(out) >= target:
+            here = len(out)
+            if here >= target:
                 break
             if flags >> bit & 1:
-                if r.pos >= len(data):
+                if pos >= n:
                     if want is None:
-                        return bytes(out), r.pos - start
+                        return bytes(out), pos - start
                     raise ValueError('stream is truncated')
-                b = r.byte()
-                out.append(b)
-                ring[rp] = b
-                rp = (rp + 1) & 0xFFF
+                out.append(data[pos])
+                pos += 1
             else:
-                if r.pos + 2 > len(data):
+                if pos + 2 > n:
                     if want is None:
-                        return bytes(out), r.pos - start
+                        return bytes(out), pos - start
                     raise ValueError('stream is truncated')
-                lo, hi = r.byte(), r.byte()
-                at = lo | (hi & 0xF0) << 4
-                for k in range((hi & 0x0F) + 3):
-                    b = ring[(at + k) & 0xFFF]
-                    out.append(b)
-                    ring[rp] = b
-                    rp = (rp + 1) & 0xFFF
+                hi = data[pos + 1]
+                at = data[pos] | (hi & 0xF0) << 4
+                pos += 2
+                count = (hi & 0x0F) + 3
+                dist = (0xFEE + here - at) & 0xFFF or 0x1000
+                src = here - dist
+                if src >= 0 and dist >= count:
+                    out += out[src:src + count]
+                else:
+                    for k in range(src, src + count):
+                        out.append(out[k] if k >= 0 else fill)
     del out[target:]
-    return bytes(out), r.pos - start
+    return bytes(out), pos - start
 
 
 def _lzss_encode(fill, header, raw):
@@ -498,7 +802,51 @@ def _kosinski_decode(data, start=0, limit=MAX_OUT):
 
 
 def _kosinski_encode(raw):
+    """Cheapest parse by bit cost: literal 9; 2-5 bytes from up to 256 back 12; 3-9 bytes 18; longer 26."""
+    raw = bytes(raw)
     n = len(raw)
+    # longest match within 256 bytes and within 0x2000, at each position
+    near = [(0, 0)] * n
+    far = [(0, 0)] * n
+    index: dict[bytes, list[int]] = {}
+    for i in range(n):
+        if i >= 1:
+            index.setdefault(raw[i - 1:i + 1], []).append(i - 1)
+        best_near = best_far = (0, 0)
+        for at in reversed(index.get(raw[i:i + 2], [])[-64:]):
+            dist = i - at
+            if dist > 0x2000:
+                break
+            k = 2
+            while k < 256 and i + k < n and raw[at + k] == raw[i + k]:
+                k += 1
+            if dist <= 256 and k > best_near[0]:
+                best_near = (k, dist)
+            if k > best_far[0]:
+                best_far = (k, dist)
+                if k == 256:
+                    break
+        near[i], far[i] = best_near, best_far
+    INF = 1 << 60
+    cost = [INF] * (n + 1)
+    step = [(1, 0, 0)] * (n + 1)        # (length, distance, kind: 0 literal, 1 short, 2 long)
+    cost[n] = 0
+    for i in range(n - 1, -1, -1):
+        c, how = cost[i + 1] + 9, (1, 0, 0)
+        k, dist = near[i]
+        for length in range(2, min(k, 5) + 1):
+            if cost[i + length] + 12 < c:
+                c, how = cost[i + length] + 12, (length, dist, 1)
+        k, dist = far[i]
+        if k >= 3:
+            for length in range(3, min(k, 9) + 1):
+                if cost[i + length] + 18 < c:
+                    c, how = cost[i + length] + 18, (length, dist, 2)
+            # long copies: every length up to 24, then only the longest
+            for length in list(range(10, min(k, 24) + 1)) + ([k] if k > 24 else []):
+                if cost[i + length] + 26 < c:
+                    c, how = cost[i + length] + 26, (length, dist, 2)
+        cost[i], step[i] = c, how
     out = bytearray(2)
     state = {'at': 0, 'bits': 0, 'used': 0}
 
@@ -511,39 +859,23 @@ def _kosinski_encode(raw):
             state.update(at=len(out), bits=0, used=0)
             out.extend(b'\0\0')
 
-    index: dict[bytes, list[int]] = {}
-    indexed = 0
     i = 0
     while i < n:
-        while indexed < i:
-            index.setdefault(bytes(raw[indexed:indexed + 2]), []).append(indexed)
-            indexed += 1
-        best_len, best_at = 0, 0
-        for at in reversed(index.get(bytes(raw[i:i + 2]), [])[-48:]):
-            if i - at > 0x2000:
-                break
-            k = 0
-            while k < 256 and i + k < n and raw[at + k] == raw[i + k]:
-                k += 1
-            if k > best_len:
-                best_len, best_at = k, at
-        dist = i - best_at
-        if best_len >= 2 and best_len <= 5 and dist <= 256:
-            put(0); put(0); put((best_len - 2) >> 1); put((best_len - 2) & 1)
-            out.append((-dist) & 0xFF)
-            i += best_len
-        elif best_len >= 3:
-            put(0); put(1)
-            off = (-dist) & 0x1FFF
-            if best_len <= 9:
-                out += bytes((off & 0xFF, (off >> 5 & 0xF8) | (best_len - 2)))
-            else:
-                out += bytes((off & 0xFF, off >> 5 & 0xF8, best_len - 1))
-            i += best_len
-        else:
+        length, dist, kind = step[i]
+        if kind == 0:
             put(1)
             out.append(raw[i])
-            i += 1
+        elif kind == 1:
+            put(0); put(0); put((length - 2) >> 1); put((length - 2) & 1)
+            out.append((-dist) & 0xFF)
+        else:
+            put(0); put(1)
+            off = (-dist) & 0x1FFF
+            if length <= 9:
+                out += bytes((off & 0xFF, (off >> 5 & 0xF8) | (length - 2)))
+            else:
+                out += bytes((off & 0xFF, off >> 5 & 0xF8, length - 1))
+        i += length
     put(0); put(1)
     out += b'\x00\xF0\x00'
     out[state['at']] = state['bits'] & 0xFF
@@ -919,7 +1251,9 @@ def _konami_encode(raw):
             out.extend(chunk)
         lit.clear()
 
-    for value, k in _runs(raw, 0x80):
+    # Runs stop at 7E: in the games that use this format a count of 7F is a command of its own
+    # (it moves the write address), and 80 is not a count their loops handle.
+    for value, k in _runs(raw, 0x7E):
         if k >= 3:
             flush()
             out += bytes((k, value))
@@ -953,13 +1287,329 @@ def _pairs_encode(raw):
     return bytes(out)
 
 
+# ---- Sega Comper ------------------------------------------------------------
+# A 16-bit description field (MSB first), then its 16 tokens: 0 = one word as it
+# is, 1 = (distance, count): count + 1 words from 0x100 - distance words back.
+
+def _comper_decode(data, start=0, limit=MAX_OUT):
+    r = _Reader(data, start)
+    out = bytearray()
+    while True:
+        desc = r.byte() << 8 | r.byte()
+        for bit in range(15, -1, -1):
+            if not desc >> bit & 1:
+                out.append(r.byte())
+                out.append(r.byte())
+            else:
+                dist = (0x100 - r.byte()) * 2
+                count = r.byte()
+                if count == 0:
+                    if not out:
+                        raise ValueError('empty stream')
+                    return bytes(out), r.pos - start
+                origin = len(out) - dist
+                if origin < 0:
+                    raise ValueError('copy reaches outside the output')
+                for k in range((count + 1) * 2):
+                    out.append(out[origin + k])
+            if len(out) > limit:
+                raise ValueError('output exceeds the limit')
+
+
+def _comper_encode(raw):
+    raw = bytes(raw)
+    n = len(raw)
+    if not n or n % 2:
+        raise ValueError('Comper data must be whole 16-bit words')
+    tokens = []
+    index: dict[bytes, list[int]] = {}
+    indexed = 0
+    i = 0
+    while i < n:
+        while indexed < i:
+            index.setdefault(raw[indexed:indexed + 2], []).append(indexed)
+            indexed += 2
+        best_len, best_at = 0, 0
+        for at in reversed(index.get(raw[i:i + 2], [])[-48:]):
+            if i - at > 512:
+                break
+            k = 0
+            while k < 512 and i + k + 1 < n and raw[at + k] == raw[i + k] and raw[at + k + 1] == raw[i + k + 1]:
+                k += 2
+            if k > best_len:
+                best_len, best_at = k, at
+        if best_len >= 4:
+            tokens.append((1, bytes(((0x100 - (i - best_at) // 2) & 0xFF, best_len // 2 - 1))))
+            i += best_len
+        else:
+            tokens.append((0, raw[i:i + 2]))
+            i += 2
+    tokens.append((1, b'\0\0'))
+    out = bytearray()
+    for g in range(0, len(tokens), 16):
+        group = tokens[g:g + 16]
+        desc = 0
+        for k, (flag, _) in enumerate(group):
+            desc |= flag << (15 - k)
+        out += bytes((desc >> 8, desc & 0xFF))
+        for _, body in group:
+            out += body
+    return bytes(out)
+
+
+# ---- Sega Kosinski, moduled (Sonic 3 & Knuckles) ----------------------------------
+# Big-endian total size, then Kosinski streams of 0x1000 unpacked bytes each,
+# every one but the last padded to a multiple of 16 bytes.
+
+def _kosinskim_decode(data, start=0, limit=MAX_OUT):
+    r = _Reader(data, start)
+    total = r.byte() << 8 | r.byte()
+    if total == 0xA000:
+        total = 0x8000
+    if not 0 < total <= limit:
+        raise ValueError('size header is out of range')
+    out = bytearray()
+    pos = start + 2
+    while len(out) < total:
+        part, used = _kosinski_decode(data, pos, 0x1000)
+        if len(part) != min(0x1000, total - len(out)):
+            raise ValueError('module size does not match the header')
+        out += part
+        pos += used
+        if len(out) < total:
+            pos = start + 2 + ((pos - start - 2 + 15) & ~15)
+    return bytes(out), pos - start
+
+
+def _kosinskim_encode(raw):
+    raw = bytes(raw)
+    n = len(raw)
+    if not n or n > 0xFFFF or n == 0xA000:
+        raise ValueError('data is too long for this codec')
+    out = bytearray((n >> 8, n & 0xFF))
+    for p in range(0, n, 0x1000):
+        out += _kosinski_encode(raw[p:p + 0x1000])
+        if p + 0x1000 < n:
+            out += bytes(-(len(out) - 2) % 16)
+    return bytes(out)
+
+
+# ---- stored as it is ------------------------------------------------------------------
+
+def _raw_decode(data, start=0, limit=MAX_OUT):
+    out = bytes(data[start:start + limit])
+    if not out:
+        raise ValueError('empty stream')
+    return out, len(out)
+
+
+# ---- how unpacked bytes are laid into video memory -----------------------------------
+# Games often store fewer bit planes than the video chip holds and fill the rest
+# in as they load. A map is one character per video-memory byte of a repeating
+# group: 0-9 a-v = that byte of the stored group, Z = a 00 the game makes up,
+# F = an FF it makes up. "012Z" is three stored planes and an empty fourth.
+
+_MAP_CHARS = '0123456789abcdefghijklmnopqrstuv'
+MAP_ALIASES = {
+    '3bpp': '0123456789abcdefgZhZiZjZkZlZmZnZ',     # Super NES: 16 bytes, then 8 each followed by 00
+    '2of4': '0123456789abcdef' + 'Z' * 16,          # Super NES: two of four planes
+    '1of2n': '01234567' + 'Z' * 8,                  # NES: first plane only
+    '1of2n-b': 'Z' * 8 + '01234567',                # NES: second plane only
+    '1x2n': '0123456701234567',                     # NES: one plane used for both
+}
+_MAPS: dict[str, tuple] = {}
+
+
+def map_parse(text: str):
+    """(group size in video memory, stored group size, [(stored index or -1, made-up value)])."""
+    hit = _MAPS.get(text)
+    if hit is None:
+        chars = MAP_ALIASES.get(text, text)
+        entries = []
+        for c in chars:
+            if c == 'Z':
+                entries.append((-1, 0x00))
+            elif c == 'F':
+                entries.append((-1, 0xFF))
+            elif c in _MAP_CHARS:
+                entries.append((_MAP_CHARS.index(c), None))
+            else:
+                raise KeyError(text)
+        k = max(q for q, _ in entries) + 1
+        if k < 1 or {q for q, _ in entries if q >= 0} != set(range(k)):
+            raise KeyError(text)
+        hit = _MAPS[text] = (len(entries), k, tuple(entries))
+    return hit
+
+
+def map_expand(text: str, raw: bytes) -> bytes:
+    m, k, entries = map_parse(text)
+    groups = len(raw) // k
+    out = bytearray(groups * m)
+    for j, (q, const) in enumerate(entries):
+        out[j::m] = raw[q:groups * k:k] if q >= 0 else bytes([const]) * groups
+    return bytes(out)
+
+
+def map_contract(text: str, expanded: bytes) -> bytes:
+    """The stored bytes that expand to `expanded`; ValueError when it holds something the game cannot store."""
+    m, k, entries = map_parse(text)
+    if len(expanded) % m:
+        raise ValueError('The data is not whole groups.')
+    groups = len(expanded) // m
+    out = bytearray(groups * k)
+    seen = set()
+    for j, (q, const) in enumerate(entries):
+        col = expanded[j::m]
+        if q < 0:
+            if col != bytes([const]) * groups:
+                raise ValueError('The game fills that part of the tile in itself (it is stored with fewer colors); '
+                                 'it cannot be edited.')
+        elif q in seen:
+            if col != out[q::k]:
+                raise ValueError('Those bytes are stored once and used twice; they can only change together.')
+        else:
+            seen.add(q)
+            out[q::k] = col
+    return bytes(out)
+
+
+def map_index(text: str, i: int):
+    """Index in the stored block of expanded byte `i`, or None when the game makes that byte up."""
+    m, k, entries = map_parse(text)
+    group, j = divmod(i, m)
+    q = entries[j][0]
+    return None if q < 0 else group * k + q
+
+
+# Layouts worth trying on each system (besides "as it is").
+MAPS = {
+    'snes': ('3bpp', '2of4', '0Z', '00'),
+    'sms': ('012Z', '01ZZ', '0ZZZ', '012F', '01FF', '0FFF'),
+    'gb': ('0Z', 'Z0', '0F', 'F0'),
+    'gbc': ('0Z', 'Z0', '0F', 'F0'),
+    'nes': ('1of2n', '1of2n-b', '1x2n'),
+    'genesis': (),
+}
+
+
+# ---- run length behind an escape byte (Capcom on the Game Boy) ---------------------
+# The first byte of the stream is the escape. After it: any other byte stands for itself;
+# escape, count, value is a run; escape, 00 ends the stream.
+
+# Stored bytes also "unpack" (as themselves, until some escape, 00 pair turns up), so a stream is
+# held to what the games' packers write: blocks of a few hundred tiles at most, runs that are
+# worth their three bytes, and no long stretch without one.
+_ESCAPE_MOST = 0x2000
+
+
+def _escape_decode(framed, data, start=0, limit=MAX_OUT):
+    n = len(data)
+    if start + 3 > n:
+        raise ValueError('stream is truncated')
+    esc = data[start]
+    pos = start + 1
+    out = bytearray()
+    runs = 0
+    while True:
+        if pos >= n:
+            raise ValueError('stream is truncated')
+        b = data[pos]
+        pos += 1
+        if b != esc:
+            out.append(b)
+        else:
+            if pos >= n:
+                raise ValueError('stream is truncated')
+            count = data[pos]
+            pos += 1
+            if count == 0:
+                break
+            if pos >= n:
+                raise ValueError('stream is truncated')
+            if count < 3 and data[pos] != esc:
+                raise ValueError('a run this short is not something a packer writes')
+            runs += 1
+            out += bytes([data[pos]]) * count
+            pos += 1
+        if len(out) > limit:
+            if framed:
+                raise ValueError('output exceeds the limit')
+            del out[limit:]
+            break
+        if len(out) > 1024 * (runs + 1) or len(out) > _ESCAPE_MOST:
+            raise ValueError('this is not packed data')
+    if not out:
+        raise ValueError('empty stream')
+    return bytes(out), pos - start
+
+
+def _escape_encode(raw, like=None):
+    raw = bytes(raw)
+    if not raw or len(raw) > _ESCAPE_MOST:
+        raise ValueError('nothing to pack' if not raw else 'data is too long for this codec')
+    seen = Counter(raw)
+    esc = like[0] if like and seen[like[0]] == 0 else min(range(256), key=lambda v: (seen[v], v not in (5, 6, 0x0C), v))
+    out = bytearray([esc])
+    since = 0       # bytes written since the last run: the decoder gives up on long stretches without one
+    for value, k in _runs(raw, 255):
+        if k >= 4 or value == esc or (k == 3 and since > 768):
+            out += bytes((esc, k, value))
+            since = 0
+        else:
+            out += bytes([value]) * k
+            since += k
+    out += bytes((esc, 0))
+    return bytes(out)
+
+
 # ---- registry ---------------------------------------------------------------
 
 def _bind(fn, *head):
     return lambda *args, **kw: fn(*head, *args, **kw)
 
 
-CODECS: dict[str, dict] = {}
+class _Registry(dict):
+    """Codecs by name. Family members (lz~..., rle~...) and layouts (codec|map) are made on first use."""
+
+    made: dict = {}     # kept apart so that iterating CODECS lists only the fixed ones
+
+    def __missing__(self, name):
+        hit = self.made.get(name)
+        if hit is not None:
+            return hit
+        if '|' in name:
+            base, text = name.split('|', 1)
+            entry = self[base]
+            m, k, _ = map_parse(text)
+            terminated = entry['terminated']
+
+            def dec(data, start=0, limit=MAX_OUT, _d=entry['decode']):
+                raw, used = _d(data, start, limit if terminated else (limit // m + 1) * k)
+                out = map_expand(text, raw)
+                if not out:
+                    raise ValueError('empty stream')
+                if not terminated:
+                    used = min(used, len(out) // m * k)
+                return out, used
+            made = {'decode': dec, 'encode': lambda raw, _b=base: encode(_b, map_contract(text, raw)), 'terminated': terminated,
+                    'base': base, 'map': text}
+        else:
+            dec, enc, terminated = gfx_families.build(name)
+            made = {'decode': dec, 'encode': enc, 'terminated': terminated}
+            if not terminated:
+                made['exact'] = True
+                made['sized'] = name.startswith('rle~')
+            elif gfx_families.features(name):
+                made['commands'] = gfx_families.features(name)
+            if name.startswith('lz~') and not name.startswith('lz~n.'):
+                # a size header says little: the body is looked at as a bare stream first
+                made['peek'] = ('lz~n.' + name.split('.', 1)[1][:-1] + 'u', 2)
+        self.made[name] = made
+        return made
+
+
+CODECS: dict[str, dict] = _Registry()
 for _name in _NINTENDO:
     CODECS[_name] = {'decode': _bind(_nintendo_decode, _name), 'encode': _bind(_nintendo_encode, _name), 'terminated': True,
                      'commands': _bind(_nintendo_commands, _name)}
@@ -967,42 +1617,409 @@ for _fill in (0x00, 0x20):
     for _header in ('le16', 'raw'):
         CODECS[f'lzss-{_fill:02x}-{_header}'] = {'decode': _bind(_lzss_decode, _fill, _header),
                                                  'encode': _bind(_lzss_encode, _fill, _header), 'terminated': _header != 'raw'}
+    CODECS[f'lzss-{_fill:02x}-le16']['peek'] = (f'lzss-{_fill:02x}-raw', 2)
+    CODECS[f'lzss-{_fill:02x}-raw']['exact'] = True
+CODECS['lz5'] = {'decode': _lz5_decode, 'encode': _lz5_encode, 'terminated': True}
+CODECS['konami-snes'] = {'decode': _bind(_konami_snes_decode, True), 'encode': _bind(_konami_snes_encode, True),
+                         'terminated': True, 'peek': ('konami-snes-body', 2)}
+CODECS.made['konami-snes-body'] = {'decode': _bind(_konami_snes_decode, False), 'encode': _bind(_konami_snes_encode, False),
+                                   'terminated': False}
 CODECS['kosinski'] = {'decode': _kosinski_decode, 'encode': _kosinski_encode, 'terminated': True}
+CODECS['kosinski-moduled'] = {'decode': _kosinskim_decode, 'encode': _kosinskim_encode, 'terminated': True}
 CODECS['nemesis'] = {'decode': _nemesis_decode, 'encode': _nemesis_encode, 'terminated': True}
 CODECS['enigma'] = {'decode': _enigma_decode, 'encode': _enigma_encode, 'terminated': True}
+CODECS['comper'] = {'decode': _comper_decode, 'encode': _comper_encode, 'terminated': True}
 CODECS['rle-konami'] = {'decode': _konami_decode, 'encode': _konami_encode, 'terminated': True}
 CODECS['rle-pairs'] = {'decode': _pairs_decode, 'encode': _pairs_encode, 'terminated': True}
-CODECS['packbits'] = {'decode': _packbits_decode, 'encode': _packbits_encode, 'terminated': False}
+CODECS['packbits'] = {'decode': _packbits_decode, 'encode': _packbits_encode, 'terminated': False, 'exact': True}
+CODECS['rle-escape'] = {'decode': _bind(_escape_decode, True), 'encode': _escape_encode, 'terminated': True,
+                        'peek': ('rle-escape-body', 0)}
+CODECS.made['rle-escape-body'] = {'decode': _bind(_escape_decode, False), 'encode': _escape_encode, 'terminated': False}
+CODECS['raw'] = {'decode': _raw_decode, 'encode': lambda raw: bytes(raw), 'terminated': False}
 
-# Codecs worth trying first on each system (all are tried in the end).
-PREFERRED = {
-    'snes': ('lz2', 'lz2-le', 'lz3', 'hal', 'lzss-00-le16', 'lzss-20-le16'),
-    'gb': ('hal', 'lz3', 'lz2', 'rle-konami', 'packbits'),
-    'gbc': ('lz3', 'hal', 'lz2', 'rle-konami', 'packbits'),
-    'nes': ('rle-konami', 'hal', 'lz2', 'packbits'),
-    'genesis': ('nemesis', 'kosinski', 'enigma', 'lzss-00-le16'),
-    'sms': ('rle-pairs', 'packbits', 'lzss-00-le16'),
+# Named members of the parameterised families (gfx_families): formats met in real games.
+ALIASES = {
+    'saxman': 'lz~le16c.l1.oku.rfee.m3.n',          # Sega (Sonic 2 sound driver and others): packed size, then Okumura LZSS
+    'rle-sega-planes': 'rle~l.r0.l0.z.p4',          # Sega Master System (Phantasy Star and many more): four plane passes
 }
+for _name, _member in ALIASES.items():
+    CODECS[_name] = CODECS[_member]
+
+# Codecs worth trying first on each system (all the fixed ones are tried in the end).
+PREFERRED = {
+    'snes': ('lz2', 'lz2-le', 'lz3', 'hal', 'lz5', 'konami-snes', 'lzss-00-le16', 'lzss-20-le16'),
+    'gb': ('hal', 'lz3', 'lz2', 'rle-konami', 'rle-escape', 'packbits'),
+    'gbc': ('lz3', 'hal', 'lz2', 'rle-konami', 'rle-escape', 'packbits'),
+    'nes': ('rle-konami', 'rle-escape', 'hal', 'lz2', 'packbits'),
+    'genesis': ('nemesis', 'kosinski', 'enigma', 'comper', 'kosinski-moduled', 'saxman', 'lzss-00-le16'),
+    'sms': ('rle-sega-planes', 'rle-pairs', 'packbits', 'lzss-00-le16'),
+}
+# Members of the parameterised families found in real games by trace/codec_survey.py search;
+# recognise() tries them after the fixed codecs.
+MEMBERS = {
+    'snes': ('lz~le16.l1.oku.b0.m3.s',      # Sculptured Software: Super Star Wars trilogy, Boxing Legends of the Ring
+             'lz~le16.m0.L4lle.b1.m3.s',    # SimAnt
+             'lz~le16.m1.L4lbe.r1.m2.s',    # Wing Commander
+             'lz~le16.l0.L4hle.b0.m3.s',    # Bahamut Lagoon
+             'rle~l.r0.l0.z.p1'),           # Run Saber
+    'gb': ('lz~le16.l1.L4lle.b0.m3.s',      # Tose: Dragon Warrior Monsters, Harvest Moon GB, Legend of the River King
+           'lz~le16.l1.oku.b0.m3.s',        # Donkey Kong (1994)
+           'rle~l.r0.l0.z.p1', 'rle~l.r0.l0.n.p1', 'rle~h.r0.l0.n.p1'),     # Cave Noire
+    'gbc': ('lz~le16.l1.L4lle.b0.m3.s',     # Tose: Dragon Warrior I & II, III, Game & Watch Gallery 3, Harvest Moon GBC
+            'lz~le16.l1.oku.b0.m3.s',
+            'rle~l.r0.l0.z.p1', 'rle~h.r0.l0.n.p1', 'rle~l.r0.l0.n.p1'),    # Tetris DX; Magi Nation
+    'nes': ('rle~l.r0.l0.z.p1', 'rle~h.r0.l0.n.p1', 'rle~l.r0.l0.n.p1'),
+    'sms': ('rle~l.r0.l0.z.p1', 'rle~h.r0.l0.n.p1', 'rle~l.r0.l0.n.p1'),
+    'genesis': (),
+}
+# Codecs that only recognise() runs (the plain search in graphics_trace would spend long on them).
+_RECOGNISE_ONLY = ('raw',)
+
+
+# Recognising a block runs the same decoder from the same place many times over (several
+# layouts, several tiles of one scene), so results are kept per ROM. bytes objects remember
+# their hash, which makes "the same ROM" cheap to tell.
+_cache: dict = {}
+_cache_rom = [None, 0]      # (hash, length) of the ROM the cache is for; bytes held
 
 
 def decode(codec: str, data: bytes, start: int = 0, limit: int = MAX_OUT):
-    return CODECS[codec]['decode'](data, start, limit)
+    """(unpacked bytes, stream bytes used); ValueError when the bytes at `start` are not a stream."""
+    if not isinstance(data, bytes) or len(data) < 0x2000:
+        return CODECS[codec]['decode'](data, start, limit)
+    owner = (hash(data), len(data))
+    if _cache_rom[0] != owner or _cache_rom[1] > 96 << 20:
+        _cache.clear()
+        _cache_rom[0], _cache_rom[1] = owner, 0
+    key = (codec, start, limit)
+    hit = _cache.get(key)
+    if hit is None:
+        try:
+            hit = CODECS[codec]['decode'](data, start, limit)
+            _cache_rom[1] += len(hit[0]) + 64
+        except (ValueError, IndexError) as e:
+            hit = e
+            _cache_rom[1] += 64
+        _cache[key] = hit
+    if isinstance(hit, Exception):
+        raise hit
+    return hit
 
 
 def encode(codec: str, raw: bytes, like: bytes | None = None) -> bytes:
     """Pack `raw`. `like` is the original stream being replaced: where a codec family has
     optional commands, only those the original used are emitted, and a result that would be
     shorter than the original is lengthened to the same size where the codec allows it."""
-    if like is not None and 'commands' in CODECS[codec]:
-        stream = CODECS[codec]['encode'](bytes(raw), CODECS[codec]['commands'](like), len(like))
+    entry = CODECS[codec]
+    if 'map' in entry:
+        return encode(entry['base'], map_contract(entry['map'], bytes(raw)), like)
+    if like is not None and 'commands' in entry:
+        stream = entry['encode'](bytes(raw), entry['commands'](like), len(like))
+    elif like is not None and entry.get('exact'):
+        # A bare stream has no end of its own: the game stops by a count kept elsewhere, and what
+        # follows may be the rest of the same stream. Only a stream of exactly the old size is safe.
+        stream = entry['encode'](bytes(raw), len(like)) if entry.get('sized') else entry['encode'](bytes(raw))
+        if len(stream) != len(like):
+            raise ValueError(f'The edited data packs to {len(stream)} bytes and must be exactly {len(like)}: this '
+                             'format has no end marker, so it can only be rewritten in the same space.')
     else:
-        stream = CODECS[codec]['encode'](bytes(raw))
-    again, used = CODECS[codec]['decode'](stream, 0, max(len(raw), 1))
-    if again[:len(raw)] != bytes(raw) or (CODECS[codec]['terminated'] and (again != bytes(raw) or used != len(stream))):
+        stream = entry['encode'](bytes(raw))
+    again, used = entry['decode'](stream, 0, max(len(raw), 1))
+    if again[:len(raw)] != bytes(raw) or (entry['terminated'] and (again != bytes(raw) or used != len(stream))):
         raise ValueError(f'{codec} encoder output failed its round-trip check')
     return stream
 
 
 def order_for(system: str) -> list[str]:
     first = [c for c in PREFERRED.get(system, ()) if c in CODECS]
-    return first + [c for c in CODECS if c not in first]
+    return first + [c for c in list(CODECS) if c not in first and c not in _RECOGNISE_ONLY
+                    and '|' not in c and '~' not in c]
+
+
+# ---- recognising a block from traced video memory ---------------------------------------
+# graphics_trace.find_compressed_block calls recognise() when its own search finds nothing
+# complete. It differs in three ways: stored-as-it-is data with made-up planes is found
+# straight from the tags; stream starts come from every gap in the source offsets around
+# the tile rather than from one walk; and each unpacked block is tried under the system's
+# layouts (MAPS).
+
+_HEAD = {'nemesis': 0x280, 'enigma': 8, 'rle-sega-planes': 2}
+
+
+def _informative(d, i):
+    return (d.tags[i] >> 28 & 7) in (1, 3) and d.data[i] not in (0x00, 0xFF)
+
+
+def stream_anchors(d, start: int, length: int, window: int = 0x4000, gap: int = 0x100, most: int = 16) -> list[int]:
+    """ROM offsets (header excluded) where the stream that produced d[start:start+length] may begin, likeliest first."""
+    n = len(d.data)
+    lo, hi = max(0, start - window), min(n, start + length + window)
+    own = [d.tags[i] & 0x0FFFFFFF for i in range(start, start + length) if _informative(d, i)]
+    r = 1
+    while not own and r < 0x200:
+        for i in (start - r, start + length - 1 + r):
+            if lo <= i < hi and _informative(d, i):
+                own.append(d.tags[i] & 0x0FFFFFFF)
+        r += 1
+    if not own:
+        return []
+    tlo = min(own)
+    offs = sorted({d.tags[i] & 0x0FFFFFFF for i in range(lo, hi) if _informative(d, i)})
+    out = []
+    for g in (gap, 0x18):   # wide gaps first; then narrow ones, as a stray tag can sit just in front of a stream
+        starts = [offs[0]] + [b for a, b in zip(offs, offs[1:]) if b - a > g]
+        for x in [x for x in starts if x <= tlo][::-1][:most]:
+            if x not in out:
+                out.append(x)
+    for x in sorted(set(own)):          # the tile's own lowest offsets: short streams, one per tile
+        if x not in out and len(out) < 2 * most + 4:
+            out.append(x)
+    # Blocks often open with blank tiles, whose 00 and FF bytes were left out above; their tags
+    # still say the stream begins a little earlier.
+    weak = sorted({d.tags[i] & 0x0FFFFFFF for i in range(lo, hi)
+                   if (d.tags[i] >> 28 & 7) in (1, 3) and d.data[i] in (0x00, 0xFF)})
+    moved = []
+    for x in out:
+        for _ in range(4):
+            k = bisect.bisect_left(weak, x)
+            if k and x - weak[k - 1] <= 0x10:
+                x = weak[bisect.bisect_left(weak, x - 0x10)]
+            else:
+                break
+        if x not in moved:
+            moved.append(x)
+    return moved
+
+
+def _probe(d, start, length):
+    target = bytes(d.data[start:start + length])
+    if len(set(target)) > 2:
+        return target, 0
+    n = len(d.data)
+    for r in range(8, 0x400, 8):
+        for k in (start - r, start + r):
+            if 0 <= k and k + 16 <= n and len(set(d.data[k:k + 16])) > 4:
+                return bytes(d.data[k:k + 16]), k - start
+    return None, 0
+
+
+def _fit(d, out, start, length, target, probe, shift, bare=False):
+    """Where `out` lies in the domain so that it reproduces the target and what surrounds it.
+
+    A stream with an end marker or a size must agree with nine tenths of the 256 bytes on
+    each side of the target (parts of a block are often overwritten later). The output of
+    a bare stream runs on into whatever follows it in the ROM, so there the unbroken run of
+    agreement around the target is taken instead, and must be at least three tiles long.
+    Returns (score, domain index of out[0], first, last) with out[first:last] the part to keep.
+    """
+    best = None
+    k = out.find(probe)
+    tries = 0
+    n = len(d.data)
+    data = d.data
+    while k >= 0 and tries < 8:
+        tries += 1
+        base = start + shift - k
+        at = start - base
+        if at >= 0 and at + length <= len(out) and out[at:at + length] == target:
+            p, q = max(0, -base), min(len(out), n - base)
+            if bare:
+                lo, hi = at, at + length
+                while lo > p and out[lo - 1] == data[base + lo - 1]:
+                    lo -= 1
+                while hi < q and out[hi] == data[base + hi]:
+                    hi += 1
+                if hi - lo >= max(48, 3 * length) and len(set(out[lo:hi])) > 4:
+                    score = (lo == 0, False, hi - lo, -lo)
+                    if best is None or score > best[0]:
+                        best = (score, base, lo, hi)
+            else:
+                w0, w1 = max(p, at - 256), min(q, at + length + 256)
+                if w1 - w0 >= 48:
+                    near = sum(x == y for x, y in zip(out[w0:w1], data[base + w0:base + w1]))
+                    if near * 10 >= (w1 - w0) * 9 and len(set(out[w0:w1])) > 2:
+                        total = sum(x == y for x, y in zip(out[p:q], data[base + p:base + q]))
+                        score = (near == w1 - w0, total == q - p, total, -p)
+                        if best is None or score > best[0]:
+                            best = (score, base, p, q)
+        k = out.find(probe, k + 1)
+    return best
+
+
+def _recognise_raw(d, rom, skip, system, start, length, target):
+    """Data stored as it is (perhaps with fewer planes than video memory holds)."""
+    n = len(d.data)
+    info = [(i - start, d.tags[i] & 0x0FFFFFFF) for i in range(start, start + length) if _informative(d, i)]
+    if not info:
+        return None
+    rom_tagged = [(j, o) for j, o in info if (d.tags[start + j] >> 28 & 7) == 1]
+    lo, hi = min(o for _, o in info), max(o for _, o in info)
+    for text in ('',) + tuple(MAPS.get(system, ())):
+        if text:
+            m, k, entries = map_parse(text)
+            if length % m:
+                continue
+            try:
+                stored = map_contract(text, target)
+            except ValueError:
+                continue
+        else:
+            m = k = length
+            entries = None
+            stored = target
+        if len(set(stored)) <= 2:
+            continue
+        cands = []
+        for j, o in rom_tagged:         # a byte copied straight from the ROM says where its group is
+            if entries is None:
+                cands.append(o - j)
+            else:
+                g, jj = divmod(j, m)
+                if entries[jj][0] >= 0:
+                    cands.append(o - g * k - entries[jj][0])
+        if len(stored) >= 12:
+            at = rom.find(stored, skip + max(0, lo - 0x100), skip + hi + 0x100 + len(stored))
+            if at >= 0:
+                cands.append(at - skip)
+        for r0 in dict.fromkeys(cands):
+            if r0 < 0 or rom[skip + r0:skip + r0 + len(stored)] != stored:
+                continue
+            # grow over the neighbouring groups that also agree
+            first, last = start, start + length     # domain span, whole groups
+            f0 = r0
+            while first - m >= 0 and f0 - k >= 0 and \
+                    (map_expand(text, rom[skip + f0 - k:skip + f0]) if text else rom[skip + f0 - k:skip + f0]) == d.data[first - m:first] \
+                    and start - first < 0x2000:
+                first -= m
+                f0 -= k
+            f1 = r0 + len(stored)
+            while last + m <= n and skip + f1 + k <= len(rom) and \
+                    (map_expand(text, rom[skip + f1:skip + f1 + k]) if text else rom[skip + f1:skip + f1 + k]) == d.data[last:last + m] \
+                    and last - start < 0x2000:
+                last += m
+                f1 += k
+            if not text:
+                # Equal bytes near a tagged offset are not yet a cause: either the tags themselves say
+                # the tile was copied from there, or the agreement runs on for many tiles.
+                told = sum(o == r0 + j for j, o in rom_tagged)
+                if told * 2 < length and last - first < 256:
+                    continue
+            decoded = bytes(d.data[first:last])
+            return {'codec': 'raw' + ('|' + text if text else ''), 'start': skip + f0, 'size': f1 - f0, 'decoded': decoded,
+                    'domain_start': first, 'first': 0, 'last': len(decoded), 'complete': True}
+    return None
+
+
+def recognise(d, rom: bytes, skip: int, system: str, start: int, length: int, codecs=None, back: int = 8,
+              anchors=None, layouts=None, exhaustive: bool = False) -> dict | None:
+    """Find the stored block behind d[start:start+length] (d: a traced domain with .data and .tags).
+
+    Returns None or {'codec', 'start' (file offset), 'size', 'decoded', 'domain_start', 'first',
+    'last', 'complete'}: decoded[first:last] is what the domain holds from domain_start on, and
+    `codec` (which may carry a layout: "lz2|3bpp") re-encodes it.
+    """
+    target = bytes(d.data[start:start + length])
+    if len(set(target)) <= 1:
+        return None
+    plain = None
+    if codecs is None:
+        plain = _recognise_raw(d, rom, skip, system, start, length, target)
+        # A short stretch stored as it is may be a literal block inside a packed stream; a codec
+        # that explains the whole stream is the better answer, so look for one first.
+        if plain and ('|' in plain['codec'] or plain['size'] >= 256):
+            return plain
+    probe, shift = _probe(d, start, length)
+    if probe is None:
+        return plain
+    if anchors is None:
+        anchors = stream_anchors(d, start, length)
+    if not anchors:
+        return plain
+    whole = bytes(d.data)
+    layouts = ('',) + tuple(MAPS.get(system, ())) if layouts is None else layouts
+    best = None
+    for name in (list(codecs) if codecs else order_for(system) + list(MEMBERS.get(system, ()))):
+        entry = CODECS[name]
+        terminated = entry['terminated']
+        peek = entry.get('peek') or (None if terminated else (name, 0))
+        seen = set()
+        for anchor in anchors:
+            for s in range(anchor, max(anchor - max(back, _HEAD.get(name, 0)), 0) - 1, -1):
+                if s in seen:
+                    continue
+                seen.add(s)
+                try:
+                    if peek:
+                        # most bytes are not a stream: look at a short piece of output before unpacking it all
+                        head, _ = decode(peek[0], rom, skip + s + peek[1], 64)
+                        if len(head) < 24 or not any(
+                                (map_expand(t, head) if t else head)[:24] in whole for t in layouts):
+                            continue
+                    raw_out, used = decode(name, rom, skip + s, 0x10000 if terminated else 0x4000)
+                except (ValueError, IndexError):
+                    continue
+                if used < 3:
+                    continue
+                for text in layouts:
+                    out = map_expand(text, raw_out) if text else raw_out
+                    fit = _fit(d, out, start, length, target, probe, shift, bare=not terminated)
+                    if fit and (best is None or fit[0] > best[0]):
+                        score, base, p, q = fit
+                        full = name + ('|' + text if text else '')
+                        size = used
+                        if not terminated:
+                            # keep only the stretch that agrees: the rest is not this stream's
+                            try:
+                                out, size = decode(full, rom, skip + s, q)
+                            except (ValueError, IndexError):
+                                continue
+                            q = min(q, len(out))
+                        best = (score, {'codec': full, 'start': skip + s, 'size': size,
+                                        'decoded': out, 'domain_start': base + p, 'first': p, 'last': q,
+                                        'complete': score[0]})
+        if best and best[0][0] and (not exhaustive or best[0][1]):
+            break       # (an exhaustive search goes on until something agrees everywhere)
+    if plain and not (best and best[0][0] and CODECS[best[1]['codec']]['terminated']):
+        return plain        # the tags name those ROM bytes; a bare stream is the weaker claim
+    return best[1] if best else None
+
+
+def search_families(d, rom: bytes, skip: int, system: str, start: int, length: int, most: int = 4, back: int = 4) -> dict | None:
+    """Try every layout of the parameterised families (gfx_families) on the tile's likely stream starts.
+
+    Slow (thousands of layouts); meant for studying a game offline. The codec named in the
+    result is concrete: add it to MEMBERS to have it recognised from then on.
+    """
+    anchors = stream_anchors(d, start, length)[:most]
+    if not anchors:
+        return None
+    whole = bytes(d.data)
+    best = recognise(d, rom, skip, system, start, length, codecs=list(gfx_families.rle_grid()), back=back,
+                     anchors=anchors, exhaustive=True)
+    starts = sorted({s for a in anchors for s in range(max(a - back, 0), a + 1)}, reverse=True)
+    for head in ('le16', 'be16', 'n'):
+        body = 0 if head == 'n' else 2
+        for flags in ('l1', 'm1', 'l0', 'm0'):
+            if best and best['complete'] and CODECS[best['codec'].partition('|')[0]]['terminated']:
+                return best
+            # a start is worth the hundreds of layouts only if the literals it would hold are in video memory
+            good = []
+            for s in starts:
+                runs = gfx_families.lz_literal_runs(flags[0] == 'm', int(flags[1]), rom, skip + s + body)
+                if runs and all(any((map_expand(t, r) if t else r)[:len(r)] in whole for t in ('',)) for r in runs[:3]):
+                    good.append(s)
+            if not good:
+                continue
+            hit = recognise(d, rom, skip, system, start, length, codecs=list(gfx_families.lz_grid((head,), (flags,))),
+                            back=0, anchors=good, layouts=('',), exhaustive=True)
+            if hit and (best is None or (hit['complete'], hit['last'] - hit['first']) > (best['complete'], best['last'] - best['first'])):
+                best = hit
+    if best and best['codec'].startswith('lz~n.') and best['start'] - skip >= 2:
+        # a bare stream may sit behind a packed-size word, which gives it an end
+        body = best['codec'][len('lz~n.'):-len('.n')]
+        for head in ('le16c', 'be16c', 'le16i', 'be16i'):
+            framed = recognise(d, rom, skip, system, start, length, codecs=[f'lz~{head}.{body}.n'], back=0,
+                               anchors=[best['start'] - skip - 2], layouts=('',))
+            if framed and framed['complete']:
+                return framed
+    return best
