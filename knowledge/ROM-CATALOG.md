@@ -1,6 +1,6 @@
 # ROM catalog
 
-ROMancer v1.0.1 identifies **1,052 exact ROM revisions** across six systems.
+ROMancer v1.1.0 Preview identifies **1,052 exact ROM revisions** across six systems.
 Each row represents one file hash. Different releases, regions or revisions of a game can have separate rows.
 
 All cataloged revisions passed the controlled byte-edit, undo/redo, build and BPS verification workflow.
