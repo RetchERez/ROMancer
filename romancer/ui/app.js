@@ -36,12 +36,13 @@ import * as regression from './views/regression.js';
 import * as release from './views/release.js';
 import * as settings from './views/settings.js';
 import * as sound from './views/sound.js';
+import * as scenes from './views/scenes.js';
 export let startupReady=false;
 applyInterfaceScale(readPreference('romancer-scale')||100);
 window.addEventListener('resize',()=>applyInterfaceScale(getSettings().scale));
 let navigationRevision=0;
-const views={gameview,overview,resources,scripts,assets,sound,tables,automation,playtest,debug,routes,regression,release,help,settings};
-const names={automation:'Recipes & definitions',overview:'Overview',gameview:'Game view',resources:'Resources',scripts:'Text & layout',assets:'Graphics & fonts',sound:'Music & sound',tables:'Stats & data',playtest:'Playtest',debug:'Investigation',routes:'Routes',regression:'Regression',release:'Export',settings:'Settings',help:'Help'};
+const views={gameview,overview,resources,scripts,assets,scenes,sound,tables,automation,playtest,debug,routes,regression,release,help,settings};
+const names={automation:'Recipes & definitions',overview:'Overview',gameview:'Game view',resources:'Resources',scripts:'Text & layout',assets:'Graphics & fonts',scenes:'Scenes & colors',sound:'Music & sound',tables:'Stats & data',playtest:'Playtest',debug:'Investigation',routes:'Routes',regression:'Regression',release:'Export',settings:'Settings',help:'Help'};
 const state={page:'overview',projects:[],project:null,artifact:null,capabilities:null,drafts:{},results:{},pending:null,job:null,runtime:null,frame:null,snapshot:null};
 let actions={},renderRevision=0,toastTimer,lastRenderedScope=null;
 const workspaceWarning='Workspace restore could not be saved. Your editing drafts are separate.';let workspaceWriteWarning=false;const workspaceWrites=new WorkspaceLocationWriter(api,error=>{if(!workspaceWriteWarning){workspaceWriteWarning=true;notify(workspaceWarning,true);}},()=>{if(workspaceWriteWarning){workspaceWriteWarning=false;if(state.lastError===workspaceWarning){state.lastError=null;const panel=document.getElementById('error-panel');if(panel)panel.innerHTML='';}}});
@@ -95,7 +96,7 @@ function baseActions(){return {
  'navigate':node=>{document.getElementById('modal').close();return navigate(node.dataset.id);},'close-modal':()=>document.getElementById('modal').close(),
  'import':()=>{state.droppedImportFile=null;return importDialog();},
  'candidate-cancel':()=>{state.candidateReview=null;state.resourcePrefill=null;state.openDeclaration=null;return render();},
- 'help-topic':node=>{state.helpTopic=node.dataset.id||({assets:'graphics',scripts:'text',resources:'discovery',release:'export',settings:'recovery',overview:'start',help:'start'}[state.page]||state.page);document.getElementById('modal').close();return navigate('help');},
+ 'help-topic':node=>{state.helpTopic=node.dataset.id||({assets:'graphics',scenes:'graphics',scripts:'text',resources:'discovery',release:'export',settings:'recovery',overview:'start',help:'start'}[state.page]||state.page);document.getElementById('modal').close();return navigate('help');},
  'workspace-search':showSearch,
  'demo-studio':async()=>{const result=await run('project.studio',{}, {render:false});await openProject(result.project_id);notify('Editing studio opened.');},
  'demo-system':async node=>{const result=await run('project.demo_system',{system_id:node.dataset.id},{render:false});await openProject(result.project_id);notify('Workshop opened.');},

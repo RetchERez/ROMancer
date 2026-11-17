@@ -290,8 +290,7 @@ class LibretroFrontend:
         self.core_path = str(Path(core_path).resolve())
         if not Path(self.core_path).is_file():
             raise FileNotFoundError(self.core_path)
-        from .bundled_cores import require_reviewed_release_core
-        require_reviewed_release_core(self.core_path)
+        self._require_reviewed_core()
         self.runtime_root = Path(save_dir or Path.cwd() / ".romancer_runtime").resolve()
         self.runtime_root.mkdir(parents=True, exist_ok=True)
         self.system_dir = Path(system_dir or self.runtime_root / "system").resolve()
@@ -356,6 +355,11 @@ class LibretroFrontend:
         self.lib.retro_set_audio_sample_batch(self._audio_batch_cb)
         self.lib.retro_set_input_poll(self._input_poll_cb)
         self.lib.retro_set_input_state(self._input_state_cb)
+
+    def _require_reviewed_core(self) -> None:
+        """Playback accepts only the pinned engines; tracing hosts apply their own pins."""
+        from .bundled_cores import require_reviewed_release_core
+        require_reviewed_release_core(self.core_path)
 
     def _require(self, name: str):
         try:

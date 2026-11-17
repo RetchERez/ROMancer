@@ -6,7 +6,7 @@
   };
 
   // romancer/ui/navigation.js
-  var BASIC_PAGES = Object.freeze(["overview", "scripts", "assets", "levels", "tables", "sound", "playtest", "release"]);
+  var BASIC_PAGES = Object.freeze(["overview", "scripts", "assets", "scenes", "levels", "tables", "sound", "playtest", "release"]);
   var ADVANCED_PAGES = Object.freeze(["gameview", "resources", "debug", "automation", "routes", "regression"]);
 
   // romancer/ui/change_summary.js
@@ -56,6 +56,8 @@
 
   // romancer/ui/icons.js
   var paths = { overview: "M3 3h7v7H3z M14 3h7v7h-7z M3 14h7v7H3z M14 14h7v7h-7z", resources: "M4 4h16v16H4z M8 8h2 M14 8h2 M8 12h2 M14 12h2 M8 16h8", scripts: "M5 3h10l4 4v14H5z M9 11h6 M9 15h6 M15 3v5h4", assets: "M3 3h18v18H3z M3 16l5-5 4 4 4-7 5 8 M8 7h.01", playtest: "M8 4l12 8-12 8z", debug: "M8 8h8v10H8z M10 8V5h4v3 M4 10h4 M16 10h4 M4 16h4 M16 16h4 M10 18v3 M14 18v3", routes: "M5 5h.01 M19 19h.01 M5 7v6a4 4 0 004 4h6 M17 15l2 2-2 2 M5 3a2 2 0 100 4 2 2 0 000-4 M19 17a2 2 0 100 4 2 2 0 000-4", regression: "M4 20V4 M4 16h4l4-6 4 3 5-8 M17 5h4v4", release: "M12 3v12 M7 8l5-5 5 5 M4 15v6h16v-6", settings: "M12 8a4 4 0 100 8 4 4 0 000-8 M12 3v2 M12 19v2 M3 12h2 M19 12h2 M5.6 5.6L7 7 M17 17l1.4 1.4 M5.6 18.4L7 17 M17 7l1.4-1.4", plus: "M12 5v14 M5 12h14", arrow: "M5 12h14 M13 6l6 6-6 6", folder: "M3 7V4h7l2 3h9v13H3z", search: "M10 3a7 7 0 100 14 7 7 0 000-14 M15 15l6 6", check: "M5 12l4 4L19 6", close: "M6 6l12 12 M18 6L6 18", download: "M12 3v12 M7 10l5 5 5-5 M4 17v4h16v-4", chevron: "M9 5l7 7-7 7", clock: "M12 3a9 9 0 100 18 9 9 0 000-18 M12 7v5l3 2", shield: "M12 3l8 3v6c0 5-8 9-8 9s-8-4-8-9V6z M8 12l3 3 5-6" };
+  paths.scenes = "M12 3a9 9 0 100 18c1.4 0 2-.9 2-1.9 0-1.1-.6-1.6-.6-2.6 0-.9.8-1.5 1.8-1.5H17a4 4 0 004-4c0-4.4-4-8-9-8z M7.5 12.5h.01 M9 8.5h.01 M13.5 7h.01 M17 10h.01";
+  paths.lock = "M6 11h12v9H6z M8.5 11V8a3.5 3.5 0 017 0v3";
   paths.levels = "M3 3h18v18H3z M3 9h18 M9 9v12 M15 3v6 M15 15h6";
   paths.sound = "M9 18V5l11-2v13 M9 8l11-2 M9 18a3 2 0 11-6 0 3 2 0 016 0 M20 16a3 2 0 11-6 0 3 2 0 016 0";
   function icon(name2, extra = "") {
@@ -224,7 +226,7 @@
   async function draftScene(ctx2, doc, getSnapshot) {
     var _a, _b, _c, _d;
     if (!(doc == null ? void 0 : doc.ok) || !ctx2.state.artifact) return "";
-    const { state: state2 } = ctx2, scope = selectionKey(state2), params = { ...ctx2.sourceParams() }, current2 = () => {
+    const { state: state2 } = ctx2, scope = selectionKey(state2), params = { ...ctx2.sourceParams() }, current3 = () => {
       var _a2, _b2;
       return scope === selectionKey(state2) && ((_a2 = ctx2.isCurrentRender) == null ? void 0 : _a2.call(ctx2)) !== false && ((_b2 = state2.results["assets.inspect"]) == null ? void 0 : _b2.document_id) === doc.document_id;
     };
@@ -238,18 +240,18 @@
     }
     const signature = JSON.stringify({ capture, ...snapshot2 }), changed2 = Array.isArray((_b = snapshot2.edits) == null ? void 0 : _b.changes) && snapshot2.edits.changes.length > 0;
     let entry = ((_c = state2.assetScene) == null ? void 0 : _c.scope) === scope && state2.assetScene.signature === signature ? state2.assetScene : null;
-    const stillMatches = () => current2() && ctx2.draft("asset-scene-trace", traces.at(-1) || "") === capture && JSON.stringify({ capture, ...getSnapshot() }) === signature;
+    const stillMatches = () => current3() && ctx2.draft("asset-scene-trace", traces.at(-1) || "") === capture && JSON.stringify({ capture, ...getSnapshot() }) === signature;
     if (!entry && capture && changed2 && doc.write_supported) {
       try {
         const restored = await ctx2.api.call("assets.preview_scene.find", { ...params, trace_id: capture, ...snapshot2 });
         if (!stillMatches()) return "";
         entry = state2.assetScene = { scope, signature, result: restored.found ? restored : null, reason: restored.reason || "" };
       } catch (error) {
-        if (!current2()) return "";
+        if (!current3()) return "";
         entry = state2.assetScene = { scope, signature, result: null, reason: error.message };
       }
     }
-    if (!current2()) return "";
+    if (!current3()) return "";
     const restoreReview = (result) => {
       state2.pending = { kind: "assets", plan_id: result.plan_id, artifact_id: state2.artifact.artifact_id, document_id: doc.document_id, signature: JSON.stringify(snapshot2) };
     };
@@ -268,8 +270,8 @@
     } });
     const r = entry == null ? void 0 : entry.result, valid2 = r && r.source_sha256 === state2.artifact.sha256 && r.artifact_id === state2.artifact.artifact_id;
     const reason = !capture ? "Load this ROM from a cold start in Playtest, then save a capture first." : !changed2 ? "Stage a palette or pixel change first." : !doc.write_supported ? "This layout is read-only." : "";
-    const pictures = valid2 && r.emulated_frame && r.visual ? '<div class="draft-scene-result"><p class="preview-caption" role="status">Emulated draft preview · ' + r.changed_pixels + " pixel" + (r.changed_pixels === 1 ? "" : "s") + ' changed</p><div class="draft-scene-pictures">' + [["Original replay", "original_png_base64"], ["Draft replay", "build_png_base64"], ["Difference", "difference_png_base64"]].map(([name2, key]) => "<figure><figcaption>" + name2 + '</figcaption><img src="data:image/png;base64,' + esc(r.visual[key]) + '" alt="' + name2 + ' of the captured scene"></figure>').join("") + '</div><p class="subtle">No project build was created. These frames were produced by the emulator using temporary checked copies. They cover the captured route; build and test the edit to keep it.</p></div>' : valid2 ? '<p class="notice">' + esc(r.reason || "The captured scene could not be reproduced. Record a new cold-start capture.") + "</p>" : "";
-    return '<details class="card draft-scene" id="asset-scene-panel" ' + (valid2 ? "open" : "") + "><summary>Preview this draft in a captured scene</summary><p>Replay the original twice and a temporary draft once. Palette changes are rendered by the emulator.</p>" + (traces.length ? select("asset-scene-trace", "Captured scene", traces.map((id, i) => [id, "Capture " + (i + 1)]), capture) : "") + '<div class="actions">' + button("Preview captured scene", "asset-scene-preview", { disabled: !!reason, reason, primary: true }) + button("Open Playtest", "navigate", { id: "playtest" }) + '</div><p class="subtle">Up to 2,400 frames and 20 input steps. Your source, saved live session and project build history stay separate.</p><p id="asset-scene-notice" class="preview-caption" role="status">' + esc(reason || (entry == null ? void 0 : entry.reason) || "Previewing does not publish a build.") + "</p>" + pictures + "</details>";
+    const pictures2 = valid2 && r.emulated_frame && r.visual ? '<div class="draft-scene-result"><p class="preview-caption" role="status">Emulated draft preview · ' + r.changed_pixels + " pixel" + (r.changed_pixels === 1 ? "" : "s") + ' changed</p><div class="draft-scene-pictures">' + [["Original replay", "original_png_base64"], ["Draft replay", "build_png_base64"], ["Difference", "difference_png_base64"]].map(([name2, key]) => "<figure><figcaption>" + name2 + '</figcaption><img src="data:image/png;base64,' + esc(r.visual[key]) + '" alt="' + name2 + ' of the captured scene"></figure>').join("") + '</div><p class="subtle">No project build was created. These frames were produced by the emulator using temporary checked copies. They cover the captured route; build and test the edit to keep it.</p></div>' : valid2 ? '<p class="notice">' + esc(r.reason || "The captured scene could not be reproduced. Record a new cold-start capture.") + "</p>" : "";
+    return '<details class="card draft-scene" id="asset-scene-panel" ' + (valid2 ? "open" : "") + "><summary>Preview this draft in a captured scene</summary><p>Replay the original twice and a temporary draft once. Palette changes are rendered by the emulator.</p>" + (traces.length ? select("asset-scene-trace", "Captured scene", traces.map((id, i) => [id, "Capture " + (i + 1)]), capture) : "") + '<div class="actions">' + button("Preview captured scene", "asset-scene-preview", { disabled: !!reason, reason, primary: true }) + button("Open Playtest", "navigate", { id: "playtest" }) + '</div><p class="subtle">Up to 2,400 frames and 20 input steps. Your source, saved live session and project build history stay separate.</p><p id="asset-scene-notice" class="preview-caption" role="status">' + esc(reason || (entry == null ? void 0 : entry.reason) || "Previewing does not publish a build.") + "</p>" + pictures2 + "</details>";
   }
   function invalidateDraftScene() {
     var _a;
@@ -539,9 +541,9 @@
       }
       if (key.endsWith(":paint-buffer")) {
         try {
-          const paint = JSON.parse(value), doc = (_h = state2.results) == null ? void 0 : _h["assets.inspect"];
-          const bitmap = (doc == null ? void 0 : doc.document_id) === paint.document_id ? doc.bitmaps.find((b) => b.id === paint.bitmap_id) : null;
-          if ((bitmap == null ? void 0 : bitmap.cells[paint.cell_index]) && !equal(paint.pixels, bitmap.cells[paint.cell_index].pixels)) return true;
+          const paint2 = JSON.parse(value), doc = (_h = state2.results) == null ? void 0 : _h["assets.inspect"];
+          const bitmap = (doc == null ? void 0 : doc.document_id) === paint2.document_id ? doc.bitmaps.find((b) => b.id === paint2.bitmap_id) : null;
+          if ((bitmap == null ? void 0 : bitmap.cells[paint2.cell_index]) && !equal(paint2.pixels, bitmap.cells[paint2.cell_index].pixels)) return true;
         } catch {
         }
       }
@@ -591,10 +593,10 @@
   function snapshot(panel2) {
     const canvas = panel2.querySelector("canvas");
     if (canvas) return cleanPreview(canvas);
-    const chips = [...panel2.querySelectorAll("svg.preview-swatch rect")];
-    if (chips.length) {
-      const width = 16, height = Math.ceil(chips.length / 16), pixels = new Uint8ClampedArray(width * height * 4);
-      for (const [i, chip] of chips.entries()) {
+    const chips2 = [...panel2.querySelectorAll("svg.preview-swatch rect")];
+    if (chips2.length) {
+      const width = 16, height = Math.ceil(chips2.length / 16), pixels = new Uint8ClampedArray(width * height * 4);
+      for (const [i, chip] of chips2.entries()) {
         const match = /^rgb\(\s*(\d+)\s*,\s*(\d+)\s*,\s*(\d+)\s*\)$/.exec(chip.getAttribute("fill"));
         if (!match) return null;
         const rgb = match.slice(1).map(Number);
@@ -641,9 +643,9 @@
       const canvas = difference.querySelector("canvas");
       let timer = null, phase = 0, disposed = false;
       const originalInert = panels.map((node) => node.inert);
-      const current2 = () => !disposed && !stopped && root.isConnected && pair.isConnected;
-      function update() {
-        if (!current2()) return;
+      const current3 = () => !disposed && !stopped && root.isConnected && pair.isConnected;
+      function update2() {
+        if (!current3()) return;
         const value = select3.value;
         const derived = value === "changes" || blink.checked;
         pair.classList.toggle("comparison-single", value !== "side" || blink.checked);
@@ -673,7 +675,7 @@
       select3.addEventListener("change", () => {
         preferences.set(key, select3.value);
         while (preferences.size > 64) preferences.delete(preferences.keys().next().value);
-        update();
+        update2();
       });
       blink.addEventListener("change", () => {
         clearInterval(timer);
@@ -682,15 +684,15 @@
         if (blink.checked) {
           phase = 0;
           timer = setInterval(() => {
-            if (current2() && !document.hidden) {
+            if (current3() && !document.hidden) {
               phase = 1 - phase;
-              update();
+              update2();
             }
           }, 1200);
         }
-        update();
+        update2();
       });
-      const record = { update, setMotion(allowed) {
+      const record = { update: update2, setMotion(allowed) {
         blink.disabled = !allowed;
         if (!allowed) {
           blink.checked = false;
@@ -698,7 +700,7 @@
           clearInterval(timer);
           timer = null;
         }
-        update();
+        update2();
       }, dispose() {
         if (disposed) return;
         disposed = true;
@@ -716,7 +718,7 @@
         });
       } };
       pairs.set(pair, record);
-      update();
+      update2();
     }
     function scan() {
       var _a2, _b2;
@@ -801,20 +803,20 @@
     if (name2.length > 120 || notes.length > 2e3) throw Error("Use up to 120 characters for the build name and 2000 for notes.");
     if (/[\x00-\x1f\x7f-\x9f]/.test(name2) || /[\x00-\x09\x0b-\x1f\x7f-\x9f]/.test(notes)) throw Error("Remove control characters from the build name or notes.");
     if (!name2 && !notes) return runner(operation, parameters, options);
-    const current2 = () => scope === selectionKey(ctx2.state), changed2 = () => Error("Build completed for the previous selection. Open that file to review it.");
+    const current3 = () => scope === selectionKey(ctx2.state), changed2 = () => Error("Build completed for the previous selection. Open that file to review it.");
     let result = await runner(operation, parameters, { ...options, render: false });
-    if (!current2()) throw changed2();
+    if (!current3()) throw changed2();
     if ((result == null ? void 0 : result.kind) === "build" && result.artifact_id) {
       try {
         await ctx2.api.call("builds.annotate", { project_id: project, artifact_id: result.artifact_id, name: name2 || result.name, notes });
       } catch (error) {
-        if (!current2()) throw changed2();
+        if (!current3()) throw changed2();
         ctx2.notify("Build created, but its name/notes were not saved. Use Build history to retry. " + error.message, true);
         result = { ...result, metadata_warning: true };
       }
-      if (!current2()) throw changed2();
+      if (!current3()) throw changed2();
       await ctx2.refreshProject();
-      if (!current2()) throw changed2();
+      if (!current3()) throw changed2();
       const row = ctx2.state.project.builds.find((r) => r.artifact_id === result.artifact_id);
       if (row) result = { ...result, name: row.name };
       if (!result.metadata_warning) {
@@ -1050,20 +1052,20 @@
   }
   async function runScoped(ctx2, operation, parameters, options = {}, updateJob2 = () => {
   }) {
-    const { state: state2 } = ctx2, scope = selectionKey(state2), current2 = () => scope === selectionKey(state2);
+    const { state: state2 } = ctx2, scope = selectionKey(state2), current3 = () => scope === selectionKey(state2);
     const changed2 = () => Error("Action finished for the previous selection. Open that project or file to review its result.");
     let result;
     try {
       result = await ctx2.api.job(operation, parameters, updateJob2);
     } catch (error) {
-      if (!current2()) throw changed2();
+      if (!current3()) throw changed2();
       if (error.result) state2.results[operation] = error.result;
       if (options.render !== false) await ctx2.render();
       throw error;
     }
-    if (!current2()) throw changed2();
+    if (!current3()) throw changed2();
     if (options.refresh !== false) await ctx2.refreshProject();
-    if (!current2()) throw changed2();
+    if (!current3()) throw changed2();
     state2.results[operation] = result;
     if (options.render !== false) await ctx2.render();
     return result;
@@ -1073,7 +1075,7 @@
   async function setArtifactSelection(ctx2, id, hooks, options = {}) {
     var _a, _b;
     const { state: state2 } = ctx2, project = (_a = state2.project) == null ? void 0 : _a.project_id, ticket = selectionTicket(state2), navigation = state2.navigationRevision;
-    const current2 = () => {
+    const current3 = () => {
       var _a2;
       return selectionCurrent(state2, ticket) && ((_a2 = state2.project) == null ? void 0 : _a2.project_id) === project;
     };
@@ -1081,16 +1083,16 @@
     hooks.stopPlayback(state2);
     state2.animationPlaying = false;
     await hooks.flushDrafts();
-    if (!current2()) return false;
+    if (!current3()) return false;
     if (state2.runtime) {
       await ctx2.api.call("runtime.close", { project_id: project });
-      if (!current2()) return false;
+      if (!current3()) return false;
       state2.runtime = null;
       state2.frame = null;
       state2.snapshot = null;
     }
     await hooks.flushDrafts();
-    if (!current2()) return false;
+    if (!current3()) return false;
     hooks.clearDraftCache();
     state2.artifact = chooseArtifact(state2.project, id);
     hooks.writePreference("romancer-artifact:" + project, ((_b = state2.artifact) == null ? void 0 : _b.artifact_id) || "");
@@ -1103,7 +1105,7 @@
     state2.pending = null;
     if (options.restore !== false && state2.navigationRevision === navigation) hooks.resumeLocation();
     await ctx2.render();
-    return current2();
+    return current3();
   }
 
   // romancer/ui/shortcuts.js
@@ -1127,13 +1129,13 @@
     const action = prefix && prefix + "-" + suffix;
     return action && available(action) ? action : "draft-" + suffix;
   }
-  function rememberEditor(state2, event, refresh) {
+  function rememberEditor(state2, event, refresh2) {
     var _a, _b, _c, _d;
     const canvas = (_b = (_a = event.target).closest) == null ? void 0 : _b.call(_a, "canvas");
     if (canvas) state2.historyEditor = canvas.id;
     else if ((_d = (_c = event.target).closest) == null ? void 0 : _d.call(_c, "input,textarea,select,[contenteditable]")) state2.historyEditor = "field";
     else return;
-    refresh();
+    refresh2();
   }
 
   // romancer/ui/runtime_setup.js
@@ -1400,14 +1402,14 @@
     var _a, _b, _c;
     const { state: state2 } = ctx2;
     if (!state2.project) return "";
-    const project = state2.project.project_id, scope = selectionKey(state2), current2 = () => scope === selectionKey(state2);
+    const project = state2.project.project_id, scope = selectionKey(state2), current3 = () => scope === selectionKey(state2);
     const doc = documentFor(state2);
     registerCheatNavigation(ctx2);
     const inspect = async (page, query) => {
-      if (!current2() || !state2.artifact) throw Error("The selected source changed. Choose a source first.");
+      if (!current3() || !state2.artifact) throw Error("The selected source changed. Choose a source first.");
       const generation = state2.cheatRequestGeneration = (state2.cheatRequestGeneration || 0) + 1;
       const result = await ctx2.api.call("cheats.inspect", { ...ctx2.sourceParams(), query, page, limit: 20 });
-      if (!current2() || state2.cheatRequestGeneration !== generation) return;
+      if (!current3() || state2.cheatRequestGeneration !== generation) return;
       state2.results["cheats.inspect"] = { ...result, query, scope };
       await ctx2.render();
     };
@@ -1425,7 +1427,7 @@
         state2.romScans = {};
         ctx2.notify(`${result.count} code references imported. The source ROM is unchanged.`);
         await ctx2.render();
-        if (current2() && state2.artifact) await ensureRomScan(ctx2, true);
+        if (current3() && state2.artifact) await ensureRomScan(ctx2, true);
       },
       "cheat-inspect": () => inspect(0, read("cheat-query").trim()),
       "cheat-page": (node) => {
@@ -1485,13 +1487,13 @@
     if (!ctx2.state.artifact) return "";
     registerCheatNavigation(ctx2);
     registerVerificationNavigation(ctx2);
-    const scope = selectionKey(ctx2.state), current2 = () => selectionKey(ctx2.state) === scope;
+    const scope = selectionKey(ctx2.state), current3 = () => selectionKey(ctx2.state) === scope;
     ctx2.use({
       "scan-format-library": () => ctx2.navigate("resources"),
       "graphics-index-play": () => ctx2.navigate("playtest"),
       "structure-inspect": (node) => {
         var _a2, _b, _c, _d;
-        if (!current2()) return;
+        if (!current3()) return;
         const offset = Number(node.dataset.id);
         if (!((_d = (_c = (_b = (_a2 = ctx2.state.romScans) == null ? void 0 : _a2[scope]) == null ? void 0 : _b.result) == null ? void 0 : _c.structures) == null ? void 0 : _d.candidates.some((c) => c.offset === offset))) throw Error("Rescan this ROM first.");
         ctx2.state.resourceJump = offset;
@@ -1499,7 +1501,7 @@
       },
       "structure-lab-window": (node) => {
         var _a2, _b, _c, _d;
-        if (!current2()) return;
+        if (!current3()) return;
         const candidate = (_d = (_c = (_b = (_a2 = ctx2.state.romScans) == null ? void 0 : _a2[scope]) == null ? void 0 : _b.result) == null ? void 0 : _c.structural_lab) == null ? void 0 : _d.candidates.find((c) => c.offset === Number(node.dataset.id));
         if (!candidate) throw Error("Rescan this selected ROM first.");
         ctx2.state.structuralPrefill = { scope, offset: candidate.offset, length: Math.min(4096, ctx2.state.artifact.size - candidate.offset) };
@@ -1507,39 +1509,39 @@
       },
       "checked-format-open": (node) => {
         var _a2, _b, _c, _d;
-        if (!current2()) return;
+        if (!current3()) return;
         const feature = (_d = (_c = (_b = (_a2 = ctx2.state.romScans) == null ? void 0 : _a2[scope]) == null ? void 0 : _b.result) == null ? void 0 : _c.checked_formats) == null ? void 0 : _d.features.find((row) => row.id === node.dataset.id);
         if (feature && ["levels", "sound"].includes(feature.page)) return ctx2.navigate(feature.page);
       },
       "sound-index-open": () => ctx2.navigate("sound"),
       "graphics-index-view": async (node) => {
         var _a2, _b, _c;
-        if (!current2()) return;
+        if (!current3()) return;
         const index = (_c = (_b = (_a2 = ctx2.state.romScans) == null ? void 0 : _a2[scope]) == null ? void 0 : _b.result) == null ? void 0 : _c.graphics_index, offset = Number(node.dataset.id);
         if (!index || ![...index.banks.map((b) => b.offset), ...index.repeated_patterns.flatMap((p) => p.offsets)].includes(offset)) throw Error("Rescan the graphics index first.");
         ctx2.state.resourceJump = offset;
         await ctx2.navigate("resources");
       },
       "rom-rescan": () => {
-        if (!current2()) return;
+        if (!current3()) return;
         return ensureRomScan(ctx2, true);
       },
       "rom-scan-cancel": async () => {
         var _a2;
-        if (!current2()) return;
+        if (!current3()) return;
         const entry = (_a2 = ctx2.state.romScans) == null ? void 0 : _a2[scope];
         if (entry == null ? void 0 : entry.job_id) await ctx2.api.call("jobs.cancel", { job_id: entry.job_id });
       },
       "rom-scan-filter": () => {
         var _a2;
-        if (!current2()) return;
+        if (!current3()) return;
         ctx2.state.romScanQuery = read("rom-scan-query").trim();
         const node = document.getElementById("rom-scan-panel");
         if (node) node.outerHTML = panel(ctx2, (_a2 = ctx2.state.romScans) == null ? void 0 : _a2[scope]);
       },
       "rom-scan-inspect": async (node) => {
         var _a2, _b;
-        if (!current2()) return;
+        if (!current3()) return;
         const entry = (_a2 = ctx2.state.romScans) == null ? void 0 : _a2[scope], offset = Number(node.dataset.id);
         if (!((_b = entry == null ? void 0 : entry.result) == null ? void 0 : _b.candidates.some((c) => c.offset === offset))) throw Error("Rescan this selected ROM first.");
         ctx2.state.resourceJump = offset;
@@ -1736,11 +1738,11 @@
     var _a, _b, _c, _d, _e;
     const { state: state2 } = ctx2;
     if (!state2.artifact) return "";
-    const scope = selectionKey(state2), current2 = () => selectionKey(state2) === scope, entry = (_a = state2.graphicsInvestigations) == null ? void 0 : _a[scope], result = entry == null ? void 0 : entry.result;
+    const scope = selectionKey(state2), current3 = () => selectionKey(state2) === scope, entry = (_a = state2.graphicsInvestigations) == null ? void 0 : _a[scope], result = entry == null ? void 0 : entry.result;
     const partHeight = ((result == null ? void 0 : result.matches.some((m) => m.height === state2.graphicsPartHeight)) ? state2.graphicsPartHeight : null) || ((result == null ? void 0 : result.matches.some((m) => m.height === 16)) ? 16 : 8), allGroups = candidateGroups(result, partHeight), groups = allGroups.slice(0, 16), coverage = result == null ? void 0 : result.coverage;
     ctx2.use({
       "graphics-show-region": async () => {
-        if (!current2()) return;
+        if (!current3()) return;
         stopPlayback(state2);
         state2.graphicsRegionOpen = true;
         await ctx2.render();
@@ -1752,19 +1754,19 @@
       },
       "graphics-analyze": () => {
         var _a2;
-        if (!current2()) return;
+        if (!current3()) return;
         stopPlayback(state2);
         const selected = state2.visualRegion;
         if (!selected || selected.scope !== scope || selected.frame_sha256 !== ((_a2 = state2.frame) == null ? void 0 : _a2.sha256)) throw Error("Select a region in the captured frame below first.");
         return ensureGraphicsObservation(ctx2, { force: true, region: selected.region, offset: Number(read("graphics-offset")), length: Number(read("graphics-length")) });
       },
       "graphics-analyze-frame": () => {
-        if (!current2()) return;
+        if (!current3()) return;
         stopPlayback(state2);
         return ensureGraphicsObservation(ctx2, { force: true, offset: Number(read("graphics-offset")), length: Number(read("graphics-length")) });
       },
       "graphics-next": () => {
-        if (!current2() || !coverage) return;
+        if (!current3() || !coverage) return;
         return ensureGraphicsObservation(ctx2, { force: true, offset: coverage.next_offset, length: state2.artifact.size - coverage.next_offset });
       },
       "graphics-cancel": () => (entry == null ? void 0 : entry.job_id) ? ctx2.api.call("jobs.cancel", { job_id: entry.job_id }) : void 0,
@@ -1773,14 +1775,14 @@
         return ctx2.render();
       },
       "graphics-edit-candidates": async () => {
-        if (!current2() || !(result == null ? void 0 : result.evidence_id)) throw Error("Analyze this selected source first.");
+        if (!current3() || !(result == null ? void 0 : result.evidence_id)) throw Error("Analyze this selected source first.");
         const matches = groups.map((_, i) => read("graphics-choice-" + i)).filter((v) => v !== "").map(Number);
         if (!matches.length) throw Error("Choose candidate source offsets for the parts you want to edit.");
         const declared2 = await ctx2.run("graphics.declare", { ...ctx2.sourceParams(), evidence_id: result.evidence_id, matches }, { render: false });
-        if (!current2()) return;
+        if (!current3()) return;
         state2.results["assets.inspect"] = declared2.inspection;
         await ctx2.navigate("assets");
-        if (!current2()) return;
+        if (!current3()) return;
         const bitmap = declared2.inspection.bitmaps[0], layout = { document_id: declared2.inspection.document_id, bitmap_id: bitmap.id, ...declared2.layout };
         ctx2.setDraft("asset-schema", JSON.stringify(declared2.schema, null, 2));
         ctx2.setDraft("sprite-layout", JSON.stringify(layout));
@@ -1930,12 +1932,12 @@
     var _a, _b, _c;
     const { state: state2 } = ctx2, a = state2.artifact;
     if (!a) return "";
-    const scope = selectionKey(state2), params = { ...ctx2.sourceParams() }, current2 = () => {
+    const scope = selectionKey(state2), params = { ...ctx2.sourceParams() }, current3 = () => {
       var _a2;
       return scope === selectionKey(state2) && ((_a2 = ctx2.isCurrentRender) == null ? void 0 : _a2.call(ctx2)) !== false;
     };
     const model = await ctx2.api.call("checks.status", params);
-    if (!current2() || model.source_sha256 !== a.sha256 || model.artifact_id !== a.artifact_id) return "";
+    if (!current3() || model.source_sha256 !== a.sha256 || model.artifact_id !== a.artifact_id) return "";
     state2.buildCheckView = { scope, page: state2.page, pending: (model.pending || []).some((j) => !terminal.has(j.status)) };
     const original2 = a.kind === "build" ? originalForBuild(state2.project, a) : null;
     const matches = (report2) => (report2 == null ? void 0 : report2.project_id) === params.project_id && report2.source_id === (original2 == null ? void 0 : original2.artifact_id) && report2.source_sha256 === (original2 == null ? void 0 : original2.sha256) && report2.target_id === a.artifact_id && report2.target_sha256 === a.sha256;
@@ -1951,27 +1953,27 @@
         if (matches(latest)) packet = latest;
       } catch {
       }
-      if (!current2()) return "";
+      if (!current3()) return "";
     }
     ctx2.use({
       "hack-compare": async () => {
-        if (!current2() || !original2) return;
+        if (!current3() || !original2) return;
         const result = await ctx2.run("builds.compare", { project_id: params.project_id, left_id: original2.artifact_id, right_id: a.artifact_id }, { render: false });
-        if (current2()) {
+        if (current3()) {
           state2.hackComparison = result;
           return ctx2.render();
         }
       },
       "hack-byte": async (node) => {
         const offset = Number(node.dataset.id);
-        if (!current2() || !(diff == null ? void 0 : diff.ranges.some((range) => range.offset === offset))) return;
+        if (!current3() || !(diff == null ? void 0 : diff.ranges.some((range) => range.offset === offset))) return;
         state2.hexComparison = { ...diff, offset };
         state2.resourceJump = offset;
         return ctx2.navigate("resources");
       },
       "check-save": async () => {
         var _a2, _b2;
-        if (!current2()) return;
+        if (!current3()) return;
         let steps2;
         if (read("check-input-mode") === "custom") steps2 = JSON.parse(read("check-steps"));
         else {
@@ -1987,30 +1989,30 @@
         const region = ((_a2 = document.getElementById("check-region-enable")) == null ? void 0 : _a2.checked) ? Object.fromEntries(["x", "y", "width", "height"].map((k) => [k, Number(read("check-region-" + k))])) : null;
         const config = { name: read("check-name").trim(), automatic: !!((_b2 = document.getElementById("check-auto")) == null ? void 0 : _b2.checked), mode: read("check-mode"), steps: steps2, region, route_ids: cfg.route_ids || [] };
         await ctx2.run("checks.configure", { ...params, artifact_id: (original2 == null ? void 0 : original2.artifact_id) || params.artifact_id, config }, { render: false });
-        if (current2()) return ctx2.render();
+        if (current3()) return ctx2.render();
       },
       "check-run": async () => {
-        if (!current2()) return;
+        if (!current3()) return;
         const target_id = original2 ? a.artifact_id : read("check-target");
         const result = await ctx2.run("checks.run", { project_id: params.project_id, source_id: (original2 == null ? void 0 : original2.artifact_id) || model.baseline_id, target_id }, { render: false });
-        if (!current2()) return;
+        if (!current3()) return;
         state2.buildCheckReport = { scope, result };
         return ctx2.render();
       },
       "check-open": async (node) => {
-        if (!current2() || !results.some((r) => r.evidence_id === node.dataset.id)) throw Error("Refresh this source’s test results first.");
+        if (!current3() || !results.some((r) => r.evidence_id === node.dataset.id)) throw Error("Refresh this source’s test results first.");
         const result = await ctx2.api.call("checks.get", { ...params, evidence_id: node.dataset.id });
-        if (!current2()) return;
+        if (!current3()) return;
         state2.buildCheckReport = { scope, result };
         return ctx2.render();
       },
       "check-refresh": async () => {
-        if (!current2()) return;
+        if (!current3()) return;
         await ctx2.refreshProject();
-        if (current2()) return ctx2.render();
+        if (current3()) return ctx2.render();
       },
       "check-cancel": (node) => {
-        if (!current2() || !model.pending.some((j) => j.job_id === node.dataset.id)) throw Error("Refresh the active checks first.");
+        if (!current3() || !model.pending.some((j) => j.job_id === node.dataset.id)) throw Error("Refresh the active checks first.");
         return ctx2.api.call("jobs.cancel", { job_id: node.dataset.id });
       }
     });
@@ -2031,27 +2033,27 @@
     clearTimeout(ctx2.state.buildCheckTimer);
     const view = ctx2.state.buildCheckView;
     if (!(view == null ? void 0 : view.pending)) return;
-    const current2 = () => ctx2.state.buildCheckView === view && selectionKey(ctx2.state) === view.scope && ctx2.state.page === view.page && !!document.getElementById("build-checks");
+    const current3 = () => ctx2.state.buildCheckView === view && selectionKey(ctx2.state) === view.scope && ctx2.state.page === view.page && !!document.getElementById("build-checks");
     const poll = async () => {
-      if (!current2()) return;
+      if (!current3()) return;
       try {
         const r = await ctx2.api.call("checks.status", ctx2.sourceParams());
-        if (!current2()) return;
+        if (!current3()) return;
         if (!(r.pending || []).some((j) => !terminal.has(j.status))) {
           await ctx2.refreshProject();
-          if (current2()) await ctx2.render();
+          if (current3()) await ctx2.render();
           return;
         }
         const node = document.getElementById("checks-progress");
         if (node) node.textContent = r.pending.filter((j) => !terminal.has(j.status)).map((j) => j.message).join(" · ");
       } catch (error) {
-        if (current2()) {
+        if (current3()) {
           const node = document.getElementById("checks-progress");
           if (node) node.textContent = error.message;
           return;
         }
       }
-      if (current2()) ctx2.state.buildCheckTimer = setTimeout(poll, 2e3);
+      if (current3()) ctx2.state.buildCheckTimer = setTimeout(poll, 2e3);
     };
     ctx2.state.buildCheckTimer = setTimeout(poll, 2e3);
   }
@@ -2102,7 +2104,7 @@
     }
     return rules;
   }
-  function discoveryForm(ctx2, baseline, result, current2) {
+  function discoveryForm(ctx2, baseline, result, current3) {
     if (!(result == null ? void 0 : result.replay_verified) || (baseline == null ? void 0 : baseline.kind) !== "source" || !result.gameplay_verified && !result.changed_pixels) return "";
     const layouts = baseline.descriptors || {}, assets = layouts.assets, graphics = ["bitmaps", "palettes", "tilemaps"].flatMap((group) => ((assets == null ? void 0 : assets[group]) || []).map((a) => [a.id, a.id]));
     const kinds = [
@@ -2112,7 +2114,7 @@
     if (!kinds.length) return "";
     ctx2.use({
       "discovery-save": async () => {
-        if (!current2()) throw Error("The selected ROM changed.");
+        if (!current3()) throw Error("The selected ROM changed.");
         const name2 = read("discovery-name").trim(), kind = read("discovery-kind"), raw = read("discovery-offset").trim(), offset = Number(raw);
         if (!name2) throw Error("Name this discovery.");
         if (kind === "byte" && (!raw || !Number.isSafeInteger(offset) || offset < 0)) throw Error("Enter the changed ROM file offset.");
@@ -2125,7 +2127,7 @@
           offset: kind === "byte" ? offset : null,
           resource: kind === "graphics" ? read("discovery-resource") : null
         }, { render: false });
-        if (current2()) ctx2.notify("Discovery saved. Open the original ROM’s Overview to edit or share it.");
+        if (current3()) ctx2.notify("Discovery saved. Open the original ROM’s Overview to edit or share it.");
       }
     });
     return '<details class="config"><summary>Save a reusable discovery</summary><p>Name the changed resource on the exact original ROM. Replay evidence covers the tested route.</p><div class="field-row">' + field("discovery-name", "Discovery name", ctx2.draft("discovery-name", "")) + select("discovery-kind", "Kind", kinds, ctx2.draft("discovery-kind", kinds[0][0])) + (result.gameplay_verified ? field("discovery-offset", "ROM file offset (named byte only)", ctx2.draft("discovery-offset", ""), { placeholder: "0x1710" }) : "") + (graphics.length ? select("discovery-resource", "Graphics resource", graphics, ctx2.draft("discovery-resource", graphics[0][0])) : "") + "</div>" + button("Save discovery", "discovery-save") + "</details>";
@@ -2134,28 +2136,28 @@
     var _a, _b, _c, _d;
     const { state: state2 } = ctx2;
     if (!state2.artifact) return "";
-    const scope = selectionKey(state2), choice = editCheckSelection(state2), current2 = () => scope === selectionKey(state2);
+    const scope = selectionKey(state2), choice = editCheckSelection(state2), current3 = () => scope === selectionKey(state2);
     const saved = (_b = (_a = choice.baseline) == null ? void 0 : _a.descriptors) == null ? void 0 : _b.watches;
     const watches = (saved == null ? void 0 : saved.source_sha256) === ((_c = choice.baseline) == null ? void 0 : _c.sha256) ? ((saved == null ? void 0 : saved.watches) || []).filter((w) => [1, 2, 4].includes(w.length)) : [];
     const watchCount = watches.length ? Math.min(8, Math.max(1, Number(ctx2.draft("expect-count", "1")) || 1)) : 0;
     ctx2.use({ "edit-check-add": () => {
-      if (!current2()) return;
+      if (!current3()) return;
       ctx2.setDraft("expect-count", String(watchCount + 1));
       return ctx2.render();
     }, "edit-check-run": async () => {
-      if (!current2()) throw Error("The selected ROM changed.");
+      if (!current3()) throw Error("The selected ROM changed.");
       const target_id = read("edit-check-target"), trace_id = read("edit-check-trace");
       if (!choice.baseline || !choice.targets.some((r) => r.artifact_id === target_id) || !choice.traces.includes(trace_id)) throw Error("Choose a descendant build and captured trace.");
       const expectations = readExpectations(watches, watchCount);
       const result2 = await ctx2.run("checks.from_trace", { project_id: state2.project.project_id, source_id: choice.baseline.artifact_id, target_id, trace_id, ...expectations.length ? { expectations } : {} }, { render: false });
-      if (!current2()) return;
+      if (!current3()) return;
       state2.editCheckResult = result2;
       return ctx2.render();
     } });
     const result = state2.editCheckResult, matching = result && ((_d = choice.baseline) == null ? void 0 : _d.sha256) === result.source_sha256 && choice.targets.some((t) => t.sha256 === result.target_sha256);
     const reason = !choice.baseline ? "Capture a fresh cold-start trace in Playtest first." : !choice.targets.length ? "Review your edit and create a separate build first." : "";
     if (prominent && !choice.traces.length) return "";
-    return '<details class="card edit-checks" ' + (matching || prominent ? "open" : "") + "><summary>" + (prominent ? "Compare a captured scene" : "Test this edit") + "</summary><p>Replay the same inputs on the original and build. Review the pictures to confirm your intended change.</p>" + (choice.targets.length ? select("edit-check-target", "Edited build", choice.targets.map((r) => [r.artifact_id, r.name || r.artifact_id]), ctx2.draft("edit-check-target", state2.artifact.kind === "build" ? state2.artifact.artifact_id : choice.targets.at(-1).artifact_id)) : "") + (choice.traces.length ? select("edit-check-trace", "Saved trace", choice.traces.map((id, i) => [id, "Capture " + (i + 1) + " · " + id.slice(0, 8)]), ctx2.draft("edit-check-trace", choice.traces.at(-1))) : "") + '<details class="config" ' + (matching || watchCount > 1 ? "open" : "") + "><summary>What should happen?</summary>" + (watchCount ? "<p>Choose a saved watch. For Same as original, leave the expected numbers blank.</p>" + expectationRows(ctx2, watches, watchCount) + (watchCount < 8 ? button("Add another check", "edit-check-add") : "") : "<p>Save a 1-, 2- or 4-byte watch on the original in Playtest. You can still compare pictures without a watch.</p>") + "</details>" + button(prominent ? "Test captured scene" : "Test this edit", "edit-check-run", { primary: true, disabled: !!reason, reason }) + button("Open Playtest", "navigate", { id: "playtest" }) + (matching ? checkReport(result) + discoveryForm(ctx2, choice.baseline, result, current2) : "") + "</details>";
+    return '<details class="card edit-checks" ' + (matching || prominent ? "open" : "") + "><summary>" + (prominent ? "Compare a captured scene" : "Test this edit") + "</summary><p>Replay the same inputs on the original and build. Review the pictures to confirm your intended change.</p>" + (choice.targets.length ? select("edit-check-target", "Edited build", choice.targets.map((r) => [r.artifact_id, r.name || r.artifact_id]), ctx2.draft("edit-check-target", state2.artifact.kind === "build" ? state2.artifact.artifact_id : choice.targets.at(-1).artifact_id)) : "") + (choice.traces.length ? select("edit-check-trace", "Saved trace", choice.traces.map((id, i) => [id, "Capture " + (i + 1) + " · " + id.slice(0, 8)]), ctx2.draft("edit-check-trace", choice.traces.at(-1))) : "") + '<details class="config" ' + (matching || watchCount > 1 ? "open" : "") + "><summary>What should happen?</summary>" + (watchCount ? "<p>Choose a saved watch. For Same as original, leave the expected numbers blank.</p>" + expectationRows(ctx2, watches, watchCount) + (watchCount < 8 ? button("Add another check", "edit-check-add") : "") : "<p>Save a 1-, 2- or 4-byte watch on the original in Playtest. You can still compare pictures without a watch.</p>") + "</details>" + button(prominent ? "Test captured scene" : "Test this edit", "edit-check-run", { primary: true, disabled: !!reason, reason }) + button("Open Playtest", "navigate", { id: "playtest" }) + (matching ? checkReport(result) + discoveryForm(ctx2, choice.baseline, result, current3) : "") + "</details>";
   }
 
   // romancer/ui/research_tools.js
@@ -2245,7 +2247,7 @@
     if (!a) return "";
     const scope = selectionKey(state2), params = { ...ctx2.sourceParams() }, generation = (state2.researchGeneration || 0) + 1;
     state2.researchGeneration = generation;
-    const current2 = () => {
+    const current3 = () => {
       var _a2;
       return scope === selectionKey(state2) && generation === state2.researchGeneration && ((_a2 = ctx2.isCurrentRender) == null ? void 0 : _a2.call(ctx2)) !== false;
     };
@@ -2253,15 +2255,15 @@
     try {
       model = await ctx2.api.call("research.inspect", { ...params, query: ctx2.draft("research-query", ""), kind: ctx2.draft("research-kind", "all"), page: state2.researchPage || 0 });
     } catch (error) {
-      if (!current2()) return "";
+      if (!current3()) return "";
       return '<details class="card"><summary>Resource browser & research</summary><p>' + esc(error.message) + "</p></details>";
     }
-    if (!current2()) return "";
+    if (!current3()) return "";
     if (!(model == null ? void 0 : model.ok) || model.artifact_id !== a.artifact_id || model.source_sha256 !== a.sha256) return "";
     state2.researchBrowser = { scope, result: model };
     const resources = model.resources || [], notes = model.notes || [], saved = ((_a = state2.researchImport) == null ? void 0 : _a.scope) === scope ? state2.researchImport : null;
     const requireCurrent = () => {
-      if (!current2()) throw Error("The selected ROM changed. Reload its research.");
+      if (!current3()) throw Error("The selected ROM changed. Reload its research.");
     };
     const run2 = async (op, extra) => {
       requireCurrent();
@@ -2456,9 +2458,9 @@
       return [c, Math.round(value / maximum * 255)];
     }));
   }
-  function quantizeColor(hex7, channels) {
-    if (typeof hex7 !== "string" || !/^#[a-f0-9]{6}$/i.test(hex7)) throw Error("Choose a valid RGB color.");
-    return Object.fromEntries(["r", "g", "b"].map((c, i) => [c, Math.round(parseInt(hex7.slice(1 + i * 2, 3 + i * 2), 16) / 255 * channelMaximum(channels[c]))]));
+  function quantizeColor(hex8, channels) {
+    if (typeof hex8 !== "string" || !/^#[a-f0-9]{6}$/i.test(hex8)) throw Error("Choose a valid RGB color.");
+    return Object.fromEntries(["r", "g", "b"].map((c, i) => [c, Math.round(parseInt(hex8.slice(1 + i * 2, 3 + i * 2), 16) / 255 * channelMaximum(channels[c]))]));
   }
   function editedPalette(palette2, changes) {
     if (!palette2) return palette2;
@@ -2491,12 +2493,12 @@
   }
   var rgbHex = (rgb) => "#" + ["r", "g", "b"].map((c) => rgb[c].toString(16).padStart(2, "0")).join("");
   function paletteComparison(original2, edited) {
-    const chips = (palette2) => palette2.entries.slice(0, 256).map((e) => `<svg class="preview-swatch" viewBox="0 0 1 1" width="100%" role="img" aria-label="Bank ${e.bank}, color ${e.index}: RGB ${e.rgb.r},${e.rgb.g},${e.rgb.b}"><title>Bank ${e.bank}, color ${e.index}: RGB ${e.rgb.r},${e.rgb.g},${e.rgb.b}</title><rect width="1" height="1" fill="rgb(${e.rgb.r},${e.rgb.g},${e.rgb.b})"/></svg>`).join("");
+    const chips2 = (palette2) => palette2.entries.slice(0, 256).map((e) => `<svg class="preview-swatch" viewBox="0 0 1 1" width="100%" role="img" aria-label="Bank ${e.bank}, color ${e.index}: RGB ${e.rgb.r},${e.rgb.g},${e.rgb.b}"><title>Bank ${e.bank}, color ${e.index}: RGB ${e.rgb.r},${e.rgb.g},${e.rgb.b}</title><rect width="1" height="1" fill="rgb(${e.rgb.r},${e.rgb.g},${e.rgb.b})"/></svg>`).join("");
     const changed2 = original2.entries.filter((e, i) => ["r", "g", "b"].some((c) => {
       var _a;
       return e.rgb[c] !== ((_a = edited.entries[i]) == null ? void 0 : _a.rgb[c]);
     })).length;
-    return `<div class="palette-comparison"><div class="preview-pair"><div><span>Original</span><div class="preview-swatches">${chips(original2)}</div></div><div><span>Edited</span><div class="preview-swatches">${chips(edited)}</div></div></div><p class="preview-caption" role="status">${changed2 ? "Preview updated" : "Unchanged"} · ${changed2} changed color${changed2 === 1 ? "" : "s"}${original2.entries.length > 256 ? " · first 256 shown" : ""}</p></div>`;
+    return `<div class="palette-comparison"><div class="preview-pair"><div><span>Original</span><div class="preview-swatches">${chips2(original2)}</div></div><div><span>Edited</span><div class="preview-swatches">${chips2(edited)}</div></div></div><p class="preview-caption" role="status">${changed2 ? "Preview updated" : "Unchanged"} · ${changed2} changed color${changed2 === 1 ? "" : "s"}${original2.entries.length > 256 ? " · first 256 shown" : ""}</p></div>`;
   }
   function mountNumberPreviews(root = document) {
     var _a;
@@ -2679,10 +2681,10 @@
       "table-batch": async () => {
         var _a2;
         if (!model) throw new Error("Load a table definition first.");
-        const current2 = collectVisible();
+        const current3 = collectVisible();
         const result = await ctx2.run("tables.batch", { ...ctx2.sourceParams(), definition: model.definition, field: read("table-batch-field"), operation: read("table-batch-operation"), value: integer3("table-batch-value"), first: integer3("table-batch-first"), count: integer3("table-batch-count") }, { render: false });
         if (((_a2 = state2.results["tables.inspect"]) == null ? void 0 : _a2.document_id) !== model.document_id || result.document_id !== model.document_id) throw Error("Table definition changed. Repeat the batch preview.");
-        const merged2 = new Map(current2.map((change) => [change.row + ":" + change.field, change]));
+        const merged2 = new Map(current3.map((change) => [change.row + ":" + change.field, change]));
         for (const change of result.changes) {
           merged2.set(change.row + ":" + change.field, change);
           const index = model.definition.fields.findIndex((field2) => field2.name === change.field);
@@ -2730,7 +2732,7 @@
     var _a;
     const { state: state2 } = ctx2, scope = selectionKey(state2), generation = (state2.referenceGeneration || 0) + 1;
     state2.referenceGeneration = generation;
-    const current2 = () => {
+    const current3 = () => {
       var _a2;
       return scope === selectionKey(state2) && state2.referenceGeneration === generation && ((_a2 = ctx2.isCurrentRender) == null ? void 0 : _a2.call(ctx2)) !== false;
     };
@@ -2738,9 +2740,9 @@
     try {
       result = await ctx2.api.call("references.catalog", { query: state2.referenceQuery || "", system_filter: "all" });
     } catch (error) {
-      return current2() ? '<details class="card"><summary>Popular-game references</summary><p>' + esc(error.message) + "</p></details>" : "";
+      return current3() ? '<details class="card"><summary>Popular-game references</summary><p>' + esc(error.message) + "</p></details>" : "";
     }
-    if (!current2()) return "";
+    if (!current3()) return "";
     const rows = (result == null ? void 0 : result.references) || [];
     ctx2.use({
       "reference-search": () => {
@@ -2748,10 +2750,10 @@
         return ctx2.render();
       },
       "reference-table": async () => {
-        if (!current2() || !state2.artifact) throw Error("Select a matching-system ROM first.");
+        if (!current3() || !state2.artifact) throw Error("Select a matching-system ROM first.");
         const params = { ...ctx2.sourceParams(), template_id: read("reference-template"), offset: integer4("reference-offset"), count: integer4("reference-count"), stride: integer4("reference-stride") };
         const checked = await ctx2.run("references.template", params, { render: false, refresh: false });
-        if (!current2()) return;
+        if (!current3()) return;
         if (checked.artifact_id !== state2.artifact.artifact_id || checked.source_sha256 !== state2.artifact.sha256) throw Error("The selected ROM changed. Inspect its table again.");
         state2.tableProposal = { scope, result: checked };
         return ctx2.navigate("tables");
@@ -2906,22 +2908,22 @@
 
   // romancer/ui/saved_discoveries.js
   var statusLabels = { REPLAY_CHECKED: "Replay checked here", IMPORTED: "Imported layout", CHECK_AGAIN: "Needs a fresh check" };
-  function discoveryControls(ctx2, model, scope, current2) {
+  function discoveryControls(ctx2, model, scope, current3) {
     var _a;
     if (((_a = ctx2.state.artifact) == null ? void 0 : _a.kind) !== "source") return "";
     const rows = model.discoveries || [], params = ctx2.sourceParams();
     const chosen = (node) => {
-      if (!current2() || !rows.some((row) => row.id === node.dataset.id)) throw Error("The selected ROM changed. Reopen its Overview.");
+      if (!current3() || !rows.some((row) => row.id === node.dataset.id)) throw Error("The selected ROM changed. Reopen its Overview.");
       return { ...params, discovery_id: node.dataset.id };
     };
     ctx2.use({
       "discovery-open": async (node) => {
         const opened = await ctx2.api.call("discoveries.open", chosen(node));
-        if (!current2() || opened.source_sha256 !== ctx2.state.artifact.sha256) return;
+        if (!current3() || opened.source_sha256 !== ctx2.state.artifact.sha256) return;
         const { document: document2, inspection } = opened;
         if (document2.kind === "graphics") {
-          const paint = ctx2.state.paint || JSON.parse(ctx2.draft("paint-buffer", "null") || "null");
-          if (paint || JSON.parse(ctx2.draft("asset-changes", "[]") || "[]").length)
+          const paint2 = ctx2.state.paint || JSON.parse(ctx2.draft("paint-buffer", "null") || "null");
+          if (paint2 || JSON.parse(ctx2.draft("asset-changes", "[]") || "[]").length)
             throw Error("Finish or discard your staged graphics changes before switching layouts.");
           ctx2.state.results["assets.inspect"] = inspection;
           const bitmap = inspection.bitmaps.find((b) => b.id === document2.resource || b.palette_id === document2.resource) || inspection.bitmaps.find((b) => {
@@ -2940,7 +2942,7 @@
       },
       "discovery-export": async (node) => {
         const result = await ctx2.run("discoveries.export", chosen(node), { render: false });
-        if (current2()) ctx2.notify("Discovery JSON is ready in Export.");
+        if (current3()) ctx2.notify("Discovery JSON is ready in Export.");
         return result;
       },
       "discovery-remove": async (node) => {
@@ -2948,9 +2950,9 @@
         return ctx2.run("discoveries.remove", params2);
       },
       "discovery-import": async () => {
-        if (!current2()) throw Error("The selected ROM changed.");
+        if (!current3()) throw Error("The selected ROM changed.");
         const document2 = await readJsonFile("discovery-file", 256 * 1024);
-        if (current2()) return ctx2.run("discoveries.import", { ...params, document: document2 });
+        if (current3()) return ctx2.run("discoveries.import", { ...params, document: document2 });
       }
     });
     return '<details class="card" ' + (rows.length ? "open" : "") + "><summary>Saved discoveries</summary>" + (rows.length ? '<ul class="saved-discoveries">' + rows.map((row) => "<li><div><strong>" + esc(row.name) + "</strong> " + badge(statusLabels[row.status] || row.status, row.status === "REPLAY_CHECKED" ? "good" : "") + '</div><div class="actions">' + button("Open editor", "discovery-open", { id: row.id }) + button("Prepare JSON export", "discovery-export", { id: row.id }) + button("Remove", "discovery-remove", { id: row.id }) + "</div></li>").join("") + "</ul>" : "<p>Save a discovery after a replay check to reopen it here.</p>") + '<div class="field-row">' + fileInput("discovery-file", "Discovery JSON for this ROM", ".json,application/json") + button("Import discovery", "discovery-import") + '</div><p class="subtle">Imported layouts are checked against the exact ROM hash. Run the gameplay check locally to reproduce the result.</p></details>';
@@ -3003,14 +3005,14 @@
   }
   async function editingReadiness(ctx2) {
     var _a, _b, _c, _d;
-    const scope = selectionKey(ctx2.state), current2 = () => {
+    const scope = selectionKey(ctx2.state), current3 = () => {
       var _a2;
       return scope === selectionKey(ctx2.state) && ((_a2 = ctx2.isCurrentRender) == null ? void 0 : _a2.call(ctx2)) !== false;
     };
     const model = await ctx2.api.call("editing.readiness", ctx2.sourceParams());
-    if (!current2()) return "";
+    if (!current3()) return "";
     ctx2.use({ "readiness-open": (node) => {
-      if (!current2()) throw Error("The selected ROM changed.");
+      if (!current3()) throw Error("The selected ROM changed.");
       const area2 = model.areas.find((a) => a.kind === node.dataset.id);
       if (!area2) throw Error("Refresh editing readiness.");
       if (area2.status === "ready" || area2.status === "unsupported") {
@@ -3025,7 +3027,7 @@
     const { project, artifact } = ctx2.state;
     const firstPracticeEdit = (project == null ? void 0 : project.demo_type) === "original-studio" && ((_a = project.builds) == null ? void 0 : _a.length) === 0 && (artifact == null ? void 0 : artifact.kind) === "source" && ((_d = (_c = (_b = artifact.descriptors) == null ? void 0 : _b.tables) == null ? void 0 : _c.definition) == null ? void 0 : _d.name) === "Scene controls";
     const owned = ctx2.state.gameVisualModel;
-    return readinessCards(model, { firstPracticeEdit, named: namedEdits((owned == null ? void 0 : owned.scope) === scope ? owned.model : null) }) + discoveryControls(ctx2, model, scope, current2);
+    return readinessCards(model, { firstPracticeEdit, named: namedEdits((owned == null ? void 0 : owned.scope) === scope ? owned.model : null) }) + discoveryControls(ctx2, model, scope, current3);
   }
 
   // romancer/ui/source_support.js
@@ -3121,7 +3123,7 @@
       var _a2;
       return ((_a2 = document.getElementById(id)) == null ? void 0 : _a2.checked) ?? true;
     };
-    const paint = (node, position, targets = false) => {
+    const paint2 = (node, position, targets = false) => {
       var _a2;
       node.width = width;
       node.height = height;
@@ -3157,7 +3159,7 @@
       const node = document.getElementById("room-edit-status");
       if (node) node.textContent = text;
     };
-    const propose = (next) => {
+    const propose2 = (next) => {
       if (!next) return false;
       if (!enabled("room-show-object")) {
         status("Enable the Objects layer to move the stool.");
@@ -3166,7 +3168,7 @@
       try {
         roomValue(v, next);
         point = next;
-        paint(canvas, point, true);
+        paint2(canvas, point, true);
         status(`Move stool to (${point.join(", ")}) - release to stage`);
         return true;
       } catch (e) {
@@ -3182,27 +3184,27 @@
       canvas.focus();
       pointer = e.pointerId;
       canvas.setPointerCapture(pointer);
-      propose(pick(e));
+      propose2(pick(e));
     });
     canvas.addEventListener("pointermove", (e) => {
-      if (alive() && pointer === e.pointerId) propose(pick(e));
+      if (alive() && pointer === e.pointerId) propose2(pick(e));
     });
     canvas.addEventListener("pointerup", (e) => {
       if (!alive() || pointer !== e.pointerId) return;
       pointer = null;
       const next = pick(e);
-      if (next && propose(next)) {
+      if (next && propose2(next)) {
         change(roomValue(v, point));
       } else {
         point = selected;
-        paint(canvas, point, true);
+        paint2(canvas, point, true);
       }
     });
     canvas.addEventListener("pointercancel", () => {
       if (!alive()) return;
       pointer = null;
       point = selected;
-      paint(canvas, point, true);
+      paint2(canvas, point, true);
       status("Move cancelled.");
     });
     canvas.addEventListener("keydown", (e) => {
@@ -3210,15 +3212,15 @@
       if (!alive() || !delta || e.ctrlKey || e.altKey || e.metaKey) return;
       e.preventDefault();
       const next = [point[0] + delta[0], point[1] + delta[1]];
-      if (propose(next)) change(roomValue(v, next));
+      if (propose2(next)) change(roomValue(v, next));
     });
     for (const id of layerIds) (_a = document.getElementById(id)) == null ? void 0 : _a.addEventListener("change", (e) => {
       ctx2.state.roomLayers[id] = e.target.checked;
-      paint(original2, v.current);
-      paint(canvas, point, true);
+      paint2(original2, v.current);
+      paint2(canvas, point, true);
     });
-    paint(original2, v.current);
-    paint(canvas, selected, true);
+    paint2(original2, v.current);
+    paint2(canvas, selected, true);
   }
 
   // romancer/ui/game_visuals.js
@@ -3240,18 +3242,18 @@
   function mountGameVisual(ctx2) {
     const owned = ctx2.state.gameVisualModel, node = document.getElementById("game-visual-preview");
     if (!owned || !node) return;
-    const current2 = () => owned.scope === selectionKey(ctx2.state) && ctx2.state.gameVisualModel === owned;
+    const current3 = () => owned.scope === selectionKey(ctx2.state) && ctx2.state.gameVisualModel === owned;
     const values = () => Object.fromEntries(owned.model.fields.map((f) => {
       var _a;
       return [f.id, ((_a = document.getElementById("game-" + f.id)) == null ? void 0 : _a.value) ?? f.value];
     }));
     const draw2 = () => {
       var _a, _b, _c;
-      if (current2()) {
+      if (current3()) {
         const focus = ((_a = document.activeElement) == null ? void 0 : _a.id) === "room-edit";
         node.innerHTML = gameVisual(owned.model, values());
         if (((_b = owned.model.visual) == null ? void 0 : _b.kind) === "room-map") mountRoomPreview(ctx2, owned.model.visual, values().room_layout, (value) => {
-          if (!current2()) return;
+          if (!current3()) return;
           const input = document.getElementById("game-room_layout");
           if (input && input.value !== value) {
             input.value = value;
@@ -3265,7 +3267,7 @@
       const input = document.getElementById("game-" + f.id);
       if (!input) continue;
       const changed2 = () => {
-        if (!current2()) return;
+        if (!current3()) return;
         const reviewed = ctx2.state.gameEditPlan;
         if (reviewed && JSON.stringify(Object.fromEntries(owned.model.fields.map((f2) => [f2.id, f2.type === "integer" ? Number(values()[f2.id]) : values()[f2.id]]))) !== JSON.stringify(reviewed.values)) {
           ctx2.state.gameEditPlan = null;
@@ -3328,9 +3330,9 @@
     var _a;
     const { state: state2 } = ctx2;
     if (!state2.artifact) return "";
-    const scope = selectionKey(state2), params = { ...ctx2.sourceParams() }, current2 = () => scope === selectionKey(state2) && (!ctx2.isCurrentRender || ctx2.isCurrentRender());
+    const scope = selectionKey(state2), params = { ...ctx2.sourceParams() }, current3 = () => scope === selectionKey(state2) && (!ctx2.isCurrentRender || ctx2.isCurrentRender());
     ctx2.use({ "game-view-bytes": async (node) => {
-      if (!current2()) throw Error("The selected file changed.");
+      if (!current3()) throw Error("The selected file changed.");
       state2.resourceJump = Number(node.dataset.id);
       await ctx2.navigate("resources");
     }, "game-investigate": () => ctx2.navigate("resources") });
@@ -3338,11 +3340,11 @@
     try {
       model = await ctx2.api.call("games.inspect", params);
     } catch (error) {
-      if (!current2()) return "";
+      if (!current3()) return "";
       state2.gameVisualModel = null;
       return `<section class="card"><h3>Game edits unavailable</h3><p>${esc(error.message)}</p>${button("Inspect bytes", "game-investigate")}</section>`;
     }
-    if (!current2()) return "";
+    if (!current3()) return "";
     state2.gameVisualModel = { scope, model };
     if (!model.profile) return `<details class="card game-definition"><summary>Find more editing data · Advanced</summary><p>Use the hex editor to search bytes, compare builds and bookmark locations. Your saved editing setups are listed above.</p>${button("Open hex editor", "game-investigate")}</details>`;
     const pending = ((_a = state2.gameEditPlan) == null ? void 0 : _a.scope) === scope && state2.gameEditPlan.result.profile_id === model.profile.id ? state2.gameEditPlan : null;
@@ -3366,13 +3368,13 @@
     ctx2.use({
       "game-focus": (node) => {
         var _a2;
-        if (!current2() || !model.fields.some((f) => f.id === node.dataset.id)) throw Error("Choose an edit for the selected ROM.");
+        if (!current3() || !model.fields.some((f) => f.id === node.dataset.id)) throw Error("Choose an edit for the selected ROM.");
         (_a2 = document.getElementById("game-" + node.dataset.id)) == null ? void 0 : _a2.focus();
       },
       "game-resource": async (node) => {
-        if (!current2()) throw Error("The selected file changed.");
+        if (!current3()) throw Error("The selected file changed.");
         const result = await ctx2.run("games.configure", { ...params, resource_id: node.dataset.id }, { refresh: false, render: false });
-        if (!current2()) return;
+        if (!current3()) return;
         await ctx2.refreshProject();
         if (result.resource_kind === "assets") {
           state2.pending = null;
@@ -3398,10 +3400,10 @@
         }
       },
       "game-review": async () => {
-        if (!current2()) throw Error("The selected file changed.");
+        if (!current3()) throw Error("The selected file changed.");
         const chosen = values(), previous = state2.gameEditPlan;
         const result = await ctx2.run("games.plan", { ...params, profile_id: model.profile.id, values: chosen }, { refresh: false, render: false });
-        if (!current2()) return;
+        if (!current3()) return;
         if (state2.gameEditPlan !== previous || !sameValues(chosen)) {
           ctx2.notify("Values changed during review. Review them again.");
           return;
@@ -3415,7 +3417,7 @@
       },
       "game-apply": async () => {
         const planned = state2.gameEditPlan;
-        if (!current2() || (planned == null ? void 0 : planned.scope) !== scope) throw Error("Review changes for the selected ROM first.");
+        if (!current3() || (planned == null ? void 0 : planned.scope) !== scope) throw Error("Review changes for the selected ROM first.");
         if (!sameValues(planned.values)) throw Error("Values changed. Review the changes again.");
         const unchanged = () => state2.gameEditPlan === planned && sameValues(planned.values);
         let artifactId = planned.result.existing_build_id;
@@ -3425,9 +3427,9 @@
           artifactId = result.artifact_id;
           await ctx2.api.call("builds.annotate", { project_id: params.project_id, artifact_id: artifactId, name: planned.result.build_name, notes: `${model.profile.name}: ${planned.result.preview.map((p) => p.label + " " + p.before + " to " + p.after).join("; ")}. Definition ${model.profile.id}. ${model.profile.reference}` });
         }
-        if (!current2()) return;
+        if (!current3()) return;
         await ctx2.refreshProject();
-        if (!current2()) return;
+        if (!current3()) return;
         if (!unchanged()) {
           ctx2.notify("Build available in history. Your newer game edits are still staged.");
           await ctx2.render();
@@ -3642,8 +3644,8 @@
   }
   function pixelBuffer(ctx2, doc, bitmap, index) {
     var _a;
-    const paint = ctx2.state.paint;
-    if ((paint == null ? void 0 : paint.document_id) === doc.document_id && paint.bitmap_id === bitmap.id && paint.cell_index === index) return paint.pixels;
+    const paint2 = ctx2.state.paint;
+    if ((paint2 == null ? void 0 : paint2.document_id) === doc.document_id && paint2.bitmap_id === bitmap.id && paint2.cell_index === index) return paint2.pixels;
     let changes = [];
     try {
       changes = JSON.parse(ctx2.draft("asset-changes", "[]"));
@@ -3666,7 +3668,7 @@
       var _a;
       return ((_a = ctx2.state.paint) == null ? void 0 : _a.cell_index) ?? 0;
     };
-    const paint = (event) => {
+    const paint2 = (event) => {
       const rect = canvas.getBoundingClientRect(), x = Math.floor((event.clientX - rect.left) / rect.width * bitmap.width), y = Math.floor((event.clientY - rect.top) / rect.height * bitmap.height);
       if (x < 0 || y < 0 || x >= bitmap.width || y >= bitmap.height) return;
       const color = Number(document.getElementById("paint-color").value), bits2 = { "mono-row-msb-v1": 1, "tile8-paired2-msb-v1": 2, "tile8-planar2-msb-v1": 2, "tile8-rowplanar4-msb-v1": 4, "tile8-paired4-msb-v1": 4, "tile8-packed4-high-v1": 4, "tile8-packed4-low-v1": 4 }[bitmap.codec];
@@ -3689,7 +3691,7 @@
       history3 = historyFor(ctx2, doc, bitmap.id, index(), start);
       history3.begin(start);
       try {
-        paint(event);
+        paint2(event);
       } catch (error) {
         ctx2.notify(error.message, true);
       }
@@ -3697,7 +3699,7 @@
     canvas.addEventListener("pointermove", (event) => {
       if (pointer !== event.pointerId) return;
       try {
-        paint(event);
+        paint2(event);
       } catch (error) {
         ctx2.notify(error.message, true);
       }
@@ -3833,7 +3835,7 @@
     const canvas = document.getElementById("map-preview");
     if (!map || !canvas) return;
     const tiles = doc.bitmaps.find((b) => b.id === map.bitmap_id), palette2 = doc.palettes.find((p) => p.id === map.palette_id);
-    let current2 = changes, selected = 0, pointer = null;
+    let current3 = changes, selected = 0, pointer = null;
     const draw2 = () => {
       canvas.width = map.width * tiles.width;
       canvas.height = map.height * tiles.height;
@@ -3841,7 +3843,7 @@
       canvas.style.width = Math.min(1024, canvas.width * 3) + "px";
       canvas.style.touchAction = "none";
       const context = canvas.getContext("2d"), image = context.createImageData(canvas.width, canvas.height);
-      image.data.set(mapPixels(doc, map, current2));
+      image.data.set(mapPixels(doc, map, current3));
       context.putImageData(image, 0, 0);
       rememberPreview(canvas, canvas.width, canvas.height, image.data);
       const before = document.getElementById("map-original");
@@ -3857,26 +3859,26 @@
     };
     const persist = (save = true) => {
       var _a;
-      if (save) ctx2.setDraft("asset-changes", JSON.stringify(current2, null, 2));
+      if (save) ctx2.setDraft("asset-changes", JSON.stringify(current3, null, 2));
       const node = document.getElementById("asset-changes");
-      if (node) node.value = JSON.stringify(current2, null, 2);
+      if (node) node.value = JSON.stringify(current3, null, 2);
       ctx2.state.pending = null;
       ctx2.state.assetAcknowledgements = [];
       (_a = document.querySelector('[data-action="asset-apply"]')) == null ? void 0 : _a.setAttribute("disabled", "");
     };
-    const paint = (index, save = true) => {
+    const paint2 = (index, save = true) => {
       const brush = { tile_index: Number(read("map-tile")), palette_bank: Number(read("map-bank")), flip_x: map.fields.flip_x.kind === "constant" ? map.fields.flip_x.value : Number(read("map-flip-x")), flip_y: map.fields.flip_y.kind === "constant" ? map.fields.flip_y.value : Number(read("map-flip-y")) };
-      current2 = paintMapCell(doc, map, current2, index, brush);
+      current3 = paintMapCell(doc, map, current3, index, brush);
       selected = index;
       persist(save);
       draw2();
       previewStatus();
       const label = document.getElementById("map-position");
-      if (label) label.textContent = "Cell " + selected + " · " + current2.filter((c) => c.kind === "map" && c.tilemap_id === map.id).length + " staged cell" + (current2.filter((c) => c.kind === "map" && c.tilemap_id === map.id).length === 1 ? "" : "s");
+      if (label) label.textContent = "Cell " + selected + " · " + current3.filter((c) => c.kind === "map" && c.tilemap_id === map.id).length + " staged cell" + (current3.filter((c) => c.kind === "map" && c.tilemap_id === map.id).length === 1 ? "" : "s");
     };
     const eventPaint = (event) => {
       const index = canvasCell(canvas.getBoundingClientRect(), event.clientX, event.clientY, map.width, map.height);
-      if (index !== null) paint(index, false);
+      if (index !== null) paint2(index, false);
     };
     canvas.addEventListener("pointerdown", (event) => {
       if (event.button !== 0) return;
@@ -3916,7 +3918,7 @@
       if ([" ", "Enter"].includes(event.key)) {
         event.preventDefault();
         try {
-          paint(selected);
+          paint2(selected);
         } catch (error) {
           ctx2.notify(error.message, true);
         }
@@ -3924,26 +3926,26 @@
     });
     const brushes = () => document.querySelectorAll("[data-map-tile]").forEach((node) => {
       var _a;
-      const index = Number(node.dataset.mapTile), pixels = ((_a = current2.find((c) => c.kind === "cell" && c.bitmap_id === tiles.id && c.cell_index === index)) == null ? void 0 : _a.after_pixels) || tiles.cells[index].pixels, context = node.getContext("2d"), image = context.createImageData(tiles.width, tiles.height);
+      const index = Number(node.dataset.mapTile), pixels = ((_a = current3.find((c) => c.kind === "cell" && c.bitmap_id === tiles.id && c.cell_index === index)) == null ? void 0 : _a.after_pixels) || tiles.cells[index].pixels, context = node.getContext("2d"), image = context.createImageData(tiles.width, tiles.height);
       pixels.forEach((v, i) => {
-        const c = colorFor(palette2, 0, v, current2);
+        const c = colorFor(palette2, 0, v, current3);
         image.data.set([c.r, c.g, c.b, 255], i * 4);
       });
       context.putImageData(image, 0, 0);
     });
     const previewStatus = () => {
       const label = document.getElementById("map-preview-status");
-      if (label) label.textContent = current2.length ? "Preview updated · " + current2.length + " staged graphics changes · not built" : "Unchanged map preview";
+      if (label) label.textContent = current3.length ? "Preview updated · " + current3.length + " staged graphics changes · not built" : "Unchanged map preview";
     };
     canvas.addEventListener("map-refresh", () => {
       var _a, _b;
       if (pointer !== null || document.getElementById("map-preview") !== canvas || ((_b = (_a = ctx2.state.results) == null ? void 0 : _a["assets.inspect"]) == null ? void 0 : _b.document_id) !== doc.document_id) return;
       try {
-        current2 = JSON.parse(ctx2.draft("asset-changes", "[]"));
-        const paint2 = ctx2.state.paint;
-        if ((paint2 == null ? void 0 : paint2.document_id) === doc.document_id) {
-          const bitmap = doc.bitmaps.find((b) => b.id === paint2.bitmap_id);
-          if (bitmap) current2 = mergeCellChanges(current2, [{ kind: "cell", bitmap_id: bitmap.id, cell_index: paint2.cell_index, before_pixels: bitmap.cells[paint2.cell_index].pixels, after_pixels: paint2.pixels }]);
+        current3 = JSON.parse(ctx2.draft("asset-changes", "[]"));
+        const paint3 = ctx2.state.paint;
+        if ((paint3 == null ? void 0 : paint3.document_id) === doc.document_id) {
+          const bitmap = doc.bitmaps.find((b) => b.id === paint3.bitmap_id);
+          if (bitmap) current3 = mergeCellChanges(current3, [{ kind: "cell", bitmap_id: bitmap.id, cell_index: paint3.cell_index, before_pixels: bitmap.cells[paint3.cell_index].pixels, after_pixels: paint3.pixels }]);
         }
         draw2();
         brushes();
@@ -3969,11 +3971,11 @@
     return ctx2.render();
   }
   function stageCurrentPaint(ctx2, doc) {
-    const changes = json("asset-changes"), paint = ctx2.state.paint;
-    if (!paint || paint.document_id !== doc.document_id) return changes;
-    const bitmap = doc.bitmaps.find((row) => row.id === paint.bitmap_id), cell = bitmap == null ? void 0 : bitmap.cells[paint.cell_index];
+    const changes = json("asset-changes"), paint2 = ctx2.state.paint;
+    if (!paint2 || paint2.document_id !== doc.document_id) return changes;
+    const bitmap = doc.bitmaps.find((row) => row.id === paint2.bitmap_id), cell = bitmap == null ? void 0 : bitmap.cells[paint2.cell_index];
     if (!cell) return changes;
-    const merged2 = mergeCellChanges(changes, [{ kind: "cell", bitmap_id: bitmap.id, cell_index: paint.cell_index, before_pixels: cell.pixels, after_pixels: paint.pixels }]);
+    const merged2 = mergeCellChanges(changes, [{ kind: "cell", bitmap_id: bitmap.id, cell_index: paint2.cell_index, before_pixels: cell.pixels, after_pixels: paint2.pixels }]);
     if (JSON.stringify(merged2) !== JSON.stringify(changes)) ctx2.setDraft("asset-changes", JSON.stringify(merged2, null, 2));
     return merged2;
   }
@@ -4172,10 +4174,10 @@ ${font ? `<section class="card"><h3>Font metrics · ${esc(font.id)}</h3><div cla
     mountPixelStrokes(ctx2, doc, bitmap, redraw);
     const map = doc.tilemaps.find((row) => row.id === ctx2.state.assetMapId) || doc.tilemaps[0];
     let changes = json("asset-changes");
-    const paint = ctx2.state.paint;
-    if ((paint == null ? void 0 : paint.document_id) === doc.document_id) {
-      const b = doc.bitmaps.find((r) => r.id === paint.bitmap_id);
-      changes = mergeCellChanges(changes, [{ kind: "cell", bitmap_id: b.id, cell_index: paint.cell_index, before_pixels: b.cells[paint.cell_index].pixels, after_pixels: paint.pixels }]);
+    const paint2 = ctx2.state.paint;
+    if ((paint2 == null ? void 0 : paint2.document_id) === doc.document_id) {
+      const b = doc.bitmaps.find((r) => r.id === paint2.bitmap_id);
+      changes = mergeCellChanges(changes, [{ kind: "cell", bitmap_id: b.id, cell_index: paint2.cell_index, before_pixels: b.cells[paint2.cell_index].pixels, after_pixels: paint2.pixels }]);
     }
     mountTilemap(ctx2, doc, map, changes);
   }
@@ -4299,7 +4301,7 @@ ${font ? `<section class="card"><h3>Font metrics · ${esc(font.id)}</h3><div cla
   function spriteAssembly(ctx2, doc, bitmap, palette2 = null) {
     var _a;
     if (!(doc == null ? void 0 : doc.ok) || !bitmap) return "";
-    const scope = selectionKey(ctx2.state), current2 = () => selectionKey(ctx2.state) === scope, layout = layoutFor(ctx2, doc, bitmap), image = layout && imageFor(ctx2, doc, bitmap, layout), undo = image && history2(ctx2, doc, bitmap, layout, image);
+    const scope = selectionKey(ctx2.state), current3 = () => selectionKey(ctx2.state) === scope, layout = layoutFor(ctx2, doc, bitmap), image = layout && imageFor(ctx2, doc, bitmap, layout), undo = image && history2(ctx2, doc, bitmap, layout, image);
     const checkHistory = () => {
       if (JSON.stringify(imageFor(ctx2, doc, bitmap, layout).pixels) !== JSON.stringify(undo.current)) throw Error("Tiles changed in another editor. Start a fresh sprite stroke before undo or redo.");
     };
@@ -4307,7 +4309,7 @@ ${font ? `<section class="card"><h3>Font metrics · ${esc(font.id)}</h3><div cla
     const connectedObject = !!layout && ((_a = ctx2.state.objectWorkbench) == null ? void 0 : _a.scope) === scope;
     ctx2.use({
       "sprite-brush": (node) => {
-        if (!current2()) return;
+        if (!current3()) return;
         const index = Number(node.dataset.id);
         if (!colors.some((c) => c.index === index)) throw Error("Choose a declared brush index.");
         ctx2.setDraft("sprite-color", String(index));
@@ -4316,7 +4318,7 @@ ${font ? `<section class="card"><h3>Font metrics · ${esc(font.id)}</h3><div cla
         document.querySelectorAll("[data-brush-index]").forEach((button2) => button2.setAttribute("aria-pressed", String(Number(button2.dataset.brushIndex) === index)));
       },
       "sprite-assemble": () => {
-        if (!current2()) return;
+        if (!current3()) return;
         const settings = { first: Number(read("sprite-first")), columns: Number(read("sprite-columns")), rows: Number(read("sprite-rows")), order: read("sprite-order"), ...mapSettings(read("sprite-map")) };
         makeAssembly(bitmap, settings);
         ctx2.setDraft("sprite-layout", JSON.stringify({ document_id: doc.document_id, bitmap_id: bitmap.id, ...settings }));
@@ -4324,19 +4326,19 @@ ${font ? `<section class="card"><h3>Font metrics · ${esc(font.id)}</h3><div cla
         return ctx2.render();
       },
       "sprite-undo": () => {
-        if (!current2() || !undo) return;
+        if (!current3() || !undo) return;
         checkHistory();
         stage2(ctx2, doc, bitmap, layout, undo.undo());
         return ctx2.render();
       },
       "sprite-redo": () => {
-        if (!current2() || !undo) return;
+        if (!current3() || !undo) return;
         checkHistory();
         stage2(ctx2, doc, bitmap, layout, undo.redo());
         return ctx2.render();
       },
       "sprite-export": () => {
-        if (!current2()) return;
+        if (!current3()) return;
         const canvas = document.getElementById("sprite-canvas");
         if (!canvas) throw Error("Assemble a sprite first.");
         canvas.dispatchEvent(new Event("sprite-refresh"));
@@ -4352,7 +4354,7 @@ ${font ? `<section class="card"><h3>Font metrics · ${esc(font.id)}</h3><div cla
     var _a, _b, _c;
     const canvas = document.getElementById("sprite-canvas"), layout = layoutFor(ctx2, doc, bitmap);
     if (!canvas || !layout) return;
-    const scope = selectionKey(ctx2.state), current2 = () => selectionKey(ctx2.state) === scope;
+    const scope = selectionKey(ctx2.state), current3 = () => selectionKey(ctx2.state) === scope;
     const image = imageFor(ctx2, doc, bitmap, layout), undo = history2(ctx2, doc, bitmap, layout, image);
     let pixels = [...image.pixels], pointer = null, cursor = { x: 0, y: 0 };
     const bits2 = { "mono-row-msb-v1": 1, "tile8-paired2-msb-v1": 2, "tile8-planar2-msb-v1": 2, "tile8-rowplanar4-msb-v1": 4, "tile8-paired4-msb-v1": 4, "tile8-packed4-high-v1": 4, "tile8-packed4-low-v1": 4 }[bitmap.codec], count = Math.min(2 ** bits2, (palette2 == null ? void 0 : palette2.colors_per_bank) || 256);
@@ -4385,7 +4387,7 @@ ${font ? `<section class="card"><h3>Font metrics · ${esc(font.id)}</h3><div cla
       const n = document.getElementById("sprite-difference-count");
       if (n) n.textContent = changed2 ? "Preview updated · " + changed2 + (changed2 === 1 ? " pixel differs" : " pixels differ") + " · not built" : "Unchanged sprite preview";
     };
-    const paint = (x, y) => {
+    const paint2 = (x, y) => {
       const color = Number(read("sprite-color"));
       if (!Number.isInteger(color) || color < 0 || color >= count) throw Error("Choose a palette index inside the declared color count.");
       paintAssemblyPixel(bitmap, layout, pixels, x, y, color);
@@ -4395,7 +4397,7 @@ ${font ? `<section class="card"><h3>Font metrics · ${esc(font.id)}</h3><div cla
       const rect = canvas.getBoundingClientRect(), x = Math.floor((event.clientX - rect.left) / rect.width * image.width), y = Math.floor((event.clientY - rect.top) / rect.height * image.height);
       if (x >= 0 && y >= 0 && x < image.width && y < image.height) {
         cursor = { x, y };
-        paint(x, y);
+        paint2(x, y);
       }
     };
     const begin = () => {
@@ -4409,7 +4411,7 @@ ${font ? `<section class="card"><h3>Font metrics · ${esc(font.id)}</h3><div cla
     };
     (_a = document.getElementById("sprite-color")) == null ? void 0 : _a.addEventListener("input", updateSwatches);
     const resize = () => {
-      if (!current2()) return;
+      if (!current3()) return;
       const panes = [beforeCanvas, canvas].filter(Boolean).map((node) => node.parentElement), width = Math.min(...panes.map((node) => Math.max(1, ((node == null ? void 0 : node.clientWidth) || 416) - 32)));
       const size2 = spritePreviewSize(image.width, image.height, ctx2.draft("sprite-zoom", "fit"), width);
       for (const node of [beforeCanvas, canvas].filter(Boolean)) {
@@ -4420,7 +4422,7 @@ ${font ? `<section class="card"><h3>Font metrics · ${esc(font.id)}</h3><div cla
       if (label) label.textContent = size2.scale + "× preview";
     };
     (_b = document.getElementById("sprite-zoom")) == null ? void 0 : _b.addEventListener("change", (event) => {
-      if (!current2()) return;
+      if (!current3()) return;
       ctx2.setDraft("sprite-zoom", event.target.value);
       resize();
     });
@@ -4434,14 +4436,14 @@ ${font ? `<section class="card"><h3>Font metrics · ${esc(font.id)}</h3><div cla
       ctx2.state.spritePreviewObserver = observer;
     }
     canvas.addEventListener("sprite-refresh", () => {
-      if (current2() && pointer === null) {
+      if (current3() && pointer === null) {
         pixels = [...imageFor(ctx2, doc, bitmap, layout).pixels];
         draw2();
         updateSwatches();
       }
     });
     canvas.addEventListener("pointerdown", (event) => {
-      if (!current2() || event.button !== 0) return;
+      if (!current3() || event.button !== 0) return;
       event.preventDefault();
       canvas.focus();
       pointer = event.pointerId;
@@ -4456,14 +4458,14 @@ ${font ? `<section class="card"><h3>Font metrics · ${esc(font.id)}</h3><div cla
       }
     });
     canvas.addEventListener("pointermove", (event) => {
-      if (current2() && pointer === event.pointerId) try {
+      if (current3() && pointer === event.pointerId) try {
         at(event);
       } catch (error) {
         ctx2.notify(error.message, true);
       }
     });
     canvas.addEventListener("pointerup", async (event) => {
-      if (!current2() || pointer !== event.pointerId) return;
+      if (!current3() || pointer !== event.pointerId) return;
       pointer = null;
       undo.commit(pixels);
       stage2(ctx2, doc, bitmap, layout, pixels);
@@ -4475,13 +4477,13 @@ ${font ? `<section class="card"><h3>Font metrics · ${esc(font.id)}</h3><div cla
       draw2();
     });
     canvas.addEventListener("keydown", async (event) => {
-      if (!current2() || !["ArrowLeft", "ArrowRight", "ArrowUp", "ArrowDown", " "].includes(event.key)) return;
+      if (!current3() || !["ArrowLeft", "ArrowRight", "ArrowUp", "ArrowDown", " "].includes(event.key)) return;
       event.preventDefault();
       cursor.x = Math.max(0, Math.min(image.width - 1, cursor.x + (event.key === "ArrowRight" ? 1 : event.key === "ArrowLeft" ? -1 : 0)));
       cursor.y = Math.max(0, Math.min(image.height - 1, cursor.y + (event.key === "ArrowDown" ? 1 : event.key === "ArrowUp" ? -1 : 0)));
       if (event.key === " ") try {
         begin();
-        paint(cursor.x, cursor.y);
+        paint2(cursor.x, cursor.y);
         undo.commit(pixels);
         stage2(ctx2, doc, bitmap, layout, pixels);
         await ctx2.render();
@@ -4532,7 +4534,7 @@ ${font ? `<section class="card"><h3>Font metrics · ${esc(font.id)}</h3><div cla
   }
   function animationStudio(ctx2, doc, bitmap) {
     if (!(doc == null ? void 0 : doc.ok) || !bitmap) return "";
-    const { state: state2 } = ctx2, scope = selectionKey(state2), current2 = () => {
+    const { state: state2 } = ctx2, scope = selectionKey(state2), current3 = () => {
       var _a;
       return selectionKey(state2) === scope && ((_a = state2.results["assets.inspect"]) == null ? void 0 : _a.document_id) === doc.document_id;
     };
@@ -4552,7 +4554,7 @@ ${font ? `<section class="card"><h3>Font metrics · ${esc(font.id)}</h3><div cla
     const selected = Math.max(0, Math.min(frames.length - 1, state2.animationIndex || 0));
     ctx2.use({
       "animation-add": () => {
-        if (!current2()) return;
+        if (!current3()) return;
         const layout = JSON.parse(ctx2.draft("sprite-layout", "null"));
         if ((layout == null ? void 0 : layout.document_id) !== doc.document_id || layout.bitmap_id !== bitmap.id) throw Error("Assemble a sprite frame first.");
         if (frames.length >= 32) throw Error("Use up to32 frames.");
@@ -4572,7 +4574,7 @@ ${font ? `<section class="card"><h3>Font metrics · ${esc(font.id)}</h3><div cla
         return ctx2.render();
       },
       "animation-edit": () => {
-        if (!current2() || !frames[selected]) return;
+        if (!current3() || !frames[selected]) return;
         state2.animationPlaying = false;
         ctx2.setDraft("sprite-layout", JSON.stringify({ document_id: doc.document_id, bitmap_id: bitmap.id, ...frames[selected] }));
         return ctx2.render();
@@ -4641,7 +4643,7 @@ ${font ? `<section class="card"><h3>Font metrics · ${esc(font.id)}</h3><div cla
   async function savedAnimationControls(ctx2, doc, bitmap) {
     var _a;
     if (!(doc == null ? void 0 : doc.ok) || !bitmap) return "";
-    const page = ctx2.state.page, scope = selectionKey(ctx2.state), params = { ...ctx2.sourceParams() }, current2 = () => {
+    const page = ctx2.state.page, scope = selectionKey(ctx2.state), params = { ...ctx2.sourceParams() }, current3 = () => {
       var _a2;
       return selectionKey(ctx2.state) === scope && ((_a2 = ctx2.isCurrentRender) == null ? void 0 : _a2.call(ctx2)) !== false;
     };
@@ -4649,41 +4651,41 @@ ${font ? `<section class="card"><h3>Font metrics · ${esc(font.id)}</h3><div cla
     try {
       list = await ctx2.api.call("animations.list", params);
     } catch (e) {
-      if (!current2()) return "";
+      if (!current3()) return "";
       return `<section class="card"><p>Saved animations unavailable: ${esc(e.message)}</p></section>`;
     }
-    if (!current2()) return "";
+    if (!current3()) return "";
     if (!(list == null ? void 0 : list.ok) || list.source_sha256 !== ctx2.state.artifact.sha256 || list.artifact_id !== ctx2.state.artifact.artifact_id) return "";
     const args = () => ({ ...params, name: read("animation-save-name"), bitmap_id: bitmap.id, document_id: doc.document_id, frames: readAnimation(doc, bitmap, ctx2.draft("animation-frames", "null")) });
     const review = ((_a = ctx2.state.animationSaveReview) == null ? void 0 : _a.scope) === scope ? ctx2.state.animationSaveReview : null;
     ctx2.use({
       "animation-preview-save": async () => {
         const p = args(), signature = JSON.stringify(p);
-        if (!current2()) throw Error("The source changed.");
+        if (!current3()) throw Error("The source changed.");
         const result = await ctx2.run("animations.preview", p, { render: false });
-        if (!current2()) return;
+        if (!current3()) return;
         if (signature !== JSON.stringify(args())) throw Error("The animation changed. Preview it again.");
         ctx2.state.animationSaveReview = { scope, signature, result };
         return ctx2.render();
       },
       "animation-save-reviewed": async () => {
         const p = args();
-        if (!current2() || !review || review.signature !== JSON.stringify(p)) throw Error("Preview the current animation before saving.");
+        if (!current3() || !review || review.signature !== JSON.stringify(p)) throw Error("Preview the current animation before saving.");
         await ctx2.run("animations.save", { ...p, review_id: review.result.review_id }, { render: false });
-        if (current2()) {
+        if (current3()) {
           ctx2.state.animationSaveReview = null;
           ctx2.notify("Animation arrangement saved. Game timing remains unchanged.");
           return ctx2.render();
         }
       },
       "animation-load-saved": (node) => {
-        if (!current2() || !list.animations.some((a) => a.animation_id === node.dataset.id)) throw Error("Choose a current saved animation.");
+        if (!current3() || !list.animations.some((a) => a.animation_id === node.dataset.id)) throw Error("Choose a current saved animation.");
         return openSavedAnimation(ctx2, node.dataset.id);
       },
       "animation-delete-saved": async (node) => {
-        if (!current2() || !list.animations.some((a) => a.animation_id === node.dataset.id)) throw Error("Choose a current saved animation.");
+        if (!current3() || !list.animations.some((a) => a.animation_id === node.dataset.id)) throw Error("Choose a current saved animation.");
         await ctx2.run("animations.delete", { ...params, animation_id: node.dataset.id }, { render: false });
-        if (current2()) return ctx2.render();
+        if (current3()) return ctx2.render();
       }
     });
     return `<details class="card" ${review ? "open" : ""}><summary>Save & reuse animation layouts</summary><p>Save the frames arranged above for this ROM revision. Research packs include saved layouts. Loading replaces the current arrangement draft; tile edits stay separate.</p><div class="actions">${field("animation-save-name", "Animation name", ctx2.draft("animation-save-name", "Sprite animation"))}${button("Preview saved layout", "animation-preview-save")}</div>${review ? `<p>${review.result.animation.frames.length} frames · ${review.result.shared_tiles.length} shared tiles. Timing is author-declared.</p>${button("Save reviewed animation", "animation-save-reviewed", { primary: true })}` : ""}${list.animations.map((a) => `<div class="actions"><span>${esc(a.name)} · ${a.frames} frames</span>${button("Load layout", "animation-load-saved", { id: a.animation_id })}${button("Delete saved layout", "animation-delete-saved", { id: a.animation_id })}</div>`).join("")}</details>`;
@@ -4699,17 +4701,17 @@ ${font ? `<section class="card"><h3>Font metrics · ${esc(font.id)}</h3><div cla
   }
   async function objectWorkbench(ctx2, doc, bitmap) {
     var _a, _b, _c, _d, _e, _f, _g, _h;
-    const { state: state2 } = ctx2, scope = selectionKey(state2), current2 = () => {
+    const { state: state2 } = ctx2, scope = selectionKey(state2), current3 = () => {
       var _a2;
       return scope === selectionKey(state2) && ((_a2 = ctx2.isCurrentRender) == null ? void 0 : _a2.call(ctx2)) !== false;
     };
     const hasSaved = ((_c = (_b = (_a = state2.artifact) == null ? void 0 : _a.object_layouts) == null ? void 0 : _b.objects) == null ? void 0 : _c.length) || ((_d = state2.objectWorkbench) == null ? void 0 : _d.scope) === scope;
     const listing = hasSaved ? await ctx2.api.call("objects.list", ctx2.sourceParams()) : { objects: [] };
-    if (!current2()) return "";
+    if (!current3()) return "";
     let entry = ((_e = state2.objectWorkbench) == null ? void 0 : _e.scope) === scope && state2.objectWorkbench.document_id === (doc == null ? void 0 : doc.document_id) ? state2.objectWorkbench : null;
     if (entry && !entry.result) {
       entry.result = await ctx2.api.call("objects.get", { ...ctx2.sourceParams(), object_id: entry.object_id });
-      if (!current2()) return "";
+      if (!current3()) return "";
       const trace = entry.result.object.trace_id;
       if (trace) {
         try {
@@ -4719,13 +4721,13 @@ ${font ? `<section class="card"><h3>Font metrics · ${esc(font.id)}</h3><div cla
         }
       }
     }
-    if (!current2()) return "";
+    if (!current3()) return "";
     const obj = (_f = entry == null ? void 0 : entry.result) == null ? void 0 : _f.object, layout = obj == null ? void 0 : obj.definition.layout;
     if (obj && ((_g = entry.trace) == null ? void 0 : _g.scene) && entry.result.source_dependency_verified && bitmap) {
       try {
         const edits = [...new Set(layout.indices.filter((i) => i !== null))].map((index) => ({ cell_index: index, pixels: pixelBuffer(ctx2, doc, bitmap, index) })).filter((edit) => JSON.stringify(edit.pixels) !== JSON.stringify(bitmap.cells[edit.cell_index].pixels));
         entry.preview = await ctx2.api.call("objects.scene", { ...ctx2.sourceParams(), object_id: entry.object_id, edits });
-        if (!current2()) return "";
+        if (!current3()) return "";
         if (entry.preview.ok === false) throw Error(entry.preview.error);
         entry.previewError = null;
       } catch (error) {
@@ -4736,24 +4738,24 @@ ${font ? `<section class="card"><h3>Font metrics · ${esc(font.id)}</h3><div cla
     ctx2.use({
       "object-open": (node) => {
         var _a2, _b2;
-        if (!current2()) throw Error("The selected ROM changed. Open this object from the current selection.");
+        if (!current3()) throw Error("The selected ROM changed. Open this object from the current selection.");
         const id = ((_a2 = node == null ? void 0 : node.dataset) == null ? void 0 : _a2.id) || ((_b2 = document.getElementById("object-choice")) == null ? void 0 : _b2.value);
         if (!listing.objects.some((o) => o.object_id === id)) throw Error("Refresh saved objects first.");
         return openObject(ctx2, id);
       },
       "object-delete": async (node) => {
         var _a2;
-        if (!current2()) throw Error("The selected ROM changed.");
+        if (!current3()) throw Error("The selected ROM changed.");
         const id = node.dataset.id, chosen = listing.objects.find((o) => o.object_id === id);
         if (!chosen) throw Error("Refresh saved objects first.");
         if (!confirm("Remove the saved layout “" + chosen.name + "”? ROM bytes and builds stay unchanged.")) return;
         await ctx2.run("objects.delete", { ...ctx2.sourceParams(), object_id: id }, { render: false });
-        if (!current2()) return;
+        if (!current3()) return;
         if (((_a2 = state2.objectWorkbench) == null ? void 0 : _a2.object_id) === id) state2.objectWorkbench = null;
         return ctx2.render();
       },
       "object-source": (node) => {
-        if (!current2() || !entry || !bitmap) throw Error("The selected source changed.");
+        if (!current3() || !entry || !bitmap) throw Error("The selected source changed.");
         const index = Number(node.dataset.id);
         if (!layout.indices.includes(index)) throw Error("Choose a source used by this object.");
         activateCell(ctx2, doc, bitmap.id, index);
@@ -4820,7 +4822,7 @@ ${font ? `<section class="card"><h3>Font metrics · ${esc(font.id)}</h3><div cla
     if (missing2) return missing2;
     const { state: state2 } = ctx2, a = state2.artifact;
     if (!a) return empty("Choose a ROM", "Import a ROM or open a workshop to connect its resources.");
-    const scope = selectionKey(state2), params = { ...ctx2.sourceParams() }, current2 = () => {
+    const scope = selectionKey(state2), params = { ...ctx2.sourceParams() }, current3 = () => {
       var _a2;
       return scope === selectionKey(state2) && ((_a2 = ctx2.isCurrentRender) == null ? void 0 : _a2.call(ctx2)) !== false;
     };
@@ -4833,7 +4835,7 @@ ${font ? `<section class="card"><h3>Font metrics · ${esc(font.id)}</h3><div cla
       state2.connectedNode = null;
     }
     const model = await ctx2.api.call("gameview.graph", { ...params, query: ctx2.draft("gameview-query", ""), kind: ctx2.draft("gameview-kind", "all"), page: state2.connectedPage || 0 });
-    if (!current2() || model.source_sha256 !== a.sha256 || model.artifact_id !== a.artifact_id) return "";
+    if (!current3() || model.source_sha256 !== a.sha256 || model.artifact_id !== a.artifact_id) return "";
     const chosen = ((traceFocus == null ? void 0 : traceFocus.trace_id) ? (_b = model.nodes.find((n) => {
       var _a2;
       return ((_a2 = n.locator) == null ? void 0 : _a2.trace_id) === traceFocus.trace_id;
@@ -4846,56 +4848,56 @@ ${font ? `<section class="card"><h3>Font metrics · ${esc(font.id)}</h3><div cla
         error = e.message;
       }
     }
-    if (!current2()) return "";
+    if (!current3()) return "";
     if (detail && (detail.source_sha256 !== a.sha256 || detail.artifact_id !== a.artifact_id)) return "";
     const node = detail == null ? void 0 : detail.node, preview2 = detail == null ? void 0 : detail.preview;
     if (node) state2.connectedNode = { scope, id: node.id };
     ctx2.use({
       "gameview-find": () => {
-        if (!current2()) return;
+        if (!current3()) return;
         state2.connectedPage = 0;
         state2.connectedNode = null;
         return ctx2.render();
       },
       "gameview-page": (el) => {
-        if (!current2()) return;
+        if (!current3()) return;
         state2.connectedPage = Math.max(0, (state2.connectedPage || 0) + Number(el.dataset.id));
         return ctx2.render();
       },
       "gameview-select": (el) => {
-        if (!current2()) return;
+        if (!current3()) return;
         if (!model.nodes.concat((detail == null ? void 0 : detail.neighbors) || []).some((n) => n.id === el.dataset.id)) throw Error("Refresh the current resources.");
         state2.connectedNode = { scope, id: el.dataset.id };
         return ctx2.render();
       },
       "gameview-bytes": () => {
-        if (!current2() || (node == null ? void 0 : node.offset) === null) return;
+        if (!current3() || (node == null ? void 0 : node.offset) === null) return;
         state2.resourceJump = node.offset;
         return ctx2.navigate("resources");
       },
       "gameview-link": async () => {
-        if (!current2() || !node) return;
+        if (!current3() || !node) return;
         await ctx2.run("gameview.link", { ...params, from_id: node.id, to_id: read("gameview-link-target"), relation: read("gameview-link-relation"), note: read("gameview-link-note") }, { render: false });
-        if (current2()) return ctx2.render();
+        if (current3()) return ctx2.render();
       },
       "gameview-unlink": async (el) => {
-        if (!current2() || !detail.connections.some((e) => e.link_id === el.dataset.id)) throw Error("Refresh this connection first.");
+        if (!current3() || !detail.connections.some((e) => e.link_id === el.dataset.id)) throw Error("Refresh this connection first.");
         await ctx2.run("gameview.unlink", { ...params, link_id: el.dataset.id }, { render: false });
-        if (current2()) return ctx2.render();
+        if (current3()) return ctx2.render();
       },
       "gameview-editor": async () => {
         var _a2;
-        if (!current2() || !(node == null ? void 0 : node.editor)) return;
+        if (!current3() || !(node == null ? void 0 : node.editor)) return;
         if (node.kind === "animation") return openSavedAnimation(ctx2, node.locator.animation_id);
         if (node.kind === "object") return openObject(ctx2, node.locator.object_id);
         if (node.kind === "graphics_capture") {
           const result = await ctx2.api.call("graphics.accesses.get", { ...params, evidence_id: node.locator.evidence_id, offset: 0, limit: 100 });
-          if (!current2()) return;
+          if (!current3()) return;
           state2.graphicsAccess = { scope, result, tiles: null };
           const trace_id = (_a2 = result.investigation_link) == null ? void 0 : _a2.graphics_trace_id;
           if (trace_id) {
             const trace = await ctx2.api.call("traces.get", { ...params, trace_id });
-            if (!current2()) return;
+            if (!current3()) return;
             state2.savedGameplayTrace = { scope, result: trace };
           }
           return ctx2.navigate("playtest");
@@ -4904,7 +4906,7 @@ ${font ? `<section class="card"><h3>Font metrics · ${esc(font.id)}</h3><div cla
         if (node.kind === "verification") {
           const proof = await ctx2.api.call("traces.verification", { ...params, verification_id: node.locator.verification_id });
           const trace = await ctx2.api.call("traces.get", { ...params, trace_id: node.locator.trace_id });
-          if (!current2()) return;
+          if (!current3()) return;
           state2.savedGameplayTrace = { scope, result: trace };
           state2.visualSourceProof = { scope, trace_id: trace.trace_id, result: proof };
           return ctx2.navigate("playtest");
@@ -4912,7 +4914,7 @@ ${font ? `<section class="card"><h3>Font metrics · ${esc(font.id)}</h3><div cla
         if (node.kind === "candidate") return openTraceCandidate(ctx2, node, scope);
         if (node.kind === "known_resource") {
           const r = await ctx2.run("games.configure", { ...params, resource_id: node.locator.resource_id }, { render: false });
-          if (!current2()) return;
+          if (!current3()) return;
           const kind2 = r.resource_kind === "assets" ? "assets" : "tables";
           state2.researchOpen = { scope, kind: kind2 };
           if (kind2 === "assets") state2.connectedAssetSetup = { scope, result: { ...r, layout: r.sprite_layout } };
@@ -4920,7 +4922,7 @@ ${font ? `<section class="card"><h3>Font metrics · ${esc(font.id)}</h3><div cla
         }
         if (node.kind === "trace") {
           const r = await ctx2.api.call("traces.get", { ...params, trace_id: node.locator.trace_id });
-          if (!current2()) return;
+          if (!current3()) return;
           if (r.checkpoint_only) state2.comparisonScene = { scope, result: r };
           else state2.savedGameplayTrace = { scope, result: r };
           return ctx2.navigate("playtest");
@@ -4935,7 +4937,7 @@ ${font ? `<section class="card"><h3>Font metrics · ${esc(font.id)}</h3><div cla
       }
     });
     const checks = await buildChecks(ctx2);
-    if (!current2()) return "";
+    if (!current3()) return "";
     return heading("", "Game view", "Follow a resource to its connected data, measured gameplay and editing tools.") + (a.kind === "build" ? editCheckControls(ctx2, { prominent: true }) + checks : "") + '<div class="field-row">' + field("gameview-query", "Find a resource", ctx2.draft("gameview-query", "")) + select("gameview-kind", "Show", categories2.map((k) => [k, names3[k]]), ctx2.draft("gameview-kind", "all")) + button("Find resources", "gameview-find") + "</div>" + model.issues.map((r) => '<p class="notice warm">' + esc(r.kind) + ": " + esc(r.message) + "</p>").join("") + (model.partial ? '<p class="notice warm">This view reached a resource budget. Filter or open a focused editor for additional data.</p>' : "") + '<div class="grid-two"><section class="card"><div class="card-heading"><h3>Resources</h3><span>' + model.total + ' matches</span></div><div class="game-node-list" tabindex="0" role="region" aria-label="Connected resource list">' + (model.nodes.map((n) => "<p>" + button(n.name, "gameview-select", { id: n.id, primary: n.id === chosen }) + '<br><span class="subtle">' + esc(names3[n.kind]) + " · " + (n.offset === null ? "Captured frame" : "0x" + n.offset.toString(16) + " · " + n.length + " bytes") + "</span></p>").join("") || "<p>No saved resources yet. Use Resources to declare a layout, or select a captured gameplay region in Playtest and save a trace.</p>") + '</div><div class="actions">' + button("Previous", "gameview-page", { id: "-1", disabled: !model.page }) + "<span>Page " + (model.page + 1) + "</span>" + button("Next", "gameview-page", { id: "1", disabled: (model.page + 1) * 50 >= model.total }) + '</div></section><section class="card"><h3>' + esc((node == null ? void 0 : node.name) || "Choose a resource") + "</h3>" + (error ? "<p>" + esc(error) + "</p>" : "") + (node ? "<p>" + esc({ native_accesses: "Measured native access capture", causal_replay: "Source verified by controlled replay", verification_result: "Source check result", checked_revision: "Verified game revision", checked_source_history: "Known original in build history", checked_declaration: "Checked resource layout", native_frame: "Measured gameplay frame", historical_frame: "Historical imported frame", pixel_candidate: "Matching pixels · source needs confirmation", user_note: "Your research note" }[node.confidence] || node.confidence.replaceAll("_", " ")) + "</p>" + ((preview2 == null ? void 0 : preview2.png_base64) ? '<figure><img class="game-resource-preview" src="data:image/png;base64,' + esc(preview2.png_base64) + '" alt="Selected resource preview"><figcaption>' + esc(preview2.caption || "") + "</figcaption></figure>" : "") + ((preview2 == null ? void 0 : preview2.colors) ? '<div class="actions">' + preview2.colors.map((c) => '<span class="game-color" title="RGB ' + c.r + ", " + c.g + ", " + c.b + '" data-color="' + c.r + "," + c.g + "," + c.b + '"></span>').join("") + "</div>" : "") + ((preview2 == null ? void 0 : preview2.fields) ? "<dl>" + preview2.fields.map((f) => "<dt>" + esc(f.name) + "</dt><dd>" + esc(f.value) + "</dd>").join("") + "</dl>" : "") + ((preview2 == null ? void 0 : preview2.text) ? "<p>" + esc(preview2.text) + "</p>" : "") + '<div class="actions">' + (node.offset !== null ? button("Inspect exact bytes", "gameview-bytes") : "") + (node.editor && node.editor !== "levels" ? button(node.kind === "candidate" ? "Open chosen graphics candidate" : node.kind === "trace" ? "Open saved trace" : "Open editor", "gameview-editor", { primary: true, disabled: (preview2 == null ? void 0 : preview2.runtime_trusted) === false }) : "") + "</div><h4>Connections</h4>" + (detail.connections_truncated ? '<p class="subtle">Showing 32 of ' + detail.connections_total + " connections. Open the focused editor for the complete resource list.</p>" : "") + (detail.connections.map((e) => {
       const other = e.from === node.id ? e.to : e.from, n = detail.neighbors.find((n2) => n2.id === other);
       return n ? '<div class="notice"><span>' + esc(relation(e.relation)) + "</span> → " + button(n.name, "gameview-select", { id: n.id }) + (e.confidence === "user_declared" ? "<p>Your declared link · " + esc(e.note) + "</p>" + button("Remove link", "gameview-unlink", { id: e.link_id }) : "") + "</div>" : "";
@@ -4983,7 +4985,7 @@ ${font ? `<section class="card"><h3>Font metrics · ${esc(font.id)}</h3><div cla
     var _a;
     const { state: state2 } = ctx2;
     if (!state2.artifact) return "";
-    const scope = selectionKey(state2), page = state2.page, params = { ...ctx2.sourceParams() }, current2 = () => {
+    const scope = selectionKey(state2), page = state2.page, params = { ...ctx2.sourceParams() }, current3 = () => {
       var _a2;
       return scope === selectionKey(state2) && page === state2.page && ((_a2 = ctx2.isCurrentRender) == null ? void 0 : _a2.call(ctx2)) !== false;
     };
@@ -4991,14 +4993,14 @@ ${font ? `<section class="card"><h3>Font metrics · ${esc(font.id)}</h3><div cla
     try {
       list = await ctx2.api.call("formats.list", {});
     } catch (e) {
-      if (!current2()) return "";
+      if (!current3()) return "";
       return `<details class="card"><summary>Reusable format library</summary><p>${esc(e.message)}</p></details>`;
     }
-    if (!current2()) return "";
+    if (!current3()) return "";
     if (!(list == null ? void 0 : list.ok)) return "";
     const packet = ((_a = state2.formatReview) == null ? void 0 : _a.scope) === scope ? state2.formatReview : null;
     const requireCurrent = () => {
-      if (!current2()) throw Error("The selected ROM or page changed. Open this library again.");
+      if (!current3()) throw Error("The selected ROM or page changed. Open this library again.");
     };
     const known = (id) => {
       if (!list.packs.some((p) => p.pack_id === id)) throw Error("Refresh the local format library.");
@@ -5011,7 +5013,7 @@ ${font ? `<section class="card"><h3>Font metrics · ${esc(font.id)}</h3><div cla
         requireCurrent();
         if (signature !== JSON.stringify(creation())) throw Error("The pack settings changed. Save them again.");
         await ctx2.run("formats.install", { document: result.document }, { render: false });
-        if (!current2()) return;
+        if (!current3()) return;
         ctx2.notify("Format pack saved locally. Original ROM unchanged.");
         return ctx2.render();
       },
@@ -5024,13 +5026,13 @@ ${font ? `<section class="card"><h3>Font metrics · ${esc(font.id)}</h3><div cla
         requireCurrent();
         if (((_b = document.getElementById("format-file")) == null ? void 0 : _b.files[0]) !== file) throw Error("The selected file changed. Import it again.");
         await ctx2.run("formats.install", { document: value }, { render: false });
-        if (current2()) return ctx2.render();
+        if (current3()) return ctx2.render();
       },
       "format-preview": async (node) => {
         requireCurrent();
         known(node.dataset.id);
         const result = await ctx2.run("formats.preview", { ...params, pack_id: node.dataset.id }, { render: false });
-        if (!current2()) return;
+        if (!current3()) return;
         state2.formatReview = { scope, result };
         return ctx2.render();
       },
@@ -5042,7 +5044,7 @@ ${font ? `<section class="card"><h3>Font metrics · ${esc(font.id)}</h3><div cla
         if (!r2.exact_source && !accept_guarded) throw Error("Acknowledge the author-declared guarded compatibility first.");
         if (r2.replacements.length && !replace) throw Error("Acknowledge the listed replacements first.");
         await ctx2.run("formats.apply", { ...params, pack_id: r2.pack_id, review_id: r2.review_id, replace, accept_guarded }, { render: false });
-        if (!current2() || state2.formatReview !== packet) return;
+        if (!current3() || state2.formatReview !== packet) return;
         state2.formatReview = null;
         for (const kind of r2.definitions) delete state2.results[kind + ".inspect"];
         await ctx2.refreshProject();
@@ -5054,7 +5056,7 @@ ${font ? `<section class="card"><h3>Font metrics · ${esc(font.id)}</h3><div cla
         known(node.dataset.id);
         if (!confirm("Remove this local format pack? Project layouts and ROMs stay unchanged.")) return;
         await ctx2.run("formats.delete", { pack_id: node.dataset.id }, { render: false });
-        if (current2()) {
+        if (current3()) {
           state2.formatReview = null;
           return ctx2.render();
         }
@@ -5063,7 +5065,7 @@ ${font ? `<section class="card"><h3>Font metrics · ${esc(font.id)}</h3><div cla
         requireCurrent();
         known(node.dataset.id);
         const result = await ctx2.run("formats.export", { project_id: params.project_id, pack_id: node.dataset.id }, { render: false });
-        if (current2()) return ctx2.api.download(params.project_id, result.export.export_id, "format-pack.json");
+        if (current3()) return ctx2.api.download(params.project_id, result.export.export_id, "format-pack.json");
       }
     });
     const r = packet == null ? void 0 : packet.result;
@@ -5083,7 +5085,7 @@ ${font ? `<section class="card"><h3>Font metrics · ${esc(font.id)}</h3><div cla
     return values;
   }
   function compressionReferences(ctx2, parent, target) {
-    const { state: state2 } = ctx2, page = state2.page, scope = selectionKey(state2), current2 = () => selectionKey(state2) === scope && state2.page === page, entry = state2.compressedReferenceSurvey;
+    const { state: state2 } = ctx2, page = state2.page, scope = selectionKey(state2), current3 = () => selectionKey(state2) === scope && state2.page === page, entry = state2.compressedReferenceSurvey;
     const integer14 = (id) => {
       const s = read(id).trim(), n = Number(s);
       if (!s || !Number.isSafeInteger(n)) throw Error("Enter a whole number for " + id + ".");
@@ -5093,9 +5095,9 @@ ${font ? `<section class="card"><h3>Font metrics · ${esc(font.id)}</h3><div cla
     const result = (entry == null ? void 0 : entry.scope) === scope && entry.result.artifact_id === parent.artifact_id && entry.result.source_sha256 === parent.sha256 && entry.result.target_offset === target ? entry.result : null;
     ctx2.use({
       "compressed-ref-survey": async () => {
-        if (!current2()) throw Error("The source changed.");
+        if (!current3()) throw Error("The source changed.");
         const p = params(), signature = JSON.stringify(p), r = await ctx2.run("references.survey", p, { render: false, refresh: false });
-        if (!current2()) return;
+        if (!current3()) return;
         if (signature !== JSON.stringify(params())) throw Error("The pointer encoding changed. Survey it again.");
         if (!r.ok || r.source_sha256 !== parent.sha256 || r.artifact_id !== parent.artifact_id) throw Error(r.error || "Parent source changed.");
         state2.compressedReferenceSurvey = { scope, result: r, signature };
@@ -5103,7 +5105,7 @@ ${font ? `<section class="card"><h3>Font metrics · ${esc(font.id)}</h3><div cla
       },
       "compressed-ref-add": (node) => {
         const offset = Number(node.dataset.id);
-        if (!current2() || !result || entry.signature !== JSON.stringify(params()) || !result.candidates.some((r) => r.offset === offset)) throw Error("Survey this pointer encoding again and choose a candidate.");
+        if (!current3() || !result || entry.signature !== JSON.stringify(params()) || !result.candidates.some((r) => r.offset === offset)) throw Error("Survey this pointer encoding again and choose a candidate.");
         const old = read("compressed-move-more").trim(), next = (old ? old + "\n" : "") + "0x" + offset.toString(16);
         parseReferenceOffsets("", next);
         ctx2.setDraft("compressed-move-more", next);
@@ -5139,7 +5141,7 @@ ${font ? `<section class="card"><h3>Font metrics · ${esc(font.id)}</h3><div cla
     var _a, _b, _c, _d, _e;
     const { state: state2 } = ctx2, artifact = state2.artifact;
     if (!artifact) return "";
-    const scope = selectionKey(state2), current2 = () => scope === selectionKey(state2);
+    const scope = selectionKey(state2), current3 = () => scope === selectionKey(state2);
     const root = compressedRoot(state2), savedMetadata = root == null ? void 0 : root.compressed_parent;
     const metadata = savedMetadata ? { ...savedMetadata, codec: { "gba-lz10": "lz10", "gba-rle": "rle" }[savedMetadata.codec] || savedMetadata.codec } : null;
     const result = ((_a = state2.results["compression.inspect"]) == null ? void 0 : _a.parent_sha256) === artifact.sha256 ? state2.results["compression.inspect"] : null;
@@ -5151,7 +5153,7 @@ ${font ? `<section class="card"><h3>Font metrics · ${esc(font.id)}</h3><div cla
     }) : [];
     const parameters = () => ({ ...ctx2.sourceParams(), offset: integer5("compression-offset"), allocation: integer5("compression-allocation"), codec: read("compression-codec") });
     const reinsertion = () => {
-      if (!current2() || !metadata) throw Error("Select this decoded resource again.");
+      if (!current3() || !metadata) throw Error("Select this decoded resource again.");
       const edited_id = read("compression-edited");
       if (!edited_id) throw Error("Create an edited decoded build first.");
       return { ...ctx2.projectParams(), parent_id: metadata.parent_id, decoded_id: root.artifact_id, edited_id, offset: metadata.offset, allocation: metadata.allocation, codec: metadata.codec };
@@ -5171,7 +5173,7 @@ ${font ? `<section class="card"><h3>Font metrics · ${esc(font.id)}</h3><div cla
       "compression-preview": async () => {
         const args = reinsertion(), signature = JSON.stringify(args);
         const result2 = await ctx2.run("compression.preview_reinsert", args, { render: false });
-        if (!current2()) return;
+        if (!current3()) return;
         if (signature !== JSON.stringify(reinsertion())) throw Error("The selected edited resource changed. Preview it again.");
         state2.compressionPreview = { scope, result: result2, signature };
         return ctx2.render();
@@ -5181,7 +5183,7 @@ ${font ? `<section class="card"><h3>Font metrics · ${esc(font.id)}</h3><div cla
         if (!preview2 || preview2.signature !== JSON.stringify(args)) throw Error("Preview the current recompression first.");
         const spec = moveSpec(), signature = JSON.stringify({ args, spec });
         const result2 = await ctx2.run("compression.plan_relocate", { ...args, spec }, { render: false });
-        if (!current2()) return;
+        if (!current3()) return;
         if (signature !== JSON.stringify({ args: reinsertion(), spec: moveSpec() })) throw Error("The move declaration changed. Review it again.");
         preview2.moveSpec = spec;
         state2.pending = { kind: "compression", artifact_id: artifact.artifact_id, plan_id: result2.plan_id, signature, relocation: true };
@@ -5190,7 +5192,7 @@ ${font ? `<section class="card"><h3>Font metrics · ${esc(font.id)}</h3><div cla
       "compression-review": async () => {
         const args = reinsertion(), signature = JSON.stringify(args);
         const plan = await ctx2.run("compression.plan_reinsert", args, { render: false });
-        if (!current2()) return;
+        if (!current3()) return;
         if (signature !== JSON.stringify(reinsertion())) throw Error("The edited resource changed. Review it again.");
         state2.pending = { kind: "compression", artifact_id: artifact.artifact_id, plan_id: plan.plan_id, signature };
         await ctx2.render();
@@ -5198,11 +5200,11 @@ ${font ? `<section class="card"><h3>Font metrics · ${esc(font.id)}</h3><div cla
       "compression-build": async () => {
         var _a2;
         if (((_a2 = state2.pending) == null ? void 0 : _a2.kind) !== "compression" || state2.pending.artifact_id !== artifact.artifact_id) throw new Error("Review reinsertion for this resource first.");
-        if (!current2()) throw Error("The selected resource changed.");
+        if (!current3()) throw Error("The selected resource changed.");
         const actual = state2.pending.relocation ? JSON.stringify({ args: reinsertion(), spec: moveSpec() }) : JSON.stringify(reinsertion());
         if (actual !== state2.pending.signature) throw Error("The selected build or move declaration changed. Review it again.");
         const built = await ctx2.run("build.apply", { ...ctx2.projectParams(), plan_id: state2.pending.plan_id }, { render: false });
-        if (!current2()) return;
+        if (!current3()) return;
         state2.pending = null;
         state2.compressionPreview = null;
         await ctx2.setArtifact(built.artifact_id);
@@ -5245,7 +5247,7 @@ ${font ? `<section class="card"><h3>Font metrics · ${esc(font.id)}</h3><div cla
     var _a, _b;
     const { state: state2 } = ctx2;
     if (!state2.artifact) return "";
-    const page = state2.page, scope = selectionKey(state2), params = { ...ctx2.sourceParams() }, current2 = () => selectionKey(state2) === scope && state2.page === page;
+    const page = state2.page, scope = selectionKey(state2), params = { ...ctx2.sourceParams() }, current3 = () => selectionKey(state2) === scope && state2.page === page;
     const kind = ctx2.draft("builder-kind", "tables"), entry = ((_a = state2.definitionReview) == null ? void 0 : _a.scope) === scope ? state2.definitionReview : null;
     const input = (id, name2, value) => field("builder-" + id, name2, ctx2.draft("builder-" + id, String(value)));
     const count = Math.max(1, Math.min(16, Number(ctx2.draft("builder-fields", "2")) || 2));
@@ -5261,10 +5263,10 @@ ${font ? `<section class="card"><h3>Font metrics · ${esc(font.id)}</h3><div cla
         return ctx2.render();
       },
       "builder-preview": async () => {
-        if (!current2()) throw Error("The selected source changed.");
+        if (!current3()) throw Error("The selected source changed.");
         const config = builderConfig(ctx2), signature = JSON.stringify(config);
         const result = await ctx2.run("definitions.preview", { ...params, ...config }, { render: false });
-        if (!current2()) return;
+        if (!current3()) return;
         if (signature !== JSON.stringify(builderConfig(ctx2))) throw Error("The form changed. Preview it again.");
         if (!result.ok || result.source_sha256 !== state2.artifact.sha256 || result.artifact_id !== state2.artifact.artifact_id) throw Error(result.error || "Preview source changed.");
         state2.definitionReview = { scope, signature, result };
@@ -5272,9 +5274,9 @@ ${font ? `<section class="card"><h3>Font metrics · ${esc(font.id)}</h3><div cla
       },
       "builder-save": async () => {
         var _a2;
-        if (!current2() || !entry || entry.signature !== JSON.stringify(builderConfig(ctx2))) throw Error("The form changed. Preview the current layout first.");
+        if (!current3() || !entry || entry.signature !== JSON.stringify(builderConfig(ctx2))) throw Error("The form changed. Preview the current layout first.");
         const config = builderConfig(ctx2), result = await ctx2.run("definitions.save", { ...params, ...config, review_id: entry.result.review_id, replace: !!((_a2 = document.getElementById("builder-replace")) == null ? void 0 : _a2.checked) }, { render: false });
-        if (!current2()) return;
+        if (!current3()) return;
         if (!result.ok) throw Error(result.error || "Definition was not saved.");
         state2.definitionReview = null;
         state2.researchOpen = { scope, kind: config.kind };
@@ -5296,35 +5298,35 @@ ${font ? `<section class="card"><h3>Font metrics · ${esc(font.id)}</h3><div cla
     var _a, _b;
     const { state: state2 } = ctx2, a = state2.artifact;
     if (!["gb", "gbc"].includes(a == null ? void 0 : a.system_id)) return "";
-    const scope = selectionKey(state2), params = { ...ctx2.sourceParams() }, current2 = () => {
+    const scope = selectionKey(state2), params = { ...ctx2.sourceParams() }, current3 = () => {
       var _a2;
       return scope === selectionKey(state2) && ((_a2 = ctx2.isCurrentRender) == null ? void 0 : _a2.call(ctx2)) !== false;
     };
     const model = await ctx2.api.call("symbols.search", { ...params, query: ctx2.draft("symbol-query", ""), page: state2.symbolPage || 0 });
-    if (!current2()) return "";
+    if (!current3()) return "";
     if (model.source_sha256 !== a.sha256 || model.artifact_id !== a.artifact_id) return "";
     const packet = ((_a = state2.symbolReview) == null ? void 0 : _a.scope) === scope ? state2.symbolReview : null;
     ctx2.use({
       "symbol-preview": async () => {
         var _a2;
-        if (!current2()) return;
+        if (!current3()) return;
         const file = (_a2 = document.getElementById("symbol-file")) == null ? void 0 : _a2.files[0];
         if (!file) throw Error("Choose a symbol file.");
         const format = read("symbol-format");
         state2.symbolReview = null;
         const item = await ctx2.api.uploadInput(state2.project.project_id, file, "symbols");
-        if (!current2()) return;
+        if (!current3()) return;
         const review = await ctx2.run("symbols.preview", { ...params, input_id: item.input_id, format }, { render: false });
-        if (!current2()) return;
+        if (!current3()) return;
         state2.symbolReview = { scope, input_id: item.input_id, format, review };
         return ctx2.render();
       },
       "symbol-import": async () => {
         var _a2, _b2;
-        if (!current2() || !((_a2 = packet == null ? void 0 : packet.review) == null ? void 0 : _a2.review_id)) throw Error("Review this source’s symbols first.");
+        if (!current3() || !((_a2 = packet == null ? void 0 : packet.review) == null ? void 0 : _a2.review_id)) throw Error("Review this source’s symbols first.");
         const acknowledged = !!((_b2 = document.getElementById("symbol-ack")) == null ? void 0 : _b2.checked);
         await ctx2.run("symbols.import", { ...params, input_id: packet.input_id, format: packet.format, review_id: packet.review.review_id, acknowledged }, { render: false });
-        if (!current2()) return;
+        if (!current3()) return;
         state2.symbolReview = null;
         state2.symbolPage = 0;
         return ctx2.render();
@@ -5338,7 +5340,7 @@ ${font ? `<section class="card"><h3>Font metrics · ${esc(font.id)}</h3><div cla
         return ctx2.render();
       },
       "symbol-bytes": (node) => {
-        if (!current2()) return;
+        if (!current3()) return;
         const offset = Number(node.dataset.id);
         if (!model.symbols.some((r) => r.file_offset === offset)) throw Error("Reload the symbol list.");
         state2.resourceJump = offset;
@@ -5355,13 +5357,13 @@ ${font ? `<section class="card"><h3>Font metrics · ${esc(font.id)}</h3><div cla
     var _a, _b, _c;
     if (!capture) return "";
     const { state: state2 } = ctx2, page = state2.page, scope = selectionKey(state2), params = { ...ctx2.sourceParams() }, id = capture.evidence_id;
-    const current2 = () => selectionKey(state2) === scope && state2.page === page && capture.evidence_id === id;
+    const current3 = () => selectionKey(state2) === scope && state2.page === page && capture.evidence_id === id;
     const r = ((_a = entry.follow) == null ? void 0 : _a.evidence_id) === id && ((_b = entry.follow) == null ? void 0 : _b.source_sha256) === state2.artifact.sha256 && ((_c = entry.follow) == null ? void 0 : _c.artifact_id) === state2.artifact.artifact_id ? entry.follow : null;
     ctx2.use({
       "follow-explain": async () => {
-        if (!current2()) throw Error("Select this capture again.");
+        if (!current3()) throw Error("Select this capture again.");
         const result = await ctx2.run("debugger.follow", { ...params, evidence_id: id }, { render: false });
-        if (!current2()) return;
+        if (!current3()) return;
         if (!result.ok || result.source_sha256 !== state2.artifact.sha256 || result.artifact_id !== state2.artifact.artifact_id) throw Error(result.error || "Capture source changed.");
         entry.follow = result;
         return ctx2.render();
@@ -5369,7 +5371,7 @@ ${font ? `<section class="card"><h3>Font metrics · ${esc(font.id)}</h3><div cla
       "follow-open": (node) => {
         const offset = Number(node.dataset.id), rows = node.dataset.name === "writer" ? r == null ? void 0 : r.writers : r == null ? void 0 : r.source_reads.concat(r.writers);
         const row = rows == null ? void 0 : rows.find((item) => item.file_offset === offset);
-        if (!current2() || !row || !Number.isSafeInteger(offset) || offset < 0 || offset >= state2.artifact.size) throw Error("Choose a captured mapped location.");
+        if (!current3() || !row || !Number.isSafeInteger(offset) || offset < 0 || offset >= state2.artifact.size) throw Error("Choose a captured mapped location.");
         if (Number.isSafeInteger(row.first_event_id) && row.first_event_id > 0) state2.nativeSourceContext = {
           scope,
           evidence_id: id,
@@ -5406,19 +5408,19 @@ ${font ? `<section class="card"><h3>Font metrics · ${esc(font.id)}</h3><div cla
     const { state: state2 } = ctx2, scope = selectionKey(state2), params = { ...ctx2.sourceParams() };
     let entry = state2.nativeTrace;
     if ((entry == null ? void 0 : entry.scope) !== scope) state2.nativeTrace = entry = { scope, generation: 0, result: null, steps: [{}] };
-    const current2 = () => selectionKey(state2) === scope && state2.nativeTrace === entry;
+    const current3 = () => selectionKey(state2) === scope && state2.nativeTrace === entry;
     const proposal = ((_a = state2.nativeProbe) == null ? void 0 : _a.scope) === scope && identity(state2, state2.nativeProbe.result) ? state2.nativeProbe.result : null;
     const playtestReplay = proposal == null ? void 0 : proposal.playtest_replay;
     if (!entry.checked) {
       entry.checked = true;
       try {
         const r = await ctx2.api.call("debugger.capabilities", params);
-        if (current2()) {
+        if (current3()) {
           if ((r == null ? void 0 : r.ok) === false || !identity(state2, r)) throw Error(r.error || "Backend identity differs.");
           entry.capabilities = r;
         }
       } catch (error) {
-        if (current2()) entry.error = error.message;
+        if (current3()) entry.error = error.message;
       }
     }
     const remembered = ctx2.draft("native-trace-id", "");
@@ -5427,23 +5429,23 @@ ${font ? `<section class="card"><h3>Font metrics · ${esc(font.id)}</h3><div cla
       const generation = ++entry.generation;
       try {
         const r = await ctx2.api.call("debugger.get", { ...params, evidence_id: remembered, offset: 0, limit: 100 });
-        if (current2() && entry.generation === generation) {
+        if (current3() && entry.generation === generation) {
           if ((r == null ? void 0 : r.ok) === false || !identity(state2, r)) throw Error(r.error || "Capture belongs to another source.");
           entry.result = r;
         }
       } catch (error) {
-        if (current2() && entry.generation === generation) entry.error = error.message;
+        if (current3() && entry.generation === generation) entry.error = error.message;
       }
     }
     const result = identity(state2, entry.result) ? entry.result : null, available = ((_b = entry.capabilities) == null ? void 0 : _b.available) === true;
     const reason = ((_c = entry.capabilities) == null ? void 0 : _c.reason) || entry.error || "The native debugger is unavailable for this source or host.";
     const steps2 = () => entry.steps.map((_, i) => ({ frames: integer6("trace-frames-" + i, 1, 3600), buttons: read("trace-buttons-" + i).split(/[\s,]+/).filter(Boolean), port: 0 }));
     const accept = async (operation, parameters) => {
-      if (!current2()) throw Error("The selected source changed. Open its native capture again.");
+      if (!current3()) throw Error("The selected source changed. Open its native capture again.");
       const generation = ++entry.generation;
       entry.error = null;
       const r = await ctx2.run(operation, { ...params, ...parameters }, { render: false, refresh: false });
-      if (!current2() || entry.generation !== generation) return;
+      if (!current3() || entry.generation !== generation) return;
       if ((r == null ? void 0 : r.ok) === false || !identity(state2, r)) throw Error(r.error || "Native capture belongs to another source.");
       entry.result = r;
       entry.loaded = true;
@@ -5452,7 +5454,7 @@ ${font ? `<section class="card"><h3>Font metrics · ${esc(font.id)}</h3><div cla
     };
     ctx2.use({
       "trace-replay-playtest": () => {
-        if (!current2() || !playtestReplay) throw Error("Capture a new Playtest observation before replaying it.");
+        if (!current3() || !playtestReplay) throw Error("Capture a new Playtest observation before replaying it.");
         if (!available) throw Error(reason);
         const { steps: steps3, start_frame } = playtestReplay;
         return accept("debugger.investigate", {
@@ -5462,7 +5464,7 @@ ${font ? `<section class="card"><h3>Font metrics · ${esc(font.id)}</h3><div cla
         });
       },
       "trace-replay-read": () => {
-        if (!current2() || !playtestReplay) throw Error("Capture a new Playtest observation before replaying it.");
+        if (!current3() || !playtestReplay) throw Error("Capture a new Playtest observation before replaying it.");
         if (!available) throw Error(reason);
         const { steps: steps3, start_frame } = playtestReplay, start = integer6("trace-read-address", 0, 16777215), length = integer6("trace-read-length", 1, 256);
         return accept("debugger.capture", { config: {
@@ -5475,7 +5477,7 @@ ${font ? `<section class="card"><h3>Font metrics · ${esc(font.id)}</h3><div cla
         } });
       },
       "trace-capture": () => {
-        if (!current2()) throw Error("The selected source changed.");
+        if (!current3()) throw Error("The selected source changed.");
         if (!available) throw Error(reason);
         const replay = { steps: steps2(), start_frame: integer6("trace-start", 0, 3599), event_limit: integer6("trace-limit", 1, 2e3), instruction_limit: 2e7, timeout: 30 };
         if (read("trace-stop") === "access") replay.stop = { occurrence: integer6("trace-occurrence", 1, replay.event_limit) };
@@ -5484,14 +5486,14 @@ ${font ? `<section class="card"><h3>Font metrics · ${esc(font.id)}</h3><div cla
         return accept("debugger.capture", { config: { ...replay, probes: [{ kind: read("trace-kind"), start, end: start + length - 1 }] } });
       },
       "trace-add-step": async () => {
-        if (!current2()) throw Error("The source changed.");
+        if (!current3()) throw Error("The source changed.");
         if (entry.steps.length >= 64) throw Error("Use at most 64 input steps.");
         entry.steps = steps2();
         entry.steps.push({});
         await ctx2.render();
       },
       "trace-remove-step": async () => {
-        if (!current2()) throw Error("The source changed.");
+        if (!current3()) throw Error("The source changed.");
         if (entry.steps.length > 1) {
           entry.steps = steps2();
           entry.steps.pop();
@@ -5499,32 +5501,32 @@ ${font ? `<section class="card"><h3>Font metrics · ${esc(font.id)}</h3><div cla
         }
       },
       "trace-manual": () => {
-        if (!current2()) throw Error("The source changed.");
+        if (!current3()) throw Error("The source changed.");
         state2.nativeProbe = null;
         return ctx2.render();
       },
       "trace-recheck": () => {
-        if (!current2()) throw Error("The source changed.");
+        if (!current3()) throw Error("The source changed.");
         entry.checked = false;
         return ctx2.render();
       },
       "trace-prepare": async () => {
         var _a2, _b2;
-        if (!current2()) throw Error("The selected source changed.");
+        if (!current3()) throw Error("The selected source changed.");
         if (!((_b2 = (_a2 = entry.capabilities) == null ? void 0 : _a2.download) == null ? void 0 : _b2.preparable)) throw Error("No pinned preparation is available for this source and host.");
         const r = await ctx2.run("debugger.prepare", params, { render: false, refresh: false });
-        if (!current2()) return;
+        if (!current3()) return;
         if ((r == null ? void 0 : r.ok) === false || !identity(state2, r)) throw Error(r.error || "Preparation result belongs to another source.");
         entry.checked = false;
         entry.error = null;
         await ctx2.render();
       },
       "trace-page": (node) => {
-        if (!current2() || !result) throw Error("Open a capture first.");
+        if (!current3() || !result) throw Error("Open a capture first.");
         return accept("debugger.get", { evidence_id: result.evidence_id, offset: Math.max(0, result.offset + Number(node.dataset.id) * 100), limit: 100 });
       },
       "trace-open": (node) => {
-        if (!current2() || !result) throw Error("Open a capture for the selected source first.");
+        if (!current3() || !result) throw Error("Open a capture for the selected source first.");
         const offset = Number(node.dataset.id);
         if (!Number.isSafeInteger(offset) || offset < 0 || offset >= state2.artifact.size || !result.events.some((e) => {
           var _a2, _b2;
@@ -5561,15 +5563,15 @@ ${font ? `<section class="card"><h3>Font metrics · ${esc(font.id)}</h3><div cla
     var _a, _b;
     const { state: state2 } = ctx2, scope = selectionKey(state2), entry = state2.nativeSourceContext;
     if (!entry || entry.scope !== scope) return "";
-    const current2 = () => selectionKey(state2) === scope && state2.nativeSourceContext === entry;
+    const current3 = () => selectionKey(state2) === scope && state2.nativeSourceContext === entry;
     if (!entry.result) {
       try {
         const r2 = await ctx2.api.call("debugger.get", { ...ctx2.sourceParams(), evidence_id: entry.evidence_id, offset: entry.offset, limit: 100 });
-        if (!current2()) return "";
+        if (!current3()) return "";
         if ((r2 == null ? void 0 : r2.ok) === false || !identity(state2, r2)) throw Error(r2.error || "Capture belongs to another source.");
         entry.result = r2;
       } catch (error) {
-        if (!current2()) return "";
+        if (!current3()) return "";
         return `<p class="notice warm">Access evidence could not be reopened: ${esc(error.message)}</p>`;
       }
     }
@@ -5577,11 +5579,11 @@ ${font ? `<section class="card"><h3>Font metrics · ${esc(font.id)}</h3><div cla
     if (!event || ![event.file_offset, context == null ? void 0 : context.file_offset, context == null ? void 0 : context.source_candidate_offset].includes(entry.source_offset)) return "";
     ctx2.use({
       "source-capture-back": () => {
-        if (!current2()) throw Error("The selected source changed.");
+        if (!current3()) throw Error("The selected source changed.");
         return ctx2.navigate("debug");
       },
       "source-capture-dismiss": () => {
-        if (!current2()) return;
+        if (!current3()) return;
         state2.nativeSourceContext = null;
         return ctx2.render();
       }
@@ -5602,7 +5604,7 @@ ${font ? `<section class="card"><h3>Font metrics · ${esc(font.id)}</h3><div cla
     const { state: state2 } = ctx2, scope = selectionKey(state2), params = { ...ctx2.sourceParams() };
     let entry = state2.dataRelocation;
     if ((entry == null ? void 0 : entry.scope) !== scope) state2.dataRelocation = entry = { scope, references: [{}], generation: 0, plan: null, replacement: null };
-    const current2 = () => selectionKey(state2) === scope && state2.dataRelocation === entry;
+    const current3 = () => selectionKey(state2) === scope && state2.dataRelocation === entry;
     const bankDefault = { nes: 8192, snes: 32768, gb: 16384, gbc: 16384 }[state2.artifact.system_id] || 0;
     const assessment = state2.artifact.system_assessment;
     const prg = ((_a = assessment == null ? void 0 : assessment.source) == null ? void 0 : _a.sha256) === state2.artifact.sha256 ? (_b = assessment.candidates) == null ? void 0 : _b.filter((c) => c.layout_valid).flatMap((c) => c.regions || []).find((r) => r.id === "prg-rom") : null;
@@ -5638,7 +5640,7 @@ ${font ? `<section class="card"><h3>Font metrics · ${esc(font.id)}</h3><div cla
     };
     ctx2.use({
       "reloc-add-reference": () => {
-        if (!current2()) throw Error("The source changed.");
+        if (!current3()) throw Error("The source changed.");
         if (entry.references.length >= 128) throw Error("Use at most 128 references.");
         entry.references = references();
         entry.references.push({});
@@ -5646,7 +5648,7 @@ ${font ? `<section class="card"><h3>Font metrics · ${esc(font.id)}</h3><div cla
         return ctx2.render();
       },
       "reloc-remove-reference": () => {
-        if (!current2()) throw Error("The source changed.");
+        if (!current3()) throw Error("The source changed.");
         if (entry.references.length > 1) {
           entry.references = references().slice(0, -1);
           invalidate();
@@ -5654,29 +5656,29 @@ ${font ? `<section class="card"><h3>Font metrics · ${esc(font.id)}</h3><div cla
         }
       },
       "reloc-upload": async () => {
-        if (!current2()) throw Error("The source changed.");
+        if (!current3()) throw Error("The source changed.");
         const file = document.getElementById("reloc-file").files[0];
         if (!file || !file.size || file.size > 48 * 1024) throw Error("Choose edited data up to 48 KiB.");
         const generation = ++entry.generation;
         const result = await ctx2.api.uploadInput(params.project_id, file, "resource");
-        if (!current2() || entry.generation !== generation) return;
+        if (!current3() || entry.generation !== generation) return;
         entry.replacement = result;
         invalidate();
         await ctx2.render();
       },
       "reloc-copy-original": () => {
-        if (!current2()) throw Error("The source changed.");
+        if (!current3()) throw Error("The source changed.");
         ++entry.generation;
         entry.replacement = null;
         invalidate();
         return ctx2.render();
       },
       "reloc-review": async () => {
-        if (!current2()) throw Error("The selected source changed.");
+        if (!current3()) throw Error("The selected source changed.");
         const declaration = spec(), signature = JSON.stringify(declaration), generation = ++entry.generation;
         invalidate();
         const result = await ctx2.run("relocation.plan", { ...params, spec: declaration }, { render: false, refresh: false });
-        if (!current2() || entry.generation !== generation) return;
+        if (!current3() || entry.generation !== generation) return;
         if ((result == null ? void 0 : result.ok) === false || result.source_sha256 !== state2.artifact.sha256 || result.artifact_id !== state2.artifact.artifact_id) throw Error(result.error || "Relocation plan belongs to another source.");
         if (JSON.stringify(spec()) !== signature) {
           ctx2.notify("The declaration changed during review. Review it again.");
@@ -5688,13 +5690,13 @@ ${font ? `<section class="card"><h3>Font metrics · ${esc(font.id)}</h3><div cla
         await ctx2.render();
       },
       "reloc-build": async () => {
-        if (!current2() || !entry.plan || state2.pending !== entry.plan) throw Error("Review this source relocation first.");
+        if (!current3() || !entry.plan || state2.pending !== entry.plan) throw Error("Review this source relocation first.");
         if (JSON.stringify(spec()) !== JSON.stringify(entry.plan.spec)) {
           invalidate();
           throw Error("The declaration changed. Review it again before building.");
         }
         const pending2 = entry.plan, result = await ctx2.run("build.apply", { project_id: params.project_id, plan_id: pending2.plan_id }, { render: false });
-        if (!current2()) return;
+        if (!current3()) return;
         entry.built = { artifact_id: result.artifact_id, sha256: result.sha256, offset: pending2.report.relocation.target_offset };
         if (entry.plan === pending2) {
           let latest;
@@ -5715,7 +5717,7 @@ ${font ? `<section class="card"><h3>Font metrics · ${esc(font.id)}</h3><div cla
       },
       "reloc-inspect-build": async () => {
         var _a2, _b2;
-        if (!current2() || !entry.built) throw Error("Create the reviewed relocated build first.");
+        if (!current3() || !entry.built) throw Error("Create the reviewed relocated build first.");
         const built = entry.built;
         await ctx2.setArtifact(built.artifact_id);
         if (((_a2 = state2.artifact) == null ? void 0 : _a2.artifact_id) !== built.artifact_id || ((_b2 = state2.artifact) == null ? void 0 : _b2.sha256) !== built.sha256) throw Error("The selection changed. Open the relocated build again.");
@@ -5755,8 +5757,8 @@ ${font ? `<section class="card"><h3>Font metrics · ${esc(font.id)}</h3><div cla
       return [...this.changes].sort(([a], [b]) => a - b).map(([offset, after]) => ({ offset, before: this.original.get(offset), after }));
     }
   };
-  var printableByte = (hex7) => {
-    const value = parseInt(hex7, 16);
+  var printableByte = (hex8) => {
+    const value = parseInt(hex8, 16);
     return value >= 32 && value <= 126 ? String.fromCharCode(value) : "·";
   };
   var byteCount = (count) => `${count} byte${count === 1 ? "" : "s"}`;
@@ -5819,10 +5821,10 @@ ${font ? `<section class="card"><h3>Font metrics · ${esc(font.id)}</h3><div cla
       delete state2.resumeHexSelection;
     }
     const policy = () => ctx2.draft("hex-checksum-policy", "maintain");
-    const draft = state2.hexDraft, current2 = () => selectionKey(state2) === ticket;
+    const draft = state2.hexDraft, current3 = () => selectionKey(state2) === ticket;
     const scoped = async (op, p) => {
       const result = await ctx2.run(op, { ...ctx2.sourceParams(), ...p }, { render: false });
-      if (!current2()) throw Error("The selected ROM changed. Repeat this action.");
+      if (!current3()) throw Error("The selected ROM changed. Repeat this action.");
       return result;
     };
     const go = async (offset) => {
@@ -5903,7 +5905,7 @@ ${font ? `<section class="card"><h3>Font metrics · ${esc(font.id)}</h3><div cla
         const reviewed2 = state2.hexReview, navigation = state2.navigationRevision;
         if ((reviewed2 == null ? void 0 : reviewed2.scope) !== ticket || reviewed2.checksumPolicy !== policy() || reviewed2.signature !== JSON.stringify(draft.edits(state2))) throw Error("Review the current byte edits first.");
         const built = await ctx2.run("build.apply", { ...ctx2.projectParams(), plan_id: reviewed2.plan.plan_id }, { render: false });
-        if (!current2()) return;
+        if (!current3()) return;
         if (state2.hexReview !== reviewed2 || JSON.stringify(draft.edits(state2)) !== reviewed2.signature) {
           ctx2.notify("Build created. Your newer byte edits are still staged.");
           return;
@@ -5912,7 +5914,7 @@ ${font ? `<section class="card"><h3>Font metrics · ${esc(font.id)}</h3><div cla
         ctx2.setDraft("hex-changes", JSON.stringify({ artifact_id: state2.artifact.artifact_id, sha256: state2.artifact.sha256, edits: [] }));
         state2.hexDraft = null;
         await ctx2.refreshProject();
-        if (!current2() || state2.navigationRevision !== navigation) return;
+        if (!current3() || state2.navigationRevision !== navigation) return;
         const selected = await ctx2.setArtifact(built.artifact_id, { restore: false });
         if (selected === false || ((_a2 = state2.artifact) == null ? void 0 : _a2.artifact_id) !== built.artifact_id || state2.navigationRevision !== navigation) return;
         ctx2.notify("Separate build created.");
@@ -6186,21 +6188,21 @@ ${state2.artifact.system_id ? `<details><summary>Advanced byte options</summary>
     if (missing2) return missing2;
     const a = state2.artifact, ticket = selectionKey(state2), generation = (state2.resourceRenderGeneration || 0) + 1;
     state2.resourceRenderGeneration = generation;
-    const current2 = () => ticket === selectionKey(state2) && generation === state2.resourceRenderGeneration && (!ctx2.isCurrentRender || ctx2.isCurrentRender()), params = a ? { ...ctx2.sourceParams() } : null;
-    if (!current2()) return "";
+    const current3 = () => ticket === selectionKey(state2) && generation === state2.resourceRenderGeneration && (!ctx2.isCurrentRender || ctx2.isCurrentRender()), params = a ? { ...ctx2.sourceParams() } : null;
+    if (!current3()) return "";
     const jump = state2.resourceJump;
     let data = state2.results["resource.inspect"], catalog, comparison = "", byteNotes = "";
     if (a) {
       if (jump !== void 0 && jump !== null || (data == null ? void 0 : data.artifact_id) !== a.artifact_id || (data == null ? void 0 : data.sha256) !== a.sha256) {
         data = await ctx2.api.call("resource.inspect", { ...params, offset: jump == null ? 0 : Math.min(parseInteger(jump), Math.max(0, a.size - 1)), length: 256 });
-        if (!current2()) return "";
+        if (!current3()) return "";
       }
       catalog = await ctx2.api.call("catalog.list", { ...params, query: state2.catalogQuery || "", page: state2.catalogPage || 0, limit: 50 });
-      if (!current2()) return "";
+      if (!current3()) return "";
       comparison = await hexComparison(ctx2, data);
-      if (!current2()) return "";
+      if (!current3()) return "";
       byteNotes = await gameByteNotes(ctx2, data);
-      if (!current2()) return "";
+      if (!current3()) return "";
       state2.results["resource.inspect"] = data;
       if (jump !== void 0 && jump !== null) {
         ctx2.setDraft("hex-offset", String(data.offset));
@@ -6208,17 +6210,17 @@ ${state2.artifact.system_id ? `<details><summary>Advanced byte options</summary>
       }
     }
     const research = a ? await researchTools(ctx2) : "";
-    if (!current2()) return "";
+    if (!current3()) return "";
     const symbols = a ? await sourceSymbols(ctx2) : "";
-    if (!current2()) return "";
+    if (!current3()) return "";
     const references = await popularReferences(ctx2);
-    if (!current2()) return "";
+    if (!current3()) return "";
     const observed = a ? await observedSourceContext(ctx2) : "";
-    if (!current2()) return "";
+    if (!current3()) return "";
     const relocation = a ? await relocationControls(ctx2) : "";
-    if (!current2()) return "";
+    if (!current3()) return "";
     const relationships = a ? await resourceRelationships(ctx2) : "";
-    if (!current2()) return "";
+    if (!current3()) return "";
     let assessment = state2.results["systems.identify"];
     if ((assessment == null ? void 0 : assessment.artifact_id) !== (a == null ? void 0 : a.artifact_id)) assessment = a && ((_b = (_a = a.system_assessment) == null ? void 0 : _a.source) == null ? void 0 : _b.sha256) === a.sha256 ? a.system_assessment : null;
     ctx2.use({
@@ -6242,16 +6244,16 @@ ${state2.artifact.system_id ? `<details><summary>Advanced byte options</summary>
       },
       "resource-moved-open": () => {
         var _a2;
-        if (!current2()) throw Error("The source changed.");
+        if (!current3()) throw Error("The source changed.");
         const offset = (_a2 = a.plan_annotations) == null ? void 0 : _a2.target_offset;
         if (!Number.isSafeInteger(offset) || offset < 0 || offset >= a.size) throw Error("Relocation metadata is incomplete. Inspect this build manually.");
         state2.resourceJump = offset;
         return ctx2.render();
       },
       "resource-moved-table": async () => {
-        if (!current2()) throw Error("The source changed.");
+        if (!current3()) throw Error("The source changed.");
         const result = await ctx2.run("relocation.table_definition", params, { render: false, refresh: false });
-        if (!current2()) return;
+        if (!current3()) return;
         if (result.source_sha256 !== a.sha256 || result.artifact_id !== a.artifact_id) throw Error("The moved table belongs to another source.");
         state2.tableProposal = { scope: ticket, result };
         return ctx2.navigate("tables");
@@ -6355,7 +6357,7 @@ ${state2.artifact.system_id ? `<details><summary>Advanced byte options</summary>
   function textGrowth(ctx2, doc) {
     var _a, _b, _c, _d;
     if (!(doc == null ? void 0 : doc.ok) || !doc.write_supported || !doc.records.length) return "";
-    const { state: state2 } = ctx2, scope = selectionKey(state2), page = state2.page, current2 = () => scope === selectionKey(state2) && page === state2.page;
+    const { state: state2 } = ctx2, scope = selectionKey(state2), page = state2.page, current3 = () => scope === selectionKey(state2) && page === state2.page;
     const chosen = ctx2.draft("growth-record", doc.records[0].id), record = doc.records.find((r) => r.id === chosen) || doc.records[0];
     const packet = ((_a = state2.textGrowthReview) == null ? void 0 : _a.scope) === scope ? state2.textGrowthReview : null;
     const args = () => {
@@ -6369,7 +6371,7 @@ ${state2.artifact.system_id ? `<details><summary>Advanced byte options</summary>
       }), destination: { offset: integer10(read("growth-target")), capacity: integer10(read("growth-capacity")), fill_byte: integer10(read("growth-fill")), alignment: integer10(read("growth-align")), bank_size: integer10(read("growth-bank")), bank_origin: integer10(read("growth-origin")), extra_references: parseGrowthReferences(read("growth-extra")), references_complete: !!((_a2 = document.getElementById("growth-complete")) == null ? void 0 : _a2.checked), destination_reserved: !!((_b2 = document.getElementById("growth-reserved")) == null ? void 0 : _b2.checked) } };
     };
     const check = () => {
-      if (!current2()) throw Error("The selected text source changed.");
+      if (!current3()) throw Error("The selected text source changed.");
     };
     ctx2.use({
       "growth-choose": () => {
@@ -6384,7 +6386,7 @@ ${state2.artifact.system_id ? `<details><summary>Advanced byte options</summary>
       "growth-preview": async () => {
         check();
         const p = args(), signature = JSON.stringify(p), result = await ctx2.run("text.grow.preview", p, { render: false });
-        if (!current2()) return;
+        if (!current3()) return;
         if (signature !== JSON.stringify(args())) throw Error("Text or destination changed. Preview it again.");
         state2.textGrowthReview = { scope, result, signature, args: p };
         return ctx2.render();
@@ -6394,7 +6396,7 @@ ${state2.artifact.system_id ? `<details><summary>Advanced byte options</summary>
         const p = args(), signature = JSON.stringify(p);
         if (!packet || packet.signature !== signature) throw Error("Text or destination changed. Preview the current growth first.");
         const result = await ctx2.run("text.grow.plan", { ...p, review_id: packet.result.review_id }, { render: false });
-        if (!current2()) return;
+        if (!current3()) return;
         if (signature !== JSON.stringify(args())) throw Error("Text changed during review. Review it again.");
         state2.pending = { kind: "text-growth", artifact_id: state2.artifact.artifact_id, plan_id: result.plan_id, signature };
         return ctx2.render();
@@ -6405,12 +6407,12 @@ ${state2.artifact.system_id ? `<details><summary>Advanced byte options</summary>
         const pending = state2.pending;
         if ((pending == null ? void 0 : pending.kind) !== "text-growth" || pending.artifact_id !== state2.artifact.artifact_id || pending.signature !== JSON.stringify(args())) throw Error("Review the current text move first.");
         const built = await applyReviewedBuild(ctx2, pending);
-        if (!current2() || state2.pending !== pending || pending.signature !== JSON.stringify(args())) {
+        if (!current3() || state2.pending !== pending || pending.signature !== JSON.stringify(args())) {
           ctx2.notify("Build saved. Newer text edits remain staged.");
           return;
         }
         const opened = await ctx2.api.call("text.grow.definition", { project_id: state2.project.project_id, artifact_id: built.artifact_id });
-        if (!current2() || state2.pending !== pending || pending.signature !== JSON.stringify(args())) return;
+        if (!current3() || state2.pending !== pending || pending.signature !== JSON.stringify(args())) return;
         if (!opened.ok) throw Error(opened.error || "Could not inspect the moved text.");
         state2.pending = null;
         state2.textGrowthReview = null;
@@ -6664,11 +6666,11 @@ ${state2.artifact.system_id ? `<details><summary>Advanced byte options</summary>
   }
   function translationControls(ctx2, model) {
     const { state: state2 } = ctx2, ticket = selectionKey(state2), preview2 = translationPreview(state2, model), enabled = (model == null ? void 0 : model.ok) && model.write_supported;
-    const schema = () => json("script-schema"), current2 = () => selectionKey(state2) === ticket;
+    const schema = () => json("script-schema"), current3 = () => selectionKey(state2) === ticket;
     ctx2.use({
       "translation-export": async () => {
         const format = read("translation-format"), params = ctx2.sourceParams(), result = await ctx2.run("translation.export", { ...params, schema: schema(), format }, { render: false });
-        if (current2()) await ctx2.api.download(params.project_id, result.export.export_id, "translation." + format);
+        if (current3()) await ctx2.api.download(params.project_id, result.export.export_id, "translation." + format);
       },
       "translation-preview": async () => {
         const file = document.getElementById("translation-file").files[0];
@@ -6676,9 +6678,9 @@ ${state2.artifact.system_id ? `<details><summary>Advanced byte options</summary>
         const selectedSchema = schema(), signature = JSON.stringify(selectedSchema), format = read("translation-format"), params = ctx2.sourceParams(), request2 = (state2.translationRequest || 0) + 1;
         state2.translationRequest = request2;
         const input = await ctx2.api.uploadInput(params.project_id, file, "translation");
-        if (!current2() || state2.translationRequest !== request2) throw Error("Selection changed. Preview this sheet again.");
+        if (!current3() || state2.translationRequest !== request2) throw Error("Selection changed. Preview this sheet again.");
         const result = await ctx2.run("translation.preview", { ...params, schema: selectedSchema, input_id: input.input_id, format }, { render: false });
-        if (!current2() || state2.translationRequest !== request2 || JSON.stringify(schema()) !== signature) throw Error("Source, file or text setup changed. Preview again.");
+        if (!current3() || state2.translationRequest !== request2 || JSON.stringify(schema()) !== signature) throw Error("Source, file or text setup changed. Preview again.");
         state2.translationSheet = { scope: ticket, preview: result, schema: selectedSchema };
         await ctx2.render();
       },
@@ -6687,7 +6689,7 @@ ${state2.artifact.system_id ? `<details><summary>Advanced byte options</summary>
         if (!(result == null ? void 0 : result.valid) || !result.changed_segments) throw Error("Preview a valid sheet with changes first.");
         if (JSON.stringify(schema()) !== JSON.stringify(saved.schema)) throw Error("Text setup changed. Preview the sheet again.");
         const request2 = state2.translationRequest, plan = await ctx2.run("script.plan", { ...ctx2.sourceParams(), schema: saved.schema, edits: result.edits }, { render: false });
-        if (!current2() || request2 !== state2.translationRequest) return;
+        if (!current3() || request2 !== state2.translationRequest) return;
         saved.plan = plan;
         await ctx2.render();
       },
@@ -6695,7 +6697,7 @@ ${state2.artifact.system_id ? `<details><summary>Advanced byte options</summary>
         const saved = state2.translationSheet, result = translationPreview(state2, model);
         if (!(saved == null ? void 0 : saved.plan) || !(result == null ? void 0 : result.valid) || JSON.stringify(schema()) !== JSON.stringify(saved.schema)) throw Error("Review a fresh translation plan first.");
         const built = await ctx2.run("structured.apply", { ...ctx2.projectParams(), plan_id: saved.plan.workbench_plan_id }, { render: false });
-        if (!current2()) return;
+        if (!current3()) return;
         state2.translationSheet = null;
         await ctx2.refreshProject();
         await ctx2.setArtifact(built.artifact_id);
@@ -6959,12 +6961,12 @@ ${state2.artifact.system_id ? `<details><summary>Advanced byte options</summary>
     const picker = document.getElementById("palette-picker");
     if (!picker || !palette2) return;
     const selector = document.getElementById("palette-index"), selectedIndex = Number(selector == null ? void 0 : selector.value);
-    const scope = selectionKey(ctx2.state), current2 = () => {
+    const scope = selectionKey(ctx2.state), current3 = () => {
       var _a;
       return scope === selectionKey(ctx2.state) && ((_a = ctx2.state.results["assets.inspect"]) == null ? void 0 : _a.document_id) === doc.document_id && document.getElementById("palette-picker") === picker;
     };
     const stage3 = () => {
-      if (!current2()) return;
+      if (!current3()) return;
       try {
         const index = Number(selector == null ? void 0 : selector.value), entry = palette2.entries[index];
         if (!Number.isInteger(index) || !entry || index !== selectedIndex) throw Error("Reload the selected palette entry before editing its color.");
@@ -6998,10 +7000,10 @@ ${state2.artifact.system_id ? `<details><summary>Advanced byte options</summary>
     };
     picker.addEventListener("input", stage3);
     picker.addEventListener("change", () => {
-      if (stage3() && current2()) ctx2.notify("Palette preview updated. Changes are staged.");
+      if (stage3() && current3()) ctx2.notify("Palette preview updated. Changes are staged.");
     });
     selector == null ? void 0 : selector.addEventListener("change", async () => {
-      if (!current2()) return;
+      if (!current3()) return;
       try {
         const entry = editedPalette(palette2, JSON.parse(ctx2.draft("asset-changes", "[]"))).entries[Number(selector.value)];
         if (!entry) return;
@@ -7031,14 +7033,14 @@ ${state2.artifact.system_id ? `<details><summary>Advanced byte options</summary>
     var _a, _b;
     const { state: state2 } = ctx2, artifact = state2.artifact, scope = selectionKey(state2);
     if (artifact.system_id !== "genesis" || artifact.size !== 786432) return "";
-    const current2 = () => {
+    const current3 = () => {
       var _a2;
       return selectionKey(state2) === scope && ((_a2 = ctx2.isCurrentRender) == null ? void 0 : _a2.call(ctx2)) !== false;
     };
     const saved = ctx2.draft(draftKey, "");
     if (((_a = state2.battleBackground) == null ? void 0 : _a.scope) !== scope) {
       const source2 = await ctx2.api.call("backgrounds.inspect", ctx2.sourceParams()).catch((error) => ({ available: false, error: error.message }));
-      if (!current2()) return "";
+      if (!current3()) return "";
       state2.battleBackground = { scope, source: source2, color: 1, past: [], future: [], fit: null };
       if (source2.available) {
         state2.battleBackground.base = colorsFromHex(source2.pixels);
@@ -7063,13 +7065,13 @@ ${state2.artifact.system_id ? `<details><summary>Advanced byte options</summary>
         let build;
         try {
           const plan = await ctx2.api.call("backgrounds.plan", { ...params, source_sha256: source.source_sha256, pixels });
-          if (!current2() || model.saved !== pixels) return;
+          if (!current3() || model.saved !== pixels) return;
           build = await ctx2.run("build.apply", { project_id: params.project_id, plan_id: plan.plan_id }, { render: false });
         } finally {
           model.building = false;
           node.disabled = !((_b2 = model.fit) == null ? void 0 : _b2.fits);
         }
-        if (!current2()) return;
+        if (!current3()) return;
         if (model.saved !== pixels) {
           ctx2.notify("Playable copy saved. Your newer edits are still in the draft.");
           return;
@@ -7121,7 +7123,7 @@ ${state2.artifact.system_id ? `<details><summary>Advanced byte options</summary>
       pixels.forEach((index, position) => image.data.set(rgba[index], position * 4));
       graphics.putImageData(image, 0, 0);
     }
-    function refresh(message = "") {
+    function refresh2(message = "") {
       draw2(draft, model.draft);
       const changed2 = model.draft.some((color, i) => color !== model.base[i]);
       undo.disabled = !model.past.length;
@@ -7166,10 +7168,10 @@ ${state2.artifact.system_id ? `<details><summary>Advanced byte options</summary>
       if (!pixels) return;
       const params = ctx2.sourceParams();
       fitTimer = setTimeout(async () => {
-        const current2 = () => live() && model.fitTicket === ticket && model.saved === pixels;
-        if (!current2()) return;
+        const current3 = () => live() && model.fitTicket === ticket && model.saved === pixels;
+        if (!current3()) return;
         const fit = await ctx2.api.call("backgrounds.fit", { ...params, source_sha256: model.source.source_sha256, pixels }).catch((error) => ({ error: error.message }));
-        if (!current2()) return;
+        if (!current3()) return;
         model.fit = fit;
         showFit();
       }, delay);
@@ -7191,7 +7193,7 @@ ${state2.artifact.system_id ? `<details><summary>Advanced byte options</summary>
       model.fit = null;
       model.saved = model.draft.some((color, i) => color !== model.base[i]) ? hexBytes(model.draft) : "";
       ctx2.setDraft(draftKey, model.saved);
-      refresh(message);
+      refresh2(message);
       queueFit();
     }
     function point(event) {
@@ -7201,7 +7203,7 @@ ${state2.artifact.system_id ? `<details><summary>Advanced byte options</summary>
         Math.min(height - 1, Math.max(0, Math.floor((event.clientY - bounds2.top) * height / bounds2.height)))
       ];
     }
-    function paint(x, y) {
+    function paint2(x, y) {
       const size2 = Number(brush.value);
       for (let row = y; row < Math.min(height, y + size2); row++) {
         model.draft.fill(model.color, row * width + x, row * width + Math.min(width, x + size2));
@@ -7211,7 +7213,7 @@ ${state2.artifact.system_id ? `<details><summary>Advanced byte options</summary>
       const [x, y] = point(event), [fromX, fromY] = previous;
       const steps2 = Math.max(Math.abs(x - fromX), Math.abs(y - fromY), 1);
       for (let step = 1; step <= steps2; step++) {
-        paint(Math.round(fromX + (x - fromX) * step / steps2), Math.round(fromY + (y - fromY) * step / steps2));
+        paint2(Math.round(fromX + (x - fromX) * step / steps2), Math.round(fromY + (y - fromY) * step / steps2));
       }
       previous = [x, y];
       draw2(draft, model.draft);
@@ -7221,7 +7223,7 @@ ${state2.artifact.system_id ? `<details><summary>Advanced byte options</summary>
       draft.setPointerCapture(event.pointerId);
       previous = point(event);
       stroke = { before: model.draft.slice(), id: event.pointerId };
-      paint(...previous);
+      paint2(...previous);
       draw2(draft, model.draft);
     });
     draft.addEventListener("pointermove", (event) => {
@@ -7294,9 +7296,9 @@ ${state2.artifact.system_id ? `<details><summary>Advanced byte options</summary>
             if (input[i * 4 + 3] < 128) continue;
             let best = Infinity;
             palette2.forEach(([r, g, b], index) => {
-              const distance = (input[i * 4] - r) ** 2 + (input[i * 4 + 1] - g) ** 2 + (input[i * 4 + 2] - b) ** 2;
-              if (distance < best) {
-                best = distance;
+              const distance2 = (input[i * 4] - r) ** 2 + (input[i * 4 + 1] - g) ** 2 + (input[i * 4 + 2] - b) ** 2;
+              if (distance2 < best) {
+                best = distance2;
                 destination[i] = index;
               }
             });
@@ -7312,7 +7314,7 @@ ${state2.artifact.system_id ? `<details><summary>Advanced byte options</summary>
       }
     });
     draw2(root.querySelector("#battle-original"), model.base);
-    refresh();
+    refresh2();
     if (!model.fit) queueFit(0);
   }
 
@@ -7331,17 +7333,17 @@ ${state2.artifact.system_id ? `<details><summary>Advanced byte options</summary>
     var _a, _b, _c, _d, _e, _f, _g, _h, _i, _j, _k, _l, _m, _n, _o, _p, _q, _r, _s, _t;
     if (((_a = ctx2.state.connectedAnimation) == null ? void 0 : _a.scope) === selectionKey(ctx2.state)) {
       const prior = ctx2.state.results["assets.inspect"];
-      let paint = ctx2.state.paint;
-      if (!paint) {
+      let paint2 = ctx2.state.paint;
+      if (!paint2) {
         try {
-          paint = JSON.parse(ctx2.draft("paint-buffer", "null"));
+          paint2 = JSON.parse(ctx2.draft("paint-buffer", "null"));
         } catch {
         }
       }
-      const bitmap2 = prior == null ? void 0 : prior.bitmaps.find((b) => b.id === (paint == null ? void 0 : paint.bitmap_id)), cell = bitmap2 == null ? void 0 : bitmap2.cells[paint == null ? void 0 : paint.cell_index];
-      if ((paint == null ? void 0 : paint.document_id) === (prior == null ? void 0 : prior.document_id) && cell && Array.isArray(paint.pixels) && paint.pixels.length === cell.pixels.length) {
+      const bitmap2 = prior == null ? void 0 : prior.bitmaps.find((b) => b.id === (paint2 == null ? void 0 : paint2.bitmap_id)), cell = bitmap2 == null ? void 0 : bitmap2.cells[paint2 == null ? void 0 : paint2.cell_index];
+      if ((paint2 == null ? void 0 : paint2.document_id) === (prior == null ? void 0 : prior.document_id) && cell && Array.isArray(paint2.pixels) && paint2.pixels.length === cell.pixels.length) {
         const changes = JSON.parse(ctx2.draft("asset-changes", "[]"));
-        ctx2.setDraft("asset-changes", JSON.stringify(mergeCellChanges(changes, [{ kind: "cell", bitmap_id: bitmap2.id, cell_index: paint.cell_index, before_pixels: cell.pixels, after_pixels: paint.pixels }])));
+        ctx2.setDraft("asset-changes", JSON.stringify(mergeCellChanges(changes, [{ kind: "cell", bitmap_id: bitmap2.id, cell_index: paint2.cell_index, before_pixels: cell.pixels, after_pixels: paint2.pixels }])));
       }
     }
     const setupReview = useResearchSetup(ctx2, "assets");
@@ -7538,7 +7540,7 @@ ${state2.artifact.system_id ? `<details><summary>Advanced byte options</summary>
     const doc = ctx2.state.results["assets.inspect"];
     if (!(doc == null ? void 0 : doc.ok)) return;
     const bitmap = doc.bitmaps.find((b) => b.id === ctx2.state.assetBitmapId) || doc.bitmaps[0], palette2 = doc.palettes.find((p) => p.id === bitmap.palette_id);
-    const refresh = () => {
+    const refresh2 = () => {
       const colors = editorPalette(ctx2, palette2);
       document.querySelectorAll("canvas[data-cell]").forEach((canvas) => {
         const index = Number(canvas.dataset.cell);
@@ -7551,13 +7553,13 @@ ${state2.artifact.system_id ? `<details><summary>Advanced byte options</summary>
       drawPaint(ctx2, doc);
     };
     (_a = documentNode("asset-preview-bank")) == null ? void 0 : _a.addEventListener("change", () => applyPreviewPaletteBank(ctx2, palette2));
-    refresh();
+    refresh2();
     mountObjectWorkbench(ctx2);
     mountDraftScene(ctx2);
     mountTools(ctx2, doc, bitmap, () => drawPaint(ctx2, doc));
     mountSprite(ctx2, doc, bitmap, palette2);
     mountAnimation(ctx2, doc, bitmap, palette2);
-    mountPaletteEditor(ctx2, doc, palette2, refresh);
+    mountPaletteEditor(ctx2, doc, palette2, refresh2);
   }
 
   // romancer/ui/views/playtest.js
@@ -7575,7 +7577,7 @@ ${state2.artifact.system_id ? `<details><summary>Advanced byte options</summary>
   var hex5 = (v) => Number.isSafeInteger(v) ? "0x" + v.toString(16) : "Not recorded";
   function graphicsAccessControls(ctx2, trace) {
     var _a, _b, _c, _d, _e;
-    const { state: state2 } = ctx2, scope = selectionKey(state2), params = { ...ctx2.sourceParams() }, current2 = () => {
+    const { state: state2 } = ctx2, scope = selectionKey(state2), params = { ...ctx2.sourceParams() }, current3 = () => {
       var _a2;
       return selectionKey(state2) === scope && ((_a2 = ctx2.isCurrentRender) == null ? void 0 : _a2.call(ctx2)) !== false;
     };
@@ -7583,10 +7585,10 @@ ${state2.artifact.system_id ? `<details><summary>Advanced byte options</summary>
     if ((entry == null ? void 0 : entry.scope) !== scope) state2.graphicsAccess = entry = { scope, result: null, tiles: null };
     const result = entry.result;
     const accept = async (op, p) => {
-      if (!current2()) throw Error("The selected ROM changed.");
+      if (!current3()) throw Error("The selected ROM changed.");
       stopPlayback(state2);
       const r = await ctx2.run(op, { ...params, ...p }, { render: false, refresh: false });
-      if (!current2()) return;
+      if (!current3()) return;
       if (r.source_sha256 !== state2.artifact.sha256 || r.artifact_id !== state2.artifact.artifact_id) throw Error("Graphics capture source identity differs.");
       entry.result = r;
       entry.tiles = null;
@@ -7598,9 +7600,9 @@ ${state2.artifact.system_id ? `<details><summary>Advanced byte options</summary>
       "graphics-access-open": () => accept("graphics.accesses.get", { evidence_id: read("graphics-access-id"), offset: 0, limit: 100 }),
       "graphics-access-page": (node) => accept("graphics.accesses.get", { evidence_id: result.evidence_id, offset: Math.max(0, result.offset + Number(node.dataset.id) * 100), limit: 100 }),
       "graphics-access-tiles": async () => {
-        if (!current2() || !result) throw Error("Open a graphics capture first.");
+        if (!current3() || !result) throw Error("Open a graphics capture first.");
         const r = await ctx2.api.call("graphics.accesses.tiles", { ...params, evidence_id: result.evidence_id, domain: read("graphics-memory-domain"), offset: Number(read("graphics-memory-offset")), count: 32, codec: read("graphics-memory-codec") });
-        if (!current2() || entry.result !== result) return;
+        if (!current3() || entry.result !== result) return;
         if (r.ok === false) throw Error(r.error);
         entry.tiles = r;
         return ctx2.render();
@@ -7632,7 +7634,7 @@ ${state2.artifact.system_id ? `<details><summary>Advanced byte options</summary>
   var statusName = (s) => ({ VERIFIED_VISUAL_SOURCE: "Source verified", NOT_VERIFIED: "Source unresolved", INCONCLUSIVE: "Replay inconclusive" })[s] || s;
   function visualSourceControls(ctx2, trace) {
     var _a, _b, _c, _d;
-    const { state: state2 } = ctx2, scope = selectionKey(state2), current2 = () => {
+    const { state: state2 } = ctx2, scope = selectionKey(state2), current3 = () => {
       var _a2;
       return selectionKey(state2) === scope && ((_a2 = ctx2.isCurrentRender) == null ? void 0 : _a2.call(ctx2)) !== false;
     };
@@ -7642,7 +7644,7 @@ ${state2.artifact.system_id ? `<details><summary>Advanced byte options</summary>
     if (!selected || selected.scope !== scope || selected.trace_id !== trace.trace_id) selected = state2.objectPartSelection = { scope, trace_id: trace.trace_id, parts: [] };
     ctx2.use({
       "source-object-toggle": (node) => {
-        if (!current2()) throw Error("The selected ROM changed.");
+        if (!current3()) throw Error("The selected ROM changed.");
         const match = Number(node.dataset.id);
         if (!packet || packet.runtime_trusted === false || !packet.verified_matches.some((m) => m.match_id === match)) throw Error("Choose a fresh verified part.");
         const part = { verification_id: packet.verification_id, match_id: match };
@@ -7654,23 +7656,23 @@ ${state2.artifact.system_id ? `<details><summary>Advanced byte options</summary>
         return ctx2.render();
       },
       "source-object-clear": () => {
-        if (!current2()) return;
+        if (!current3()) return;
         selected.parts = [];
         return ctx2.render();
       },
       "source-object-create": async () => {
-        if (!current2()) throw Error("The selected ROM changed.");
+        if (!current3()) throw Error("The selected ROM changed.");
         if (!selected.parts.length) throw Error("Select at least one verified placement.");
         const result = await ctx2.run("objects.create", { ...ctx2.sourceParams(), name: read("verified-object-name").trim(), parts: [...selected.parts] }, { render: false });
-        if (!current2()) return;
+        if (!current3()) return;
         return openObject(ctx2, result.object_id);
       }
     });
     const run2 = async (start) => {
-      if (!current2()) return;
+      if (!current3()) return;
       stopPlayback(state2);
       const result = await ctx2.run("traces.verify", { ...ctx2.sourceParams(), trace_id: trace.trace_id, start, limit: 8 }, { render: false, refresh: false });
-      if (!current2()) return;
+      if (!current3()) return;
       state2.visualSourceProof = { scope, trace_id: trace.trace_id, result };
       return ctx2.render();
     };
@@ -7682,16 +7684,16 @@ ${state2.artifact.system_id ? `<details><summary>Advanced byte options</summary>
         const id = ((_a2 = el == null ? void 0 : el.dataset) == null ? void 0 : _a2.id) || ((_b2 = trace.verification_summary) == null ? void 0 : _b2.verification_id);
         if (!history3.some((r) => r.verification_id === id) && id !== ((_c2 = trace.verification_summary) == null ? void 0 : _c2.verification_id)) throw Error("Choose saved verification for this trace.");
         const result = await ctx2.api.call("traces.verification", { ...ctx2.sourceParams(), verification_id: id });
-        if (!current2()) return;
+        if (!current3()) return;
         state2.visualSourceProof = { scope, trace_id: trace.trace_id, result };
         return ctx2.render();
       },
       "source-open": async () => {
-        if (!current2() || !(packet == null ? void 0 : packet.verification_id)) return;
+        if (!current3() || !(packet == null ? void 0 : packet.verification_id)) return;
         const match = Number(read("verified-source-part"));
         if (!packet.verified_matches.some((m) => m.match_id === match)) throw Error("Choose a source-verified part.");
         const result = await ctx2.run("traces.open_verified", { ...ctx2.sourceParams(), verification_id: packet.verification_id, matches: [match] }, { render: false });
-        if (!current2()) return;
+        if (!current3()) return;
         state2.connectedAssetSetup = { scope, result };
         state2.researchOpen = { scope, kind: "assets" };
         return ctx2.navigate("assets");
@@ -7710,7 +7712,7 @@ ${state2.artifact.system_id ? `<details><summary>Advanced byte options</summary>
     var _a, _b, _c;
     const { state: state2 } = ctx2, a = state2.artifact;
     if (!a) return "";
-    const scope = selectionKey(state2), params = { ...ctx2.sourceParams() }, current2 = () => {
+    const scope = selectionKey(state2), params = { ...ctx2.sourceParams() }, current3 = () => {
       var _a2;
       return scope === selectionKey(state2) && ((_a2 = ctx2.isCurrentRender) == null ? void 0 : _a2.call(ctx2)) !== false;
     };
@@ -7718,10 +7720,10 @@ ${state2.artifact.system_id ? `<details><summary>Advanced byte options</summary>
     const saved = ((_c = state2.savedGameplayTrace) == null ? void 0 : _c.scope) === scope ? state2.savedGameplayTrace.result : null;
     const result = (saved == null ? void 0 : saved.checkpoint_only) ? null : saved, partHeight = (result == null ? void 0 : result.matches.some((m) => m.height === 16)) ? 16 : 8, groups = candidateGroups(result, partHeight).slice(0, 16);
     const save = async (offset, length) => {
-      if (!current2() || !selected) throw Error("Pause, capture a frame and select a current region first.");
+      if (!current3() || !selected) throw Error("Pause, capture a frame and select a current region first.");
       stopPlayback(state2);
       const r = await ctx2.run("traces.capture", { ...params, name: read("trace-name").trim(), frame_sha256: selected.frame_sha256, region: selected.region, offset, length }, { render: false });
-      if (!current2()) return;
+      if (!current3()) return;
       state2.savedGameplayTrace = { scope, result: r };
       return ctx2.render();
     };
@@ -7730,23 +7732,23 @@ ${state2.artifact.system_id ? `<details><summary>Advanced byte options</summary>
       "trace-save-quick": async () => {
         var _a2, _b2, _c2;
         await save(0, a.size);
-        if (current2() && state2.page === "playtest") (_c2 = (_b2 = (_a2 = globalThis.document) == null ? void 0 : _a2.getElementById("saved-gameplay-trace")) == null ? void 0 : _b2.scrollIntoView) == null ? void 0 : _c2.call(_b2, { block: "start" });
+        if (current3() && state2.page === "playtest") (_c2 = (_b2 = (_a2 = globalThis.document) == null ? void 0 : _a2.getElementById("saved-gameplay-trace")) == null ? void 0 : _b2.scrollIntoView) == null ? void 0 : _c2.call(_b2, { block: "start" });
       },
       "trace-next": () => {
-        if (!(result == null ? void 0 : result.coverage) || !current2()) return;
+        if (!(result == null ? void 0 : result.coverage) || !current3()) return;
         return save(result.coverage.next_offset, a.size - result.coverage.next_offset);
       },
       "trace-gameview": () => {
-        if (!current2()) return;
+        if (!current3()) return;
         state2.connectedTraceFocus = { scope, trace_id: result == null ? void 0 : result.trace_id };
         return ctx2.navigate("gameview");
       },
       "trace-open": async () => {
-        if (!current2() || !(result == null ? void 0 : result.trace_id)) throw Error("Save a fresh source-bound trace first.");
+        if (!current3() || !(result == null ? void 0 : result.trace_id)) throw Error("Save a fresh source-bound trace first.");
         const matches = groups.map((g, i) => read("trace-part-" + i)).filter((v) => v !== "").map(Number);
         if (!matches.length) throw Error("Choose the source offset for a matching part.");
         const r = await ctx2.run("traces.open", { ...params, trace_id: result.trace_id, matches }, { render: false });
-        if (!current2()) return;
+        if (!current3()) return;
         state2.connectedAssetSetup = { scope, result: r };
         state2.researchOpen = { scope, kind: "assets" };
         return ctx2.navigate("assets");
@@ -7864,27 +7866,27 @@ ${state2.artifact.system_id ? `<details><summary>Advanced byte options</summary>
   async function suitePictures(ctx2, suite) {
     var _a;
     if ((suite == null ? void 0 : suite.project_id) !== ((_a = ctx2.state.project) == null ? void 0 : _a.project_id)) return "";
-    const ids = suite.tests.filter((t) => t.status !== "PASS").flatMap((t) => [t.baseline_id, t.candidate_id]).filter(Boolean).slice(0, 8), pictures = [];
+    const ids = suite.tests.filter((t) => t.status !== "PASS").flatMap((t) => [t.baseline_id, t.candidate_id]).filter(Boolean).slice(0, 8), pictures2 = [];
     for (const evidence_id of ids) {
       try {
         const record = await ctx2.api.call("reports.get", { ...ctx2.projectParams(), evidence_id });
-        pictures.push(visualFailures(record));
+        pictures2.push(visualFailures(record));
       } catch {
-        pictures.push("<p>A stored screenshot report is unavailable. Run this test again.</p>");
+        pictures2.push("<p>A stored screenshot report is unavailable. Run this test again.</p>");
       }
     }
-    return pictures.join("");
+    return pictures2.join("");
   }
 
   // romancer/ui/save_manager.js
   function saveManager(ctx2, listing) {
     var _a, _b;
-    const { state: state2 } = ctx2, ticket = selectionKey(state2), active = ((_a = state2.runtime) == null ? void 0 : _a.artifact_id) === ((_b = state2.artifact) == null ? void 0 : _b.artifact_id), current2 = () => selectionKey(state2) === ticket;
+    const { state: state2 } = ctx2, ticket = selectionKey(state2), active = ((_a = state2.runtime) == null ? void 0 : _a.artifact_id) === ((_b = state2.artifact) == null ? void 0 : _b.artifact_id), current3 = () => selectionKey(state2) === ticket;
     ctx2.use({
       "save-capture": async () => {
         stopPlayback(state2);
         await ctx2.run("saves.capture", { ...ctx2.sourceParams(), name: read("save-name") }, { render: false });
-        if (current2()) {
+        if (current3()) {
           ctx2.notify("Battery save backed up.");
           await ctx2.render();
         }
@@ -7894,35 +7896,35 @@ ${state2.artifact.system_id ? `<details><summary>Advanced byte options</summary>
         const file = document.getElementById("save-file").files[0], name2 = read("save-name"), params = ctx2.sourceParams();
         if (!file) throw Error("Choose a raw .sav or .srm file first.");
         const input = await ctx2.api.uploadInput(params.project_id, file, "save");
-        if (!current2()) throw Error("The ROM changed. Import for the selected ROM again.");
+        if (!current3()) throw Error("The ROM changed. Import for the selected ROM again.");
         await ctx2.run("saves.import", { ...params, input_id: input.input_id, name: name2 }, { render: false });
-        if (current2()) {
+        if (current3()) {
           ctx2.notify("Save imported. Restart explicitly to use it.");
           await ctx2.render();
         }
       },
       "save-export": async () => {
         const params = ctx2.sourceParams(), result = await ctx2.run("saves.export", { ...params, save_id: read("save-choice") }, { render: false });
-        if (current2()) await ctx2.api.download(params.project_id, result.export.export_id, "battery-save.sav");
+        if (current3()) await ctx2.api.download(params.project_id, result.export.export_id, "battery-save.sav");
       },
       "save-restore": async () => {
         stopPlayback(state2);
         const params = ctx2.sourceParams();
         try {
           const result = await ctx2.run("saves.restore", { ...params, save_id: read("save-choice") }, { render: false, refresh: false });
-          if (!current2()) return;
+          if (!current3()) return;
           state2.runtime = result.runtime;
           state2.frame = null;
           ctx2.notify("Restarted with selected save. Previous RAM is in an automatic backup.");
         } catch (error) {
           const status = await ctx2.api.call("runtime.status", { project_id: params.project_id }).catch(() => null);
-          if (current2() && (status == null ? void 0 : status.active) === false) {
+          if (current3() && (status == null ? void 0 : status.active) === false) {
             state2.runtime = null;
             state2.frame = null;
           }
           throw error;
         } finally {
-          if (current2()) await ctx2.render();
+          if (current3()) await ctx2.render();
         }
       }
     });
@@ -8452,7 +8454,7 @@ ${state2.artifact.system_id ? `<details><summary>Advanced byte options</summary>
   }
   function commandForms(ctx2, doc) {
     var _a, _b;
-    const { state: state2 } = ctx2, scope = selectionKey(state2), page = state2.page, current2 = () => scope === selectionKey(state2) && page === state2.page;
+    const { state: state2 } = ctx2, scope = selectionKey(state2), page = state2.page, current3 = () => scope === selectionKey(state2) && page === state2.page;
     let draft;
     try {
       draft = JSON.parse(ctx2.draft("command-form", "null"));
@@ -8467,7 +8469,7 @@ ${state2.artifact.system_id ? `<details><summary>Advanced byte options</summary>
       operands = [];
     }
     const store = (next, fields = operands) => {
-      if (!current2()) throw Error("Choose the current source again.");
+      if (!current3()) throw Error("Choose the current source again.");
       state2.commandFormReview = null;
       ctx2.setDraft("command-form", JSON.stringify(next));
       ctx2.setDraft("command-form-fields", JSON.stringify(fields));
@@ -8494,7 +8496,7 @@ ${state2.artifact.system_id ? `<details><summary>Advanced byte options</summary>
       "cf-remove-script": (node) => store({ ...draft, scripts: draft.scripts.filter((s) => s.id !== node.dataset.id) }),
       "cf-preview": async () => {
         const stored2 = ctx2.draft("command-form", "null"), config = { ...draft, name: name(read("cf-name"), 80) }, r = await ctx2.run("definitions.preview", { ...ctx2.sourceParams(), kind: "commands", config }, { render: false });
-        if (!current2()) return;
+        if (!current3()) return;
         if (ctx2.draft("command-form", "null") !== stored2 || read("cf-name").trim() !== config.name) throw Error("The form changed. Preview it again.");
         state2.commandFormReview = { scope, config, review_id: r.review_id, signature: JSON.stringify(draft) };
         return ctx2.render();
@@ -8502,12 +8504,12 @@ ${state2.artifact.system_id ? `<details><summary>Advanced byte options</summary>
       "cf-save": async () => {
         var _a2;
         const review2 = state2.commandFormReview;
-        if (!current2() || (review2 == null ? void 0 : review2.scope) !== scope || review2.signature !== JSON.stringify(draft) || read("cf-name").trim() !== review2.config.name) throw Error("Preview this current grammar first.");
+        if (!current3() || (review2 == null ? void 0 : review2.scope) !== scope || review2.signature !== JSON.stringify(draft) || read("cf-name").trim() !== review2.config.name) throw Error("Preview this current grammar first.");
         const r = await ctx2.run("definitions.save", { ...ctx2.sourceParams(), kind: "commands", config: review2.config, review_id: review2.review_id, replace: !!((_a2 = document.getElementById("cf-replace")) == null ? void 0 : _a2.checked) }, { render: false });
-        if (!current2()) return;
+        if (!current3()) return;
         state2.commandFormReview = null;
         const inspected = await ctx2.api.call("commands.inspect", { ...ctx2.sourceParams(), definition: review2.config });
-        if (!current2()) return;
+        if (!current3()) return;
         state2.results["commands.inspect"] = inspected;
         ctx2.setDraft("command-definition", JSON.stringify(review2.config, null, 2));
         return ctx2.render();
@@ -8544,7 +8546,7 @@ ${state2.artifact.system_id ? `<details><summary>Advanced byte options</summary>
   function commandSequence(ctx2, doc) {
     var _a, _b, _c;
     if (!Array.isArray((_a = doc == null ? void 0 : doc.definition) == null ? void 0 : _a.commands) || !doc.definition.commands.length) return "";
-    const { state: state2 } = ctx2, scope = selectionKey(state2), page = state2.page, current2 = () => scope === selectionKey(state2) && page === state2.page;
+    const { state: state2 } = ctx2, scope = selectionKey(state2), page = state2.page, current3 = () => scope === selectionKey(state2) && page === state2.page;
     const script = doc.scripts.find((s) => s.id === ctx2.draft("command-script", "")) || doc.scripts[0];
     if (!(script == null ? void 0 : script.editable)) return "";
     const draftKey3 = "command-sequence-" + doc.document_id + "-" + script.id;
@@ -8558,7 +8560,7 @@ ${state2.artifact.system_id ? `<details><summary>Advanced byte options</summary>
     const index = Math.max(0, Math.min(Number(ctx2.draft("cq-index", "0")) || 0, draft.items.length - 1)), item = draft.items[index], grammar = doc.definition.commands, cmd = grammar.find((c) => c.opcode === (item == null ? void 0 : item.opcode)), insert = grammar.find((c) => String(c.opcode) === ctx2.draft("cq-opcode", "")) || grammar.find((c) => c.role !== "end") || grammar[0];
     const packet = ((_b = state2.commandRewriteReview) == null ? void 0 : _b.scope) === scope ? state2.commandRewriteReview : null;
     const store = (items) => {
-      if (!current2()) throw Error("The command source changed.");
+      if (!current3()) throw Error("The command source changed.");
       state2.pending = null;
       state2.commandRewriteReview = null;
       ctx2.setDraft(draftKey3, JSON.stringify({ ...draft, items, changed: JSON.stringify(items) !== JSON.stringify(original(script)) }));
@@ -8592,16 +8594,16 @@ ${state2.artifact.system_id ? `<details><summary>Advanced byte options</summary>
       "cq-preview": async () => {
         if (error) throw Error(error);
         const p = args(), signature = JSON.stringify(p), r = await ctx2.run("commands.rewrite.preview", p, { render: false });
-        if (!current2()) return;
+        if (!current3()) return;
         if (signature !== JSON.stringify(args()) || ctx2.draft(draftKey3, "null") !== JSON.stringify(draft) && draft.changed) throw Error("The sequence changed. Preview it again.");
         state2.commandRewriteReview = { scope, args: p, signature, result: r };
         return ctx2.render();
       },
       "cq-plan": async () => {
         const p = args();
-        if (!current2() || !packet || packet.signature !== JSON.stringify(p)) throw Error("Preview the current sequence first.");
+        if (!current3() || !packet || packet.signature !== JSON.stringify(p)) throw Error("Preview the current sequence first.");
         const r = await ctx2.run("commands.rewrite.plan", { ...p, review_id: packet.result.review_id }, { render: false });
-        if (!current2()) return;
+        if (!current3()) return;
         if (packet !== state2.commandRewriteReview || packet.signature !== JSON.stringify(args())) throw Error("The sequence changed. Review it again.");
         state2.pending = { kind: "command-rewrite", artifact_id: state2.artifact.artifact_id, plan_id: r.plan_id, signature: packet.signature };
         return ctx2.render();
@@ -8609,14 +8611,14 @@ ${state2.artifact.system_id ? `<details><summary>Advanced byte options</summary>
       "cq-build": async () => {
         var _a2, _b2, _c2;
         const p = state2.pending;
-        if (!current2() || (p == null ? void 0 : p.kind) !== "command-rewrite" || p.signature !== JSON.stringify(args())) throw Error("Review this current sequence first.");
+        if (!current3() || (p == null ? void 0 : p.kind) !== "command-rewrite" || p.signature !== JSON.stringify(args())) throw Error("Review this current sequence first.");
         const built = await applyReviewedBuild(ctx2, p);
-        if (!current2() || state2.pending !== p || p.signature !== JSON.stringify(args())) {
+        if (!current3() || state2.pending !== p || p.signature !== JSON.stringify(args())) {
           ctx2.notify("Build saved. Newer command edits remain staged.");
           return;
         }
         const opened = await ctx2.api.call("commands.rewrite.definition", { ...ctx2.projectParams(), artifact_id: built.artifact_id });
-        if (!current2() || state2.pending !== p || p.signature !== JSON.stringify(args())) return;
+        if (!current3() || state2.pending !== p || p.signature !== JSON.stringify(args())) return;
         if (!opened.ok) throw Error(opened.error || "Could not reopen the command build.");
         state2.pending = null;
         state2.commandRewriteReview = null;
@@ -8655,7 +8657,7 @@ ${state2.artifact.system_id ? `<details><summary>Advanced byte options</summary>
     var _a, _b, _c, _d, _e;
     const { state: state2 } = ctx2, a = state2.artifact;
     if (!a) return "";
-    const page = state2.page, scope = selectionKey(state2), params = { ...ctx2.sourceParams() }, current2 = () => selectionKey(state2) === scope && state2.page === page;
+    const page = state2.page, scope = selectionKey(state2), params = { ...ctx2.sourceParams() }, current3 = () => selectionKey(state2) === scope && state2.page === page;
     let doc = state2.results["commands.inspect"];
     if ((doc == null ? void 0 : doc.source_sha256) !== a.sha256) doc = null;
     const saved = (_a = a.descriptors) == null ? void 0 : _a.commands;
@@ -8663,7 +8665,7 @@ ${state2.artifact.system_id ? `<details><summary>Advanced byte options</summary>
     if (!doc && saved) {
       try {
         doc = await ctx2.api.call("commands.inspect", { ...params, definition: saved });
-        if (!current2()) return "";
+        if (!current3()) return "";
         state2.results["commands.inspect"] = doc;
       } catch (e) {
         error = e.message;
@@ -8686,7 +8688,7 @@ ${state2.artifact.system_id ? `<details><summary>Advanced byte options</summary>
     const script = (doc == null ? void 0 : doc.scripts.find((s) => s.id === ctx2.draft("command-script", ""))) || (doc == null ? void 0 : doc.scripts[0]), index = Math.max(0, Math.min(Number(ctx2.draft("command-index", "0")) || 0, ((script == null ? void 0 : script.commands.length) || 1) - 1)), cmd = script == null ? void 0 : script.commands[index], operand = (cmd == null ? void 0 : cmd.fields.find((f) => f.name === ctx2.draft("command-field", ""))) || (cmd == null ? void 0 : cmd.fields[0]);
     const selected = () => {
       const script2 = doc == null ? void 0 : doc.scripts.find((s) => s.id === read("command-script")), cmd2 = script2 == null ? void 0 : script2.commands[Number(read("command-index"))], f = cmd2 == null ? void 0 : cmd2.fields.find((f2) => f2.name === read("command-field"));
-      if (!current2() || !(script2 == null ? void 0 : script2.editable) || !f) throw Error("Choose a fully decoded command and a declared operand.");
+      if (!current3() || !(script2 == null ? void 0 : script2.editable) || !f) throw Error("Choose a fully decoded command and a declared operand.");
       return { script: script2, cmd: cmd2, f };
     };
     const store = (next) => {
@@ -8705,23 +8707,23 @@ ${state2.artifact.system_id ? `<details><summary>Advanced byte options</summary>
       },
       "command-inspect": async () => {
         const definition = schema(), signature = JSON.stringify(definition), r = await ctx2.run("commands.inspect", { ...params, definition }, { render: false });
-        if (!current2()) return;
+        if (!current3()) return;
         if (signature !== JSON.stringify(schema())) throw Error("The command definition changed. Inspect it again.");
         state2.results["commands.inspect"] = r;
         return ctx2.render();
       },
       "command-preview-definition": async () => {
         const config = schema(), r = await ctx2.run("definitions.preview", { ...params, kind: "commands", config }, { render: false });
-        if (!current2()) return;
+        if (!current3()) return;
         state2.commandDefinitionReview = { scope, config, review_id: r.review_id };
         return ctx2.render();
       },
       "command-save-definition": async () => {
         var _a2;
         const review = state2.commandDefinitionReview;
-        if (!current2() || (review == null ? void 0 : review.scope) !== scope || JSON.stringify(review.config) !== JSON.stringify(schema())) throw Error("Preview the current command definition again.");
+        if (!current3() || (review == null ? void 0 : review.scope) !== scope || JSON.stringify(review.config) !== JSON.stringify(schema())) throw Error("Preview the current command definition again.");
         await ctx2.run("definitions.save", { ...params, kind: "commands", config: review.config, review_id: review.review_id, replace: !!((_a2 = document.getElementById("command-replace")) == null ? void 0 : _a2.checked) }, { render: false });
-        if (current2()) {
+        if (current3()) {
           state2.commandDefinitionReview = null;
           return ctx2.render();
         }
@@ -8736,18 +8738,18 @@ ${state2.artifact.system_id ? `<details><summary>Advanced byte options</summary>
       },
       "command-discard": () => store([]),
       "command-review": async () => {
-        if (!current2() || !doc || !changes.length) throw Error("Stage a declared operand change first.");
+        if (!current3() || !doc || !changes.length) throw Error("Stage a declared operand change first.");
         const signature = JSON.stringify(changes), r = await ctx2.run("commands.plan", { ...params, definition: doc.definition, document_id: doc.document_id, changes }, { render: false });
-        if (!current2()) return;
+        if (!current3()) return;
         if (signature !== JSON.stringify(JSON.parse(ctx2.draft("command-changes", "{}")).changes)) throw Error("The edits changed. Review again.");
         state2.pending = { kind: "commands", artifact_id: a.artifact_id, plan_id: r.plan_id, signature };
         return ctx2.render();
       },
       "command-build": async () => {
         const p = state2.pending;
-        if (!current2() || (p == null ? void 0 : p.kind) !== "commands" || p.artifact_id !== a.artifact_id || p.signature !== JSON.stringify(changes)) throw Error("Review the current command edits first.");
+        if (!current3() || (p == null ? void 0 : p.kind) !== "commands" || p.artifact_id !== a.artifact_id || p.signature !== JSON.stringify(changes)) throw Error("Review the current command edits first.");
         await ctx2.run("build.apply", { ...ctx2.projectParams(), plan_id: p.plan_id }, { render: false });
-        if (current2()) {
+        if (current3()) {
           if (state2.pending !== p || JSON.stringify(restoreCommandChanges(doc, ctx2.draft("command-changes", "null"))) !== p.signature) {
             ctx2.notify("Command build created. Your newer edits are still staged.");
             return ctx2.render();
@@ -8779,7 +8781,7 @@ ${state2.artifact.system_id ? `<details><summary>Advanced byte options</summary>
     const { state: state2 } = ctx2, scope = selectionKey(state2), params = { ...ctx2.sourceParams() };
     let entry = state2.structuralLab;
     if ((entry == null ? void 0 : entry.scope) !== scope) state2.structuralLab = entry = { scope, result: null, generation: 0 };
-    const current2 = () => selectionKey(state2) === scope && state2.structuralLab === entry;
+    const current3 = () => selectionKey(state2) === scope && state2.structuralLab === entry;
     if (((_a = state2.structuralPrefill) == null ? void 0 : _a.scope) === scope) {
       const p = state2.structuralPrefill;
       state2.structuralPrefill = null;
@@ -8789,21 +8791,21 @@ ${state2.artifact.system_id ? `<details><summary>Advanced byte options</summary>
     const result = bound(state2, entry.result) ? entry.result : null;
     ctx2.use({
       "lab-survey": async () => {
-        if (!current2()) throw Error("The selected source changed.");
+        if (!current3()) throw Error("The selected source changed.");
         const window2 = { offset: integer13("lab-offset", 0, 64 * 1024 ** 2), length: integer13("lab-length", 1, 65536) }, generation = ++entry.generation;
         const r = await ctx2.run("structures.survey", { ...params, ...window2 }, { render: false, refresh: false });
-        if (!current2() || entry.generation !== generation) return;
+        if (!current3() || entry.generation !== generation) return;
         if ((r == null ? void 0 : r.ok) === false || !bound(state2, r)) throw Error(r.error || "Experiment belongs to another source.");
         entry.result = r;
         entry.window = window2;
         await ctx2.render();
       },
       "lab-open": async (node) => {
-        if (!current2() || !result) throw Error("Run an experiment for the selected source first.");
+        if (!current3() || !result) throw Error("Run an experiment for the selected source first.");
         if (!result.candidates.some((c) => c.candidate_id === node.dataset.id)) throw Error("Choose a current hypothesis.");
         const generation = ++entry.generation;
         const r = await ctx2.run("structures.definition", { ...params, ...entry.window, candidate_id: node.dataset.id, interpretation: read("lab-interpretation") }, { render: false, refresh: false });
-        if (!current2() || entry.generation !== generation) return;
+        if (!current3() || entry.generation !== generation) return;
         if ((r == null ? void 0 : r.ok) === false || !bound(state2, r)) throw Error(r.error || "Definition belongs to another source.");
         state2.tableProposal = { scope, result: r };
         await ctx2.navigate("tables");
@@ -8825,11 +8827,11 @@ ${state2.artifact.system_id ? `<details><summary>Advanced byte options</summary>
   };
   function valueFinder(ctx2) {
     var _a;
-    const { state: state2 } = ctx2, scope = selectionKey(state2), params = { ...ctx2.sourceParams() }, current2 = () => selectionKey(state2) === scope;
+    const { state: state2 } = ctx2, scope = selectionKey(state2), params = { ...ctx2.sourceParams() }, current3 = () => selectionKey(state2) === scope;
     const result = matchingFinder(state2, state2.valueSearch) ? state2.valueSearch : null, video = matchingFinder(state2, state2.valueVideo) ? state2.valueVideo : null;
     const keep = async (operation, parameters, key) => {
       const next = await ctx2.run(operation, { ...params, ...parameters }, { render: false });
-      if (!current2()) return;
+      if (!current3()) return;
       state2[key] = { ...next, selection_scope: scope };
       delete state2.results[operation];
       return ctx2.render();
@@ -8842,7 +8844,7 @@ ${state2.artifact.system_id ? `<details><summary>Advanced byte options</summary>
       },
       "finder-watch": (node) => {
         var _a2, _b;
-        if (!current2() || !result) throw Error("Start a current-source search first.");
+        if (!current3() || !result) throw Error("Start a current-source search first.");
         const offset = Number(node.dataset.id);
         if (!result.matches.some((m) => m.offset === offset)) throw Error("Select a measured result.");
         const watches = ((_b = (_a2 = state2.artifact.descriptors) == null ? void 0 : _a2.watches) == null ? void 0 : _b.watches) || [];
@@ -8885,13 +8887,13 @@ ${state2.artifact.system_id ? `<details><summary>Advanced byte options</summary>
       state2.watchChanges = null;
       state2.watchGeneration = (state2.watchGeneration || 0) + 1;
     }
-    const current2 = () => {
+    const current3 = () => {
       var _a2, _b2, _c;
       const saved = (_b2 = (_a2 = state2.artifact) == null ? void 0 : _a2.descriptors) == null ? void 0 : _b2.watches;
       return selectionKey(state2) === scope && state2.runtime === runtime && JSON.stringify((saved == null ? void 0 : saved.source_sha256) === ((_c = state2.artifact) == null ? void 0 : _c.sha256) ? saved.watches : []) === signature;
     };
     const save = (next) => {
-      if (!current2()) throw Error("The selected source changed. Add watches again.");
+      if (!current3()) throw Error("The selected source changed. Add watches again.");
       state2.watchGeneration++;
       state2.watchBaseline = null;
       state2.watchReadings = null;
@@ -8902,8 +8904,8 @@ ${state2.artifact.system_id ? `<details><summary>Advanced byte options</summary>
       "watch-add": () => save([...watches, { name: read("watch-name"), region: Number(read("watch-region")), offset: Number(read("watch-offset")), length: Number(read("watch-length")) }]),
       "watch-remove": (node) => save(watches.filter((_, i) => i !== Number(node.dataset.id))),
       "watch-read": async () => {
-        if (!current2() || !runtime) throw Error("Load this source in Playtest before reading watches.");
-        const generation = ++state2.watchGeneration, baseline = state2.watchBaseline, valid2 = () => current2() && state2.watchGeneration === generation && state2.watchBaseline === baseline, readings = {}, changes = {};
+        if (!current3() || !runtime) throw Error("Load this source in Playtest before reading watches.");
+        const generation = ++state2.watchGeneration, baseline = state2.watchBaseline, valid2 = () => current3() && state2.watchGeneration === generation && state2.watchBaseline === baseline, readings = {}, changes = {};
         let context = null;
         for (const watch of watches) {
           const result = await ctx2.api.call("runtime.memory", { ...params, region: watch.region, offset: watch.offset, length: watch.length });
@@ -8928,7 +8930,7 @@ ${state2.artifact.system_id ? `<details><summary>Advanced byte options</summary>
         return ctx2.render();
       },
       "watch-baseline": () => {
-        if (!current2() || !state2.watchReadings) throw new Error("Read current watches first.");
+        if (!current3() || !state2.watchReadings) throw new Error("Read current watches first.");
         state2.watchGeneration++;
         state2.watchBaseline = structuredClone(state2.watchReadings);
         state2.watchChanges = null;
@@ -8967,22 +8969,22 @@ ${state2.artifact.system_id ? `<details><summary>Advanced byte options</summary>
     const { state: state2 } = ctx2, missing2 = requireProject(ctx2);
     if (missing2) return missing2;
     if (!state2.artifact) return empty("Select a source or build", "A case binds exact source bytes and a registered build.");
-    const scope = selectionKey(state2), params = { ...ctx2.sourceParams() }, source = state2.artifact, current2 = () => selectionKey(state2) === scope;
+    const scope = selectionKey(state2), params = { ...ctx2.sourceParams() }, source = state2.artifact, current3 = () => selectionKey(state2) === scope;
     const references = ((_a = state2.debugReferences) == null ? void 0 : _a.scope) === scope && state2.debugReferences.result.source_sha256 === source.sha256 ? state2.debugReferences.result : null;
     const mapped = ((_b = state2.debugAddress) == null ? void 0 : _b.scope) === scope && state2.debugAddress.result.source_sha256 === source.sha256 && state2.debugAddress.result.artifact_id === source.artifact_id ? state2.debugAddress.result : null;
     const resolved = (mapped == null ? void 0 : mapped.ok) === true && mapped.status === "RESOLVED" && Number.isSafeInteger(mapped.offset) && mapped.offset >= 0 && mapped.offset < source.size;
     const keep = async (operation, parameters, key) => {
-      if (!current2()) throw Error("The selected source changed. Run this investigation again.");
+      if (!current3()) throw Error("The selected source changed. Run this investigation again.");
       const generations = state2.debugRequestGeneration ??= {};
       const generation = generations[key] = (generations[key] || 0) + 1;
       delete state2[key];
       const result2 = await ctx2.run(operation, { ...params, ...parameters }, { render: false });
-      if (!current2() || generations[key] !== generation) return;
+      if (!current3() || generations[key] !== generation) return;
       state2[key] = { scope, result: result2 };
       return ctx2.render();
     };
     const jump = (offset) => {
-      if (!current2()) throw Error("The selected source changed. Inspect the current result again.");
+      if (!current3()) throw Error("The selected source changed. Inspect the current result again.");
       if (!Number.isSafeInteger(offset) || offset < 0 || offset >= source.size) throw Error("The result is outside this source.");
       state2.resourceJump = offset;
       return ctx2.navigate("resources");
@@ -9014,13 +9016,13 @@ ${state2.artifact.system_id ? `<details><summary>Advanced byte options</summary>
     });
     const result = state2.results["debug.observe"] || state2.results["debug.inspect"];
     const commands = await commandEditor(ctx2);
-    if (!current2()) return "";
+    if (!current3()) return "";
     const investigation = await investigationSeries(ctx2);
-    if (!current2()) return "";
+    if (!current3()) return "";
     const native = await executionTrace(ctx2);
-    if (!current2()) return "";
+    if (!current3()) return "";
     const structures = await structuralLab(ctx2);
-    if (!current2()) return "";
+    if (!current3()) return "";
     return `${heading("", "Investigation", "")}${commands}${investigation}${native}${structures}<details class="card"><summary>Additional memory tools</summary>${valueFinder(ctx2)}${memoryWatches(ctx2)}</details>${hardwareReference(ctx2)}<section class="card"><h3>Declared references</h3>${field("uses-offset", "Target file offset", ctx2.draft("uses-offset", "0"))}${button("Find declared references", "uses-read")}${(references == null ? void 0 : references.ok) ? `<div>${references.uses.map((row) => `<div class="actions"><span>${esc(row.name)} · ${esc(row.kind)}</span>${button("Inspect0x" + row.offset.toString(16), "uses-open", { id: String(row.offset) })}</div>`).join("") || "<p>No declared references to this offset.</p>"}<p class="subtle">${references.partial ? "Partial scan (first4,096 table records)." : "Undeclared uses remain unknown."}</p></div>` : ""}</section><div class="grid-even"><section class="card"><h3>Address explorer</h3>${select("address-system", "System", [["nes", "NES"], ["snes", "SNES"], ["genesis", "Genesis"], ["gb", "Game Boy"], ["gbc", "Game Boy Color"]], ctx2.draft("address-system", state2.artifact.system_id || "nes"))}${field("cpu-address", "CPU address", ctx2.draft("cpu-address", "0x8000"))}${select("address-mapping", "Declared mapping", [["nrom", "NES NROM"], ["prg-bank", "NES explicit PRG bank"], ["lorom", "SNES LoROM"], ["hirom", "SNES HiROM"], ["linear", "Genesis linear"], ["gb-rom", "Game Boy explicit ROM bank"]], ctx2.draft("address-mapping", { nes: "nrom", snes: "lorom", genesis: "linear", gb: "gb-rom", gbc: "gb-rom" }[state2.artifact.system_id] || "nrom"))}<details class="config"><summary>Mapping bounds</summary><div class="field-row">${field("address-bank", "Explicit bank (optional)", ctx2.draft("address-bank", ""))}${field("address-prg", "PRG file offset", ctx2.draft("address-prg", "16"))}${field("address-prg-size", "NROM PRG bytes", ctx2.draft("address-prg-size", "16384"))}${field("address-bank-size", "Bank bytes", ctx2.draft("address-bank-size", "8192"))}${field("address-window", "CPU window start", ctx2.draft("address-window", "0x8000"))}${field("address-prefix", "Copier header bytes", ctx2.draft("address-prefix", "0"))}${field("address-file", "Loaded-file offset", ctx2.draft("address-file", "0"))}${field("address-window-length", "Loaded-file bytes", ctx2.draft("address-window-length", "8192"))}</div></details>${button("Resolve address", "address-resolve", { primary: true })}${resolved ? button("Inspect mapped bytes", "address-open") + '<p class="subtle">Declared mapping only; active bank state was not observed.</p>' : ""}${report(mapped, "Mapped bytes")}</section><section class="card"><h3>Compare bytes</h3>${select("compare-other", "Compare selected source with", [...state2.project.sources, ...state2.project.builds].filter((r) => r.artifact_id !== state2.artifact.artifact_id).map((r) => [r.artifact_id, r.name]), ctx2.draft("compare-other", ""))}<div class="field-row">${field("compare-offset", "File offset", ctx2.draft("compare-offset", "0"))}${field("compare-length", "Bytes", ctx2.draft("compare-length", "256"))}</div>${button("Compare range", "compare-bytes")}${report(state2.results["resources.compare"], "Byte differences")}<h3>Native memory</h3><div class="field-row">${select("memory-region", "Region", [["2", "System RAM"], ["3", "Video RAM"], ["0", "Save RAM"]], ctx2.draft("memory-region", "2"))}${field("memory-offset", "Region offset", ctx2.draft("memory-offset", "0"))}${field("memory-length", "Bytes to observe", ctx2.draft("memory-length", "32"))}</div>${button("Capture memory snapshot", "memory-read", { disabled: !state2.runtime })}${report(state2.results["runtime.memory"], "Measured memory")}</section></div><details class="card"><summary>Advanced trace case</summary><div class="grid-two"><section class="card"><div class="card-heading"><h3>Case workspace</h3>${badge("EXPLICIT MAPPINGS")}</div><p class="subtle">Import your revision-bound case and trace JSON below. A bank or address space that has not been established stays unresolved.</p>${jsonEditor("debug-case", "Troubleshooting case", ctx2.draft("debug-case", "{}"), false)}${jsonEditor("debug-trace", "Explicit imported trace", ctx2.draft("debug-trace", "{}"), false)}<div class="actions">${button("Inspect case & source", "debug-inspect", { primary: true, icon: "debug" })}</div><div class="notice">Imported reads and writes are candidates. They do not establish an emulator write event or prove causation.</div></section><section class="card"><h3>Native observations</h3><p class="subtle">Use a fresh owned worker to compare declared memory probes before and after real controller input.</p>${jsonEditor("debug-runtime", "Observation configuration", ctx2.draft("debug-runtime", JSON.stringify({ load: {}, steps: [{ frames: 1, buttons: [], port: 0 }], initial_state_file: null, timeout: 30, frame_region: [0, 0, 1, 1], memory_probe_ids: [] }, null, 2)), true)}${button("Observe in native worker", "debug-observe", { icon: "playtest" })}<div class="notice warm">Memory snapshots are bounded observations. A changed value alone does not show which instruction wrote it.</div>${(result == null ? void 0 : result.probes) ? `<div class="table-wrap"><table><thead><tr><th>Probe</th><th>Resolution</th><th>Source bytes</th></tr></thead><tbody>${result.probes.map((p) => {
       var _a2;
       return `<tr><td>${esc(p.probe_id)}</td><td>${esc(p.status)}</td><td><code>${esc(((_a2 = p.source) == null ? void 0 : _a2.raw_hex) || "Unresolved")}</code></td></tr>`;
@@ -9072,23 +9074,23 @@ ${state2.artifact.system_id ? `<details><summary>Advanced byte options</summary>
     ctx2.use({
       "route-run": configured,
       "route-add-step": () => {
-        const current2 = json("route-json"), check = assertion();
-        current2.steps.push({ frames: Number(read("step-frames")), buttons: read("step-buttons").split(",").map((v) => v.trim()).filter(Boolean), port: Number(read("step-port")), assertions: check ? [check] : [], transition: null, checkpoint: read("step-checkpoint") === "yes" });
-        return saveLocal(current2);
+        const current3 = json("route-json"), check = assertion();
+        current3.steps.push({ frames: Number(read("step-frames")), buttons: read("step-buttons").split(",").map((v) => v.trim()).filter(Boolean), port: Number(read("step-port")), assertions: check ? [check] : [], transition: null, checkpoint: read("step-checkpoint") === "yes" });
+        return saveLocal(current3);
       },
       "route-remove-step": (node) => {
-        const current2 = json("route-json");
-        current2.steps.splice(Number(node.dataset.id), 1);
-        return saveLocal(current2);
+        const current3 = json("route-json");
+        current3.steps.splice(Number(node.dataset.id), 1);
+        return saveLocal(current3);
       },
       "route-set-assertion": () => {
-        const current2 = json("route-json"), index = Number(read("step-index")), check = assertion();
-        if (!current2.steps[index] || !check) throw new Error("Choose a step and an assertion.");
-        current2.steps[index].assertions.push(check);
-        return saveLocal(current2);
+        const current3 = json("route-json"), index = Number(read("step-index")), check = assertion();
+        if (!current3.steps[index] || !check) throw new Error("Choose a step and an assertion.");
+        current3.steps[index].assertions.push(check);
+        return saveLocal(current3);
       },
       "route-preview": async () => {
-        const current2 = json("route-json"), result = await ctx2.run("routes.compile", { name: read("route-name"), steps: current2.steps, max_frames: Number(read("route-max-frames")), max_actions: Number(read("route-max-actions")) }, { render: false });
+        const current3 = json("route-json"), result = await ctx2.run("routes.compile", { name: read("route-name"), steps: current3.steps, max_frames: Number(read("route-max-frames")), max_actions: Number(read("route-max-actions")) }, { render: false });
         ctx2.setDraft("route-json", JSON.stringify(result.route, null, 2));
         await ctx2.render();
       },
@@ -9204,14 +9206,14 @@ ${state2.artifact.system_id ? `<details><summary>Advanced byte options</summary>
   // romancer/ui/replay_release.js
   function replayRelease(ctx2) {
     var _a;
-    const { state: state2 } = ctx2, params = ctx2.projectParams(), scope = selectionKey(state2), current2 = () => scope === selectionKey(state2);
+    const { state: state2 } = ctx2, params = ctx2.projectParams(), scope = selectionKey(state2), current3 = () => scope === selectionKey(state2);
     const checks = state2.project.builds.flatMap((build) => (build.build_check_results || []).filter((result) => result.replay_verified && result.target_id === build.artifact_id).map((result) => ({ ...result, build }))).slice(-32).reverse();
     const recent = state2.results["release.replay"];
     const created = (_a = state2.results["release.proof"]) == null ? void 0 : _a.export;
     ctx2.use({
       "release-proof": async () => {
         var _a2;
-        if (!current2()) throw Error("The selection changed. Reopen Export.");
+        if (!current3()) throw Error("The selection changed. Reopen Export.");
         const id = read("release-proof-check");
         const check = checks.find((row) => row.evidence_id === id);
         if (!check || check.target_id !== read("release-target")) throw Error("Choose the build tested by this replay in the Edited build menu above.");
@@ -9227,15 +9229,15 @@ ${state2.artifact.system_id ? `<details><summary>Advanced byte options</summary>
       },
       "release-replay": async () => {
         var _a2, _b;
-        if (!current2()) throw Error("The selection changed. Reopen Export.");
+        if (!current3()) throw Error("The selection changed. Reopen Export.");
         const source_id = read("release-source"), target_id = read("release-target");
         if (!source_id || !target_id) throw Error("Select the exact original and patched build above.");
         const patch = (_b = (_a2 = document.getElementById("release-replay-patch")) == null ? void 0 : _a2.files) == null ? void 0 : _b[0];
         if (!patch || !patch.name.toLowerCase().endsWith(".bps")) throw Error("Choose the BPS from the proof package.");
         const proof = await readJsonFile("release-replay-file", 32 * 1024);
-        if (!current2()) return;
+        if (!current3()) return;
         const input = await ctx2.api.uploadInput(params.project_id, patch, "patch");
-        if (!current2() || source_id !== read("release-source") || target_id !== read("release-target")) return;
+        if (!current3() || source_id !== read("release-source") || target_id !== read("release-target")) return;
         return ctx2.run("release.replay", { ...params, source_id, target_id, input_id: input.input_id, proof });
       }
     });
@@ -9253,11 +9255,11 @@ ${state2.artifact.system_id ? `<details><summary>Advanced byte options</summary>
     if (!file) throw new Error("Choose a BPS or IPS patch first.");
     const scope = selectionKey(ctx2.state), project_id = ctx2.state.project.project_id, artifact_id = ctx2.state.artifact.artifact_id, request2 = (ctx2.state.patchRequest || 0) + 1;
     ctx2.state.patchRequest = request2;
-    const current2 = () => selectionKey(ctx2.state) === scope && ctx2.state.patchRequest === request2;
+    const current3 = () => selectionKey(ctx2.state) === scope && ctx2.state.patchRequest === request2;
     const input = await ctx2.api.uploadInput(project_id, file, "patch");
-    if (!current2()) throw new Error("The selected file or ROM changed. Preview the patch for the new selection.");
+    if (!current3()) throw new Error("The selected file or ROM changed. Preview the patch for the new selection.");
     const preview2 = await ctx2.run("patches.preview", { project_id, artifact_id, input_id: input.input_id, expected_reference: expectedReference }, { render: false });
-    if (!current2()) throw new Error("The selection changed while the patch was checked. Preview it again.");
+    if (!current3()) throw new Error("The selection changed while the patch was checked. Preview it again.");
     ctx2.state.patchImport = { scope, input, preview: preview2, file };
     return preview2;
   }
@@ -9781,19 +9783,19 @@ ${state2.artifact.system_id ? `<details><summary>Advanced byte options</summary>
     if (setupReview) return setupReview;
     const { state: state2 } = ctx2;
     if (!state2.project || !state2.artifact) return heading("", "Music & sound", "") + empty("Open a source to inspect audio", "Audio hardware and game music drivers are identified separately.");
-    const scope = selectionKey(state2), current2 = () => scope === selectionKey(state2), params = { ...ctx2.sourceParams() }, saved = (_a = state2.artifact.descriptors) == null ? void 0 : _a.sound;
+    const scope = selectionKey(state2), current3 = () => scope === selectionKey(state2), params = { ...ctx2.sourceParams() }, saved = (_a = state2.artifact.descriptors) == null ? void 0 : _a.sound;
     const system2 = await ctx2.api.call("sound.system", params);
-    if (!current2() || ((_b = ctx2.isCurrentRender) == null ? void 0 : _b.call(ctx2)) === false) return "";
+    if (!current3() || ((_b = ctx2.isCurrentRender) == null ? void 0 : _b.call(ctx2)) === false) return "";
     let doc = state2.results["sound.inspect"];
     if ((doc == null ? void 0 : doc.source_sha256) !== state2.artifact.sha256) doc = null;
     if (!doc && (saved == null ? void 0 : saved.source_sha256) === state2.artifact.sha256) {
       doc = await ctx2.api.call("sound.inspect", { ...params, definition: saved });
-      if (!current2() || ((_c = ctx2.isCurrentRender) == null ? void 0 : _c.call(ctx2)) === false) return "";
+      if (!current3() || ((_c = ctx2.isCurrentRender) == null ? void 0 : _c.call(ctx2)) === false) return "";
       state2.results["sound.inspect"] = doc;
     }
     if (!doc && system2.known_definition) {
       doc = await ctx2.api.call("sound.inspect", { ...params, definition: system2.known_definition });
-      if (!current2() || ((_d = ctx2.isCurrentRender) == null ? void 0 : _d.call(ctx2)) === false) return "";
+      if (!current3() || ((_d = ctx2.isCurrentRender) == null ? void 0 : _d.call(ctx2)) === false) return "";
       state2.results["sound.inspect"] = doc;
     }
     let changes = [], draftError = "";
@@ -9804,7 +9806,7 @@ ${state2.artifact.system_id ? `<details><summary>Advanced byte options</summary>
     }
     const sameDocument = () => {
       var _a2;
-      return current2() && ((_a2 = state2.results["sound.inspect"]) == null ? void 0 : _a2.document_id) === (doc == null ? void 0 : doc.document_id);
+      return current3() && ((_a2 = state2.results["sound.inspect"]) == null ? void 0 : _a2.document_id) === (doc == null ? void 0 : doc.document_id);
     };
     const persist = (next) => {
       if (!sameDocument()) return;
@@ -9876,7 +9878,7 @@ ${state2.artifact.system_id ? `<details><summary>Advanced byte options</summary>
         clearPreview(state2);
         const generation = state2.soundPreviewGeneration;
         const result = await ctx2.run("sound.capture", { ...params, frames: Number(read("sound-frames")) }, { render: false });
-        if (!current2() || state2.soundPreviewGeneration !== generation) return;
+        if (!current3() || state2.soundPreviewGeneration !== generation) return;
         state2.frame = result.frame;
         delete result.frame;
         delete state2.results["sound.capture"];
@@ -9899,18 +9901,18 @@ ${state2.artifact.system_id ? `<details><summary>Advanced byte options</summary>
       },
       "sound-plan": async () => {
         var _a2;
-        if (!current2() || !doc) throw Error("Inspect supported audio first.");
+        if (!current3() || !doc) throw Error("Inspect supported audio first.");
         const submitted = ctx2.draft("sound-changes", "{}"), result = await ctx2.run("sound.plan", { ...params, definition: doc.definition, document_id: doc.document_id, changes }, { render: false });
-        if (!current2() || ((_a2 = state2.results["sound.inspect"]) == null ? void 0 : _a2.document_id) !== doc.document_id || ctx2.draft("sound-changes", "{}") !== submitted) return ctx2.render();
+        if (!current3() || ((_a2 = state2.results["sound.inspect"]) == null ? void 0 : _a2.document_id) !== doc.document_id || ctx2.draft("sound-changes", "{}") !== submitted) return ctx2.render();
         state2.pending = { kind: "sound", artifact_id: state2.artifact.artifact_id, document_id: doc.document_id, plan_id: result.plan_id, changes: JSON.stringify(changes) };
         return ctx2.render();
       },
       "sound-build": async () => {
         var _a2, _b2, _c2;
-        if (!current2() || ((_a2 = state2.pending) == null ? void 0 : _a2.kind) !== "sound" || state2.pending.artifact_id !== state2.artifact.artifact_id || state2.pending.document_id !== (doc == null ? void 0 : doc.document_id) || ((_b2 = state2.results["sound.inspect"]) == null ? void 0 : _b2.document_id) !== (doc == null ? void 0 : doc.document_id) || state2.pending.changes !== JSON.stringify(changes)) throw Error("Review the current sound changes first.");
+        if (!current3() || ((_a2 = state2.pending) == null ? void 0 : _a2.kind) !== "sound" || state2.pending.artifact_id !== state2.artifact.artifact_id || state2.pending.document_id !== (doc == null ? void 0 : doc.document_id) || ((_b2 = state2.results["sound.inspect"]) == null ? void 0 : _b2.document_id) !== (doc == null ? void 0 : doc.document_id) || state2.pending.changes !== JSON.stringify(changes)) throw Error("Review the current sound changes first.");
         const submitted = ctx2.draft("sound-changes", "{}");
         await ctx2.run("build.apply", { ...ctx2.projectParams(), plan_id: state2.pending.plan_id }, { render: false });
-        if (!current2()) return;
+        if (!current3()) return;
         const unchanged = ((_c2 = state2.results["sound.inspect"]) == null ? void 0 : _c2.document_id) === doc.document_id && ctx2.draft("sound-changes", "{}") === submitted;
         if (unchanged) persist([]);
         else state2.pending = null;
@@ -9971,13 +9973,747 @@ ${state2.artifact.system_id ? `<details><summary>Advanced byte options</summary>
     });
   }
 
+  // romancer/ui/views/scenes.js
+  var scenes_exports = {};
+  __export(scenes_exports, {
+    mount: () => mount12,
+    render: () => render16
+  });
+
+  // romancer/ui/scene_editor.js
+  var plural = (count, word, many = word + "s") => `${count} ${count === 1 ? word : many}`;
+  var hex7 = (rgb) => "#" + rgb.map((v) => Math.max(0, Math.min(255, Math.round(v))).toString(16).padStart(2, "0")).join("");
+  function parseHex(text) {
+    const match = /^#?([0-9a-f]{6})$/i.exec(String(text || ""));
+    if (!match) return null;
+    const value = parseInt(match[1], 16);
+    return [value >> 16 & 255, value >> 8 & 255, value & 255];
+  }
+  var distance = (a, b) => (a[0] - b[0]) ** 2 + (a[1] - b[1]) ** 2 + (a[2] - b[2]) ** 2;
+  function levelIndex(value, levels) {
+    let best = 0;
+    for (let i = 1; i < levels.length; i++) if (Math.abs(levels[i] - value) < Math.abs(levels[best] - value)) best = i;
+    return best;
+  }
+  function snapColor(rgb, picker) {
+    if (picker.kind === "levels") return rgb.map((value) => picker.levels[levelIndex(value, picker.levels)]);
+    const hidden = new Set(picker.hidden || []);
+    let best = -1;
+    picker.colors.forEach((color, index) => {
+      if (!hidden.has(index) && (best < 0 || distance(color, rgb) < distance(picker.colors[best], rgb))) best = index;
+    });
+    return [...picker.colors[best]];
+  }
+  function pickerSummary(colors, picker) {
+    if (picker.kind === "levels") {
+      const top = picker.levels.length - 1, [r, g, b] = colors[0].map((v) => levelIndex(v, picker.levels));
+      return `Red ${r}, green ${g}, blue ${b} (each 0 to ${top})`;
+    }
+    if (picker.kind === "master") {
+      const index = picker.colors.findIndex((c) => distance(c, colors[0]) === 0);
+      return index < 0 ? "A color outside the NES set" : `NES color ${index + 1} of ${picker.colors.length}`;
+    }
+    const names7 = ["white", "light gray", "dark gray", "black"];
+    return colors.map((color, slot) => `slot ${slot + 1}: ${names7[Math.max(0, picker.colors.findIndex((c) => distance(c, color) === 0))]}`).join(", ");
+  }
+  function swatchesForPixel(rgb, swatches, tolerance = 1500) {
+    const found = [];
+    for (const swatch of swatches) swatch.colors.forEach((color, slot) => {
+      const d = distance(color, rgb);
+      if (d <= tolerance) found.push({ swatch, slot, distance: d });
+    });
+    if (!found.length) return [];
+    const best = Math.min(...found.map((f) => f.distance));
+    return found.filter((f) => f.distance <= best + 48).sort((a, b) => a.distance - b.distance || Number(b.swatch.editable) - Number(a.swatch.editable));
+  }
+  function groupSwatches(swatches) {
+    const groups = [];
+    for (const swatch of swatches) {
+      let group = groups.at(-1);
+      if (!group || group.name !== swatch.group) {
+        group = { name: swatch.group, items: [] };
+        groups.push(group);
+      }
+      group.items.push(swatch);
+    }
+    return groups;
+  }
+  var sameColors = (a, b) => JSON.stringify(a) === JSON.stringify(b);
+  function swatchLabel(swatch) {
+    const state2 = swatch.editable ? swatch.pending ? "changed, not saved yet" : "can be changed" : "locked: " + swatch.locked_reason;
+    return `${swatch.name}, ${swatch.colors.map(hex7).join(" ")}, ${state2}${swatch.editable && swatch.uses ? ", used in " + plural(swatch.uses, "scene") : ""}`;
+  }
+  function changeLine(change) {
+    if (change.planning) return "Working out how to change only this scene…";
+    if (change.error) return change.error;
+    if (change.working) return `Re-rendering ${plural(change.working, "scene")} in the real game…`;
+    return `${change.badge}. ${plural(change.visible_count, "scene")} ${change.visible_count === 1 ? "looks" : "look"} different.`;
+  }
+  var KEY_BUTTONS = { ArrowUp: "up", ArrowDown: "down", ArrowLeft: "left", ArrowRight: "right", z: "a", x: "b", a: "x", s: "y", q: "l", w: "r", Enter: "start", Shift: "select" };
+  var offsetText = (value) => "0x" + Number(value).toString(16).toUpperCase().padStart(6, "0");
+
+  // romancer/ui/views/scenes.js
+  var pictures = /* @__PURE__ */ new Map();
+  var PAD = [["up", "Up"], ["down", "Down"], ["left", "Left"], ["right", "Right"], ["a", "A"], ["b", "B"], ["start", "Start"], ["select", "Select"]];
+  var SLOT_NAMES = ["Lightest slot", "Light slot", "Dark slot", "Darkest slot"];
+  function editorFor2(ctx2) {
+    var _a;
+    const { state: state2 } = ctx2, scope = [state2.project.project_id, state2.artifact.artifact_id, state2.artifact.sha256].join(":");
+    if (((_a = state2.sceneEditor) == null ? void 0 : _a.scope) !== scope) {
+      stopLoops(state2.sceneEditor);
+      state2.sceneEditor = { scope, params: ctx2.sourceParams(), summary: null, sceneId: null, view: null, selected: null, draft: null, proposal: null, inspect: null, matches: [], scopeChoice: "all", playing: false, held: /* @__PURE__ */ new Set(), ticket: 0 };
+    }
+    return state2.sceneEditor;
+  }
+  function stopLoops(ed) {
+    if (!ed) return;
+    ed.ticket++;
+    ed.playing = false;
+    clearTimeout(ed.poll);
+    clearTimeout(ed.proposeTimer);
+    clearTimeout(ed.lookPoll);
+    clearTimeout(ed.recordPoll);
+  }
+  var current2 = (ctx2, ed) => ctx2.state.sceneEditor === ed && ctx2.state.page === "scenes";
+  var call = (ctx2, ed, operation, more = {}) => ctx2.api.call("edits." + operation, { ...ed.params, ...more });
+  function picture(ctx2, ed, key) {
+    const id = ed.scope + "|" + key;
+    let loading = pictures.get(id);
+    if (!loading) {
+      loading = call(ctx2, ed, "image", { key }).then((result) => new Promise((resolve, reject) => {
+        const image = new Image();
+        image.onload = () => resolve(image);
+        image.onerror = () => reject(new Error("This picture could not be shown."));
+        image.src = "data:image/png;base64," + result.png_base64;
+      }));
+      loading.catch(() => pictures.delete(id));
+      pictures.set(id, loading);
+      if (pictures.size > 800) pictures.delete(pictures.keys().next().value);
+    }
+    return loading;
+  }
+  var chips = (colors) => `<span class="scene-chips">${colors.map((color) => `<span class="scene-chip" data-color="${hex7(color)}"></span>`).join("")}</span>`;
+  var selectedSwatch = (ed) => {
+    var _a;
+    return ((_a = ed.view) == null ? void 0 : _a.swatches.find((swatch) => swatch.id === ed.selected)) || null;
+  };
+  var shownChange = (ed) => ed.proposal || ed.inspect;
+  function galleryPart(ed) {
+    const summary = ed.summary, recording = summary.recording, running = (recording == null ? void 0 : recording.state) === "running", engine = summary.engine;
+    return `<div class="card-heading"><h3>Scenes</h3>${badge(plural(summary.scenes.length, "scene") + " recorded", summary.scenes.length ? "good" : "neutral")}</div>
+ <p class="subtle">A scene is a moment of the game that ROMancer has watched. When you change something, every scene that uses the same data is shown. Scenes you haven't recorded can't be shown, so record the places you care about.</p>
+ <div class="actions">${running ? button("Stop recording", "scene-record-stop") : button("Record more scenes", "scene-record", { primary: !summary.scenes.length, icon: "plus", disabled: !engine.installed, reason: engine.reason })}${button(ed.playing ? "Stop playing" : "Play and capture a moment", "scene-play-toggle", { icon: "playtest", disabled: !engine.installed || running, reason: engine.installed ? "Wait for recording to finish, or stop it." : engine.reason })}</div>
+ ${recording ? `<div class="scene-progress" role="status" aria-live="polite">${running ? `<progress max="${recording.total}" value="${recording.done}" aria-label="Recording progress"></progress>` : ""}<span>${esc(recording.message)}${running && recording.found ? " " + plural(recording.found, "new scene") + " so far." : ""}</span></div>` : ""}
+ <div class="scene-strip" role="group" aria-label="Recorded scenes">${summary.scenes.map((row) => `<button type="button" class="scene-thumb ${row.id === ed.sceneId ? "selected" : ""}" data-action="scene-open" data-id="${row.id}" aria-pressed="${row.id === ed.sceneId}"><img alt="" data-picture="${esc(row.image)}" width="${row.width}" height="${row.height}"><span>${esc(row.label)}</span></button>`).join("") || `<p class="subtle">No scenes yet. Record more scenes lets the game play by itself for a few minutes; Play and capture lets you go where you want.</p>`}</div>`;
+  }
+  function playPart(ed) {
+    if (!ed.playing) return "";
+    return `<div class="card-heading"><h3>Play the game</h3>${badge("LIVE", "good")}</div><div class="scene-play"><div id="scene-controller" tabindex="0" role="application" aria-label="Game screen. Arrow keys move. Z is the A button, X is B, Enter is Start, Shift is Select."><canvas id="scene-play-canvas" class="scene-canvas" width="160" height="144"></canvas></div><div><p>Click the game, then play with the keyboard: arrow keys, <kbd>Z</kbd> for A, <kbd>X</kbd> for B, <kbd>Enter</kbd> for Start, <kbd>Shift</kbd> for Select. Or tap a button:</p><div class="actions scene-pad">${PAD.map(([id, label]) => button(label, "scene-tap", { id })).join("")}</div><div class="actions">${button("Capture this moment", "scene-capture", { primary: true, icon: "plus" })}${button("Stop playing", "scene-play-toggle")}</div><p class="subtle" id="scene-play-status" role="status" aria-live="polite">Starting the game…</p></div></div>`;
+  }
+  function alsoPart(ed) {
+    var _a;
+    const change = shownChange(ed);
+    if (!change) return "";
+    const tone = change.error || !change.working && !change.verified ? "notice warm" : "notice";
+    return `<h4>Also changes <small>${esc(change.title)}</small></h4><p class="${tone}" role="status" aria-live="polite">${esc(change.verdict)}</p>
+ <p>${badge(change.badge, change.scene_count > 1 ? "warm" : "neutral")} ${esc(change.coverage)}</p>
+ <div class="scene-strip" role="group" aria-label="Scenes that use the same data">${change.affected.map((row, index) => `<button type="button" class="scene-thumb ${row.visible ? "flagged" : ""} ${row.state === "working" ? "working" : ""}" data-action="scene-compare" data-id="${index}"><img alt="" data-picture="${esc(row.after || row.before)}" width="${row.width}" height="${row.height}"><span>${esc(row.label)}${row.edited_here ? " (this scene)" : ""}</span><small>${esc(row.status)}</small></button>`).join("")}</div>
+ <p class="subtle">Each picture is the real game replayed with your change. Choose one to compare before and after.</p>
+ <details><summary>Details</summary><p>${plural(change.bytes, "byte")} in the ROM ${change.bytes === 1 ? "changes" : "change"}.</p><div class="table-wrap"><table><thead><tr><th>Place in the file</th><th>Before</th><th>After</th></tr></thead><tbody>${change.details.map((row) => `<tr><td>${offsetText(row.file_offset)}</td><td>${row.before.toString(16).toUpperCase().padStart(2, "0")}</td><td>${row.after.toString(16).toUpperCase().padStart(2, "0")}</td></tr>`).join("")}</tbody></table></div>${((_a = change.notes) == null ? void 0 : _a.length) ? `<p>${change.notes.map(esc).join(" ")}</p>` : ""}</details>`;
+  }
+  function stagePart(ed) {
+    const view = ed.view;
+    if (!view) return `<h3>Scene</h3><p class="subtle">Record a scene, then choose it above to see its colors.</p>`;
+    return `<div class="card-heading"><h3>${esc(view.scene.label)}</h3><span id="scene-look">${ed.showOriginal ? badge("ORIGINAL") : ""}</span></div>
+ <canvas id="scene-canvas" class="scene-canvas scene-pickable" width="${view.scene.width}" height="${view.scene.height}" data-action="scene-pick-pixel" role="img" aria-label="The game screen in this scene. Click a pixel to select its color, or choose a color from the palette list."></canvas>
+ <div class="actions">${button(ed.showOriginal ? "Show with my changes" : "Show original", "scene-toggle-original")}${button("Forget this scene", "scene-forget")}</div>
+ <p class="subtle">Click any pixel to pick the color under it, or choose from the palette.</p><div id="scene-also">${alsoPart(ed)}</div>`;
+  }
+  function palettePart(ed) {
+    const view = ed.view;
+    if (!view) return "";
+    const matches = new Set(ed.matches), locked = view.swatches.filter((swatch) => !swatch.editable).length;
+    return `<div class="card-heading"><h3>Colors in this scene</h3>${badge(plural(view.swatches.length - locked, "color") + " you can change", "good")}</div>
+ ${groupSwatches(view.swatches).map((group) => `<div class="scene-palette-group"><h4>${esc(group.name)}</h4><div class="scene-swatches">${group.items.map((swatch) => `<button type="button" class="scene-swatch ${swatch.editable ? "" : "locked"} ${swatch.id === ed.selected ? "selected" : ""} ${matches.has(swatch.id) ? "match" : ""}" data-action="scene-select" data-id="${esc(swatch.id)}" aria-pressed="${swatch.id === ed.selected}" aria-label="${esc(swatchLabel(swatch))}" title="${esc(swatchLabel(swatch))}">${chips(swatch.pending || swatch.colors)}${swatch.editable ? "" : icon("lock", "scene-lock")}${swatch.pending ? '<span class="scene-dot" aria-hidden="true"></span>' : ""}</button>`).join("")}</div></div>`).join("")}
+ ${locked ? `<p class="subtle">${icon("lock", "scene-lock-inline")} ${plural(locked, "color")} ${locked === 1 ? "is" : "are"} locked. Choose one to see why.</p>` : ""}`;
+  }
+  function pickerControls(ed, swatch, picker) {
+    const draft = ed.draft;
+    if (picker.kind === "master") {
+      const hidden = new Set(picker.hidden);
+      return `<div class="scene-master" role="group" aria-label="${esc(picker.label)}">${picker.colors.map((color, index) => hidden.has(index) ? "" : `<button type="button" class="scene-master-color ${sameColors(color, draft[0]) ? "selected" : ""}" data-action="scene-master" data-id="${index}" aria-pressed="${sameColors(color, draft[0])}" aria-label="NES color ${index + 1}" title="NES color ${index + 1}"><span class="scene-chip" data-color="${hex7(color)}"></span></button>`).join("")}</div>`;
+    }
+    if (picker.kind === "shades") return `<div class="scene-shades">${draft.map((color, slot) => `<div role="group" aria-label="${SLOT_NAMES[slot]}"><span>${SLOT_NAMES[slot]}</span>${picker.colors.map((shade, index) => `<button type="button" class="scene-master-color ${sameColors(shade, color) ? "selected" : ""}" data-action="scene-shade" data-id="${index}" data-slot="${slot}" aria-pressed="${sameColors(shade, color)}" aria-label="${SLOT_NAMES[slot]}: ${["white", "light gray", "dark gray", "black"][index]}"><span class="scene-chip" data-color="${hex7(shade)}"></span></button>`).join("")}</div>`).join("")}</div>`;
+    const top = picker.levels.length - 1;
+    return `<div class="scene-levels">${["Red", "Green", "Blue"].map((name2, channel) => `<label><span>${name2}</span><input type="range" min="0" max="${top}" step="1" value="${levelIndex(draft[0][channel], picker.levels)}" data-channel="${channel}" aria-label="${name2}, 0 to ${top}"><output data-channel-value="${channel}">${levelIndex(draft[0][channel], picker.levels)}</output></label>`).join("")}<label class="scene-any"><span>Or pick any color; it snaps to the nearest one this system can show</span><input type="color" value="${hex7(draft[0])}" data-any-color aria-label="Pick any color"></label></div>`;
+  }
+  function pickerPart(ed) {
+    var _a;
+    const swatch = selectedSwatch(ed);
+    if (!swatch) return `<h3>Change a color</h3><p class="subtle">Choose a color from the palette, or click a pixel in the picture.</p>`;
+    if (!swatch.editable) return `<div class="card-heading"><h3>${esc(swatch.name)}</h3>${badge("LOCKED", "warm")}</div><p>${chips(swatch.colors)}</p><p class="notice">${icon("lock", "scene-lock-inline")} This color can't be changed here. ${esc(swatch.locked_reason)}</p>`;
+    const picker = ed.view.pickers[swatch.format], proposal = ((_a = ed.proposal) == null ? void 0 : _a.swatch) === swatch.id && ed.proposal.scene_id === ed.sceneId ? ed.proposal : null, support = ed.summary.private_copy;
+    const unchanged = sameColors(ed.draft, swatch.colors), ready = proposal && !proposal.working && !proposal.error;
+    return `<div class="card-heading"><h3>${esc(swatch.name)}</h3>${badge("Used in " + plural(swatch.uses, "scene"), swatch.uses > 1 ? "warm" : "neutral")}</div>
+ <div class="scene-before-after"><div><small>Now</small>${chips(swatch.colors)}</div><div aria-hidden="true">${icon("arrow")}</div><div><small>New</small><span id="scene-draft-chips">${chips(ed.draft)}</span></div></div>
+ <p id="scene-draft-text" class="subtle" role="status" aria-live="polite">${esc(pickerSummary(ed.draft, picker))}</p>
+ <p class="subtle">${esc(picker.help)}</p>${pickerControls(ed, swatch, picker)}
+ <fieldset class="scene-scope"><legend>Where should it change?</legend><label><input type="radio" name="scene-scope" value="all" ${ed.scopeChoice === "all" || !support.available ? "checked" : ""}> Everywhere this color is used (${plural(swatch.uses, "recorded scene")})</label><label class="${support.available ? "" : "scene-disabled"}"><input type="radio" name="scene-scope" value="only_this" ${support.available ? "" : "disabled"} ${ed.scopeChoice === "only_this" && support.available ? "checked" : ""}> Only in this scene</label>${support.available ? '<p class="subtle">Only this scene gives it a private copy of the data. ROMancer checks by replay that the other scenes stay as they are.</p>' : `<p class="subtle">${esc(support.reason)}</p>`}</fieldset>
+ ${proposal ? `<p class="${proposal.error || !proposal.working && !proposal.verified ? "notice warm" : "notice"}" role="status" aria-live="polite">${esc(proposal.verdict)}</p>` : ""}
+ <div class="actions">${proposal ? button("Keep this change", "scene-keep", { primary: true, icon: "check", disabled: !ready, reason: proposal.error ? "This change could not be made." : "Wait until every scene has been re-rendered." }) + button("Cancel", "scene-cancel") : button("Show what changes", "scene-propose", { primary: true, disabled: unchanged, reason: "Choose a different color first." })}</div>
+ <details><summary>Details</summary><p>This color is read from ${plural(swatch.details.filter(Boolean).length, "byte")} of the ROM${swatch.status === "code" ? ", written as a value inside the game code" : ""}.</p><ul>${swatch.details.filter(Boolean).map((row) => `<li>Place in the file: ${offsetText(row.file_offset)}</li>`).join("")}</ul>${swatch.notes.map((note) => `<p>${esc(note)}</p>`).join("")}</details>`;
+  }
+  function changesPart(ed) {
+    const list = ed.summary.changes;
+    return `<div class="card-heading"><h3>Change list</h3>${badge(list.summary, list.changes.length ? "good" : "neutral")}</div>
+ ${list.changes.map((change) => {
+      var _a;
+      return `<div class="scene-change"><div>${change.from_rgb ? chips(change.from_rgb) + icon("arrow", "scene-arrow") + chips(change.to_rgb) : icon("assets")}</div><div><strong>${esc(change.title)}</strong><small>${esc(changeLine(change))}${change.verified || change.working ? "" : " Not confirmed by replay."}</small></div><div class="actions">${button(((_a = ed.inspect) == null ? void 0 : _a.id) === change.id ? "Hide scenes" : "Show scenes", "scene-inspect", { id: change.id })}${button("Undo", "scene-undo", { id: change.id })}</div></div>`;
+    }).join("") || '<p class="subtle">Changes you keep are listed here. Nothing is written until you review and save.</p>'}
+ <div class="actions">${button("Review and save", "scene-review", { primary: true, icon: "download", disabled: !list.changes.length || !!ed.summary.preview, reason: list.changes.length ? "Keep or cancel the color you are trying first." : "Keep a change first." })}</div>`;
+  }
+  var PARTS = { "scene-gallery": galleryPart, "scene-play-panel": playPart, "scene-stage": stagePart, "scene-palette": palettePart, "scene-picker": pickerPart, "scene-changes": changesPart };
+  function paint(root) {
+    for (const node of root.querySelectorAll("[data-color]")) node.style.backgroundColor = node.dataset.color;
+  }
+  function loadPictures(ctx2, ed, root) {
+    for (const node of root.querySelectorAll("img[data-picture]")) {
+      const key = node.dataset.picture;
+      picture(ctx2, ed, key).then((image) => {
+        if (node.isConnected && node.dataset.picture === key) node.src = image.src;
+      }).catch(() => {
+      });
+    }
+  }
+  async function drawStage(ctx2, ed) {
+    var _a;
+    const canvas = document.getElementById("scene-canvas");
+    if (!canvas || !ed.view) return;
+    const own = (_a = ed.proposal) == null ? void 0 : _a.affected.find((row) => row.scene_id === ed.sceneId && row.after);
+    const key = ed.showOriginal ? ed.view.scene.image : own ? own.after : ed.view.look.image;
+    try {
+      const image = await picture(ctx2, ed, key);
+      if (!canvas.isConnected) return;
+      canvas.getContext("2d").drawImage(image, 0, 0, canvas.width, canvas.height);
+      if (!ed.pixels || ed.pixels.id !== ed.sceneId) {
+        const original2 = await picture(ctx2, ed, ed.view.scene.image), buffer = document.createElement("canvas");
+        buffer.width = original2.naturalWidth;
+        buffer.height = original2.naturalHeight;
+        const context = buffer.getContext("2d", { willReadFrequently: true });
+        context.drawImage(original2, 0, 0);
+        ed.pixels = { id: ed.sceneId, data: context.getImageData(0, 0, buffer.width, buffer.height) };
+      }
+    } catch {
+    }
+  }
+  var PAGE_PARTS = Object.keys(PARTS).filter((id) => id !== "scene-play-panel");
+  function update(ctx2, ed, ids = PAGE_PARTS) {
+    var _a, _b;
+    if (!current2(ctx2, ed) || !ed.summary) return;
+    const focused = document.activeElement, focusKey = ((_a = focused == null ? void 0 : focused.dataset) == null ? void 0 : _a.action) ? [focused.dataset.action, focused.dataset.id || "", focused.dataset.slot || ""].join("|") : null;
+    for (const id of ids) {
+      const node = document.getElementById(id);
+      if (!node) continue;
+      const had = node.contains(focused);
+      node.innerHTML = PARTS[id](ed);
+      node.hidden = !node.innerHTML;
+      paint(node);
+      loadPictures(ctx2, ed, node);
+      if (had && focusKey) {
+        const [action, key, slot] = focusKey.split("|");
+        (_b = [...node.querySelectorAll("[data-action]")].find((candidate) => candidate.dataset.action === action && (candidate.dataset.id || "") === key && (candidate.dataset.slot || "") === slot)) == null ? void 0 : _b.focus({ preventScroll: true });
+      }
+    }
+    if (ids.includes("scene-stage")) void drawStage(ctx2, ed);
+    watchLook(ctx2, ed);
+  }
+  function watchLook(ctx2, ed) {
+    clearTimeout(ed.lookPoll);
+    if (!ed.view || ed.view.look.state !== "working" || ed.proposal) return;
+    ed.lookPoll = setTimeout(async () => {
+      if (!current2(ctx2, ed) || ed.proposal || !ed.sceneId) return;
+      try {
+        const id = ed.sceneId, view = await call(ctx2, ed, "scene", { scene_id: id });
+        if (!current2(ctx2, ed) || ed.sceneId !== id || ed.proposal) return;
+        ed.view = view;
+        void drawStage(ctx2, ed);
+        watchLook(ctx2, ed);
+      } catch {
+      }
+    }, 600);
+  }
+  function updateAlso(ctx2, ed) {
+    var _a, _b;
+    const node = document.getElementById("scene-also");
+    if (!node || !current2(ctx2, ed)) return update(ctx2, ed, ["scene-stage"]);
+    const focused = document.activeElement, index = node.contains(focused) ? (_a = focused.dataset) == null ? void 0 : _a.id : null;
+    node.innerHTML = alsoPart(ed);
+    paint(node);
+    loadPictures(ctx2, ed, node);
+    if (index !== null && index !== void 0) (_b = node.querySelector(`[data-action="scene-compare"][data-id="${index}"]`)) == null ? void 0 : _b.focus({ preventScroll: true });
+    void drawStage(ctx2, ed);
+  }
+  async function loadScene(ctx2, ed, sceneId) {
+    ed.sceneId = sceneId;
+    ed.view = sceneId ? await call(ctx2, ed, "scene", { scene_id: sceneId }) : null;
+    ed.matches = [];
+    if (ed.selected && !selectedSwatch(ed)) {
+      ed.selected = null;
+      ed.draft = null;
+    }
+    const swatch = selectedSwatch(ed);
+    if (swatch && !ed.proposal) ed.draft = (swatch.pending || swatch.colors).map((color) => [...color]);
+  }
+  async function refresh(ctx2, ed, summary) {
+    var _a, _b;
+    ed.summary = summary || await call(ctx2, ed, "open");
+    if (!ed.summary.scenes.some((row) => row.id === ed.sceneId)) ed.sceneId = ((_a = ed.summary.scenes[0]) == null ? void 0 : _a.id) || null;
+    ed.proposal = ed.summary.preview && ((_b = ed.proposal) == null ? void 0 : _b.id) === ed.summary.preview.id ? ed.proposal : ed.summary.preview;
+    if (ed.inspect && !ed.summary.changes.changes.some((change) => change.id === ed.inspect.id)) ed.inspect = null;
+    await loadScene(ctx2, ed, ed.sceneId);
+  }
+  async function dropPreview(ctx2, ed) {
+    clearTimeout(ed.proposeTimer);
+    if (ed.proposal && ed.proposal.state === "preview") {
+      const id = ed.proposal.id;
+      ed.proposal = null;
+      try {
+        ed.summary = await call(ctx2, ed, "remove", { change_id: id });
+      } catch {
+      }
+    }
+  }
+  function watchProposal(ctx2, ed) {
+    clearTimeout(ed.poll);
+    const tick = async () => {
+      var _a;
+      if (!current2(ctx2, ed) || !ed.proposal || !ed.proposal.working) return;
+      try {
+        const id = ed.proposal.id, change = (await call(ctx2, ed, "change", { change_id: id })).change;
+        if (!current2(ctx2, ed) || ((_a = ed.proposal) == null ? void 0 : _a.id) !== id) return;
+        const settled = !change.working;
+        ed.proposal = change;
+        updateAlso(ctx2, ed);
+        if (settled) {
+          ed.summary.preview = change;
+          update(ctx2, ed, ["scene-picker"]);
+          return;
+        }
+      } catch (error) {
+        ctx2.notify(error.message, true);
+        return;
+      }
+      ed.poll = setTimeout(tick, 400);
+    };
+    ed.poll = setTimeout(tick, 300);
+  }
+  async function propose(ctx2, ed) {
+    clearTimeout(ed.proposeTimer);
+    const swatch = selectedSwatch(ed);
+    if (!swatch || !swatch.editable || !ed.draft) return;
+    if (sameColors(ed.draft, swatch.colors)) {
+      await dropPreview(ctx2, ed);
+      update(ctx2, ed, ["scene-stage", "scene-picker", "scene-changes"]);
+      return;
+    }
+    const result = await call(ctx2, ed, "propose_color", { scene_id: ed.sceneId, domain: swatch.domain, entry: swatch.entry, colors: ed.draft, scope: ed.scopeChoice });
+    if (!current2(ctx2, ed)) return;
+    ed.proposal = result.change;
+    ed.inspect = null;
+    ed.summary.preview = result.change;
+    ed.showOriginal = false;
+    update(ctx2, ed, ["scene-stage", "scene-picker", "scene-changes"]);
+    watchProposal(ctx2, ed);
+  }
+  function schedulePropose(ctx2, ed) {
+    clearTimeout(ed.proposeTimer);
+    ed.proposeTimer = setTimeout(() => propose(ctx2, ed).catch((error) => ctx2.notify(error.message, true)), 500);
+  }
+  function setDraft(ctx2, ed, colors, { redraw = false } = {}) {
+    ed.draft = colors;
+    const swatch = selectedSwatch(ed), picker = ed.view.pickers[swatch.format];
+    if (redraw) update(ctx2, ed, ["scene-picker"]);
+    else {
+      const holder = document.getElementById("scene-draft-chips");
+      if (holder) {
+        holder.innerHTML = chips(colors);
+        paint(holder);
+      }
+      const text = document.getElementById("scene-draft-text");
+      if (text) text.textContent = pickerSummary(colors, picker);
+    }
+    schedulePropose(ctx2, ed);
+  }
+  function watchRecording(ctx2, ed) {
+    clearTimeout(ed.recordPoll);
+    const tick = async () => {
+      var _a, _b;
+      if (!current2(ctx2, ed)) return;
+      try {
+        const before = ed.summary.scenes.length, summary = await call(ctx2, ed, "open");
+        if (!current2(ctx2, ed)) return;
+        ed.summary = summary;
+        if (((_a = summary.recording) == null ? void 0 : _a.state) === "running") {
+          update(ctx2, ed, ["scene-gallery"]);
+          ed.recordPoll = setTimeout(tick, 500);
+          return;
+        }
+        if (!ed.sceneId && summary.scenes.length) await loadScene(ctx2, ed, summary.scenes[0].id);
+        update(ctx2, ed, before || ed.sceneId ? ["scene-gallery", "scene-stage", "scene-palette", "scene-picker"] : void 0);
+        if ((_b = summary.recording) == null ? void 0 : _b.message) ctx2.notify(summary.recording.message, summary.recording.state === "failed");
+      } catch (error) {
+        ctx2.notify(error.message, true);
+      }
+    };
+    ed.recordPoll = setTimeout(tick, 400);
+  }
+  async function playLoop(ctx2, ed) {
+    const ticket = ++ed.ticket;
+    let due = performance.now();
+    while (ed.playing && ed.ticket === ticket && current2(ctx2, ed)) {
+      const status = document.getElementById("scene-play-status");
+      try {
+        const taps = ed.taps || [];
+        ed.taps = [];
+        const packet = await call(ctx2, ed, "play", { frames: taps.length ? 10 : 4, buttons: [.../* @__PURE__ */ new Set([...ed.held, ...taps])] });
+        if (!ed.playing || ed.ticket !== ticket || !current2(ctx2, ed)) break;
+        if (packet.busy) {
+          if (status) status.textContent = packet.message + (packet.progress ? ` (${Math.round(100 * packet.progress[0] / Math.max(1, packet.progress[1]))}%)` : "");
+          await new Promise((resolve) => setTimeout(resolve, 400));
+          due = performance.now();
+          continue;
+        }
+        const canvas = document.getElementById("scene-play-canvas");
+        if (canvas) {
+          if (canvas.width !== packet.width || canvas.height !== packet.height) {
+            canvas.width = packet.width;
+            canvas.height = packet.height;
+          }
+          const image = new Image();
+          image.onload = () => {
+            if (canvas.isConnected) canvas.getContext("2d").drawImage(image, 0, 0);
+          };
+          image.src = "data:image/png;base64," + packet.png_base64;
+        }
+        if (status) status.textContent = "Playing. Capture the moment when the screen shows what you want to edit.";
+        due = Math.max(due + (taps.length ? 10 : 4) * 1e3 / 60, performance.now() - 50);
+        await new Promise((resolve) => setTimeout(resolve, Math.max(0, due - performance.now())));
+      } catch (error) {
+        ed.playing = false;
+        ctx2.notify(error.message, true);
+        update(ctx2, ed, ["scene-gallery", "scene-play-panel"]);
+        break;
+      }
+    }
+  }
+  function compareDialog(ctx2, ed, row) {
+    var _a;
+    ctx2.modal(row.label, `<p>${esc(row.status)}${row.note ? " " + esc(row.note) : ""}</p><canvas id="scene-compare-canvas" class="scene-canvas" width="${row.width}" height="${row.height}" role="img" aria-label="Before and after, split at the slider"></canvas><label class="scene-slider"><span>Before</span><input type="range" min="0" max="100" value="50" data-compare aria-label="Slide from before to after"><span>After</span></label><div class="actions">${button("Show before", "scene-compare-set", { id: "0" })}${button("Show after", "scene-compare-set", { id: "100" })}${button("Close", "close-modal")}</div><details><summary>Details</summary><p>${row.replayed_from_frame === null || row.replayed_from_frame === void 0 ? "The replay did not reach this scene." : "Replayed in the real engine from a savestate " + plural(Math.max(0, Math.round((((_a = ed.summary.scenes.find((scene) => scene.id === row.scene_id)) == null ? void 0 : _a.frame) - row.replayed_from_frame) / 60)), "second") + " earlier."} ${plural(row.pixels, "pixel")} changed.</p></details>`);
+    const canvas = document.getElementById("scene-compare-canvas"), slider = document.querySelector("#modal [data-compare]");
+    const draw2 = async () => {
+      try {
+        const [before, after] = await Promise.all([picture(ctx2, ed, row.before), picture(ctx2, ed, row.after || row.before)]);
+        if (!canvas.isConnected) return;
+        const context = canvas.getContext("2d"), split = Math.round(canvas.width * Number(slider.value) / 100);
+        context.drawImage(before, 0, 0);
+        if (split > 0) context.drawImage(after, 0, 0, split, canvas.height, 0, 0, split, canvas.height);
+        if (split > 0 && split < canvas.width) {
+          context.fillStyle = "#ffffff";
+          context.fillRect(split - 1, 0, 1, canvas.height);
+        }
+      } catch {
+      }
+    };
+    slider.addEventListener("input", draw2);
+    ed.compareSet = (value) => {
+      slider.value = value;
+      draw2();
+    };
+    void draw2();
+  }
+  function reviewBody(review) {
+    return `<p class="notice" role="status">${esc(review.headline)}</p><p>${esc(review.coverage)}</p>${review.unverified.length ? `<p class="notice warm">Not confirmed by replay: ${review.unverified.map(esc).join("; ")}. These may not do what you expect.</p>` : ""}
+ <h3>${plural(review.changes.length, "change")}</h3>${review.changes.map((change) => `<div class="scene-change"><div>${change.from_rgb ? chips(change.from_rgb) + icon("arrow", "scene-arrow") + chips(change.to_rgb) : icon("assets")}</div><div><strong>${esc(change.title)}</strong><small>${esc(changeLine(change))}</small></div></div>`).join("")}
+ <h3>Everything that changes</h3><div class="scene-review-grid">${review.scenes.map((scene) => `<figure class="${scene.visible ? "flagged" : ""}"><figcaption><strong>${esc(scene.label)}</strong><small>${scene.state === "working" ? "Re-rendering…" : scene.visible ? "Looks different" : "Uses changed data; nothing visible at this moment"}</small></figcaption><div class="scene-pair"><div><small>Before</small><img alt="Before" data-picture="${esc(scene.before)}" width="${scene.width}" height="${scene.height}"></div><div><small>After</small><img alt="After" data-picture="${esc(scene.after)}" width="${scene.width}" height="${scene.height}"></div></div></figure>`).join("")}</div>
+ <p class="subtle">${esc(review.writes_note)}</p>
+ <details><summary>Details</summary><p>${plural(review.bytes, "byte")} will be written.</p>${review.details.map((change) => `<p><strong>${esc(change.title)}</strong></p><div class="table-wrap"><table><thead><tr><th>Place in the file</th><th>Before</th><th>After</th></tr></thead><tbody>${change.writes.map((row) => `<tr><td>${offsetText(row.file_offset)}</td><td>${row.before.toString(16).toUpperCase().padStart(2, "0")}</td><td>${row.after.toString(16).toUpperCase().padStart(2, "0")}</td></tr>`).join("")}</tbody></table></div>`).join("")}</details>
+ <div class="actions">${button(review.ready ? "Save as a new build" : "Re-rendering scenes…", "scene-save", { primary: true, icon: "download", disabled: !review.ready, reason: "Every scene is being re-rendered with all changes together." })}${button("Keep editing", "close-modal")}</div>`;
+  }
+  async function reviewDialog(ctx2, ed) {
+    let review = await call(ctx2, ed, "review"), signature = "";
+    const show = () => {
+      const next = JSON.stringify([review.ready, review.scenes.map((scene) => [scene.after, scene.state])]);
+      if (next === signature) return;
+      signature = next;
+      ed.review = review;
+      ctx2.modal("Review your changes", reviewBody(review));
+      const modal2 = document.getElementById("modal");
+      paint(modal2);
+      loadPictures(ctx2, ed, modal2);
+    };
+    show();
+    while (!review.ready && current2(ctx2, ed) && document.getElementById("modal").open && ed.review) {
+      await new Promise((resolve) => setTimeout(resolve, 500));
+      if (!document.getElementById("modal").open) break;
+      review = await call(ctx2, ed, "review");
+      show();
+    }
+  }
+  async function render16(ctx2) {
+    const { state: state2 } = ctx2, missing2 = requireProject(ctx2);
+    if (missing2) return missing2;
+    if (!state2.artifact) return empty("Import a game first", "Open a project and choose the ROM whose colors you want to change.");
+    const ed = editorFor2(ctx2);
+    let failure = "";
+    try {
+      await refresh(ctx2, ed);
+    } catch (error) {
+      failure = error.message;
+      ed.summary = null;
+    }
+    ctx2.use({
+      "scene-open": async (node) => {
+        if (node.dataset.id === ed.sceneId) return;
+        await dropPreview(ctx2, ed);
+        ed.inspect = null;
+        ed.selected = null;
+        ed.draft = null;
+        ed.showOriginal = false;
+        await loadScene(ctx2, ed, node.dataset.id);
+        update(ctx2, ed);
+      },
+      "scene-select": async (node) => {
+        var _a;
+        const id = node.dataset.id;
+        if (ed.proposal && ed.proposal.swatch !== id) await dropPreview(ctx2, ed);
+        ed.selected = id;
+        ed.matches = [];
+        const swatch = selectedSwatch(ed);
+        ed.draft = (((_a = ed.proposal) == null ? void 0 : _a.swatch) === id ? ed.proposal.to_rgb : swatch.pending || swatch.colors).map((color) => [...color]);
+        update(ctx2, ed, ["scene-stage", "scene-palette", "scene-picker", "scene-changes"]);
+      },
+      "scene-pick-pixel": async (node, event) => {
+        if (!ed.pixels || ed.pixels.id !== ed.sceneId) return;
+        const box = node.getBoundingClientRect(), data = ed.pixels.data, x = Math.min(data.width - 1, Math.max(0, Math.floor((event.clientX - box.left) * data.width / box.width))), y = Math.min(data.height - 1, Math.max(0, Math.floor((event.clientY - box.top) * data.height / box.height))), at = (y * data.width + x) * 4;
+        const found = swatchesForPixel([data.data[at], data.data[at + 1], data.data[at + 2]], ed.view.swatches);
+        if (!found.length) {
+          ctx2.notify("No palette color in this scene matches that pixel.");
+          return;
+        }
+        const ids = [...new Set(found.map((match) => match.swatch.id))], first = found[0].swatch;
+        if (ed.proposal && ed.proposal.swatch !== first.id) await dropPreview(ctx2, ed);
+        ed.selected = first.id;
+        ed.matches = ids.length > 1 ? ids : [];
+        ed.draft = (first.pending || first.colors).map((color) => [...color]);
+        update(ctx2, ed, ["scene-stage", "scene-palette", "scene-picker", "scene-changes"]);
+        ctx2.notify(ids.length > 1 ? `${plural(ids.length, "palette color")} look like this pixel. ${first.name} is selected; the others are outlined.` : `That pixel is ${first.name}.`);
+      },
+      "scene-master": (node) => {
+        const picker = ed.view.pickers[selectedSwatch(ed).format];
+        setDraft(ctx2, ed, [[...picker.colors[Number(node.dataset.id)]]], { redraw: true });
+      },
+      "scene-shade": (node) => {
+        const picker = ed.view.pickers[selectedSwatch(ed).format], next = ed.draft.map((color) => [...color]);
+        next[Number(node.dataset.slot)] = [...picker.colors[Number(node.dataset.id)]];
+        setDraft(ctx2, ed, next, { redraw: true });
+      },
+      "scene-propose": () => propose(ctx2, ed),
+      "scene-keep": async () => {
+        var _a;
+        const id = (_a = ed.proposal) == null ? void 0 : _a.id;
+        if (!id) return;
+        clearTimeout(ed.poll);
+        const summary = await call(ctx2, ed, "keep", { change_id: id });
+        ed.proposal = null;
+        await refresh(ctx2, ed, summary);
+        update(ctx2, ed);
+        ctx2.notify("Added to the change list. Nothing is written until you review and save.");
+      },
+      "scene-cancel": async () => {
+        await dropPreview(ctx2, ed);
+        const swatch = selectedSwatch(ed);
+        if (swatch) ed.draft = (swatch.pending || swatch.colors).map((color) => [...color]);
+        await refresh(ctx2, ed);
+        update(ctx2, ed);
+      },
+      "scene-undo": async (node) => {
+        var _a;
+        const summary = await call(ctx2, ed, "remove", { change_id: node.dataset.id });
+        if (((_a = ed.inspect) == null ? void 0 : _a.id) === node.dataset.id) ed.inspect = null;
+        await refresh(ctx2, ed, summary);
+        const swatch = selectedSwatch(ed);
+        if (swatch && !ed.proposal) ed.draft = (swatch.pending || swatch.colors).map((color) => [...color]);
+        update(ctx2, ed);
+        ctx2.notify("Change undone.");
+      },
+      "scene-inspect": async (node) => {
+        var _a, _b;
+        if (((_a = ed.inspect) == null ? void 0 : _a.id) === node.dataset.id) ed.inspect = null;
+        else {
+          await dropPreview(ctx2, ed);
+          ed.inspect = (await call(ctx2, ed, "change", { change_id: node.dataset.id })).change;
+        }
+        update(ctx2, ed, ["scene-stage", "scene-picker", "scene-changes"]);
+        (_b = document.getElementById("scene-also")) == null ? void 0 : _b.scrollIntoView({ block: "nearest" });
+      },
+      "scene-compare": (node) => {
+        var _a;
+        const row = (_a = shownChange(ed)) == null ? void 0 : _a.affected[Number(node.dataset.id)];
+        if (row) compareDialog(ctx2, ed, row);
+      },
+      "scene-compare-set": (node) => {
+        var _a;
+        return (_a = ed.compareSet) == null ? void 0 : _a.call(ed, node.dataset.id);
+      },
+      "scene-toggle-original": () => {
+        ed.showOriginal = !ed.showOriginal;
+        update(ctx2, ed, ["scene-stage"]);
+      },
+      "scene-forget": async () => {
+        const summary = await call(ctx2, ed, "forget_scene", { scene_id: ed.sceneId });
+        ed.sceneId = null;
+        ed.selected = null;
+        await refresh(ctx2, ed, summary);
+        update(ctx2, ed);
+        ctx2.notify("Scene removed.");
+      },
+      "scene-record": async () => {
+        ed.summary = await call(ctx2, ed, "record", { steps: 40, restart: false });
+        update(ctx2, ed, ["scene-gallery"]);
+        watchRecording(ctx2, ed);
+      },
+      "scene-record-stop": async () => {
+        ed.summary = await call(ctx2, ed, "record_stop");
+        update(ctx2, ed, ["scene-gallery"]);
+      },
+      "scene-play-toggle": () => {
+        var _a;
+        ed.playing = !ed.playing;
+        ed.held.clear();
+        ed.taps = [];
+        update(ctx2, ed, ["scene-gallery", "scene-play-panel"]);
+        if (ed.playing) {
+          mountController2(ctx2, ed);
+          (_a = document.getElementById("scene-controller")) == null ? void 0 : _a.focus();
+          void playLoop(ctx2, ed);
+        } else ed.ticket++;
+      },
+      "scene-tap": (node) => {
+        (ed.taps ||= []).push(node.dataset.id);
+      },
+      "scene-capture": async () => {
+        const result = await call(ctx2, ed, "capture", { label: "" });
+        await refresh(ctx2, ed, result);
+        await dropPreview(ctx2, ed);
+        ed.selected = null;
+        await loadScene(ctx2, ed, result.scene_id);
+        update(ctx2, ed, ["scene-gallery", "scene-stage", "scene-palette", "scene-picker", "scene-changes"]);
+        ctx2.notify("Captured. This moment is now a scene you can edit.");
+      },
+      "scene-review": () => reviewDialog(ctx2, ed),
+      "scene-save": async () => {
+        const result = await call(ctx2, ed, "save", { revision: ed.review.revision });
+        ed.review = null;
+        ed.inspect = null;
+        ed.proposal = null;
+        state2.results["build.apply"] = result;
+        await ctx2.refreshProject();
+        await refresh(ctx2, ed, result.session);
+        update(ctx2, ed);
+        const patch = result.patch_export;
+        ctx2.modal("Saved", `<p class="notice" role="status">Saved as <strong>${esc(result.name)}</strong>. Your original ROM is unchanged.</p><p>${esc(result.checksum_note || "")}</p><p class="subtle">Playtest the build to see your colors in the running game. The scenes here belong to the original ROM, so keep editing the original and save again to make another build.</p><div class="actions">${button("Playtest saved build", "scene-playtest-build", { id: result.artifact_id, primary: true, icon: "playtest" })}${patch ? button("Download patch", "download", { id: patch.export_id, name: patch.download_name, icon: "download" }) : ""}${button("Keep editing", "close-modal")}</div>`);
+      },
+      "scene-playtest-build": (node) => {
+        ctx2.closeModal();
+        return playtestCreatedBuild(ctx2, node.dataset.id);
+      }
+    });
+    const title = heading("Colors", "Scenes & colors", "Change a color and see every scene it changes before you save.");
+    if (!ed.summary) return `${title}<div class="card"><p class="error">${esc(failure)}</p></div>`;
+    const engine = ed.summary.engine;
+    return `${title}${engine.installed ? "" : `<div class="notice warm" role="status">${esc(engine.reason)}</div>`}
+ <section class="card" id="scene-gallery" aria-label="Scenes">${galleryPart(ed)}</section>
+ <section class="card" id="scene-play-panel" aria-label="Play the game" ${ed.playing ? "" : "hidden"}>${playPart(ed)}</section>
+ <div class="scene-layout"><section class="card" id="scene-stage" aria-label="Scene picture">${stagePart(ed)}</section>
+ <div class="scene-side"><section class="card" id="scene-picker" aria-label="Change a color">${pickerPart(ed)}</section><section class="card" id="scene-palette" aria-label="Colors in this scene" ${ed.view ? "" : "hidden"}>${palettePart(ed)}</section><section class="card" id="scene-changes" aria-label="Change list">${changesPart(ed)}</section></div></div>`;
+  }
+  function mountController2(ctx2, ed) {
+    const pad = document.getElementById("scene-controller");
+    if (!pad || pad.dataset.mounted) return;
+    pad.dataset.mounted = "true";
+    const key = (event) => KEY_BUTTONS[event.key] || KEY_BUTTONS[event.key.toLowerCase()];
+    pad.addEventListener("keydown", (event) => {
+      const name2 = key(event);
+      if (name2) {
+        event.preventDefault();
+        ed.held.add(name2);
+      }
+    });
+    pad.addEventListener("keyup", (event) => {
+      const name2 = key(event);
+      if (name2) {
+        event.preventDefault();
+        ed.held.delete(name2);
+      }
+    });
+    pad.addEventListener("blur", () => ed.held.clear());
+    pad.addEventListener("pointerdown", () => pad.focus());
+  }
+  function mount12(ctx2) {
+    var _a, _b;
+    const ed = ctx2.state.sceneEditor, main = document.getElementById("main");
+    if (!ed || !ed.summary || !main) return;
+    paint(main);
+    loadPictures(ctx2, ed, main);
+    void drawStage(ctx2, ed);
+    watchLook(ctx2, ed);
+    const picker = document.getElementById("scene-picker");
+    picker == null ? void 0 : picker.addEventListener("input", (event) => {
+      const node = event.target, swatch = selectedSwatch(ed);
+      if (!swatch || !ed.draft) return;
+      const levels = ed.view.pickers[swatch.format].levels;
+      if (node.dataset.channel !== void 0 && levels) {
+        const next = [[...ed.draft[0]]];
+        next[0][Number(node.dataset.channel)] = levels[Number(node.value)];
+        const output = picker.querySelector(`[data-channel-value="${node.dataset.channel}"]`);
+        if (output) output.textContent = node.value;
+        setDraft(ctx2, ed, next);
+      }
+      if (node.dataset.anyColor !== void 0 && levels) {
+        const picked = parseHex(node.value);
+        if (!picked) return;
+        const next = [snapColor(picked, ed.view.pickers[swatch.format])];
+        next[0].forEach((value, channel) => {
+          const range = picker.querySelector(`input[data-channel="${channel}"]`), index = levelIndex(value, levels);
+          if (range) range.value = index;
+          const output = picker.querySelector(`[data-channel-value="${channel}"]`);
+          if (output) output.textContent = index;
+        });
+        setDraft(ctx2, ed, next);
+      }
+    });
+    picker == null ? void 0 : picker.addEventListener("change", (event) => {
+      var _a2;
+      if (event.target.name === "scene-scope") {
+        ed.scopeChoice = event.target.value;
+        if (ed.proposal || !sameColors(ed.draft, (_a2 = selectedSwatch(ed)) == null ? void 0 : _a2.colors)) schedulePropose(ctx2, ed);
+      }
+    });
+    if (ed.playing) {
+      mountController2(ctx2, ed);
+      void playLoop(ctx2, ed);
+    }
+    if (((_a = ed.summary.recording) == null ? void 0 : _a.state) === "running") watchRecording(ctx2, ed);
+    if ((_b = ed.proposal) == null ? void 0 : _b.working) watchProposal(ctx2, ed);
+  }
+
   // romancer/ui/app.js
   var startupReady = false;
   applyInterfaceScale(readPreference("romancer-scale") || 100);
   window.addEventListener("resize", () => applyInterfaceScale(getSettings().scale));
   var navigationRevision = 0;
-  var views = { gameview: gameview_exports, overview: overview_exports, resources: resources_exports, scripts: scripts_exports, assets: assets_exports, sound: sound_exports, tables: tables_exports, automation: automation_exports, playtest: playtest_exports, debug: debug_exports, routes: routes_exports, regression: regression_exports, release: release_exports, help: help_exports, settings: settings_exports };
-  var names6 = { automation: "Recipes & definitions", overview: "Overview", gameview: "Game view", resources: "Resources", scripts: "Text & layout", assets: "Graphics & fonts", sound: "Music & sound", tables: "Stats & data", playtest: "Playtest", debug: "Investigation", routes: "Routes", regression: "Regression", release: "Export", settings: "Settings", help: "Help" };
+  var views = { gameview: gameview_exports, overview: overview_exports, resources: resources_exports, scripts: scripts_exports, assets: assets_exports, scenes: scenes_exports, sound: sound_exports, tables: tables_exports, automation: automation_exports, playtest: playtest_exports, debug: debug_exports, routes: routes_exports, regression: regression_exports, release: release_exports, help: help_exports, settings: settings_exports };
+  var names6 = { automation: "Recipes & definitions", overview: "Overview", gameview: "Game view", resources: "Resources", scripts: "Text & layout", assets: "Graphics & fonts", scenes: "Scenes & colors", sound: "Music & sound", tables: "Stats & data", playtest: "Playtest", debug: "Investigation", routes: "Routes", regression: "Regression", release: "Export", settings: "Settings", help: "Help" };
   var state = { page: "overview", projects: [], project: null, artifact: null, capabilities: null, drafts: {}, results: {}, pending: null, job: null, runtime: null, frame: null, snapshot: null };
   var actions2 = {};
   var renderRevision = 0;
@@ -10121,14 +10857,14 @@ ${state2.artifact.system_id ? `<details><summary>Advanced byte options</summary>
       state.hexDraft = null;
       state.hexReview = null;
     }
-    await render16();
+    await render17();
   }
   var ctx = {
     state,
     api,
     navigate,
     notify,
-    render: render16,
+    render: render17,
     refreshProject,
     openProject,
     modal,
@@ -10239,7 +10975,7 @@ ${state2.artifact.system_id ? `<details><summary>Advanced byte options</summary>
     state.page = "overview";
     await refreshProject();
     resumeLocation();
-    await render16();
+    await render17();
   }
   async function closeProject() {
     rememberLocation();
@@ -10253,7 +10989,7 @@ ${state2.artifact.system_id ? `<details><summary>Advanced byte options</summary>
     lastDraft = null;
     removePreference("romancer-project");
     workspaceWrites.enqueue(null);
-    await render16();
+    await render17();
   }
   async function navigate(page) {
     var _a, _b, _c, _d, _e;
@@ -10266,7 +11002,7 @@ ${state2.artifact.system_id ? `<details><summary>Advanced byte options</summary>
     if (revision !== navigationRevision || ((_c = state.project) == null ? void 0 : _c.project_id) !== project || ((_d = state.artifact) == null ? void 0 : _d.artifact_id) !== artifact || state.selectionRevision !== selection2 || !views[page]) return false;
     if (page === "settings" && state.page !== "settings") state.settingsReturnPage = state.page;
     state.page = page;
-    await render16();
+    await render17();
     (_e = document.getElementById("main")) == null ? void 0 : _e.focus({ preventScroll: true });
   }
   async function importDialog() {
@@ -10311,10 +11047,10 @@ ${state2.artifact.system_id ? `<details><summary>Advanced byte options</summary>
         state.candidateReview = null;
         state.resourcePrefill = null;
         state.openDeclaration = null;
-        return render16();
+        return render17();
       },
       "help-topic": (node) => {
-        state.helpTopic = node.dataset.id || ({ assets: "graphics", scripts: "text", resources: "discovery", release: "export", settings: "recovery", overview: "start", help: "start" }[state.page] || state.page);
+        state.helpTopic = node.dataset.id || ({ assets: "graphics", scenes: "graphics", scripts: "text", resources: "discovery", release: "export", settings: "recovery", overview: "start", help: "start" }[state.page] || state.page);
         document.getElementById("modal").close();
         return navigate("help");
       },
@@ -10358,7 +11094,7 @@ ${state2.artifact.system_id ? `<details><summary>Advanced byte options</summary>
         await refreshProject();
         state.artifact = state.project.sources.at(-1);
         state.page = "resources";
-        await render16();
+        await render17();
         notify("Source copied into the project. Original preserved.");
       },
       "cancel-job": async () => {
@@ -10374,7 +11110,7 @@ ${state2.artifact.system_id ? `<details><summary>Advanced byte options</summary>
         if (((_a = state.project) == null ? void 0 : _a.project_id) !== project) return;
         state.downloadFeedback = { project_id: project, name: name2 };
         notify("Download started: " + name2 + ". Check your browser’s Downloads list.");
-        if (state.page === "release") await render16();
+        if (state.page === "release") await render17();
       },
       "search-file": async (node) => {
         var _a;
@@ -10390,7 +11126,7 @@ ${state2.artifact.system_id ? `<details><summary>Advanced byte options</summary>
       ...projectActions({ ...ctx, closeProject, flushDrafts, importDialog })
     };
   }
-  async function render16() {
+  async function render17() {
     var _a, _b, _c, _d, _e, _f, _g, _h, _i, _j, _k, _l, _m, _n;
     if (((_a = document.getElementById("app")) == null ? void 0 : _a.dataset.startupRecovered) === "true") return;
     rememberLocation();
@@ -10538,7 +11274,7 @@ ${state2.artifact.system_id ? `<details><summary>Advanced byte options</summary>
         state.artifact = chooseArtifact(state.project, readPreference("romancer-artifact:" + state.project.project_id));
         resumeLocation();
       }
-      await render16();
+      await render17();
       if (((_a = document.getElementById("app")) == null ? void 0 : _a.dataset.startupRecovered) !== "true") {
         startupReady = true;
         if (settingsWarning) notify(settingsWarning, true);

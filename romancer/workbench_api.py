@@ -257,6 +257,8 @@ class WorkbenchAPI:
         self.editing_readiness=EditingReadinessTools(self);self.routes.update(self.editing_readiness.routes())
         from .draft_scene import DraftSceneTools
         self.draft_scene=DraftSceneTools(self);self.routes.update(self.draft_scene.routes())
+        from .edit_session import EditSessionTools
+        self.edit_sessions=EditSessionTools(self);self.routes.update(self.edit_sessions.routes())
         for operation in tuple(self.routes):
             if operation.startswith('containers.') or operation in ('runtime.load_disc','route.run_disc','release.disc_set'):
                 del self.routes[operation]
@@ -1713,4 +1715,4 @@ class WorkbenchAPI:
         path=self._export_path(project,'zip');result=package_release(path,{'title':p['title'],'files':selected},cancelled=c)
         result['export']=self._record_export(project,path,'package',title=p['title']+'-release');return result
 
-    def close(self):self.jobs.close();self.runtime.close()
+    def close(self):self.edit_sessions.close();self.jobs.close();self.runtime.close()
