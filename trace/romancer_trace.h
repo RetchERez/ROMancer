@@ -18,6 +18,16 @@
  * same value. Plain copy loops, DMA and immediate loads are therefore exact;
  * computed values are reported as derived, never as exact.
  *
+ * A domain's `data` must be the machine's real state whenever the frontend can
+ * look (between retro_* calls): either the engine's own memory, or a view the
+ * engine refreshes after every run, reset and loadstate. A buffer that only
+ * follows the game's writes goes stale on loadstate and leaks between games.
+ *
+ * Tags are not part of a savestate. The Game Boy engines clear every tag (via
+ * romancer_trace_reset) when a game loads, on reset and on loadstate, because
+ * the bytes then come from the state rather than from writes that were
+ * watched; to get provenance after a loadstate, replay from it with tracing on.
+ *
  * The header is self-contained C99 and compiles as C++. Define
  * ROMANCER_TRACE_IMPLEMENTATION in exactly one translation unit.
  */

@@ -1,9 +1,35 @@
-"""Apply ROMancer provenance hooks to a Gambatte source tree (argv[1])."""
+"""Apply ROMancer provenance hooks to a Gambatte source tree (argv[1]).
+
+Domain data is always the machine's real state:
+
+* vram, wram, oam, hram and dmg_palette (BGP, OBP0, OBP1 at FF47-FF49) point
+  straight at the core's own memory, which savestates save and restore.
+* palette (64 BG bytes then 64 OBJ bytes, FF69/FF6B) is a view copied from the
+  LCD's palette memory after every palette write, at the end of every
+  GB::runFor (so after every retro_run), and whenever the whole machine state
+  is replaced. Gambatte keeps the two halves in separate arrays and reuses
+  bytes of them for the DMG registers, so they cannot be exposed in place.
+  On DMG hardware the view is all zero (there is no CGB palette memory); on
+  CGB hardware running a DMG game it shows the colors the picture is drawn
+  with (the boot ROM's compatibility palette).
+
+Tags are not part of a savestate. Whenever the machine state is replaced
+(power-on after a game loads, retro_reset, retro_unserialize) every tag, the
+read ring and the write counter are cleared: the bytes now come from the state,
+not from writes this build watched, and a tag left over from another timeline
+or another game would be a false claim. Tracing stays enabled or disabled as
+it was. Callers that want provenance after a loadstate replay from it with
+tracing on (provenance.verify_edit does).
+"""
 import re
 import sys
 from pathlib import Path
 
 root = Path(sys.argv[1]) / 'libgambatte' / 'src'
+# The edits are not idempotent: a second run would duplicate hooks before an anchor finally failed.
+for _rel in ('gambatte-memory.h', 'gambatte-memory.cpp', 'gambatte.cpp', 'video.h', 'cpu.cpp'):
+    if 'ROMANCER_TRACE' in (root / _rel).read_text(encoding='utf-8', newline=''):
+        raise SystemExit(f'{_rel}: already patched; start from pristine source')
 
 
 def edit(rel, old, new, count=1):
@@ -31,7 +57,7 @@ public:
 	rt_domain *rtVram_, *rtWram_, *rtHram_, *rtOam_, *rtPal_, *rtDmg_;
 	enum { RT_CELLS = 0x4000 + 0x8000 + 0x80 + 0xA0 + 0x80 + 3 };
 	uint32_t rtTag_[RT_CELLS], rtPc_[RT_CELLS];
-	unsigned char rtPalData_[0x80], rtDmgData_[3];
+	unsigned char rtPalData_[0x80];
 	void rtInit() {
 		uint32_t *t = rtTag_, *c = rtPc_;
 		rtVram_ = rt_register("vram", 0x4000, t, c, cart_.vramdata()); t += 0x4000; c += 0x4000;
@@ -40,7 +66,18 @@ public:
 		rtHram_ = rt_register("hram", 0x80, t, c, ioamhram_ + 0x180); t += 0x80; c += 0x80;
 		rtOam_ = rt_register("oam", 0xA0, t, c, ioamhram_); t += 0xA0; c += 0xA0;
 		rtPal_ = rt_register("palette", 0x80, t, c, rtPalData_); t += 0x80; c += 0x80;
-		rtDmg_ = rt_register("dmg_palette", 3, t, c, rtDmgData_);
+		/* BGP, OBP0, OBP1: the registers themselves, so a loadstate restores them. */
+		rtDmg_ = rt_register("dmg_palette", 3, t, c, ioamhram_ + 0x147);
+		rtStateReplaced();
+	}
+	/* Copy the LCD's palette memory into the palette domain's view. */
+	void rtSync() {
+		for (unsigned i = 0; i < 0x80; ++i) rtPalData_[i] = lcd_.rtCgbPaletteByte(i);
+	}
+	/* Power-on, reset or loadstate replaced every byte: no tag describes it any more. */
+	void rtStateReplaced() {
+		romancer_trace_reset();
+		rtSync();
 	}
 	/* Tag for the byte behind a host pointer, or RT_NONE. */
 	uint32_t rtTagOfPtr(const unsigned char *q) const {
@@ -84,9 +121,11 @@ public:
 		else if (q >= ioamhram_ && q < ioamhram_ + 0xA0) rt_write(rtOam_, q - ioamhram_, value);
 		else if (q >= ioamhram_ + 0x180 && q < ioamhram_ + 0x200) rt_write(rtHram_, q - ioamhram_ - 0x180, value);
 	}
-	void rtPalette(rt_domain *d, unsigned char *mirror, unsigned index, unsigned value) {
-		mirror[index] = value;
-		rt_write(d, index, value);
+	/* A write to FF69/FF6B. The LCD ignores it while it is drawing, so tag it only if it landed. */
+	void rtPalette(unsigned index, unsigned value) {
+		unsigned now = lcd_.rtCgbPaletteByte(index);
+		rtPalData_[index] = now;
+		if (now == (value & 0xFF)) rt_write(rtPal_, index, value);
 	}
 #endif
 '''
@@ -118,11 +157,31 @@ edit(MEM, '\t\t\tif (oamDmaSrc) ioamhram_[oamDmaPos_] = oamDmaSrc[oamDmaPos_];\n
 # Palettes.
 for reg, idx in (('dmgBgPaletteChange', 0), ('dmgSpPalette1Change', 1), ('dmgSpPalette2Change', 2)):
     edit(MEM, f'\t\t\tlcd_.{reg}(data, cc);\n',
-         f'\t\t\tlcd_.{reg}(data, cc);\n' + T.format(f'\t\trtPalette(rtDmg_, rtDmgData_, {idx}, data);'))
+         f'\t\t\tlcd_.{reg}(data, cc);\n' + T.format(f'\t\trt_write(rtDmg_, {idx}, data);'))
 edit(MEM, '\t\t\tlcd_.cgbBgColorChange(index, data, cc);\n',
-     '\t\t\tlcd_.cgbBgColorChange(index, data, cc);\n' + T.format('\t\t\trtPalette(rtPal_, rtPalData_, index, data);'))
+     '\t\t\tlcd_.cgbBgColorChange(index, data, cc);\n' + T.format('\t\t\trtPalette(index, data);'))
 edit(MEM, '\t\t\tlcd_.cgbSpColorChange(index, data, cc);\n',
-     '\t\t\tlcd_.cgbSpColorChange(index, data, cc);\n' + T.format('\t\t\trtPalette(rtPal_, rtPalData_, 0x40 + index, data);'))
+     '\t\t\tlcd_.cgbSpColorChange(index, data, cc);\n' + T.format('\t\t\trtPalette(0x40 + index, data);'))
+# The LCD's palette memory, one byte at a time, as FF69/FF6B address it.
+edit('video.h', '      void setDmgMode(bool mode) { ppu_.setDmgMode(mode); }\n',
+     T.format('      /* Byte `index` of CGB palette memory (0-0x3F BG, 0x40-0x7F OBJ) as the picture uses it now.\n'
+              '       * In DMG mode on CGB hardware bgpData_[0] and objpData_[0..1] hold BGP/OBP0/OBP1 and the\n'
+              '       * colors live in dmgColorsGBC_ (BG palette 0, OBJ palettes 0 and 1). */\n'
+              '      unsigned rtCgbPaletteByte(unsigned index) const {\n'
+              '         if (!ppu_.cgb()) return 0;\n'
+              '         if (ppu_.inDmgMode()) {\n'
+              '            if (index < 8) return dmgColorsGBC_[index];\n'
+              '            if (index - 0x40u < 16) return dmgColorsGBC_[8 + (index - 0x40u)];\n'
+              '         }\n'
+              '         return index < 0x40 ? bgpData_[index] : objpData_[(index - 0x40u) & 0x3F];\n'
+              '      }')
+     + '      void setDmgMode(bool mode) { ppu_.setDmgMode(mode); }\n')
+# Every way the whole state is replaced (GB::load, GB::reset, GB::loadState) ends in Memory::loadState.
+edit(MEM, '\tif (!isCgb())\n\t\tstd::memset(cart_.vramdata() + 0x2000, 0, 0x2000);\n}\n',
+     '\tif (!isCgb())\n\t\tstd::memset(cart_.vramdata() + 0x2000, 0, 0x2000);\n' + T.format('\trtStateReplaced();') + '}\n')
+# The frontend can only look between calls: bring the palette view up to date when a run ends.
+edit('gambatte.cpp', '\tconst long cyclesSinceBlit = p_->cpu.runFor(samples * 2);\n',
+     '\tconst long cyclesSinceBlit = p_->cpu.runFor(samples * 2);\n' + T.format('\tp_->cpu.mem_.rtSync();'))
 # GDMA/HDMA: push the source byte so the VRAM store matches it.
 edit(MEM, '\t\t\t\t\tnontrivial_write(0x8000 | (dmaDest++ & 0x1FFF), data, cc);\n',
      T.format('\t\t\t\t\trtRead(src, data);') + '\t\t\t\t\tnontrivial_write(0x8000 | (dmaDest++ & 0x1FFF), data, cc);\n')
@@ -130,13 +189,16 @@ edit(MEM, '\t\t\t\t\tnontrivial_write(0x8000 | (dmaDest++ & 0x1FFF), data, cc);\
 # Register domains after every successful ROM load; this unit owns the state.
 p = root / MEM
 t = p.read_text(encoding='utf-8', newline='')
-m = re.search(r'int Memory::loadROM\(.*?\n\}\r?\n', t, re.S)
-body = m.group(0)
+found = re.findall(r'int Memory::loadROM\(.*?\n\}\r?\n', t, re.S)
+if len(found) != 1:
+    raise SystemExit(f'{MEM}: expected 1 Memory::loadROM, found {len(found)}')
+body = found[0]
 last = body.rfind('return 0;')
 if last < 0:
     raise SystemExit('loadROM has no success return')
-t = t.replace(body, body[:last] + T.format('   rtInit();') + '   ' + body[last:])
-t = T.format('#define ROMANCER_TRACE_IMPLEMENTATION\n#include "romancer_trace.h"') + t
+nl = '\r\n' if '\r\n' in t else '\n'
+t = t.replace(body, body[:last] + T.format('   rtInit();').replace('\n', nl) + '   ' + body[last:])
+t = T.format('#define ROMANCER_TRACE_IMPLEMENTATION\n#include "romancer_trace.h"').replace('\n', nl) + t
 p.write_text(t, encoding='utf-8', newline='')
 
 # CPU: data reads, opcode fetches, operand fetches.
@@ -157,5 +219,7 @@ edit(CPU, '\n\t\t\t\tPC_READ(opcode);\n', '\n\t\t\t\tCB_READ(opcode);\n')
 p = Path(sys.argv[1]) / 'libgambatte' / 'libretro' / 'link.T'
 t = p.read_text(encoding='utf-8', newline='')
 if 'romancer_trace_' not in t:
+    if t.count('global: retro_*;') != 1:
+        raise SystemExit('link.T: expected one "global: retro_*;"')
     p.write_text(t.replace('global: retro_*;', 'global: retro_*; romancer_trace_*;'), encoding='utf-8', newline='')
 print('gambatte hooks applied')

@@ -7,11 +7,30 @@ palette 0x80 (64 BG bytes then 64 OBJ bytes, FF69/FF6B), dmg_palette 3 (BGP, OBP
 Every SM83 bus access goes through _SM83Step in src/sm83/sm83.c (opcode fetch,
 operand fetch and data load), so the CPU read hooks live there and cover both
 the GBCartLoad8 active-region fast path and the GBLoad8 slow path.
+
+Domain data is always the machine's real state. vram, wram, hram, oam and
+dmg_palette (the BGP/OBP0/OBP1 registers in memory.io) point at mGBA's own
+memory. palette is a little-endian byte view of video.palette (which mGBA keeps
+as 16-bit words), refreshed after every palette write, at the end of every
+frame, and whenever the machine state is replaced; on a non-CGB model it is all
+zero, as in the Gambatte build, because video.palette then holds the frontend's
+shade colors rather than anything the game wrote.
+
+Tags are not part of a savestate: reset and loadstate clear every tag, the read
+ring and the write counter (see patch_gambatte.py for the reasoning).
+
+The libretro core defers its first reset to the first retro_run, retro_serialize
+or retro_unserialize after a game loads, so until then no domain is registered
+(the domains of a game that was unloaded are dropped with it).
 """
 import sys
 from pathlib import Path
 
 root = Path(sys.argv[1])
+# The edits are not idempotent: a second run would duplicate hooks before an anchor finally failed.
+for _rel in ('src/gb/memory.c', 'src/gb/gb.c', 'src/gb/serialize.c', 'src/gb/core.c', 'src/sm83/sm83.c'):
+    if 'ROMANCER_TRACE' in (root / _rel).read_text(encoding='utf-8', newline=''):
+        raise SystemExit(f'{_rel}: already patched; start from pristine source')
 
 
 def edit(rel, old, new, count=1):
@@ -30,6 +49,8 @@ T = '#ifdef ROMANCER_TRACE\n{}\n#endif\n'
 edit('include/mgba/internal/gb/memory.h', 'void GBMemoryInit(struct GB* gb);\n',
      T.format('struct SM83Core;\n'
               'void GBRTInit(struct GB* gb);\n'
+              'void GBRTSync(struct GB* gb);\n'
+              'void GBRTStateReplaced(struct GB* gb);\n'
               'void GBRTPalette(unsigned index, uint8_t value);\n'
               'void GBRTDmgPalette(unsigned index, uint8_t value);\n'
               'void GBRTCpuAccess(struct SM83Core* cpu, uint16_t address, uint8_t value, int kind);')
@@ -43,27 +64,41 @@ IMPL = r'''#ifdef ROMANCER_TRACE
 static rt_domain *_rtVram, *_rtWram, *_rtHram, *_rtOam, *_rtPal, *_rtDmg;
 enum { RT_CELLS = 0x4000 + 0x8000 + 0x80 + 0xA0 + 0x80 + 3 };
 static uint32_t _rtTag[RT_CELLS], _rtPc[RT_CELLS];
-static uint8_t _rtPalData[0x80], _rtDmgData[3];
+static uint8_t _rtPalData[0x80];
 
-/* Called at the end of GBReset: every buffer has its final address then. */
+/* Copy the real palette words into the palette domain's byte view. */
+void GBRTSync(struct GB* gb) {
+	int i;
+	if (gb->model < GB_MODEL_CGB) {
+		/* no CGB palette memory: video.palette holds the frontend's shade colors */
+		memset(_rtPalData, 0, sizeof(_rtPalData));
+		return;
+	}
+	for (i = 0; i < 64; ++i) {
+		_rtPalData[i * 2] = gb->video.palette[i];
+		_rtPalData[i * 2 + 1] = gb->video.palette[i] >> 8;
+	}
+}
+
+/* Reset or loadstate replaced every byte: no tag describes it any more. */
+void GBRTStateReplaced(struct GB* gb) {
+	romancer_trace_reset();
+	GBRTSync(gb);
+}
+
+/* Called during GBReset once every buffer has its final address. */
 void GBRTInit(struct GB* gb) {
 	uint32_t* t = _rtTag;
 	uint32_t* c = _rtPc;
-	int i;
 	_rtVram = rt_register("vram", 0x4000, t, c, gb->video.vram); t += 0x4000; c += 0x4000;
 	_rtWram = rt_register("wram", 0x8000, t, c, gb->memory.wram); t += 0x8000; c += 0x8000;
 	/* mGBA keeps 0x7F HRAM bytes; index 0x7F (IE) is never tagged */
 	_rtHram = rt_register("hram", 0x80, t, c, gb->memory.hram); t += 0x80; c += 0x80;
 	_rtOam = rt_register("oam", 0xA0, t, c, gb->video.oam.raw); t += 0xA0; c += 0xA0;
 	_rtPal = rt_register("palette", 0x80, t, c, _rtPalData); t += 0x80; c += 0x80;
-	_rtDmg = rt_register("dmg_palette", 3, t, c, _rtDmgData);
-	for (i = 0; i < 64; ++i) {
-		_rtPalData[i * 2] = gb->video.palette[i];
-		_rtPalData[i * 2 + 1] = gb->video.palette[i] >> 8;
-	}
-	for (i = 0; i < 3; ++i) {
-		_rtDmgData[i] = gb->memory.io[GB_REG_BGP + i];
-	}
+	/* BGP, OBP0, OBP1: the registers themselves, so a loadstate restores them. */
+	_rtDmg = rt_register("dmg_palette", 3, t, c, &gb->memory.io[GB_REG_BGP]);
+	GBRTSync(gb);
 }
 
 /* ROM file offset behind a CPU address, or RT_PC_NONE (RAM, BIOS, MBC-mediated reads). */
@@ -166,7 +201,6 @@ void GBRTPalette(unsigned index, uint8_t value) {
 
 void GBRTDmgPalette(unsigned index, uint8_t value) {
 	if (index < 3) {
-		_rtDmgData[index] = value;
 		rt_write(_rtDmg, index, value);
 	}
 }
@@ -177,6 +211,11 @@ edit('src/gb/memory.c', 'static void _pristineCow(struct GB* gba);\n',
 
 # CPU stores (GBStore8), at the physically stored index.
 M = 'src/gb/memory.c'
+# The libretro core resets (and so registers domains) only on its first run after a game loads.
+# Until then the previous game's domains would point at freed memory: drop them with the game.
+edit(M, 'void GBMemoryDeinit(struct GB* gb) {\n\tmappedMemoryFree(gb->memory.wram, GB_SIZE_WORKING_RAM);\n',
+     'void GBMemoryDeinit(struct GB* gb) {\n' + T.format('\tromancer_trace.domain_count = 0;')
+     + '\tmappedMemoryFree(gb->memory.wram, GB_SIZE_WORKING_RAM);\n')
 edit(M, '\t\t\tgb->video.renderer->writeVRAM(gb->video.renderer, (address & (GB_SIZE_VRAM_BANK0 - 1)) | (GB_SIZE_VRAM_BANK0 * gb->video.vramCurrentBank));\n'
         '\t\t\tgb->video.vramBank[address & (GB_SIZE_VRAM_BANK0 - 1)] = value;\n',
      '\t\t\tgb->video.renderer->writeVRAM(gb->video.renderer, (address & (GB_SIZE_VRAM_BANK0 - 1)) | (GB_SIZE_VRAM_BANK0 * gb->video.vramCurrentBank));\n'
@@ -218,6 +257,17 @@ edit(M, '\tgb->cpu->memory.store8(gb->cpu, gb->memory.hdmaDest, b);\n',
 
 # ---- gb.c: register domains once every buffer exists -------------------------
 edit('src/gb/gb.c', '\tGBIOReset(gb);\n', '\tGBIOReset(gb);\n' + T.format('\tGBRTInit(gb);'))
+
+# Reset (which also runs when a game loads) and loadstate replace the whole state; a frame's end
+# is the only other moment the frontend can look.
+edit('src/gb/gb.c', '\n\tgb->sramMaskWriteback = false;\n\tGBSavedataUnmask(gb);\n}\n',
+     '\n\tgb->sramMaskWriteback = false;\n\tGBSavedataUnmask(gb);\n' + T.format('\tGBRTStateReplaced(gb);') + '}\n')
+edit('src/gb/serialize.c', '\tmTimingInterrupt(&gb->timing);\n\n\treturn true;\n}\n',
+     '\tmTimingInterrupt(&gb->timing);\n\n'
+     + T.format('\t{\n\t\tvoid GBRTStateReplaced(struct GB* gb);\n\t\tGBRTStateReplaced(gb);\n\t}') + '\treturn true;\n}\n')
+edit('src/gb/core.c', '\twhile (gb->video.frameCounter == frameCounter) {\n\t\tSM83Run(core->cpu);\n\t}\n}\n',
+     '\twhile (gb->video.frameCounter == frameCounter) {\n\t\tSM83Run(core->cpu);\n\t}\n'
+     + T.format('\t{\n\t\tvoid GBRTSync(struct GB* gb);\n\t\tGBRTSync(gb);\n\t}') + '}\n')
 
 # ---- sm83.c: opcode fetch, operand fetch, data loads ------------------------
 S = 'src/sm83/sm83.c'
