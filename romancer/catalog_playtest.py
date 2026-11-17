@@ -4,7 +4,7 @@ from functools import lru_cache
 import json
 from pathlib import Path
 
-from .core_pins import CORE_PINS
+from .core_pins import CORE_PINS, WINDOWS_CORE_PINS
 from .rom_sample_db import HASH, _fields, _hash, _int
 from .script_schema import _nonfinite, _unique_object
 
@@ -71,7 +71,7 @@ def validate(report):
         if original is None or original['loaded'] or 'confirmed' in original:
             raise ValueError('Confirmed route does not match an original load refusal.')
         engine_id, compatibility = cartridge_engine(original['system_id'], proof['sha256'])
-        if not compatibility or CORE_PINS[engine_id]['sha256'] != proof['core_sha256']:
+        if not compatibility or WINDOWS_CORE_PINS[engine_id]['sha256'] != proof['core_sha256']:
             raise ValueError('Confirmed route has a different engine identity.')
         _int(proof['title_frame'], 1, 36_000)
         _int(proof['gameplay_frame'], proof['title_frame']+1, 36_000)
