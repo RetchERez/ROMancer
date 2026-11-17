@@ -68,12 +68,13 @@ def audit_windows(path,source,downloads,*,cores=None,observers=None):
     from romancer.bundled_cores import CORE_PINS,core_members
     engines=core_members(cores) if cores is not None else {}
     from romancer.bundled_debuggers import observer_files
+    from romancer.observer_pins import OBSERVER_FAMILIES
     native=observer_files(observers) if observers is not None else {}
     identity={'schema_version':1,'product':'ROMancer','version':ROMANCER_VERSION,
               'release_name':ROMANCER_RELEASE_NAME,'build_label':ROMANCER_BUILD_LABEL,
               'credit':'By RetchEWretched','platform':'windows-amd64','install_layout':INSTALL_LAYOUT,'runtime':PINS,
               'engines':{'included':bool(engines),'systems':CORE_PINS if engines else {}}}
-    if native:identity['observers']={'included':True,'families':['MesenCE 2.2.1 + physical-ppu-access-v2','MAME 0.289'],'source_included':True}
+    if native:identity['observers']={'included':True,'families':OBSERVER_FAMILIES,'source_included':True}
     if (type(manifest) is not dict or set(manifest)!=set(identity)|{'files'}
             or any(manifest.get(k)!=v or type(manifest.get(k)) is not type(v) for k,v in identity.items())
             or type(manifest.get('files')) is not list):raise ValueError('Windows manifest identity differs')

@@ -30,3 +30,17 @@ class BundledDebuggerTests(unittest.TestCase):
             root=Path(temp);work=root/'work';old=cache_root(work,'nes');old.mkdir(parents=True);bundled=root/'debuggers/mesence-2.2.1';bundled.mkdir(parents=True)
             with patch('romancer.native_debugger.backend_root',return_value=bundled):
                 self.assertEqual(preferred_root(work,'nes'),bundled)
+
+    def test_mame_is_prepared_on_first_use_not_bundled(self):
+        from romancer.observer_pins import OBSERVER_FILES,OBSERVER_FAMILIES
+        self.assertFalse([name for name in OBSERVER_FILES if name.startswith('mame-')])
+        self.assertEqual(OBSERVER_FAMILIES,['MesenCE 2.2.1 + physical-ppu-access-v2'])
+        from romancer.debugger_provision import preferred_root,cache_root,download_info,MAME
+        with tempfile.TemporaryDirectory() as temp:
+            root=Path(temp);work=root/'work';absent=root/'debuggers/mame-0.289'
+            with patch('romancer.genesis_debugger.backend_root',return_value=absent):
+                prepared=cache_root(work,'genesis');prepared.mkdir(parents=True)
+                self.assertEqual(preferred_root(work,'genesis'),prepared)
+        info=download_info('genesis')
+        self.assertFalse(info['bundled']);self.assertTrue(info['requires_network'])
+        self.assertGreaterEqual(info['download_bytes'],MAME[1])
