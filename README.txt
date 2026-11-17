@@ -1,15 +1,23 @@
-ROMancer v1.0.0
+ROMancer v1.1.0 Preview
 By RetchEWretched
 
 ROMancer is a local ROM editing, investigation and playtesting workbench.
 It supports NES, SNES, Genesis / Mega Drive, Master System, Game Boy and
 Game Boy Color cartridge formats. Everyday work runs offline.
 
+To edit Phantasy Star II's battle background, open the USA/Europe Rev A ROM
+and choose Graphics & fonts. In Battle background, paint on the draft or
+import a 320 x 128 PNG. The draft shows whether the image fits. Save playable
+copy opens the new build in Playtest. Technical details shows the graphics,
+tile placement and checksum bytes.
+
 Visual level editing is coming soon. The Levels entry is disabled in this
 release. Read-only layout research and measured locations remain available.
 Generic graphics tilemaps remain available as graphics resources.
 
 The built-in catalog recognizes all 1,052 supplied exact ROM revisions.
+See knowledge/ROM-CATALOG.md for the full list. The portable Windows ZIP
+includes ROM Catalog.html for offline search by title, system or hash.
 A full-file rescan confirmed each SHA-256, size, system and CRC32. Records
 include SHA-1, numerical cartridge header facts, file regions, checksum
 results and bounded text, graphics and compression findings. Names come
@@ -44,11 +52,12 @@ available. The supplied Pokemon Red and Blue revisions share a
 
 START ON WINDOWS
 
-1. Close any running copy of ROMancer, then run ROMancer-v1.0.0-Setup.exe.
-2. Open the ROMancer desktop or Start menu shortcut.
-   For the Windows ZIP, extract it fully. Open ROMancer.cmd runs it
-   in place. Install ROMancer.cmd adds it to your installed versions.
+1. Extract ROMancer-v1.0.0-Windows.zip in Windows File Explorer.
+2. Double-click ROMancer.exe in the extracted folder.
+   Keep ROMancer.exe, ROM Catalog.html and the ROMancer Files folder together.
 3. Open an original workshop or choose New project and import your own cartridge image.
+
+In a developer-built Windows bundle, use Open ROMancer.cmd.
 
 Python and Pillow are included in the Windows x64 package. Edge provides the
 desktop window; Open in browser is available if the window cannot open.
@@ -93,13 +102,13 @@ For Top Gear 3000, use Load game and create a fresh state in ROMancer
 v1.0.0. The bundled DSP-4 engine captures the race data needed to resume.
 States made with the older engine cannot be converted into complete states.
 
-The Windows installer is unsigned. Verify its SHA-256 against SHA256SUMS
-from the same trusted release location. Windows may show a publisher warning.
+The Windows launcher is unsigned. Verify the portable ZIP against SHA256SUMS
+from the GitHub release. Windows may show a publisher warning.
 
 Open Help for the illustrated offline guide. The source package includes
 user-guide/index.html and user-guide/guide.pdf. The release package
-includes an installer, portable Windows build, source, guide, component
-notices and hashes. The GitHub repository and release draft are private.
+includes the portable Windows build, guide, tested games, extras, engine
+source and hashes. Tagged app source is available from the GitHub release.
 
 SOURCE SETUP
 

@@ -532,6 +532,7 @@
         } catch {
         }
       }
+      if (key.endsWith(":battle-background-pixels") && typeof value === "string" && value.length === 40960) return true;
       if (key.includes(":game-")) {
         const field2 = (_g = (_f = (_e = state2.gameVisualModel) == null ? void 0 : _e.model) == null ? void 0 : _f.fields) == null ? void 0 : _g.find((f) => key.endsWith(":game-" + f.id));
         if (field2 && String(field2.value) !== String(value)) return true;
@@ -1136,6 +1137,26 @@
   }
 
   // romancer/ui/runtime_setup.js
+  async function loadPlaytestGame(ctx2, system_id, content, message = "Game loaded. Press Play.") {
+    var _a;
+    const { state: state2 } = ctx2, scope = selectionKey(state2);
+    state2.liveMuted = getSettings().startMuted;
+    (_a = ctx2.setDraft) == null ? void 0 : _a.call(ctx2, "runtime-volume", String(getSettings().volume));
+    const isDisc = content.startsWith("disc:");
+    const target = isDisc ? { container_id: content.slice(5) } : { artifact_id: content };
+    const loaded = await ctx2.run(
+      isDisc ? "runtime.load_disc" : "runtime.load_profile",
+      { ...ctx2.projectParams(), ...target, system_id },
+      { refresh: false, render: false }
+    );
+    if (scope !== selectionKey(state2)) return;
+    state2.runtime = loaded;
+    state2.frame = null;
+    if (state2.page === "playtest") {
+      await ctx2.render();
+      ctx2.notify(message);
+    }
+  }
   var families = [["nes", "NES"], ["snes", "SNES"], ["genesis", "Genesis"], ["gb", "Game Boy"], ["gbc", "Game Boy Color"], ["sms", "Master System"]];
   var defaultKeys = { up: "ArrowUp", down: "ArrowDown", left: "ArrowLeft", right: "ArrowRight", a: "z", b: "x", x: "a", y: "s", l: "q", r: "w", start: "Enter", select: "Shift" };
   async function runtimeSetup(ctx2) {
@@ -6995,6 +7016,306 @@ ${state2.artifact.system_id ? `<details><summary>Advanced byte options</summary>
     });
   }
 
+  // romancer/ui/battle_background.js
+  var draftKey = "battle-background-pixels";
+  var hexBytes = (pixels) => Array.from(pixels, (color) => color.toString(16)).join("");
+  var colorsFromHex = (text) => Uint8Array.from(text, (color) => Number.parseInt(color, 16));
+  function showReview(review) {
+    if (!(review == null ? void 0 : review.fits)) return "<p>ROM byte changes appear here when the draft fits.</p>";
+    const rows = review.ranges.map((range) => `<tr><th scope="row">${esc(range.purpose)}</th><td><code>0x${range.offset.toString(16).toUpperCase()}</code></td><td>${range.changed_bytes}</td><td><code>${esc(range.before)}</code></td><td><code>${esc(range.after)}</code></td></tr>`).join("");
+    return `<p>${review.tiles_used} of ${review.tiles_limit} tiles · ${review.encoded_bytes.toLocaleString()} of ${review.encoded_limit.toLocaleString()} graphics bytes</p>
+  <div class="table-wrap"><table><thead><tr><th scope="col">What changes</th><th scope="col">ROM offset</th><th scope="col">Changed bytes</th><th scope="col">Original · first 16 bytes</th><th scope="col">Draft · first 16 bytes</th></tr></thead><tbody>${rows}</tbody></table></div>
+ `;
+  }
+  async function battleBackground(ctx2) {
+    var _a, _b;
+    const { state: state2 } = ctx2, artifact = state2.artifact, scope = selectionKey(state2);
+    if (artifact.system_id !== "genesis" || artifact.size !== 786432) return "";
+    const current2 = () => {
+      var _a2;
+      return selectionKey(state2) === scope && ((_a2 = ctx2.isCurrentRender) == null ? void 0 : _a2.call(ctx2)) !== false;
+    };
+    const saved = ctx2.draft(draftKey, "");
+    if (((_a = state2.battleBackground) == null ? void 0 : _a.scope) !== scope) {
+      const source2 = await ctx2.api.call("backgrounds.inspect", ctx2.sourceParams()).catch((error) => ({ available: false, error: error.message }));
+      if (!current2()) return "";
+      state2.battleBackground = { scope, source: source2, color: 1, past: [], future: [], fit: null };
+      if (source2.available) {
+        state2.battleBackground.base = colorsFromHex(source2.pixels);
+      }
+    }
+    const model = state2.battleBackground, { source } = model;
+    if (!source.available) {
+      return source.error ? `<section class="card"><h3>Battle background</h3><p class="error">${esc(source.error)}</p></section>` : "";
+    }
+    if (model.saved !== saved) {
+      model.draft = typeof saved === "string" && saved.length === model.base.length && /^[0-9a-f]+$/.test(saved) ? colorsFromHex(saved) : model.base.slice();
+      Object.assign(model, { saved, past: [], future: [], fit: null });
+    }
+    const params = ctx2.sourceParams();
+    ctx2.use({
+      "battle-background-build": async (node) => {
+        var _a2, _b2, _c;
+        if (model.building || !((_a2 = model.fit) == null ? void 0 : _a2.fits)) return;
+        const pixels = model.saved;
+        model.building = true;
+        node.disabled = true;
+        let build;
+        try {
+          const plan = await ctx2.api.call("backgrounds.plan", { ...params, source_sha256: source.source_sha256, pixels });
+          if (!current2() || model.saved !== pixels) return;
+          build = await ctx2.run("build.apply", { project_id: params.project_id, plan_id: plan.plan_id }, { render: false });
+        } finally {
+          model.building = false;
+          node.disabled = !((_b2 = model.fit) == null ? void 0 : _b2.fits);
+        }
+        if (!current2()) return;
+        if (model.saved !== pixels) {
+          ctx2.notify("Playable copy saved. Your newer edits are still in the draft.");
+          return;
+        }
+        ctx2.setDraft(draftKey, "");
+        const opened = await playtestCreatedBuild(ctx2, build.artifact_id);
+        if (opened === false || state2.page !== "playtest" || ((_c = state2.artifact) == null ? void 0 : _c.artifact_id) !== build.artifact_id) return;
+        if (state2.profileAvailable) await loadPlaytestGame(ctx2, build.system_id, build.artifact_id, "Playable copy loaded. Press Play.");
+        else ctx2.notify("Playable copy saved. Choose an emulator in Playtest to load it.");
+      }
+    });
+    const swatches = source.palette.map((_, i) => `<button type="button" class="battle-swatch" data-battle-color="${i}" aria-label="Palette color ${i}" aria-pressed="${i === model.color}"><span>${i.toString(16).toUpperCase()}</span></button>`).join("");
+    const canvas = (name2, label) => `<figure><figcaption>${label}</figcaption><canvas width="${source.width}" height="${source.height}" id="battle-${name2}" aria-label="${label} of the battle background"></canvas>${name2 === "draft" ? '<div class="battle-fit"><p id="battle-fit" role="status"><strong class="badge"></strong><span></span></p><button id="battle-fit-retry" type="button" hidden>Retry fit check</button></div>' : ""}</figure>`;
+    return `<section class="card battle-background" id="battle-background">
+  <div class="card-heading"><h3>Battle background</h3>${badge("Phantasy Star II · Rev A", "good")}</div>
+  <p>Paint on the draft, or import a 320 × 128 PNG. This backdrop is shared by standard battles.</p>
+  <div class="battle-pictures">${canvas("original", artifact.kind === "build" ? "Selected build" : "Original")}${canvas("draft", "Draft")}</div>
+  <div class="battle-inputs">
+   <div class="battle-swatches" role="group" aria-label="Battle palette">${swatches}</div>
+   <label class="field battle-brush"><span>Brush</span><select id="battle-brush"><option value="1">1 pixel</option><option value="4">4 pixels</option><option value="8">8 pixels</option></select></label>
+  </div>
+  <div class="actions battle-actions">
+   <label class="button battle-import">Import backdrop PNG<input id="battle-png" type="file" accept="image/png,.png" aria-label="Import backdrop PNG"></label>
+   <button id="battle-save" type="button">Save draft PNG</button>
+   <button id="battle-undo" type="button">Undo paint</button><button id="battle-redo" type="button">Redo paint</button>
+   <button id="battle-reset" type="button">Reset draft</button>
+   ${button("Save playable copy", "battle-background-build", { primary: true, icon: "playtest", disabled: !((_b = model.fit) == null ? void 0 : _b.fits) || model.building, reason: "Make an edit that fits before saving." })}
+   ${artifact.kind === "build" ? button("Open in Playtest", "navigate", { id: "playtest", icon: "playtest" }) : ""}
+  </div>
+  <p class="preview-caption" id="battle-status" role="status"></p>
+  <details class="battle-review" id="battle-technical"><summary>Technical details</summary><div id="battle-byte-review">${showReview(model.fit)}</div></details>
+ </section>`;
+  }
+  function mountBattleBackground(ctx2) {
+    const model = ctx2.state.battleBackground, root = document.getElementById("battle-background");
+    if (!root || !(model == null ? void 0 : model.source.available)) return;
+    const { width, height, palette: palette2 } = model.source;
+    const draft = root.querySelector("#battle-draft"), status = root.querySelector("#battle-status");
+    const build = root.querySelector('[data-action="battle-background-build"]');
+    const fitLabel = root.querySelector("#battle-fit"), details = root.querySelector("#battle-byte-review");
+    const retry = root.querySelector("#battle-fit-retry");
+    const undo = root.querySelector("#battle-undo"), redo = root.querySelector("#battle-redo");
+    const reset = root.querySelector("#battle-reset"), brush = root.querySelector("#battle-brush");
+    const live = () => root.isConnected && selectionKey(ctx2.state) === model.scope;
+    const rgba = palette2.map(([r, g, b]) => [r, g, b, 255]);
+    let previous = null, stroke = null, imageRequest = 0, fitTimer;
+    function draw2(canvas, pixels) {
+      const graphics = canvas.getContext("2d"), image = graphics.createImageData(width, height);
+      pixels.forEach((index, position) => image.data.set(rgba[index], position * 4));
+      graphics.putImageData(image, 0, 0);
+    }
+    function refresh(message = "") {
+      draw2(draft, model.draft);
+      const changed2 = model.draft.some((color, i) => color !== model.base[i]);
+      undo.disabled = !model.past.length;
+      redo.disabled = !model.future.length;
+      reset.disabled = !changed2;
+      status.textContent = message;
+      showFit();
+    }
+    function showFit() {
+      const fit = model.fit;
+      let title = "Original image fits", help = "Paint or import an image to create a playable copy.", tone = "good";
+      if (model.saved) {
+        if (!fit) {
+          title = "Checking fit…";
+          help = "";
+          tone = "";
+        } else if (fit.error) {
+          title = "Couldn’t check fit";
+          help = fit.error;
+          tone = "warm";
+        } else if (!fit.fits) {
+          title = "Needs simplification";
+          help = fit.reason;
+          tone = "warm";
+        } else {
+          title = "Fits in the ROM";
+          help = "Save a playable copy to try it in Playtest.";
+        }
+      }
+      const label = fitLabel.querySelector("strong");
+      label.textContent = title;
+      label.className = "badge " + tone;
+      fitLabel.querySelector("span").textContent = help;
+      details.innerHTML = showReview(fit);
+      setUnavailable(build, !(fit == null ? void 0 : fit.fits) || model.building, model.building ? "Saving the playable copy." : "Make an edit that fits before saving.");
+      retry.hidden = !(fit == null ? void 0 : fit.error);
+    }
+    function queueFit(delay = 180) {
+      clearTimeout(fitTimer);
+      const pixels = model.saved;
+      const ticket = model.fitTicket = (model.fitTicket || 0) + 1;
+      if (!pixels) return;
+      const params = ctx2.sourceParams();
+      fitTimer = setTimeout(async () => {
+        const current2 = () => live() && model.fitTicket === ticket && model.saved === pixels;
+        if (!current2()) return;
+        const fit = await ctx2.api.call("backgrounds.fit", { ...params, source_sha256: model.source.source_sha256, pixels }).catch((error) => ({ error: error.message }));
+        if (!current2()) return;
+        model.fit = fit;
+        showFit();
+      }, delay);
+    }
+    retry.addEventListener("click", () => {
+      model.fit = null;
+      showFit();
+      queueFit(0);
+    });
+    function commit(before, message) {
+      if (!model.draft.some((color, i) => color !== before[i])) return;
+      model.past.push(before);
+      if (model.past.length > 24) model.past.shift();
+      model.future = [];
+      save(message);
+    }
+    function save(message) {
+      imageRequest++;
+      model.fit = null;
+      model.saved = model.draft.some((color, i) => color !== model.base[i]) ? hexBytes(model.draft) : "";
+      ctx2.setDraft(draftKey, model.saved);
+      refresh(message);
+      queueFit();
+    }
+    function point(event) {
+      const bounds2 = draft.getBoundingClientRect();
+      return [
+        Math.min(width - 1, Math.max(0, Math.floor((event.clientX - bounds2.left) * width / bounds2.width))),
+        Math.min(height - 1, Math.max(0, Math.floor((event.clientY - bounds2.top) * height / bounds2.height)))
+      ];
+    }
+    function paint(x, y) {
+      const size2 = Number(brush.value);
+      for (let row = y; row < Math.min(height, y + size2); row++) {
+        model.draft.fill(model.color, row * width + x, row * width + Math.min(width, x + size2));
+      }
+    }
+    function extend(event) {
+      const [x, y] = point(event), [fromX, fromY] = previous;
+      const steps2 = Math.max(Math.abs(x - fromX), Math.abs(y - fromY), 1);
+      for (let step = 1; step <= steps2; step++) {
+        paint(Math.round(fromX + (x - fromX) * step / steps2), Math.round(fromY + (y - fromY) * step / steps2));
+      }
+      previous = [x, y];
+      draw2(draft, model.draft);
+    }
+    draft.addEventListener("pointerdown", (event) => {
+      if (event.button !== 0 || stroke) return;
+      draft.setPointerCapture(event.pointerId);
+      previous = point(event);
+      stroke = { before: model.draft.slice(), id: event.pointerId };
+      paint(...previous);
+      draw2(draft, model.draft);
+    });
+    draft.addEventListener("pointermove", (event) => {
+      if ((stroke == null ? void 0 : stroke.id) === event.pointerId) extend(event);
+    });
+    function end(event) {
+      if ((stroke == null ? void 0 : stroke.id) !== event.pointerId) return;
+      const { before } = stroke;
+      stroke = null;
+      commit(before);
+    }
+    draft.addEventListener("pointerup", end);
+    draft.addEventListener("pointercancel", end);
+    draft.addEventListener("lostpointercapture", end);
+    const swatches = root.querySelectorAll("[data-battle-color]");
+    swatches.forEach((node, index) => {
+      node.style.setProperty("--swatch", `rgb(${palette2[index].join(",")})`);
+      node.addEventListener("click", () => {
+        model.color = index;
+        swatches.forEach((item) => item.setAttribute("aria-pressed", String(item === node)));
+      });
+    });
+    undo.addEventListener("click", () => {
+      if (model.past.length) {
+        model.future.push(model.draft);
+        model.draft = model.past.pop();
+        save();
+      }
+    });
+    redo.addEventListener("click", () => {
+      if (model.future.length) {
+        model.past.push(model.draft);
+        model.draft = model.future.pop();
+        save();
+      }
+    });
+    reset.addEventListener("click", () => {
+      const before = model.draft;
+      model.draft = model.base.slice();
+      commit(before);
+    });
+    root.querySelector("#battle-save").addEventListener("click", () => {
+      const link = document.createElement("a");
+      link.download = "Battle-background.png";
+      link.href = draft.toDataURL("image/png");
+      link.click();
+    });
+    const picker = root.querySelector("#battle-png");
+    picker.addEventListener("change", async () => {
+      var _a;
+      const file = (_a = picker.files) == null ? void 0 : _a[0];
+      picker.value = "";
+      if (!file) return;
+      const request2 = ++imageRequest;
+      try {
+        if (file.size > 2 * 1024 * 1024) throw Error("Choose a PNG under 2 MiB.");
+        const header = new DataView(await file.slice(0, 24).arrayBuffer());
+        if (header.byteLength !== 24 || header.getUint32(0) !== 2303741511 || header.getUint32(4) !== 218765834 || header.getUint32(12) !== 1229472850) throw Error("Choose a valid PNG image.");
+        if (header.getUint32(16) !== width || header.getUint32(20) !== height) throw Error("The battle backdrop must be 320 × 128 pixels.");
+        const bitmap = await createImageBitmap(file);
+        try {
+          if (!live() || request2 !== imageRequest) return;
+          const canvas = document.createElement("canvas");
+          canvas.width = width;
+          canvas.height = height;
+          const graphics = canvas.getContext("2d");
+          graphics.drawImage(bitmap, 0, 0);
+          const input = graphics.getImageData(0, 0, width, height).data, destination = new Uint8Array(width * height);
+          for (let i = 0; i < destination.length; i++) {
+            if (input[i * 4 + 3] < 128) continue;
+            let best = Infinity;
+            palette2.forEach(([r, g, b], index) => {
+              const distance = (input[i * 4] - r) ** 2 + (input[i * 4 + 1] - g) ** 2 + (input[i * 4 + 2] - b) ** 2;
+              if (distance < best) {
+                best = distance;
+                destination[i] = index;
+              }
+            });
+          }
+          const before = model.draft;
+          model.draft = destination;
+          commit(before, "PNG imported and matched to the battle palette.");
+        } finally {
+          bitmap.close();
+        }
+      } catch (error) {
+        if (live() && request2 === imageRequest) status.textContent = error.message;
+      }
+    });
+    draw2(root.querySelector("#battle-original"), model.base);
+    refresh();
+    if (!model.fit) queueFit(0);
+  }
+
   // romancer/ui/views/assets.js
   var codecBits = { "tile8-packed4-low-v1": 4, "mono-row-msb-v1": 1, "tile8-paired2-msb-v1": 2, "tile8-planar2-msb-v1": 2, "tile8-paired4-msb-v1": 4, "tile8-rowplanar4-msb-v1": 4, "tile8-packed4-high-v1": 4 };
   function literalColorCount(bitmap, palette2) {
@@ -7007,7 +7328,7 @@ ${state2.artifact.system_id ? `<details><summary>Advanced byte options</summary>
     return { r: shade, g: shade, b: shade };
   }
   async function render8(ctx2) {
-    var _a, _b, _c, _d, _e, _f, _g, _h, _i, _j, _k, _l, _m, _n, _o, _p, _q, _r;
+    var _a, _b, _c, _d, _e, _f, _g, _h, _i, _j, _k, _l, _m, _n, _o, _p, _q, _r, _s, _t;
     if (((_a = ctx2.state.connectedAnimation) == null ? void 0 : _a.scope) === selectionKey(ctx2.state)) {
       const prior = ctx2.state.results["assets.inspect"];
       let paint = ctx2.state.paint;
@@ -7028,6 +7349,9 @@ ${state2.artifact.system_id ? `<details><summary>Advanced byte options</summary>
     const { state: state2 } = ctx2, missing2 = requireProject(ctx2);
     if (missing2) return missing2;
     if (!state2.artifact) return empty("Import an asset resource", "A declared uncompressed codec and source revision are required.");
+    const background = await battleBackground(ctx2);
+    const backgroundReady = ((_b = state2.battleBackground) == null ? void 0 : _b.scope) === selectionKey(state2) && state2.battleBackground.source.available;
+    if (((_c = ctx2.isCurrentRender) == null ? void 0 : _c.call(ctx2)) === false) return "";
     const connected = state2.connectedAssetSetup;
     if ((connected == null ? void 0 : connected.scope) === selectionKey(state2)) {
       state2.connectedAssetSetup = null;
@@ -7047,10 +7371,10 @@ ${state2.artifact.system_id ? `<details><summary>Advanced byte options</summary>
       ctx2.setDraft("sprite-map", layout.indices.map((v, i) => v === null ? "." : String(v) + (layout.flips[i] & 1 ? "h" : "") + (layout.flips[i] & 2 ? "v" : "")).join(", "));
       state2.spriteHistory = null;
     }
-    const fallback = ((_b = state2.candidateReview) == null ? void 0 : _b.artifact_id) === state2.artifact.artifact_id ? {} : ((_c = state2.artifact.descriptors) == null ? void 0 : _c.assets) || ((_d = state2.project.descriptors) == null ? void 0 : _d.assets) || {};
-    let document2 = ((_e = state2.candidateReview) == null ? void 0 : _e.artifact_id) === state2.artifact.artifact_id ? null : state2.results["assets.inspect"];
+    const fallback = ((_d = state2.candidateReview) == null ? void 0 : _d.artifact_id) === state2.artifact.artifact_id ? {} : ((_e = state2.artifact.descriptors) == null ? void 0 : _e.assets) || ((_f = state2.project.descriptors) == null ? void 0 : _f.assets) || {};
+    let document2 = ((_g = state2.candidateReview) == null ? void 0 : _g.artifact_id) === state2.artifact.artifact_id ? null : state2.results["assets.inspect"];
     if ((document2 == null ? void 0 : document2.source_sha256) !== state2.artifact.sha256) document2 = null;
-    if (!document2 && ((_f = fallback.source) == null ? void 0 : _f.sha256) === state2.artifact.sha256) {
+    if (!document2 && ((_h = fallback.source) == null ? void 0 : _h.sha256) === state2.artifact.sha256) {
       document2 = await ctx2.api.call("assets.inspect", { ...ctx2.sourceParams(), schema: fallback });
       state2.results["assets.inspect"] = document2;
     }
@@ -7063,7 +7387,7 @@ ${state2.artifact.system_id ? `<details><summary>Advanced byte options</summary>
       ctx2.setDraft("paint-buffer", "");
     }
     const key = document2 == null ? void 0 : document2.document_id;
-    if (((_g = state2.paint) == null ? void 0 : _g.document_id) !== key) state2.paint = null;
+    if (((_i = state2.paint) == null ? void 0 : _i.document_id) !== key) state2.paint = null;
     if ((document2 == null ? void 0 : document2.ok) && !state2.paint) {
       try {
         const saved = JSON.parse(ctx2.draft("paint-buffer", "null")), savedBitmap = document2.bitmaps.find((b) => b.id === (saved == null ? void 0 : saved.bitmap_id));
@@ -7074,9 +7398,9 @@ ${state2.artifact.system_id ? `<details><summary>Advanced byte options</summary>
       } catch {
       }
     }
-    const bitmap = ((_h = document2 == null ? void 0 : document2.bitmaps) == null ? void 0 : _h.find((b) => b.id === state2.assetBitmapId)) || ((_i = document2 == null ? void 0 : document2.bitmaps) == null ? void 0 : _i[0]), palette2 = (_j = document2 == null ? void 0 : document2.palettes) == null ? void 0 : _j.find((p) => p.id === (bitmap == null ? void 0 : bitmap.palette_id));
+    const bitmap = ((_j = document2 == null ? void 0 : document2.bitmaps) == null ? void 0 : _j.find((b) => b.id === state2.assetBitmapId)) || ((_k = document2 == null ? void 0 : document2.bitmaps) == null ? void 0 : _k[0]), palette2 = (_l = document2 == null ? void 0 : document2.palettes) == null ? void 0 : _l.find((p) => p.id === (bitmap == null ? void 0 : bitmap.palette_id));
     state2.assetPage = Math.min(Math.max(0, Number.isSafeInteger(state2.assetPage) ? state2.assetPage : 0), Math.max(0, Math.ceil(((bitmap == null ? void 0 : bitmap.count) || 0) / 64) - 1));
-    const selected = ((_k = state2.paint) == null ? void 0 : _k.cell_index) ?? 0;
+    const selected = ((_m = state2.paint) == null ? void 0 : _m.cell_index) ?? 0;
     const request2 = () => {
       if (!(document2 == null ? void 0 : document2.ok)) throw new Error("Inspect a valid asset descriptor first.");
       const changes = mergeCellChanges(json("asset-changes"), state2.paint ? [{ kind: "cell", bitmap_id: bitmap.id, cell_index: selected, before_pixels: bitmap.cells[selected].pixels, after_pixels: state2.paint.pixels }] : []);
@@ -7171,13 +7495,13 @@ ${state2.artifact.system_id ? `<details><summary>Advanced byte options</summary>
         ctx2.render();
       }
     });
-    if (((_l = state2.candidateReview) == null ? void 0 : _l.artifact_id) === state2.artifact.artifact_id) return `${heading("", "Confirm graphics candidate", "")}<section class="card"><p>${esc(state2.candidateReview.reason)}</p><p>Confirm the format and allocation, then load the declaration.</p>${graphicsDeclaration(ctx2)}${button("Cancel candidate", "candidate-cancel")}</section>`;
+    if (((_n = state2.candidateReview) == null ? void 0 : _n.artifact_id) === state2.artifact.artifact_id) return `${heading("", "Confirm graphics candidate", "")}<section class="card"><p>${esc(state2.candidateReview.reason)}</p><p>Confirm the format and allocation, then load the declaration.</p>${graphicsDeclaration(ctx2)}${button("Cancel candidate", "candidate-cancel")}</section>`;
     const scene = await draftScene(ctx2, document2, () => {
       var _a2;
       return { schema: JSON.parse(ctx2.draft("asset-schema", JSON.stringify(fallback))), edits: { schema_version: 1, document_id: document2.document_id, changes: mergeCellChanges(JSON.parse(ctx2.draft("asset-changes", "[]")), ((_a2 = state2.paint) == null ? void 0 : _a2.document_id) === document2.document_id ? [{ kind: "cell", bitmap_id: state2.paint.bitmap_id, cell_index: state2.paint.cell_index, before_pixels: document2.bitmaps.find((b) => b.id === state2.paint.bitmap_id).cells[state2.paint.cell_index].pixels, after_pixels: state2.paint.pixels }] : []), acknowledged_consumers: state2.assetAcknowledgements || [] } };
     });
-    const pending = ((_m = state2.pending) == null ? void 0 : _m.kind) === "assets" && state2.pending.artifact_id === state2.artifact.artifact_id;
-    return `${heading("Asset workshop", "Graphics & fonts", "Inspect declared tiles, palettes, maps, and fonts. Shared consumers require explicit acknowledgment.")}<div class="identity"><strong>${esc(state2.artifact.name)}</strong><code>${short(state2.artifact.sha256)}</code>${badge((document2 == null ? void 0 : document2.write_supported) ? "Editable" : "Declaration needed", (document2 == null ? void 0 : document2.write_supported) ? "good" : "warm")}</div>${((_n = state2.discoveryGraphics) == null ? void 0 : _n.scope) === selectionKey(state2) && state2.discoveryGraphics.document_id === (document2 == null ? void 0 : document2.document_id) ? '<p class="notice">Opened discovery · ' + esc(state2.discoveryGraphics.name) + "</p>" : ""}<div class="grid-two asset-workspace"><div class="asset-editors">${((_o = state2.verifiedVisualSource) == null ? void 0 : _o.scope) === selectionKey(state2) && state2.verifiedVisualSource.document_id === (document2 == null ? void 0 : document2.document_id) ? '<p class="notice">This editor was opened from authenticated causal source verification. The proof covers the captured placement and replay; later edits still need playtesting.</p>' : ""}${previewPaletteControls(ctx2, palette2)}${await objectWorkbench(ctx2, document2, bitmap)}${spriteAssembly(ctx2, document2, bitmap, palette2)}${animationStudio(ctx2, document2, bitmap)}${await savedAnimationControls(ctx2, document2, bitmap)}${paletteEditor(ctx2, palette2)}${scene}${assetTools(ctx2, document2, bitmap, palette2)}<section class="card asset-collection"><div class="card-heading"><h3>Tile collection</h3><span class="subtle">${(bitmap == null ? void 0 : bitmap.count) || 0} cells · ${esc(bitmap ? formatLabel(bitmap.codec, state2.artifact.system_id) : "No tile layout loaded")}</span></div>${bitmap ? `<div class="pixel-grid">${bitmap.cells.slice((state2.assetPage || 0) * 64, (state2.assetPage || 0) * 64 + 64).map((cell) => `<div class="pixel-card"><canvas width="${bitmap.width}" height="${bitmap.height}" data-cell="${cell.index}" aria-label="Tile ${cell.index}"></canvas>${button("Edit tile " + cell.index, "asset-select-cell", { id: String(cell.index) })}</div>`).join("")}</div>` : empty("Load a declared asset descriptor", "Unknown compression and codecs remain read only.")}<div class="actions">${button("Previous page", "asset-page", { id: "-1", disabled: !(state2.assetPage > 0) })}${button("Next page", "asset-page", { id: "1", disabled: !bitmap || (state2.assetPage || 0) * 64 + 64 >= bitmap.count })}</div><div class="swatches" role="group" aria-label="Declared palette colors">${(palette2 == null ? void 0 : palette2.entries.slice(0, 64).map((entry, i) => `<span class="swatch" data-color-index="${i}" title="Color ${entry.index} (${entry.components.r}, ${entry.components.g}, ${entry.components.b})"></span>`).join("")) || ""}</div></section>${bitmap ? `<section class="card asset-pixel-editor"><div class="card-heading"><h3>Pixel editor · cell ${selected}</h3><span id="pixel-edit-status">${JSON.stringify(pixelBuffer(ctx2, document2, bitmap, selected)) !== JSON.stringify(bitmap.cells[selected].pixels) ? badge("Staged", "warm") : badge("Unchanged")}</span></div><div class="preview-pair pixel-comparison"><div><span>Original tile</span><div class="pixel-card"><canvas id="paint-original" aria-label="Original selected tile"></canvas></div></div><div><span>Editing · paint here</span><div class="pixel-card"><canvas id="paint-canvas" width="${bitmap.width}" height="${bitmap.height}" tabindex="0" role="img" aria-label="Pixel editor: arrows move; Space paints selected index"></canvas><small>Drag to paint. Undo restores a complete stroke.</small></div></div></div><p id="pixel-preview-status" class="preview-caption" role="status" aria-live="polite"></p><div>${field("paint-color", "Palette index", ctx2.draft("paint-color", "1"), { type: "number", min: 0 })}<p class="subtle small">Grayscale shows stored indices when no palette is declared.</p>${button("Discard pending pixels", "asset-discard")}</div></section>` : ""}</div><section class="card"><h3>Graphics setup</h3>${graphicsDeclaration(ctx2)}${jsonEditor("asset-schema", "Advanced asset schema", ctx2.draft("asset-schema", JSON.stringify(fallback, null, 2)), false)}${button("Inspect assets", "asset-inspect", { icon: "assets" })}${jsonEditor("asset-changes", "Additional cell / palette / map / advance changes", ctx2.draft("asset-changes", "[]"), false)}<div class="actions">${button("Review graphics changes", "asset-plan", { primary: !pending, disabled: !(document2 == null ? void 0 : document2.write_supported) })}${pending ? button("Create graphics build", "asset-apply", { primary: true, icon: "check" }) : ""}</div>${((_q = (_p = state2.results["assets.plan"]) == null ? void 0 : _p.required_consumers) == null ? void 0 : _q.length) && !((_r = state2.results["assets.plan"]) == null ? void 0 : _r.ok) ? `<div class="notice warm">${state2.results["assets.plan"].required_consumers.length} declared consumers are affected. Read the report below before acknowledging them.</div>${button("Acknowledge listed consumers", "asset-acknowledge")}` : ""}</section></div>${report(state2.results["assets.plan"], "Asset plan & affected consumers")}${report(state2.results["structured.apply"], "Build result")}${editCheckControls(ctx2)}`;
+    const pending = ((_o = state2.pending) == null ? void 0 : _o.kind) === "assets" && state2.pending.artifact_id === state2.artifact.artifact_id;
+    return `${heading("Asset workshop", "Graphics & fonts", "Inspect declared tiles, palettes, maps, and fonts. Shared consumers require explicit acknowledgment.")}<div class="identity"><strong>${esc(state2.artifact.name)}</strong><code>${short(state2.artifact.sha256)}</code>${badge((document2 == null ? void 0 : document2.write_supported) || backgroundReady ? "Editable" : "Declaration needed", (document2 == null ? void 0 : document2.write_supported) || backgroundReady ? "good" : "warm")}</div>${background}${((_p = state2.discoveryGraphics) == null ? void 0 : _p.scope) === selectionKey(state2) && state2.discoveryGraphics.document_id === (document2 == null ? void 0 : document2.document_id) ? '<p class="notice">Opened discovery · ' + esc(state2.discoveryGraphics.name) + "</p>" : ""}<div class="grid-two asset-workspace"><div class="asset-editors">${((_q = state2.verifiedVisualSource) == null ? void 0 : _q.scope) === selectionKey(state2) && state2.verifiedVisualSource.document_id === (document2 == null ? void 0 : document2.document_id) ? '<p class="notice">This editor was opened from authenticated causal source verification. The proof covers the captured placement and replay; later edits still need playtesting.</p>' : ""}${previewPaletteControls(ctx2, palette2)}${await objectWorkbench(ctx2, document2, bitmap)}${spriteAssembly(ctx2, document2, bitmap, palette2)}${animationStudio(ctx2, document2, bitmap)}${await savedAnimationControls(ctx2, document2, bitmap)}${paletteEditor(ctx2, palette2)}${scene}${assetTools(ctx2, document2, bitmap, palette2)}<section class="card asset-collection"><div class="card-heading"><h3>Tile collection</h3><span class="subtle">${(bitmap == null ? void 0 : bitmap.count) || 0} cells · ${esc(bitmap ? formatLabel(bitmap.codec, state2.artifact.system_id) : "No tile layout loaded")}</span></div>${bitmap ? `<div class="pixel-grid">${bitmap.cells.slice((state2.assetPage || 0) * 64, (state2.assetPage || 0) * 64 + 64).map((cell) => `<div class="pixel-card"><canvas width="${bitmap.width}" height="${bitmap.height}" data-cell="${cell.index}" aria-label="Tile ${cell.index}"></canvas>${button("Edit tile " + cell.index, "asset-select-cell", { id: String(cell.index) })}</div>`).join("")}</div>` : empty("Load a declared asset descriptor", "Unknown compression and codecs remain read only.")}<div class="actions">${button("Previous page", "asset-page", { id: "-1", disabled: !(state2.assetPage > 0) })}${button("Next page", "asset-page", { id: "1", disabled: !bitmap || (state2.assetPage || 0) * 64 + 64 >= bitmap.count })}</div><div class="swatches" role="group" aria-label="Declared palette colors">${(palette2 == null ? void 0 : palette2.entries.slice(0, 64).map((entry, i) => `<span class="swatch" data-color-index="${i}" title="Color ${entry.index} (${entry.components.r}, ${entry.components.g}, ${entry.components.b})"></span>`).join("")) || ""}</div></section>${bitmap ? `<section class="card asset-pixel-editor"><div class="card-heading"><h3>Pixel editor · cell ${selected}</h3><span id="pixel-edit-status">${JSON.stringify(pixelBuffer(ctx2, document2, bitmap, selected)) !== JSON.stringify(bitmap.cells[selected].pixels) ? badge("Staged", "warm") : badge("Unchanged")}</span></div><div class="preview-pair pixel-comparison"><div><span>Original tile</span><div class="pixel-card"><canvas id="paint-original" aria-label="Original selected tile"></canvas></div></div><div><span>Editing · paint here</span><div class="pixel-card"><canvas id="paint-canvas" width="${bitmap.width}" height="${bitmap.height}" tabindex="0" role="img" aria-label="Pixel editor: arrows move; Space paints selected index"></canvas><small>Drag to paint. Undo restores a complete stroke.</small></div></div></div><p id="pixel-preview-status" class="preview-caption" role="status" aria-live="polite"></p><div>${field("paint-color", "Palette index", ctx2.draft("paint-color", "1"), { type: "number", min: 0 })}<p class="subtle small">Grayscale shows stored indices when no palette is declared.</p>${button("Discard pending pixels", "asset-discard")}</div></section>` : ""}</div><section class="card"><h3>Graphics setup</h3>${graphicsDeclaration(ctx2)}${jsonEditor("asset-schema", "Advanced asset schema", ctx2.draft("asset-schema", JSON.stringify(fallback, null, 2)), false)}${button("Inspect assets", "asset-inspect", { icon: "assets" })}${jsonEditor("asset-changes", "Additional cell / palette / map / advance changes", ctx2.draft("asset-changes", "[]"), false)}<div class="actions">${button("Review graphics changes", "asset-plan", { primary: !pending, disabled: !(document2 == null ? void 0 : document2.write_supported) })}${pending ? button("Create graphics build", "asset-apply", { primary: true, icon: "check" }) : ""}</div>${((_s = (_r = state2.results["assets.plan"]) == null ? void 0 : _r.required_consumers) == null ? void 0 : _s.length) && !((_t = state2.results["assets.plan"]) == null ? void 0 : _t.ok) ? `<div class="notice warm">${state2.results["assets.plan"].required_consumers.length} declared consumers are affected. Read the report below before acknowledging them.</div>${button("Acknowledge listed consumers", "asset-acknowledge")}` : ""}</section></div>${report(state2.results["assets.plan"], "Asset plan & affected consumers")}${report(state2.results["structured.apply"], "Build result")}${editCheckControls(ctx2)}`;
   }
   function documentNode(id) {
     return document.getElementById(id);
@@ -7210,6 +7534,7 @@ ${state2.artifact.system_id ? `<details><summary>Advanced byte options</summary>
   }
   function mount6(ctx2) {
     var _a;
+    mountBattleBackground(ctx2);
     const doc = ctx2.state.results["assets.inspect"];
     if (!(doc == null ? void 0 : doc.ok)) return;
     const bitmap = doc.bitmaps.find((b) => b.id === ctx2.state.assetBitmapId) || doc.bitmaps[0], palette2 = doc.palettes.find((p) => p.id === bitmap.palette_id);
@@ -7999,16 +8324,7 @@ ${state2.artifact.system_id ? `<details><summary>Advanced byte options</summary>
           writePreference("romancer-core", selected.path);
         }
       },
-      "runtime-load": async () => {
-        var _a2;
-        state2.liveMuted = getSettings().startMuted;
-        (_a2 = ctx2.setDraft) == null ? void 0 : _a2.call(ctx2, "runtime-volume", String(getSettings().volume));
-        const system_id = read("profile-family"), content = read("runtime-content");
-        state2.runtime = await ctx2.run(content.startsWith("disc:") ? "runtime.load_disc" : "runtime.load_profile", { ...ctx2.projectParams(), ...content.startsWith("disc:") ? { container_id: content.slice(5) } : { artifact_id: content }, system_id }, { refresh: false, render: false });
-        state2.frame = null;
-        await ctx2.render();
-        ctx2.notify("Game loaded. Press Play.");
-      },
+      "runtime-load": () => loadPlaytestGame(ctx2, read("profile-family"), read("runtime-content")),
       "runtime-close": async () => {
         stopPlayback(state2);
         await ctx2.run("runtime.close", ctx2.projectParams(), { refresh: false, render: false });
@@ -8231,10 +8547,10 @@ ${state2.artifact.system_id ? `<details><summary>Advanced byte options</summary>
     const { state: state2 } = ctx2, scope = selectionKey(state2), page = state2.page, current2 = () => scope === selectionKey(state2) && page === state2.page;
     const script = doc.scripts.find((s) => s.id === ctx2.draft("command-script", "")) || doc.scripts[0];
     if (!(script == null ? void 0 : script.editable)) return "";
-    const draftKey2 = "command-sequence-" + doc.document_id + "-" + script.id;
+    const draftKey3 = "command-sequence-" + doc.document_id + "-" + script.id;
     let draft, error = "";
     try {
-      draft = restoreSequence(doc, script.id, ctx2.draft(draftKey2, "null"));
+      draft = restoreSequence(doc, script.id, ctx2.draft(draftKey3, "null"));
     } catch {
       error = "This sequence draft cannot be read. Reset it before editing.";
       draft = { document_id: doc.document_id, script_id: script.id, items: original(script), changed: false };
@@ -8245,7 +8561,7 @@ ${state2.artifact.system_id ? `<details><summary>Advanced byte options</summary>
       if (!current2()) throw Error("The command source changed.");
       state2.pending = null;
       state2.commandRewriteReview = null;
-      ctx2.setDraft(draftKey2, JSON.stringify({ ...draft, items, changed: JSON.stringify(items) !== JSON.stringify(original(script)) }));
+      ctx2.setDraft(draftKey3, JSON.stringify({ ...draft, items, changed: JSON.stringify(items) !== JSON.stringify(original(script)) }));
       return ctx2.render();
     };
     const args = () => {
@@ -8277,7 +8593,7 @@ ${state2.artifact.system_id ? `<details><summary>Advanced byte options</summary>
         if (error) throw Error(error);
         const p = args(), signature = JSON.stringify(p), r = await ctx2.run("commands.rewrite.preview", p, { render: false });
         if (!current2()) return;
-        if (signature !== JSON.stringify(args()) || ctx2.draft(draftKey2, "null") !== JSON.stringify(draft) && draft.changed) throw Error("The sequence changed. Preview it again.");
+        if (signature !== JSON.stringify(args()) || ctx2.draft(draftKey3, "null") !== JSON.stringify(draft) && draft.changed) throw Error("The sequence changed. Preview it again.");
         state2.commandRewriteReview = { scope, args: p, signature, result: r };
         return ctx2.render();
       },
@@ -9817,7 +10133,7 @@ ${state2.artifact.system_id ? `<details><summary>Advanced byte options</summary>
     openProject,
     modal,
     closeModal: () => document.getElementById("modal").close(),
-    draft: (id, fallback) => state.drafts[draftKey(id)] ?? fallback,
+    draft: (id, fallback) => state.drafts[draftKey2(id)] ?? fallback,
     setDraft: saveDraft,
     use: (handlers) => Object.assign(actions2, handlers),
     run,
@@ -9831,7 +10147,7 @@ ${state2.artifact.system_id ? `<details><summary>Advanced byte options</summary>
     const page = id === "investigation-id" || id.startsWith("series-") ? "debug" : state.page;
     return [page, ...doc ? [doc] : [], id].join(":");
   }
-  function draftKey(id) {
+  function draftKey2(id) {
     var _a, _b;
     return [(_a = state.project) == null ? void 0 : _a.project_id, (_b = state.artifact) == null ? void 0 : _b.artifact_id, draftFieldKey(id)].join(":");
   }

@@ -15,6 +15,7 @@ export function hasStagedChanges(state){
   if(/:(?:asset-changes|table-changes|sound-changes|command-changes)$/.test(key)){try{const data=JSON.parse(value);if(changed(Array.isArray(data)?data:data?.changes))return true;}catch{}}
   if(key.endsWith(':command-sequence')||key.includes(':command-sequence-')){try{if(JSON.parse(value)?.changed)return true;}catch{}}
   if(key.endsWith(':hex-changes')){try{const saved=JSON.parse(value);if(saved.artifact_id===state.artifact.artifact_id&&saved.sha256===state.artifact.sha256&&saved.edits?.length)return true;}catch{}}
+  if(key.endsWith(':battle-background-pixels')&&typeof value==='string'&&value.length===40960)return true;
   if(key.includes(':game-')){const field=state.gameVisualModel?.model?.fields?.find(f=>key.endsWith(':game-'+f.id));if(field&&String(field.value)!==String(value))return true;}
   if(key.endsWith(':paint-buffer')){try{const paint=JSON.parse(value),doc=state.results?.['assets.inspect'];const bitmap=doc?.document_id===paint.document_id?doc.bitmaps.find(b=>b.id===paint.bitmap_id):null;if(bitmap?.cells[paint.cell_index]&&!equal(paint.pixels,bitmap.cells[paint.cell_index].pixels))return true;}catch{}}
   const table=state.results?.['tables.inspect'];

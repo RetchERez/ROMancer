@@ -1,9 +1,9 @@
 {
   "name": "romancer",
-  "version": "1.0.0",
+  "version": "1.1.0",
   "private": true,
   "type": "module",
-  "description": "ROMancer local retro resource workbench \u2014 By RetchEWretched",
+  "description": "ROMancer local retro resource workbench — By RetchEWretched",
   "license": "MIT",
   "engines": {
     "node": ">=20"

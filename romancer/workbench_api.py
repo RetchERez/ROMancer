@@ -40,6 +40,9 @@ class WorkbenchAPI:
             'settings.workspace.save':('location',self._settings_workspace_save),
             'system.operations':('',self._operations),
             'games.inspect':('project_id artifact_id',self._game_inspect),
+            'backgrounds.inspect':('project_id artifact_id',self._background_inspect),
+            'backgrounds.fit':('project_id artifact_id source_sha256 pixels',self._background_fit),
+            'backgrounds.plan':('project_id artifact_id source_sha256 pixels',self._background_plan),
             'games.maps.catalog':('project_id artifact_id offset limit query',lambda p,c:self._game_maps(p,c,'catalog')),
             'games.maps.inspect':('project_id artifact_id header state',lambda p,c:self._game_maps(p,c,'inspect')),
             'games.maps.plan':('project_id artifact_id header changes',lambda p,c:self._game_maps(p,c,'plan')),
@@ -285,6 +288,60 @@ class WorkbenchAPI:
         from .verified_games import maps
         return maps(self,p,operation,cancelled=c)
 
+    def _background_inspect(self,p,c):
+        from . import battle_background
+        project = self.project(p)
+        row = projects.artifact(project,p['artifact_id'])
+        if not battle_background.matches(project,row):
+            return {'ok':True,'available':False}
+        _, measured, path = self.source(p)
+        return {'ok':True,'source_sha256':measured['sha256'],**battle_background.inspect(path)}
+
+    def _background_edit(self,p):
+        from . import battle_background
+        from .system_integrity import integrity_edits
+
+        project,row,path = self.source(p)
+        if not battle_background.matches(project,row) or row['sha256'] != p['source_sha256']:
+            raise ValueError('Reopen the supported original or its matching build before saving the draft.')
+        try:
+            edits,tile_count,encoded_bytes = battle_background.prepare_edit(path,p['pixels'])
+        except battle_background.BackgroundCapacityError as error:
+            return project,row,[],{'ok':True,'fits':False,'reason':str(error)}
+        edits = integrity_edits(path,row['sha256'],'genesis',edits)
+        purposes = {
+            battle_background.ART_OFFSET:'Compressed artwork',
+            battle_background.MAP_OFFSET:'Tile placement',
+            0x18E:'Mega Drive checksum',
+        }
+        ranges = []
+        for edit in edits:
+            before,after = bytes.fromhex(edit['before']),bytes.fromhex(edit['after'])
+            ranges.append({
+                'offset':edit['offset'], 'purpose':purposes[edit['offset']],
+                'length':len(after), 'changed_bytes':sum(a != b for a,b in zip(before,after)),
+                'before':before[:16].hex(' ').upper(), 'after':after[:16].hex(' ').upper(),
+            })
+        return project,row,edits,{
+            'ok':True,'fits':True,'ranges':ranges,
+            'tiles_used':tile_count,'tiles_limit':battle_background.MAX_TILES,
+            'encoded_bytes':encoded_bytes,'encoded_limit':battle_background.ART_CAPACITY,
+        }
+
+    def _background_fit(self,p,c):
+        return self._background_edit(p)[3]
+
+    def _background_plan(self,p,c):
+        project,row,edits,details = self._background_edit(p)
+        if not details['fits']:
+            raise ValueError(details['reason'])
+        plan = projects.plan_byte_edits(project,row['artifact_id'],edits,annotations={
+            'kind':'battle-background-v1',
+            'game':'Phantasy Star II (USA, Europe) (Rev A)',
+            'tiles_used':details['tiles_used'],
+        })
+        return {**details,'plan_id':plan['plan_id']}
+
     def _cheat_import(self,p,c):
         from .cheat_catalog import import_catalog
         count=import_catalog(self.project(p),p['input_id'],cancelled=c)
@@ -477,7 +534,7 @@ class WorkbenchAPI:
     def _capabilities(self,p,c):
         from .contracts import adapter_inventory
         from .system_registry import system_inventory
-        return {'ok': True, 'product': 'ROMancer', 'version': ROMANCER_VERSION, 'display_version': ROMANCER_BUILD_LABEL, 'release_name': ROMANCER_RELEASE_NAME, 'build_label': ROMANCER_BUILD_LABEL, 'target_version': ROMANCER_VERSION, 'credit': 'By RetchEWretched', 'release_status': 'RELEASE', 'python': platform.python_version(), 'platform': platform.system(), 'pillow': importlib.util.find_spec('PIL') is not None, 'native_dialog': os.name == 'nt' or importlib.util.find_spec('tkinter') is not None, 'adapters': {**adapter_inventory(), 'adapters': [a for a in adapter_inventory()['adapters'] if a['id'] in ('nes', 'snes', 'genesis', 'gb', 'gbc', 'sms')]}, 'systems': system_inventory(), 'runtime_note': 'The full Windows release includes engines for all six systems. Source installations can use compatible local libretro cores. Gameplay evidence applies to the exact ROM and tested setup.'}
+        return {'ok': True, 'product': 'ROMancer', 'version': ROMANCER_VERSION, 'display_version': ROMANCER_BUILD_LABEL, 'release_name': ROMANCER_RELEASE_NAME, 'build_label': ROMANCER_BUILD_LABEL, 'target_version': ROMANCER_VERSION, 'credit': 'By RetchEWretched', 'release_status': 'PREVIEW', 'python': platform.python_version(), 'platform': platform.system(), 'pillow': importlib.util.find_spec('PIL') is not None, 'native_dialog': os.name == 'nt' or importlib.util.find_spec('tkinter') is not None, 'adapters': {**adapter_inventory(), 'adapters': [a for a in adapter_inventory()['adapters'] if a['id'] in ('nes', 'snes', 'genesis', 'gb', 'gbc', 'sms')]}, 'systems': system_inventory(), 'runtime_note': 'The full Windows release includes engines for all six systems. Source installations can use compatible local libretro cores. Gameplay evidence applies to the exact ROM and tested setup.'}
 
     def _agent_config(self,p,c):
         if type(p['allow_writes']) is not bool or type(p['read_roots']) is not list or len(p['read_roots'])>8:raise ValueError('choose agent access and up to eight import folders')

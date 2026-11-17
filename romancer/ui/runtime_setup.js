@@ -1,5 +1,23 @@
 import {esc,field,select,button,json,read} from './common.js';
 import {getSettings} from './app_settings.js';
+import {selectionKey} from './tool_inputs.js';
+
+export async function loadPlaytestGame(ctx,system_id,content,message='Game loaded. Press Play.'){
+ const {state}=ctx,scope=selectionKey(state);
+ state.liveMuted=getSettings().startMuted;
+ ctx.setDraft?.('runtime-volume',String(getSettings().volume));
+ const isDisc=content.startsWith('disc:');
+ const target=isDisc?{container_id:content.slice(5)}:{artifact_id:content};
+ const loaded=await ctx.run(isDisc?'runtime.load_disc':'runtime.load_profile',
+  {...ctx.projectParams(),...target,system_id},{refresh:false,render:false});
+ if(scope!==selectionKey(state))return;
+ state.runtime=loaded;
+ state.frame=null;
+ if(state.page==='playtest'){
+  await ctx.render();
+  ctx.notify(message);
+ }
+}
 const families=[['nes','NES'],['snes','SNES'],['genesis','Genesis'],['gb','Game Boy'],['gbc','Game Boy Color'],['sms','Master System']];
 const defaultKeys={up:'ArrowUp',down:'ArrowDown',left:'ArrowLeft',right:'ArrowRight',a:'z',b:'x',x:'a',y:'s',l:'q',r:'w',start:'Enter',select:'Shift'};
 export async function runtimeSetup(ctx){const {state}=ctx,family=state.profileFamily||state.artifact?.system_id||'nes';

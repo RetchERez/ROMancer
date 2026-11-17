@@ -20,13 +20,13 @@ PROTOCOL='2025-11-25'
 MAX_MESSAGE=1024*1024
 MAX_RESULT=256*1024
 READ_OPERATIONS=frozenset('''assets.preview_scene.get assets.preview_scene.find editing.readiness discoveries.open objects.scene objects.list objects.get graphics.accesses.list graphics.accesses.tiles graphics.accesses.get graphics.accesses.memory gameview.graph gameview.detail traces.get traces.verification traces.origin checks.status checks.get symbols.preview symbols.search references.catalog references.template research.note_get research.inspect research.preview system.capabilities system.operations projects.list project.open
-games.inspect games.maps.catalog games.maps.inspect cheats.catalog cheats.inspect systems.reference systems.classify_address rom.check catalog.list resource.inspect resources.explain resources.relationships
+games.inspect games.maps.catalog games.maps.inspect backgrounds.inspect backgrounds.fit cheats.catalog cheats.inspect systems.reference systems.classify_address rom.check catalog.list resource.inspect resources.explain resources.relationships
 hex.search hex.numbers hex.bookmarks builds.timeline builds.compare project.validate investigations.get investigations.probe debugger.capabilities debugger.get structures.survey structures.definition relocation.table_definition
 assets.inspect script.inspect tables.inspect tables.batch levels.inspect sound.inspect sound.system revision.lookup
 profiles.get profiles.validate runtime.checkpoints reports.list exports.list jobs.get
 systems.address resources.address_uses watches.compare debug.inspect compression.inspect compression.preview_reinsert'''.split())
 WRITE_OPERATIONS=frozenset('''assets.preview_scene project.studio objects.create objects.open objects.delete graphics.accesses.capture gameview.link gameview.unlink traces.capture traces.checkpoint traces.open traces.verify traces.open_verified checks.configure checks.run checks.from_trace discoveries.save discoveries.export discoveries.import discoveries.remove release.proof release.replay compression.plan_relocate symbols.import research.note_save research.note_delete research.export research.apply project.create project.demo project.demo_system source.import inputs.import
-games.plan games.configure games.maps.plan cheats.import systems.plan_edits assets.plan script.plan tables.plan levels.plan sound.plan
+games.plan games.configure games.maps.plan backgrounds.plan cheats.import systems.plan_edits assets.plan script.plan tables.plan levels.plan sound.plan
 build.apply structured.apply builds.annotate hex.bookmark catalog.index rom.scan.start
 rom.scan.run release.prepare release.verify resources.declare_assets resources.declare_script tables.save_definition patches.preview patches.apply revision.import
 runtime.load_profile runtime.advance runtime.step runtime.capture runtime.memory runtime.close
@@ -113,6 +113,9 @@ DESCRIPTIONS={
  'project.create':'Create a separate ROM project. Never overwrite an original.',
  'source.import':'Import an owned ROM copy from an explicitly allowed local folder.',
  'games.inspect':'Identify an exact supported game revision and inspect verified named fields.',
+ 'backgrounds.inspect':'Read the supported battle background as indexed pixels and its native palette.',
+ 'backgrounds.fit':'Check whether a battle background fits and preview its ROM changes without saving a plan.',
+ 'backgrounds.plan':'Review a source-bound battle background replacement and return the ROM change ranges.',
  'games.plan':'Preview named game edits; returns a source-bound plan, not a modified ROM.',
  'games.maps.catalog':'Browse bounded real map thumbnails and references for the exact supported game revision. Structural decoding is not gameplay certification.',
  'games.maps.inspect':'Decode a real room, arrival and object definitions. Conditional map branches require explicit observed or selected state; object visibility is not inferred.',
@@ -175,6 +178,11 @@ def _investigation_properties(operation):
     def obj(properties):return {'type':'object','properties':properties,'required':list(properties),'additionalProperties':False}
     def array(items,maximum,minimum=0):return {'type':'array','items':items,'minItems':minimum,'maxItems':maximum}
     source={'project_id':string(),'artifact_id':string()}
+    if operation=='backgrounds.inspect':return source
+    if operation in ('backgrounds.fit','backgrounds.plan'):
+        return {**source,'source_sha256':string(64),
+                'pixels':{'type':'string','minLength':40960,'maxLength':40960,'pattern':'^[0-9a-f]+$',
+                          'description':'320 × 128 row-major pixels, one hexadecimal palette index per pixel.'}}
     if operation in ('text.grow.definition','commands.rewrite.definition'):return source
     if operation in ('commands.rewrite.preview','commands.rewrite.plan'):
         props={**source,'definition':{'type':'object','description':'Checked source-bound fixed-length opcode grammar.'},'document_id':string(64),'script_id':string(64),'items':array(obj({'opcode':integer(0,255),'values':{'type':'object','description':'Exactly the declared operand names and bounded integer values.'}}),256,1),'fill_byte':integer(0,255),'no_interior_references':{'type':'boolean'}}

@@ -17,10 +17,11 @@ class PublicReleaseTests(unittest.TestCase):
             api=WorkbenchAPI(Path(folder))
             try:
                 value=api.dispatch('system.capabilities',{})
-                self.assertEqual(value['release_name'],'ROMancer v1.0.0')
-                self.assertEqual(value['version'],'1.0.0')
-                self.assertEqual(value['target_version'],'1.0.0')
-                self.assertEqual(value['build_label'],'v1.0.0')
+                self.assertEqual(value['release_name'],'ROMancer v1.1.0 Preview')
+                self.assertEqual(value['version'],'1.1.0')
+                self.assertEqual(value['target_version'],'1.1.0')
+                self.assertEqual(value['build_label'],'v1.1.0')
+                self.assertEqual(value['release_status'],'PREVIEW')
             finally:api.close()
 
     def test_level_editing_is_excluded_from_the_release(self):
