@@ -114,7 +114,7 @@ jobs:
           $entry = Get-ItemProperty -LiteralPath 'HKCU:/Software/Microsoft/Windows/CurrentVersion/Uninstall/ROMancer'
           if ($entry.InstallLocation -ne $target -or $entry.DisplayVersion -ne '1.0.1') { throw 'Apps registration differs' }
           $active = Get-Content -LiteralPath (Join-Path $target 'active.json') -Raw | ConvertFrom-Json
-          if ($active.slot -notmatch '^1[.]0[.]0-[0-9a-f]{16}$') { throw 'Package slot differs' }
+          if ($active.slot -notmatch '^1[.]0[.]1-[0-9a-f]{16}$') { throw 'Package slot differs' }
           $version = Join-Path $target ('versions/' + $active.slot)
           $installedPython = Join-Path $version 'python/python.exe'
           $env:PATH = (Join-Path $version 'python') + ';' + $env:SystemRoot + '/System32;' + $env:SystemRoot + '/System32/WindowsPowerShell/v1.0'
