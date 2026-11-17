@@ -1898,7 +1898,7 @@ def _private_copy_support() -> dict:
     if graphics_trace is not None and callable(getattr(graphics_trace, 'plan_private_copy', None)):
         return {'available': True, 'reason': ''}
     return {'available': False, 'reason': 'Changing only this scene needs ROMancer to give it a private copy of the data and '
-                                          'point this one use at it. That tool is not part of this preview build yet, so a '
+                                          'point this one use at it. That tool is not part of this build yet, so a '
                                           'change applies everywhere the data is used.'}
 
 

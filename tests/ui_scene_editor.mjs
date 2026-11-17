@@ -36,7 +36,7 @@ assert.ok(BASIC_PAGES.includes('scenes'),'Scenes & colors is a basic editing scr
 // The screen: plain language first, byte offsets only inside Details, locked colors say why.
 const scene={id:'s1',label:'Scene 1 (0:10 into play)',frame:600,origin:'explore',image:'scene:s1',width:160,height:144};
 const change={id:'c1',kind:'color',title:'Background palette 0, color 1',state:'kept',scene_id:'s1',swatch:'palette:0',from_rgb:[[255,0,0]],to_rgb:[[0,255,0]],scope:'all',bytes:2,affected:[],working:0,scene_count:14,visible_count:1,verified:true,verified_here:true,badge:'Used in 14 scenes',coverage:"Seen in 14 of 15 recorded scenes; 1 looks different. Scenes you haven't recorded can't be shown.",verdict:'Checked.',planning:false,error:'',notes:[],details:[]};
-const summary={system:'gbc',system_label:'Game Boy Color',engine:{installed:true,reason:''},scenes:[scene],scene_limit:160,recording:null,live:{state:'off'},preview:null,private_copy:{available:false,reason:'Changing only this scene needs a private copy; that tool is not part of this preview build yet.'},
+const summary={system:'gbc',system_label:'Game Boy Color',engine:{installed:true,reason:''},scenes:[scene],scene_limit:160,recording:null,live:{state:'off'},preview:null,private_copy:{available:false,reason:'Changing only this scene needs a private copy; that tool is not part of this build yet.'},
  changes:{revision:1,changes:[change],scene_count:14,summary:'1 change: affects 14 scenes'}};
 const view={scene,look:{image:'scene:s1',state:'original'},recorded_scenes:1,line:{palette:4},pickers:{'rgb555-le':{...gbc,label:'32 levels',help:'This system stores 32 levels of red, green and blue.'}},
  swatches:[{id:'palette:0',domain:'palette',entry:0,group:'Background palette 0',name:'Background palette 0, color 1',format:'rgb555-le',colors:[[255,0,0]],editable:true,status:'rom',locked_reason:'',uses:14,notes:[],pending:[[0,255,0]],pending_change:'c1',details:[{file_offset:42823,kind:'rom',code_address:3981},{file_offset:42824,kind:'rom',code_address:3983}]},
@@ -54,7 +54,7 @@ const outsideDetails=html.replace(/<details>[\s\S]*?<\/details>/g,'');
 assert(!/0x[0-9A-F]{4}/.test(outsideDetails),'Byte offsets stay inside Details.');
 state.sceneEditor.selected='palette:0';state.sceneEditor.draft=[[0,255,0]];html=await render(ctx);
 assert.match(html,/Used in 14 scenes/);assert.match(html,/Everywhere this color is used \(14 recorded scenes\)/);
-assert.match(html,/value="only_this" disabled/);assert.match(html,/not part of this preview build yet/);
+assert.match(html,/value="only_this" disabled/);assert.match(html,/not part of this build yet/);
 assert.match(html,/type="range" min="0" max="31"/);assert.match(html,/<details><summary>Details<\/summary>[\s\S]*0x00A747/);
 state.sceneEditor.selected='palette:1';html=await render(ctx);
 assert.match(html,/This color can't be changed here\. The game works this color out/);

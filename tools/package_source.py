@@ -61,6 +61,7 @@ APPROVED_FILES = frozenset({
     'trace/codec_survey.py',
     'trace/coverage_report.py',
     'trace/coverage_sweep.py',
+    'trace/graphics_report.py',
     'trace/graphics_sweep.py',
     'trace/palette_state_check.py',
     'trace/patch_blastem.py',

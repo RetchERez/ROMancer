@@ -1,6 +1,6 @@
 {
   "schema_version": 1,
-  "product": "ROMancer v1.0.0",
+  "product": "ROMancer v1.1.0",
   "subtitle": "A practical guide to the current editing tools: small first edits, advanced workflows, actual editing and appearance examples, a glossary and an alphabetical index.",
   "scope": "This guide covers the six supported cartridge systems. The offline catalog identifies 942 exact revisions. Recognized ROM formats can be inspected and edited as bytes without a catalog match. Game-specific editors use checked definitions.",
   "basic_summary": "Start the application, choose saved preferences, identify a source, make a focused edit, preserve progress and export a checked patch. These procedures build the habits used throughout the guide.",
@@ -899,7 +899,7 @@
       "title": "Change a color and see every scene it touches",
       "part": "Basic",
       "kicker": "SCENES AND COLORS / NEW IN v1.1",
-      "intro": "A color in a game is usually shared. The same few bytes can paint a title screen, a menu and a level. Scenes &amp; colors lets you change a color and look at every recorded moment of the game that changes with it, before anything is saved. It works with NES, Super NES, Mega Drive, Master System, Game Boy and Game Boy Color games, and needs no game-specific definition.",
+      "intro": "A color in a game is usually shared. The same few bytes can paint a title screen, a menu and a level. Scenes &amp; colors lets you change a color, redraw a picture or repaint the background, and look at every recorded moment of the game that changes with it, before anything is saved. It works with NES, Super NES, Mega Drive, Master System, Game Boy and Game Boy Color games, and needs no game-specific definition.",
       "steps": [
         "Select your ROM in the top bar and open <b>Scenes &amp; colors</b>. A <b>scene</b> is a moment of the game that ROMancer has watched. To collect scenes, choose <b>Record more scenes</b> and the game plays by itself for a few minutes, or choose <b>Play and capture a moment</b>, play to the screen you want and choose <b>Capture this moment</b>. <b>Stop recording</b> ends a recording early.",
         "Choose a scene. Click a pixel in its picture, or choose a swatch under <b>Colors in this scene</b>. Pick the new color. The controls offer only colors the console can show: sliders on most systems, the console color chart on NES, and four shades on the original Game Boy.",
@@ -933,11 +933,48 @@
         }
       ],
       "related": [
+        "scenes-graphics",
         "gbc-colors",
         "palettes",
         "play",
         "patches",
         "projects"
+      ],
+      "terms": [
+        "term-palette",
+        "term-scene",
+        "term-build"
+      ]
+    },
+    {
+      "id": "scenes-graphics",
+      "title": "Redraw a picture or repaint the background",
+      "part": "Basic",
+      "kicker": "SCENES AND COLORS / NEW IN v1.1",
+      "intro": "Scenes &amp; colors also edits what the game draws with. <b>Graphics</b> redraws one of the small pictures a scene is built from. <b>Background</b> changes which picture each cell of a background layer shows. As with colors, every recorded scene that uses the same data is replayed before anything is saved.",
+      "steps": [
+        "Open <b>Scenes &amp; colors</b>, choose a scene and choose <b>Graphics</b> above it. Click a picture in the scene, or choose it from the list.",
+        "Redraw the picture pixel by pixel with the colors of its palette. You can also save it as an 8 by 8 PNG, edit it in any drawing program and load it back.",
+        "To change the background instead, choose <b>Background</b>. Choose the picture to paint with, then paint it into the cells of the layer.",
+        "Choose <b>Show what changes</b> and read the <b>Also changes</b> strip, then <b>Keep this change</b>. <b>Review and save</b> writes a separate build, as it does for colors."
+      ],
+      "result": "The new build shows your picture or background. Your original ROM is unchanged.",
+      "note": "A locked picture or cell cannot be changed here. The game builds it while it runs, or ROMancer has not seen where it comes from. A scene recorded at another moment may show it unlocked.",
+      "details": [
+        {
+          "title": "Packed pictures and the run-time patch",
+          "text": "Many games keep their pictures packed to save space. When ROMancer recognises the packing, it unpacks the data, applies your change and packs it again. When it does not, the saved build gets a small run-time patch that swaps your picture in as the game loads it. The editor then shows two results: the scene itself, and the game started from power-on. Read both before you keep the change."
+        },
+        {
+          "title": "What to expect",
+          "text": "Measured across the catalog on development builds of the tracing engines, a color edit was confirmed by replay on 906 of 938 ROMs and a picture edit on 916 of 938. <b>Only in this scene</b> is rarely available; expect a change to apply everywhere the data is used. Super NES replays are slow: with many recorded scenes, Show what changes and Review and save can take minutes."
+        }
+      ],
+      "related": [
+        "scenes-colors",
+        "sprites",
+        "tilemaps",
+        "play"
       ],
       "terms": [
         "term-palette",
@@ -5499,6 +5536,7 @@
     "research-packs",
     "resources",
     "scenes-colors",
+    "scenes-graphics",
     "settings",
     "sound",
     "start",

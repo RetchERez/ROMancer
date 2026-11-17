@@ -18,8 +18,8 @@ SYSTEM_LABELS = {
     'gb': 'Game Boy',
     'gbc': 'Game Boy Color',
 }
-TESTED_GAMES = 'https://github.com/RetchERez/ROMancer/releases/download/v1.0.0/TESTED-GAMES.txt'
-PORTABLE = 'https://github.com/RetchERez/ROMancer/releases/download/v1.0.0/ROMancer-v1.0.0-Windows.zip'
+TESTED_GAMES = 'https://github.com/RetchERez/ROMancer/releases/download/v1.1.0/TESTED-GAMES.txt'
+PORTABLE = 'https://github.com/RetchERez/ROMancer/releases/download/v1.1.0/ROMancer-v1.1.0-Windows.zip'
 
 
 def grouped(records):

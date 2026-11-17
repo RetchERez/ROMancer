@@ -1,27 +1,35 @@
-# ROMancer v1.0.1
+# ROMancer v1.1.0
 
-**[Download for Windows x64](https://github.com/RetchERez/ROMancer/releases/download/v1.0.1/ROMancer-v1.0.1-Windows.zip)** · **[Download for Linux x86-64](https://github.com/RetchERez/ROMancer/releases/download/v1.0.1/ROMancer-v1.0.1-Linux-x86_64.tar.gz)**
+**[Download for Windows x64](https://github.com/RetchERez/ROMancer/releases/download/v1.1.0/ROMancer-v1.1.0-Windows.zip)** · **[Download for Linux x86-64](https://github.com/RetchERez/ROMancer/releases/download/v1.1.0/ROMancer-v1.1.0-Linux-x86_64.tar.gz)**
 
 By **RetchEWretched**. Edit ROMs, preview changes, playtest builds, and export patches offline.
 
+## New in v1.1
+
+- **Scenes & colors editor.** Record moments of the game, change a color, and the **Also changes** strip replays every recorded scene that uses the same data in the real engine, so you see what else changes before you save. Works on all six systems without a game-specific definition.
+- **Tile and background editing.** In the same editor, redraw a picture pixel by pixel or paint pictures into background cells. Packed graphics are re-packed when ROMancer recognises the packing; otherwise the build gets a small run-time patch, shown both in the scene and from power-on.
+- **Accurate catalog.** The catalog now lists 942 cartridge dumps that match the No-Intro reference lists exactly, under their No-Intro names. Fan translations, re-release dumps and entries that did not boot were removed.
+
+Measured across the catalog (938 of 942 entries have a result): a color edit was confirmed by replay on 906 ROMs and a picture edit on 916. Per-ROM results are in [trace/COVERAGE.md](../trace/COVERAGE.md); limits are in the [release notes](https://github.com/RetchERez/ROMancer/releases/tag/v1.1.0).
+
 ## Get started on Windows
 
-1. In File Explorer, right-click **ROMancer-v1.0.1-Windows.zip** and choose **Extract All**.
+1. In File Explorer, right-click **ROMancer-v1.1.0-Windows.zip** and choose **Extract All**.
 2. Pick a destination and click **Extract**. Open the extracted folder.
 3. Double-click **ROMancer.exe**. Keep it next to the **ROMancer Files** folder.
 
-The ZIP includes the runtime, emulator engines, and offline user guide. Try an included practice ROM or choose **New project** to import your own. Open **Help → User guide** for a walkthrough. The launcher is unsigned, so Windows may show a SmartScreen warning.
+The ZIP includes the runtime, emulator engines, tracing engines for Scenes & colors, and offline user guide. Try an included practice ROM or choose **New project** to import your own. Open **Help → User guide** for a walkthrough. The launcher is unsigned, so Windows may show a SmartScreen warning.
 
-[User guide (PDF)](https://github.com/RetchERez/ROMancer/releases/download/v1.0.1/ROMancer-v1.0.0-User-Guide.pdf) · [All 942 ROM revisions](../knowledge/ROM-CATALOG.md) · [Tested games](https://github.com/RetchERez/ROMancer/releases/download/v1.0.1/TESTED-GAMES.txt) · [Release and checksums](https://github.com/RetchERez/ROMancer/releases/tag/v1.0.1)
+[User guide (PDF)](https://github.com/RetchERez/ROMancer/releases/download/v1.1.0/ROMancer-v1.1.0-User-Guide.pdf) · [All 942 ROM revisions](../knowledge/ROM-CATALOG.md) · [Tested games](https://github.com/RetchERez/ROMancer/releases/download/v1.1.0/TESTED-GAMES.txt) · [Release and checksums](https://github.com/RetchERez/ROMancer/releases/tag/v1.1.0)
 
 ## Get started on Linux
 
 ```
-tar xf ROMancer-v1.0.1-Linux-x86_64.tar.gz
-./ROMancer-v1.0.1-Linux-x86_64/ROMancer.sh
+tar xf ROMancer-v1.1.0-Linux-x86_64.tar.gz
+./ROMancer-v1.1.0-Linux-x86_64/ROMancer.sh
 ```
 
-Python and the emulator engines are included; nothing is installed system-wide. Needs glibc 2.28 or newer (Ubuntu 20.04+, Debian 10+, Fedora 29+, SteamOS 3) and a web browser. Run `./ROMancer.sh --install-desktop` to add a menu entry. Native debugger captures are Windows-only.
+Python, the emulator engines and the tracing engines are included; nothing is installed system-wide. Needs glibc 2.28 or newer (Ubuntu 20.04+, Debian 10+, Fedora 29+, SteamOS 3) and a web browser. Run `./ROMancer.sh --install-desktop` to add a menu entry. Native debugger captures are Windows-only.
 
 ## Editors in action
 

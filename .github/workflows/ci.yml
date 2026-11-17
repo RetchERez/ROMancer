@@ -34,6 +34,8 @@ jobs:
       - run: npm run build
       - run: git diff --exit-code -- romancer/ui/app.bundle.js romancer/ui/bundle.json
       - run: npm test
+      - name: Catalog files, pins and counts agree
+        run: python -B tools/prune_catalog.py --check
       - run: python -B -m unittest discover -s tests -v
       - run: python -B tools/package_source.py . dist/ci-source.zip
       - run: python -B tools/audit_release.py --source dist/ci-source.zip

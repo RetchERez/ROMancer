@@ -1,4 +1,4 @@
-ROMancer v1.1.0 Preview for Linux x86-64
+ROMancer v1.1.0 for Linux x86-64
 By RetchEWretched
 
 1. Extract the archive:   tar xf ROMancer-v1.1.0-Linux-x86_64.tar.gz
@@ -13,8 +13,9 @@ Debian 10+, Fedora 29+, Linux Mint 20+, SteamOS 3) and a web browser.
 ROMancer opens in an app window when Chrome, Chromium, Edge, Brave or Vivaldi
 is installed, and otherwise in your default browser.
 
-New in v1.1: Scenes & colors. Change a color and see every recorded scene it
-touches before you save. Open Help and choose the Scenes & colors topic.
+New in v1.1: Scenes & colors. Change a color, a picture or the background and
+see every recorded scene it touches before you save. Open Help and choose the
+Scenes & colors topic.
 
 Python, Pillow, the emulator engines and the tracing engines that Scenes &
 colors uses are included. Nothing is installed

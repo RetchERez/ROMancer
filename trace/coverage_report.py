@@ -1,6 +1,10 @@
 """Summarize coverage_sweep results per system.
 
-    python -B trace/coverage_report.py SWEEPDIR INDEX.json [--markdown OUT.md] [--no-chips]
+    python -B trace/coverage_report.py SWEEPDIR INDEX.json [--catalog knowledge/rom_samples.json]
+                                       [--markdown OUT.md] [--no-chips]
+
+With --catalog, only ROMs that are in the catalog are reported, under their catalog names,
+and the "in catalog" column counts catalog entries.
 
 Palette status per ROM (first that applies):
   verified  - a traced palette source was edited, the planned color arrived in palette
@@ -145,10 +149,15 @@ def cause(r, pal, chip):
 def main():
     ap = argparse.ArgumentParser()
     ap.add_argument('sweep'); ap.add_argument('index'); ap.add_argument('--markdown')
+    ap.add_argument('--catalog', help='rom_samples.json: report only the ROMs in this catalog')
     ap.add_argument('--no-chips', action='store_true', help='skip reading SNES headers from the corpus')
     a = ap.parse_args()
     index = json.loads(Path(a.index).read_text())
     rows = [json.loads(p.read_text()) for p in sorted(Path(a.sweep).glob('*.json'))]
+    catalog = None
+    if a.catalog:
+        catalog = {r['sha256']: r for r in json.loads(Path(a.catalog).read_text(encoding='utf-8'))['records']}
+        rows = [r for r in rows if r.get('sha256') in catalog]
     per = defaultdict(lambda: {'pal': Counter(), 'gfx': Counter(), 'n': 0})
     unverified = defaultdict(list)
     chips = defaultdict(list)
@@ -162,12 +171,14 @@ def main():
             except Exception:  # an unreadable archive only loses the chip note
                 chip = ''
         name = re.split(r'(?<=\.zip)!', r['member'], flags=re.I)[-1]
+        if catalog:
+            name = catalog[r['sha256']]['labels'][0]
         if chip:
             chips[chip].append((name, pal))
         if pal != 'verified':
             unverified[r['system']].append((name, pal, cause(r, pal, chip)))
-    total = Counter(v['system_id'] for v in index.values())
-    lines = ['| System | Traced / in corpus | Palette verified | ram-only | traced | located | derived | none | errors | Graphics direct | derived | none |',
+    total = Counter(v['system_id'] for v in (catalog or index).values())
+    lines = [f"| System | Traced / in {'catalog' if catalog else 'corpus'} | Palette verified | ram-only | traced | located | derived | none | errors | Graphics direct | derived | none |",
              '|---|---|---|---|---|---|---|---|---|---|---|---|']
     for system in sorted(total):
         s = per.get(system)
@@ -175,7 +186,14 @@ def main():
             lines.append(f'| {system} | 0 / {total[system]} | | | | | | | | | | |'); continue
         p, g = s['pal'], s['gfx']
         lines.append(f"| {system} | {s['n']} / {total[system]} | {p['verified']} | {p['ram-only']} | {p['traced']} | {p['located']} | {p['derived']} | {p['none']} | {p['error']} | {g['direct']} | {g['derived']} | {g['none']} |")
+    lines.append(f"| all | {sum(s['n'] for s in per.values())} / {sum(total.values())} | " + ' | '.join(
+        str(sum(s[k][v] for s in per.values())) for k, v in
+        [('pal', x) for x in PALETTE] + [('gfx', x) for x in ('direct', 'derived', 'none')]) + ' |')
     text = '\n'.join(lines)
+    if catalog:
+        missing = sorted(catalog[sha]['labels'][0] for sha in set(catalog) - {r.get('sha256') for r in rows})
+        if missing:
+            text += f'\n\nIn the catalog but not swept ({len(missing)}): ' + '; '.join(missing)
     for system in sorted(unverified):
         items = unverified[system]
         groups = Counter(c.split(':')[0] for _n, _p, c in items)
@@ -191,7 +209,7 @@ def main():
         text += '\n' + '\n'.join(f'- {chip}: ' + '; '.join(f'{n} ({p})' for n, p in sorted(items)) for chip, items in sorted(chips.items()) if chip in UNTRACED_CHIPS)
     print(text)
     if a.markdown:
-        Path(a.markdown).write_text(text + '\n', encoding='utf-8')
+        Path(a.markdown).write_text(text + '\n', encoding='utf-8', newline='\n')
 
 
 if __name__ == '__main__':

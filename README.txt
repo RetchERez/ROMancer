@@ -1,19 +1,23 @@
-ROMancer v1.1.0 Preview
+ROMancer v1.1.0
 By RetchEWretched
 
 ROMancer is a local ROM editing, investigation and playtesting workbench.
 It supports NES, SNES, Genesis / Mega Drive, Master System, Game Boy and
 Game Boy Color cartridge formats. Everyday work runs offline.
 
-NEW IN v1.1.0 PREVIEW
+NEW IN v1.1.0
 
-Scenes & colors. Change a color and see every scene it touches before you
-save. Open Scenes & colors with your ROM selected.
+Scenes & colors. Change a color, a picture or the background and see every
+scene it touches before you save. Open Scenes & colors with your ROM selected.
 - Record scenes. A scene is a moment of the game that ROMancer has watched.
   Record more scenes lets the game play by itself for a few minutes. Play
   and capture a moment lets you play to the screen you want.
 - Change a color. Click a pixel in a scene or choose a swatch, then pick the
   new color. Only colors the console can show are offered.
+- Redraw a picture. In Graphics, click a picture in the scene and redraw it
+  pixel by pixel, or save it as a PNG and load your edited copy.
+- Change the background. In Background, choose a picture and paint it into
+  the cells of a background layer.
 - See what else changes. The Also changes strip shows every recorded scene
   that uses the same data, replayed in the real engine with your change.
 - Know the limits. "Used in N scenes" counts recorded scenes only. Scenes
@@ -21,8 +25,8 @@ save. Open Scenes & colors with your ROM selected.
 - Review, then save. Kept changes wait in the Change list. Review and save
   replays everything together and writes a separate build. Your original
   ROM is unchanged.
-- Locked colors say why: the game works them out while it runs, or ROMancer
-  has not seen where they come from.
+- Locked colors, pictures and cells say why: the game works them out while
+  it runs, or ROMancer has not seen where they come from.
 It works for NES, Super NES, Mega Drive, Master System, Game Boy and Game Boy
 Color games without a game-specific definition. Help has a Scenes & colors
 topic and the guide has a chapter. Recorded scenes are kept in the project
@@ -37,9 +41,24 @@ packaged release loads only the pinned tracing builds.
 
 Also new: a battle background editor for Phantasy Star II (below).
 
-This is a preview. Scenes & colors has been measured across the supplied
-catalog (see trace/COVERAGE.md in the source for per-system results); it has
-not had a public release cycle. Playtest every build before sharing it.
+What to expect from Scenes & colors. It was measured on development builds of
+the tracing engines across the catalog; 938 of the 942 entries have a result.
+- Colors: an edit was confirmed by replay on 906 of 938 (trace/COVERAGE.md
+  lists every other ROM with the reason).
+- Pictures: an edit was confirmed by replay on 916 of 938. On 744 the picture
+  is changed where it is stored. Packed pictures are unpacked and re-packed
+  when ROMancer recognises the packing (confirmed on 128 ROMs). Otherwise the
+  build gets a small run-time patch that swaps the picture in as the game
+  loads it, and the editor shows the result both in the scene and from
+  power-on.
+- Background cells: confirmed on 680 of 938.
+- "Only in this scene" is rarely available: it was confirmed on 50 ROMs.
+  Expect a change to apply everywhere the data is used.
+- Colors and pictures that the game works out while it runs can be locked.
+- Super NES replays are slow. With many recorded scenes, Show what changes
+  and Review and save can take minutes.
+- Game Boy Advance is not supported; no mGBA tracing engine is included.
+Playtest every build before sharing it.
 
 To edit Phantasy Star II's battle background, open the USA/Europe Rev A ROM
 and choose Graphics & fonts. In Battle background, paint on the draft or
