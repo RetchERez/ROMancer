@@ -560,6 +560,10 @@ class SweepTests(unittest.TestCase):
             self.assertIn('| gb | 2 | 1 | 1 | 1 | 0 | 1 | 0 |', text)
             self.assertIn('Confirmed re-packs by codec: lz2 1.', text)
             self.assertNotIn('Game A', text)
+            away = dict(results[0], core='other_trace_libretro.dll')
+            listed = self.report.section(totals, results, {}, unavailable=[away])
+            self.assertIn('### Not available (1)', listed)
+            self.assertIn('| gb | Game A | other_trace_libretro.dll |', listed)
             page = Path(folder) / 'COVERAGE.md'
             page.write_text('| palette table |\n', encoding='utf-8')
             self.report.write_section(page, text)

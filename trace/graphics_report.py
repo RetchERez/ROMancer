@@ -15,6 +15,10 @@ every ROM whose background-cell edit is not confirmed with its cause. The sectio
 between two marker lines and only that part of the file is replaced (it is added at the
 end when the markers are not there yet). --before names the --json output of an earlier
 sweep; the section then also says how the background-cell count moved.
+
+--not-shipped TEXT (repeatable) names an engine that is not part of the released tracing
+packs: a result whose engine file name contains TEXT is left out of every count and listed
+as not available, because a user of the release cannot trace that ROM.
 """
 import argparse
 import json
@@ -51,7 +55,8 @@ def rom_name(result: dict, titles: dict) -> str:
     return name.rsplit('.', 1)[0] if '.' in name[-5:] else name
 
 
-def section(totals: dict, results: list, titles: dict, before: dict | None = None, before_label: str = 'the sweep before this one') -> str:
+def section(totals: dict, results: list, titles: dict, before: dict | None = None, before_label: str = 'the sweep before this one',
+            unavailable: list | None = None) -> str:
     """The graphics part of the coverage document, as Markdown."""
     lines = [BEGIN, '', '## Graphics: what a replay confirmed', '',
              'From `trace/graphics_sweep.py` (one result per ROM; totals by `trace/graphics_report.py`). Every count is an '
@@ -147,6 +152,12 @@ def section(totals: dict, results: list, titles: dict, before: dict | None = Non
     if errors:
         lines += ['', f'### Not traced ({len(errors)})', '', '| System | ROM | Error |', '|---|---|---|']
         lines += [f'| {system} | {name} | {error[:120]} |' for system, name, error in errors]
+    if unavailable:
+        lines += ['', f'### Not available ({len(unavailable)})', '',
+                  'Swept with a tracing engine that is not shipped, so not counted anywhere above.', '',
+                  '| System | ROM | Engine |', '|---|---|---|']
+        lines += [f'| {r["system"]} | {rom_name(r, titles)} | {r.get("core", "")} |'
+                  for r in sorted(unavailable, key=lambda r: (r['system'], rom_name(r, titles).lower()))]
     lines += ['', END]
     return '\n'.join(lines)
 
@@ -165,6 +176,8 @@ def main():
     ap = argparse.ArgumentParser()
     ap.add_argument('sweep'); ap.add_argument('--catalog'); ap.add_argument('--json')
     ap.add_argument('--markdown', help='coverage document whose graphics section is rewritten')
+    ap.add_argument('--not-shipped', action='append', default=[],
+                    help='text in the file name of an engine that is not shipped; its results are not counted (repeatable)')
     ap.add_argument('--before', help='--json output of an earlier sweep, for the before/after line')
     ap.add_argument('--before-label', default='the sweep before this one', help='what to call that earlier sweep')
     a = ap.parse_args()
@@ -173,18 +186,22 @@ def main():
         records = json.loads(Path(a.catalog).read_text(encoding='utf-8'))['records']
         keep = {r['sha256'] for r in records}
         titles = {r['sha256']: (r.get('labels') or [''])[0] for r in records}
-    results = []
+    results, unavailable = [], []
     with tempfile.TemporaryDirectory() as folder:
         for p in Path(a.sweep).glob('*.json'):
             if keep is None or p.stem in keep:
+                result = json.loads(p.read_text())
+                if any(text.lower() in result.get('core', '').lower() for text in a.not_shipped):
+                    unavailable.append(result)
+                    continue
                 shutil.copyfile(p, Path(folder) / p.name)
-                results.append(json.loads(p.read_text()))
+                results.append(result)
         totals = graphics_sweep.report(folder)
     if a.json:
         Path(a.json).write_text(json.dumps(totals, indent=1) + '\n', encoding='utf-8', newline='\n')
     if a.markdown:
         before = json.loads(Path(a.before).read_text(encoding='utf-8')) if a.before else None
-        write_section(Path(a.markdown), section(totals, results, titles, before, a.before_label))
+        write_section(Path(a.markdown), section(totals, results, titles, before, a.before_label, unavailable))
     print('\n'.join(table(totals)))
 
 
