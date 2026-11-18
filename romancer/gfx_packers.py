@@ -740,13 +740,15 @@ class _MsbBits:
         return self.pos - start + (1 if self.bit else 0)
 
 
-def ring256_decode(data, start=0, limit=MAX_OUT):
+def ring256_decode(data, start=0, limit=MAX_OUT, framed=True):
     if start + 3 > len(data):
         raise ValueError('stream is truncated')
-    size = data[start] | data[start + 1] << 8
-    if not 0 < size <= limit:
-        raise ValueError('size header is out of range')
-    bits = _MsbBits(data, start + 2)
+    size = limit
+    if framed:
+        size = data[start] | data[start + 1] << 8
+        if not 0 < size <= limit:
+            raise ValueError('size header is out of range')
+    bits = _MsbBits(data, start + 2 if framed else start)
     out = bytearray()
     while len(out) < size:
         if bits.read(1):
@@ -920,6 +922,9 @@ def lzkn_encode(raw):
 
 
 CODECS.update({
-    'lz-ring256': {'decode': ring256_decode, 'encode': ring256_encode, 'terminated': True},
+    'lz-ring256': {'decode': ring256_decode, 'encode': ring256_encode, 'terminated': True, 'peek': ('lz-ring256-body', 2)},
     'lz-konami-md': {'decode': lzkn_decode, 'encode': lzkn_encode, 'terminated': True},
 })
+# Any bytes unpack as a ring-256 stream, so a recogniser looks at the start of the body first.
+BODIES = {'lz-ring256-body': {'decode': lambda data, start=0, limit=MAX_OUT: ring256_decode(data, start, limit, False),
+                              'encode': lambda raw: ring256_encode(raw)[2:], 'terminated': False}}

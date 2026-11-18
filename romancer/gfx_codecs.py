@@ -1669,6 +1669,7 @@ CODECS['rle-escape'] = {'decode': _bind(_escape_decode, True), 'encode': _escape
                         'peek': ('rle-escape-body', 0)}
 CODECS.made['rle-escape-body'] = {'decode': _bind(_escape_decode, False), 'encode': _escape_encode, 'terminated': False}
 CODECS.update(gfx_packers.CODECS)
+CODECS.made.update(gfx_packers.BODIES)
 CODECS['raw'] = {'decode': _raw_decode, 'encode': lambda raw: bytes(raw), 'terminated': False}
 
 # Named members of the parameterised families (gfx_families): formats met in real games.
@@ -1707,7 +1708,7 @@ MEMBERS = {
     'genesis': (),
 }
 # Codecs that only recognise() runs (the plain search in graphics_trace would spend long on them).
-_RECOGNISE_ONLY = ('raw',)
+_RECOGNISE_ONLY = ('raw', 'lz-ring256')
 
 
 # Recognising a block runs the same decoder from the same place many times over (several
@@ -2006,7 +2007,8 @@ def recognise(d, rom: bytes, skip: int, system: str, start: int, length: int, co
     whole = bytes(d.data)
     layouts = ('',) + tuple(MAPS.get(system, ())) if layouts is None else layouts
     best = None
-    for name in (list(codecs) if codecs else order_for(system) + list(MEMBERS.get(system, ()))):
+    for name in (list(codecs) if codecs else order_for(system) + [c for c in _RECOGNISE_ONLY if c != 'raw']
+                 + list(MEMBERS.get(system, ()))):
         entry = CODECS[name]
         terminated = entry['terminated']
         peek = entry.get('peek') or (None if terminated else (name, 0))

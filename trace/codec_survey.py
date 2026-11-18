@@ -5,7 +5,7 @@
     python -B trace/codec_survey.py search INDEX.json DUMPDIR MATCHES.json [--system S ...] [--out FILE]
     python -B trace/codec_survey.py family INDEX.json DUMPDIR [--out FILE]
     python -B trace/codec_survey.py verify INDEX.json DUMPDIR OUTDIR [--system S ...] [--jobs N] [--only SHA,...] [--list FILE]
-    python -B trace/codec_survey.py report OUTDIR [SWEEPDIR]
+    python -B trace/codec_survey.py report OUTDIR [SWEEPDIR] [--also OLDOUTDIR ...] [--catalog FILE] [--json OUT]
 
 dump    For every ROM whose sweep result (SWEEPDIR/<sha>.json) has a tile the
         game unpacks itself, run the tracing engine as the sweep does and keep
@@ -26,8 +26,9 @@ verify  For ROMs that match offline (or those named in --list): trace again and,
         (verify_plan). `confirmed`: the planned bytes arrived; `clean`: and no
         other byte of the block's stretch of video memory changed. One JSON per
         ROM in OUTDIR; the shared sweep results are never written.
-report  Totals of OUTDIR by system; with SWEEPDIR, the count of ROMs with a
-        replay-confirmed codec path before (the sweep) and after (either).
+report  Totals of OUTDIR by system; with SWEEPDIR (and --also, earlier verify
+        runs), the count of ROMs with a replay-confirmed codec path before
+        and after.
 """
 import argparse
 import json
@@ -555,7 +556,7 @@ def cmd_verify(a):
     from concurrent.futures import ThreadPoolExecutor
 
     def run(sha):
-        more = [x for name in hints.get(sha, ()) for x in ('--codec', name)]
+        more = [x for name in hints.get(sha, a.codec or ()) for x in ('--codec', name)]
         code = _spawn(['verify1', a.index, a.dumpdir, a.outdir, sha, '--frames', str(a.frames)] + more, a.timeout)
         out = Path(a.outdir) / f'{sha}.json'
         if not out.exists():
@@ -570,28 +571,55 @@ def cmd_verify(a):
 
 
 def cmd_report(a):
-    rows = [json.loads(p.read_text()) for p in Path(a.outdir).glob('*.json')]
-    before = {}
-    if a.sweepdir:
-        for p in Path(a.sweepdir).glob('*.json'):
+    """Per system: ROMs whose packed graphics were re-packed (or moved) and replayed as planned.
+
+    before  the sweep's own result or an earlier verify run (--also DIR, repeatable)
+    after   before, or a result in OUTDIR that is confirmed and sound (see `sound`)
+    """
+    keep = None
+    if a.catalog:
+        keep = {r['sha256'] for r in json.loads(Path(a.catalog).read_text(encoding='utf-8'))['records']}
+
+    def load(folder):
+        out = []
+        for p in Path(folder).glob('*.json'):
             try:
                 r = json.loads(p.read_text())
             except ValueError:
                 continue
-            if r.get('ok') and 'tile' in r.get('derived_edit', {}):
-                de = r['derived_edit']
-                before[r['sha256']] = (r['system'], bool(de.get('as_planned') and de.get('path') in ('reencode', 'relocate')),
-                                       de.get('codec'))
+            if keep is None or r.get('sha256') in keep:
+                out.append(r)
+        return out
+    rows = load(a.outdir)
+    system_of, before = {}, set()
+    if a.sweepdir:
+        for r in load(a.sweepdir):
+            if r.get('ok'):
+                system_of[r['sha256']] = r['system']
+                de = r.get('derived_edit', {})
+                if de.get('as_planned') and de.get('path') in ('reencode', 'relocate'):
+                    before.add(r['sha256'])
+    for folder in a.also or ():
+        for r in load(folder):
+            system_of.setdefault(r['sha256'], r['system'])
+            if r.get('confirmed'):
+                before.add(r['sha256'])
+    for r in rows:
+        system_of.setdefault(r['sha256'], r['system'])
     out = {}
-    for system in sorted({r['system'] for r in rows} | {v[0] for v in before.values()}):
+    for system in sorted(set(system_of.values())):
         rs = [r for r in rows if r['system'] == system]
-        good = {r['sha256'] for r in rs if r.get('confirmed')}
-        first = {r['sha256'] for r in rs if r.get('tries') and r['tries'][0].get('as_planned')}
-        s = {'verified_here': len(rs), 'errors': sum(not r.get('ok') for r in rs), 'confirmed': len(good),
-             'confirmed_on_first_target': len(first)}
-        s['confirmed_by_codec'] = dict(Counter(r['codec'] for r in rs if r.get('confirmed')).most_common())
-        s['confirmed_by_path'] = dict(Counter(r['path'] for r in rs if r.get('confirmed')))
-        s['matched_unconfirmed'] = dict(Counter(r.get('codec') or 'none' for r in rs if r.get('ok') and not r.get('confirmed')))
+        good = {r['sha256'] for r in rs if r.get('confirmed') and r.get('clean', True)}
+        was = {sha for sha in before if system_of[sha] == system}
+        new = good - was
+        s = {'roms': sum(v == system for v in system_of.values()), 'verified_here': len(rs),
+             'errors': sum(not r.get('ok') for r in rs), 'confirmed_before': len(was), 'confirmed_after': len(was | good),
+             'new_here': len(new),
+             'new_by_codec': dict(Counter(r['codec'] for r in rs if r['sha256'] in new).most_common()),
+             'new_by_path': dict(Counter(r['path'] for r in rs if r['sha256'] in new)),
+             'confirmed_here_not_sound': sum(bool(r.get('confirmed')) and not r.get('clean', True) for r in rs)}
+        s['matched_unconfirmed'] = dict(Counter(r.get('codec') or 'none' for r in rs
+                                                if r.get('ok') and not r.get('confirmed') and r['sha256'] not in was).most_common())
         why = Counter()
         for r in rs:
             if r.get('ok') and not r.get('confirmed'):
@@ -599,15 +627,12 @@ def cmd_report(a):
                     if t.get('codec'):
                         why[(t.get('error') or ('replayed, not as planned' if 'as_planned' in t else 'no plan'))[:70]] += 1
         s['unconfirmed_reasons'] = dict(why.most_common(6))
-        if before:
-            b = {sha for sha, v in before.items() if v[0] == system}
-            was = {sha for sha in b if before[sha][1]}
-            s['roms_with_unpacked_tiles'] = len(b)
-            s['codec_path_confirmed_before'] = len(was)
-            s['codec_path_confirmed_after'] = len(was | good)
-            s['confirmed_before_but_not_here'] = len({r['sha256'] for r in rs if r['sha256'] in was} - good)
         out[system] = s
+    total = {k: sum(s[k] for s in out.values()) for k in ('roms', 'verified_here', 'confirmed_before', 'confirmed_after', 'new_here')}
+    out['all'] = total
     print(json.dumps(out, indent=1))
+    if a.json:
+        Path(a.json).write_text(json.dumps(out, indent=1) + '\n', encoding='utf-8', newline='\n')
 
 
 def main():
@@ -635,9 +660,12 @@ def main():
     p.add_argument('--frames', type=int, default=1800); p.add_argument('--timeout', type=int, default=900)
     p.add_argument('--only'); p.add_argument('--matches'); p.add_argument('--redo', action='store_true')
     p.add_argument('--list', help='file of SHA-256s, one per line: verify these (a dump is not needed)')
+    p.add_argument('--codec', action='append', help='codecs to try on ROMs that --matches gives no codec for')
     p = sub.add_parser('verify1'); p.add_argument('index'); p.add_argument('dumpdir'); p.add_argument('outdir'); p.add_argument('sha')
     p.add_argument('--frames', type=int, default=1800); p.add_argument('--codec', action='append')
     p = sub.add_parser('report'); p.add_argument('outdir'); p.add_argument('sweepdir', nargs='?')
+    p.add_argument('--also', action='append', help='an earlier verify OUTDIR whose confirmations count as before')
+    p.add_argument('--catalog', help='rom_samples.json: count only the ROMs in this catalog'); p.add_argument('--json')
     a = ap.parse_args()
     if a.cmd == 'dump':
         cmd_dump(a)
