@@ -2,6 +2,7 @@ import {badge,button,esc,setUnavailable} from './common.js';
 import {playtestCreatedBuild} from './build_handoff.js';
 import {loadPlaytestGame} from './runtime_setup.js';
 import {selectionKey} from './tool_inputs.js';
+import {indexedPng,matchPalette,matchRows,matchSummary} from './battle_png.js';
 
 const draftKey='battle-background-pixels';
 const hexBytes=pixels=>Array.from(pixels,color=>color.toString(16)).join('');
@@ -66,6 +67,7 @@ export async function battleBackground(ctx){
  return `<section class="card battle-background" id="battle-background">
   <div class="card-heading"><h3>Battle background</h3>${badge('Phantasy Star II · Rev A','good')}</div>
   <p>Paint on the draft, or import a 320 × 128 PNG. This backdrop is shared by standard battles.</p>
+  <p class="preview-caption">Battles show only the 16 colors below. Export a PNG to get a picture that already carries them, draw with those colors, and it imports exactly. Any other color is listed when you import.</p>
   <div class="battle-pictures">${canvas('original',artifact.kind==='build'?'Selected build':'Original')}${canvas('draft','Draft')}</div>
   <div class="battle-inputs">
    <div class="battle-swatches" role="group" aria-label="Battle palette">${swatches}</div>
@@ -73,13 +75,15 @@ export async function battleBackground(ctx){
   </div>
   <div class="actions battle-actions">
    <label class="button battle-import">Import backdrop PNG<input id="battle-png" type="file" accept="image/png,.png" aria-label="Import backdrop PNG"></label>
-   <button id="battle-save" type="button">Save draft PNG</button>
+   <button id="battle-export-original" type="button">Export ${artifact.kind==='build'?'this build’s':'original'} PNG</button>
+   <button id="battle-save" type="button">Export draft PNG</button>
    <button id="battle-undo" type="button">Undo paint</button><button id="battle-redo" type="button">Redo paint</button>
    <button id="battle-reset" type="button">Reset draft</button>
    ${button('Save playable copy','battle-background-build',{primary:true,icon:'playtest',disabled:!model.fit?.fits||model.building,reason:'Make an edit that fits before saving.'})}
    ${artifact.kind==='build'?button('Open in Playtest','navigate',{id:'playtest',icon:'playtest'}):''}
   </div>
   <p class="preview-caption" id="battle-status" role="status"></p>
+  <div class="battle-match" id="battle-match" hidden></div>
   <details class="battle-review" id="battle-technical"><summary>Technical details</summary><div id="battle-byte-review">${showReview(model.fit)}</div></details>
  </section>`;
 }
@@ -147,6 +151,7 @@ export function mountBattleBackground(ctx){
  retry.addEventListener('click',()=>{model.fit=null;showFit();queueFit(0);});
  function commit(before,message){
   if(!model.draft.some((color,i)=>color!==before[i]))return;
+  showMatch(null);
   model.past.push(before);
   if(model.past.length>24)model.past.shift();
   model.future=[];
@@ -207,15 +212,30 @@ export function mountBattleBackground(ctx){
    swatches.forEach(item=>item.setAttribute('aria-pressed',String(item===node)));
   });
  });
- undo.addEventListener('click',()=>{if(model.past.length){model.future.push(model.draft);model.draft=model.past.pop();save();}});
- redo.addEventListener('click',()=>{if(model.future.length){model.past.push(model.draft);model.draft=model.future.pop();save();}});
+ undo.addEventListener('click',()=>{if(model.past.length){model.future.push(model.draft);model.draft=model.past.pop();save();showMatch(null);}});
+ redo.addEventListener('click',()=>{if(model.future.length){model.past.push(model.draft);model.draft=model.future.pop();save();showMatch(null);}});
  reset.addEventListener('click',()=>{const before=model.draft;model.draft=model.base.slice();commit(before);});
- root.querySelector('#battle-save').addEventListener('click',()=>{
+ const match=root.querySelector('#battle-match');
+ function showMatch(result){
+  const rows=result?matchRows(result):[];
+  match.hidden=!rows.length;
+  if(!rows.length){match.textContent='';return;}
+  const chip=color=>`<span class="battle-chip" data-chip="${color}"></span><code>${color}</code>`;
+  const more=result.changed.length-rows.length;
+  match.innerHTML=`<div class="table-wrap"><table><caption>Colors that were not battle colors</caption><thead><tr><th scope="col">In your PNG</th><th scope="col">Changed to</th><th scope="col">Battle color</th><th scope="col">Pixels</th></tr></thead><tbody>${rows.map(row=>`<tr><td>${chip(row.from)}</td><td>${chip(row.to)}</td><td>${row.index.toString(16).toUpperCase()}</td><td>${row.pixels.toLocaleString()}</td></tr>`).join('')}</tbody></table></div>${more>0?`<p>and ${more} more.</p>`:''}`;
+  match.querySelectorAll('[data-chip]').forEach(node=>node.style.setProperty('--swatch',node.dataset.chip));
+ }
+ function exportPng(pixels,name){
+  const url=URL.createObjectURL(new Blob([indexedPng(pixels,width,height,palette)],{type:'image/png'}));
   const link=document.createElement('a');
-  link.download='Battle-background.png';
-  link.href=draft.toDataURL('image/png');
+  link.download=name;
+  link.href=url;
   link.click();
- });
+  setTimeout(()=>URL.revokeObjectURL(url),1000);
+  status.textContent=`${name} saved with the 16 battle colors as its palette.`;
+ }
+ root.querySelector('#battle-save').addEventListener('click',()=>exportPng(model.draft,'Battle-background-draft.png'));
+ root.querySelector('#battle-export-original').addEventListener('click',()=>exportPng(model.base,'Battle-background.png'));
  const picker=root.querySelector('#battle-png');
  picker.addEventListener('change',async()=>{
   const file=picker.files?.[0];
@@ -227,23 +247,19 @@ export function mountBattleBackground(ctx){
    const header=new DataView(await file.slice(0,24).arrayBuffer());
    if(header.byteLength!==24||header.getUint32(0)!==0x89504e47||header.getUint32(4)!==0x0d0a1a0a||header.getUint32(12)!==0x49484452)throw Error('Choose a valid PNG image.');
    if(header.getUint32(16)!==width||header.getUint32(20)!==height)throw Error('The battle backdrop must be 320 × 128 pixels.');
-   const bitmap=await createImageBitmap(file);
+   // Colors must arrive as written in the file: no color-profile conversion.
+   const bitmap=await createImageBitmap(file,{colorSpaceConversion:'none',premultiplyAlpha:'none'});
    try{
     if(!live()||request!==imageRequest)return;
     const canvas=document.createElement('canvas');canvas.width=width;canvas.height=height;
     const graphics=canvas.getContext('2d');graphics.drawImage(bitmap,0,0);
-    const input=graphics.getImageData(0,0,width,height).data,destination=new Uint8Array(width*height);
-    for(let i=0;i<destination.length;i++){
-     if(input[i*4+3]<128)continue;
-     let best=Infinity;
-     palette.forEach(([r,g,b],index)=>{
-      const distance=(input[i*4]-r)**2+(input[i*4+1]-g)**2+(input[i*4+2]-b)**2;
-      if(distance<best){best=distance;destination[i]=index;}
-     });
-    }
+    const result=matchPalette(graphics.getImageData(0,0,width,height).data,palette);
     const before=model.draft;
-    model.draft=destination;
-    commit(before,'PNG imported and matched to the battle palette.');
+    model.draft=result.pixels;
+    const summary=matchSummary(result);
+    if(model.draft.some((color,i)=>color!==before[i]))commit(before,summary);
+    else status.textContent=summary+' It is the same picture as the draft.';
+    showMatch(result);
    }finally{bitmap.close();}
   }catch(error){if(live()&&request===imageRequest)status.textContent=error.message;}
  });

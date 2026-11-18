@@ -1,9 +1,20 @@
-ROMancer v1.2.0
+ROMancer v1.2.1
 By RetchEWretched
 
 ROMancer is a local ROM editing, investigation and playtesting workbench.
 It supports NES, SNES, Genesis / Mega Drive, Master System, Game Boy and
 Game Boy Color cartridge formats. Everyday work runs offline.
+
+NEW IN v1.2.1
+
+Phantasy Star II battle background: exact PNG export and import.
+- Export original PNG and Export draft PNG save the picture with the 16 battle
+  colors as its palette. Open it in an image editor and you are drawing with
+  the game's own colors.
+- Import now tells you about every color that is not a battle color: the
+  color in your PNG, the battle color it was changed to, and how many pixels.
+  Nothing is changed without being listed. Undo paint takes the import back.
+- A PNG's color profile no longer shifts its colors on import.
 
 NEW IN v1.2.0
 
@@ -78,7 +89,11 @@ Playtest every build before sharing it.
 
 To edit Phantasy Star II's battle background, open the USA/Europe Rev A ROM
 and choose Graphics & fonts. In Battle background, paint on the draft or
-import a 320 x 128 PNG. The draft shows whether the image fits. Save playable
+import a 320 x 128 PNG. Export original PNG and Export draft PNG save the
+picture with the 16 battle colors as its palette, so a picture drawn with
+those colors imports exactly. If an imported PNG uses any other color, the
+editor lists each one, the battle color it was changed to and how many pixels
+that was. The draft shows whether the image fits. Save playable
 copy opens the new build in Playtest. Technical details shows the graphics,
 tile placement and checksum bytes.
 
@@ -122,7 +137,7 @@ available. The supplied Pokemon Red and Blue revisions share a
 
 START ON WINDOWS
 
-1. Extract ROMancer-v1.2.0-Windows.zip in Windows File Explorer.
+1. Extract ROMancer-v1.2.1-Windows.zip in Windows File Explorer.
 2. Double-click ROMancer.exe in the extracted folder.
    Keep ROMancer.exe, ROM Catalog.html and the ROMancer Files folder together.
 3. Open an original workshop or choose New project and import your own cartridge image.
@@ -143,8 +158,8 @@ SHA-256 is checked and later captures work offline. No ROM data is uploaded.
 
 START ON LINUX
 
-1. Extract ROMancer-v1.2.0-Linux-x86_64.tar.gz:  tar xf ROMancer-v1.2.0-Linux-x86_64.tar.gz
-2. Run ./ROMancer-v1.2.0-Linux-x86_64/ROMancer.sh
+1. Extract ROMancer-v1.2.1-Linux-x86_64.tar.gz:  tar xf ROMancer-v1.2.1-Linux-x86_64.tar.gz
+2. Run ./ROMancer-v1.2.1-Linux-x86_64/ROMancer.sh
    (./ROMancer.sh --install-desktop adds ROMancer to your application menu).
 
 The Linux x86-64 package includes Python, Pillow and the same six engines built

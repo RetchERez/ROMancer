@@ -2458,9 +2458,9 @@
       return [c, Math.round(value / maximum * 255)];
     }));
   }
-  function quantizeColor(hex8, channels) {
-    if (typeof hex8 !== "string" || !/^#[a-f0-9]{6}$/i.test(hex8)) throw Error("Choose a valid RGB color.");
-    return Object.fromEntries(["r", "g", "b"].map((c, i) => [c, Math.round(parseInt(hex8.slice(1 + i * 2, 3 + i * 2), 16) / 255 * channelMaximum(channels[c]))]));
+  function quantizeColor(hex9, channels) {
+    if (typeof hex9 !== "string" || !/^#[a-f0-9]{6}$/i.test(hex9)) throw Error("Choose a valid RGB color.");
+    return Object.fromEntries(["r", "g", "b"].map((c, i) => [c, Math.round(parseInt(hex9.slice(1 + i * 2, 3 + i * 2), 16) / 255 * channelMaximum(channels[c]))]));
   }
   function editedPalette(palette2, changes) {
     if (!palette2) return palette2;
@@ -4261,10 +4261,10 @@ ${font ? `<section class="card"><h3>Font metrics · ${esc(font.id)}</h3><div cla
   function paintAssemblyPixel(bitmap, layout, pixels, x, y, color) {
     const width = layout.columns * bitmap.width, part = Math.floor(y / bitmap.height) * layout.columns + Math.floor(x / bitmap.width), index = layout.tiles[part];
     if (index === null || index === void 0) throw Error("This part has no mapped source tile.");
-    const stored2 = storedPixel(bitmap, layout, part, x % bitmap.width, y % bitmap.height);
+    const stored3 = storedPixel(bitmap, layout, part, x % bitmap.width, y % bitmap.height);
     layout.tiles.forEach((tile, i) => {
       if (tile !== index) return;
-      for (let yy = 0; yy < bitmap.height; yy++) for (let xx = 0; xx < bitmap.width; xx++) if (storedPixel(bitmap, layout, i, xx, yy) === stored2) pixels[(Math.floor(i / layout.columns) * bitmap.height + yy) * width + i % layout.columns * bitmap.width + xx] = color;
+      for (let yy = 0; yy < bitmap.height; yy++) for (let xx = 0; xx < bitmap.width; xx++) if (storedPixel(bitmap, layout, i, xx, yy) === stored3) pixels[(Math.floor(i / layout.columns) * bitmap.height + yy) * width + i % layout.columns * bitmap.width + xx] = color;
     });
   }
   function mapSettings(text) {
@@ -5757,8 +5757,8 @@ ${font ? `<section class="card"><h3>Font metrics · ${esc(font.id)}</h3><div cla
       return [...this.changes].sort(([a], [b]) => a - b).map(([offset, after]) => ({ offset, before: this.original.get(offset), after }));
     }
   };
-  var printableByte = (hex8) => {
-    const value = parseInt(hex8, 16);
+  var printableByte = (hex9) => {
+    const value = parseInt(hex9, 16);
     return value >= 32 && value <= 126 ? String.fromCharCode(value) : "·";
   };
   var byteCount = (count) => `${count} byte${count === 1 ? "" : "s"}`;
@@ -5774,10 +5774,10 @@ ${font ? `<section class="card"><h3>Font metrics · ${esc(font.id)}</h3><div cla
   function serializeHexDraft(state2, draft) {
     return JSON.stringify({ artifact_id: state2.artifact.artifact_id, sha256: state2.artifact.sha256, edits: draft.edits(state2).map((e) => [e.offset, e.before, e.after]) });
   }
-  function restoreHexDraft(state2, data, stored2) {
+  function restoreHexDraft(state2, data, stored3) {
     const draft = new HexDraft(state2, data);
-    if (!stored2) return draft;
-    const value = JSON.parse(stored2);
+    if (!stored3) return draft;
+    const value = JSON.parse(stored3);
     if (value.artifact_id !== state2.artifact.artifact_id || value.sha256 !== state2.artifact.sha256) throw Error("Saved byte edits belong to a different source.");
     if (!Array.isArray(value.edits) || value.edits.length > 16e3) throw Error("Saved byte draft exceeds the editing budget.");
     const seen = /* @__PURE__ */ new Set();
@@ -7018,6 +7018,118 @@ ${state2.artifact.system_id ? `<details><summary>Advanced byte options</summary>
     });
   }
 
+  // romancer/ui/battle_png.js
+  var crcTable = Uint32Array.from({ length: 256 }, (_, n) => {
+    for (let k = 0; k < 8; k++) n = n & 1 ? 3988292384 ^ n >>> 1 : n >>> 1;
+    return n >>> 0;
+  });
+  function crc32(bytes) {
+    let crc = 4294967295;
+    for (const byte of bytes) crc = crcTable[(crc ^ byte) & 255] ^ crc >>> 8;
+    return (crc ^ 4294967295) >>> 0;
+  }
+  function adler32(bytes) {
+    let a = 1, b = 0;
+    for (const byte of bytes) {
+      a = (a + byte) % 65521;
+      b = (b + a) % 65521;
+    }
+    return (b << 16 | a) >>> 0;
+  }
+  function chunk(type, data) {
+    const out = new Uint8Array(12 + data.length), view = new DataView(out.buffer);
+    view.setUint32(0, data.length);
+    for (let i = 0; i < 4; i++) out[4 + i] = type.charCodeAt(i);
+    out.set(data, 8);
+    view.setUint32(8 + data.length, crc32(out.subarray(4, 8 + data.length)));
+    return out;
+  }
+  function stored2(raw) {
+    const blocks = Math.max(1, Math.ceil(raw.length / 65535)), out = new Uint8Array(2 + raw.length + blocks * 5 + 4), view = new DataView(out.buffer);
+    out[0] = 120;
+    out[1] = 1;
+    let at = 2;
+    for (let block = 0; block < blocks; block++) {
+      const part = raw.subarray(block * 65535, (block + 1) * 65535);
+      out[at] = block === blocks - 1 ? 1 : 0;
+      view.setUint16(at + 1, part.length, true);
+      view.setUint16(at + 3, ~part.length & 65535, true);
+      out.set(part, at + 5);
+      at += 5 + part.length;
+    }
+    view.setUint32(at, adler32(raw));
+    return out;
+  }
+  function indexedPng(pixels, width, height, palette2) {
+    if (pixels.length !== width * height) throw Error("The picture does not match its size.");
+    const header = new Uint8Array(13), view = new DataView(header.buffer);
+    view.setUint32(0, width);
+    view.setUint32(4, height);
+    header[8] = 8;
+    header[9] = 3;
+    const colors = Uint8Array.from(palette2.flatMap(([r, g, b]) => [r, g, b]));
+    const raw = new Uint8Array((width + 1) * height);
+    for (let row = 0; row < height; row++) raw.set(pixels.subarray(row * width, (row + 1) * width), row * (width + 1) + 1);
+    const parts = [Uint8Array.of(137, 80, 78, 71, 13, 10, 26, 10), chunk("IHDR", header), chunk("PLTE", colors), chunk("IDAT", stored2(raw)), chunk("IEND", new Uint8Array(0))];
+    const out = new Uint8Array(parts.reduce((size2, part) => size2 + part.length, 0));
+    let at = 0;
+    for (const part of parts) {
+      out.set(part, at);
+      at += part.length;
+    }
+    return out;
+  }
+  var sameColorTolerance = 18;
+  function matchPalette(rgba, palette2) {
+    const count = rgba.length >> 2, pixels = new Uint8Array(count), seen = /* @__PURE__ */ new Map();
+    let transparent = 0;
+    for (let i = 0; i < count; i++) {
+      if (rgba[i * 4 + 3] < 128) {
+        transparent++;
+        continue;
+      }
+      const r = rgba[i * 4], g = rgba[i * 4 + 1], b = rgba[i * 4 + 2], key = r << 16 | g << 8 | b;
+      let entry = seen.get(key);
+      if (!entry) {
+        let best = Infinity, index = 0;
+        palette2.forEach(([pr2, pg2, pb2], candidate) => {
+          const distance2 = (r - pr2) ** 2 + (g - pg2) ** 2 + (b - pb2) ** 2;
+          if (distance2 < best) {
+            best = distance2;
+            index = candidate;
+          }
+        });
+        const [pr, pg, pb] = palette2[index];
+        const same = Math.max(Math.abs(r - pr), Math.abs(g - pg), Math.abs(b - pb)) <= sameColorTolerance;
+        entry = { from: [r, g, b], index, to: palette2[index], same, pixels: 0 };
+        seen.set(key, entry);
+      }
+      entry.pixels++;
+      pixels[i] = entry.index;
+    }
+    const all = [...seen.values()], changed2 = all.filter((entry) => !entry.same).sort((a, b) => b.pixels - a.pixels);
+    return {
+      pixels,
+      transparent,
+      colors: all.length,
+      changed: changed2,
+      changedPixels: changed2.reduce((sum, entry) => sum + entry.pixels, 0)
+    };
+  }
+  var hex5 = ([r, g, b]) => "#" + [r, g, b].map((value) => value.toString(16).padStart(2, "0")).join("").toUpperCase();
+  var plural = (n, word) => `${n.toLocaleString("en-US")} ${word}${n === 1 ? "" : "s"}`;
+  function matchSummary(result) {
+    const notes = [];
+    if (!result.colors) notes.push("PNG imported. It has no solid pixels.");
+    else if (!result.changed.length) notes.push(`PNG imported. ${result.colors === 1 ? "Its one color is a battle color" : `All ${result.colors} of its colors are battle colors`}, so nothing was changed.`);
+    else notes.push(`PNG imported, but ${plural(result.changed.length, "color")} of ${result.colors} ${result.changed.length === 1 ? "is" : "are"} not in the battle palette. ${plural(result.changedPixels, "pixel")} ${result.changedPixels === 1 ? "was" : "were"} changed to the nearest battle color. Undo paint takes the import back.`);
+    if (result.transparent) notes.push(`${plural(result.transparent, "see-through pixel")} became color 0.`);
+    return notes.join(" ");
+  }
+  function matchRows(result, limit = 12) {
+    return result.changed.slice(0, limit).map((entry) => ({ from: hex5(entry.from), to: hex5(entry.to), index: entry.index, pixels: entry.pixels }));
+  }
+
   // romancer/ui/battle_background.js
   var draftKey = "battle-background-pixels";
   var hexBytes = (pixels) => Array.from(pixels, (color) => color.toString(16)).join("");
@@ -7088,6 +7200,7 @@ ${state2.artifact.system_id ? `<details><summary>Advanced byte options</summary>
     return `<section class="card battle-background" id="battle-background">
   <div class="card-heading"><h3>Battle background</h3>${badge("Phantasy Star II · Rev A", "good")}</div>
   <p>Paint on the draft, or import a 320 × 128 PNG. This backdrop is shared by standard battles.</p>
+  <p class="preview-caption">Battles show only the 16 colors below. Export a PNG to get a picture that already carries them, draw with those colors, and it imports exactly. Any other color is listed when you import.</p>
   <div class="battle-pictures">${canvas("original", artifact.kind === "build" ? "Selected build" : "Original")}${canvas("draft", "Draft")}</div>
   <div class="battle-inputs">
    <div class="battle-swatches" role="group" aria-label="Battle palette">${swatches}</div>
@@ -7095,13 +7208,15 @@ ${state2.artifact.system_id ? `<details><summary>Advanced byte options</summary>
   </div>
   <div class="actions battle-actions">
    <label class="button battle-import">Import backdrop PNG<input id="battle-png" type="file" accept="image/png,.png" aria-label="Import backdrop PNG"></label>
-   <button id="battle-save" type="button">Save draft PNG</button>
+   <button id="battle-export-original" type="button">Export ${artifact.kind === "build" ? "this build’s" : "original"} PNG</button>
+   <button id="battle-save" type="button">Export draft PNG</button>
    <button id="battle-undo" type="button">Undo paint</button><button id="battle-redo" type="button">Redo paint</button>
    <button id="battle-reset" type="button">Reset draft</button>
    ${button("Save playable copy", "battle-background-build", { primary: true, icon: "playtest", disabled: !((_b = model.fit) == null ? void 0 : _b.fits) || model.building, reason: "Make an edit that fits before saving." })}
    ${artifact.kind === "build" ? button("Open in Playtest", "navigate", { id: "playtest", icon: "playtest" }) : ""}
   </div>
   <p class="preview-caption" id="battle-status" role="status"></p>
+  <div class="battle-match" id="battle-match" hidden></div>
   <details class="battle-review" id="battle-technical"><summary>Technical details</summary><div id="battle-byte-review">${showReview(model.fit)}</div></details>
  </section>`;
   }
@@ -7183,6 +7298,7 @@ ${state2.artifact.system_id ? `<details><summary>Advanced byte options</summary>
     });
     function commit(before, message) {
       if (!model.draft.some((color, i) => color !== before[i])) return;
+      showMatch(null);
       model.past.push(before);
       if (model.past.length > 24) model.past.shift();
       model.future = [];
@@ -7251,6 +7367,7 @@ ${state2.artifact.system_id ? `<details><summary>Advanced byte options</summary>
         model.future.push(model.draft);
         model.draft = model.past.pop();
         save();
+        showMatch(null);
       }
     });
     redo.addEventListener("click", () => {
@@ -7258,6 +7375,7 @@ ${state2.artifact.system_id ? `<details><summary>Advanced byte options</summary>
         model.past.push(model.draft);
         model.draft = model.future.pop();
         save();
+        showMatch(null);
       }
     });
     reset.addEventListener("click", () => {
@@ -7265,12 +7383,30 @@ ${state2.artifact.system_id ? `<details><summary>Advanced byte options</summary>
       model.draft = model.base.slice();
       commit(before);
     });
-    root.querySelector("#battle-save").addEventListener("click", () => {
+    const match = root.querySelector("#battle-match");
+    function showMatch(result) {
+      const rows = result ? matchRows(result) : [];
+      match.hidden = !rows.length;
+      if (!rows.length) {
+        match.textContent = "";
+        return;
+      }
+      const chip = (color) => `<span class="battle-chip" data-chip="${color}"></span><code>${color}</code>`;
+      const more = result.changed.length - rows.length;
+      match.innerHTML = `<div class="table-wrap"><table><caption>Colors that were not battle colors</caption><thead><tr><th scope="col">In your PNG</th><th scope="col">Changed to</th><th scope="col">Battle color</th><th scope="col">Pixels</th></tr></thead><tbody>${rows.map((row) => `<tr><td>${chip(row.from)}</td><td>${chip(row.to)}</td><td>${row.index.toString(16).toUpperCase()}</td><td>${row.pixels.toLocaleString()}</td></tr>`).join("")}</tbody></table></div>${more > 0 ? `<p>and ${more} more.</p>` : ""}`;
+      match.querySelectorAll("[data-chip]").forEach((node) => node.style.setProperty("--swatch", node.dataset.chip));
+    }
+    function exportPng(pixels, name2) {
+      const url = URL.createObjectURL(new Blob([indexedPng(pixels, width, height, palette2)], { type: "image/png" }));
       const link = document.createElement("a");
-      link.download = "Battle-background.png";
-      link.href = draft.toDataURL("image/png");
+      link.download = name2;
+      link.href = url;
       link.click();
-    });
+      setTimeout(() => URL.revokeObjectURL(url), 1e3);
+      status.textContent = `${name2} saved with the 16 battle colors as its palette.`;
+    }
+    root.querySelector("#battle-save").addEventListener("click", () => exportPng(model.draft, "Battle-background-draft.png"));
+    root.querySelector("#battle-export-original").addEventListener("click", () => exportPng(model.base, "Battle-background.png"));
     const picker = root.querySelector("#battle-png");
     picker.addEventListener("change", async () => {
       var _a;
@@ -7283,7 +7419,7 @@ ${state2.artifact.system_id ? `<details><summary>Advanced byte options</summary>
         const header = new DataView(await file.slice(0, 24).arrayBuffer());
         if (header.byteLength !== 24 || header.getUint32(0) !== 2303741511 || header.getUint32(4) !== 218765834 || header.getUint32(12) !== 1229472850) throw Error("Choose a valid PNG image.");
         if (header.getUint32(16) !== width || header.getUint32(20) !== height) throw Error("The battle backdrop must be 320 × 128 pixels.");
-        const bitmap = await createImageBitmap(file);
+        const bitmap = await createImageBitmap(file, { colorSpaceConversion: "none", premultiplyAlpha: "none" });
         try {
           if (!live() || request2 !== imageRequest) return;
           const canvas = document.createElement("canvas");
@@ -7291,21 +7427,13 @@ ${state2.artifact.system_id ? `<details><summary>Advanced byte options</summary>
           canvas.height = height;
           const graphics = canvas.getContext("2d");
           graphics.drawImage(bitmap, 0, 0);
-          const input = graphics.getImageData(0, 0, width, height).data, destination = new Uint8Array(width * height);
-          for (let i = 0; i < destination.length; i++) {
-            if (input[i * 4 + 3] < 128) continue;
-            let best = Infinity;
-            palette2.forEach(([r, g, b], index) => {
-              const distance2 = (input[i * 4] - r) ** 2 + (input[i * 4 + 1] - g) ** 2 + (input[i * 4 + 2] - b) ** 2;
-              if (distance2 < best) {
-                best = distance2;
-                destination[i] = index;
-              }
-            });
-          }
+          const result = matchPalette(graphics.getImageData(0, 0, width, height).data, palette2);
           const before = model.draft;
-          model.draft = destination;
-          commit(before, "PNG imported and matched to the battle palette.");
+          model.draft = result.pixels;
+          const summary = matchSummary(result);
+          if (model.draft.some((color, i) => color !== before[i])) commit(before, summary);
+          else status.textContent = summary + " It is the same picture as the draft.";
+          showMatch(result);
         } finally {
           bitmap.close();
         }
@@ -7574,7 +7702,7 @@ ${state2.artifact.system_id ? `<details><summary>Advanced byte options</summary>
   function domainLabel(name2) {
     return { nesChrRom: "Pattern graphics in ROM", nesChrRam: "Pattern graphics memory", nesPpuMemory: "Pattern and background memory", nesSpriteRam: "Sprite placement memory", nesPaletteRam: "Palette memory", nesNametableRam: "Background tile map", snesPrgRom: "Program and graphics in ROM", snesVideoRam: "Tile and background memory", snesSpriteRam: "Sprite placement memory", snesCgRam: "Palette memory", gbPrgRom: "Program and graphics in ROM", gbVideoRam: "Tile and background memory", gbSpriteRam: "Sprite placement memory", gbBgPaletteRam: "Background palette memory", gbObjPaletteRam: "Sprite palette memory", smsPrgRom: "Program and graphics in ROM", smsVideoRam: "Tile and background memory", smsPaletteRam: "Palette memory", genesisVideoRam: "Tile and background memory", genesisColorRam: "Palette memory", genesisVScrollRam: "Vertical scroll memory", genesisWorkRam: "Working RAM", cpu: "CPU bus" }[name2] || "Recorded memory";
   }
-  var hex5 = (v) => Number.isSafeInteger(v) ? "0x" + v.toString(16) : "Not recorded";
+  var hex6 = (v) => Number.isSafeInteger(v) ? "0x" + v.toString(16) : "Not recorded";
   function graphicsAccessControls(ctx2, trace) {
     var _a, _b, _c, _d, _e;
     const { state: state2 } = ctx2, scope = selectionKey(state2), params = { ...ctx2.sourceParams() }, current3 = () => {
@@ -7608,10 +7736,10 @@ ${state2.artifact.system_id ? `<details><summary>Advanced byte options</summary>
         return ctx2.render();
       }
     });
-    return '<details class="card" id="graphics-accesses" ' + (result ? "open" : "") + '><summary>Native graphics accesses & video memory</summary><p>Replay this saved route in the native observer. Record ROM reads, video-memory writes, registers and the final scene.</p><div class="field-row">' + field("graphics-access-offset", "ROM span start", ctx2.draft("graphics-access-offset", String(((_b = (_a = trace == null ? void 0 : trace.matches) == null ? void 0 : _a[0]) == null ? void 0 : _b.offset) || 0))) + field("graphics-access-length", "ROM bytes to observe", ctx2.draft("graphics-access-length", String(((_d = (_c = trace == null ? void 0 : trace.matches) == null ? void 0 : _c[0]) == null ? void 0 : _d.length) || 32))) + field("graphics-access-start", "First frame to record", ctx2.draft("graphics-access-start", "0")) + "</div>" + button("Record native accesses", "graphics-access-capture", { primary: true, disabled: ((_e = trace == null ? void 0 : trace.replay) == null ? void 0 : _e.status) !== "READY" || state2.playing, reason: "Save a cold-start trace of up to 3600 frames and 64 input steps first." }) + "<details><summary>Open saved capture by ID</summary>" + field("graphics-access-id", "Capture ID", ctx2.draft("graphics-access-id", "")) + button("Open saved capture", "graphics-access-open") + "</details>" + (result ? graphicsAccessReport(result) + '<div class="actions">' + button("Previous events", "graphics-access-page", { id: "-1", disabled: !result.offset }) + button("Next events", "graphics-access-page", { id: "1", disabled: result.offset + result.limit >= result.total_events }) + "</div>" + (result.memory_domains.length ? '<details open><summary>Inspect recorded video memory</summary><div class="field-row">' + select("graphics-memory-domain", "Memory domain", result.memory_domains.map((d) => [d.name, domainLabel(d.name) + " · " + d.size + " bytes"]), ctx2.draft("graphics-memory-domain", result.memory_domains[0].name)) + field("graphics-memory-offset", "Memory offset", ctx2.draft("graphics-memory-offset", "0")) + select("graphics-memory-codec", "Tile interpretation", [[codecs[state2.artifact.system_id], formatLabel(codecs[state2.artifact.system_id], state2.artifact.system_id)], ...state2.artifact.system_id === "snes" ? [["tile8-paired2-msb-v1", "SNES tiles (4 colors)"]] : []], ctx2.draft("graphics-memory-codec", codecs[state2.artifact.system_id])) + "</div>" + button("Preview 32 recorded tiles", "graphics-access-tiles") + '<p class="subtle">Choose pattern/video memory, not OAM or palette memory. Grayscale shows stored indices; this view does not identify a ROM source.</p>' + (entry.tiles ? '<canvas id="graphics-memory-tiles" aria-label="Recorded video-memory tile indices"></canvas><p>' + hex5(entry.tiles.offset) + " · " + entry.tiles.cells.length + " tiles · end of capture</p>" : "") + "</details>" : "") : "") + "</details>";
+    return '<details class="card" id="graphics-accesses" ' + (result ? "open" : "") + '><summary>Native graphics accesses & video memory</summary><p>Replay this saved route in the native observer. Record ROM reads, video-memory writes, registers and the final scene.</p><div class="field-row">' + field("graphics-access-offset", "ROM span start", ctx2.draft("graphics-access-offset", String(((_b = (_a = trace == null ? void 0 : trace.matches) == null ? void 0 : _a[0]) == null ? void 0 : _b.offset) || 0))) + field("graphics-access-length", "ROM bytes to observe", ctx2.draft("graphics-access-length", String(((_d = (_c = trace == null ? void 0 : trace.matches) == null ? void 0 : _c[0]) == null ? void 0 : _d.length) || 32))) + field("graphics-access-start", "First frame to record", ctx2.draft("graphics-access-start", "0")) + "</div>" + button("Record native accesses", "graphics-access-capture", { primary: true, disabled: ((_e = trace == null ? void 0 : trace.replay) == null ? void 0 : _e.status) !== "READY" || state2.playing, reason: "Save a cold-start trace of up to 3600 frames and 64 input steps first." }) + "<details><summary>Open saved capture by ID</summary>" + field("graphics-access-id", "Capture ID", ctx2.draft("graphics-access-id", "")) + button("Open saved capture", "graphics-access-open") + "</details>" + (result ? graphicsAccessReport(result) + '<div class="actions">' + button("Previous events", "graphics-access-page", { id: "-1", disabled: !result.offset }) + button("Next events", "graphics-access-page", { id: "1", disabled: result.offset + result.limit >= result.total_events }) + "</div>" + (result.memory_domains.length ? '<details open><summary>Inspect recorded video memory</summary><div class="field-row">' + select("graphics-memory-domain", "Memory domain", result.memory_domains.map((d) => [d.name, domainLabel(d.name) + " · " + d.size + " bytes"]), ctx2.draft("graphics-memory-domain", result.memory_domains[0].name)) + field("graphics-memory-offset", "Memory offset", ctx2.draft("graphics-memory-offset", "0")) + select("graphics-memory-codec", "Tile interpretation", [[codecs[state2.artifact.system_id], formatLabel(codecs[state2.artifact.system_id], state2.artifact.system_id)], ...state2.artifact.system_id === "snes" ? [["tile8-paired2-msb-v1", "SNES tiles (4 colors)"]] : []], ctx2.draft("graphics-memory-codec", codecs[state2.artifact.system_id])) + "</div>" + button("Preview 32 recorded tiles", "graphics-access-tiles") + '<p class="subtle">Choose pattern/video memory, not OAM or palette memory. Grayscale shows stored indices; this view does not identify a ROM source.</p>' + (entry.tiles ? '<canvas id="graphics-memory-tiles" aria-label="Recorded video-memory tile indices"></canvas><p>' + hex6(entry.tiles.offset) + " · " + entry.tiles.cells.length + " tiles · end of capture</p>" : "") + "</details>" : "") : "") + "</details>";
   }
   function graphicsAccessReport(r) {
-    return '<section class="notice"><h4>Recorded access trail</h4>' + (r.scene ? '<figure><img class="game-resource-preview" src="data:image/png;base64,' + esc(r.scene.png_base64) + '" alt="Native observer end-of-capture scene"><figcaption>Separate native replay · final scene</figcaption></figure>' : "") + "<p>" + r.total_events + " stored events · showing " + r.offset + "–" + Math.min(r.offset + r.limit, r.total_events) + ". " + (r.omitted_events ? r.omitted_events + " events omitted at the capture budget." : "") + "</p>" + (r.runtime_trusted === false ? '<p class="notice warm">Historical imported capture. Record a fresh replay for current execution evidence.</p>' : "") + '<div class="table-wrap"><table><thead><tr><th>Kind</th><th>Domain / address</th><th>ROM offset</th><th>Value</th><th>Native operation</th></tr></thead><tbody>' + (r.events || []).map((e) => "<tr><td>" + esc(e.kind) + "</td><td>" + esc(domainLabel(e.domain || "cpu")) + " " + hex5(e.physical_offset ?? e.address) + "</td><td>" + hex5(e.file_offset) + "</td><td>" + hex5(e.value) + "</td><td>" + esc(e.operation_kind || e.actor || "Not recorded") + "</td></tr>").join("") + "</tbody></table></div><p>Adjacent reads and writes do not establish dataflow. CPU context may precede the access. Use source verification to test literal ROM-to-picture dependencies.</p><details><summary>Technical names & register state</summary><pre>" + esc(JSON.stringify({ domains: [...new Set((r.events || []).map((e) => e.domain))], registers: r.graphics_state || {} }, null, 2)) + "</pre></details></section>";
+    return '<section class="notice"><h4>Recorded access trail</h4>' + (r.scene ? '<figure><img class="game-resource-preview" src="data:image/png;base64,' + esc(r.scene.png_base64) + '" alt="Native observer end-of-capture scene"><figcaption>Separate native replay · final scene</figcaption></figure>' : "") + "<p>" + r.total_events + " stored events · showing " + r.offset + "–" + Math.min(r.offset + r.limit, r.total_events) + ". " + (r.omitted_events ? r.omitted_events + " events omitted at the capture budget." : "") + "</p>" + (r.runtime_trusted === false ? '<p class="notice warm">Historical imported capture. Record a fresh replay for current execution evidence.</p>' : "") + '<div class="table-wrap"><table><thead><tr><th>Kind</th><th>Domain / address</th><th>ROM offset</th><th>Value</th><th>Native operation</th></tr></thead><tbody>' + (r.events || []).map((e) => "<tr><td>" + esc(e.kind) + "</td><td>" + esc(domainLabel(e.domain || "cpu")) + " " + hex6(e.physical_offset ?? e.address) + "</td><td>" + hex6(e.file_offset) + "</td><td>" + hex6(e.value) + "</td><td>" + esc(e.operation_kind || e.actor || "Not recorded") + "</td></tr>").join("") + "</tbody></table></div><p>Adjacent reads and writes do not establish dataflow. CPU context may precede the access. Use source verification to test literal ROM-to-picture dependencies.</p><details><summary>Technical names & register state</summary><pre>" + esc(JSON.stringify({ domains: [...new Set((r.events || []).map((e) => e.domain))], registers: r.graphics_state || {} }, null, 2)) + "</pre></details></section>";
   }
   function mountGraphicsAccess(ctx2) {
     const entry = ctx2.state.graphicsAccess, canvas = document.getElementById("graphics-memory-tiles");
@@ -8495,9 +8623,9 @@ ${state2.artifact.system_id ? `<details><summary>Advanced byte options</summary>
       },
       "cf-remove-script": (node) => store({ ...draft, scripts: draft.scripts.filter((s) => s.id !== node.dataset.id) }),
       "cf-preview": async () => {
-        const stored2 = ctx2.draft("command-form", "null"), config = { ...draft, name: name(read("cf-name"), 80) }, r = await ctx2.run("definitions.preview", { ...ctx2.sourceParams(), kind: "commands", config }, { render: false });
+        const stored3 = ctx2.draft("command-form", "null"), config = { ...draft, name: name(read("cf-name"), 80) }, r = await ctx2.run("definitions.preview", { ...ctx2.sourceParams(), kind: "commands", config }, { render: false });
         if (!current3()) return;
-        if (ctx2.draft("command-form", "null") !== stored2 || read("cf-name").trim() !== config.name) throw Error("The form changed. Preview it again.");
+        if (ctx2.draft("command-form", "null") !== stored3 || read("cf-name").trim() !== config.name) throw Error("The form changed. Preview it again.");
         state2.commandFormReview = { scope, config, review_id: r.review_id, signature: JSON.stringify(draft) };
         return ctx2.render();
       },
@@ -8766,7 +8894,7 @@ ${state2.artifact.system_id ? `<details><summary>Advanced byte options</summary>
   }
 
   // romancer/ui/structural_lab.js
-  var hex6 = (v) => "0x" + v.toString(16);
+  var hex7 = (v) => "0x" + v.toString(16);
   var bound = (state2, r) => {
     var _a, _b;
     return (r == null ? void 0 : r.source_sha256) === ((_a = state2.artifact) == null ? void 0 : _a.sha256) && r.artifact_id === ((_b = state2.artifact) == null ? void 0 : _b.artifact_id);
@@ -8811,7 +8939,7 @@ ${state2.artifact.system_id ? `<details><summary>Advanced byte options</summary>
         await ctx2.navigate("tables");
       }
     });
-    return `<section class="card structural-lab"><h2>Explore ROM structure</h2><p>Test repeated numeric layouts, inspect sample records, and open a neutral editor. These are hypotheses; game meaning and pointer use need behavioral evidence.</p><div class="field-row">${field("lab-offset", "Window file offset", ctx2.draft("lab-offset", "0"))}${field("lab-length", "Window bytes (up to 65536)", ctx2.draft("lab-length", "4096"))}</div>${button("Test this range", "lab-survey", { primary: true })}${result ? `<p>${result.coverage.positions_tested} layouts tested · start positions sampled every ${result.coverage.position_stride} bytes · ${result.total_candidates} surviving hypotheses${result.truncated ? " · result limit reached" : ""}</p><p class="notice">${esc(result.next_experiment)}</p>${select("lab-interpretation", "Open editor as", [["numeric", "Neutral numeric values"], ["linear-pointer", "An explicit linear-pointer hypothesis"]], ctx2.draft("lab-interpretation", "numeric"))}${result.candidates.length ? `<div class="table-wrap"><table><thead><tr><th>First record</th><th>Layout</th><th>Sample values and possible targets</th><th></th></tr></thead><tbody>${result.candidates.slice(0, 12).map((c) => `<tr><td><code>${hex6(c.offset)}</code></td><td>${c.count} records · ${c.stride} bytes/record<br>${c.width * 8} bit · ${esc(c.endian)}<br>Target hypothesis: stored − ${hex6(c.base)}</td><td>${c.samples.slice(0, 3).map((s) => `<div><code>${hex6(s.stored_value)} → ${hex6(s.target_offset)}</code>${s.target_preview ? " · " + esc(s.target_preview) : ""}</div>`).join("")}</td><td>${button("Open table editor", "lab-open", { id: c.candidate_id })}</td></tr>`).join("")}</tbody></table></div><p class="subtle">Showing ${Math.min(12, result.candidates.length)} of ${result.candidates.length} retained hypotheses. Use a smaller range to separate layouts. Opening an editor does not modify ROM bytes.</p>` : "<p>No repeated layout survived these tests. Try another range or use native access evidence to locate data.</p>"}` : ""}</section>`;
+    return `<section class="card structural-lab"><h2>Explore ROM structure</h2><p>Test repeated numeric layouts, inspect sample records, and open a neutral editor. These are hypotheses; game meaning and pointer use need behavioral evidence.</p><div class="field-row">${field("lab-offset", "Window file offset", ctx2.draft("lab-offset", "0"))}${field("lab-length", "Window bytes (up to 65536)", ctx2.draft("lab-length", "4096"))}</div>${button("Test this range", "lab-survey", { primary: true })}${result ? `<p>${result.coverage.positions_tested} layouts tested · start positions sampled every ${result.coverage.position_stride} bytes · ${result.total_candidates} surviving hypotheses${result.truncated ? " · result limit reached" : ""}</p><p class="notice">${esc(result.next_experiment)}</p>${select("lab-interpretation", "Open editor as", [["numeric", "Neutral numeric values"], ["linear-pointer", "An explicit linear-pointer hypothesis"]], ctx2.draft("lab-interpretation", "numeric"))}${result.candidates.length ? `<div class="table-wrap"><table><thead><tr><th>First record</th><th>Layout</th><th>Sample values and possible targets</th><th></th></tr></thead><tbody>${result.candidates.slice(0, 12).map((c) => `<tr><td><code>${hex7(c.offset)}</code></td><td>${c.count} records · ${c.stride} bytes/record<br>${c.width * 8} bit · ${esc(c.endian)}<br>Target hypothesis: stored − ${hex7(c.base)}</td><td>${c.samples.slice(0, 3).map((s) => `<div><code>${hex7(s.stored_value)} → ${hex7(s.target_offset)}</code>${s.target_preview ? " · " + esc(s.target_preview) : ""}</div>`).join("")}</td><td>${button("Open table editor", "lab-open", { id: c.candidate_id })}</td></tr>`).join("")}</tbody></table></div><p class="subtle">Showing ${Math.min(12, result.candidates.length)} of ${result.candidates.length} retained hypotheses. Use a smaller range to separate layouts. Opening an editor does not modify ROM bytes.</p>` : "<p>No repeated layout survived these tests. Try another range or use native access evidence to locate data.</p>"}` : ""}</section>`;
   }
 
   // romancer/ui/value_finder.js
@@ -9981,8 +10109,8 @@ ${state2.artifact.system_id ? `<details><summary>Advanced byte options</summary>
   });
 
   // romancer/ui/scene_editor.js
-  var plural = (count, word, many = word + "s") => `${count} ${count === 1 ? word : many}`;
-  var hex7 = (rgb) => "#" + rgb.map((v) => Math.max(0, Math.min(255, Math.round(v))).toString(16).padStart(2, "0")).join("");
+  var plural2 = (count, word, many = word + "s") => `${count} ${count === 1 ? word : many}`;
+  var hex8 = (rgb) => "#" + rgb.map((v) => Math.max(0, Math.min(255, Math.round(v))).toString(16).padStart(2, "0")).join("");
   function parseHex(text) {
     const match = /^#?([0-9a-f]{6})$/i.exec(String(text || ""));
     if (!match) return null;
@@ -10041,13 +10169,13 @@ ${state2.artifact.system_id ? `<details><summary>Advanced byte options</summary>
   var sameColors = (a, b) => JSON.stringify(a) === JSON.stringify(b);
   function swatchLabel(swatch) {
     const state2 = swatch.editable ? swatch.pending ? "changed, not saved yet" : "can be changed" : "locked: " + swatch.locked_reason;
-    return `${swatch.name}, ${swatch.colors.map(hex7).join(" ")}, ${state2}${swatch.editable && swatch.uses ? ", used in " + plural(swatch.uses, "scene") : ""}`;
+    return `${swatch.name}, ${swatch.colors.map(hex8).join(" ")}, ${state2}${swatch.editable && swatch.uses ? ", used in " + plural2(swatch.uses, "scene") : ""}`;
   }
   function changeLine(change) {
     if (change.planning) return change.scope === "only_this" || !change.verdict ? "Working out how to change only this scene…" : change.verdict;
     if (change.error) return change.error;
-    if (change.working) return `Re-rendering ${plural(change.working, "scene")} in the real game…`;
-    return `${change.badge}. ${plural(change.visible_count, "scene")} ${change.visible_count === 1 ? "looks" : "look"} different.`;
+    if (change.working) return `Re-rendering ${plural2(change.working, "scene")} in the real game…`;
+    return `${change.badge}. ${plural2(change.visible_count, "scene")} ${change.visible_count === 1 ? "looks" : "look"} different.`;
   }
   var KEY_BUTTONS = { ArrowUp: "up", ArrowDown: "down", ArrowLeft: "left", ArrowRight: "right", z: "a", x: "b", a: "x", s: "y", q: "l", w: "r", Enter: "start", Shift: "select" };
   var offsetText = (value) => "0x" + Number(value).toString(16).toUpperCase().padStart(6, "0");
@@ -10211,7 +10339,7 @@ ${state2.artifact.system_id ? `<details><summary>Advanced byte options</summary>
     }
     return loading;
   }
-  var chips = (colors) => `<span class="scene-chips">${colors.map((color) => `<span class="scene-chip" data-color="${hex7(color)}"></span>`).join("")}</span>`;
+  var chips = (colors) => `<span class="scene-chips">${colors.map((color) => `<span class="scene-chip" data-color="${hex8(color)}"></span>`).join("")}</span>`;
   var selectedSwatch = (ed) => {
     var _a;
     return ((_a = ed.view) == null ? void 0 : _a.swatches.find((swatch) => swatch.id === ed.selected)) || null;
@@ -10219,10 +10347,10 @@ ${state2.artifact.system_id ? `<details><summary>Advanced byte options</summary>
   var shownChange = (ed) => ed.proposal || ed.inspect;
   function galleryPart(ed) {
     const summary = ed.summary, recording = summary.recording, running = (recording == null ? void 0 : recording.state) === "running", engine = summary.engine;
-    return `<div class="card-heading"><h3>Scenes</h3>${badge(plural(summary.scenes.length, "scene") + " recorded", summary.scenes.length ? "good" : "neutral")}</div>
+    return `<div class="card-heading"><h3>Scenes</h3>${badge(plural2(summary.scenes.length, "scene") + " recorded", summary.scenes.length ? "good" : "neutral")}</div>
  <p class="subtle">A scene is a moment of the game that ROMancer has watched. When you change something, every scene that uses the same data is shown. Scenes you haven't recorded can't be shown, so record the places you care about.</p>
  <div class="actions">${running ? button("Stop recording", "scene-record-stop") : button("Record more scenes", "scene-record", { primary: !summary.scenes.length, icon: "plus", disabled: !engine.installed, reason: engine.reason })}${button(ed.playing ? "Stop playing" : "Play and capture a moment", "scene-play-toggle", { icon: "playtest", disabled: !engine.installed || running, reason: engine.installed ? "Wait for recording to finish, or stop it." : engine.reason })}</div>
- ${recording ? `<div class="scene-progress" role="status" aria-live="polite">${running ? `<progress max="${recording.total}" value="${recording.done}" aria-label="Recording progress"></progress>` : ""}<span>${esc(recording.message)}${running && recording.found ? " " + plural(recording.found, "new scene") + " so far." : ""}</span></div>` : ""}
+ ${recording ? `<div class="scene-progress" role="status" aria-live="polite">${running ? `<progress max="${recording.total}" value="${recording.done}" aria-label="Recording progress"></progress>` : ""}<span>${esc(recording.message)}${running && recording.found ? " " + plural2(recording.found, "new scene") + " so far." : ""}</span></div>` : ""}
  <div class="scene-strip" role="group" aria-label="Recorded scenes">${summary.scenes.map((row) => `<button type="button" class="scene-thumb ${row.id === ed.sceneId ? "selected" : ""}" data-action="scene-open" data-id="${row.id}" aria-pressed="${row.id === ed.sceneId}"><img alt="" data-picture="${esc(row.image)}" width="${row.width}" height="${row.height}"><span>${esc(row.label)}</span></button>`).join("") || `<p class="subtle">No scenes yet. Record more scenes lets the game play by itself for a few minutes; Play and capture lets you go where you want.</p>`}</div>`;
   }
   function playPart(ed) {
@@ -10232,7 +10360,7 @@ ${state2.artifact.system_id ? `<details><summary>Advanced byte options</summary>
   var byteText = (value) => value === null || value === void 0 ? "new" : value.toString(16).toUpperCase().padStart(2, "0");
   function verdictPart(change) {
     var _a, _b;
-    if (((_a = change.checks) == null ? void 0 : _a.length) && !change.error && !change.planning) return `<div role="status" aria-live="polite">${change.checks.map((check) => `<p class="${checkTone2(check.state)}"><strong>${esc(check.name)}.</strong> ${esc(check.text)}</p>`).join("")}</div>${change.method_text ? `<p class="subtle">${esc(change.method_text)}${change.grows ? ` The ROM file gets ${plural(change.grows, "byte")} longer to make room.` : ""}${change.every_scene ? " The patch runs all the time, so every recorded scene was re-rendered, not only the ones that show this picture." : ""}</p>` : ""}`;
+    if (((_a = change.checks) == null ? void 0 : _a.length) && !change.error && !change.planning) return `<div role="status" aria-live="polite">${change.checks.map((check) => `<p class="${checkTone2(check.state)}"><strong>${esc(check.name)}.</strong> ${esc(check.text)}</p>`).join("")}</div>${change.method_text ? `<p class="subtle">${esc(change.method_text)}${change.grows ? ` The ROM file gets ${plural2(change.grows, "byte")} longer to make room.` : ""}${change.every_scene ? " The patch runs all the time, so every recorded scene was re-rendered, not only the ones that show this picture." : ""}</p>` : ""}`;
     const tone = change.error || !change.working && !change.verified ? "notice warm" : "notice";
     return `<p class="${tone}" role="status" aria-live="polite">${esc(change.verdict)}${change.planning && ((_b = change.progress) == null ? void 0 : _b.done) ? ` (replay ${change.progress.done})` : ""}</p>`;
   }
@@ -10244,7 +10372,7 @@ ${state2.artifact.system_id ? `<details><summary>Advanced byte options</summary>
  <p>${badge(change.badge, change.scene_count > 1 ? "warm" : "neutral")} ${esc(change.coverage)}</p>
  <div class="scene-strip" role="group" aria-label="Scenes that use the same data">${change.affected.map((row, index) => `<button type="button" class="scene-thumb ${row.visible ? "flagged" : ""} ${row.state === "working" ? "working" : ""}" data-action="scene-compare" data-id="${index}"><img alt="" data-picture="${esc(row.after || row.before)}" width="${row.width}" height="${row.height}"><span>${esc(row.label)}${row.edited_here ? " (this scene)" : ""}</span><small>${esc(row.status)}</small></button>`).join("")}</div>
  <p class="subtle">Each picture is the real game replayed with your change. Choose one to compare before and after.</p>
- <details><summary>Details</summary><p>${plural(change.bytes, "byte")} in the ROM ${change.bytes === 1 ? "changes" : "change"}.</p><div class="table-wrap"><table><thead><tr><th>Place in the file</th><th>Before</th><th>After</th></tr></thead><tbody>${change.details.map((row) => `<tr><td>${offsetText(row.file_offset)}</td><td>${byteText(row.before)}</td><td>${byteText(row.after)}</td></tr>`).join("")}</tbody></table></div>${change.bytes > change.details.length ? `<p>Only the first ${change.details.length} are listed.</p>` : ""}${((_a = change.notes) == null ? void 0 : _a.length) ? `<p>${change.notes.map(esc).join(" ")}</p>` : ""}${((_b = change.tried) == null ? void 0 : _b.length) ? `<p>Tried first: ${change.tried.map(esc).join(" ")}</p>` : ""}</details>`;
+ <details><summary>Details</summary><p>${plural2(change.bytes, "byte")} in the ROM ${change.bytes === 1 ? "changes" : "change"}.</p><div class="table-wrap"><table><thead><tr><th>Place in the file</th><th>Before</th><th>After</th></tr></thead><tbody>${change.details.map((row) => `<tr><td>${offsetText(row.file_offset)}</td><td>${byteText(row.before)}</td><td>${byteText(row.after)}</td></tr>`).join("")}</tbody></table></div>${change.bytes > change.details.length ? `<p>Only the first ${change.details.length} are listed.</p>` : ""}${((_a = change.notes) == null ? void 0 : _a.length) ? `<p>${change.notes.map(esc).join(" ")}</p>` : ""}${((_b = change.tried) == null ? void 0 : _b.length) ? `<p>Tried first: ${change.tried.map(esc).join(" ")}</p>` : ""}</details>`;
   }
   var STAGE_LABEL = { colors: "The game screen in this scene. Click a pixel to select its color, or choose a color from the palette list.", graphics: "The game screen in this scene. Click a pixel to open the picture under it, or choose a picture from the list.", background: "The game screen in this scene with a grid over its background cells. Click or drag to paint cells with the chosen picture. With the keyboard: arrow keys move, Space paints." };
   var STAGE_HINT = { colors: "Click any pixel to pick the color under it, or choose from the palette.", graphics: "Click any pixel to open the 8 by 8 picture under it. The game builds its screen from these pictures, so changing one changes every place it is drawn.", background: "The grid shows the background cells. Choose a picture, then click or drag over cells to paint them. Cells outlined with dashes are stored together with a painted cell and change with it." };
@@ -10269,19 +10397,19 @@ ${state2.artifact.system_id ? `<details><summary>Advanced byte options</summary>
     const view = ed.view;
     if (!view) return "";
     const matches = new Set(ed.matches), locked = view.swatches.filter((swatch) => !swatch.editable).length;
-    return `<div class="card-heading"><h3>Colors in this scene</h3>${badge(plural(view.swatches.length - locked, "color") + " you can change", "good")}</div>
+    return `<div class="card-heading"><h3>Colors in this scene</h3>${badge(plural2(view.swatches.length - locked, "color") + " you can change", "good")}</div>
  ${groupSwatches(view.swatches).map((group) => `<div class="scene-palette-group"><h4>${esc(group.name)}</h4><div class="scene-swatches">${group.items.map((swatch) => `<button type="button" class="scene-swatch ${swatch.editable ? "" : "locked"} ${swatch.id === ed.selected ? "selected" : ""} ${matches.has(swatch.id) ? "match" : ""}" data-action="scene-select" data-id="${esc(swatch.id)}" aria-pressed="${swatch.id === ed.selected}" aria-label="${esc(swatchLabel(swatch))}" title="${esc(swatchLabel(swatch))}">${chips(swatch.pending || swatch.colors)}${swatch.editable ? "" : icon("lock", "scene-lock")}${swatch.pending ? '<span class="scene-dot" aria-hidden="true"></span>' : ""}</button>`).join("")}</div></div>`).join("")}
- ${locked ? `<p class="subtle">${icon("lock", "scene-lock-inline")} ${plural(locked, "color")} ${locked === 1 ? "is" : "are"} locked. Choose one to see why.</p>` : ""}`;
+ ${locked ? `<p class="subtle">${icon("lock", "scene-lock-inline")} ${plural2(locked, "color")} ${locked === 1 ? "is" : "are"} locked. Choose one to see why.</p>` : ""}`;
   }
   function pickerControls(ed, swatch, picker) {
     const draft = ed.draft;
     if (picker.kind === "master") {
       const hidden = new Set(picker.hidden);
-      return `<div class="scene-master" role="group" aria-label="${esc(picker.label)}">${picker.colors.map((color, index) => hidden.has(index) ? "" : `<button type="button" class="scene-master-color ${sameColors(color, draft[0]) ? "selected" : ""}" data-action="scene-master" data-id="${index}" aria-pressed="${sameColors(color, draft[0])}" aria-label="NES color ${index + 1}" title="NES color ${index + 1}"><span class="scene-chip" data-color="${hex7(color)}"></span></button>`).join("")}</div>`;
+      return `<div class="scene-master" role="group" aria-label="${esc(picker.label)}">${picker.colors.map((color, index) => hidden.has(index) ? "" : `<button type="button" class="scene-master-color ${sameColors(color, draft[0]) ? "selected" : ""}" data-action="scene-master" data-id="${index}" aria-pressed="${sameColors(color, draft[0])}" aria-label="NES color ${index + 1}" title="NES color ${index + 1}"><span class="scene-chip" data-color="${hex8(color)}"></span></button>`).join("")}</div>`;
     }
-    if (picker.kind === "shades") return `<div class="scene-shades">${draft.map((color, slot) => `<div role="group" aria-label="${SLOT_NAMES[slot]}"><span>${SLOT_NAMES[slot]}</span>${picker.colors.map((shade, index) => `<button type="button" class="scene-master-color ${sameColors(shade, color) ? "selected" : ""}" data-action="scene-shade" data-id="${index}" data-slot="${slot}" aria-pressed="${sameColors(shade, color)}" aria-label="${SLOT_NAMES[slot]}: ${["white", "light gray", "dark gray", "black"][index]}"><span class="scene-chip" data-color="${hex7(shade)}"></span></button>`).join("")}</div>`).join("")}</div>`;
+    if (picker.kind === "shades") return `<div class="scene-shades">${draft.map((color, slot) => `<div role="group" aria-label="${SLOT_NAMES[slot]}"><span>${SLOT_NAMES[slot]}</span>${picker.colors.map((shade, index) => `<button type="button" class="scene-master-color ${sameColors(shade, color) ? "selected" : ""}" data-action="scene-shade" data-id="${index}" data-slot="${slot}" aria-pressed="${sameColors(shade, color)}" aria-label="${SLOT_NAMES[slot]}: ${["white", "light gray", "dark gray", "black"][index]}"><span class="scene-chip" data-color="${hex8(shade)}"></span></button>`).join("")}</div>`).join("")}</div>`;
     const top = picker.levels.length - 1;
-    return `<div class="scene-levels">${["Red", "Green", "Blue"].map((name2, channel) => `<label><span>${name2}</span><input type="range" min="0" max="${top}" step="1" value="${levelIndex(draft[0][channel], picker.levels)}" data-channel="${channel}" aria-label="${name2}, 0 to ${top}"><output data-channel-value="${channel}">${levelIndex(draft[0][channel], picker.levels)}</output></label>`).join("")}<label class="scene-any"><span>Or pick any color; it snaps to the nearest one this system can show</span><input type="color" value="${hex7(draft[0])}" data-any-color aria-label="Pick any color"></label></div>`;
+    return `<div class="scene-levels">${["Red", "Green", "Blue"].map((name2, channel) => `<label><span>${name2}</span><input type="range" min="0" max="${top}" step="1" value="${levelIndex(draft[0][channel], picker.levels)}" data-channel="${channel}" aria-label="${name2}, 0 to ${top}"><output data-channel-value="${channel}">${levelIndex(draft[0][channel], picker.levels)}</output></label>`).join("")}<label class="scene-any"><span>Or pick any color; it snaps to the nearest one this system can show</span><input type="color" value="${hex8(draft[0])}" data-any-color aria-label="Pick any color"></label></div>`;
   }
   function lockedPart(ed, swatch) {
     var _a;
@@ -10302,14 +10430,14 @@ ${state2.artifact.system_id ? `<details><summary>Advanced byte options</summary>
     if (!swatch.editable) return lockedPart(ed, swatch);
     const picker = ed.view.pickers[swatch.format], proposal = ((_a = ed.proposal) == null ? void 0 : _a.swatch) === swatch.id && ed.proposal.scene_id === ed.sceneId ? ed.proposal : null, support = ed.summary.private_copy;
     const unchanged = sameColors(ed.draft, swatch.colors), ready = proposal && !proposal.working && !proposal.error;
-    return `<div class="card-heading"><h3>${esc(swatch.name)}</h3>${badge("Used in " + plural(swatch.uses, "scene"), swatch.uses > 1 ? "warm" : "neutral")}</div>
+    return `<div class="card-heading"><h3>${esc(swatch.name)}</h3>${badge("Used in " + plural2(swatch.uses, "scene"), swatch.uses > 1 ? "warm" : "neutral")}</div>
  <div class="scene-before-after"><div><small>Now</small>${chips(swatch.colors)}</div><div aria-hidden="true">${icon("arrow")}</div><div><small>New</small><span id="scene-draft-chips">${chips(ed.draft)}</span></div></div>
  <p id="scene-draft-text" class="subtle" role="status" aria-live="polite">${esc(pickerSummary(ed.draft, picker))}</p>
  <p class="subtle">${esc(picker.help)}</p>${pickerControls(ed, swatch, picker)}
- <fieldset class="scene-scope"><legend>Where should it change?</legend><label><input type="radio" name="scene-scope" value="all" ${ed.scopeChoice === "all" || !support.available ? "checked" : ""}> Everywhere this color is used (${plural(swatch.uses, "recorded scene")})</label><label class="${support.available ? "" : "scene-disabled"}"><input type="radio" name="scene-scope" value="only_this" ${support.available ? "" : "disabled"} ${ed.scopeChoice === "only_this" && support.available ? "checked" : ""}> Only in this scene</label>${support.available ? '<p class="subtle">Only this scene gives it a private copy of the data. ROMancer checks by replay that the other scenes stay as they are.</p>' : `<p class="subtle">${esc(support.reason)}</p>`}</fieldset>
+ <fieldset class="scene-scope"><legend>Where should it change?</legend><label><input type="radio" name="scene-scope" value="all" ${ed.scopeChoice === "all" || !support.available ? "checked" : ""}> Everywhere this color is used (${plural2(swatch.uses, "recorded scene")})</label><label class="${support.available ? "" : "scene-disabled"}"><input type="radio" name="scene-scope" value="only_this" ${support.available ? "" : "disabled"} ${ed.scopeChoice === "only_this" && support.available ? "checked" : ""}> Only in this scene</label>${support.available ? '<p class="subtle">Only this scene gives it a private copy of the data. ROMancer checks by replay that the other scenes stay as they are.</p>' : `<p class="subtle">${esc(support.reason)}</p>`}</fieldset>
  ${proposal ? `<p class="${proposal.error || !proposal.working && !proposal.verified ? "notice warm" : "notice"}" role="status" aria-live="polite">${esc(proposal.verdict)}</p>` : ""}
  <div class="actions">${proposal ? button("Keep this change", "scene-keep", { primary: true, icon: "check", disabled: !ready, reason: proposal.error ? "This change could not be made." : "Wait until every scene has been re-rendered." }) + button("Cancel", "scene-cancel") : button("Show what changes", "scene-propose", { primary: true, disabled: unchanged, reason: "Choose a different color first." })}</div>
- <details><summary>Details</summary><p>This color is read from ${plural(swatch.details.filter(Boolean).length, "byte")} of the ROM${swatch.status === "code" ? ", written as a value inside the game code" : ""}.</p><ul>${swatch.details.filter(Boolean).map((row) => `<li>Place in the file: ${offsetText(row.file_offset)}</li>`).join("")}</ul>${swatch.notes.map((note) => `<p>${esc(note)}</p>`).join("")}</details>`;
+ <details><summary>Details</summary><p>This color is read from ${plural2(swatch.details.filter(Boolean).length, "byte")} of the ROM${swatch.status === "code" ? ", written as a value inside the game code" : ""}.</p><ul>${swatch.details.filter(Boolean).map((row) => `<li>Place in the file: ${offsetText(row.file_offset)}</li>`).join("")}</ul>${swatch.notes.map((note) => `<p>${esc(note)}</p>`).join("")}</details>`;
   }
   function changesPart(ed) {
     const list = ed.summary.changes;
@@ -10348,14 +10476,14 @@ ${state2.artifact.system_id ? `<details><summary>Advanced byte options</summary>
     if (!ed.view) return "";
     if (!ed.gfx) return `<h3>Pictures in this scene</h3>${READING}`;
     const tiles = sheetTiles(ed), rows = Math.max(1, Math.ceil(tiles.length / SHEET_COLS)), chosen = tileById(ed, ed.mode === "background" ? ed.brush.tile : (_a = ed.tile) == null ? void 0 : _a.id);
-    return `<div class="card-heading"><h3>Pictures in this scene</h3>${badge(plural(tiles.length, "picture"), "neutral")}</div>
+    return `<div class="card-heading"><h3>Pictures in this scene</h3>${badge(plural2(tiles.length, "picture"), "neutral")}</div>
  <p class="subtle">${ed.mode === "background" ? "Choose the picture to paint with." : "Choose a picture to redraw, or click it in the scene."} Dimmed pictures are locked; choose one to see why. A dot marks a picture you have changed.</p>
  <div class="scene-sheetwrap"><canvas id="scene-sheet" class="scene-sheet" width="${SHEET_COLS * SHEET_CELL}" height="${rows * SHEET_CELL}" tabindex="0" role="application" data-action="scene-sheet-pick" aria-label="Pictures in this scene, ${SHEET_COLS} across. Arrow keys move from picture to picture; the chosen one ${ed.mode === "background" ? "becomes the brush" : "opens in the editor"}."></canvas></div>
  <p class="subtle" id="scene-sheet-status" role="status" aria-live="polite">${chosen ? esc(chosen.name) + " is chosen." : "No picture chosen."}</p>
  <label class="scene-check"><input type="checkbox" data-sheet-all ${ed.sheetAll ? "checked" : ""}> Also show pictures that are loaded but not on screen (${ed.gfx.tiles.length} in all)</label>`;
   }
   function scopePart(ed, uses, what, support) {
-    return `<fieldset class="scene-scope"><legend>Where should it change?</legend><label><input type="radio" name="scene-scope" value="all" ${ed.scopeChoice === "all" || !support.available ? "checked" : ""}> Everywhere this ${what} is used (${plural(uses, "recorded scene")})</label><label class="${support.available ? "" : "scene-disabled"}"><input type="radio" name="scene-scope" value="only_this" ${support.available ? "" : "disabled"} ${ed.scopeChoice === "only_this" && support.available ? "checked" : ""}> Only in this scene</label>${support.available ? '<p class="subtle">Only this scene gives it a private copy of the data. If ROMancer cannot make one, it says why and changes nothing.</p>' : `<p class="subtle">${esc(support.reason)}</p>`}</fieldset>`;
+    return `<fieldset class="scene-scope"><legend>Where should it change?</legend><label><input type="radio" name="scene-scope" value="all" ${ed.scopeChoice === "all" || !support.available ? "checked" : ""}> Everywhere this ${what} is used (${plural2(uses, "recorded scene")})</label><label class="${support.available ? "" : "scene-disabled"}"><input type="radio" name="scene-scope" value="only_this" ${support.available ? "" : "disabled"} ${ed.scopeChoice === "only_this" && support.available ? "checked" : ""}> Only in this scene</label>${support.available ? '<p class="subtle">Only this scene gives it a private copy of the data. If ROMancer cannot make one, it says why and changes nothing.</p>' : `<p class="subtle">${esc(support.reason)}</p>`}</fieldset>`;
   }
   function keepPart(proposal, propose2) {
     if (!proposal) return propose2;
@@ -10370,12 +10498,12 @@ ${state2.artifact.system_id ? `<details><summary>Advanced byte options</summary>
     if (!tile.editable) return `<div class="card-heading"><h3>${esc(tile.name)}</h3>${badge("LOCKED", "warm")}</div><canvas id="scene-tile-now" class="scene-tile-view" width="64" height="64" role="img" aria-label="The picture as it is now"></canvas><p class="notice">${icon("lock", "scene-lock-inline")} This picture can't be changed here. ${esc(tile.reason)}</p>`;
     const palette2 = tilePalette(tile, ed.gfx.colors, state2.line), proposal = tileChange(ed), clear = tile.zero === "clear";
     const inkName = (index) => `Color ${index + 1}${index === 0 && clear ? ", see-through" : ""}`;
-    return `<div class="card-heading"><h3>${esc(tile.name)}</h3>${badge("Used in " + plural(tile.uses, "scene"), tile.uses > 1 ? "warm" : "neutral")}</div>
+    return `<div class="card-heading"><h3>${esc(tile.name)}</h3>${badge("Used in " + plural2(tile.uses, "scene"), tile.uses > 1 ? "warm" : "neutral")}</div>
  <p class="subtle">${badge(howLabel(tile), tile.how === "direct" ? "good" : "warm")} ${esc(tile.reason)}</p>
  <div class="scene-tile-edit"><canvas id="scene-tile-editor" class="scene-tile-editor" width="320" height="320" tabindex="0" role="application" aria-label="Picture editor, 8 by 8 pixels. Arrow keys move. Space or Enter uses the tool. Number keys choose a color. P is the pencil, I picks a color, F fills. Control Z undoes."></canvas>
  <div class="scene-tile-side"><div><small>Now</small><canvas id="scene-tile-now" class="scene-tile-view" width="64" height="64" role="img" aria-label="The picture as it is now"></canvas></div><div><small>New</small><canvas id="scene-tile-new" class="scene-tile-view" width="64" height="64" role="img" aria-label="The picture as you have drawn it"></canvas></div></div></div>
  <p id="scene-tile-status" class="subtle" role="status" aria-live="polite">${esc(tileStatus(ed, tile))}</p>
- <div class="scene-inks" role="group" aria-label="Colors of this picture's palette">${palette2.map((color, index) => `<button type="button" class="scene-ink ${index === state2.ink ? "selected" : ""}" data-action="scene-ink" data-id="${index}" aria-pressed="${index === state2.ink}" aria-label="${inkName(index)}" title="${inkName(index)}"><span class="scene-chip" data-color="${hex7(color)}"></span></button>`).join("")}</div>
+ <div class="scene-inks" role="group" aria-label="Colors of this picture's palette">${palette2.map((color, index) => `<button type="button" class="scene-ink ${index === state2.ink ? "selected" : ""}" data-action="scene-ink" data-id="${index}" aria-pressed="${index === state2.ink}" aria-label="${inkName(index)}" title="${inkName(index)}"><span class="scene-chip" data-color="${hex8(color)}"></span></button>`).join("")}</div>
  <p class="subtle">A picture can only use the colors of its palette${clear ? "; the first one is see-through" : ""}.</p>
  <div class="actions" role="group" aria-label="Drawing tools">${TOOLS.map(([id, label]) => `<button type="button" class="${state2.tool === id ? "selected" : ""}" data-action="scene-tool" data-id="${id}" aria-pressed="${state2.tool === id}">${label}</button>`).join("")}${button("Flip sideways", "scene-tile-flip", { id: "h" })}${button("Flip upside down", "scene-tile-flip", { id: "v" })}${button("Undo", "scene-tile-undo")}${button("Start over", "scene-tile-reset")}</div>
  ${tile.lines > 1 ? `<label class="scene-line"><span>Shown with palette</span><select data-tile-line aria-label="Palette to show this picture with">${Array.from({ length: tile.lines }, (_, line) => `<option value="${line}" ${line === state2.line ? "selected" : ""}>Palette ${line + 1}</option>`).join("")}</select></label><p class="subtle">This only changes how the picture is shown here. The game chooses the palette wherever it draws the picture.</p>` : ""}
@@ -10396,16 +10524,16 @@ ${state2.artifact.system_id ? `<details><summary>Advanced byte options</summary>
     if (!layer) return `<h3>Paint the background</h3><p class="notice warm" role="status">ROMancer could not read a background layer in this scene.${ed.summary.system === "snes" ? " On Super NES it needs the scroll settings recorded with the scene; record this scene again." : ""}</p>`;
     const brush = ed.brush, tile = tileById(ed, brush.tile), proposal = cellChange(ed), painted = [...ed.painted.values()], shared = sharedCells(layer, painted.map((cell) => cell.index)), packed = painted.filter((cell) => cellState(layer, cell.index) === "packed").length;
     const plain = layer.counts.rom + layer.counts.code, toggle = (way, label) => `<button type="button" class="${brush[way] ? "selected" : ""}" data-action="scene-bg-flip" data-id="${way}" aria-pressed="${brush[way]}">${label}</button>`;
-    return `<div class="card-heading"><h3>Paint the background</h3>${badge(plural(painted.length, "cell") + " painted", painted.length ? "good" : "neutral")}</div>
+    return `<div class="card-heading"><h3>Paint the background</h3>${badge(plural2(painted.length, "cell") + " painted", painted.length ? "good" : "neutral")}</div>
  ${layers.length > 1 ? `<label class="scene-line"><span>Layer</span><select data-bg-layer aria-label="Background layer">${layers.map((row) => `<option value="${row.index}" ${row.index === layer.index ? "selected" : ""}>${esc(layerLabel(row))}</option>`).join("")}</select></label>` : ""}
  ${layer.placed ? layer.placed_by === "registers" ? `<p class="notice warm">ROMancer did not see this layer in the picture, so the grid is placed from the game's own scroll settings. It may be hidden behind another layer.</p>` : "" : `<p class="notice warm" role="status">ROMancer could not find this layer on the recorded screen, so it cannot show which cell is where. Try another layer or another scene.</p>`}
  <div class="scene-brush"><div><small>Brush</small><canvas id="scene-brush-view" class="scene-tile-view" width="64" height="64" role="img" aria-label="${tile ? esc(tile.name) : "No picture chosen"}"></canvas></div><div><strong>${tile ? esc(tile.name) : "No picture chosen"}</strong><p class="subtle">Choose a picture below, or use Pick from the scene and click a cell.</p></div></div>
  <div class="actions" role="group" aria-label="Painting tools">${BRUSH_TOOLS.map(([id, label]) => `<button type="button" class="${brush.tool === id ? "selected" : ""}" data-action="scene-bg-tool" data-id="${id}" aria-pressed="${brush.tool === id}">${label}</button>`).join("")}${layer.flips ? toggle("hflip", "Flip sideways") + toggle("vflip", "Flip upside down") : ""}</div>
  ${layer.lines > 1 ? `<label class="scene-line"><span>Palette</span><select data-bg-line aria-label="Palette for painted cells"><option value="-1" ${brush.line < 0 ? "selected" : ""}>Keep each cell's palette</option>${Array.from({ length: layer.lines }, (_, line) => `<option value="${line}" ${line === brush.line ? "selected" : ""}>Palette ${line + 1}</option>`).join("")}</select></label>${layer.line_note ? `<p class="subtle">${esc(layer.line_note)}</p>` : ""}` : ""}
- ${painted.length ? `<p role="status">${plural(painted.length, "cell")} painted.${shared.length ? ` <strong>${plural(shared.length, "other cell")} in this scene ${shared.length === 1 ? "is" : "are"} stored in the same place in the ROM and will change too</strong> (outlined with dashes).` : ""}${esc(builtCellsNote(packed))}</p>` : '<p class="subtle">Nothing painted yet.</p>'}
+ ${painted.length ? `<p role="status">${plural2(painted.length, "cell")} painted.${shared.length ? ` <strong>${plural2(shared.length, "other cell")} in this scene ${shared.length === 1 ? "is" : "are"} stored in the same place in the ROM and will change too</strong> (outlined with dashes).` : ""}${esc(builtCellsNote(packed))}</p>` : '<p class="subtle">Nothing painted yet.</p>'}
  ${proposal ? verdictPart(proposal) : ""}
  <div class="actions">${keepPart(proposal, button("Show what changes", "scene-bg-propose", { primary: true, disabled: !painted.length, reason: "Paint at least one cell first." }) + button("Clear painting", "scene-bg-clear", { disabled: !painted.length, reason: "Nothing is painted." }))}</div>
- <p class="subtle">In this layer ${plural(plain, "cell")} can be changed directly, ${layer.counts.derived} ${layer.counts.derived === 1 ? "is" : "are"} built by the game while it runs, and ${layer.counts.unknown} ${layer.counts.unknown === 1 ? "is" : "are"} locked (shaded) because ROMancer has not seen where ${layer.counts.unknown === 1 ? "it comes" : "they come"} from.</p>
+ <p class="subtle">In this layer ${plural2(plain, "cell")} can be changed directly, ${layer.counts.derived} ${layer.counts.derived === 1 ? "is" : "are"} built by the game while it runs, and ${layer.counts.unknown} ${layer.counts.unknown === 1 ? "is" : "are"} locked (shaded) because ROMancer has not seen where ${layer.counts.unknown === 1 ? "it comes" : "they come"} from.</p>
  <details><summary>Details</summary><p>${layer.width} by ${layer.height} cells of ${layer.cell} by ${layer.cell} pixels. ${layer.placed_by === "picture" ? "Placed by matching it against the recorded screen." : layer.placed_by === "registers" ? "Placed from the game's scroll registers." : "Not placed."}</p>${layer.notes.map((note) => `<p>${esc(note)}</p>`).join("")}</details>`;
   }
   function inkTile(context, pixels, palette2, x, y, scale, { hflip = false, vflip = false, clear = false } = {}) {
@@ -10416,7 +10544,7 @@ ${state2.artifact.system_id ? `<details><summary>Advanced byte options</summary>
         context.fillRect(x + px * scale, y + py * scale, scale, scale);
         continue;
       }
-      context.fillStyle = hex7(palette2[p] || [0, 0, 0]);
+      context.fillStyle = hex8(palette2[p] || [0, 0, 0]);
       context.fillRect(x + px * scale, y + py * scale, scale, scale);
     }
   }
@@ -11260,7 +11388,7 @@ ${state2.artifact.system_id ? `<details><summary>Advanced byte options</summary>
   }
   function compareDialog(ctx2, ed, row) {
     var _a;
-    ctx2.modal(row.label, `<p>${esc(row.status)}${row.note ? " " + esc(row.note) : ""}</p><canvas id="scene-compare-canvas" class="scene-canvas" width="${row.width}" height="${row.height}" role="img" aria-label="Before and after, split at the slider"></canvas><label class="scene-slider"><span>Before</span><input type="range" min="0" max="100" value="50" data-compare aria-label="Slide from before to after"><span>After</span></label><div class="actions">${button("Show before", "scene-compare-set", { id: "0" })}${button("Show after", "scene-compare-set", { id: "100" })}${button("Close", "close-modal")}</div><details><summary>Details</summary><p>${row.replayed_from_frame === null || row.replayed_from_frame === void 0 ? "The replay did not reach this scene." : "Replayed in the real engine from a savestate " + plural(Math.max(0, Math.round((((_a = ed.summary.scenes.find((scene) => scene.id === row.scene_id)) == null ? void 0 : _a.frame) - row.replayed_from_frame) / 60)), "second") + " earlier."} ${plural(row.pixels, "pixel")} changed.</p></details>`);
+    ctx2.modal(row.label, `<p>${esc(row.status)}${row.note ? " " + esc(row.note) : ""}</p><canvas id="scene-compare-canvas" class="scene-canvas" width="${row.width}" height="${row.height}" role="img" aria-label="Before and after, split at the slider"></canvas><label class="scene-slider"><span>Before</span><input type="range" min="0" max="100" value="50" data-compare aria-label="Slide from before to after"><span>After</span></label><div class="actions">${button("Show before", "scene-compare-set", { id: "0" })}${button("Show after", "scene-compare-set", { id: "100" })}${button("Close", "close-modal")}</div><details><summary>Details</summary><p>${row.replayed_from_frame === null || row.replayed_from_frame === void 0 ? "The replay did not reach this scene." : "Replayed in the real engine from a savestate " + plural2(Math.max(0, Math.round((((_a = ed.summary.scenes.find((scene) => scene.id === row.scene_id)) == null ? void 0 : _a.frame) - row.replayed_from_frame) / 60)), "second") + " earlier."} ${plural2(row.pixels, "pixel")} changed.</p></details>`);
     const canvas = document.getElementById("scene-compare-canvas"), slider = document.querySelector("#modal [data-compare]");
     const draw2 = async () => {
       try {
@@ -11285,10 +11413,10 @@ ${state2.artifact.system_id ? `<details><summary>Advanced byte options</summary>
   }
   function reviewBody(review) {
     return `<p class="notice" role="status">${esc(review.headline)}</p><p>${esc(review.coverage)}</p>${review.unverified.length ? `<p class="notice warm">Not confirmed by replay: ${review.unverified.map(esc).join("; ")}. These may not do what you expect.</p>` : ""}
- <h3>${plural(review.changes.length, "change")}</h3>${review.changes.map((change) => `<div class="scene-change"><div>${change.from_rgb ? chips(change.from_rgb) + icon("arrow", "scene-arrow") + chips(change.to_rgb) : icon("assets")}</div><div><strong>${esc(change.title)}</strong><small>${esc(changeLine(change))}</small></div></div>`).join("")}
+ <h3>${plural2(review.changes.length, "change")}</h3>${review.changes.map((change) => `<div class="scene-change"><div>${change.from_rgb ? chips(change.from_rgb) + icon("arrow", "scene-arrow") + chips(change.to_rgb) : icon("assets")}</div><div><strong>${esc(change.title)}</strong><small>${esc(changeLine(change))}</small></div></div>`).join("")}
  <h3>Everything that changes</h3><div class="scene-review-grid">${review.scenes.map((scene) => `<figure class="${scene.visible ? "flagged" : ""}"><figcaption><strong>${esc(scene.label)}</strong><small>${scene.state === "working" ? "Re-rendering…" : scene.visible ? "Looks different" : "Uses changed data; nothing visible at this moment"}</small></figcaption><div class="scene-pair"><div><small>Before</small><img alt="Before" data-picture="${esc(scene.before)}" width="${scene.width}" height="${scene.height}"></div><div><small>After</small><img alt="After" data-picture="${esc(scene.after)}" width="${scene.width}" height="${scene.height}"></div></div></figure>`).join("")}</div>
  <p class="subtle">${esc(review.writes_note)}</p>
- ${review.grows ? `<p class="notice">One of these changes needs more room than the ROM has, so the saved build is ${plural(review.grows, "byte")} longer than the original.</p>` : ""}<details><summary>Details</summary><p>${plural(review.bytes, "byte")} will be written.</p>${review.details.map((change) => `<p><strong>${esc(change.title)}</strong></p><div class="table-wrap"><table><thead><tr><th>Place in the file</th><th>Before</th><th>After</th></tr></thead><tbody>${change.writes.map((row) => `<tr><td>${offsetText(row.file_offset)}</td><td>${byteText(row.before)}</td><td>${byteText(row.after)}</td></tr>`).join("")}</tbody></table></div>`).join("")}</details>
+ ${review.grows ? `<p class="notice">One of these changes needs more room than the ROM has, so the saved build is ${plural2(review.grows, "byte")} longer than the original.</p>` : ""}<details><summary>Details</summary><p>${plural2(review.bytes, "byte")} will be written.</p>${review.details.map((change) => `<p><strong>${esc(change.title)}</strong></p><div class="table-wrap"><table><thead><tr><th>Place in the file</th><th>Before</th><th>After</th></tr></thead><tbody>${change.writes.map((row) => `<tr><td>${offsetText(row.file_offset)}</td><td>${byteText(row.before)}</td><td>${byteText(row.after)}</td></tr>`).join("")}</tbody></table></div>`).join("")}</details>
  <div class="actions">${button(review.ready ? "Save as a new build" : "Re-rendering scenes…", "scene-save", { primary: true, icon: "download", disabled: !review.ready, reason: "Every scene is being re-rendered with all changes together." })}${button("Keep editing", "close-modal")}</div>`;
   }
   async function reviewDialog(ctx2, ed) {
@@ -11379,7 +11507,7 @@ ${state2.artifact.system_id ? `<details><summary>Advanced byte options</summary>
         ed.matches = ids.length > 1 ? ids : [];
         ed.draft = (first.pending || first.colors).map((color) => [...color]);
         update(ctx2, ed, ["scene-stage", "scene-palette", "scene-picker", "scene-changes"]);
-        ctx2.notify(ids.length > 1 ? `${plural(ids.length, "palette color")} look like this pixel. ${first.name} is selected; the others are outlined.` : `That pixel is ${first.name}.`);
+        ctx2.notify(ids.length > 1 ? `${plural2(ids.length, "palette color")} look like this pixel. ${first.name} is selected; the others are outlined.` : `That pixel is ${first.name}.`);
       },
       "scene-master": (node) => {
         const picker = ed.view.pickers[selectedSwatch(ed).format];

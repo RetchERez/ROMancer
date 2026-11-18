@@ -121,6 +121,10 @@ h1{margin-bottom:0}
 .battle-fit button[hidden]{display:none}
 #battle-status:empty{display:none}
 .battle-review{margin-top:1rem}
+.battle-match{margin-top:.5rem}
+.battle-match[hidden]{display:none}
+.battle-match caption{text-align:left;font-weight:600;padding-bottom:.3rem}
+.battle-chip{display:inline-block;width:1rem;height:1rem;margin-right:.4rem;vertical-align:-.15rem;border:1px solid var(--control-line);border-radius:2px;background:var(--swatch)}
 @media(max-width:680px){.battle-pictures{grid-template-columns:1fr}}
 @container asset-content (max-width:900px){.asset-collection,.asset-pixel-editor{grid-column:1/-1}.asset-pixel-editor{position:static}}
 

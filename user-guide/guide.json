@@ -1,6 +1,6 @@
 {
   "schema_version": 1,
-  "product": "ROMancer v1.2.0",
+  "product": "ROMancer v1.2.1",
   "subtitle": "A practical guide to the current editing tools: small first edits, advanced workflows, actual editing and appearance examples, a glossary and an alphabetical index.",
   "scope": "This guide covers the six supported cartridge systems. The offline catalog identifies 942 exact revisions. Recognized ROM formats can be inspected and edited as bytes without a catalog match. Game-specific editors use checked definitions.",
   "basic_summary": "Start the application, choose saved preferences, identify a source, make a focused edit, preserve progress and export a checked patch. These procedures build the habits used throughout the guide.",

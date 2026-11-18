@@ -9,7 +9,8 @@
     "romancer/ui/artifact_selection.js": "33096b65765d03afb0f0e822db16d8cdab47c2f808448029bcee6113ced9c545",
     "romancer/ui/asset_controls.js": "e5018eb4ff8fe45c2ab6c84e6dc0ec1e5e77213ef3727bc23877e686c5b23e07",
     "romancer/ui/audio_live.js": "89b80f7590cb0dca9a350775e8648d7e6a4904faf4bc2f181cd56941b3bbaae9",
-    "romancer/ui/battle_background.js": "689f2b40c8626732e7ca3fd761c1c38356b9947a219941e0556faf66a3b1c3f6",
+    "romancer/ui/battle_background.js": "e249c777ac77c650e10ada5996f12afeb739ba35bad2131d5ecd33c27cdb38f8",
+    "romancer/ui/battle_png.js": "99eaebdc3b41601cee08182b0969ef82bccce1827bb94cb9b2cb4c006b1cb537",
     "romancer/ui/brush_colors.js": "c5c85df203a62c4ace9900649972978b5a283c393d51ffa7f87e94d1dd03d82c",
     "romancer/ui/build_checks.js": "05a8f4b919af066a5a264d2953634b5b907d0e426b4f018b5d0e93ba54103a2e",
     "romancer/ui/build_details.js": "6774d8f84e651a38fe08c609a68bf960d044ca40615c93bda8312759a2889d0e",
@@ -117,5 +118,5 @@
     "romancer/ui/workspace_search.js": "ea65f3f0c59cd3d00f21943d51ffc69823ac3c75b08e3fcc36a550902c4a32da",
     "romancer/ui/workspace_status.js": "f26c21f3920e1bb958541eb6f36b38514e92b1fbe04d03397fe54a256fd4e53f"
   },
-  "sha256": "3fc2c82005dfbea34e0d2ec227ac453d129da4ff2c15b89f24d5f22a4bf6bbcd"
+  "sha256": "d5ae108e99f96165123ab4c03ded1ab36950383e97db91e678b5d1820bf8cb07"
 }
