@@ -1116,8 +1116,12 @@ def _plan_color(job: dict) -> dict:
     starts = [f for f, _ in reversed(scene.checkpoints)]
     count = [0]
 
-    def replay(writes):
-        """(bytes of the entry after the change, other palette bytes that changed) from the latest savestate that shows it."""
+    every = sorted(header['checkpoints'], reverse=True)
+
+    def replay(writes, wide=False):
+        """(bytes of the entry after the change, other palette bytes that changed, whether the entry moved), from the
+        latest savestate that shows the change in this entry. `wide` steps back through every savestate of the scene,
+        not only the two latest and power-on: a palette loaded long before the scene needs one from before the load."""
         edited = bytearray(rom)
         for offset, _, value in writes:
             edited[offset] = value
@@ -1125,19 +1129,24 @@ def _plan_color(job: dict) -> dict:
         path = Path(job['store']) / 'work' / (hashlib.sha256(edited).hexdigest()[:24] + job['suffix'])
         if not path.exists():
             path.write_bytes(edited)
-        for start in starts:
+        seen = (None, [], False)
+        for start in (every if wide else starts):
             count[0] += 1
             _progress(job, job.get('step', ''), count[0], 0)
             base = trail.baseline(start)
+            if base is None:
+                continue                  # this savestate does not replay the unchanged game faithfully
             data, _ = trail.replay(path, start)
             changed = [i for i, (a, b) in enumerate(zip(base[swatch.domain], data[swatch.domain])) if a != b]
             if changed:
                 # Another entry that held this same color and now holds the new one is the same stored color, loaded twice.
                 twin = lambda i: (base[swatch.domain][i - i % size:i - i % size + size] == swatch.stored
                                   and data[swatch.domain][i - i % size:i - i % size + size] == wanted)
-                return (bytes(data[swatch.domain][i] for i in sorted(slots)),
+                seen = (bytes(data[swatch.domain][i] for i in sorted(slots)),
                         [i for i in changed if i not in slots and not twin(i)], bool(slots & set(changed)))
-        return None, [], False
+                if seen[2]:
+                    break                 # the entry itself moved; otherwise an earlier savestate may still reach it
+        return seen
 
     job['step'] = 'Checking whether the color is stored next to where it was traced…'
     _progress(job, job['step'])
@@ -1159,7 +1168,7 @@ def _plan_color(job: dict) -> dict:
             continue
         if not writes:
             continue
-        after, others, hit = replay(writes)
+        after, others, hit = replay(writes, wide=True)
         if hit and after == wanted and not others:
             return {'writes': [list(w) for w in writes], 'method': 'color', 'notes': [place['note']], 'as_planned': True,
                     'place': [o + lead for o in place['offsets']]}
