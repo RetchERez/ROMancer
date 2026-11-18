@@ -52,6 +52,9 @@ METHODS = {
                'small patch that swaps your picture in after the game has loaded it.',
     'private-copy': 'This scene gets its own copy of the data, and the game is pointed at the copy for this one use. '
                     'The original data stays as it is.',
+    'import': 'These pictures came from a PNG you read in. Each one was changed the way the ROM keeps it: written straight '
+              'over plain picture data, packed again into its set, or swapped in by a small patch. The game was replayed '
+              'for each group and once more with all of them together.',
     'cells': 'These background cells are stored as plain data in the ROM. Your version is written straight over them.',
     'cells-reencode': 'This part of the background is packed in the ROM. ROMancer unpacked it, changed it and packed it again.',
     'cells-built': 'The game builds this part of the background from a stored piece that it uses again and again (a block of '
@@ -902,7 +905,7 @@ def _stored_tile(record: dict, system: str):
 def plan_task(job: dict) -> dict:
     """Plan one edit and confirm it by replaying the scene. Returns {'writes', 'method', 'in_scene', ...} or {'error'}."""
     try:
-        return {'tile': _plan_tile, 'cells': _plan_cells, 'color': _plan_color}[job['what']](job)
+        return {'tile': _plan_tile, 'tiles': _plan_tiles, 'cells': _plan_cells, 'color': _plan_color}[job['what']](job)
     except ValueError as error:
         return {'error': str(error)}
     except Exception as error:
@@ -1024,6 +1027,399 @@ def _tile_failure(system: str, tried: list) -> str:
             'It is unpacked or drawn by the game while it runs')
     text += '.' if overlay_available(system) else f', and the patch that would swap it in is not available for {name} yet.'
     return text + ' What was tried: ' + ' '.join(t if t.endswith('.') else t + '.' for t in tried)
+
+
+MAX_IMPORT_TILES = 1024
+PATCH_TILES = 24         # pictures one swap-in patch holds (graphics_trace.plan_overlay_patch)
+
+
+def _checksum_places(rom: bytes, system: str) -> set:
+    """File offsets the cartridge checksum occupies; plans that are joined must not disagree about them."""
+    found = set()
+    middle, early = len(rom) // 2, min(len(rom) - 2, 0x1000 + gt.rom_skip(rom, system))
+    for at in (middle, middle + 1, early, early + 1, len(rom) - 2, len(rom) - 1):      # odd and even: a word sum has two bytes
+        probe = bytearray(rom)
+        probe[at] ^= 0x55
+        fixed = gt.fix_checksums(bytes(probe), rom, system)
+        for start in range(0, len(fixed), 4096):
+            if fixed[start:start + 4096] != probe[start:start + 4096]:
+                found.update(i for i in range(start, min(start + 4096, len(fixed))) if fixed[i] != probe[i])
+    if system == 'genesis':
+        found.update(range(0x1A4, 0x1A8))
+        found.update((0x18E, 0x18F))
+    return found
+
+
+def _plan_tiles(job: dict) -> dict:
+    """Plan many pictures as one change (a PNG that was read back).
+
+    The pictures are sorted by how the ROM keeps them. Those stored as plain
+    data are written together and checked by one replay. Those packed in a
+    set ROMancer recognises are packed again, one replay per set. The rest
+    go into one swap-in patch where the system has it. Each group is checked
+    on its own, then one more replay checks everything together. A picture
+    that no way confirms is left out, with the reason, and the others are
+    still offered.
+    """
+    scene, trail, rom, make, buttons, header, rgb = _setup(job)
+    system = job['system']
+    view = SceneGraphics(scene, system, rom, rgb, header['width'], header['height'])
+    avoid = [tuple(r) for r in job.get('avoid', [])]
+    slow = gt.CPU[system] not in ('sm83', '6502')
+    candidates = 6 if slow else 24
+    companions = job.get('companions', [])
+    calls = [0]
+
+    def verify(plan, expect=None):
+        calls[0] += 1
+        _progress(job, job.get('step', 'Replaying the game to check'), calls[0], 0)
+        return gt.verify_plan(make, rom, plan, scene, expect=expect, domains=TILE_DOMAINS, buttons_for=buttons)
+
+    def step(text):
+        job['step'] = text
+        _progress(job, text)
+
+    def count(n):
+        return f'{n} picture{"" if n == 1 else "s"}'
+
+    items, skipped = [], []
+    for record in job['tiles']:
+        ident = tile_id(record['domain'], record['address'], record['format'])
+        try:
+            tile = view.tile(record['domain'], record['address'], record['format'])
+            pixels = parse_pixels(record['pixels'], tile.format)
+        except ValueError as error:
+            skipped.append({'tile': ident, 'reason': str(error)})
+            continue
+        new = gt.encode_tile(pixels, tile.format)
+        if new == tile.stored:
+            continue
+        items.append(SimpleNamespace(id=ident, tile=tile, pixels=pixels, new=new, expect=gt.expect_for(tile, new), tried=[]))
+    if not items:
+        raise ValueError('The picture you read in is the same as the scene, so there is nothing to change.')
+
+    def expect_of(group) -> dict:
+        out: dict = {}
+        for item in group:
+            for name, cells in item.expect.items():
+                out.setdefault(name, {}).update(cells)
+        return out
+
+    def good(result, group) -> bool:
+        if any(item.tile.domain != 'chr_rom' for item in group):
+            return bool(result.get('as_planned'))
+        return bool(result.get('verified'))          # the picture chip reads these straight from the ROM: the screen is the check
+
+    parts = []           # {'method', 'block', 'decoded', 'items', 'plan'}
+    used = []            # file ranges earlier groups write, so a later group does not take the same free space
+
+    def taken(plan):
+        used.extend((o, o + 1) for o, _, _ in plan.writes)
+
+    # ---- 1. pictures stored as plain data
+    direct, rest, seen = [], [], {}
+    for item in items:
+        if not item.tile.editable:
+            rest.append(item)
+            continue
+        try:
+            writes = gt.plan_tile_edit(item.tile, item.pixels, rom)
+        except ValueError as error:
+            item.tried.append(str(error))
+            rest.append(item)
+            continue
+        if any(seen.get(o, n) != n for o, _, n in writes):
+            skipped.append({'tile': item.id, 'reason': 'This picture shares stored bytes with another picture you changed, '
+                                                      'and the two were drawn differently. Only the other one was changed.'})
+            continue
+        for o, _, n in writes:
+            seen[o] = n
+        item.writes = writes
+        direct.append(item)
+    for _ in range(3):
+        if not direct:
+            break
+        step(f'Writing {count(len(direct))} straight into the ROM and replaying the game to check…')
+        writes = sorted({(o, a, n) for item in direct for o, a, n in item.writes})
+        plan = gt.EditPlan('direct', gt.with_checksums(rom, writes, system), len(rom), expect_of(direct))
+        result = plan.verified = verify(plan)
+        if good(result, direct):
+            packed_in = any(item.tile.layout != 'plain' and item.tile.domain != 'chr_rom' for item in direct)
+            parts.append({'method': 'direct-packed' if packed_in else 'direct', 'block': None, 'decoded': None, 'items': direct, 'plan': plan})
+            taken(plan)
+            direct = []
+            break
+        missed = {name: set(cells) for name, cells in (result.get('missed') or {}).items()}
+        bad = [item for item in direct if item.tile.domain != 'chr_rom'
+               and any(a in missed.get(item.tile.domain, ()) for a in item.tile.addresses)]
+        if not bad:
+            bad = list(direct)
+        for item in bad:
+            item.tried.append('written in place, the replay did not show the picture as drawn')
+        rest.extend(bad)
+        direct = [item for item in direct if item not in bad]
+    for item in direct:
+        item.tried.append('written in place, the replay did not show the picture as drawn')
+        rest.append(item)
+
+    # ---- 2. pictures packed in a set ROMancer can pack again
+    def inside(block, tile) -> bool:
+        try:
+            return block.domain == tile.domain and all(block.decoded[block.decoded_index(a)] == tile.stored[k]
+                                                       for k, a in enumerate(tile.addresses))
+        except (ValueError, IndexError):
+            return False
+
+    blocks, loose = [], []
+    for item in rest:
+        tile = item.tile
+        if tile.domain == 'chr_rom':
+            skipped.append({'tile': item.id, 'reason': 'ROMancer wrote this picture into the ROM, but replaying the game did not '
+                                                      'show a change in this scene, so it was left out.'})
+            continue
+        home = None
+        if tile.addresses[-1] - tile.addresses[0] + 1 == len(tile.addresses):
+            for block, members in blocks:
+                if inside(block, tile):
+                    home = members
+                    break
+            if home is None:
+                step('Looking for how the game packs these pictures…')
+                try:
+                    block = gt.find_compressed_block(scene, rom, system, tile.domain, tile.addresses[0], len(tile.addresses))
+                except ValueError:
+                    block = None
+                if block is None:
+                    item.tried.append('no known packing reproduces this picture')
+                else:
+                    home = []
+                    blocks.append((block, home))
+        if home is None:
+            loose.append(item)
+        else:
+            home.append(item)
+    # A picture written in place can sit inside a set that is now packed again: it joins the set, or the two would
+    # write the same bytes of the ROM differently.
+    plain = next((part for part in parts if part['method'] in ('direct', 'direct-packed')), None)
+    joiners = {}
+    if plain is not None:
+        claimed = []
+        for number, (block, members) in enumerate(blocks):
+            joiners[number] = [item for item in plain['items'] if item not in claimed and item.tile.domain != 'chr_rom'
+                               and inside(block, item.tile)
+                               and any(block.start <= o < block.start + block.size for o, _, _ in item.writes)]
+            claimed.extend(joiners[number])
+
+    def leave_plain(moved):
+        plain['items'] = [item for item in plain['items'] if item not in moved]
+        if not plain['items']:
+            parts.remove(plain)
+            return
+        writes = sorted({(o, a, n) for item in plain['items'] for o, a, n in item.writes})
+        rebuilt = gt.EditPlan('direct', gt.with_checksums(rom, writes, system), len(rom), expect_of(plain['items']))
+        rebuilt.verified = plain['plan'].verified
+        plain['plan'] = rebuilt
+    for number, (block, own) in enumerate(blocks):
+        members = own + joiners.get(number, [])
+        step(f'Packing {count(len(members))} back into the ROM and replaying the game to check…')
+        mates = [c for c in companions if c.get('block') is not None and c['block'] == block.start and c.get('decoded')]
+        changes = {a: item.new[k] for item in members for k, a in enumerate(item.tile.addresses) if item.new[k] != item.tile.stored[k]}
+        raw = bytearray(block.decoded)
+        for other in mates:
+            for index, value in other['decoded'].items():
+                raw[int(index)] = value
+        try:
+            plan = gt.plan_block_edit(replace(block, decoded=bytes(raw)), changes, rom, system, verify=verify,
+                                      avoid=avoid + used, max_candidates=candidates)
+            _also(plan, mates)
+            result = plan.verified = verify(plan)
+            if not result.get('as_planned'):
+                raise ValueError(f'{block.codec} packed again, the replay did not show the pictures as drawn')
+            decoded = {str(block.decoded_index(a)): item.new[k] for item in members for k, a in enumerate(item.tile.addresses)
+                       if item.new[k] != item.tile.stored[k]}
+            for other in mates:
+                decoded = {**{str(k): v for k, v in other['decoded'].items()}, **decoded}
+            if joiners.get(number):
+                leave_plain(joiners[number])
+            parts.append({'method': plan.kind, 'block': block.start, 'decoded': decoded, 'items': members, 'plan': plan,
+                          'range': [block.start, block.start + block.size]})
+            taken(plan)
+        except ValueError as error:
+            for item in own:                 # the pictures written in place stay written in place
+                item.tried.append(str(error))
+            loose.extend(own)
+
+    # ---- 3. the rest: one patch that swaps them in after the game has loaded them
+    if loose and not overlay_available(system):
+        for item in loose:
+            skipped.append({'tile': item.id, 'reason': _tile_failure(system, item.tried)})
+        loose = []
+    patched = [c for c in companions if c.get('method') == 'overlay']
+    if loose:
+        mine = {(item.tile.domain, item.tile.addresses[0]) for item in loose}
+        earlier = [(_stored_tile(t, system), parse_pixels(t['pixels'], t['format'])) for other in patched for t in other['tiles']
+                   if (t['domain'], t['address']) not in mine]
+        room = max(0, PATCH_TILES - len(earlier))
+        for item in loose[room:]:
+            skipped.append({'tile': item.id, 'reason': f'This picture is unpacked by the game in a way ROMancer cannot pack again. The patch '
+                                                      f'that swaps such pictures in holds {PATCH_TILES}, and it is full.'})
+        loose = loose[:room]
+    def swap_in(group, before, reserved):
+        """One patch that swaps `group` in (with the pictures `before` already patched); the plan, or None and why."""
+        fired, errors = False, []
+        for options in gt.OVERLAY_VARIANTS[gt.CPU[system]]:
+            if options.get('hook') in ('irq', 'poll') and fired:
+                continue
+            try:
+                plan = gt.plan_overlay_patch(before + [(item.tile, item.pixels) for item in group], rom, system,
+                                             avoid=avoid + reserved, scene=scene, **options)
+                plan.expect = expect_of(group)
+                _also(plan, patched)
+                result = plan.verified = verify(plan)
+                fired = fired or bool(result.get('verified'))
+                if result.get('as_planned'):
+                    return plan, errors
+                errors.append('the patch did not replay as planned')
+            except ValueError as error:
+                if str(error) not in errors:
+                    errors.append(str(error))
+        return None, errors
+
+    patched = [c for c in companions if c.get('method') == 'overlay']
+    if loose:
+        step(f'Adding a small patch that swaps {count(len(loose))} in, and replaying the game to check…')
+        chosen, errors = swap_in(loose, earlier, used)
+        if chosen is None:
+            for item in loose:
+                skipped.append({'tile': item.id, 'reason': _tile_failure(system, item.tried + errors[:2])})
+        else:
+            parts.append({'method': 'overlay', 'block': None, 'decoded': None, 'items': loose, 'plan': chosen})
+            taken(chosen)
+
+    if not parts:
+        reasons = []
+        for entry in skipped:
+            if entry['reason'] not in reasons:
+                reasons.append(entry['reason'])
+        raise ValueError('None of the pictures you changed could be changed in a way the real game confirmed, so nothing is changed. '
+                         + ' '.join(reasons[:3]))
+
+    # ---- 4. everything together
+    checksum = _checksum_places(rom, system)
+
+    def join(group):
+        merged, size, notes = {}, len(rom), []
+        for part in group:
+            for o, a, n in part['plan'].writes:
+                if o in checksum:
+                    continue
+                if o in merged and merged[o][1] != n:
+                    raise ValueError(f"two groups of pictures need the same place in the ROM ({part['method']} at {o:#x}; "
+                                     f"{len(checksum)} checksum bytes; groups {[p['method'] for p in group]})")
+                merged[o] = (a, n)
+            size = max(size, part['plan'].rom_size)
+            notes.extend(n for n in part['plan'].notes if n not in notes)
+        data = [(o, a, n) for o, (a, n) in sorted(merged.items())]
+        fixed = gt.fix_checksums(gt.apply_writes(rom, data, size), rom, system)
+        plan = gt.EditPlan('import', gt._diff_writes(rom, fixed), len(fixed), expect_of([i for part in group for i in part['items']]), notes)
+        for part in group:
+            for other in companions:
+                if (part['block'] is not None and other.get('block') == part['block']) or \
+                        (part['method'] == 'overlay' and other.get('method') == 'overlay'):
+                    _also(plan, [other])
+        return plan
+
+    def everything(group):
+        return [item for part in group for item in part['items']]
+
+    together = None
+    if len(parts) == 1:
+        final = join(parts)
+        final.verified = parts[0]['plan'].verified
+    else:
+        final = None
+        try:
+            step('Replaying the game once more with every picture together…')
+            final = join(parts)
+            result = final.verified = verify(final)
+            if not good(result, everything(parts)):
+                together = {'missed': {k: len(v) for k, v in (result.get('missed') or {}).items()},
+                            'unplanned': dict(result.get('unplanned') or {}), 'verified': bool(result.get('verified'))}
+                final = None
+        except ValueError as error:
+            together = {'error': str(error)}
+            final = None
+        if final is None and (together or {}).get('missed') and overlay_available(system):
+            # Pictures written into packed data can change their neighbours, so a second group no longer matches what it
+            # expected to find. One patch that swaps all of them in does not depend on how they are packed.
+            pool = [item for item in everything(parts) if item.tile.domain != 'chr_rom']
+            fixed = [part for part in parts if all(item.tile.domain == 'chr_rom' for item in part['items'])]
+            mine = {(item.tile.domain, item.tile.addresses[0]) for item in pool}
+            before = [(_stored_tile(t, system), parse_pixels(t['pixels'], t['format'])) for other in patched for t in other['tiles']
+                      if (t['domain'], t['address']) not in mine]
+            if pool and len(pool) + len(before) <= PATCH_TILES:
+                step(f'These pictures share packed data. Swapping all {len(pool)} in with one patch instead…')
+                reserved = [(o, o + 1) for part in fixed for o, _, _ in part['plan'].writes]
+                chosen, _ = swap_in(pool, before, reserved)
+                if chosen is not None:
+                    group = fixed + [{'method': 'overlay', 'block': None, 'decoded': None, 'items': pool, 'plan': chosen}]
+                    try:
+                        final = join(group)
+                        final.verified = chosen.verified if not fixed else verify(final)
+                        fine = good(final.verified, everything(group))
+                        if fine and len(scene.checkpoints) > 1:
+                            # A patch can work from the moment before the scene and still not from power-on. The pictures
+                            # written in place did work from there, so the patch only replaces them if it does too.
+                            step('Checking that patch again, playing the game from the start…')
+                            saved = scene.checkpoints
+                            try:
+                                scene.checkpoints = saved[:1]
+                                fine = good(verify(final), everything(group))
+                            finally:
+                                scene.checkpoints = saved
+                        if fine:
+                            parts = group
+                        else:
+                            final = None
+                    except ValueError:
+                        final = None
+        if final is None:
+            # Take the groups that do not get in each other's way, largest first, and check those together.
+            fits = []
+            for part in sorted(parts, key=lambda part: -len(part['items'])):
+                try:
+                    join(fits + [part])
+                    fits.append(part)
+                except ValueError:
+                    pass
+            if 1 < len(fits) < len(parts):
+                step('Replaying the game once more with the pictures that go together…')
+                final = join(fits)
+                result = final.verified = verify(final)
+                if not good(result, everything(fits)):
+                    final = None
+            if final is None:
+                fits = [max(parts, key=lambda part: len(part['items']))]
+                final = join(fits)
+                final.verified = fits[0]['plan'].verified
+            for part in parts:
+                if part not in fits:
+                    for item in part['items']:
+                        skipped.append({'tile': item.id, 'reason': 'This picture was confirmed on its own, but not together with the other '
+                                                                  'pictures in this PNG: they share packed data in the ROM, and changing '
+                                                                  'one changes what the other is made from. It was left out.'})
+            parts = fits
+    out = _plan_out(final, rom, 'import')
+    out['parts'] = [{'method': part['method'], 'block': part['block'], 'decoded': part['decoded'], 'tiles': [i.id for i in part['items']],
+                     'expect': {name: {str(i): int(v) for i, v in cells.items()} for name, cells in expect_of(part['items']).items()}}
+                    for part in parts]
+    out['block_ranges'] = [part['range'] for part in parts if part.get('range')]
+    out['done'] = [item.id for item in everything(parts)]
+    out['skipped'] = skipped
+    out['replays'] = calls[0]
+    out['together'] = together
+    out['tried'] = []
+    return out
 
 
 def _plan_cells(job: dict) -> dict:

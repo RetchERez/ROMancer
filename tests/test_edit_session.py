@@ -416,6 +416,84 @@ class EditSessionEndToEndTests(unittest.TestCase):
             session.close()
 
 
+    def test_pictures_and_a_background_go_out_as_png_and_come_back_as_one_checked_change(self):
+        from PIL import Image
+        from romancer import scene_graphics as sg, scene_png as sp
+        from romancer.edit_session import EditSession
+        session = EditSession(self.temp / 'store-png', self.rom, 'gbc')
+
+        def settle(change):
+            deadline = time.monotonic() + 600
+            while time.monotonic() < deadline:
+                view = session.change(change['id'])
+                if not view['working']:
+                    return view
+                time.sleep(0.2)
+            self.fail('the change never settled')
+
+        def redraw(png, squares):
+            image = Image.open(io.BytesIO(png))
+            for left, top in squares:
+                seen = []
+                for y in range(8):
+                    for x in range(8):
+                        if image.getpixel((left + x, top + y)) not in seen:
+                            seen.append(image.getpixel((left + x, top + y)))
+                for y in range(2, 6):
+                    for x in range(2, 6):
+                        value = image.getpixel((left + x, top + y))
+                        image.putpixel((left + x, top + y), seen[1] if value == seen[0] else seen[0] if value == seen[1] else value)
+            out = io.BytesIO()
+            image.save(out, format='PNG')
+            return out.getvalue()
+        try:
+            session.record(12, wait=True)
+            scene_id, view = max(((sid, session.graphics_view(sid)) for sid in session.scenes),
+                                 key=lambda pair: sum(1 for t in pair[1]['tiles'] if t['on_screen'] and t['editable'] and not t['blank']))
+            sheet = session.export_picture(scene_id, 'sheet')
+            image = Image.open(io.BytesIO(sheet['png']))
+            self.assertEqual((image.mode, image.size), ('P', (sp.COLUMNS * 8, sheet['height'])))
+            self.assertEqual(sheet['pictures'], len(view['tiles']))
+            self.assertTrue(sheet['name'].endswith('pictures.png'))
+            same = session.import_picture(scene_id, 'sheet', 0, sheet['png'])
+            self.assertEqual((same['pictures'], same['change'], same['colors']), (0, None, []))
+            self.assertIn('nothing to change', same['summary'])
+            with self.assertRaisesRegex(ValueError, 'Keep the size the same'):
+                session.import_picture(scene_id, 'layer', 0, sheet['png'])
+            numbers = [n for n, t in enumerate(view['tiles']) if t['on_screen'] and t['editable'] and not t['blank']
+                       and len(set(t['pixels'][18:22] + t['pixels'][26:30] + t['pixels'][34:38] + t['pixels'][42:46])) > 1][:3]
+            self.assertEqual(len(numbers), 3)
+            drawn = redraw(sheet['png'], [(n % sp.COLUMNS * 8, n // sp.COLUMNS * 8) for n in numbers[:2]])
+            result = session.import_picture(scene_id, 'sheet', 0, drawn)
+            self.assertEqual((result['pictures'], result['off_colors'], result['by_number']), (2, 0, True))
+            final = settle(result['change'])
+            self.assertEqual(final['error'], '')
+            self.assertEqual((final['method'], final['title'], len(final['tiles'])), ('import', '2 pictures from a PNG', 2))
+            self.assertTrue(final['verified'], final['checks'])
+            self.assertEqual(sum(final['import']['ways'].values()), 2)
+            session.keep(final['id'])
+            again = session.export_picture(scene_id, 'sheet')
+            self.assertEqual(Image.open(io.BytesIO(again['png'])).tobytes(), Image.open(io.BytesIO(drawn)).tobytes(),
+                             'what was kept shows in the next PNG')
+            self.assertIsNone(session.import_picture(scene_id, 'sheet', 0, again['png'])['change'])
+            # a picture redrawn in the editor afterwards joins the pictures from the PNG: still one change
+            third = view['tiles'][numbers[2]]
+            pixels = sg.parse_pixels(third['pixels'], third['format'])
+            pixels[27] = (pixels[27] + 1) % 4
+            joined = settle(session.propose_tile(scene_id, third['id'], sg.pixel_text(pixels, third['format'])))
+            self.assertEqual((joined['error'], joined['title'], len(joined['tiles'])), ('', '3 pictures from a PNG', 3))
+            session.keep(joined['id'])
+            self.assertEqual(len(session.changes), 1)
+            # a background layer: saved as laid out, read back the same, and a drawn square goes back to its picture
+            layer = max(view['layers'], key=lambda row: row['seen'])
+            picture = session.export_picture(scene_id, 'layer', layer['index'])
+            self.assertEqual((picture['width'], picture['height']), (layer['width'] * layer['cell'], layer['height'] * layer['cell']))
+            self.assertIsNone(session.import_picture(scene_id, 'layer', layer['index'], picture['png'])['change'])
+            review = session.review()
+            self.assertEqual((len(review['changes']), review['unverified']), (1, []))
+        finally:
+            session.close()
+
     def test_workbench_operations_change_a_color_and_the_saved_build_boots_with_it(self):
         from romancer import palette_trace as pt, provenance as pv, trace_cores
         from romancer.edit_session import _Engine

@@ -1,9 +1,23 @@
-ROMancer v1.2.1
+ROMancer v1.3.0
 By RetchEWretched
 
 ROMancer is a local ROM editing, investigation and playtesting workbench.
 It supports NES, SNES, Genesis / Mega Drive, Master System, Game Boy and
 Game Boy Color cartridge formats. Everyday work runs offline.
+
+NEW IN v1.3.0
+
+Graphics of any game as PNG, out and back in. In Scenes & colors, every
+recorded scene can save its pictures as one PNG and each background layer as
+a picture, with the scene's colors as the palette. Load an edited PNG and
+ROMancer works out which pictures changed, checks them by replaying the
+game, and offers them as one change. @@MEASURED@@
+- Colors that are not in a picture's palette line are listed with the color
+  they became, as in the battle background editor.
+- A picture that cannot be changed is left out with the reason; the rest are
+  still offered.
+- Fixed: two kept changes on a Mega Drive game could be refused as needing
+  "the same place in the ROM" when only the header checksum overlapped.
 
 NEW IN v1.2.1
 
@@ -44,6 +58,13 @@ scene it touches before you save. Open Scenes & colors with your ROM selected.
   pixel by pixel, or save it as a PNG and load your edited copy.
 - Change the background. In Background, choose a picture and paint it into
   the cells of a background layer.
+- Save and load as PNG. Under the pictures of a scene, Save pictures as PNG
+  saves every picture of the scene as one PNG, and Save background as PNG
+  saves a background layer the way the game lays it out. Both carry the
+  scene's own colors as the PNG's palette. Draw on the PNG in any image
+  program, keep its size, and load it back: ROMancer finds the pictures you
+  changed, lists any color that is not in a picture's palette line, replays
+  the game to check, and offers them as one change.
 - See what else changes. The Also changes strip shows every recorded scene
   that uses the same data, replayed in the real engine with your change.
 - Know the limits. "Used in N scenes" counts recorded scenes only. Scenes
@@ -137,7 +158,7 @@ available. The supplied Pokemon Red and Blue revisions share a
 
 START ON WINDOWS
 
-1. Extract ROMancer-v1.2.1-Windows.zip in Windows File Explorer.
+1. Extract ROMancer-v1.3.0-Windows.zip in Windows File Explorer.
 2. Double-click ROMancer.exe in the extracted folder.
    Keep ROMancer.exe, ROM Catalog.html and the ROMancer Files folder together.
 3. Open an original workshop or choose New project and import your own cartridge image.
@@ -158,8 +179,8 @@ SHA-256 is checked and later captures work offline. No ROM data is uploaded.
 
 START ON LINUX
 
-1. Extract ROMancer-v1.2.1-Linux-x86_64.tar.gz:  tar xf ROMancer-v1.2.1-Linux-x86_64.tar.gz
-2. Run ./ROMancer-v1.2.1-Linux-x86_64/ROMancer.sh
+1. Extract ROMancer-v1.3.0-Linux-x86_64.tar.gz:  tar xf ROMancer-v1.3.0-Linux-x86_64.tar.gz
+2. Run ./ROMancer-v1.3.0-Linux-x86_64/ROMancer.sh
    (./ROMancer.sh --install-desktop adds ROMancer to your application menu).
 
 The Linux x86-64 package includes Python, Pillow and the same six engines built

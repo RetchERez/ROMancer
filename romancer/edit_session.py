@@ -42,6 +42,7 @@ from pathlib import Path
 from . import palette_trace as pt
 from . import provenance as pv
 from . import scene_graphics as sg
+from . import scene_png as sp
 from .libretro_frontend import BUTTON_IDS, LibretroError
 from .trace_cores import SYSTEM_LABELS, TraceCoreMissing, TraceFrontend, core_options, header_skip, trace_core_for
 
@@ -1264,6 +1265,9 @@ class EditSession:
             return                                   # a private copy of a color, planned by private_copy_task
         change.update(method=result['method'], in_scene=result.get('in_scene'), expect=result.get('expect') or {},
                       block=result.get('block'), decoded=result.get('decoded'), tried=result.get('tried', []))
+        if change['method'] == 'import':
+            self._planned_import(change, result, writes)
+            return
         offsets = set(change.get('expect_offsets') or ())
         if result.get('block_range'):
             first, last = result['block_range']
@@ -1289,11 +1293,65 @@ class EditSession:
             raise ValueError(f"This change needs the same place in the ROM as \u201c{clash['title']}\u201d, which is already in your "
                              'change list. Undo that change first, then try this one again.')
 
+    def _planned_import(self, change: dict, result: dict, writes: list) -> None:
+        """A PNG's pictures, planned in groups: remember the groups, leave out what was not confirmed, and take over
+        kept changes that had to be packed or patched together with them."""
+        by_id = {sg.tile_id(t['domain'], t['address'], t['format']): t for t in change['tiles']}
+        done = [ident for ident in result.get('done', ()) if ident in by_id]
+        info = change.setdefault('import', {})
+        names = {}
+        try:
+            names = {tile['id']: tile['name'] for tile in self.graphics_view(change['scene_id'])['tiles']}
+        except ValueError:
+            pass
+        info['skipped'] = list(info.get('skipped', ())) + [{'tile': entry['tile'], 'name': names.get(entry['tile'], entry['tile']),
+                                                             'reason': entry['reason']} for entry in result.get('skipped', ())]
+        info['replays'] = result.get('replays', 0)
+        info['together'] = result.get('together')
+        change['tiles'] = [by_id[ident] for ident in done]
+        change['parts'] = [{'method': part['method'], 'block': part.get('block'), 'decoded': part.get('decoded'),
+                            'tiles': [by_id[ident] for ident in part['tiles'] if ident in by_id], 'expect': part.get('expect') or {}}
+                           for part in result.get('parts', ())]
+        info['ways'] = {}
+        for part in change['parts']:
+            info['ways'][part['method']] = info['ways'].get(part['method'], 0) + len(part['tiles'])
+        offsets = set(change.get('expect_offsets') or ())
+        for first, last in result.get('block_ranges', ()):
+            offsets.update(range(first - self.skip, last - self.skip))
+        change['expect_offsets'] = sorted(offsets) or None
+        others = [c for c in self.changes if c['key'] != change['key']]
+        blocks = {part['block'] for part in change['parts'] if part['method'] in ('reencode', 'relocate') and part['block'] is not None}
+        patch = any(part['method'] == 'overlay' for part in change['parts'])
+        merged = [c for c in others if (c.get('method') in ('reencode', 'relocate') and c.get('block') in blocks)
+                  or (patch and c.get('method') == 'overlay')]
+        if merged:
+            mine = {(t['domain'], t['address']) for t in change['tiles']}
+            taken_over = [t for c in merged for t in c['tiles'] if (t['domain'], t['address']) not in mine]
+            change['tiles'] = taken_over + change['tiles']
+            change['replaces'] = [c['id'] for c in merged]
+            change['extra_scenes'] = sorted(set(change.get('extra_scenes', ())) | {sid for c in merged for sid in c['affected']})
+            for part in change['parts']:
+                for c in merged:
+                    if (part['method'] == 'overlay' and c.get('method') == 'overlay') or \
+                            (part['block'] is not None and c.get('block') == part['block']):
+                        part['tiles'] = [t for t in c['tiles'] if (t['domain'], t['address']) not in
+                                         {(x['domain'], x['address']) for x in part['tiles']}] + part['tiles']
+        if patch:
+            change['every_scene'] = True
+        count = len(change['tiles'])
+        change['title'] = f'{count} picture{"s" if count != 1 else ""} from a PNG'
+        mine = {o for o, _, _ in writes}
+        clash = next((c for c in others if c not in merged and any(o in mine for o, _, _ in c['writes'])), None)
+        if clash is not None:
+            raise ValueError(f"These pictures need the same place in the ROM as \u201c{clash['title']}\u201d, which is already in your "
+                             'change list. Undo that change first, then read the PNG in again.')
+
     def _checksum_offsets(self) -> set:
         """File offsets of the cartridge checksum; the session brings them up to date itself, so plans leave them out."""
         if self._checksum_bytes is None:
             found = set()
-            for at in (len(self.rom) // 2, min(len(self.rom) - 1, 0x1000 + self.skip), len(self.rom) - 2):
+            middle, early = len(self.rom) // 2, min(len(self.rom) - 2, 0x1000 + self.skip)
+            for at in (middle, middle + 1, early, early + 1, len(self.rom) - 2, len(self.rom) - 1):   # odd and even: a word sum has two bytes
                 probe = bytearray(self.rom)
                 probe[at] ^= 0x55
                 fixed = _with_checksums(bytes(probe), self.rom, self.system)
@@ -1301,6 +1359,8 @@ class EditSession:
                              for i in range(start, min(start + 4096, len(fixed))) if fixed[i] != probe[i])
             if self.system == 'genesis':
                 found.update(range(0x1A4, 0x1A8))        # the header's "end of ROM" field follows the ROM's size
+                if found - set(range(0x1A4, 0x1A8)):
+                    found.update((0x18E, 0x18F))         # both bytes of the checksum word, whichever the probes moved
             self._checksum_bytes = found
         return self._checksum_bytes
 
@@ -1426,9 +1486,14 @@ class EditSession:
                     if memory is not None and memory.data is not None and item.addresses[-1] < len(memory.data) \
                             and bytes(memory.data[a] for a in item.addresses) == item.stored:
                         holders.append(sid)
-            companions = [{'block': c.get('block'), 'decoded': c.get('decoded'), 'method': c.get('method'), 'tiles': c.get('tiles', []),
-                           'expect': c.get('expect') if c['scene_id'] == scene_id else None}
-                          for c in self.changes if c['key'] != key and c.get('method') in ('reencode', 'relocate', 'overlay')]
+            earlier = next((c for c in self.changes if c['key'] == 'import:' + scene_id), None)
+            if earlier is not None and not only:
+                # This scene already has pictures read in from a PNG: the new picture joins them, so they stay one change.
+                wanted = {sg.tile_id(t['domain'], t['address'], t['format']): sg.parse_pixels(t['pixels'], t['format'])
+                          for t in earlier['tiles']}
+                wanted[tile] = pixels
+                return self._propose_tiles(scene_id, wanted, dict(earlier.get('import') or {}, summary='', colors=[], skipped=[]))
+            companions = self._companions(key, scene_id)
             change = {'kind': 'graphics', 'key': key, 'scene_id': scene_id, 'title': f'Picture {item.index}',
                       'swatch': None, 'from_rgb': None, 'to_rgb': None, 'writes': [], 'scope': 'only_this' if only else 'all',
                       'tiles': [record], 'planning': True, 'plan_task': 'graphics',
@@ -1438,6 +1503,127 @@ class EditSession:
                                    'pixels': record['pixels'], 'scope': 'only_this' if only else 'all',
                                    'avoid': self._avoid(key), 'companions': companions}}
             return self._propose(change)
+
+    def _companions(self, key: str, scene_id: str) -> list:
+        """Kept changes a new plan may have to be packed or patched together with."""
+        out = []
+        for c in self.changes:
+            if c['key'] == key:
+                continue
+            here = c['scene_id'] == scene_id
+            if c.get('method') in ('reencode', 'relocate', 'overlay'):
+                out.append({'block': c.get('block'), 'decoded': c.get('decoded'), 'method': c.get('method'),
+                            'tiles': c.get('tiles', []), 'expect': c.get('expect') if here else None})
+            elif c.get('method') == 'import':
+                for part in c.get('parts', ()):
+                    if part['method'] in ('reencode', 'relocate', 'overlay'):
+                        out.append({'block': part.get('block'), 'decoded': part.get('decoded'), 'method': part['method'],
+                                    'tiles': part.get('tiles', []), 'expect': part.get('expect') if here else None})
+        return out
+
+    def export_picture(self, scene_id: str, what: str, layer: int = 0) -> dict:
+        """A PNG of the scene's pictures ('sheet') or of one background layer ('layer'), with the changes you kept."""
+        with self.lock:
+            graphics = self._graphics(scene_id)
+            view = self.graphics_view(scene_id)
+            if what == 'sheet':
+                out = sp.export_sheet(graphics, view)
+                name = 'pictures'
+            elif what == 'layer':
+                out = sp.export_layer(graphics, view, int(layer))
+                name = 'background-' + ''.join(ch if ch.isalnum() else '-' for ch in out['layer']).strip('-').lower()
+            else:
+                raise ValueError('Choose the pictures or a background layer to save.')
+            number = list(self.scenes).index(scene_id) + 1
+            return {**out, 'what': what, 'name': f'scene-{number}-{name}.png'}
+
+    def import_picture(self, scene_id: str, what: str, layer: int, raw: bytes) -> dict:
+        """Read a PNG saved by export_picture back in and plan every picture that differs as one change.
+
+        Returns {'summary', 'colors', 'skipped', 'pictures', 'change'}; 'change' is None when nothing is to be changed.
+        """
+        with self.lock:
+            self._require_core()
+            graphics = self._graphics(scene_id)
+            view = self.graphics_view(scene_id)
+            if what == 'sheet':
+                wanted, report = sp.read_sheet(graphics, view, raw)
+            elif what == 'layer':
+                wanted, report = sp.read_layer(graphics, view, int(layer), raw)
+            else:
+                raise ValueError('Choose the pictures or a background layer to read in.')
+            key = 'import:' + scene_id
+            earlier = next((c for c in self.changes if c['key'] == key), None)
+            if earlier is not None:                  # pictures of the earlier PNG that this one does not show stay as they are
+                for t in earlier['tiles']:
+                    ident = sg.tile_id(t['domain'], t['address'], t['format'])
+                    if ident not in report.covered:
+                        wanted.setdefault(ident, sg.parse_pixels(t['pixels'], t['format']))
+            names = {tile['id']: tile['name'] for tile in view['tiles']}
+            skipped = []
+            for change in self.changes:
+                if change['key'] == key:
+                    continue
+                for t in change.get('tiles', ()):
+                    ident = sg.tile_id(t['domain'], t['address'], t['format'])
+                    if ident not in wanted:
+                        continue
+                    if sg.pixel_text(wanted[ident], t['format']) != t['pixels']:
+                        skipped.append({'tile': ident, 'name': names.get(ident, ident),
+                                        'reason': f"\u201c{change['title']}\u201d in your change list already changes this picture. "
+                                                  'Undo that change to read in a different version.'})
+                    del wanted[ident]
+            for ident in list(wanted):
+                domain, address, fmt = sg.parse_tile_id(ident)
+                item = graphics.tile(domain, address, fmt)
+                how, can, reason = sg.tile_reason(item, self.system)
+                if can and any('8 colors' in note for note in item.notes) and any(p > 7 for p in wanted[ident]):
+                    can, reason = False, ('The ROM stores this picture with 8 colors, so only the first 8 colors of its palette '
+                                          'can be used in it.')
+                if not can:
+                    skipped.append({'tile': ident, 'name': names.get(ident, ident), 'reason': reason})
+                    del wanted[ident]
+            info = {'what': what, 'summary': sp.summary(report, len(wanted), skipped), 'colors': report.rows(),
+                    'off_colors': len(report.off), 'by_number': bool(report.by_number), 'skipped': skipped}
+            if earlier is not None and {sg.tile_id(t['domain'], t['address'], t['format']): t['pixels'] for t in earlier['tiles']} == \
+                    {ident: sg.pixel_text(pixels, sg.parse_tile_id(ident)[2]) for ident, pixels in wanted.items()}:
+                wanted = {}
+                info['summary'] = 'PNG read. It is the same as the pictures you already read in, so there is nothing new to change.'
+            if not wanted:
+                return {**info, 'pictures': 0, 'change': None}
+            if len(wanted) > sg.MAX_IMPORT_TILES:
+                raise ValueError(f'This PNG changes {len(wanted):,} pictures. ROMancer checks up to {sg.MAX_IMPORT_TILES:,} at a time. '
+                                 'Change fewer pictures, keep them, then read in the rest.')
+            change = self._propose_tiles(scene_id, wanted, info)
+            return {**info, 'pictures': len(wanted), 'change': change}
+
+    def _propose_tiles(self, scene_id: str, wanted: dict, info: dict) -> dict:
+        """Plan new pixels for many pictures as one change ({tile id: pixels})."""
+        graphics = self._graphics(scene_id)
+        key = 'import:' + scene_id
+        records, offsets, users = [], set(), set()
+        for ident, pixels in wanted.items():
+            domain, address, fmt = sg.parse_tile_id(ident)
+            item = graphics.tile(domain, address, fmt)
+            records.append({'domain': domain, 'address': address, 'format': fmt, 'stored': item.stored.hex(),
+                            'from': sg.pixel_text(item.pixels, fmt), 'pixels': sg.pixel_text(pixels, fmt)})
+            if domain != 'chr_rom':
+                offsets.update(s['offset'] for s in item.sources if s)
+                for sid, scene in self.scenes.items():
+                    memory = scene.snapshot.domains.get(domain)
+                    if memory is not None and memory.data is not None and item.addresses[-1] < len(memory.data) \
+                            and bytes(memory.data[a] for a in item.addresses) == item.stored:
+                        users.add(sid)
+            users.update(self._tile_users(item))
+        count = len(records)
+        change = {'kind': 'graphics', 'key': key, 'scene_id': scene_id,
+                  'title': f'{count} picture{"s" if count != 1 else ""} from a PNG',
+                  'swatch': None, 'from_rgb': None, 'to_rgb': None, 'writes': [], 'scope': 'all',
+                  'tiles': records, 'planning': True, 'plan_task': 'graphics', 'import': info,
+                  'expect_offsets': sorted(offsets) or None, 'extra_scenes': sorted(users),
+                  'plan_job': {'what': 'tiles', 'scene_id': scene_id, 'tiles': records, 'avoid': self._avoid(key),
+                               'companions': self._companions(key, scene_id)}}
+        return self._propose(change)
 
     def propose_cells(self, scene_id: str, cells) -> dict:
         """Plan a change to background cells (which picture, flips, palette line), painted as one change."""
@@ -1676,6 +1862,7 @@ class EditSession:
                 'cells': change.get('cells', []) if full else [], 'cell_count': len(change.get('cells', ())),
                 'every_scene': bool(change.get('every_scene')), 'tried': change.get('tried', []) if full else [],
                 'grows': max(0, (change.get('rom_size') or 0) - len(self.rom)),
+                'import': change.get('import') if full else None,
                 'details': [{'file_offset': o, 'before': a, 'after': b} for o, a, b in change['writes'][:64]] if full else []}
 
     def _checks(self, change: dict, working: int) -> tuple[list, bool]:
@@ -1954,6 +2141,8 @@ class EditSessionTools:
             'edits.tile_at': (base + ' scene_id x y', lambda p, c: {'ok': True, **self.session(p).tile_at(p['scene_id'], p['x'], p['y'])}),
             'edits.propose_tile': (base + ' scene_id tile pixels scope', lambda p, c: {'ok': True, 'change': self.session(p).propose_tile(
                 p['scene_id'], p['tile'], p['pixels'], p['scope'])}),
+            'edits.export_picture': (base + ' scene_id what layer', self._export_picture),
+            'edits.import_picture': (base + ' scene_id what layer png_base64', self._import_picture),
             'edits.propose_cells': (base + ' scene_id cells', lambda p, c: {'ok': True, 'change': self.session(p).propose_cells(
                 p['scene_id'], p['cells'])}),
             'edits.find_color': (base + ' scene_id domain entry colors', lambda p, c: {'ok': True, 'change': self.session(p).find_color(
@@ -1965,6 +2154,20 @@ class EditSessionTools:
             'edits.save': (base + ' revision', self._save),
             'edits.close': (base, self._close),
         }
+
+    def _export_picture(self, p, c):
+        out = self.session(p).export_picture(p['scene_id'], p['what'], p['layer'])
+        return {'ok': True, **{k: v for k, v in out.items() if k != 'png'}, 'png_base64': base64.b64encode(out['png']).decode()}
+
+    def _import_picture(self, p, c):
+        text = p['png_base64']
+        if type(text) is not str or len(text) > sp.MAX_PNG * 4 // 3 + 8:
+            raise ValueError(f'That PNG is larger than {sp.MAX_PNG // 1024} KB. Save it as an 8-bit (palette) PNG and try again.')
+        try:
+            raw = base64.b64decode(text, validate=True)
+        except ValueError:
+            raise ValueError('That file is not a PNG picture ROMancer can read.') from None
+        return {'ok': True, **self.session(p).import_picture(p['scene_id'], p['what'], p['layer'], raw)}
 
     def _engines(self, p, c):
         from .trace_cores import available

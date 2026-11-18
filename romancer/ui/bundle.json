@@ -106,7 +106,7 @@
     "romancer/ui/views/release.js": "40cca5a494ac414328d09cf2579b7b43fc5a640eab2f2500114a7acbc507167f",
     "romancer/ui/views/resources.js": "21b6277f81d4d88e33d983995408298ef1e74885603160598fff57da756077c3",
     "romancer/ui/views/routes.js": "fa7948c7755fa32608253373d38327b9ba0cbcff1a0b852561a0a7fb665179cd",
-    "romancer/ui/views/scenes.js": "7baf5755969adaf147f0b1441922396e215bbcb6bc7b46d809d706e018db2fee",
+    "romancer/ui/views/scenes.js": "ddb76af2ad14f1c62bde1597631e243ca3d46b1e7c6195f5f709aca8b74d41ee",
     "romancer/ui/views/scripts.js": "c36f949922e8b75e73580a0390212d14f2dc1cf267e7c332b688586925fc75b4",
     "romancer/ui/views/settings.js": "64f7b86541b926be47de7c873d2791127eb96be5d599504320d4784e651667a7",
     "romancer/ui/views/sound.js": "8184598ed12694110fbe12bc33dd76e74984595e8ba661fb7e02655ba2a761d0",
@@ -118,5 +118,5 @@
     "romancer/ui/workspace_search.js": "ea65f3f0c59cd3d00f21943d51ffc69823ac3c75b08e3fcc36a550902c4a32da",
     "romancer/ui/workspace_status.js": "f26c21f3920e1bb958541eb6f36b38514e92b1fbe04d03397fe54a256fd4e53f"
   },
-  "sha256": "d5ae108e99f96165123ab4c03ded1ab36950383e97db91e678b5d1820bf8cb07"
+  "sha256": "f7faeb83f16295266165f011ddd2e2e69a3e68e3dad7810569ef47dd0d289060"
 }

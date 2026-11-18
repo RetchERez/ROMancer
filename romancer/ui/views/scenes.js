@@ -129,7 +129,8 @@ const READING='<p class="subtle" role="status">Reading the pictures of this scen
 const tileById=(ed,id)=>ed.gfx?.tiles.find(tile=>tile.id===id)||null;
 const selectedTile=ed=>ed.tile?tileById(ed,ed.tile.id):null;
 const currentLayer=ed=>ed.gfx?.layers.find(layer=>layer.index===ed.layer)||null;
-const tileChange=ed=>ed.proposal&&ed.proposal.kind==='graphics'&&ed.proposal.scene_id===ed.sceneId?ed.proposal:null;
+const pngChange=ed=>ed.proposal&&ed.proposal.kind==='graphics'&&ed.proposal.scene_id===ed.sceneId&&ed.proposal.import&&ed.proposal.import.what!=='edit'?ed.proposal:null;
+const tileChange=ed=>ed.proposal&&ed.proposal.kind==='graphics'&&ed.proposal.scene_id===ed.sceneId&&!pngChange(ed)?ed.proposal:null;
 const cellChange=ed=>ed.proposal&&ed.proposal.kind==='background'&&ed.proposal.scene_id===ed.sceneId?ed.proposal:null;
 const tilePixels=(tile,original=false)=>parsePixels(!original&&tile.pending?tile.pending.pixels:tile.pixels,tile.bits);
 function sheetTiles(ed){
@@ -145,7 +146,31 @@ function sheetPart(ed){
  <p class="subtle">${ed.mode==='background'?'Choose the picture to paint with.':'Choose a picture to redraw, or click it in the scene.'} Dimmed pictures are locked; choose one to see why. A dot marks a picture you have changed.</p>
  <div class="scene-sheetwrap"><canvas id="scene-sheet" class="scene-sheet" width="${SHEET_COLS*SHEET_CELL}" height="${rows*SHEET_CELL}" tabindex="0" role="application" data-action="scene-sheet-pick" aria-label="Pictures in this scene, ${SHEET_COLS} across. Arrow keys move from picture to picture; the chosen one ${ed.mode==='background'?'becomes the brush':'opens in the editor'}."></canvas></div>
  <p class="subtle" id="scene-sheet-status" role="status" aria-live="polite">${chosen?esc(chosen.name)+' is chosen.':'No picture chosen.'}</p>
- <label class="scene-check"><input type="checkbox" data-sheet-all ${ed.sheetAll?'checked':''}> Also show pictures that are loaded but not on screen (${ed.gfx.tiles.length} in all)</label>`;
+ <label class="scene-check"><input type="checkbox" data-sheet-all ${ed.sheetAll?'checked':''}> Also show pictures that are loaded but not on screen (${ed.gfx.tiles.length} in all)</label>
+ ${pngPart(ed)}`;
+}
+function pngReport(report){
+ if(!report)return '';
+ const colors=report.colors||[],skipped=report.skipped||[];
+ return `${report.summary?`<p class="${report.off_colors||skipped.length?'notice warm':'notice'}" role="status" aria-live="polite">${esc(report.summary)}</p>`:''}
+ ${colors.length?`<div class="table-wrap"><table class="scene-png-colors"><caption>Colors that were not in the picture's palette line</caption><thead><tr><th scope="col">In your PNG</th><th scope="col">Changed to</th><th scope="col">Pixels</th></tr></thead><tbody>${colors.map(row=>`<tr><td><span class="scene-chip" data-color="${esc(row.from)}"></span> <code>${esc(row.from)}</code></td><td><span class="scene-chip" data-color="${esc(row.to)}"></span> <code>${esc(row.to)}</code></td><td>${row.pixels.toLocaleString('en-US')}</td></tr>`).join('')}</tbody></table></div>${report.off_colors>colors.length?`<p class="subtle">and ${report.off_colors-colors.length} more.</p>`:''}`:''}
+ ${skipped.length?`<details class="scene-png-skipped" open><summary>${plural(skipped.length,'picture')} left out</summary><ul>${skipped.slice(0,12).map(row=>`<li><strong>${esc(row.name||row.tile)}.</strong> ${esc(row.reason)}</li>`).join('')}</ul>${skipped.length>12?`<p class="subtle">and ${skipped.length-12} more, for the same kinds of reason.</p>`:''}</details>`:''}`;
+}
+function pngPart(ed){
+ const proposal=pngChange(ed),layers=ed.gfx.layers,report=proposal?.import||ed.pngReport,busy=!!ed.pngBusy;
+ const layer=layers.find(row=>row.index===ed.pngLayer)||currentLayer(ed)||layers[0];
+ const ways=proposal&&!proposal.working&&!proposal.error&&proposal.import?.ways?Object.entries(proposal.import.ways).map(([way,count])=>`${plural(count,'picture')} ${({direct:'written straight into the ROM','direct-packed':'written straight into the ROM','reencode':'packed again','relocate':'packed again and moved','overlay':'swapped in by a small patch'})[way]||way}`).join(', '):'';
+ return `<section class="scene-png" aria-label="Save and load as PNG"><h4>Save and load as PNG</h4>
+ <p class="subtle">Save every picture of this scene as one PNG, or a background layer the way the game lays it out. The PNG carries this scene's own colors. Draw on it in any image program, keep its size, and load it back. ROMancer finds the pictures you changed and replays the game to check them.</p>
+ <div class="actions">${button('Save pictures as PNG','scene-png-save',{id:'sheet',icon:'download',disabled:busy})}${button('Load pictures PNG','scene-png-load',{id:'sheet',disabled:busy})}</div>
+ ${layers.length?`${layers.length>1?`<label class="scene-line"><span>Background layer</span><select data-png-layer aria-label="Background layer to save or load">${layers.map(row=>`<option value="${row.index}" ${row===layer?'selected':''}>${esc(layerLabel(row))}</option>`).join('')}</select></label>`:''}
+ <div class="actions">${button('Save background as PNG','scene-png-save',{id:'layer',icon:'download',disabled:busy})}${button('Load background PNG','scene-png-load',{id:'layer',disabled:busy})}</div>
+ <p class="subtle">A background shows one picture in many places. Change it the same way wherever it shows, or draw it once on the pictures PNG.</p>`:''}
+ <input type="file" id="scene-png-file" accept="image/png,.png" hidden aria-label="PNG saved from this scene, to load back">
+ ${busy?`<p class="notice" role="status">${esc(ed.pngBusy)}</p>`:''}
+ ${pngReport(report)}
+ ${proposal?`${verdictPart(proposal)}${ways?`<p class="subtle">${esc(ways)}.</p>`:''}<div class="actions">${keepPart(proposal,'')}</div>`:''}
+ </section>`;
 }
 function scopePart(ed,uses,what,support){
  return `<fieldset class="scene-scope"><legend>Where should it change?</legend><label><input type="radio" name="scene-scope" value="all" ${ed.scopeChoice==='all'||!support.available?'checked':''}> Everywhere this ${what} is used (${plural(uses,'recorded scene')})</label><label class="${support.available?'':'scene-disabled'}"><input type="radio" name="scene-scope" value="only_this" ${support.available?'':'disabled'} ${ed.scopeChoice==='only_this'&&support.available?'checked':''}> Only in this scene</label>${support.available?'<p class="subtle">Only this scene gives it a private copy of the data. If ROMancer cannot make one, it says why and changes nothing.</p>':`<p class="subtle">${esc(support.reason)}</p>`}</fieldset>`;
@@ -368,8 +393,10 @@ function watchProposal(ctx,ed){
    const id=ed.proposal.id,change=(await call(ctx,ed,'change',{change_id:id})).change;
    if(!current(ctx,ed)||ed.proposal?.id!==id)return;
    const settled=!change.working,stage=change.planning!==ed.proposal.planning||!!change.error!==!!ed.proposal.error;ed.proposal=change;updateAlso(ctx,ed);
-   if(stage&&!settled)update(ctx,ed,['scene-picker']);
-   if(settled){ed.summary.preview=change;update(ctx,ed,['scene-picker','scene-changes']);return;}
+   const png=change.import&&change.import.what!=='edit'?['scene-palette']:[];
+   if(stage&&!settled)update(ctx,ed,['scene-picker',...png]);
+   else if(png.length&&!settled&&change.planning)update(ctx,ed,png);
+   if(settled){ed.summary.preview=change;update(ctx,ed,['scene-picker','scene-changes',...png]);return;}
   }catch(error){ctx.notify(error.message,true);return;}
   ed.poll=setTimeout(tick,400);
  };
@@ -528,6 +555,22 @@ function mountGraphics(ctx,ed){
   }
  });
  sheet?.addEventListener('change',event=>{if(event.target.dataset.sheetAll!==undefined){ed.sheetAll=event.target.checked;update(ctx,ed,['scene-palette']);}});
+ sheet?.addEventListener('change',async event=>{
+  const node=event.target;
+  if(node.dataset.pngLayer!==undefined){ed.pngLayer=Number(node.value);return;}
+  if(node.id!=='scene-png-file'||!node.files?.[0])return;
+  const file=node.files[0],what=ed.pngWhat||'sheet',layer=(ed.gfx.layers.find(row=>row.index===ed.pngLayer)||currentLayer(ed)||ed.gfx.layers[0])?.index??0;node.value='';
+  try{
+   if(file.size>600*1024)throw Error('That PNG is larger than 600 KB. Save it as an 8-bit (palette) PNG and try again.');
+   const bytes=new Uint8Array(await file.arrayBuffer());let text='';for(let i=0;i<bytes.length;i+=0x8000)text+=String.fromCharCode(...bytes.subarray(i,i+0x8000));
+   await dropPreview(ctx,ed);ed.pngBusy='Reading the PNG and comparing it with the scene\u2026';ed.pngReport=null;update(ctx,ed,['scene-palette']);
+   const result=await call(ctx,ed,'import_picture',{scene_id:ed.sceneId,what,layer,png_base64:btoa(text)});
+   if(!current(ctx,ed))return;
+   ed.pngBusy='';ed.pngReport=result;
+   if(result.change){ed.proposal=result.change;ed.inspect=null;ed.summary.preview=result.change;ed.showOriginal=false;update(ctx,ed,['scene-stage','scene-picker','scene-palette','scene-changes']);watchProposal(ctx,ed);}
+   else update(ctx,ed,['scene-palette']);
+  }catch(error){ed.pngBusy='';ed.pngReport={summary:error.message,off_colors:1};if(current(ctx,ed))update(ctx,ed,['scene-palette']);}
+ });
  sheet?.addEventListener('keydown',event=>{
   if(event.target.id!=='scene-sheet')return;
   const tiles=sheetTiles(ed),chosen=ed.mode==='background'?ed.brush.tile:ed.tile?.id,at=tiles.findIndex(tile=>tile.id===chosen),step={ArrowLeft:-1,ArrowRight:1,ArrowUp:-SHEET_COLS,ArrowDown:SHEET_COLS}[event.key];
@@ -566,6 +609,15 @@ function graphicsHandlers(ctx,ed){
    buffer.toBlob(blob=>{if(!blob)return;const link=document.createElement('a'),url=URL.createObjectURL(blob);link.href=url;link.download=tile.name.replace(/[^A-Za-z0-9]+/g,'-').toLowerCase()+'.png';document.body.append(link);link.click();link.remove();setTimeout(()=>URL.revokeObjectURL(url),1000);ctx.notify('Saved as an 8 by 8 PNG. Edit it in any drawing program and load it back.');},'image/png');
   },
   'scene-tile-import':()=>document.getElementById('scene-tile-file')?.click(),
+  'scene-png-save':async node=>{
+   const what=node.dataset.id,layer=(ed.gfx.layers.find(row=>row.index===ed.pngLayer)||currentLayer(ed)||ed.gfx.layers[0])?.index??0;
+   const result=await call(ctx,ed,'export_picture',{scene_id:ed.sceneId,what,layer});
+   if(!current(ctx,ed))return;
+   const bytes=Uint8Array.from(atob(result.png_base64),ch=>ch.charCodeAt(0)),url=URL.createObjectURL(new Blob([bytes],{type:'image/png'})),link=document.createElement('a');
+   link.href=url;link.download=result.name;document.body.append(link);link.click();link.remove();setTimeout(()=>URL.revokeObjectURL(url),1000);
+   ctx.notify(`${result.name} saved: ${result.width} by ${result.height} pixels, ${plural(result.pictures,'picture')}${result.indexed?', with the scene\u2019s '+result.colors+' colors as its palette':''}. Keep that size when you draw on it.`);
+  },
+  'scene-png-load':node=>{ed.pngWhat=node.dataset.id;document.getElementById('scene-png-file')?.click();},
   'scene-tile-propose':async()=>{
    const tile=selectedTile(ed);if(!tile||!ed.tile)return;
    if(sameTile(ed.tile.draft,tilePixels(tile,true))){ctx.notify('Draw something different first. The picture is still as the game has it.');return;}

@@ -1,8 +1,8 @@
-ROMancer v1.2.1 for Linux x86-64
+ROMancer v1.3.0 for Linux x86-64
 By RetchEWretched
 
-1. Extract the archive:   tar xf ROMancer-v1.2.1-Linux-x86_64.tar.gz
-2. Start ROMancer:        ./ROMancer-v1.2.1-Linux-x86_64/ROMancer.sh
+1. Extract the archive:   tar xf ROMancer-v1.3.0-Linux-x86_64.tar.gz
+2. Start ROMancer:        ./ROMancer-v1.3.0-Linux-x86_64/ROMancer.sh
    (or double-click ROMancer.sh in your file manager and choose Run)
 3. Open the included practice game or import your ROM.
 
