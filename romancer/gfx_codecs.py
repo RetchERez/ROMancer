@@ -1699,16 +1699,22 @@ MEMBERS = {
              'lz~le16.m0.L4lle.b1.m3.s',    # SimAnt
              'lz~le16.m1.L4lbe.r1.m2.s',    # Wing Commander
              'lz~le16.l0.L4hle.b0.m3.s',    # Bahamut Lagoon
+             'lz~le16.l1.L4lle.b1.m3.s',    # Kid Klown in Crazy Chase
+             'lz~le16c.l1.L4hle.b1.m2.n',   # Fatal Fury 2
+             'lz~n.l0.L6hle.r0.m3.n',       # Wizardry V
              'rle~l.r0.l0.z.p1'),           # Run Saber
     'gb': ('lz~le16.l1.L4lle.b0.m3.s',      # Tose: Dragon Warrior Monsters, Harvest Moon GB, Legend of the River King
            'lz~le16.l1.oku.b0.m3.s',        # Donkey Kong (1994)
            'rle~l.r0.l0.z.p1', 'rle~l.r0.l0.n.p1', 'rle~h.r0.l0.n.p1'),     # Cave Noire
     'gbc': ('lz~le16.l1.L4lle.b0.m3.s',     # Tose: Dragon Warrior I & II, III, Game & Watch Gallery 3, Harvest Moon GBC
             'lz~le16.l1.oku.b0.m3.s',
-            'rle~l.r0.l0.z.p1', 'rle~h.r0.l0.n.p1', 'rle~l.r0.l0.n.p1'),    # Tetris DX; Magi Nation
+            'rle~l.r0.l0.z.p1', 'rle~h.r0.l0.n.p1', 'rle~l.r0.l0.n.p1',     # Tetris DX; Magi Nation
+            'rle~l.r0.l0.z.p2'),            # Harry Potter and the Chamber of Secrets
     'nes': ('rle~l.r0.l0.z.p1', 'rle~h.r0.l0.n.p1', 'rle~l.r0.l0.n.p1'),
-    'sms': ('rle~l.r0.l0.z.p1', 'rle~h.r0.l0.n.p1', 'rle~l.r0.l0.n.p1'),
-    'genesis': (),
+    'sms': ('rle~l.r0.l0.z.p1', 'rle~h.r0.l0.n.p1', 'rle~l.r0.l0.n.p1',
+            'rle~h.r0.l0.z.p4'),            # Golvellius
+    'genesis': ('lz~le16c.l1.L6hbe.r3c0.m1.n',      # Konami: Rocket Knight Adventures, The Hyperstone Heist
+                'lz~be16.l1.oku.b0.m3.s'),          # The Punisher
 }
 # Codecs that only recognise() runs (the plain search in graphics_trace would spend long on them).
 _RECOGNISE_ONLY = ('raw', 'lz-ring256')
