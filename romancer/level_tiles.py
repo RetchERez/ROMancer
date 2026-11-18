@@ -16,7 +16,7 @@ def decode_tiles(raw,definition,storage):
         colors=t['color_count']
         if colors&(colors-1):raise ValueError('tile palette size must be a power of two')
         parts=t['segments']
-        if type(parts) is not list or not 1<=len(parts)<=64:raise ValueError('declare one to64 tile segments')
+        if type(parts) is not list or not 1<=len(parts)<=64:raise ValueError('declare one to 64 tile segments')
     tiles=[None]*t['count'];segments=[]
     for i,part in enumerate(parts):
         fields(part,'first count offset codec pixel_map');number(part['first'],0,t['count']-1);number(part['count'],1,t['count'])

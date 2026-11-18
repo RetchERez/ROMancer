@@ -19,7 +19,7 @@ export function makeAssembly(bitmap,{first=0,columns,rows,order='rows',indices=n
  if(custom&&(!Array.isArray(indices)||indices.length!==columns*rows||!indices.some(v=>v!==null)||indices.some(v=>v!==null&&(!Number.isSafeInteger(v)||v<0||v>=bitmap.count))))throw Error('Every mapped tile must be inside the declared tile collection.');
  if(!custom&&first+columns*rows>bitmap.count)throw Error('Choose a grid inside the declared tile collection.');
  const tiles=custom?[...indices]:Array.from({length:columns*rows},(_,i)=>first+(order==='rows'?i:(i%columns)*rows+Math.floor(i/columns)));
- flips=flips??tiles.map(()=>0);if(!Array.isArray(flips)||flips.length!==tiles.length||flips.some(v=>!Number.isSafeInteger(v)||v<0||v>3))throw Error('Tile flips must be0,1(horizontal),2(vertical) or3.');
+ flips=flips??tiles.map(()=>0);if(!Array.isArray(flips)||flips.length!==tiles.length||flips.some(v=>!Number.isSafeInteger(v)||v<0||v>3))throw Error('Tile flips must be 0, 1 (horizontal), 2 (vertical) or 3.');
  if(colors!==null&&(!Array.isArray(colors)||colors.length!==tiles.length||colors.some(group=>group!==null&&(typeof group!=='object'||Array.isArray(group)||Object.entries(group).some(([k,c])=>!/^\d{1,2}$/.test(k)||Number(k)>15||!Array.isArray(c)||c.length!==3||c.some(v=>!Number.isInteger(v)||v<0||v>255))))))throw Error('Observed tile colors are invalid.');
  return {first,columns,rows,order,tiles,indices:custom?[...indices]:null,flips:[...flips],colors,provenance:['pixel_candidate','causal_replay','checked_declaration'].includes(provenance)?provenance:'declared_layout'};
 }

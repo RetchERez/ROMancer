@@ -18,12 +18,12 @@ def composite(scene,definition,source_tiles,edits):
     columns=number(layout['columns'],1,8);rows=number(layout['rows'],1,8)
     if x+columns*8>width or y+rows*8>height:raise ValueError('Object placement lies outside the captured scene.')
     if any(len(layout[k])!=columns*rows for k in ('indices','flips','colors')):raise ValueError('Object layout dimensions differ.')
-    if type(edits) is not list or len(edits)>64:raise ValueError('Preview up to64 changed source tiles.')
+    if type(edits) is not list or len(edits)>64:raise ValueError('Preview up to 64 changed source tiles.')
     changed={};used={i for i in layout['indices'] if i is not None}
     for edit in edits:
         fields(edit,'cell_index pixels');index=number(edit['cell_index'],0,1023)
         if index not in used or index in changed:raise ValueError('Choose each used source tile only once.')
-        if type(edit['pixels']) is not list or len(edit['pixels'])!=64:raise ValueError('A source tile needs64 pixels.')
+        if type(edit['pixels']) is not list or len(edit['pixels'])!=64:raise ValueError('A source tile needs 64 pixels.')
         for v in edit['pixels']:number(v,0,15)
         if index not in source_tiles or len(source_tiles[index])!=64:raise ValueError('Original source tile is unavailable.')
         changed[index]=edit['pixels']

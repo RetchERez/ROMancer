@@ -2,7 +2,7 @@
 from .asset_schema import number
 
 def survey_references(raw,target_offset,width,endian,base,alignment,*,start=0,cancelled=lambda:False):
-    if type(raw) is not bytes or not 1<=len(raw)<=1024**2:raise ValueError('Survey at most1MiB of source bytes at a time.')
+    if type(raw) is not bytes or not 1<=len(raw)<=1024**2:raise ValueError('Survey at most 1 MiB of source bytes at a time.')
     number(target_offset,0,64*1024**2);number(width,2,4);number(base,-0xffffffff,0xffffffff);number(start,0,64*1024**2)
     if type(alignment) is not int or alignment not in (1,2,4):raise ValueError('Choose pointer alignment1,2 or4.')
     if endian not in ('little','big'):raise ValueError('Choose little or big endian.')

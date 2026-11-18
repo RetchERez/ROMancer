@@ -2,7 +2,7 @@ import {selectionKey} from './tool_inputs.js';
 import {esc,button,field,select,read,area} from './common.js';
 export function parseReferenceOffsets(first,more){
  const values=[first.trim(),...more.trim().split(/[\s,]+/)].filter(Boolean).map(s=>{if(!/^(?:0x[0-9a-f]+|\d+)$/i.test(s))throw Error('Each pointer offset must be decimal or 0x hexadecimal.');const n=Number(s);if(!Number.isSafeInteger(n)||n<0||n>=64*1024**2)throw Error('Pointer offset is outside its supported range.');return n;});
- if(!values.length||values.length>128)throw Error('Declare one to128 references.');if(new Set(values).size!==values.length)throw Error('Remove duplicate reference offsets.');return values;
+ if(!values.length||values.length>128)throw Error('Declare one to 128 references.');if(new Set(values).size!==values.length)throw Error('Remove duplicate reference offsets.');return values;
 }
 export function compressionReferences(ctx,parent,target){
  const {state}=ctx,page=state.page,scope=selectionKey(state),current=()=>selectionKey(state)===scope&&state.page===page,entry=state.compressedReferenceSurvey;

@@ -1,13 +1,13 @@
 # ROM catalog
 
-ROMancer v1.1.0 identifies **942 exact ROM revisions** across six systems.
+ROMancer v1.1.1 identifies **942 exact ROM revisions** across six systems.
 Each row represents one file hash. Different releases, regions or revisions of a game can have separate rows.
 
 All cataloged revisions passed the controlled byte-edit, undo/redo, build and BPS verification workflow.
 Game-specific visual and named editors use checked definitions for the selected revision.
-[See game-specific edits and playtest results](https://github.com/RetchERez/ROMancer/releases/download/v1.1.0/TESTED-GAMES.txt).
+[See game-specific edits and playtest results](https://github.com/RetchERez/ROMancer/releases/download/v1.1.1/TESTED-GAMES.txt).
 
-Use Ctrl+F to search here, or open **ROM Catalog.html** in the extracted [portable ZIP](https://github.com/RetchERez/ROMancer/releases/download/v1.1.0/ROMancer-v1.1.0-Windows.zip)
+Use Ctrl+F to search here, or open **ROM Catalog.html** in the extracted [portable ZIP](https://github.com/RetchERez/ROMancer/releases/download/v1.1.1/ROMancer-v1.1.1-Windows.zip)
 to search by title or hash and filter by system offline.
 
 | System | Revisions |

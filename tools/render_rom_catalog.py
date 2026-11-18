@@ -7,7 +7,7 @@ import sys
 if __package__ in (None, ''):
     sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 
-from romancer import ROMANCER_RELEASE_NAME
+from romancer import ROMANCER_RELEASE_NAME, ROMANCER_VERSION
 from romancer.rom_sample_db import load_database
 
 SYSTEM_LABELS = {
@@ -18,8 +18,9 @@ SYSTEM_LABELS = {
     'gb': 'Game Boy',
     'gbc': 'Game Boy Color',
 }
-TESTED_GAMES = 'https://github.com/RetchERez/ROMancer/releases/download/v1.1.0/TESTED-GAMES.txt'
-PORTABLE = 'https://github.com/RetchERez/ROMancer/releases/download/v1.1.0/ROMancer-v1.1.0-Windows.zip'
+RELEASE = 'https://github.com/RetchERez/ROMancer/releases/download/v' + ROMANCER_VERSION
+TESTED_GAMES = RELEASE + '/TESTED-GAMES.txt'
+PORTABLE = RELEASE + '/ROMancer-v' + ROMANCER_VERSION + '-Windows.zip'
 
 
 def grouped(records):

@@ -15,7 +15,7 @@
   summary.textContent='Startup details';reason.textContent=String(message||'Startup took too long.').replace(/(#token=)[^\s]+/g,'$1[hidden]').slice(0,1200);
   details.append(summary,reason);actions.append(retry,browser);box.append(title,text,actions,details);root.replaceChildren(box);
  }
- const timer=setTimeout(()=>recover('The workbench did not finish opening within15 seconds.'),15000);
+ const timer=setTimeout(()=>recover('The workbench did not finish opening within 15 seconds.'),15000);
  window.addEventListener('error',event=>{if(!ready)recover(event.message||'A required application file could not load.');});
  window.addEventListener('unhandledrejection',event=>{if(!ready)recover(event.reason?.message||'Startup failed.');});
  window.addEventListener('romancer-ready',async()=>{

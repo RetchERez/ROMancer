@@ -61,7 +61,7 @@ def integrity_edits(path, expected_sha256, system_id, edits):
         prefix = candidate['metadata']['copier_header_bytes']
         body = len(raw) - prefix
         if candidate['format'] not in ('lorom','hirom','exhirom-candidate') or not 32768<=body<=8*1024**2 or body%32768:
-            raise ValueError('Checksum maintenance requires a checked 32KiB-aligned SNES container up to8MiB.')
+            raise ValueError('Checksum maintenance requires a checked 32KiB-aligned SNES container up to 8 MiB.')
         if candidate['format']=='exhirom-candidate' and not extended_checksum_verified:
             raise ValueError('This extended ROM does not match the supported checksum convention. Preserve its checksum explicitly in Advanced byte options or supply a checked convention.')
         start = candidate['header_offset'] + 28

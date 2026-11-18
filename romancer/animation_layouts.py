@@ -53,17 +53,17 @@ def animations_for(row,path):
     saved=row.get('animation_layouts')
     if saved is None:return []
     fields(saved,'source_sha256 animations')
-    if saved['source_sha256']!=row['sha256'] or type(saved['animations']) is not list or len(saved['animations'])>16:raise ValueError('Animation collection differs from the source or exceeds16 layouts.')
+    if saved['source_sha256']!=row['sha256'] or type(saved['animations']) is not list or len(saved['animations'])>16:raise ValueError('Animation collection differs from the source or exceeds 16 layouts.')
     values=[checked_item(path,row,v) for v in saved['animations']]
     if len({v['id'] for v in values})!=len(values):raise ValueError('Duplicate animation identities.')
     canonical_bytes(values,max_bytes=512*1024);return values
 
 def review_animations(row,path,incoming):
-    if type(incoming) is not list or len(incoming)>16:raise ValueError('Import at most16 animation layouts.')
+    if type(incoming) is not list or len(incoming)>16:raise ValueError('Import at most 16 animation layouts.')
     old={a['id']:a for a in animations_for(row,path)}
     for item in incoming:
         checked=checked_item(path,row,item);old[checked['id']]=checked
-    if len(old)>16:raise ValueError('The merged animation collection exceeds16 layouts.')
+    if len(old)>16:raise ValueError('The merged animation collection exceeds 16 layouts.')
     values=list(old.values());canonical_bytes(values,max_bytes=512*1024);return values
 
 class AnimationTools:

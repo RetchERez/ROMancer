@@ -84,7 +84,7 @@ class GraphicsAccessTools:
     def capture(self,p,c):
         project,row,path=self.api.source(p);trace=self.api.traces.get(p,c)
         if not trace['runtime_trusted']:raise ValueError('Use a fresh local trace for native graphics replay.')
-        if row['size']>64*1024**2:raise ValueError('Native graphics replay supports cartridges up to64MiB.')
+        if row['size']>64*1024**2:raise ValueError('Native graphics replay supports cartridges up to 64 MiB.')
         from .debugger_provision import preferred_root
         root=preferred_root(self.api.workspace,row['system_id']);backend=verify_backend(root,row['system_id'])
         if row['system_id']!='genesis' and not backend.get('native_access_details'):raise ValueError('The full graphics observer is required. Install the current complete Windows package or rebuild its documented observer source.')

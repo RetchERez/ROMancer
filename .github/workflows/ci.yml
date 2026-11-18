@@ -41,6 +41,54 @@ jobs:
       - run: python -B tools/audit_release.py --source dist/ci-source.zip
       - run: python -c "from pathlib import Path; Path('work_private').mkdir(exist_ok=True)"
       - run: python -B tools/verify_v1.py --output work_private/workflow.json --work-dir work_private/fixtures
+  linux-bundle:
+    # Builds the Linux package on a real Linux kernel and runs it: launcher check, playtest
+    # engines, tracing engines, server start and local API. The engines are taken unchanged
+    # from the newest published Linux archive and must match the pins in this checkout.
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+        with:
+          persist-credentials: false
+      - name: Find the newest published Linux archive
+        id: donor
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          set -euo pipefail
+          row="$(gh api "repos/$GITHUB_REPOSITORY/releases?per_page=100" --jq '[.[] | select(.draft | not) | .assets[] | select(.name | test("^ROMancer-v[0-9.]+-Linux-x86_64[.]tar[.]gz$"))] | sort_by(.created_at) | last | select(. != null) | [.id, .name] | @tsv')"
+          if [ -z "$row" ]; then
+            echo "No published Linux archive to take the engines from. Source checks run in the test job."
+            exit 0
+          fi
+          echo "id=$(printf %s "$row" | cut -f1)" >> "$GITHUB_OUTPUT"
+          echo "name=$(printf %s "$row" | cut -f2)" >> "$GITHUB_OUTPUT"
+      - name: Download it
+        if: steps.donor.outputs.id != ''
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          ROMANCER_DONOR_ASSET: ${{ steps.donor.outputs.id }}
+          ROMANCER_DONOR_NAME: ${{ steps.donor.outputs.name }}
+        run: |
+          gh api -H 'Accept: application/octet-stream' "repos/$GITHUB_REPOSITORY/releases/assets/$ROMANCER_DONOR_ASSET" > "$RUNNER_TEMP/$ROMANCER_DONOR_NAME"
+      - name: Build the Linux package and run it
+        if: steps.donor.outputs.id != ''
+        env:
+          ROMANCER_DONOR_NAME: ${{ steps.donor.outputs.name }}
+        run: bash linux/ci_smoke.sh "$RUNNER_TEMP/$ROMANCER_DONOR_NAME" "$RUNNER_TEMP/linux-smoke"
+      - name: Run the package on the oldest supported glibc (Debian 10)
+        if: steps.donor.outputs.id != ''
+        run: |
+          docker run --rm -v "$RUNNER_TEMP/linux-smoke:/w:ro" debian:10 bash -c '
+            set -euo pipefail
+            cd /w/pkg*/ROMancer-v*-Linux-x86_64
+            ./ROMancer.sh --check
+            RT="$PWD/ROMancer Files/Runtime"; PY="$RT/python/bin/python3"
+            "$PY" -I -B "$RT/app/tools/verify_engines.py" --workspace /tmp/engines --output /tmp/engines.json > /dev/null
+            "$PY" -I -B "$RT/app/tools/verify_trace_engines.py" --workspace /tmp/trace --output /tmp/trace.json > /dev/null
+            "$PY" -I -c "import json;assert all(json.load(open(f))[\"ok\"] for f in (\"/tmp/engines.json\", \"/tmp/trace.json\"))"
+            echo "OK on glibc $(getconf GNU_LIBC_VERSION)"'
   windows-bundle:
     # Draft release assets require repository push access on GitHub. The token
     # is exposed only to the download step; checkout never persists it.
@@ -114,9 +162,9 @@ jobs:
           $setup = Start-Process -FilePath (Join-Path $PWD 'work_private/Setup.exe') -ArgumentList @('/S', ('/D=' + $target)) -WindowStyle Hidden -Wait -PassThru
           if ($setup.ExitCode -ne 0) { throw 'Setup executable failed' }
           $entry = Get-ItemProperty -LiteralPath 'HKCU:/Software/Microsoft/Windows/CurrentVersion/Uninstall/ROMancer'
-          if ($entry.InstallLocation -ne $target -or $entry.DisplayVersion -ne '1.1.0') { throw 'Apps registration differs' }
+          if ($entry.InstallLocation -ne $target -or $entry.DisplayVersion -ne '1.1.1') { throw 'Apps registration differs' }
           $active = Get-Content -LiteralPath (Join-Path $target 'active.json') -Raw | ConvertFrom-Json
-          if ($active.slot -notmatch '^1[.]1[.]0-[0-9a-f]{16}$') { throw 'Package slot differs' }
+          if ($active.slot -notmatch '^1[.]1[.]1-[0-9a-f]{16}$') { throw 'Package slot differs' }
           $version = Join-Path $target ('versions/' + $active.slot)
           $installedPython = Join-Path $version 'python/python.exe'
           $env:PATH = (Join-Path $version 'python') + ';' + $env:SystemRoot + '/System32;' + $env:SystemRoot + '/System32/WindowsPowerShell/v1.0'

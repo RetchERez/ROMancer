@@ -76,7 +76,7 @@ def learn_mapping(original,frames,match,locators):
     by_color={v:{m['source_pixel'] for m in mapping if m['value']==v} for v in colors}
     eligible={v for v,ids in by_color.items() if len(ids)>=4};mapping=[m for m in mapping if m['value'] in eligible]
     ids={m['source_pixel'] for m in mapping}
-    if len(ids)<16 or len(eligible)<2 or len({i%8 for i in ids})<4 or len({i//8 for i in ids})<4:raise ValueError('Fewer than16 distinct source pixel origins with independent color controls were recovered. This may be a global color effect or a transformed/partial format.')
+    if len(ids)<16 or len(eligible)<2 or len({i%8 for i in ids})<4 or len({i//8 for i in ids})<4:raise ValueError('Fewer than 16 distinct source pixel origins with independent color controls were recovered. This may be a global color effect or a transformed/partial format.')
     return {'pixel_map':mapping,'source_colors':{str(v):list(next(iter(colors[v]))) for v in eligible},'unique_source_pixels':len(ids),'region':region}
 
 

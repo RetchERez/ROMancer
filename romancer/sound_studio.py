@@ -201,4 +201,4 @@ def preview_sound(raw, definition, source_sha256, kind, resource_id, changes=Non
         total += count
         for n in range(min(count, limit - len(values))):
             values.append(round((1 if n * frequency / rate % 1 < 0.5 else -1) * volume / 15 * 10000))
-    return (wav_bytes(values, rate), {'kind': 'song', 'sample_rate': rate, 'sample_frames': len(values), 'truncated': total > limit, 'preview_scope': 'Reference pulse preview, up to20seconds. Native playback verifies the actual driver, mixer and timing.'})
+    return (wav_bytes(values, rate), {'kind': 'song', 'sample_rate': rate, 'sample_frames': len(values), 'truncated': total > limit, 'preview_scope': 'Reference pulse preview, up to 20 seconds. Native playback verifies the actual driver, mixer and timing.'})

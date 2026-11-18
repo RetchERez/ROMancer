@@ -1,6 +1,6 @@
 {
   "schema_version": 1,
-  "product": "ROMancer v1.1.0",
+  "product": "ROMancer v1.1.1",
   "subtitle": "A practical guide to the current editing tools: small first edits, advanced workflows, actual editing and appearance examples, a glossary and an alphabetical index.",
   "scope": "This guide covers the six supported cartridge systems. The offline catalog identifies 942 exact revisions. Recognized ROM formats can be inspected and edited as bytes without a catalog match. Game-specific editors use checked definitions.",
   "basic_summary": "Start the application, choose saved preferences, identify a source, make a focused edit, preserve progress and export a checked patch. These procedures build the habits used throughout the guide.",
@@ -12,27 +12,27 @@
       "title": "Install, open and choose a workspace",
       "part": "Basic",
       "kicker": "Start here",
-      "intro": "The full Windows x64 release includes Python, Pillow and credited emulator engines. The source edition uses your own Python installation. Both include this guide.",
+      "intro": "The full Windows x64 and Linux x86-64 releases include Python, Pillow and credited emulator engines. The source edition uses your own Python installation. All include this guide.",
       "steps": [
-        "Run the Windows setup executable. Choose the install location, finish setup, then open ROMancer. The application and its saved workspace are separate.",
-        "For the portable Windows ZIP, extract the entire archive and use <b>Open ROMancer.cmd</b>. Keep app, python, cores and the root launch files together.",
+        "On Windows, extract the entire ROMancer ZIP and double-click <b>ROMancer.exe</b>. Keep it beside the ROMancer Files folder.",
+        "On Linux, extract the archive and run <b>./ROMancer.sh</b>. It needs glibc 2.28+ and a web browser.",
         "For the source edition, install Python 3.13 or 3.14 and the pinned requirements, then use <b>Launch ROMancer.cmd</b> on Windows or the supplied run.sh launcher. Read the root README for the command-line and MCP entry points.",
         "Open <b>Help</b> for this guide. Start a workshop or import a ROM you supply. No AI account, subscription or API key is required."
       ],
-      "result": "ROMancer opens its local interface and your project list. The full Windows edition selects a matching included engine when you load a supported system.",
+      "result": "ROMancer opens its local interface and your project list. The full Windows and Linux editions select a matching included engine when you load a supported system.",
       "note": "Keep the portable folder intact. Projects are stored separately. Game-specific editors use checked definitions for the selected revision.",
       "details": [
         {
           "title": "Update and recovery",
-          "text": "Close ROMancer before running Setup. Setup keeps earlier installations and the workspace, including if you tested an earlier copy labeled 1.0.0. Rollback restores the previous application. Older applications may have limited support for newer project features."
+          "text": "Extract the new release into its own folder and start it from there. Projects stay in the separate workspace, so the new copy opens them. Keep the earlier folder as your rollback. Older applications may have limited support for newer project features."
         },
         {
           "title": "Offline guide",
-          "text": "Open user-guide/index.html directly from the source folder, or app/user-guide/index.html in the Windows payload. The adjacent guide.pdf is the printable edition. Keep the screenshots folder beside the HTML."
+          "text": "Open user-guide/index.html from the source folder, or from ROMancer Files/Runtime/app in the Windows and Linux packages. The adjacent guide.pdf is the printable edition. Keep the screenshots folder beside the HTML."
         },
         {
           "title": "Choose your route",
-          "text": "Start with Your first edit and the included practice game. The release also includes three BPS examples for Chrono Trigger, The Immortal and Rastan. Each requires its matching original ROM. Advanced users and AI clients can use the same review and build operations through the local API or MCP."
+          "text": "Start with Your first edit and the included practice game. The Extras ZIP on the GitHub release has three BPS examples for Chrono Trigger, The Immortal and Rastan. Each requires its matching original ROM. Advanced users and AI clients can use the same review and build operations through the local API or MCP."
         }
       ],
       "related": [
@@ -96,7 +96,7 @@
         },
         {
           "title": "Audio and motion",
-          "text": "Volume and start-muted preferences control playback defaults; use the current preview controls when listening. Preview looping repeats the available preview, not the game sequence. Reduced motion makes interface motion less distracting."
+          "text": "Volume and start-muted preferences control playback defaults; use the current preview controls when listening. Preview looping repeats the available preview, not the game sequence. Reduce interface motion makes movement in the interface less distracting."
         },
         {
           "title": "Apply, Cancel and defaults",
@@ -104,7 +104,7 @@
         },
         {
           "title": "Basic and Advanced navigation",
-          "text": "Basic keeps Overview, Text & layout, Graphics & fonts, Levels, Stats & data, Music & sound, Playtest and Export visible. Expand Advanced for Game view, Resources/hex, Investigation, Recipes & definitions, Routes and Regression. A direct task opens the matching group automatically."
+          "text": "Basic keeps Overview, Text & layout, Graphics & fonts, Scenes & colors, Stats & data, Music & sound, Playtest and Export visible. Levels is listed as coming soon and is disabled in this release. Expand Advanced for Game view, Resources/hex, Investigation, Recipes & definitions, Routes and Regression. A direct task opens the matching group automatically."
         }
       ],
       "related": [
@@ -187,11 +187,11 @@
       "kicker": "Support / checked scope",
       "intro": "A passing automated check describes the exact scenario it ran. It does not mean every ROM, edit or computer configuration is certified.",
       "steps": [
-        "Read VERIFICATION STATUS in README.txt for the released build results, skips and unperformed manual checks. A skipped test is not a pass.",
+        "Read README.txt for what was checked in this release and what was only measured. A skipped test is not a pass.",
         "If a file cannot import, read the exact error. An HTML page saved as .7z is not an archive; obtain your real cartridge file and extract a valid archive before importing. Never rename an error page to .sms.",
         "Open Settings, expand Diagnostics & support, run checks and prepare a support report. Review it before sharing; exclude ROMs, saves, states, private backups, credentials and personal paths.",
         "For a bug report, record version/build, operating system, scale setting, exact steps, expected result and actual result. Prefer reproducing with an included workshop.",
-        "Use the GitHub bug form once the repository is published. Security problems should use its private vulnerability-reporting channel after that channel is enabled; do not post secrets publicly."
+        "Use the bug report form on the GitHub repository. Report security problems privately to the repository maintainer; do not post secrets publicly."
       ],
       "result": "A short, reproducible report gives another person enough information to investigate without your commercial game data.",
       "note": "Automated accessibility/contrast checks and keyboard navigation help find problems. They do not replace a human screen-reader trial, an independent beginner trial or testing Windows-wide display scaling on a clean machine.",
@@ -227,7 +227,7 @@
         "Make one small edit, review it, create a separate <a href=\"#term-build\">build</a>, then playtest that build. Export its patch after checking the result."
       ],
       "result": "A project holds owned source copies, editing setup, builds and evidence. Start a new project for unrelated work.",
-      "note": "The Windows x64 distribution includes its runtime and emulator engines. Supply your own ROMs. GB and GBC use separate system modes.",
+      "note": "The Windows x64 and Linux x86-64 packages include their runtime and emulator engines. Supply your own ROMs. GB and GBC use separate system modes.",
       "part": "Basic",
       "intro": "A project keeps one piece of work together: original ROMs, saved editing changes, playable builds and test results. Start with the included editing studio to practice, or import your own ROM.",
       "related": [
@@ -274,7 +274,7 @@
         "Dialogue: select the Original again and open <b>Text &amp; layout</b>. Replace HELLO, EXPLORER! with WELCOME, ROM HACKER! Check capacity, review and build. The character table supports uppercase letters.",
         "Movement: choose <b>Edit stats</b> on Overview. Change Hero speed from 2 to 3, review and build. Compare equal Right input frames in Playtest. Zero stops movement; the checked limit is 8 pixels per frame.",
         "Music: in <b>Music &amp; sound</b>, click a melody note or choose its Event, change Note number and choose Stage note edit. Inspect the note view and Original/Edited waveform previews. Review, build and listen in Playtest.",
-        "Playtest controls: arrows move, A attacks an overlapping enemy and chirps, Start restarts. HP0 stops the hero; an enemy with0 health disappears. Save/load states belong to that exact build. Export and verify a patch from its Original."
+        "Playtest controls: arrows move, A attacks an overlapping enemy and chirps, Start restarts. HP 0 stops the hero; an enemy with 0 health disappears. Save/load states belong to that exact build. Export and verify a patch from its Original."
       ],
       "result": "Review your edits, save a separate build, playtest it and verify its patch export.",
       "note": "Mossy Hollow is an original practice game. Use Playtest for the live scene.",
@@ -299,7 +299,7 @@
       "kicker": "Task shortcuts / offline search",
       "intro": "Use the task you want to perform as a starting point. Keep this guide open beside the editor when a term is unfamiliar.",
       "steps": [
-        "On <b>Overview</b>, open <b>Choose a task</b>. Graphics &amp; fonts covers sprites and palettes; Numbers &amp; stats opens Stats & data. Investigation helps locate unknown values.",
+        "On <b>Overview</b>, use the cards under <b>What can I edit in this ROM?</b> and <b>Inspect, test and share</b>. Edit graphics covers sprites and palettes; Edit stats opens Stats &amp; data. Investigation helps locate unknown values.",
         "Open <b>Help &gt; User guide</b>. Choose <b>Search guide</b>, enter a short term such as palette or save states, then open a matching topic.",
         "Add another word to narrow results. Search matches all entered words and includes glossary definitions and index aliases. Clear empties the results.",
         "Follow a topic’s related links or glossary terms. For an exact phrase, use the browser or PDF reader Find command."
@@ -392,7 +392,7 @@
         "Open <b>Graphics &amp; fonts</b>. Keep First tile 0, Tiles across 1 and Tiles down 1; click <b>Assemble tiles</b>. Leave Preview size on Fit and click brush swatch <b>1</b>.",
         "Focus the <b>Editing</b> canvas. Press Right Arrow once, then Space. Expect <b>1 pixel differs</b>. Choose <b>Undo sprite stroke</b> to restore the pixel and <b>Redo sprite stroke</b> to stage the change again.",
         "Click <b>Review graphics changes</b>, read the byte summary, then <b>Create graphics build</b>. Name and notes are optional. Click <b>Playtest saved build</b> in the bottom bar to select that output and open Playtest.",
-        "Choose <b>Load game</b>, then Play. Pause to inspect the result. The full Windows edition supplies the engine; the source edition may require core setup.",
+        "Choose <b>Load game</b>, then Play. Pause to inspect the result. The full Windows and Linux editions supply the engine; the source edition may require core setup.",
         "Choose <b>Check my hack</b> to compare original and build bytes. Then choose <b>Export saved build</b> and <b>Create verified patch</b>. Continue with Apply a downloaded patch to check a fresh reconstruction."
       ],
       "result": "The tested exercise changed exactly file offset 16400 (0x4010), from 81 to C1. Native original/build frames differed, a save/load roundtrip restored the view, and reapplying the exported patch recreated the same build hash.",
@@ -445,7 +445,7 @@
       "steps": [
         "Search the workspace for <b>palette</b>, <b>sprite</b>, <b>hex</b> or <b>save state</b>. Choose a tool result. Click a matching file to select its exact revision and inspect it in Resources.",
         "In Sprite assembly, choose a brush swatch. Labels distinguish declared colors, observed gameplay colors and grayscale placeholders. An unknown game palette is not silently guessed.",
-        "Use <b>Compare</b>: Side by side, Original, Edited or Changes only. Difference and blink views are read-only. Slow blink is optional and follows app and operating-system reduced-motion settings.",
+        "Use <b>Compare</b>: Side by side, Original, Edited or Changes only. Difference and blink views are read-only. <b>Blink slowly</b> is optional and follows app and operating-system reduced-motion settings.",
         "Review the planned changes. Read the measured byte summary; open the full report for offsets and technical detail. Name and notes for this build are optional.",
         "Create the build and playtest that output. On Export, choose Create verified patch. Human-readable filenames follow your release title; Download started points you to the browser’s save workflow."
       ],
@@ -632,7 +632,7 @@
       "details": [
         {
           "title": "What is recorded",
-          "text": "The facts catalog stores hashes, sizes, header numbers, numeric checks and bounded candidate ranges. The separate source-evidence index records 4,228 directly measured relationships; 640 files have at least one. Reference associations cover 906 files. NES comparisons match PRG/CHR input inventories and exclude the container header. Entire-file comparisons on other systems describe named ROM inputs, not complete gameplay validity."
+          "text": "The facts catalog stores hashes, sizes, header numbers, numeric checks and bounded candidate ranges. The separate source-evidence index records 3,648 directly measured relationships; 554 files have at least one. Reference associations cover 905 files. NES comparisons match PRG/CHR input inventories and exclude the container header. Entire-file comparisons on other systems describe named ROM inputs, not complete gameplay validity."
         },
         {
           "title": "Maintenance and automation · Advanced",
@@ -827,7 +827,7 @@
         "Use the opened editor to stage changes, undo or redo them, review, create a separate build, playtest and export a verified patch. Saving a layout alone does not modify the ROM."
       ],
       "result": "A reusable exact-source definition opens in the appropriate editing tool, with the same decoded fields that you reviewed.",
-      "note": "In the current original Mossy Hollow studio, actor health and contact damage begin at file0x1D16, with two records16 bytes apart. Fields at byte0 and1 decode Health5/3 and Contact damage1/1. This is a workshop-specific example; do not transfer these offsets to another ROM. Health for that runtime stays1–9.",
+      "note": "In the current original Mossy Hollow studio, actor health and contact damage begin at file offset 0x1D16, with two records 16 bytes apart. Fields at byte 0 and 1 decode Health 5/3 and Contact damage 1/1. This is a workshop-specific example; do not transfer these offsets to another ROM. Health for that runtime stays 1–9.",
       "related": [
         "research-notes",
         "tables",
@@ -896,6 +896,9 @@
     },
     {
       "id": "scenes-colors",
+      "image": "270-scenes-colors",
+      "image_alt": "Scenes & colors in Colors mode: a recorded scene, a new color chosen for one palette entry, and the Also changes strip listing the other recorded scenes",
+      "caption": "Colors mode. A new color is chosen on the right; Also changes shows every recorded scene that uses the same color, replayed with the change.",
       "title": "Change a color and see every scene it touches",
       "part": "Basic",
       "kicker": "SCENES AND COLORS / NEW IN v1.1",
@@ -912,7 +915,7 @@
       "note": "<b>Used in N scenes</b> counts only the scenes you have recorded. Scenes you haven't recorded can't be shown. Before you save, record the places you care about, and playtest the build afterwards.",
       "details": [
         {
-          "title": "What \"seen in N scenes\" means",
+          "title": "What \"Used in N scenes\" means",
           "text": "ROMancer learns where a color is used by watching the game run. The count beside a color, and the pictures in the Also changes strip, cover the scenes recorded so far and nothing else. A color used in 3 recorded scenes may also be used in a level you have not reached. Recording more of the game makes the answer more complete; it never makes it guaranteed. A scene can also use the changed data without showing it at that moment. Those are listed as <b>Uses changed data; nothing visible at this moment</b>."
         },
         {
@@ -929,7 +932,7 @@
         },
         {
           "title": "If the tracing engine is not installed",
-          "text": "Scenes &amp; colors uses a second, tracing build of each emulator engine, kept in the <b>trace-cores</b> folder beside the app. The full Windows and Linux packages include it. A copy without that folder shows a message naming the system instead of the editor. Playtest is not affected."
+          "text": "Scenes &amp; colors uses a second, tracing build of each emulator engine, kept in the <b>trace-cores</b> folder beside the app. The full Windows and Linux packages include it. A copy without that folder shows a message naming the system instead of the editor. Scenes &amp; colors is not available for Kirby Tilt ’n’ Tumble, because its tracing engine is not included. Playtest is not affected."
         }
       ],
       "related": [
@@ -948,6 +951,9 @@
     },
     {
       "id": "scenes-graphics",
+      "image": "271-scenes-graphics",
+      "image_alt": "Scenes & colors in Graphics mode: one 8 by 8 picture opened from the scene and redrawn, with the scenes that use it listed below",
+      "caption": "Graphics mode. Click a pixel in the scene to open the picture under it, redraw it, then choose Show what changes.",
       "title": "Redraw a picture or repaint the background",
       "part": "Basic",
       "kicker": "SCENES AND COLORS / NEW IN v1.1",
@@ -1012,7 +1018,7 @@
       "details": [
         {
           "title": "Top Gear 3000 save states",
-          "text": "Load the verified cartridge with Load game and create a new state. ROMancer v1.0.0 saves the DSP-4 chip state needed to resume the race. States made with the older engine lack that data and cannot be repaired. Verify by reloading a new state and repeating an input from the same point."
+          "text": "Load the verified cartridge with Load game and create a new state. ROMancer v1.0.0 and later save the DSP-4 chip state needed to resume the race. States made with the older engine lack that data and cannot be repaired. Verify by reloading a new state and repeating an input from the same point."
         }
       ]
     },
@@ -1056,7 +1062,7 @@
       "kicker": "SHARE YOUR CHANGES",
       "image": "214-explicit-original-build-export",
       "steps": [
-        "Open <b>Export</b>. Select the exact <b>Original revision</b> and the intended <b>Target build</b>. Add a useful title and notes.",
+        "Open <b>Export</b>. Select the exact <b>Original ROM</b> and the intended <b>Edited build</b>. Add a useful title and notes.",
         "Click <b>Create verified patch</b>. ROMancer reconstructs the target with a separate BPS decoder and checks its identity.",
         "Download the prepared patch. Include the expected original revision and instructions with your release, then test applying that patch to a fresh source copy."
       ],
@@ -1110,7 +1116,7 @@
       "title": "Apply a downloaded BPS or IPS patch safely",
       "part": "Basic",
       "kicker": "Exact source / compatibility preview / separate build",
-      "intro": "A patch requires an exact source revision. ROMancer-v1.0.0-Hack-Examples.zip includes three BPS examples. Its README lists each change and the matching original hash.",
+      "intro": "A patch requires an exact source revision. ROMancer-v1.0.0-Hack-Examples.zip, inside the Extras ZIP on the GitHub release, includes three BPS examples. Its README lists each change and the matching original hash.",
       "steps": [
         "On Export, expand <b>Apply a patch downloaded from someone else</b>. Choose the exact ROM the patch requires in the top bar, then select or drop its BPS or IPS patch.",
         "Under <b>Apply a downloaded patch</b>, choose or drop one BPS or IPS file. For IPS, enter the author's full-file reference: eight hexadecimal CRC32 digits or 64 SHA-256 digits. BPS checks embedded checksums.",
@@ -1479,7 +1485,7 @@
       "steps": [
         "After creating a build, choose <b>Check my hack</b> in the footer. The review pairs the build with its exact original. Choose <b>Compare original and build</b> to see changed bytes and open a range in hex.",
         "Use <b>Run checks</b> to replay the configured inputs. Original, build and difference frames show the selected checkpoint. A named edit describes its latest build step.",
-        "Leave Run after new builds selected to queue this check automatically. Save test setup for this revision. For button sequences or a fixed comparison region, expand Advanced inputs and comparison region.",
+        "Leave <b>Check new descendant builds automatically after saving this setup</b> selected to queue this check automatically, then choose <b>Save test setup for this revision</b>. For button sequences or a fixed comparison region, expand Advanced inputs and comparison region.",
         "Create a build normally, or choose an existing Build to check and Run checks. The application shows progress and lets you cancel the job. It remains usable while separate workers run.",
         "Open a recent result. Compare Original, Build and Difference. Read cartridge integrity, state replay and worker closure results alongside the visual result.",
         "PASS means the configured checks passed. REVIEW means the image changed under the review policy. REGRESSION means an explicit assertion or integrity check failed. INCONCLUSIVE means the baseline was unstable, flat or otherwise unsuitable. BLOCKED explains why execution could not complete."
@@ -1710,7 +1716,7 @@
         "Read the file offset on the left, hex bytes in the middle and printable ASCII on the right. A centered dot stands for a nonprintable byte. The outline follows the selected byte in both columns. Underlined values are staged edits. Below the grid, Original and Draft show the exact selected byte.",
         "Search AB ?? CD, UTF-8 or an integer with an explicit byte order. Open <b>Number inspector &amp; bookmarks</b> to inspect or bookmark the selected offset.",
         "Edit a byte using two hex digits. Use the footer <b>Undo</b> and <b>Redo</b> to check the staged change, then choose <b>Review byte edits</b> and <b>Create separate build</b>. Your original remains unchanged.",
-        "To share a build, open <b>Export</b>, select its original revision and target build, and create a verified patch. Keep the original ROM private."
+        "To share a build, open <b>Export</b>, select its Original ROM and Edited build, and create a verified patch. Keep the original ROM private."
       ],
       "result": "The exact before/after byte change is reviewed, stored in a separate build and can be exported as an independently verified patch.",
       "note": "An uncatalogued ROM can use the same byte workflow when its cartridge layout is recognized. Before changing gameplay, find a checked definition or trace that connects the bytes to the intended behavior. The ASCII column shows standard characters. Custom game text may use a different encoding.",
@@ -1750,7 +1756,7 @@
         "In Resources, open <b>Declared resource catalog</b>, choose <b>Index declared resources</b> and search a name. Choose <b>Inspect</b> to open the bytes.",
         "Select a byte in the hex editor. Open <b>Number inspector & bookmarks</b>, then <b>Explain selected bytes</b>. Read its source-bound name, offset, stored bytes, numeric value, byte order and declared bounds when available.",
         "Use <b>Declared resource relationships</b> to follow related source ranges. Check the evidence for each relationship before using it to plan an edit.",
-        "In Troubleshooting, use <b>Find declared references</b> or <b>Resolve address</b>, then <b>Inspect mapped bytes</b>. Confirm the current source, mapping and bank. Recompute after switching sources; do not reuse a stale result."
+        "In <b>Advanced &gt; Investigation</b>, use <b>Find declared references</b> or <b>Resolve address</b>, then <b>Inspect mapped bytes</b>. Confirm the current source, mapping and bank. Recompute after switching sources; do not reuse a stale result."
       ],
       "result": "The hex selection belongs to the intended artifact and declared file offset. The explanation identifies its bounded stored meaning, or explicitly reports that no interpretation has been established.",
       "note": "Use a checked declaration or runtime evidence before assigning gameplay meaning to stored bytes. Sound samples and known sequence fields each have their own scope.",
@@ -1796,7 +1802,7 @@
       "details": [
         {
           "title": "System formats",
-          "text": "NES stored CHR uses planar 2bpp; Game Boy uses paired row bitplanes. SNES templates support paired 4bpp; Genesis supports packed 4bpp and big-endian palette words. templates include low-nibble-first 4bpp and RGB555. Each game can add compression and its own layout."
+          "text": "NES stored CHR uses planar 2bpp; Game Boy uses paired row bitplanes. SNES templates support paired 4bpp; Genesis supports packed 4bpp and big-endian palette words. Each game can add compression and its own layout."
         },
         {
           "title": "Six supported modes",
@@ -1895,7 +1901,41 @@
           "title": "Practice: stored colors update the assembled preview",
           "caption": "Actual editor capture using the original authored SMS workshop. A stored palette entry is staged from green to cyan; the original remains fixed. This is a preview exercise, not a commercial game support claim."
         }
-      ]
+      ],
+      "visual_page": {
+        "title": "Edit stored palette entries / examples",
+        "kicker": "Advanced / actual application captures",
+        "panels": [
+          {
+            "image": "08-dejavu-colors",
+            "title": "Original and edited Game Boy Color palette",
+            "x": 48,
+            "top": 846,
+            "width": 640,
+            "crop": [
+              180,
+              60,
+              1390,
+              860
+            ],
+            "caption": "Actual Game Boy Color interface palette, original and edited colors."
+          },
+          {
+            "image": "262-native-palette-workshop-preview",
+            "title": "Practice: stored colors update the assembled preview",
+            "x": 748,
+            "top": 846,
+            "width": 640,
+            "crop": [
+              0,
+              0,
+              937,
+              967
+            ],
+            "caption": "Actual editor capture using the original authored SMS workshop. A stored palette entry is staged from green to cyan; the original remains fixed. This is a preview exercise, not a commercial game support claim."
+          }
+        ]
+      }
     },
     {
       "id": "native-draft-preview",
@@ -1934,7 +1974,7 @@
         "Create the other explicit frame arrangements. Select a frame to inspect it, use <b>Edit selected frame</b> to revise its layout, or <b>Remove selected frame</b> to remove it from this preview.",
         "Use <b>Play animation</b> and <b>Pause animation</b> to review the proposed sequence. Read the shared-tile count before changing pixels.",
         "Review the actual asset changes and build them. Playtest the real game animation to establish whether its own script uses the edited tiles in the intended order.",
-        "Expand <b>Save & reuse animation layouts</b>. Name the arrangement, preview it, check its shared tiles, then save the reviewed layout. Up to16 saved layouts are kept per source, each with1–32 frames and40–2,000ms declared frame durations.",
+        "Expand <b>Save & reuse animation layouts</b>. Name the arrangement, preview it, check its shared tiles, then save the reviewed layout. Up to 16 saved layouts are kept per source, each with 1–32 frames and 40–2,000 ms declared frame durations.",
         "Use <b>Load layout</b> to reopen its exact graphics document and frame arrangements. Loading replaces the arrangement draft; tile edits stay separate. Saved layouts appear in Game view and are included in exported research packs. Delete saved layout removes that saved arrangement, not ROM bytes."
       ],
       "result": "The preview cycles through the layouts you supplied and reflects staged tile/palette edits. The unchanged original remains available for comparison.",
@@ -2715,7 +2755,7 @@
       "kicker": "HARDWARE HELP / SEPARATE ADDRESS DOMAINS",
       "intro": "A CPU address, file offset and video-memory offset can have the same number and refer to different things. Hardware help explains the region without pretending to know a game variable.",
       "steps": [
-        "Open <b>Advanced > Troubleshooting</b> and expand <b>Hardware & address help</b>. A completed ROM scan supplies the CPU, byte-order convention, graphics layout and mapping notes for the selected system.",
+        "Open <b>Advanced > Investigation</b> and expand <b>Hardware & address help</b>. A completed ROM scan supplies the CPU, byte-order convention, graphics layout and mapping notes for the selected system.",
         "Choose the address domain, enter a decimal or 0x hexadecimal value, and click <b>Explain address</b>. NES PPU, physical VRAM and SNES audio CPU domains are separate choices only where supported.",
         "Read the region and its conditions. A GB cartridge window may contain RTC registers; a SNES audio port is not audio RAM; Genesis sound RAM requires bus arbitration. Register descriptions never read or write the hardware.",
         "For a persistent ROM edit, use Address explorer with a checked mapping, including the physical bank and header offset. A core’s exposed-memory offset also needs an established mapping before treating it as a CPU address."
@@ -2750,7 +2790,7 @@
       "steps": [
         "Let the automatic scan finish. Expand <b>Cartridge verification</b> in ROM investigation. Read <b>Consistent</b>, <b>Needs attention</b>, <b>Mismatch</b> and <b>Not checked</b> separately. A warning is not a proof of corruption.",
         "Inspect supported reset vectors or entry branches. CPU addresses and file locations remain different. Click a vector/header or target-byte button to examine its actual storage. An unresolved bank state does not receive a guessed target.",
-        "For GB/GBC, read the documented header checks. Logo comparison uses fingerprints rather than distributed logo assets; Custom headers can intentionally differ.",
+        "For GB/GBC, read the documented header checks. Logo comparison uses fingerprints rather than distributed logo assets; custom headers can intentionally differ.",
         "For ordinary LoROM/HiROM up to 4 MiB, checksum verification handles standard tail mirroring and an identified copier header. The size declaration uses the rounded-up payload size. Enhancement chips, extended maps and unresolved layouts remain outside this checksum rule."
       ],
       "result": "A valid non-power-of-two standard SNES image can be checked correctly, and all six systems get startup checks within their supported mappings and encodings.",
@@ -2801,7 +2841,7 @@
       "intro": "A changed RAM value is a lead. A native capture adds real access callbacks, execution context and supported source mappings.",
       "steps": [
         "Open <b>Advanced > Investigation > Trace actual accesses</b>, or investigate a captured value. A value investigation derives a supported physical watch from authenticated core memory. Manual watches use an explicit CPU address and read/write/execution kind; Genesis supports read/write watches and separately ordered instruction samples.",
-        "The full Windows package is ready to capture. In a source-only or smaller build, choose <b>Prepare debugger</b> if needed. Pinned tools are downloaded and checked once; no ROM is uploaded.",
+        "The full Windows package includes MesenCE and is ready to capture every system except Genesis. The first Genesis capture downloads the official MAME 0.289 release once (about 84 MiB) after you confirm it. In a source-only build, choose <b>Prepare debugger</b> if needed. Pinned tools are downloaded and checked once; no ROM is uploaded. Native captures are Windows-only.",
         "Choose <b>Replay last Playtest change</b> when an observation includes compatible cold-start inputs, or set up a custom replay. The debugger starts from power on in a separate session.",
         "Choose <b>Capture route</b> for a bounded sample, or <b>Stop at a watched access</b> and set <b>Watched access number</b>. The focused mode uses one explicit watch and stops after that occurrence inside the requested recording window.",
         "Inspect access address, value, execution context and registers. A source button opens its recorded file location; Resources explains the association and links back.",
@@ -2863,8 +2903,8 @@
       "steps": [
         "Open <b>Advanced > Investigation > Events & commands</b>. Expand <b>Build a documented command format</b> to enter opcode, command name, total byte count and role. Add named operands with byte position, width, byte order and integer bounds, then add the command to the grammar.",
         "Add the documented script ID, name, file offset and reserved byte count. <b>Preview known format</b> runs the real decoder. Save only after reviewing it; replacing an existing setup requires acknowledgement. Advanced JSON supports larger grammars and pointer fields.",
-        "Each operand declares offset within the command, bytes1–4, little/big endian, minimum, maximum and optional target_base. Byte0 is the opcode and cannot be edited. For a declared pointer operand, target file offset = stored value − target_base.",
-        "Choose <b>Inspect commands</b>. Unknown instructions, truncated operands, invalid values or a missing declared end leave that script read-only. At most32 scripts,256 command types,256 decoded commands per script and2,048 commands overall are handled.",
+        "Each operand declares offset within the command, bytes 1–4, little/big endian, minimum, maximum and optional target_base. Byte 0 is the opcode and cannot be edited. For a declared pointer operand, target file offset = stored value − target_base.",
+        "Choose <b>Inspect commands</b>. Unknown instructions, truncated operands, invalid values or a missing declared end leave that script read-only. At most 32 scripts, 256 command types, 256 decoded commands per script and 2,048 commands overall are handled.",
         "For sequence changes, expand <b>Arrange a linear command sequence</b>. Insert before the selected row, remove or move commands, then stage their named values. Supply the confirmed unused-tail byte and acknowledge that no outside consumer enters the script’s middle. Preview, review and create the build.",
         "Preview and save a definition only after reviewing its structure. Game view connects the saved script and its commands. Declared target references can connect to existing resources, and author links can record triggers, destinations, collision or animation relationships."
       ],
@@ -2930,15 +2970,15 @@
       "title": "Set up or repair native investigation",
       "part": "Advanced",
       "kicker": "Setup / source records / recovery",
-      "intro": "The full Windows edition includes reviewed native observers, separate from the everyday playtesting engines. Source-only builds can prepare a pinned cache.",
+      "intro": "The full Windows edition includes the reviewed MesenCE observer, separate from the everyday playtesting engines. MAME for Genesis is downloaded once on first use. Source-only builds can prepare a pinned cache. Native captures are Windows-only.",
       "steps": [
-        "Open <b>Investigation > Trace actual accesses</b>. Check observer availability. The full Windows edition already includes MesenCE and MAME. Windows x64 is required; Genesis also needs an x86-64-v2 CPU.",
-        "In a source-only or smaller custom build, choose <b>Prepare debugger</b> if needed. Fixed official HTTPS artifacts are checked by exact size and SHA-256. No caller-supplied executable or download URL is accepted.",
+        "Open <b>Investigation > Trace actual accesses</b>. Check observer availability. The full Windows edition already includes MesenCE. Windows x64 is required; Genesis uses MAME and also needs an x86-64-v2 CPU.",
+        "For the first Genesis capture, or in a source-only build, choose <b>Prepare debugger</b>. After you confirm, the official MAME 0.289 release is downloaded once (about 84 MiB). Fixed official HTTPS artifacts are checked by exact size and SHA-256. No caller-supplied executable or download URL is accepted.",
         "Bundled observers and prepared caches work offline after verification. The full Windows package retains complete matching observer source and licenses. Prepared upstream tools keep their own source records and notices.",
         "If bundled checks fail, reinstall the current full package; an old cache cannot replace it silently. In source-only mode, Prepare debugger preserves a changed cache while activating a verified replacement. No ROM is uploaded."
       ],
       "result": "A checked bundled observer or prepared cache, available to both the interface and typed MCP operations.",
-      "note": "Bundled MesenCE and MAME retain their upstream licenses and complete corresponding source. The original ROMancer wrapper remains MIT licensed. Exact hashes establish the distributed files, not an independent audit of every upstream build input.",
+      "note": "Bundled MesenCE retains its upstream license and complete corresponding source. The downloaded MAME is the unmodified official release under its own license. The original ROMancer wrapper remains MIT licensed. Exact hashes establish the distributed files, not an independent audit of every upstream build input.",
       "related": [
         "native-accesses",
         "checks"
@@ -3046,7 +3086,7 @@
       "kicker": "Real ROMancer editing / Master System",
       "intro": "This example replaces the first humanoid enemy graphics with one connected blob per enemy. ROMancer made the build through its asset planner and repeated the same edit through the actual Graphics & fonts interface. Other enemy types are unchanged.",
       "steps": [
-        "To try the result, use Apply downloaded patch with Rastan-Single-Blob-Enemies.bps and the matching original. Review compatibility and create a separate build.",
+        "To try the result, use Apply a downloaded patch with Rastan-Single-Blob-Enemies.bps and the matching original. Review compatibility and create a separate build.",
         "For the exact supported original, open Game edits -> Open first enemy sprites. ROMancer loads the checked 60-tile range and observed assembly. Other revisions do not receive this definition.",
         "In Sprite assembly choose 2 tiles across, 4 down and custom map 30,32,31,33,52,54,53,55. This arrangement was checked against captured native graphics.",
         "Paint one connected body across the tile boundaries. The corrected example has one connected shape in each of its three lower-body animation frames.",
@@ -3256,7 +3296,7 @@
       "intro": "Help and Resources include a searchable library of pinned public research for Pokemon Red/Blue, Crystal, Super Mario Bros. and Super Mario World.",
       "steps": [
         "Expand Popular-game references and search for Pokemon or Mario. Read the documented facts and use Primary source for the pinned project version. Links require a network connection; the bundled summaries work offline.",
-        "Keep address domains separate. For example the published Super Mario Bros. lives counter is CPU RAM 0x075A, not a ROM file offset. Player power-up form at 0x0756 is a different concept from the movement-state variable.",
+        "Keep address domains separate. For example, the published Super Mario Bros. lives counter is CPU RAM 0x075A, not a ROM file offset. Player power-up form at 0x0756 is a different concept from the movement-state variable.",
         "Choose the correct documented prefix and Preview table layout. Red/Blue uses five base stats after its Dex number; Crystal separates special attack/defense.",
         "Inspect values and record identities in the proposed Data table. Save this layout only when the declaration is correct. Use the normal reviewed table build to make changes; omitted fields and padding stay outside the prefix."
       ],
@@ -3279,7 +3319,7 @@
       "kicker": "RGBDS / GNU nm",
       "intro": "A matching symbol listing connects human-readable names to addresses. ROMancer reads RGBDS bank:address listings for Game Boy and Game Boy Color.",
       "steps": [
-        "Obtain the symbol file produced for your exact game build. In Resources expand Named addresses from a symbol file. Choose the listing and its supported format, then Review symbol file.",
+        "Obtain the symbol file produced for your exact game build. In Resources, expand Named addresses from a symbol file. Choose the listing and its supported format, then Review symbol file.",
         "Read entry and ignored-line counts. This text format has no embedded ROM identity, so confirm that it belongs to the selected build before importing the reviewed names.",
         "Search a symbol name. Inspect bytes opens a mapped location inside the selected ROM. RAM and I/O symbols show the CPU address and do not offer a ROM byte button.",
         "Keep code entry semantics separate: odd GNU code addresses are not automatically converted into Thumb code offsets. A missing or ambiguous mapping must be resolved before editing.",
@@ -3455,7 +3495,7 @@
       "intro": "Source verification tests a ROM-to-picture dependency. A native graphics capture adds a separate access trail and a measured video-memory snapshot. The two kinds of evidence answer different questions.",
       "steps": [
         "Save a fresh cold-start trace in Playtest. Expand Native graphics accesses & video memory. Set a focused ROM span up to 2048 bytes, and choose Record native accesses. The trace must fit 3600 frames and 64 supported input steps without truncation.",
-        "The reviewed observer replays the route in an isolated process. NES, SNES, Game Boy, Game Boy Color and SMS use MesenCE; Genesis uses MAME. The full Windows package includes these tools and their corresponding sources.",
+        "The reviewed observer replays the route in an isolated process. NES, SNES, Game Boy, Game Boy Color and SMS use MesenCE; Genesis uses MAME. The full Windows package includes MesenCE and its corresponding source; MAME is downloaded once, after you confirm, for the first Genesis capture.",
         "Read the event page: access kind, physical memory domain or CPU-bus address, measured file offset where mapping was established, value and native operation kind. Move between pages. Omitted-event counts show when a capture budget was reached.",
         "Inspect the final scene and registers. Choose the pattern/video-memory domain, offset and tested tile codec to preview 32 complete stored tiles. Grayscale shows indices; it does not guess a palette or a ROM origin.",
         "Reopen saved captures through Game view or their capture ID. Pair the trail with a verified visual source or a controlled value investigation. Export reusable layouts and notes as checked research, keeping runtime evidence local and source-bound."
@@ -3508,7 +3548,7 @@
         "If it does not fit, reduce the edit or use Move to reserved space only when you understand its references. Declare the reserved destination, expected fill, capacity, alignment, bank origin/window and the existing linear pointer to the stream start.",
         "The form supports all complete external references. Confirm reservation and completeness only when established. The automation API supports up to 128 explicitly declared references. Review the move and create a separate parent build, then inspect the pointer and playtest the resource in its real scene.",
         "In the reserved-move controls, enter the first reviewed pointer and any additional reviewed pointer offsets, one per line. These UI pointers share the selected width, byte order and encoding adjustment. Mixed encodings remain available through the automation schema.",
-        "Optionally expand <b>Look for pointer candidates</b>. Survey at most1MiB at a time for exact matches to the selected target/encoding/alignment. Add individual candidates only after checking their use. At most256 are retained;32 are shown per focused window. Narrow the window to review more.",
+        "Optionally expand <b>Look for pointer candidates</b>. Survey at most 1 MiB at a time for exact matches to the selected target/encoding/alignment. Add individual candidates only after checking their use. At most 256 are retained; 32 are shown per focused window. Narrow the window to review more.",
         "Acknowledge the complete reference set and reserved destination, then review the move. A matching fill byte does not prove free space. Build and playtest the relocated result; the previous compressed stream is preserved."
       ],
       "result": "The original SNES LC_LZ2 example was independently decoded, edited through ROMancer, recompressed within its allocation, built and compared in native playback. Moving a stream additionally needs reserved storage and all required pointer consumers; passing one example does not identify another game’s compression.",
@@ -3623,7 +3663,7 @@
       "intro": "A reusable format pack keeps saved editor layouts for later projects. Exact-source matching is the default; a successful match still needs review before layouts are saved.",
       "steps": [
         "On a source with checked saved editor layouts, open <b>Resources > Reusable format library</b>. Save a named local pack with <b>Exact ROM revision</b>. A pack contains declarative metadata, not executable plugins or a copy of the ROM.",
-        "To share it, export its JSON file. To use one, import a local JSON pack up to512KiB. The library holds up to32 packs. Invalid stored files can be removed without blocking the list.",
+        "To share it, export its JSON file. To use one, import a local JSON pack up to 512 KiB. The library holds up to 32 packs. Invalid stored files can be removed without blocking the list.",
         "Deep scan suggests matching packs. Open the library and choose <b>Preview match</b>; ROMancer checks the console, source identity and every actual editor decoder. A mismatch is not silently accepted.",
         "Protected-region matching is Advanced: explicitly declare the hash regions that guard compatibility. Console and size must agree, protected bytes must match and the editors must inspect successfully. Another revision needs a separate compatibility acknowledgement.",
         "Review listed definition replacements, then <b>Apply reviewed layouts</b>. ROM bytes are unchanged. Existing drafts are separate; reopen the appropriate editor to inspect this source. Export research notes and evidence separately when needed."
@@ -4094,7 +4134,7 @@
     {
       "id": "term-theme",
       "term": "Theme",
-      "definition": "The application color treatment. ROMancer is the default; Dark uses neutral graphite and Light uses a readable white surface. Themes do not modify the game palette."
+      "definition": "The application color treatment. ROMancer is the default; Dark uses neutral graphite and Light uses grey panels on a light background. Themes do not modify the game palette."
     },
     {
       "id": "term-tile",
@@ -4378,7 +4418,7 @@
       ]
     },
     {
-      "term": "Choose a task",
+      "term": "Task cards on Overview",
       "topics": [
         "start",
         "find-help"
@@ -5340,12 +5380,6 @@
       "term": "Text overflow",
       "topics": [
         "support-editing"
-      ]
-    },
-    {
-      "term": "Themes",
-      "topics": [
-        "settings"
       ]
     },
     {

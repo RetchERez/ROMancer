@@ -4,7 +4,7 @@ from .asset_schema import number
 
 
 def scan_structures(raw,system,start,file_size,*,cancelled=lambda:False):
-    if type(raw) is not bytes or len(raw)>1024**2:raise ValueError('structural scan window exceeds1MiB')
+    if type(raw) is not bytes or len(raw)>1024**2:raise ValueError('structural scan window exceeds 1 MiB')
     number(start,0,64*1024**2);number(file_size,start+len(raw),64*1024**2)
     stride=max(4,math.ceil(len(raw)/65536/4)*4);rows=[];checked=0
     if system in ('genesis',):

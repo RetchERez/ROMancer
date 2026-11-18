@@ -170,7 +170,7 @@ def candidate_layout(report,selected):
     if not 1<=count<=1024 or any((p['offset']-base)%unit for p in parts) or (end-base)%unit:raise ValueError('candidate source ranges need separate tile collections')
     left=min(p['x'] for p in parts);top=min(p['y'] for p in parts)
     width=max(p['x']+p['width'] for p in parts)-left;height=max(p['y']+p['height'] for p in parts)-top
-    if width%8 or height%8 or not 1<=width//8<=8 or not 1<=height//8<=8 or any((p['x']-left)%8 or (p['y']-top)%8 for p in parts):raise ValueError('placements need a shared grid of up to8by8tiles')
+    if width%8 or height%8 or not 1<=width//8<=8 or not 1<=height//8<=8 or any((p['x']-left)%8 or (p['y']-top)%8 for p in parts):raise ValueError('placements need a shared grid of up to 8 by 8 tiles')
     columns,rows=width//8,height//8;indices=[None]*(columns*rows);flips=[0]*len(indices);colors=[None]*len(indices)
     for p in parts:
         for stored in range(p['height']//8):

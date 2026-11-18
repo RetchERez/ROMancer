@@ -14,7 +14,7 @@ def validate_recipe(recipe):
     if recipe['format']!='romancer-recipe-v1':raise ValueError('unsupported recipe format')
     label(recipe['name'],80);fields(recipe['source'],'sha256 size');number(recipe['source']['size'],1,64*1024**2)
     if type(recipe['source']['sha256']) is not str or not re.fullmatch('[0-9a-f]{64}',recipe['source']['sha256']):raise ValueError('invalid recipe source SHA-256')
-    if type(recipe['operations']) is not list or not 1<=len(recipe['operations'])<=1024:raise ValueError('recipe needs1..1024 supported operations')
+    if type(recipe['operations']) is not list or not 1<=len(recipe['operations'])<=1024:raise ValueError('recipe needs 1..1024 supported operations')
     for operation in recipe['operations']:
         if type(operation) is not dict:raise ValueError('invalid recipe operation')
         kind=operation.get('kind')
@@ -56,7 +56,7 @@ def preview_recipe(path,recipe,*,cancelled=lambda:False):
             if cancelled():raise KeyboardInterrupt
             number(edit['offset'],0,source['size'])
             for key in ('before','after'):
-                if type(edit[key]) is not str or not re.fullmatch('(?:[0-9a-f]{2}){1,4096}',edit[key]):raise ValueError('recipe byte ranges use1..4096 lowercase hex bytes')
+                if type(edit[key]) is not str or not re.fullmatch('(?:[0-9a-f]{2}){1,4096}',edit[key]):raise ValueError('recipe byte ranges use 1..4096 lowercase hex bytes')
             length=len(edit['before'])//2
             if len(edit['before'])!=len(edit['after']) or edit['before']==edit['after']:raise ValueError('recipe edits must change bytes without resizing')
             if edit['offset']<end:raise ValueError('recipe operations overlap')

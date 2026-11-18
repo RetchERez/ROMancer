@@ -170,7 +170,7 @@ def parse_cue(path):
         elif track:
             if current_file is None or current is not None or current_file.casefold() in used:raise ValueError('only separate-file tracks are supported')
             number=int(track[1]);mode=track[2].upper()
-            if number!=len(tracks)+1 or number>99:raise ValueError('CUE tracks must be ordered from01')
+            if number!=len(tracks)+1 or number>99:raise ValueError('CUE tracks must be ordered from 01')
             current={'number':number,'file':current_file,'mode':mode,'index':None};tracks.append(current);used.add(current_file.casefold())
         elif index:
             if current is None:raise ValueError('CUE index without track')
@@ -191,7 +191,7 @@ def parse_cue(path):
         source=checked_path(path.parent/track['file']);measured=p._measure(source);sector=2048 if track['mode']=='MODE1/2048' else 2352
         if not measured['size'] or measured['size']%sector:raise ValueError('track alignment mismatch')
         members.append({'name':track['file'],**measured});total+=measured['size']
-    if total>8*1024**3:raise ValueError('disc set exceeds8GiB')
+    if total>8*1024**3:raise ValueError('disc set exceeds 8 GiB')
     p._measure(path,measure)
     return {'cue':path.name,'tracks':tracks,'members':members}
 

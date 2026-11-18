@@ -17,12 +17,30 @@ class PublicReleaseTests(unittest.TestCase):
             api=WorkbenchAPI(Path(folder))
             try:
                 value=api.dispatch('system.capabilities',{})
-                self.assertEqual(value['release_name'],'ROMancer v1.1.0')
-                self.assertEqual(value['version'],'1.1.0')
-                self.assertEqual(value['target_version'],'1.1.0')
-                self.assertEqual(value['build_label'],'v1.1.0')
+                self.assertEqual(value['release_name'],'ROMancer v1.1.1')
+                self.assertEqual(value['version'],'1.1.1')
+                self.assertEqual(value['target_version'],'1.1.1')
+                self.assertEqual(value['build_label'],'v1.1.1')
                 self.assertEqual(value['release_status'],'RELEASE')
             finally:api.close()
+
+    def test_window_title_names_this_release(self):
+        # The desktop window shows the page title; it said v1.0.0 through v1.1.0.
+        from romancer import ROMANCER_RELEASE_NAME
+        page=(Path(__file__).resolve().parents[1]/'romancer'/'ui'/'index.html').read_text(encoding='utf-8')
+        self.assertIn('<title>'+ROMANCER_RELEASE_NAME+' — By RetchEWretched</title>',page)
+
+    def test_messages_keep_the_space_before_a_number(self):
+        # Messages such as "within15 seconds" and "at most32 scripts" reached v1.1.0.
+        import re
+        root=Path(__file__).resolve().parents[1]/'romancer'
+        glued=re.compile(r"[a-z,;:.] (?:most|least|than|within|exceeds|between|up to|first|need|needs)\d")
+        found=[]
+        for path in sorted(root.rglob('*')):
+            if path.suffix in ('.py','.js') and path.name!='app.bundle.js':
+                found+=[path.name+': '+match.group(0) for match in glued.finditer(path.read_text(encoding='utf-8'))]
+        self.assertEqual(found,[])
+        self.assertIn('within 15 seconds',(root/'ui'/'startup.js').read_text(encoding='utf-8'))
 
     def test_level_editing_is_excluded_from_the_release(self):
         from romancer.mcp_server import MCPServer

@@ -83,7 +83,7 @@ def _authored():
     for address,z in [(0x209b,8),(0x20dc,24)]:ppu(address);load(z);a.emit(0x18,0x69,80);write(0x2007)
     value(0);write(0x2003);value(2);write(0x4014);value(0);write(0x2005);write(0x2005);a.absolute(0x4c,'frame')
     a.label('restart');a.absolute(0x4c,0x8000)
-    # With dimensions at most16px, start/middle/end cover every touched8px cell.
+    # With dimensions at most 16 px, start/middle/end cover every touched8px cell.
     a.label('blocked')
     for right,bottom in [(x,y) for y in (0,1,2) for x in (0,1,2)]:
         load(10);a.emit(0x18,0x65,14)
@@ -147,10 +147,10 @@ def matches_studio_runtime(raw):
 
 def validate_studio_data(raw):
     if not matches_studio_runtime(raw):return
-    if any(value>8 for value in raw[0x1710:0x1712]):raise ValueError('Original workshop speed must be0 to8 pixels per frame.')
+    if any(value>8 for value in raw[0x1710:0x1712]):raise ValueError('Original workshop speed must be 0 to 8 pixels per frame.')
     for index in range(2):
         at=0x1d10+index*16;actor=dict(zip(ACTOR_FIELDS,raw[at:at+12]))
-        if not 1<=actor['width']<=16 or not 1<=actor['height']<=16 or actor['offset_x']>15 or actor['offset_y']>15:raise ValueError('Original workshop hitboxes need1 to16 pixel dimensions and0 to15 pixel offsets.')
+        if not 1<=actor['width']<=16 or not 1<=actor['height']<=16 or actor['offset_x']>15 or actor['offset_y']>15:raise ValueError('Original workshop hitboxes need 1 to 16 pixel dimensions and 0 to 15 pixel offsets.')
         if actor['x']>28 or actor['y']>29 or actor['x']*8+actor['offset_x']+actor['width']>256 or actor['y']*8+actor['offset_y']+actor['height']>240:raise ValueError('Original workshop starting hitbox must fit inside the256 by240 pixel room.')
         if not actor['patrol_left']<=actor['x']<=actor['patrol_right']<=28:raise ValueError('Starting X must lie between the left and right movement limits.')
         if actor['starting_health']>9 or actor['contact_damage']>9 or actor['ai_enabled']>1 or actor['damage_cooldown']>120:raise ValueError('Original workshop actor values exceed their engine limits.')

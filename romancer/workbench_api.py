@@ -928,7 +928,7 @@ class WorkbenchAPI:
             projects._measure(path,row,cancelled=c);owned=next(r for r in value['sources']+value['builds'] if r['artifact_id']==row['artifact_id'])
             saved=owned.setdefault('recipes',[])
             if recipe not in saved:
-                if len(saved)>=16:raise ValueError('this source already has16 saved recipes')
+                if len(saved)>=16:raise ValueError('this source already has 16 saved recipes')
                 saved.append(recipe)
             projects.write_json(project/'project.json',value)
         return {'ok':True,'status':'SAVED','recipe':recipe}

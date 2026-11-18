@@ -54,7 +54,7 @@ class TextGrowthTools:
         rules={r['resource']:r for r in d['profile']['rules']};refs=[]
         for pointer in d['format']['pointers']:
             if pointer['target_record']==record['id']:refs.append({'offset':rules[pointer['rule']]['offset'],'width':pointer['width'],'endian':pointer['endian'],'base':-pointer['base'],'target_delta':0})
-        if type(dest['extra_references']) is not list or len(dest['extra_references'])>128:raise ValueError('Declare at most128 additional references.')
+        if type(dest['extra_references']) is not list or len(dest['extra_references'])>128:raise ValueError('Declare at most 128 additional references.')
         if any(type(ref) is not dict or type(ref.get('target_delta')) is not int or ref['target_delta']!=0 for ref in dest['extra_references']):raise ValueError('Growing text supports record-start references only; interior segment offsets can shift.')
         refs+=dest['extra_references']
         for old in rules.values():

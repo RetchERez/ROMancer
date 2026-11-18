@@ -25,6 +25,15 @@ class UserGuideTests(unittest.TestCase):
             (root/'walkthrough.en.vtt').write_text('wrong caption format',encoding='utf-8')
             with self.assertRaisesRegex(ValueError,'unexpected format'):load_content(root)
 
+    def test_built_guide_names_the_release_and_every_linked_picture_exists(self):
+        import re
+        from romancer import ROMANCER_VERSION
+        guide=Path(__file__).resolve().parents[1]/'user-guide';page=(guide/'index.html').read_text(encoding='utf-8')
+        self.assertIn('<title>ROMancer v'+ROMANCER_VERSION+' User Guide</title>',page)
+        pictures=set(re.findall(r'(?:src|poster|href)="(screenshots/[^"]+)"',page))
+        self.assertGreater(len(pictures),40)
+        self.assertEqual(sorted(name for name in pictures if not (guide/name).is_file()),[])
+
     def test_reviewed_guide_and_new_ui_files_join_source_inventory(self):
         from tools.package_source import APPROVED_FILES, DIRECTORIES
         required={'user-guide/index.html','user-guide/guide.css','user-guide/guide.js','user-guide/guide.pdf','user-guide/guide.json',

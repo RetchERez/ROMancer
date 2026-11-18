@@ -12,8 +12,8 @@ export class LiveAudio{
  constructor(factory=()=>new AudioContext()){this.factory=factory;this.ticket=0;this.nodes=new Set();this.volume=1;this.muted=false;this.active=false;}
  async start(){this.stop();const ticket=this.ticket;try{this.context=this.factory();this.gain=this.context.createGain();this.gain.connect(this.context.destination);this.setVolume(this.volume,this.muted);await this.context.resume();if(ticket!==this.ticket)return;this.active=true;this.next=this.context.currentTime;}catch(error){if(ticket===this.ticket)this.stop();throw error;}}
  get queuedSeconds(){return this.active?Math.max(0,this.next-this.context.currentTime):0;}
- setVolume(value,muted=this.muted){if(!Number.isFinite(value)||value<0||value>1)throw new Error('Volume must be between0 and1.');this.volume=value;this.muted=muted;if(this.gain)this.gain.gain.value=muted?0:value;}
- enqueue(packet,ticket){if(!this.active||ticket!==this.ticket)return false;const decoded=decodePCM(packet);if(!decoded.left.length)return false;if(decoded.duration>.25)throw new Error('Audio packet exceeds250ms.');
+ setVolume(value,muted=this.muted){if(!Number.isFinite(value)||value<0||value>1)throw new Error('Volume must be between 0 and 1.');this.volume=value;this.muted=muted;if(this.gain)this.gain.gain.value=muted?0:value;}
+ enqueue(packet,ticket){if(!this.active||ticket!==this.ticket)return false;const decoded=decodePCM(packet);if(!decoded.left.length)return false;if(decoded.duration>.25)throw new Error('Audio packet exceeds 250 ms.');
   // Drop a late packet rather than scheduling an unbounded backlog.
   const start=Math.max(this.context.currentTime+.01,this.next);if(start+decoded.duration-this.context.currentTime>.25)return false;
   const buffer=this.context.createBuffer(2,decoded.left.length,decoded.rate);buffer.copyToChannel(decoded.left,0);buffer.copyToChannel(decoded.right,1);

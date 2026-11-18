@@ -104,7 +104,7 @@ def preflight_load(load,base,*,allow_game_save=False):
             check_output_paths(path,[session]);entry['source']=str(path);total+=path.stat().st_size
             with path.open('rb') as stream:
                 if hash_stream(stream)!=entry['expected_sha256']:raise ValueError('system dependency revision mismatch')
-        if total>8*1024**3:raise ValueError('runtime input set exceeds8GiB')
+        if total>8*1024**3:raise ValueError('runtime input set exceeds 8 GiB')
     return load
 
 

@@ -42,7 +42,7 @@ def measure_system_files(directory):
         relative=path.relative_to(directory).as_posix()
         if relative.casefold() in names:raise ValueError('duplicate system-file name')
         names.add(relative.casefold());measure=_measure(path);total+=measure['size']
-        if len(result)>=256 or total>256*1024**2:raise ValueError('choose a dedicated per-system BIOS folder within256MiB/256files')
+        if len(result)>=256 or total>256*1024**2:raise ValueError('choose a dedicated per-system BIOS folder within 256 MiB/256 files')
         result.append({'source':str(path),'relative':relative,'expected_sha256':measure['sha256'],'size':measure['size']})
     return result
 

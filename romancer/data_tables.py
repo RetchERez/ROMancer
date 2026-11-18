@@ -70,7 +70,7 @@ def validate_definition(definition,size):
 @contextmanager
 def _context(path,sha,definition):
     path=checked_path(Path(path));source=_measure(path)
-    if not 1<=source['size']<=64*1024**2:raise ValueError('tables require a declared flat resource up to64MiB')
+    if not 1<=source['size']<=64*1024**2:raise ValueError('tables require a declared flat resource up to 64 MiB')
     if source['sha256']!=sha:raise ValueError('source revision changed; inspect the current table')
     definition=validate_definition(definition,source['size'])
     with path.open('rb') as stream:

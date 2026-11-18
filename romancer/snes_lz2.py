@@ -41,7 +41,7 @@ def decode_lz2(data,max_output=LIMIT,*,cancelled=lambda:False):
         commands+=1
 
 def encode_lz2(raw):
-    if type(raw) is not bytes or not 1<=len(raw)<=LIMIT:raise ValueError('Encode a nonempty LC_LZ2 resource up to1MiB.')
+    if type(raw) is not bytes or not 1<=len(raw)<=LIMIT:raise ValueError('Encode a nonempty LC_LZ2 resource up to 1 MiB.')
     output=bytearray();history=defaultdict(lambda:deque(maxlen=24));pos=0
     def header(command,count):
         n=count-1
