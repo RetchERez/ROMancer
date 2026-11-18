@@ -42,7 +42,7 @@ sys.path.insert(0, str(HERE)); sys.path.insert(0, str(HERE.parent))
 STEP = 900
 SETTLE = 45          # frames before a scene at which video memory is sampled once more
 SWEEP_VERSION = 5
-MAP_PICKS = 2        # background cells tried per layer and kind of source
+MAP_PICKS = {'stored': 4, 'computed': 2, 'blank': 2}     # background cells tried per layer and kind of source
 MAP_SECONDS = 300    # no new background cell is started after this long (per ROM)
 VIDEO_DOMAINS = ('vram', 'chr', 'vram4')
 
@@ -249,14 +249,16 @@ def measure_map_edit(rom, system, scenes, chosen, fe_for, buttons=explore, secon
     stored in the ROM, in the chosen scene and then the others (latest
     first); then cells the game computes, the same way. The first edit that
     replays as planned is the result; `scenes` in it lists what was tried in
-    every scene before that.
+    every scene before that. Last of all come stored cells that show a blank
+    tile (a cleared screen): such an edit is as real as any, and the result
+    says `blank_tile` so that it can be told apart.
     """
     deadline = time.perf_counter() + seconds
     order = [chosen] + [sc for sc in reversed(scenes) if sc is not chosen]
     tried = []
-    for phase in ('stored', 'computed'):
+    for phase in ('stored', 'computed', 'blank'):
         for scene in order:
-            if phase == 'computed' and time.perf_counter() > deadline:
+            if phase != 'stored' and time.perf_counter() > deadline:
                 break
             m = measure_map(rom, system, scene, fe_for, buttons, phase=phase, deadline=deadline)
             if m.get('as_planned'):
@@ -271,13 +273,15 @@ def measure_map_edit(rom, system, scenes, chosen, fe_for, buttons=explore, secon
     return out
 
 
-def map_candidates(scene, system, lay, status, most=MAP_PICKS):
+def map_candidates(scene, system, lay, status, most=2, with_picture=True):
     """[(layer, how many cells qualify, [cells to try])] for cells whose tile number has `status`.
 
     A cell qualifies when its tile number's source is not a 00/FF coincidence
     and the tile it shows holds a picture (filler cells say little, and a
     whole blank map is often one ROM byte written everywhere). The cells to
     try come from the middle of the map and from different ROM bytes.
+    `with_picture=False` asks for the other cells instead: those that show a
+    tile of one flat color.
     """
     from romancer import graphics_trace as gt, cell_trace as ct
     doms = scene.snapshot.domains
@@ -290,7 +294,8 @@ def map_candidates(scene, system, lay, status, most=MAP_PICKS):
             if tiles is None or tiles.data is None or c.tile_address < 0:
                 return True
             return len(set(tiles.data[c.tile_address:c.tile_address + size])) > 1
-        cells = [c for c in layer.cells if ct.tile_status(c) == status and not ct.tile_source(c)['weak'] and pictured(c)]
+        cells = [c for c in layer.cells if ct.tile_status(c) == status and not ct.tile_source(c)['weak']
+                 and pictured(c) == with_picture]
         seen, picked = set(), []
         start = len(cells) // 3
         for c in cells[start:] + cells[:start]:
@@ -311,7 +316,8 @@ def measure_map(rom, system, scene, fe_for, buttons=explore, lay=None, phase='st
     The edit is the smallest there is: the cell's tile number plus one.
     phase 'stored' tries cells whose tile number is a ROM byte, then code
     values, written in place; phase 'computed' tries cells the game computes
-    (a packed map, or cells built from a stored piece). `as_planned` is true
+    (a packed map, or cells built from a stored piece); phase 'blank' is
+    'stored' for cells that show a blank tile. `as_planned` is true
     only when the replay with the edited ROM left exactly the planned bytes
     in the cell.
     """
@@ -332,14 +338,17 @@ def measure_map(rom, system, scene, fe_for, buttons=explore, lay=None, phase='st
     def verify(plan, expect=None):
         return gt.verify_plan(fe_for, rom, plan, short if plan.kind == 'cell-source' else quick, expect=expect,
                               buttons_for=buttons)
-    kinds = (('rom', ('direct',)), ('code', ('direct',))) if phase == 'stored' else (('derived', ('reencode', 'cell-source')),)
+    kinds = (('derived', ('reencode', 'cell-source')),) if phase == 'computed' else (('rom', ('direct',)), ('code', ('direct',)))
     # A layer the registers say is not drawn (a Mega Drive window of no size, a Super NES layer that is switched
     # off) is not a background: its "map" may be tile data or anything else that sits at that address.
     drawn = [layer for layer in lay if layer.shown is not False]
-    picks = [(status, paths, map_candidates(scene, system, drawn, status)) for status, paths in kinds]
+    picks = [(status, paths, map_candidates(scene, system, drawn, status, MAP_PICKS[phase], phase != 'blank'))
+             for status, paths in kinds]
     count = sum(n for _, _, found in picks for _, n, _ in found)
     result = {'scene_frame': scene.frame, 'phase': phase, 'layers': len(drawn),
               'candidates': count if phase == 'stored' else 0, 'computed_candidates': count if phase == 'computed' else 0}
+    if phase == 'blank':
+        result['blank_candidates'] = count
     attempts = result['attempts'] = []
     spare = None
     for status, paths, found in picks:
@@ -363,6 +372,8 @@ def measure_map(rom, system, scene, fe_for, buttons=explore, lay=None, phase='st
                 hit = dict(layer=layer.name, cell=[c.x, c.y], source=status, path=plan.details['path'],
                            writes=len(plan.writes), also_cells=len(plan.details['also_cells']),
                            outside_maps=plan.details['outside_maps'], **brief(plan.verified))
+                if phase == 'blank':
+                    hit['blank_tile'] = True
                 if plan.kind == 'cell-source':
                     hit['relation'] = plan.details.get('relation')
                 elif 'block' in plan.details:
@@ -738,7 +749,8 @@ def map_cause(r):
         return ('out of time' if m.get('stopped') else 'nothing drawn'), ''
     stored = [a for a in attempts if a['source'] != 'derived']
     computed = [a for a in attempts if a['source'] == 'derived']
-    detail = f'{len(stored)} stored and {len(computed)} computed cells tried in {len({t["scene_frame"] for t in scenes})} scenes'
+    frames = len({t['scene_frame'] for t in scenes if t.get('attempts')})
+    detail = f'{len(stored)} stored and {len(computed)} computed cells tried in {frames} scene{"s" if frames != 1 else ""}'
     if not stored:
         return 'computed', detail
     if all('also feeds a byte' in a.get('error', '') or 'come from one ROM byte' in a.get('error', '') for a in stored):
@@ -772,7 +784,8 @@ def report(outdir):
         for m in done:
             path = m.get('path', 'direct')
             s['map_edit_path'][path] = s['map_edit_path'].get(path, 0) + 1
-        s['map_edit_in_another_scene'] = sum(bool(m.get('scenes')) for m in done)
+        s['map_edit_in_another_scene'] = sum(any(t['scene_frame'] != m['scene_frame'] for t in m.get('scenes', ())) for m in done)
+        s['map_edit_on_a_blank_tile'] = sum(bool(m.get('blank_tile')) for m in done)
         s['map_edit_other_cells_change_too'] = sum(bool(m.get('also_cells')) for m in done)
         s['map_edit_changes_outside_the_maps'] = sum(bool(m.get('outside_maps')) for m in done)
         s['map_edit_cause'] = {}

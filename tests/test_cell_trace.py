@@ -369,7 +369,7 @@ class SweepTests(unittest.TestCase):
         layers = gt.layers(self.scene, 'gb')
         (layer, count, picked), = self.gs.map_candidates(self.scene, 'gb', layers, 'rom')
         self.assertEqual(count, 32)                                    # row 8
-        self.assertEqual(len(picked), self.gs.MAP_PICKS)
+        self.assertEqual(len(picked), 2)
         self.assertEqual(len({c.sources[0]['offset'] for c in picked}), len(picked))
         (_, count, picked), = self.gs.map_candidates(self.scene, 'gb', layers, 'derived')
         self.assertEqual(count, 8 * 32 + 32)                           # the block rows and row 9
@@ -384,6 +384,21 @@ class SweepTests(unittest.TestCase):
         self.assertTrue(m['as_planned'])
         self.assertEqual((m['scene_frame'], m['path'], m['source']), (900, 'direct', 'rom'))
         self.assertEqual([(t['scene_frame'], t['phase'], t['candidates']) for t in m['scenes']], [(1800, 'stored', 0)])
+
+    def test_a_cell_that_shows_a_blank_tile_is_the_last_resort_and_says_so(self):
+        vram, tags = self.game.draw(self.game.rom)
+        vram = bytearray(vram)
+        vram[0x60 * 16:0x80 * 16] = bytes(0x20 * 16)                   # the tiles row 8 shows: one flat color
+        for a in list(range(0x1800, 0x1800 + 8 * 32)) + list(range(0x1800 + 9 * 32, 0x1800 + 10 * 32)):
+            vram[a], tags[a] = 0, 0                                    # nothing else on the map
+        scene = make_scene({'vram': (bytes(vram), tags)}, 1800)
+        scene.video = self.scene.video
+        self.assertEqual(self.gs.map_candidates(scene, 'gb', gt.layers(scene, 'gb'), 'rom')[0][1], 0)
+        self.assertEqual(self.gs.map_candidates(scene, 'gb', gt.layers(scene, 'gb'), 'rom', with_picture=False)[0][1], 32)
+        m = self.gs.measure_map_edit(self.game.rom, 'gb', [scene], scene, None)
+        self.assertTrue(m['as_planned'])
+        self.assertEqual((m['phase'], m['path'], m['blank_tile']), ('blank', 'direct', True))
+        self.assertEqual([t['phase'] for t in m['scenes']], ['stored', 'computed'])
 
     def test_a_layer_that_is_not_drawn_is_not_tried(self):
         self.scene.video = dict(self.scene.video, lcdc=0xB1, wx=7, wy=150)      # window on, off screen, same map
@@ -433,7 +448,7 @@ class SweepTests(unittest.TestCase):
         chosen = self.blocks_only(1800)
         m = self.gs.measure_map_edit(self.game.rom, 'gb', [chosen], chosen, None)
         self.assertFalse(m.get('as_planned'))
-        self.assertEqual([t['phase'] for t in m['scenes']], ['stored', 'computed'])
+        self.assertEqual([t['phase'] for t in m['scenes']], ['stored', 'computed', 'blank'])
         self.assertEqual(self.gs.map_cause({'map_edit': m})[0], 'computed')
         m = self.gs.measure_map_edit(self.game.rom, 'gb', [self.scene], self.scene, None)
         self.assertEqual(self.gs.map_cause({'map_edit': m})[0], 'no effect')
@@ -452,7 +467,8 @@ class SweepTests(unittest.TestCase):
     def test_the_coverage_section_is_replaced_in_place(self):
         import tempfile
         from pathlib import Path
-        done = {'scene_frame': 900, 'as_planned': True, 'path': 'cell-source', 'also_cells': 3, 'outside_maps': 0, 'scenes': [{}]}
+        done = {'scene_frame': 900, 'as_planned': True, 'path': 'cell-source', 'also_cells': 3, 'outside_maps': 0,
+                'scenes': [{'scene_frame': 1800}]}
         missed = {'scene_frame': 1800, 'candidates': 0, 'computed_candidates': 5,
                   'scenes': [{'scene_frame': 1800, 'layers': 1, 'attempts': [{'source': 'derived', 'error': 'x'}]}]}
 
@@ -470,9 +486,10 @@ class SweepTests(unittest.TestCase):
             self.assertEqual(totals['gb']['map_edit_path'], {'cell-source': 1})
             self.assertEqual(totals['gb']['map_edit_cause'], {'computed': 1})
             self.assertEqual(totals['gb']['map_edit_in_another_scene'], 1)
+            self.assertEqual(totals['gb']['map_edit_on_a_blank_tile'], 0)
             text = self.report.section(totals, results, {'b' * 64: 'Game B (USA)'}, {'gb': {'map_edit_as_planned': 0}})
-            self.assertIn('| gb | Game B (USA) | computed (0 stored and 1 computed cells tried in 1 scenes) |', text)
-            self.assertIn('| gb | 2 | 1 | 0 | 0 | 0 | 1 | 1 | 1 | 1 |', text)
+            self.assertIn('| gb | Game B (USA) | computed (0 stored and 1 computed cells tried in 1 scene) |', text)
+            self.assertIn('| gb | 2 | 1 | 0 | 0 | 0 | 1 | 1 | 1 | 0 | 1 |', text)
             self.assertIn('before this one: gb 0 (all 0)', text)
             self.assertNotIn('Game A', text)
             page = Path(folder) / 'COVERAGE.md'

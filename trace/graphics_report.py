@@ -77,16 +77,19 @@ def section(totals: dict, results: list, titles: dict, before: dict | None = Non
               'literal inside packed data. The ROM bytes at and around the traced source were tried one at a time; the '
               'place counts only when the cell then held exactly the planned value and nothing outside the background '
               'maps changed. Every other cell built from the same piece changes with it (the "other cells" column '
-              'counts the ROMs where that happened, by any path).', '',
+              'counts the ROMs where that happened, by any path).',
+              '- **on a blank tile**: of the confirmed edits, those made on a cell that shows a tile of one flat color, '
+              'because no sampled scene had a stored cell with a picture in it (a cleared screen). They are counted in '
+              '"confirmed" and "in place".', '',
               '| System | traced | confirmed | ' + ' | '.join(name for name, _ in CELL_PATHS)
-              + ' | in another scene than the tile edit | other cells change too | not confirmed |',
-              '|---' * (len(CELL_PATHS) + 6) + '|']
-    total = [0] * (len(CELL_PATHS) + 5)
+              + ' | in another scene than the tile edit | other cells change too | on a blank tile | not confirmed |',
+              '|---' * (len(CELL_PATHS) + 7) + '|']
+    total = [0] * (len(CELL_PATHS) + 6)
     for system, s in totals.items():
         paths = s.get('map_edit_path', {})
         row = [s['traced'], s['map_edit_as_planned']] + [paths.get(key, 0) for _, key in CELL_PATHS] + [
             s.get('map_edit_in_another_scene', 0), s.get('map_edit_other_cells_change_too', 0),
-            s['traced'] - s['map_edit_as_planned']]
+            s.get('map_edit_on_a_blank_tile', 0), s['traced'] - s['map_edit_as_planned']]
         total = [a + b for a, b in zip(total, row)]
         lines.append(f'| {system} | ' + ' | '.join(map(str, row)) + ' |')
     lines.append('| all | ' + ' | '.join(map(str, total)) + ' |')
