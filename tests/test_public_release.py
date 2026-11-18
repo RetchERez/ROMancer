@@ -24,6 +24,12 @@ class PublicReleaseTests(unittest.TestCase):
                 self.assertEqual(value['release_status'],'RELEASE')
             finally:api.close()
 
+    def test_window_title_names_this_release(self):
+        # The desktop window shows the page title; it said v1.0.0 through v1.1.0.
+        from romancer import ROMANCER_RELEASE_NAME
+        page=(Path(__file__).resolve().parents[1]/'romancer'/'ui'/'index.html').read_text(encoding='utf-8')
+        self.assertIn('<title>'+ROMANCER_RELEASE_NAME+' — By RetchEWretched</title>',page)
+
     def test_level_editing_is_excluded_from_the_release(self):
         from romancer.mcp_server import MCPServer
         with tempfile.TemporaryDirectory() as folder:
