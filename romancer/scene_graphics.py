@@ -1173,6 +1173,9 @@ def _plan_color(job: dict) -> dict:
         after, others, hit = replay(writes)
         return {'changed': {swatch.domain: sorted(slots) if hit else []}, 'others': others}
     hits = sorted(h['offset'] + lead for h in pt.locate_derived_source(probe, body, swatch, scene))
+    if not hits and not any(source and source['kind'] == 'derived' for source in swatch.sources):
+        raise ValueError('ROMancer has not seen where this color comes from, and did not find this palette stored as plain '
+                         'colors in the ROM. It is probably packed, or made by the game as it runs.')
     if not hits:
         raise ValueError('ROMancer changed the bytes around where this color was traced and replayed the game each time, '
                          'but none of them changed it. The game works it out from something further away.')
