@@ -146,6 +146,7 @@ APPROVED_FILES = frozenset({
     '.github/README.md',
     '.github/screenshots/sonic-green-hill-palette.png',
     '.github/screenshots/top-gear-3000-playtest.png',
+    '.github/screenshots/scenes-png-import.png',
     '.github/workflows/ci.yml',
     '.gitignore',
     'LICENSE',
