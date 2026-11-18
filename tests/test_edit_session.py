@@ -451,6 +451,16 @@ class EditSessionEndToEndTests(unittest.TestCase):
             scene_id, view = max(((sid, session.graphics_view(sid)) for sid in session.scenes),
                                  key=lambda pair: sum(1 for t in pair[1]['tiles'] if t['on_screen'] and t['editable'] and not t['blank']))
             sheet = session.export_picture(scene_id, 'sheet')
+            # everything at once: one ZIP with every scene's sheet and layers, and a list of what is in it
+            import io as _io, zipfile as _zipfile
+            everything = session.export_everything()
+            with _zipfile.ZipFile(_io.BytesIO(everything['zip'])) as archive:
+                names = archive.namelist()
+                self.assertIn('CONTENTS.txt', names)
+                self.assertEqual(everything['files'], len(names) - 1)
+                self.assertEqual(archive.read(next(n for n in names if n.endswith('/' + sheet['name']))), sheet['png'])
+                self.assertIn(sheet['name'], archive.read('CONTENTS.txt').decode())
+            self.assertGreaterEqual(everything['scenes'], 1)
             image = Image.open(io.BytesIO(sheet['png']))
             self.assertEqual((image.mode, image.size), ('P', (sp.COLUMNS * 8, sheet['height'])))
             self.assertEqual(sheet['pictures'], len(view['tiles']))

@@ -1003,6 +1003,7 @@
         "Choose <b>Record a level map</b>, then play through the level. ROMancer keeps a scene every time the screen moves. <b>Let ROMancer walk right</b> plays for you.",
         "Choose <b>Finish the level map</b>. The map opens when it is ready. <b>Save map as PNG</b> saves the picture.",
         "Choose <b>Pick a picture</b> and click a place on the map, or drag over several, to take it as your brush. When the level is built from blocks, the brush snaps to them.",
+        "If the level has more than one background layer, <b>Show</b> chooses all layers together or one alone, and <b>Paint on</b> chooses whether your change is made on all layers or on one.",
         "Click or drag somewhere else to paint the brush there, then choose <b>Show what changes</b>. Read what ROMancer found, look at the map, then <b>Keep this change</b>. <b>Review and save</b> writes a separate build."
       ],
       "result": "The new build shows your change in the level. Your original ROM is unchanged.",

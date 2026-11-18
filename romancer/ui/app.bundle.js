@@ -1974,20 +1974,20 @@
       "check-save": async () => {
         var _a2, _b2;
         if (!current3()) return;
-        let steps2;
-        if (read("check-input-mode") === "custom") steps2 = JSON.parse(read("check-steps"));
+        let steps3;
+        if (read("check-input-mode") === "custom") steps3 = JSON.parse(read("check-steps"));
         else {
           let remaining = Number(read("check-frames"));
           if (!Number.isSafeInteger(remaining) || remaining < 1 || remaining > 2400) throw Error("Choose 1 to 2400 frames before capture.");
-          steps2 = [];
+          steps3 = [];
           while (remaining) {
             const count = Math.min(600, remaining);
-            steps2.push({ frames: count, buttons: [], port: 0 });
+            steps3.push({ frames: count, buttons: [], port: 0 });
             remaining -= count;
           }
         }
         const region = ((_a2 = document.getElementById("check-region-enable")) == null ? void 0 : _a2.checked) ? Object.fromEntries(["x", "y", "width", "height"].map((k) => [k, Number(read("check-region-" + k))])) : null;
-        const config = { name: read("check-name").trim(), automatic: !!((_b2 = document.getElementById("check-auto")) == null ? void 0 : _b2.checked), mode: read("check-mode"), steps: steps2, region, route_ids: cfg.route_ids || [] };
+        const config = { name: read("check-name").trim(), automatic: !!((_b2 = document.getElementById("check-auto")) == null ? void 0 : _b2.checked), mode: read("check-mode"), steps: steps3, region, route_ids: cfg.route_ids || [] };
         await ctx2.run("checks.configure", { ...params, artifact_id: (original2 == null ? void 0 : original2.artifact_id) || params.artifact_id, config }, { render: false });
         if (current3()) return ctx2.render();
       },
@@ -2841,6 +2841,15 @@
         return result;
       } finally {
         clearTimeout(timer);
+      }
+    },
+    // Told to the service as the page goes away, so that it can stop once the last window has closed. keepalive lets the
+    // request outlive the page.
+    closing() {
+      try {
+        fetch("/api/call", { method: "POST", keepalive: true, headers: headers(), body: JSON.stringify({ operation: "system.ui_closed", parameters: {} }) }).catch(() => {
+        });
+      } catch {
       }
     },
     async call(operation, parameters = {}) {
@@ -5439,7 +5448,7 @@ ${font ? `<section class="card"><h3>Font metrics · ${esc(font.id)}</h3><div cla
     }
     const result = identity(state2, entry.result) ? entry.result : null, available = ((_b = entry.capabilities) == null ? void 0 : _b.available) === true;
     const reason = ((_c = entry.capabilities) == null ? void 0 : _c.reason) || entry.error || "The native debugger is unavailable for this source or host.";
-    const steps2 = () => entry.steps.map((_, i) => ({ frames: integer6("trace-frames-" + i, 1, 3600), buttons: read("trace-buttons-" + i).split(/[\s,]+/).filter(Boolean), port: 0 }));
+    const steps3 = () => entry.steps.map((_, i) => ({ frames: integer6("trace-frames-" + i, 1, 3600), buttons: read("trace-buttons-" + i).split(/[\s,]+/).filter(Boolean), port: 0 }));
     const accept = async (operation, parameters) => {
       if (!current3()) throw Error("The selected source changed. Open its native capture again.");
       const generation = ++entry.generation;
@@ -5456,19 +5465,19 @@ ${font ? `<section class="card"><h3>Font metrics · ${esc(font.id)}</h3><div cla
       "trace-replay-playtest": () => {
         if (!current3() || !playtestReplay) throw Error("Capture a new Playtest observation before replaying it.");
         if (!available) throw Error(reason);
-        const { steps: steps3, start_frame } = playtestReplay;
+        const { steps: steps4, start_frame } = playtestReplay;
         return accept("debugger.investigate", {
           investigation_id: proposal.investigation_id,
           candidate_id: proposal.candidate.candidate_id,
-          replay: { steps: steps3, start_frame, event_limit: 200, instruction_limit: 2e7, timeout: 30 }
+          replay: { steps: steps4, start_frame, event_limit: 200, instruction_limit: 2e7, timeout: 30 }
         });
       },
       "trace-replay-read": () => {
         if (!current3() || !playtestReplay) throw Error("Capture a new Playtest observation before replaying it.");
         if (!available) throw Error(reason);
-        const { steps: steps3, start_frame } = playtestReplay, start = integer6("trace-read-address", 0, 16777215), length = integer6("trace-read-length", 1, 256);
+        const { steps: steps4, start_frame } = playtestReplay, start = integer6("trace-read-address", 0, 16777215), length = integer6("trace-read-length", 1, 256);
         return accept("debugger.capture", { config: {
-          steps: steps3,
+          steps: steps4,
           start_frame,
           event_limit: 200,
           instruction_limit: 2e7,
@@ -5479,7 +5488,7 @@ ${font ? `<section class="card"><h3>Font metrics · ${esc(font.id)}</h3><div cla
       "trace-capture": () => {
         if (!current3()) throw Error("The selected source changed.");
         if (!available) throw Error(reason);
-        const replay = { steps: steps2(), start_frame: integer6("trace-start", 0, 3599), event_limit: integer6("trace-limit", 1, 2e3), instruction_limit: 2e7, timeout: 30 };
+        const replay = { steps: steps3(), start_frame: integer6("trace-start", 0, 3599), event_limit: integer6("trace-limit", 1, 2e3), instruction_limit: 2e7, timeout: 30 };
         if (read("trace-stop") === "access") replay.stop = { occurrence: integer6("trace-occurrence", 1, replay.event_limit) };
         if (proposal) return accept("debugger.investigate", { investigation_id: proposal.investigation_id, candidate_id: proposal.candidate.candidate_id, replay });
         const start = integer6("trace-address", 0, 268435455), length = integer6("trace-length", 1, 4096);
@@ -5488,14 +5497,14 @@ ${font ? `<section class="card"><h3>Font metrics · ${esc(font.id)}</h3><div cla
       "trace-add-step": async () => {
         if (!current3()) throw Error("The source changed.");
         if (entry.steps.length >= 64) throw Error("Use at most 64 input steps.");
-        entry.steps = steps2();
+        entry.steps = steps3();
         entry.steps.push({});
         await ctx2.render();
       },
       "trace-remove-step": async () => {
         if (!current3()) throw Error("The source changed.");
         if (entry.steps.length > 1) {
-          entry.steps = steps2();
+          entry.steps = steps3();
           entry.steps.pop();
           await ctx2.render();
         }
@@ -7327,9 +7336,9 @@ ${state2.artifact.system_id ? `<details><summary>Advanced byte options</summary>
     }
     function extend(event) {
       const [x, y] = point(event), [fromX, fromY] = previous;
-      const steps2 = Math.max(Math.abs(x - fromX), Math.abs(y - fromY), 1);
-      for (let step = 1; step <= steps2; step++) {
-        paint2(Math.round(fromX + (x - fromX) * step / steps2), Math.round(fromY + (y - fromY) * step / steps2));
+      const steps3 = Math.max(Math.abs(x - fromX), Math.abs(y - fromY), 1);
+      for (let step = 1; step <= steps3; step++) {
+        paint2(Math.round(fromX + (x - fromX) * step / steps3), Math.round(fromY + (y - fromY) * step / steps3));
       }
       previous = [x, y];
       draw2(draft, model.draft);
@@ -9187,7 +9196,7 @@ ${state2.artifact.system_id ? `<details><summary>Advanced byte options</summary>
     } catch {
       route = example;
     }
-    const steps2 = route.steps || [];
+    const steps3 = route.steps || [];
     const saveLocal = async (value) => {
       ctx2.setDraft("route-json", JSON.stringify(value, null, 2));
       state2.savedRoute = null;
@@ -9260,7 +9269,7 @@ ${state2.artifact.system_id ? `<details><summary>Advanced byte options</summary>
       }
     });
     return `<section class="card"><h3>Routes</h3><div class="field-row">${select("route-system", "Saved system setup", familyOptions, ctx2.draft("route-system", ((_a = state2.artifact) == null ? void 0 : _a.system_id) || "nes"))}${select("route-content", "Content", [...state2.artifact ? [[state2.artifact.artifact_id, state2.artifact.name]] : []], ctx2.draft("route-content", ((_b = state2.artifact) == null ? void 0 : _b.artifact_id) || ""))}${field("route-name", "Route name", ctx2.draft("route-name", route.id || "My route"))}</div><div class="actions">${button("Record playtest inputs", "route-record-start", { disabled: !state2.runtime || !!state2.recordingRoute })}${button("Open playtest", "navigate", { id: "playtest" })}${state2.recordingRoute ? button("Add current frame assertion", "route-record-capture") + button("Stop & save recording", "route-record-stop", { primary: true }) : ""}</div><div class="field-row">${select("route-definition", "Saved route", [["", "Choose a route"], ...definitions.map((d) => [d.definition_id, d.name + " · " + d.steps + " steps" + (d.complete ? "" : " · draft")])], ctx2.draft("route-definition", ((_c = state2.savedRoute) == null ? void 0 : _c.definition_id) || ""))}${select("route-start", "Replay start", [["cold", "Cold start"], ["checkpoint", "Recorded checkpoint"]], ctx2.draft("route-start", "cold"))}</div><div class="actions">${button("Open definition", "route-open-definition", { disabled: !definitions.length })}${button("Replay saved route", "route-replay-definition", { primary: true, disabled: !definitions.length })}${button("Save as cold-start test", "route-save-definition")}</div>
-<details class="config"><summary>Edit route steps</summary><div class="table-wrap"><table><thead><tr><th>Step</th><th>Frames</th><th>Input</th><th>Assertions</th><th></th></tr></thead><tbody>${steps2.map((s, i) => `<tr><td>${i + 1}</td><td>${s.frames}</td><td>${esc(s.buttons.join(", ") || "None")}</td><td>${s.assertions.length}</td><td>${button("Remove", "route-remove-step", { id: String(i) })}</td></tr>`).join("")}</tbody></table></div><div class="field-row">${field("step-frames", "Frames", ctx2.draft("step-frames", "60"))}${field("step-buttons", "Buttons (comma separated)", ctx2.draft("step-buttons", ""))}${field("step-port", "Controller port", ctx2.draft("step-port", "0"))}${select("step-checkpoint", "Save checkpoint after step", [["no", "No"], ["yes", "Yes"]], ctx2.draft("step-checkpoint", "no"))}${select("step-assertion", "Assertion", [["none", "None"], ["memory_eq", "Exact memory bytes"], ["capture_sha256", "Exact frame hash"]], ctx2.draft("step-assertion", "none"))}${field("step-region", "Memory region", ctx2.draft("step-region", "2"))}${field("step-offset", "Memory offset", ctx2.draft("step-offset", "0"))}${field("step-hex", "Expected bytes", ctx2.draft("step-hex", ""))}${field("step-capture", "Expected frame SHA-256", ctx2.draft("step-capture", ""))}${field("step-index", "Existing step index (starts at 0)", ctx2.draft("step-index", "0"))}${field("step-length", "Bytes for live assertion", ctx2.draft("step-length", "1"))}</div><div class="actions">${button("Add step", "route-add-step")}${button("Add assertion to step", "route-set-assertion")}${state2.recordingRoute ? button("Record current memory assertion", "route-record-memory") : ""}</div><div class="field-row">${field("route-max-frames", "Maximum frames", ctx2.draft("route-max-frames", route.max_frames || 6e3))}${field("route-max-actions", "Maximum actions", ctx2.draft("route-max-actions", route.max_actions || 100))}</div><div class="actions">${button("Review route", "route-preview")}${button("Save definition", "route-save-definition")}</div></details>${report(state2.results["routes.compile"], "Route review")}</section>`;
+<details class="config"><summary>Edit route steps</summary><div class="table-wrap"><table><thead><tr><th>Step</th><th>Frames</th><th>Input</th><th>Assertions</th><th></th></tr></thead><tbody>${steps3.map((s, i) => `<tr><td>${i + 1}</td><td>${s.frames}</td><td>${esc(s.buttons.join(", ") || "None")}</td><td>${s.assertions.length}</td><td>${button("Remove", "route-remove-step", { id: String(i) })}</td></tr>`).join("")}</tbody></table></div><div class="field-row">${field("step-frames", "Frames", ctx2.draft("step-frames", "60"))}${field("step-buttons", "Buttons (comma separated)", ctx2.draft("step-buttons", ""))}${field("step-port", "Controller port", ctx2.draft("step-port", "0"))}${select("step-checkpoint", "Save checkpoint after step", [["no", "No"], ["yes", "Yes"]], ctx2.draft("step-checkpoint", "no"))}${select("step-assertion", "Assertion", [["none", "None"], ["memory_eq", "Exact memory bytes"], ["capture_sha256", "Exact frame hash"]], ctx2.draft("step-assertion", "none"))}${field("step-region", "Memory region", ctx2.draft("step-region", "2"))}${field("step-offset", "Memory offset", ctx2.draft("step-offset", "0"))}${field("step-hex", "Expected bytes", ctx2.draft("step-hex", ""))}${field("step-capture", "Expected frame SHA-256", ctx2.draft("step-capture", ""))}${field("step-index", "Existing step index (starts at 0)", ctx2.draft("step-index", "0"))}${field("step-length", "Bytes for live assertion", ctx2.draft("step-length", "1"))}</div><div class="actions">${button("Add step", "route-add-step")}${button("Add assertion to step", "route-set-assertion")}${state2.recordingRoute ? button("Record current memory assertion", "route-record-memory") : ""}</div><div class="field-row">${field("route-max-frames", "Maximum frames", ctx2.draft("route-max-frames", route.max_frames || 6e3))}${field("route-max-actions", "Maximum actions", ctx2.draft("route-max-actions", route.max_actions || 100))}</div><div class="actions">${button("Review route", "route-preview")}${button("Save definition", "route-save-definition")}</div></details>${report(state2.results["routes.compile"], "Route review")}</section>`;
   }
 
   // romancer/ui/views/routes.js
@@ -10216,6 +10225,15 @@ ${state2.artifact.system_id ? `<details><summary>Advanced byte options</summary>
     }
     return out;
   }
+  function paintLayers(view, choice) {
+    if (view.plane !== 0 || view.planes.length < 2) return [view.plane];
+    return choice === "all" ? view.planes.map((plane) => plane.index) : [Number(choice)];
+  }
+  var layerChoices = (view) => view.plane === 0 && view.planes.length > 1 ? [["all", "All layers"], ...view.planes.map((plane) => [String(plane.index), plane.name + " only"])] : [];
+  function steps2(level, change) {
+    const at = change ? change.working || change.error ? 2 : 3 : level.painted.size ? 2 : level.brush ? 1 : 0;
+    return [["Pick", "Click a place on the map, or drag over several, to take it as your brush."], ["Paint", "Click or drag where the brush should go."], ["Check", "Choose Show what changes. ROMancer replays the game."], ["Keep", "Look at the map, then keep the change or cancel it."]].map(([name2, text], index) => ({ name: name2, text, now: index === at, done: index < at }));
+  }
   var paintedCells = (painted) => [...painted.entries()].map(([place, from]) => {
     const [col, row] = place.split(",").map(Number);
     return { col, row, from };
@@ -10247,8 +10265,10 @@ ${state2.artifact.system_id ? `<details><summary>Advanced byte options</summary>
     const level = ed.level;
     if (!level || !level.view) return "";
     const view = level.view, change = levelChange(ed), painted = level.painted.size, brush = level.brush;
-    const planes = view.planes.length > 1 ? `<label>Layer <select id="level-plane" aria-label="Layer of the level">${view.planes.map((p) => `<option value="${p.index}" ${p.index === view.plane ? "selected" : ""}>${esc(p.name)} (${p.width} by ${p.height})</option>`).join("")}</select></label>` : "";
-    const choices = units(view), unitPart = choices.length > 1 ? `<label>Brush snaps to <select id="level-unit" aria-label="What the brush snaps to">${choices.map((u) => `<option value="${u.id}" ${u.id === level.unit ? "selected" : ""}>${esc(u.label)}</option>`).join("")}</select></label>` : "";
+    const planes = view.planes.length > 1 ? `<label>Show <select id="level-plane" aria-label="Which layers the map shows">${view.planes.map((p) => `<option value="${p.index}" ${p.index === view.plane ? "selected" : ""}>${p.index === 0 ? "All layers together" : esc(p.name) + " alone"}</option>`).join("")}</select></label>` : "";
+    const choices = layerChoices(view), paintOn = choices.length ? `<label>Paint on <select id="level-layers" aria-label="Which layers a change is made on">${choices.map(([value, label]) => `<option value="${value}" ${value === level.paintOn ? "selected" : ""}>${esc(label)}</option>`).join("")}</select></label>` : "";
+    const guide = `<ol class="level-steps" aria-label="How to change the level">${steps2(level, change).map((step) => `<li class="${step.now ? "now" : step.done ? "done" : ""}"${step.now ? ' aria-current="step"' : ""}><strong>${step.name}</strong><span>${step.text}</span></li>`).join("")}</ol>`;
+    const sizes = units(view), unitPart = sizes.length > 1 ? `<label>Brush snaps to <select id="level-unit" aria-label="What the brush snaps to">${sizes.map((u) => `<option value="${u.id}" ${u.id === level.unit ? "selected" : ""}>${esc(u.label)}</option>`).join("")}</select></label>` : "";
     const zoom = `<label>Zoom <select id="level-zoom" aria-label="Zoom">${ZOOMS.map((z) => `<option value="${z}" ${z === level.zoom ? "selected" : ""}>${z}x</option>`).join("")}</select></label>`;
     const tools = TOOLS.map(([id, label]) => `<button type="button" class="scene-mode ${level.tool === id ? "active" : ""}" data-action="level-tool" data-id="${id}" aria-pressed="${level.tool === id}">${label}</button>`).join("");
     const hint = level.tool === "pick" ? "Click a place to take its picture as your brush, or drag to take a block of places (a platform, a tree)." : !brush ? "Pick a picture from the map first." : level.tool === "paint" ? "Click or drag on the map to put your brush there." : "Click or drag over painted places to take the paint off.";
@@ -10258,7 +10278,8 @@ ${state2.artifact.system_id ? `<details><summary>Advanced byte options</summary>
     const after = view.after ? `<label class="level-toggle"><input type="checkbox" id="level-after" ${level.showAfter ? "checked" : ""}> Show the map with the changes</label>` : "";
     const propose2 = button("Show what changes", "level-propose", { primary: true, disabled: !painted, reason: "Paint at least one place first." }) + button("Clear paint", "level-clear", { disabled: !painted && !change });
     return `<div class="card-heading"><h3>${esc(view.name)}</h3>${badge(`${view.width} by ${view.height} cells · ${plural2(view.scenes.length, "capture")}`, "neutral")}</div>
- <div class="actions level-bar">${planes}${zoom}${unitPart}${after}${button("Save map as PNG", "level-export", { icon: "download" })}${button("Remove this level map", "level-forget")}${button("Close", "level-close")}</div>
+ ${guide}
+ <div class="actions level-bar">${planes}${paintOn}${zoom}${unitPart}${after}${button("Save map as PNG", "level-export", { icon: "download" })}${button("Remove this level map", "level-forget")}${button("Close", "level-close")}</div>
  <div class="scene-modes" role="group" aria-label="Tool">${tools}</div>
  <p class="subtle" role="status">${hint}${built}${locked}</p>
  <div class="level-scroll" id="level-scroll" tabindex="0" aria-label="The level map. Scroll to move around."><canvas id="level-canvas" class="level-canvas" width="${view.width * view.cell * level.zoom}" height="${view.height * view.cell * level.zoom}" role="img" aria-label="Map of ${esc(view.name)}"></canvas></div>
@@ -10348,6 +10369,7 @@ ${state2.artifact.system_id ? `<details><summary>Advanced byte options</summary>
       ed.level = {
         id,
         view,
+        paintOn: same && ed.level.paintOn ? ed.level.paintOn : "all",
         unit: same && unitIds.includes(ed.level.unit) ? ed.level.unit : unitIds[unitIds.length - 1],
         tool: same ? ed.level.tool : "pick",
         brush: same ? ed.level.brush : null,
@@ -10469,7 +10491,7 @@ ${state2.artifact.system_id ? `<details><summary>Advanced byte options</summary>
         const level = ed.level;
         if (!level || !level.painted.size) return;
         await host.dropPreview();
-        const result = await host.call("level_paint", { level_id: level.id, plane: level.view.plane, cells: paintedCells(level.painted) });
+        const result = await host.call("level_paint", { level_id: level.id, plane: level.view.plane, cells: paintedCells(level.painted), layers: paintLayers(level.view, level.paintOn) });
         if (!host.current()) return;
         ed.proposal = result.change;
         ed.inspect = null;
@@ -10579,6 +10601,9 @@ ${state2.artifact.system_id ? `<details><summary>Advanced byte options</summary>
         if (event.target.id === "level-zoom") {
           level.zoom = Number(event.target.value);
           host.update(["scene-level"]);
+        }
+        if (event.target.id === "level-layers") {
+          level.paintOn = event.target.value;
         }
         if (event.target.id === "level-unit") {
           level.unit = event.target.value;
@@ -10773,7 +10798,7 @@ ${state2.artifact.system_id ? `<details><summary>Advanced byte options</summary>
     const summary = ed.summary, recording = summary.recording, running = (recording == null ? void 0 : recording.state) === "running", engine = summary.engine;
     return `<div class="card-heading"><h3>Scenes</h3>${badge(plural2(summary.scenes.filter((row) => row.origin !== "level").length, "scene") + " recorded", summary.scenes.length ? "good" : "neutral")}</div>
  <p class="subtle">A scene is a moment of the game that ROMancer has watched. When you change something, every scene that uses the same data is shown. Scenes you haven't recorded can't be shown, so record the places you care about.</p>
- <div class="actions">${running ? button("Stop recording", "scene-record-stop") : button("Record more scenes", "scene-record", { primary: !summary.scenes.length, icon: "plus", disabled: !engine.installed, reason: engine.reason })}${button(ed.playing ? "Stop playing" : "Play and capture a moment", "scene-play-toggle", { icon: "playtest", disabled: !engine.installed || running, reason: engine.installed ? "Wait for recording to finish, or stop it." : engine.reason })}</div>
+ <div class="actions">${running ? button("Stop recording", "scene-record-stop") : button("Record more scenes", "scene-record", { primary: !summary.scenes.length, icon: "plus", disabled: !engine.installed, reason: engine.reason })}${button(ed.playing ? "Stop playing" : "Play and capture a moment", "scene-play-toggle", { icon: "playtest", disabled: !engine.installed || running, reason: engine.installed ? "Wait for recording to finish, or stop it." : engine.reason })}${button("Save all graphics (ZIP)", "scene-save-everything", { icon: "download", disabled: !summary.scenes.length, reason: "Record a scene first." })}</div>
  ${recording ? `<div class="scene-progress" role="status" aria-live="polite">${running ? `<progress max="${recording.total}" value="${recording.done}" aria-label="Recording progress"></progress>` : ""}<span>${esc(recording.message)}${running && recording.found ? " " + plural2(recording.found, "new scene") + " so far." : ""}</span></div>` : ""}
  <div class="scene-strip" role="group" aria-label="Recorded scenes">${summary.scenes.filter((row) => row.origin !== "level" || row.id === ed.sceneId).map((row) => `<button type="button" class="scene-thumb ${row.id === ed.sceneId ? "selected" : ""}" data-action="scene-open" data-id="${row.id}" aria-pressed="${row.id === ed.sceneId}"><img alt="" data-picture="${esc(row.image)}" width="${row.width}" height="${row.height}"><span>${esc(row.label)}</span></button>`).join("") || `<p class="subtle">No scenes yet. Record more scenes lets the game play by itself for a few minutes; Play and capture lets you go where you want.</p>`}</div>`;
   }
@@ -11827,6 +11852,19 @@ ${state2.artifact.system_id ? `<details><summary>Advanced byte options</summary>
         setTimeout(() => URL.revokeObjectURL(url), 1e3);
         ctx2.notify(`${result.name} saved: ${result.width} by ${result.height} pixels, ${plural2(result.pictures, "picture")}${result.indexed ? ", with the scene’s " + result.colors + " colors as its palette" : ""}. Keep that size when you draw on it.`);
       },
+      "scene-save-everything": async () => {
+        ctx2.notify("Saving the graphics of every scene…");
+        const result = await call(ctx2, ed, "export_everything");
+        if (!current2(ctx2, ed)) return;
+        const bytes = Uint8Array.from(atob(result.zip_base64), (ch) => ch.charCodeAt(0)), url = URL.createObjectURL(new Blob([bytes], { type: "application/zip" })), link = document.createElement("a");
+        link.href = url;
+        link.download = result.name;
+        document.body.append(link);
+        link.click();
+        link.remove();
+        setTimeout(() => URL.revokeObjectURL(url), 1e3);
+        ctx2.notify(`${result.name} saved: ${plural2(result.files, "PNG file")} from ${plural2(result.scenes, "scene")}${result.levels ? " and " + plural2(result.levels, "level map") : ""}. CONTENTS.txt inside lists them.`);
+      },
       "scene-png-load": (node) => {
         var _a;
         ed.pngWhat = node.dataset.id;
@@ -12860,8 +12898,16 @@ ${state2.artifact.system_id ? `<details><summary>Advanced byte options</summary>
       notify(error.message, true);
     }
   });
+  var windowOpen = () => {
+    api.call("system.ui_alive").catch(() => {
+    });
+  };
+  windowOpen();
+  setInterval(windowOpen, 15e3);
+  window.addEventListener("pageshow", windowOpen);
   window.addEventListener("pagehide", () => {
     var _a, _b, _c, _d;
+    api.closing();
     clearTimeout(state.buildCheckTimer);
     clearTimeout(locationTimer);
     rememberLocation();

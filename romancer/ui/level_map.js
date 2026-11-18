@@ -44,6 +44,18 @@ export function stamp(view,brush,col,row){
  }
  return out;
 }
+// Which layers a change is made on: the layer being looked at, one chosen layer, or all of them.
+// The first map of a level shows every layer together; the others show one layer alone.
+export function paintLayers(view,choice){
+ if(view.plane!==0||view.planes.length<2)return [view.plane];
+ return choice==='all'?view.planes.map(plane=>plane.index):[Number(choice)];
+}
+export const layerChoices=view=>view.plane===0&&view.planes.length>1?[['all','All layers'],...view.planes.map(plane=>[String(plane.index),plane.name+' only'])]:[];
+// The four steps of changing a level, and which one the user is on.
+export function steps(level,change){
+ const at=change?(change.working||change.error?2:3):level.painted.size?2:level.brush?1:0;
+ return [['Pick','Click a place on the map, or drag over several, to take it as your brush.'],['Paint','Click or drag where the brush should go.'],['Check','Choose Show what changes. ROMancer replays the game.'],['Keep','Look at the map, then keep the change or cancel it.']].map(([name,text],index)=>({name,text,now:index===at,done:index<at}));
+}
 export const paintedCells=painted=>[...painted.entries()].map(([place,from])=>{const [col,row]=place.split(',').map(Number);return {col,row,from};});
 export function levelStatus(summary,playing){
  const rec=summary.level_recording,job=summary.level_job;
@@ -73,8 +85,10 @@ export function levelsPart(ed){
 export function levelPart(ed,verdict,keep){
  const level=ed.level;if(!level||!level.view)return '';
  const view=level.view,change=levelChange(ed),painted=level.painted.size,brush=level.brush;
- const planes=view.planes.length>1?`<label>Layer <select id="level-plane" aria-label="Layer of the level">${view.planes.map(p=>`<option value="${p.index}" ${p.index===view.plane?'selected':''}>${esc(p.name)} (${p.width} by ${p.height})</option>`).join('')}</select></label>`:'';
- const choices=units(view),unitPart=choices.length>1?`<label>Brush snaps to <select id="level-unit" aria-label="What the brush snaps to">${choices.map(u=>`<option value="${u.id}" ${u.id===level.unit?'selected':''}>${esc(u.label)}</option>`).join('')}</select></label>`:'';
+ const planes=view.planes.length>1?`<label>Show <select id="level-plane" aria-label="Which layers the map shows">${view.planes.map(p=>`<option value="${p.index}" ${p.index===view.plane?'selected':''}>${p.index===0?'All layers together':esc(p.name)+' alone'}</option>`).join('')}</select></label>`:'';
+ const choices=layerChoices(view),paintOn=choices.length?`<label>Paint on <select id="level-layers" aria-label="Which layers a change is made on">${choices.map(([value,label])=>`<option value="${value}" ${value===level.paintOn?'selected':''}>${esc(label)}</option>`).join('')}</select></label>`:'';
+ const guide=`<ol class="level-steps" aria-label="How to change the level">${steps(level,change).map(step=>`<li class="${step.now?'now':step.done?'done':''}"${step.now?' aria-current="step"':''}><strong>${step.name}</strong><span>${step.text}</span></li>`).join('')}</ol>`;
+ const sizes=units(view),unitPart=sizes.length>1?`<label>Brush snaps to <select id="level-unit" aria-label="What the brush snaps to">${sizes.map(u=>`<option value="${u.id}" ${u.id===level.unit?'selected':''}>${esc(u.label)}</option>`).join('')}</select></label>`:'';
  const zoom=`<label>Zoom <select id="level-zoom" aria-label="Zoom">${ZOOMS.map(z=>`<option value="${z}" ${z===level.zoom?'selected':''}>${z}x</option>`).join('')}</select></label>`;
  const tools=TOOLS.map(([id,label])=>`<button type="button" class="scene-mode ${level.tool===id?'active':''}" data-action="level-tool" data-id="${id}" aria-pressed="${level.tool===id}">${label}</button>`).join('');
  const hint=level.tool==='pick'?'Click a place to take its picture as your brush, or drag to take a block of places (a platform, a tree).':
@@ -85,7 +99,8 @@ export function levelPart(ed,verdict,keep){
  const after=view.after?`<label class="level-toggle"><input type="checkbox" id="level-after" ${level.showAfter?'checked':''}> Show the map with the changes</label>`:'';
  const propose=button('Show what changes','level-propose',{primary:true,disabled:!painted,reason:'Paint at least one place first.'})+button('Clear paint','level-clear',{disabled:!painted&&!change});
  return `<div class="card-heading"><h3>${esc(view.name)}</h3>${badge(`${view.width} by ${view.height} cells · ${plural(view.scenes.length,'capture')}`,'neutral')}</div>
- <div class="actions level-bar">${planes}${zoom}${unitPart}${after}${button('Save map as PNG','level-export',{icon:'download'})}${button('Remove this level map','level-forget')}${button('Close','level-close')}</div>
+ ${guide}
+ <div class="actions level-bar">${planes}${paintOn}${zoom}${unitPart}${after}${button('Save map as PNG','level-export',{icon:'download'})}${button('Remove this level map','level-forget')}${button('Close','level-close')}</div>
  <div class="scene-modes" role="group" aria-label="Tool">${tools}</div>
  <p class="subtle" role="status">${hint}${built}${locked}</p>
  <div class="level-scroll" id="level-scroll" tabindex="0" aria-label="The level map. Scroll to move around."><canvas id="level-canvas" class="level-canvas" width="${view.width*view.cell*level.zoom}" height="${view.height*view.cell*level.zoom}" role="img" aria-label="Map of ${esc(view.name)}"></canvas></div>
@@ -153,7 +168,7 @@ export function levelTools(ctx,ed,host){
   const view=await host.call('level',{level_id:id,plane});
   const same=ed.level&&ed.level.id===id&&ed.level.view?.plane===view.plane;
   const unitIds=units(view).map(u=>u.id);
-  ed.level={id,view,unit:same&&unitIds.includes(ed.level.unit)?ed.level.unit:unitIds[unitIds.length-1],tool:same?ed.level.tool:'pick',brush:same?ed.level.brush:null,painted:same?ed.level.painted:new Map(),zoom:same?ed.level.zoom:view.height*view.cell>300?1:2,
+  ed.level={id,view,paintOn:same&&ed.level.paintOn?ed.level.paintOn:'all',unit:same&&unitIds.includes(ed.level.unit)?ed.level.unit:unitIds[unitIds.length-1],tool:same?ed.level.tool:'pick',brush:same?ed.level.brush:null,painted:same?ed.level.painted:new Map(),zoom:same?ed.level.zoom:view.height*view.cell>300?1:2,
    showAfter:same?ed.level.showAfter:true,last:same?ed.level.last:null,drag:null};
  };
  const reload=async()=>{if(!ed.level)return;try{await load(ed.level.id,ed.level.view.plane);}catch{ed.level=null;}host.update(['scene-level']);};
@@ -194,7 +209,7 @@ export function levelTools(ctx,ed,host){
   'level-propose':async()=>{
    const level=ed.level;if(!level||!level.painted.size)return;
    await host.dropPreview();
-   const result=await host.call('level_paint',{level_id:level.id,plane:level.view.plane,cells:paintedCells(level.painted)});
+   const result=await host.call('level_paint',{level_id:level.id,plane:level.view.plane,cells:paintedCells(level.painted),layers:paintLayers(level.view,level.paintOn)});
    if(!host.current())return;
    ed.proposal=result.change;ed.inspect=null;ed.summary.preview=result.change;level.painted=new Map();level.showAfter=true;
    await reload();host.update(['scene-changes']);host.watchProposal();
@@ -238,6 +253,7 @@ export function levelTools(ctx,ed,host){
   main.addEventListener('change',async event=>{
    const level=ed.level;if(!level)return;
    if(event.target.id==='level-zoom'){level.zoom=Number(event.target.value);host.update(['scene-level']);}
+   if(event.target.id==='level-layers'){level.paintOn=event.target.value;}
    if(event.target.id==='level-unit'){level.unit=event.target.value;level.brush=null;level.tool='pick';host.update(['scene-level']);}
    if(event.target.id==='level-after'){level.showAfter=event.target.checked;void redraw();}
    if(event.target.id==='level-plane'){await host.dropPreview();const id=level.id;ed.level=null;await load(id,Number(event.target.value));host.update(['scene-level','scene-changes']);}

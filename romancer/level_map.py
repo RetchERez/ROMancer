@@ -111,6 +111,21 @@ class Plane:
             window.weak = {place: spot for place, spot in window.weak.items() if moving(place)}
         self.windows = {number: window for number, window in self.windows.items() if window.cells}
 
+    def keep_levels(self, screen_columns: int, screen_rows: int) -> None:
+        """When some part of the recording scrolled, leave out the parts that never did: a title screen, a "get ready"
+        screen, a game over. They are single screens the game drew between levels, not places in a level. A game that
+        shows its world one screen at a time has no part that scrolled, and keeps them all."""
+        spans: dict = {}
+        for window in self.windows.values():
+            for column, row in window.cells:
+                span = spans.setdefault(window.section, [column, column, row, row])
+                span[0], span[1] = min(span[0], column), max(span[1], column)
+                span[2], span[3] = min(span[2], row), max(span[3], row)
+        scrolled = {section for section, (left, right, top, bottom) in spans.items()
+                    if right - left + 1 > screen_columns + 2 or bottom - top + 1 > screen_rows + 2}
+        if scrolled and len(scrolled) < len(spans):
+            self.windows = {number: window for number, window in self.windows.items() if window.section in scrolled}
+
     def cover(self) -> list:
         """The fewest frames that still show every place: each time the frame that adds the most."""
         left = set()
@@ -303,9 +318,17 @@ def screen_picture(graphics, system: str):
         covered = ImageChops.lighter(covered, solid)
         same = ImageChops.difference(picture, shot).convert('L').point(lambda v: 255 if v == 0 else 0)
         agrees = ImageChops.lighter(agrees, ImageChops.multiply(same, solid))
-    # where no layer is solid the game shows its backdrop color: take it from the screen
+    # Where no layer is solid the game shows its backdrop, which is one color: the color most of those pixels
+    # have on the recorded screen. Painting that color there, and not the screen itself, keeps sprites that
+    # stood in front of the backdrop off the map.
     backdrop = covered.point(lambda v: 0 if v else 255)
-    out.paste(shot, (0, 0), ImageChops.lighter(agrees, backdrop))
+    out.paste(shot, (0, 0), agrees)
+    counts: dict = {}
+    for pixel, open_here in zip(shot.getdata(), backdrop.getdata()):
+        if open_here:
+            counts[pixel] = counts.get(pixel, 0) + 1
+    if counts:
+        out.paste(max(counts, key=counts.get), (0, 0), backdrop)
     return out
 
 
@@ -565,14 +588,22 @@ def stitch(frames: list, system: str) -> list:
                 lines = graphics.screen[row * px:row * px + px]
                 rows[row] = [b''.join(line[x:x + px] for line in lines) for x in range(0, graphics.width - px + 1, px)]
             before = state['rows']
-            if before is not None and (abs(U - before[1]) >= px or abs(V - before[2]) >= px):
+            # Only plain scrolling counts: a restart or a new room moves the map by whole screens, and a floor of
+            # repeating bricks looks the same after that too.
+            if before is not None and not jumped and (abs(U - before[1]) >= px or abs(V - before[2]) >= px)                     and ((U - before[1]) % (4 * px) or (V - before[2]) % (4 * px)):
                 for row, columns in rows.items():
                     old = before[0].get(row)
                     if old is None or len(set(columns)) < 4:
                         continue                    # plain sky looks the same wherever the screen is: it says nothing
-                    alike = sum(1 for a, b in zip(columns, old) if a == b)      # a clock or a score may tick in a few places
+                    # Compare what is drawn in the row, not the empty stretch around it: a cloud in a wide sky is
+                    # mostly sky before and after it moves.
+                    plain = max(set(columns), key=columns.count), max(set(old), key=old.count)
+                    drawn = [(a, b) for a, b in zip(columns, old) if a != plain[0] or b != plain[1]]
+                    if len(drawn) < 4:
+                        continue
+                    alike = sum(1 for a, b in drawn if a == b)                  # a clock or a score may tick in a few places
                     same, seen = state['still'].get(row, (0, 0))
-                    state['still'][row] = (same + (alike * 4 >= len(columns) * 3), seen + 1)
+                    state['still'][row] = (same + (alike * 4 >= len(drawn) * 3), seen + 1)
             state['rows'] = (rows, U, V)
             state['at'] = (sx, sy, U, V)
     for key, plane in planes.items():
@@ -580,8 +611,10 @@ def stitch(frames: list, system: str) -> list:
     for key, plane in planes.items():
         # A row of the screen that held the same varied picture while the level scrolled past is not part of the level.
         still = track[key]['still']
-        fixed = {row for row, (same, seen) in still.items() if seen >= 3 and same >= 0.8 * seen}
+        fixed = {row for row, (same, seen) in still.items() if seen >= 4 and same >= 0.9 * seen}
         count = frames[0].graphics.height // plane.px
+        if __import__('os').environ.get('LEVEL_DEBUG'):
+            print('still rows', plane.name, sorted(still.items()), 'fixed', sorted(fixed), flush=True)
         above = [row for row in fixed if row < count // 3]
         below = [row for row in fixed if row >= count - count // 3]
         if above:                                   # blank lines between a status bar and the edge of the screen go with it
@@ -589,6 +622,7 @@ def stitch(frames: list, system: str) -> list:
         if below:
             fixed.update(range(min(below), count + 1))
         plane.trim(fixed)
+        plane.keep_levels(frames[0].graphics.width // plane.px, count)
     found = [plane.assign() for plane in planes.values() if plane.windows]
     found.sort(key=lambda plane: -len(plane.cells))
     return found

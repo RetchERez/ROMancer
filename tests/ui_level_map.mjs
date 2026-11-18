@@ -1,5 +1,5 @@
 import assert from 'node:assert/strict';
-import {placeAt,units,snap,brushFrom,stamp,paintedCells,levelStatus,levelsPart,levelPart,levelChange} from '../romancer/ui/level_map.js';
+import {placeAt,units,snap,brushFrom,stamp,paintedCells,paintLayers,layerChoices,steps,levelStatus,levelsPart,levelPart,levelChange} from '../romancer/ui/level_map.js';
 
 // a map of 12 by 6 cells; (5,2) was never seen, (7,3) cannot be changed
 const width=12,height=6,frames=Array.from({length:width*height},()=>0),status=Array.from({length:width*height},()=>'r');
@@ -95,4 +95,26 @@ html=levelPart({level:{...level,view:{...view,unshown:1,pending:[{col:3,row:2,ch
 assert.match(html,/1 place you painted does not look different on the map/);
 html=levelPart({level:{...level,view:{...view,unshown:2,pending:[{col:3,row:2,change:'c1'},{col:4,row:2,change:'c1'}]}},proposal},verdict,keep);
 assert.match(html,/The places you painted do not look different on the map/);
+// which layers a change is made on
+const two={...view,planes:[{index:0,name:'plane A',width,height,cell:8},{index:1,name:'plane B',width:20,height:6,cell:8}]};
+assert.deepEqual(layerChoices(view),[]);                                   // one layer: nothing to choose
+assert.deepEqual(layerChoices(two),[['all','All layers'],['0','plane A only'],['1','plane B only']]);
+assert.deepEqual(layerChoices({...two,plane:1}),[]);                       // a layer shown alone is the layer painted
+assert.deepEqual(paintLayers(view,'all'),[0]);
+assert.deepEqual(paintLayers(two,'all'),[0,1]);
+assert.deepEqual(paintLayers(two,'1'),[1]);
+assert.deepEqual(paintLayers({...two,plane:1},'all'),[1]);
+html=levelPart({level:{...level,view:two,paintOn:'1'},proposal:null},verdict,keep);
+assert.match(html,/All layers together/);
+assert.match(html,/plane B alone/);
+assert.match(html,/Paint on/);
+assert.match(html,/<option value="1" selected>plane B only/);
+// the four steps
+const fresh={...level,brush:null,painted:new Map()};
+assert.deepEqual(steps(fresh,null).map(step=>step.now),[true,false,false,false]);
+assert.deepEqual(steps({...fresh,brush},null).map(step=>step.now),[false,true,false,false]);
+assert.deepEqual(steps({...fresh,brush,painted},null).map(step=>step.now),[false,false,true,false]);
+assert.deepEqual(steps(fresh,{working:1}).map(step=>step.now),[false,false,true,false]);
+assert.deepEqual(steps(fresh,{working:0,error:''}).map(step=>step.now),[false,false,false,true]);
+assert.match(levelPart({level:fresh,proposal:null},verdict,keep),/aria-current="step"><strong>Pick/);
 console.log('level map checks passed');

@@ -146,4 +146,6 @@ document.addEventListener('dragover',event=>{if([...event.dataTransfer?.types||[
 document.addEventListener('dragleave',event=>{if(!event.relatedTarget)document.body.classList.remove('file-drag');});
 document.addEventListener('drop',event=>{if(![...event.dataTransfer?.types||[]].includes('Files'))return;event.preventDefault();document.body.classList.remove('file-drag');try{state.droppedImportFile=droppedSource(event.dataTransfer.files);importDialog();}catch(error){notify(error.message,true);}});
 
-window.addEventListener('pagehide',()=>{clearTimeout(state.buildCheckTimer);clearTimeout(locationTimer);rememberLocation();state.visualComparison?.dispose();state.visualComparison=null;state.spritePreviewObserver?.disconnect();state.spritePreviewObserver=null;stopPlayback(state);disposeAudio();state.soundPlayer?.close();state.animationClock?.stop();});
+const windowOpen=()=>{api.call('system.ui_alive').catch(()=>{});};windowOpen();setInterval(windowOpen,15000);
+window.addEventListener('pageshow',windowOpen);
+window.addEventListener('pagehide',()=>{api.closing();clearTimeout(state.buildCheckTimer);clearTimeout(locationTimer);rememberLocation();state.visualComparison?.dispose();state.visualComparison=null;state.spritePreviewObserver?.disconnect();state.spritePreviewObserver=null;stopPlayback(state);disposeAudio();state.soundPlayer?.close();state.animationClock?.stop();});

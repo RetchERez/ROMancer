@@ -15,6 +15,9 @@ background layer. Save map as PNG saves it.
   brush and paint it somewhere else. The brush snaps to the blocks the level
   is built from. Show what changes replays the game, and the map then shows
   every place that changes before you keep anything.
+- All layers or one. When a game draws a level on several background
+  layers, Show picks all layers together or one alone, and Paint on picks
+  whether a change is made on all layers or on one.
 - A block in one place. Most games build a level from blocks and keep a list
   of which block goes where. When ROMancer finds that list (in the ROM, or by
   following the level through the game's memory back to the ROM), a whole

@@ -141,6 +141,14 @@ class StitchTests(unittest.TestCase):
         self.assertEqual(plane.windows[13].across, 0)
         self.assertEqual(plane.windows[14].across, 40)
 
+    def test_screens_between_levels_are_left_out_when_a_level_scrolled(self):
+        steps = [(other_room, 0, 0)] + [(level, across, 0) for across in range(0, 400, 40)]      # a title screen, then a level
+        plane = lm.stitch(frames_for(steps), 'gb')[0]
+        self.assertEqual(len(plane.sections), 1)
+        self.assertNotIn(0, plane.windows)
+        rooms = lm.stitch(frames_for([(level, 0, 0), (other_room, 0, 0)]), 'gb')[0]             # nothing scrolled: both rooms stay
+        self.assertEqual(len(rooms.sections), 2)
+
     def test_a_blank_screen_places_nothing(self):
         steps = [(level, 0, 0), (lambda column, row: 1, 0, 0), (level, 40, 0)]
         plane = lm.stitch(frames_for(steps), 'gb')[0]

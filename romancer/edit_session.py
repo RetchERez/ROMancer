@@ -1592,6 +1592,60 @@ class EditSession(LevelTools):
             number = list(self.scenes).index(scene_id) + 1
             return {**out, 'what': what, 'name': f'scene-{number}-{name}.png'}
 
+    def export_everything(self) -> dict:
+        """One ZIP with the graphics of every recorded scene and every level map, each as PNG.
+
+        For each scene: its pictures as one sheet, and every background layer
+        laid out the way the game shows it (the files Save pictures as PNG and
+        Save background as PNG give, so any of them can be drawn on and loaded
+        back in its scene). For each level map: the whole map. A text file
+        lists what is in the ZIP.
+        """
+        import io
+        import zipfile
+        with self.lock:
+            out = io.BytesIO()
+            listing, scenes, files = [], 0, 0
+            level_scenes = self.level_scene_ids()
+            with zipfile.ZipFile(out, 'w', zipfile.ZIP_DEFLATED) as archive:
+                for scene_id in list(self.scenes):
+                    if scene_id in level_scenes:
+                        continue                              # a level's captures are in its map
+                    try:
+                        sheet = self.export_picture(scene_id, 'sheet')
+                    except ValueError:
+                        continue
+                    scenes += 1
+                    folder = sheet['name'].rsplit('-pictures.png', 1)[0]
+                    archive.writestr(f'{folder}/{sheet["name"]}', sheet['png'])
+                    files += 1
+                    listing.append(f'{folder}: {self._label(scene_id)}')
+                    listing.append(f'  {sheet["name"]}  {sheet["width"]} by {sheet["height"]} pixels, {sheet["pictures"]} pictures')
+                    for layer in self.graphics_view(scene_id)['layers']:
+                        try:
+                            picture = self.export_picture(scene_id, 'layer', layer['index'])
+                        except ValueError:
+                            continue                          # a layer with no flat picture (Mode 7)
+                        archive.writestr(f'{folder}/{picture["name"]}', picture['png'])
+                        files += 1
+                        listing.append(f'  {picture["name"]}  {picture["width"]} by {picture["height"]} pixels, background layer {layer["name"]}')
+                for level in self.levels:
+                    for number, plane in enumerate(level['planes']):
+                        picture = self.export_level(level['id'], number)
+                        tail = 'all-layers' if number == 0 else ''.join(ch if ch.isalnum() else '-' for ch in plane['name']).strip('-').lower()
+                        name = f'level-maps/{picture["name"].rsplit(".png", 1)[0]}-{tail}.png'
+                        archive.writestr(name, picture['png'])
+                        files += 1
+                        listing.append(f'{name}  {picture["width"]} by {picture["height"]} pixels, level map {level["name"]}')
+                if not files:
+                    raise ValueError('There is nothing to save yet. Record a scene first.')
+                archive.writestr('CONTENTS.txt', '\r\n'.join(
+                    ['Graphics saved by ROMancer from the recorded scenes of one game.',
+                     'A scene folder holds the pictures of that scene as one sheet and each background layer.',
+                     'To change the game, draw on one of these PNGs, keep its size, and load it back in that scene',
+                     'with Load pictures PNG or Load background PNG. Level maps are for looking at.', ''] + listing) + '\r\n')
+            return {'zip': out.getvalue(), 'name': 'romancer-graphics.zip', 'scenes': scenes, 'levels': len(self.levels), 'files': files}
+
     def import_picture(self, scene_id: str, what: str, layer: int, raw: bytes) -> dict:
         """Read a PNG saved by export_picture back in and plan every picture that differs as one change.
 
@@ -2198,6 +2252,7 @@ class EditSessionTools:
                 p['scene_id'], p['tile'], p['pixels'], p['scope'])}),
             'edits.export_picture': (base + ' scene_id what layer', self._export_picture),
             'edits.import_picture': (base + ' scene_id what layer png_base64', self._import_picture),
+            'edits.export_everything': (base, self._export_everything),
             'edits.propose_cells': (base + ' scene_id cells', lambda p, c: {'ok': True, 'change': self.session(p).propose_cells(
                 p['scene_id'], p['cells'])}),
             'edits.find_color': (base + ' scene_id domain entry colors', lambda p, c: {'ok': True, 'change': self.session(p).find_color(
@@ -2209,8 +2264,8 @@ class EditSessionTools:
             'edits.level': (base + ' level_id plane', lambda p, c: {'ok': True, **self.session(p).level_view(p['level_id'], p['plane'])}),
             'edits.level_place': (base + ' level_id plane col row', lambda p, c: {'ok': True, **self.session(p).level_place(
                 p['level_id'], p['plane'], p['col'], p['row'])}),
-            'edits.level_paint': (base + ' level_id plane cells', lambda p, c: {'ok': True, 'change': self.session(p).propose_level(
-                p['level_id'], p['plane'], p['cells'])}),
+            'edits.level_paint': (base + ' level_id plane cells layers', lambda p, c: {'ok': True, 'change': self.session(p).propose_level(
+                p['level_id'], p['plane'], p['cells'], p['layers'])}),
             'edits.level_export': (base + ' level_id plane edited', self._export_level),
             'edits.change': (base + ' change_id', lambda p, c: {'ok': True, 'change': self.session(p).change(p['change_id'])}),
             'edits.keep': (base + ' change_id', lambda p, c: self._summary(self.session(p), self.session(p).keep(p['change_id']))),
@@ -2223,6 +2278,10 @@ class EditSessionTools:
     def _export_picture(self, p, c):
         out = self.session(p).export_picture(p['scene_id'], p['what'], p['layer'])
         return {'ok': True, **{k: v for k, v in out.items() if k != 'png'}, 'png_base64': base64.b64encode(out['png']).decode()}
+
+    def _export_everything(self, p, c):
+        out = self.session(p).export_everything()
+        return {'ok': True, **{k: v for k, v in out.items() if k != 'zip'}, 'zip_base64': base64.b64encode(out['zip']).decode()}
 
     def _export_level(self, p, c):
         out = self.session(p).export_level(p['level_id'], p['plane'], bool(p['edited']))

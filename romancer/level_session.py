@@ -37,6 +37,10 @@ MIN_PLANE_CELLS = 200
 MAX_LEVEL_CELLS = 256       # places painted in one change
 
 
+class _Same(Exception):
+    """A place that already shows what was painted."""
+
+
 class LevelTools:
     """Mixed into EditSession."""
 
@@ -443,8 +447,31 @@ class LevelTools:
 
     # ---- changes
 
-    def propose_level(self, level_id: str, plane: int, cells) -> dict:
-        """Plan copying the picture of one place on the map to others: [{'col', 'row', 'from': [col, row]}]."""
+    def _level_across(self, level: dict, shown: int, other: int, place: tuple):
+        """The place in another layer's map that the game drew over a place of the map being shown, or None.
+
+        Layers scroll at their own speeds, so the same spot of the level is at
+        different places of their maps. The capture that showed the place says
+        where both layers sat on the screen at that moment.
+        """
+        here, there = self._level_plane(level, shown), self._level_plane(level, other)
+        spot = here.cells.get(place)
+        if spot is None:
+            return None
+        mine, theirs = here.windows.get(spot.frame), there.windows.get(spot.frame)
+        if mine is None or theirs is None:
+            return None
+        x, y = place[0] * here.px - mine.across, place[1] * here.px - mine.down
+        return ((x + theirs.across) // there.px, (y + theirs.down) // there.px)
+
+    def propose_level(self, level_id: str, plane: int, cells, layers=None) -> dict:
+        """Plan copying the picture of one place on the map to others: [{'col', 'row', 'from': [col, row]}].
+
+        Places are given on the map of `plane`. `layers` names the layers to
+        change (indices into the level's planes); None means that plane only.
+        In another layer the place that the game drew over each place is
+        painted, where that layer was captured there.
+        """
         with self.lock:
             self._require_core()
             level = self._level(level_id)
@@ -453,51 +480,72 @@ class LevelTools:
             groups: dict = {}
             places, seen = [], set()
             nes = self.system == 'nes'
+            wanted = [number] if layers is None else sorted({int(k) for k in layers})
+            if not wanted or any(not 0 <= k < len(level['planes']) for k in wanted):
+                raise ValueError('Choose which layer to paint on.')
+            jobs = []
             for item in cells:
-                col, row = int(item['col']), int(item['row'])
-                if (col, row) in seen:
+                here, there = (int(item['col']), int(item['row'])), (int(item['from'][0]), int(item['from'][1]))
+                for k in wanted:
+                    if k == number:
+                        jobs.append((k, here, here, there))
+                        continue
+                    to, origin = self._level_across(level, number, k, here), self._level_across(level, number, k, there)
+                    if to is not None and origin is not None and to != origin:
+                        jobs.append((k, here, to, origin))
+            for k, shown, (col, row), origin in jobs:
+                if (k, col, row) in seen:
                     continue
-                seen.add((col, row))
-                target = mapped.cells.get((col, row))
-                source = mapped.cells.get((int(item['from'][0]), int(item['from'][1])))
-                if target is None or source is None:
-                    raise ValueError('No capture showed that part of the level, so it cannot be painted.')
-                t_scene, s_scene = level['scene_ids'][target.frame], level['scene_ids'][source.frame]
-                t_graphics = self._graphics(t_scene)
-                t_view = t_graphics.layers()[target.layer]
-                now = t_view.layer.cell(target.x, target.y)
-                s_graphics = self._graphics(s_scene)
-                s_view = s_graphics.layers()[source.layer]
-                want = s_view.layer.cell(source.x, source.y)
-                fmt = s_view.layer.tile_format
-                pixels = s_graphics.tile_pixels(s_view.layer.tile_domain, want.tile_address, fmt)
-                address = None
-                if t_view.layer.tile_format == fmt:
-                    if t_graphics.tile_pixels(t_view.layer.tile_domain, want.tile_address, fmt) == pixels:
-                        address = want.tile_address
-                    else:               # the same picture may be loaded somewhere else at that point of the level
-                        for other in t_view.layer.cells:
-                            if t_graphics.tile_pixels(t_view.layer.tile_domain, other.tile_address, fmt) == pixels:
-                                address = other.tile_address
-                                break
-                if address is None:
-                    raise ValueError('The picture you chose is not loaded at that point of the level, so the game cannot '
-                                     'show it there. Choose a picture from nearer that place.')
-                change = {'layer': target.layer, 'x': target.x, 'y': target.y,
-                          'tile': sg.tile_id(t_view.layer.tile_domain, address, fmt), 'scene_id': t_scene,
-                          'like': {'scene_id': s_scene, 'layer': source.layer, 'x': source.x, 'y': source.y}}
-                if len(now.addresses) > 1 and not nes:
-                    change.update(hflip=want.hflip, vflip=want.vflip, line=want.palette)
-                if now.status == 'unknown':
-                    raise ValueError(sg.CELL_REASONS['unknown'])
-                sg.hardware_tile(t_view, now, t_view.layer.tile_domain, address, fmt)
-                if (now.tile_address, now.hflip, now.vflip, now.palette) == (address, change.get('hflip', now.hflip),
-                                                                           change.get('vflip', now.vflip), change.get('line', now.palette)):
+                seen.add((k, col, row))
+                mapped = self._level_plane(level, k)
+                try:
+                    target = mapped.cells.get((col, row))
+                    source = mapped.cells.get(origin)
+                    if target is None or source is None:
+                        raise ValueError('No capture showed that part of the level, so it cannot be painted.')
+                    t_scene, s_scene = level['scene_ids'][target.frame], level['scene_ids'][source.frame]
+                    t_graphics = self._graphics(t_scene)
+                    t_view = t_graphics.layers()[target.layer]
+                    now = t_view.layer.cell(target.x, target.y)
+                    s_graphics = self._graphics(s_scene)
+                    s_view = s_graphics.layers()[source.layer]
+                    want = s_view.layer.cell(source.x, source.y)
+                    fmt = s_view.layer.tile_format
+                    pixels = s_graphics.tile_pixels(s_view.layer.tile_domain, want.tile_address, fmt)
+                    address = None
+                    if t_view.layer.tile_format == fmt:
+                        if t_graphics.tile_pixels(t_view.layer.tile_domain, want.tile_address, fmt) == pixels:
+                            address = want.tile_address
+                        else:               # the same picture may be loaded somewhere else at that point of the level
+                            for other in t_view.layer.cells:
+                                if t_graphics.tile_pixels(t_view.layer.tile_domain, other.tile_address, fmt) == pixels:
+                                    address = other.tile_address
+                                    break
+                    if address is None:
+                        raise ValueError('The picture you chose is not loaded at that point of the level, so the game cannot '
+                                         'show it there. Choose a picture from nearer that place.')
+                    change = {'layer': target.layer, 'x': target.x, 'y': target.y,
+                              'tile': sg.tile_id(t_view.layer.tile_domain, address, fmt), 'scene_id': t_scene,
+                              'like': {'scene_id': s_scene, 'layer': source.layer, 'x': source.x, 'y': source.y}}
+                    if len(now.addresses) > 1 and not nes:
+                        change.update(hflip=want.hflip, vflip=want.vflip, line=want.palette)
+                    if now.status == 'unknown':
+                        raise ValueError(sg.CELL_REASONS['unknown'])
+                    sg.hardware_tile(t_view, now, t_view.layer.tile_domain, address, fmt)
+                    if (now.tile_address, now.hflip, now.vflip, now.palette) == (address, change.get('hflip', now.hflip),
+                                                                               change.get('vflip', now.vflip), change.get('line', now.palette)):
+                        raise _Same()
+                    change['from'] = {'tile': sg.tile_id(t_view.layer.tile_domain, now.tile_address, t_view.layer.tile_format),
+                                      'hflip': now.hflip, 'vflip': now.vflip, 'line': now.palette}
+                    groups.setdefault(t_scene, []).append(change)
+                    if list(shown) not in places:
+                        places.append(list(shown))
+                except _Same:
                     continue
-                change['from'] = {'tile': sg.tile_id(t_view.layer.tile_domain, now.tile_address, t_view.layer.tile_format),
-                                  'hflip': now.hflip, 'vflip': now.vflip, 'line': now.palette}
-                groups.setdefault(t_scene, []).append(change)
-                places.append([col, row])
+                except ValueError:
+                    if k == number or len(wanted) == 1:
+                        raise               # the layer being looked at: say why
+                    continue                # another layer does not have that picture there: leave that layer as it is
             if not places:
                 raise ValueError('Those places already look like that. Paint a different picture first.')
             if len(places) > MAX_LEVEL_CELLS:
