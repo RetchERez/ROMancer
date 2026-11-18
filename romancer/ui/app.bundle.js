@@ -166,7 +166,7 @@
   }
   var field = (id, label, value = "", options = {}) => `<label class="field">${fieldTitle(id, label)}<input id="${id}" ${options.type ? `type="${options.type}"` : ""} value="${esc(value)}" placeholder="${esc(options.placeholder || "")}" ${options.readonly ? "readonly" : ""} ${options.min !== void 0 ? `min="${options.min}"` : ""}>${options.hint ? `<small>${esc(options.hint)}</small>` : ""}</label>`;
   var area = (id, label, value = "", rows = 5) => `<label class="field"><span>${esc(label)}</span><textarea id="${id}" rows="${rows}" spellcheck="false">${esc(value)}</textarea></label>`;
-  var select = (id, label, options, value) => `<label class="field">${fieldTitle(id, label)}<select id="${id}">${options.map(([key, text]) => `<option value="${esc(key)}" ${String(key) === String(value) ? "selected" : ""}>${esc(text)}</option>`).join("")}</select></label>`;
+  var select = (id, label, options, value) => `<label class="field">${fieldTitle(id, label)}<select id="${id}">${options.map(([key2, text]) => `<option value="${esc(key2)}" ${String(key2) === String(value) ? "selected" : ""}>${esc(text)}</option>`).join("")}</select></label>`;
   var jsonEditor = (id, label, value, open = false) => `<details class="config" ${open ? "open" : ""}><summary>${esc(label)} <span>JSON descriptor</span></summary>${area(id, label, typeof value === "string" ? value : JSON.stringify(value, null, 2), 8)}</details>`;
   var read = (id) => {
     const node = document.getElementById(id);
@@ -270,7 +270,7 @@
     } });
     const r = entry == null ? void 0 : entry.result, valid2 = r && r.source_sha256 === state2.artifact.sha256 && r.artifact_id === state2.artifact.artifact_id;
     const reason = !capture ? "Load this ROM from a cold start in Playtest, then save a capture first." : !changed2 ? "Stage a palette or pixel change first." : !doc.write_supported ? "This layout is read-only." : "";
-    const pictures2 = valid2 && r.emulated_frame && r.visual ? '<div class="draft-scene-result"><p class="preview-caption" role="status">Emulated draft preview · ' + r.changed_pixels + " pixel" + (r.changed_pixels === 1 ? "" : "s") + ' changed</p><div class="draft-scene-pictures">' + [["Original replay", "original_png_base64"], ["Draft replay", "build_png_base64"], ["Difference", "difference_png_base64"]].map(([name2, key]) => "<figure><figcaption>" + name2 + '</figcaption><img src="data:image/png;base64,' + esc(r.visual[key]) + '" alt="' + name2 + ' of the captured scene"></figure>').join("") + '</div><p class="subtle">No project build was created. These frames were produced by the emulator using temporary checked copies. They cover the captured route; build and test the edit to keep it.</p></div>' : valid2 ? '<p class="notice">' + esc(r.reason || "The captured scene could not be reproduced. Record a new cold-start capture.") + "</p>" : "";
+    const pictures2 = valid2 && r.emulated_frame && r.visual ? '<div class="draft-scene-result"><p class="preview-caption" role="status">Emulated draft preview · ' + r.changed_pixels + " pixel" + (r.changed_pixels === 1 ? "" : "s") + ' changed</p><div class="draft-scene-pictures">' + [["Original replay", "original_png_base64"], ["Draft replay", "build_png_base64"], ["Difference", "difference_png_base64"]].map(([name2, key2]) => "<figure><figcaption>" + name2 + '</figcaption><img src="data:image/png;base64,' + esc(r.visual[key2]) + '" alt="' + name2 + ' of the captured scene"></figure>').join("") + '</div><p class="subtle">No project build was created. These frames were produced by the emulator using temporary checked copies. They cover the captured route; build and test the edit to keep it.</p></div>' : valid2 ? '<p class="notice">' + esc(r.reason || "The captured scene could not be reproduced. Record a new cold-start capture.") + "</p>" : "";
     return '<details class="card draft-scene" id="asset-scene-panel" ' + (valid2 ? "open" : "") + "><summary>Preview this draft in a captured scene</summary><p>Replay the original twice and a temporary draft once. Palette changes are rendered by the emulator.</p>" + (traces.length ? select("asset-scene-trace", "Captured scene", traces.map((id, i) => [id, "Capture " + (i + 1)]), capture) : "") + '<div class="actions">' + button("Preview captured scene", "asset-scene-preview", { disabled: !!reason, reason, primary: true }) + button("Open Playtest", "navigate", { id: "playtest" }) + '</div><p class="subtle">Up to 2,400 frames and 20 input steps. Your source, saved live session and project build history stay separate.</p><p id="asset-scene-notice" class="preview-caption" role="status">' + esc(reason || (entry == null ? void 0 : entry.reason) || "Previewing does not publish a build.") + "</p>" + pictures2 + "</details>";
   }
   function invalidateDraftScene() {
@@ -315,24 +315,24 @@
 
   // romancer/ui/preferences.js
   var memory = /* @__PURE__ */ new Map();
-  function readPreference(key, fallback = null) {
+  function readPreference(key2, fallback = null) {
     try {
-      return localStorage.getItem(key) ?? memory.get(key) ?? fallback;
+      return localStorage.getItem(key2) ?? memory.get(key2) ?? fallback;
     } catch {
-      return memory.get(key) ?? fallback;
+      return memory.get(key2) ?? fallback;
     }
   }
-  function writePreference(key, value) {
-    memory.set(key, String(value));
+  function writePreference(key2, value) {
+    memory.set(key2, String(value));
     try {
-      localStorage.setItem(key, String(value));
+      localStorage.setItem(key2, String(value));
     } catch {
     }
   }
-  function removePreference(key) {
-    memory.delete(key);
+  function removePreference(key2) {
+    memory.delete(key2);
     try {
-      localStorage.removeItem(key);
+      localStorage.removeItem(key2);
     } catch {
     }
   }
@@ -431,14 +431,14 @@
   // romancer/ui/app_settings.js
   var DEFAULT_SETTINGS = Object.freeze({ theme: "romancer", scale: 100, autoDeepScan: true, autoGraphics: true, rememberWorkspace: true, volume: 80, startMuted: false, loopPreview: false, reduceMotion: false, advancedTools: false });
   var keys = Object.keys(DEFAULT_SETTINGS);
-  var booleanKeys = keys.filter((key) => typeof DEFAULT_SETTINGS[key] === "boolean");
+  var booleanKeys = keys.filter((key2) => typeof DEFAULT_SETTINGS[key2] === "boolean");
   function validateSettings(values) {
-    if (!values || typeof values !== "object" || Array.isArray(values) || Object.keys(values).length !== keys.length || Object.keys(values).some((key) => !keys.includes(key))) throw Error("Settings contain missing or unknown fields.");
+    if (!values || typeof values !== "object" || Array.isArray(values) || Object.keys(values).length !== keys.length || Object.keys(values).some((key2) => !keys.includes(key2))) throw Error("Settings contain missing or unknown fields.");
     if (!["romancer", "dark", "light"].includes(values.theme)) throw Error("Choose a valid theme.");
     if (!Number.isSafeInteger(values.scale) || ![100, 125, 150, 200].includes(values.scale)) throw Error("Choose a supported interface scale.");
     if (!Number.isSafeInteger(values.volume) || values.volume < 0 || values.volume > 100) throw Error("Volume must be a whole number from 0 to 100.");
-    for (const key of booleanKeys) if (typeof values[key] !== "boolean") throw Error(key + " must be true or false.");
-    return Object.fromEntries(keys.map((key) => [key, values[key]]));
+    for (const key2 of booleanKeys) if (typeof values[key2] !== "boolean") throw Error(key2 + " must be true or false.");
+    return Object.fromEntries(keys.map((key2) => [key2, values[key2]]));
   }
   function checkedPacket(packet) {
     var _a;
@@ -512,34 +512,34 @@
     if (!state2.project || !state2.artifact) return false;
     if (((_a = state2.pending) == null ? void 0 : _a.artifact_id) === state2.artifact.artifact_id || ((_b = state2.gameEditPlan) == null ? void 0 : _b.scope) === selectionKey(state2)) return true;
     const prefix = state2.project.project_id + ":" + state2.artifact.artifact_id + ":";
-    for (const [key, value] of Object.entries(state2.drafts || {})) {
-      if (!key.startsWith(prefix)) continue;
-      if (/:(?:asset-changes|table-changes|sound-changes|command-changes)$/.test(key)) {
+    for (const [key2, value] of Object.entries(state2.drafts || {})) {
+      if (!key2.startsWith(prefix)) continue;
+      if (/:(?:asset-changes|table-changes|sound-changes|command-changes)$/.test(key2)) {
         try {
           const data = JSON.parse(value);
           if (changed(Array.isArray(data) ? data : data == null ? void 0 : data.changes)) return true;
         } catch {
         }
       }
-      if (key.endsWith(":command-sequence") || key.includes(":command-sequence-")) {
+      if (key2.endsWith(":command-sequence") || key2.includes(":command-sequence-")) {
         try {
           if ((_c = JSON.parse(value)) == null ? void 0 : _c.changed) return true;
         } catch {
         }
       }
-      if (key.endsWith(":hex-changes")) {
+      if (key2.endsWith(":hex-changes")) {
         try {
           const saved = JSON.parse(value);
           if (saved.artifact_id === state2.artifact.artifact_id && saved.sha256 === state2.artifact.sha256 && ((_d = saved.edits) == null ? void 0 : _d.length)) return true;
         } catch {
         }
       }
-      if (key.endsWith(":battle-background-pixels") && typeof value === "string" && value.length === 40960) return true;
-      if (key.includes(":game-")) {
-        const field2 = (_g = (_f = (_e = state2.gameVisualModel) == null ? void 0 : _e.model) == null ? void 0 : _f.fields) == null ? void 0 : _g.find((f) => key.endsWith(":game-" + f.id));
+      if (key2.endsWith(":battle-background-pixels") && typeof value === "string" && value.length === 40960) return true;
+      if (key2.includes(":game-")) {
+        const field2 = (_g = (_f = (_e = state2.gameVisualModel) == null ? void 0 : _e.model) == null ? void 0 : _f.fields) == null ? void 0 : _g.find((f) => key2.endsWith(":game-" + f.id));
         if (field2 && String(field2.value) !== String(value)) return true;
       }
-      if (key.endsWith(":paint-buffer")) {
+      if (key2.endsWith(":paint-buffer")) {
         try {
           const paint2 = JSON.parse(value), doc = (_h = state2.results) == null ? void 0 : _h["assets.inspect"];
           const bitmap = (doc == null ? void 0 : doc.document_id) === paint2.document_id ? doc.bitmaps.find((b) => b.id === paint2.bitmap_id) : null;
@@ -548,12 +548,12 @@
         }
       }
       const table = (_i = state2.results) == null ? void 0 : _i["tables.inspect"];
-      if (table && key.includes(":table-cell-" + table.document_id)) {
-        for (const row of table.rows) for (const [index, cell] of row.cells.entries()) if (key.endsWith("-" + row.index + "-" + index) && String(value) !== String(cell.value)) return true;
+      if (table && key2.includes(":table-cell-" + table.document_id)) {
+        for (const row of table.rows) for (const [index, cell] of row.cells.entries()) if (key2.endsWith("-" + row.index + "-" + index) && String(value) !== String(cell.value)) return true;
       }
       const script = (_j = state2.results) == null ? void 0 : _j["script.inspect"];
-      if ((script == null ? void 0 : script.records) && key.includes(":script-segment-")) {
-        for (const [index, record] of script.records.entries()) for (const segment of record.segments) if (key.endsWith(":script-segment-" + index + "-" + segment.index) && String(value) !== String(segment.text)) return true;
+      if ((script == null ? void 0 : script.records) && key2.includes(":script-segment-")) {
+        for (const [index, record] of script.records.entries()) for (const segment of record.segments) if (key2.endsWith(":script-segment-" + index + "-" + segment.index) && String(value) !== String(segment.text)) return true;
       }
     }
     return ((_k = state2.hexDraft) == null ? void 0 : _k.scope) === selectionKey(state2) && !!((_m = (_l = state2.hexDraft) == null ? void 0 : _l.changes) == null ? void 0 : _m.size);
@@ -613,7 +613,7 @@
     let stopped = false, scheduled = 0;
     const motion = (_a = globalThis.matchMedia) == null ? void 0 : _a.call(globalThis, "(prefers-reduced-motion: reduce)");
     let allowBlink = blinkAllowed(reduceMotion, motion == null ? void 0 : motion.matches);
-    function attach(pair, key) {
+    function attach(pair, key2) {
       const panels = [...pair.children];
       if (panels.length !== 2) return;
       try {
@@ -625,7 +625,7 @@
       controls.className = "comparison-controls";
       controls.innerHTML = '<label>Compare <select aria-label="Comparison view"><option value="side">Side by side</option><option value="original">Original</option><option value="edited">Edited</option><option value="changes">Changes only</option></select></label><label class="comparison-blink"><input type="checkbox" aria-label="Blink original and edited"> Blink slowly</label><span class="subtle comparison-note"></span>';
       const select3 = controls.querySelector("select"), blink = controls.querySelector("input"), note = controls.querySelector(".comparison-note");
-      select3.value = preferences.get(key) || "side";
+      select3.value = preferences.get(key2) || "side";
       blink.disabled = !allowBlink;
       if (!allowBlink) blink.parentElement.title = "Blink follows reduced-motion settings.";
       const difference = document.createElement("div");
@@ -673,7 +673,7 @@
         }
       }
       select3.addEventListener("change", () => {
-        preferences.set(key, select3.value);
+        preferences.set(key2, select3.value);
         while (preferences.size > 64) preferences.delete(preferences.keys().next().value);
         update2();
       });
@@ -730,8 +730,8 @@
       }
       let index = 0;
       for (const pair of root.querySelectorAll(".preview-pair,.game-map-previews")) {
-        const key = [(_a2 = state2.project) == null ? void 0 : _a2.project_id, (_b2 = state2.artifact) == null ? void 0 : _b2.artifact_id, state2.page, pair.className, index++].join(":");
-        if (!pairs.has(pair)) attach(pair, key);
+        const key2 = [(_a2 = state2.project) == null ? void 0 : _a2.project_id, (_b2 = state2.artifact) == null ? void 0 : _b2.artifact_id, state2.page, pair.className, index++].join(":");
+        if (!pairs.has(pair)) attach(pair, key2);
       }
       for (const record of pairs.values()) record.update();
     }
@@ -850,9 +850,9 @@
   // romancer/ui/build_handoff.js
   function createdBuild(state2) {
     if (!state2.project || !state2.artifact) return null;
-    const results = ["structured.apply", "build.apply", "patches.apply"].map((key) => {
+    const results = ["structured.apply", "build.apply", "patches.apply"].map((key2) => {
       var _a;
-      return (_a = state2.results) == null ? void 0 : _a[key];
+      return (_a = state2.results) == null ? void 0 : _a[key2];
     });
     return [...state2.project.builds].reverse().find((row) => row.source_id === state2.artifact.artifact_id && results.some((result) => (result == null ? void 0 : result.artifact_id) === row.artifact_id && result.sha256 === row.sha256)) || null;
   }
@@ -932,7 +932,7 @@
     (_b = state2.soundPlayer) == null ? void 0 : _b.close();
     state2.soundPlayer = null;
     state2.soundPreview = null;
-    for (const key of ["commandFormReview", "formatReview", "textGrowthReview", "commandRewriteReview", "openAnimationAfterMount", "definitionReview", "commandDefinitionReview", "commandFocus", "animationSaveReview", "connectedAnimation", "connectedSoundJump", "compressedReferenceSurvey", "soundInstrument", "visualSourceProof", "verifiedVisualSource", "savedGameplayTrace", "connectedNode", "connectedTraceFocus", "connectedAssetSetup", "connectedTableJump", "connectedLevelJump", "buildCheckView", "buildCheckReport", "discoveryGraphics", "editCheckResult", "tablePreview", "dataRelocation", "nativeSourceContext", "structuralLab", "structuralPrefill", "tableProposal", "nativeTrace", "nativeProbe", "investigationSeries", "comparisonScene", "valuePanelScope", "gameMapsView", "gameMapEditor", "levelEditor", "levelClipboard", "levelRect", "paint", "pixelHistories", "pixelHistoryScope", "spriteHistory", "hexDraft", "hexReview", "hexSearch", "hexNumbers", "hexExplanation", "hexBookmarks", "hexComparison", "historyComparison", "translationSheet", "translationReview"]) state2[key] = null;
+    for (const key2 of ["commandFormReview", "formatReview", "textGrowthReview", "commandRewriteReview", "openAnimationAfterMount", "definitionReview", "commandDefinitionReview", "commandFocus", "animationSaveReview", "connectedAnimation", "connectedSoundJump", "compressedReferenceSurvey", "soundInstrument", "visualSourceProof", "verifiedVisualSource", "savedGameplayTrace", "connectedNode", "connectedTraceFocus", "connectedAssetSetup", "connectedTableJump", "connectedLevelJump", "buildCheckView", "buildCheckReport", "discoveryGraphics", "editCheckResult", "tablePreview", "dataRelocation", "nativeSourceContext", "structuralLab", "structuralPrefill", "tableProposal", "nativeTrace", "nativeProbe", "investigationSeries", "comparisonScene", "valuePanelScope", "gameMapsView", "gameMapEditor", "levelEditor", "levelClipboard", "levelRect", "paint", "pixelHistories", "pixelHistoryScope", "spriteHistory", "hexDraft", "hexReview", "hexSearch", "hexNumbers", "hexExplanation", "hexBookmarks", "hexComparison", "historyComparison", "translationSheet", "translationReview"]) state2[key2] = null;
     state2.drafts = {};
     state2.romScans = {};
     state2.graphicsInvestigations = {};
@@ -943,7 +943,7 @@
   function clearProjectState(state2) {
     selectionTicket(state2);
     releaseProjectResources(state2);
-    for (const key of ["project", "artifact", "runtime", "frame", "snapshot", "pending", "paint", "profileFamily", "profileLoadedFamily", "candidateReview", "resourcePrefill", "openDeclaration"]) state2[key] = null;
+    for (const key2 of ["project", "artifact", "runtime", "frame", "snapshot", "pending", "paint", "profileFamily", "profileLoadedFamily", "candidateReview", "resourcePrefill", "openDeclaration"]) state2[key2] = null;
     state2.results = {};
     state2.playing = false;
     state2.heldButtons = [];
@@ -989,30 +989,30 @@
       } catch {
       }
     }
-    enqueue(key, operation, onError) {
-      this.operations.set(key, { operation, onError });
-      const prior = this.pending.get(key) || Promise.resolve();
-      const next = prior.then(operation).then(() => this.failed.delete(key)).catch((error) => {
-        this.failed.set(key, error);
+    enqueue(key2, operation, onError) {
+      this.operations.set(key2, { operation, onError });
+      const prior = this.pending.get(key2) || Promise.resolve();
+      const next = prior.then(operation).then(() => this.failed.delete(key2)).catch((error) => {
+        this.failed.set(key2, error);
         try {
           onError(error);
         } catch {
         }
       });
-      this.pending.set(key, next);
+      this.pending.set(key2, next);
       this.changed();
       void next.finally(() => {
-        if (this.pending.get(key) === next) {
-          this.pending.delete(key);
-          if (!this.failed.has(key)) this.operations.delete(key);
+        if (this.pending.get(key2) === next) {
+          this.pending.delete(key2);
+          if (!this.failed.has(key2)) this.operations.delete(key2);
         }
         this.changed();
       });
     }
     async retry() {
-      for (const key of this.failed.keys()) if (!this.pending.has(key)) {
-        const task = this.operations.get(key);
-        if (task) this.enqueue(key, task.operation, task.onError);
+      for (const key2 of this.failed.keys()) if (!this.pending.has(key2)) {
+        const task = this.operations.get(key2);
+        if (task) this.enqueue(key2, task.operation, task.onError);
       }
       await this.flush();
     }
@@ -1046,9 +1046,9 @@
       return [node.id || summary + ":" + index, node];
     });
   }
-  var rememberDetails = (root) => root ? new Map(detailsEntries(root).map(([key, node]) => [key, node.open])) : /* @__PURE__ */ new Map();
+  var rememberDetails = (root) => root ? new Map(detailsEntries(root).map(([key2, node]) => [key2, node.open])) : /* @__PURE__ */ new Map();
   function restoreDetails(root, saved) {
-    for (const [key, node] of detailsEntries(root)) if (saved.has(key)) node.open = saved.get(key);
+    for (const [key2, node] of detailsEntries(root)) if (saved.has(key2)) node.open = saved.get(key2);
   }
   async function runScoped(ctx2, operation, parameters, options = {}, updateJob2 = () => {
   }) {
@@ -1113,13 +1113,13 @@
   function shortcutFor(event, { modalOpen = false, gameFocused = false } = {}) {
     var _a, _b;
     if (event.defaultPrevented || event.repeat || event.isComposing || event.keyCode === 229 || event.metaKey || event.altKey || modalOpen || gameFocused) return null;
-    const editing = !!((_b = (_a = event.target) == null ? void 0 : _a.closest) == null ? void 0 : _b.call(_a, 'input,textarea,select,[contenteditable]:not([contenteditable="false"])')), key = event.key.toLowerCase();
+    const editing = !!((_b = (_a = event.target) == null ? void 0 : _a.closest) == null ? void 0 : _b.call(_a, 'input,textarea,select,[contenteditable]:not([contenteditable="false"])')), key2 = event.key.toLowerCase();
     if (event.ctrlKey) {
-      if (!event.shiftKey && key === "s") return "save";
-      if (!event.shiftKey && key === "k") return "search";
+      if (!event.shiftKey && key2 === "s") return "save";
+      if (!event.shiftKey && key2 === "k") return "search";
       if (editing) return null;
-      if (key === "z") return event.shiftKey ? "redo" : "undo";
-      if (!event.shiftKey && key === "y") return "redo";
+      if (key2 === "z") return event.shiftKey ? "redo" : "undo";
+      if (!event.shiftKey && key2 === "y") return "redo";
     } else if (!editing && event.key === "?") return "help";
     return null;
   }
@@ -1206,7 +1206,7 @@
           ctx2.setDraft("core-path", result.profile.core);
           ctx2.setDraft("core-options", JSON.stringify(result.profile.options, null, 2));
           ctx2.setDraft("system-path", result.profile.system_dir || "");
-          for (const [key, value] of Object.entries(result.profile.input_map)) ctx2.setDraft("key-" + key, value);
+          for (const [key2, value] of Object.entries(result.profile.input_map)) ctx2.setDraft("key-" + key2, value);
         }
         await ctx2.render();
       },
@@ -1223,13 +1223,13 @@
       },
       "profile-validate": () => ctx2.run("profiles.validate", { system_id: read("profile-family") }, { refresh: false }),
       "profile-option": () => {
-        const key = read("option-key"), value = read("option-value");
-        if (!key) throw new Error("Enter an option name.");
-        ctx2.setDraft("core-options", JSON.stringify({ ...json("core-options"), [key]: value }, null, 2));
+        const key2 = read("option-key"), value = read("option-value");
+        if (!key2) throw new Error("Enter an option name.");
+        ctx2.setDraft("core-options", JSON.stringify({ ...json("core-options"), [key2]: value }, null, 2));
         return ctx2.render();
       }
     });
-    return `<p class="notice ${setupError ? "warm" : ""}">${running ? "Emulator loaded · " + esc(running.core.library_name) : available ? `Emulator ready${state2.profileEngine ? " · " + esc(state2.profileEngine) + " included" : ""}` : profile ? esc(setupError) : "The source edition needs a reviewed emulator core. The full Windows and Linux downloads include one."}</p>${tilt ? '<p class="notice">Directions tilt the game. Release them to hold it flat during the balance prompt.</p>' : ""}${!profile ? `${button("Find local cores", "profile-scan")}<div class="actions">${candidates.map((row) => button("Use " + row.core.split(/[\\/]/).at(-1), "profile-auto", { id: row.candidate_id })).join("")}</div>${state2.results["profiles.scan_local"] && !candidates.length ? "<p>No matching core found. Open Advanced setup to choose one.</p>" : ""}` : ""}<div class="field-row">${select("profile-family", "System", families, family)}${select("runtime-content", "ROM or build to play", [...state2.artifact ? [[state2.artifact.artifact_id, state2.artifact.name]] : []], ctx2.draft("runtime-content", ((_f = state2.artifact) == null ? void 0 : _f.artifact_id) || "disc:" + ((_h = (_g = state2.project.containers) == null ? void 0 : _g[0]) == null ? void 0 : _h.container_id)))}</div><div class="actions">${button("Load system settings", "profile-open")}${button("Check setup", "profile-validate")}</div><details class="config"><summary>Controller keys & advanced options</summary>${field("system-path", "System-file folder (optional)", ctx2.draft("system-path", (profile == null ? void 0 : profile.system_dir) || ""))}<div class="field-row">${field("option-key", "Option name", ctx2.draft("option-key", ""))}${field("option-value", "Option value", ctx2.draft("option-value", ""))}</div>${button("Set option", "profile-option")}<div class="field-row">${Object.entries(defaultKeys).map(([key, value]) => field("key-" + key, key.toUpperCase(), ctx2.draft("key-" + key, (profile == null ? void 0 : profile.input_map[key]) || value))).join("")}</div></details>${button("Save emulator settings", "profile-save")}`;
+    return `<p class="notice ${setupError ? "warm" : ""}">${running ? "Emulator loaded · " + esc(running.core.library_name) : available ? `Emulator ready${state2.profileEngine ? " · " + esc(state2.profileEngine) + " included" : ""}` : profile ? esc(setupError) : "The source edition needs a reviewed emulator core. The full Windows and Linux downloads include one."}</p>${tilt ? '<p class="notice">Directions tilt the game. Release them to hold it flat during the balance prompt.</p>' : ""}${!profile ? `${button("Find local cores", "profile-scan")}<div class="actions">${candidates.map((row) => button("Use " + row.core.split(/[\\/]/).at(-1), "profile-auto", { id: row.candidate_id })).join("")}</div>${state2.results["profiles.scan_local"] && !candidates.length ? "<p>No matching core found. Open Advanced setup to choose one.</p>" : ""}` : ""}<div class="field-row">${select("profile-family", "System", families, family)}${select("runtime-content", "ROM or build to play", [...state2.artifact ? [[state2.artifact.artifact_id, state2.artifact.name]] : []], ctx2.draft("runtime-content", ((_f = state2.artifact) == null ? void 0 : _f.artifact_id) || "disc:" + ((_h = (_g = state2.project.containers) == null ? void 0 : _g[0]) == null ? void 0 : _h.container_id)))}</div><div class="actions">${button("Load system settings", "profile-open")}${button("Check setup", "profile-validate")}</div><details class="config"><summary>Controller keys & advanced options</summary>${field("system-path", "System-file folder (optional)", ctx2.draft("system-path", (profile == null ? void 0 : profile.system_dir) || ""))}<div class="field-row">${field("option-key", "Option name", ctx2.draft("option-key", ""))}${field("option-value", "Option value", ctx2.draft("option-value", ""))}</div>${button("Set option", "profile-option")}<div class="field-row">${Object.entries(defaultKeys).map(([key2, value]) => field("key-" + key2, key2.toUpperCase(), ctx2.draft("key-" + key2, (profile == null ? void 0 : profile.input_map[key2]) || value))).join("")}</div></details>${button("Save emulator settings", "profile-save")}`;
   }
   function wavFromPCM(encoded, rate) {
     if (!Number.isInteger(rate) || rate < 1 || rate > 192e3) throw new Error("Unsupported sample rate.");
@@ -1331,7 +1331,7 @@
       await ctx2.navigate("resources");
     } });
     const fields = Object.entries(record.header_numbers || {}).slice(0, 10);
-    return '<div class="recorded-sample"><div class="card-heading"><h4>Recorded sample</h4><span class="badge good">Hash matched</span></div><p><strong>' + esc(record.labels[0]) + "</strong> · " + esc(record.system_id.toUpperCase()) + " · " + size(record.size) + '</p><p class="subtle">This file matches our offline measurements. The name comes from its supplied filename.</p><details><summary>Measured file facts & locations</summary><p>Checks and offsets describe this exact file. Candidate locations still need investigation before editing.</p><p>CRC32 <code>' + esc(record.crc32) + "</code> · " + esc(record.format) + "</p>" + (record.sha1 ? "<p>SHA-1 <code>" + esc(record.sha1) + "</code></p>" : "") + (structures.length ? "<h4>Measured structures</h4><ul>" + structures.map((row) => "<li>" + esc(row.kind.replaceAll("-", " ")) + " · " + row.count + " × " + row.stride + " bytes " + button("Inspect bytes", "sample-location", { id: String(row.offset) }) + "</li>").join("") + "</ul>" : "") + (fields.length ? '<dl class="field-row">' + fields.map(([key, value]) => "<div><dt>" + esc(key.replaceAll("_", " ")) + "</dt><dd>" + esc(String(value)) + "</dd></div>").join("") + "</dl>" : "") + (rows.length ? '<div class="table-wrap" role="region" tabindex="0" aria-label="Recorded sample resource locations"><table><thead><tr><th>Offset</th><th>Bytes</th><th>Finding</th><th></th></tr></thead><tbody>' + rows.slice(0, 6).map((row) => "<tr><td><code>0x" + row.offset.toString(16).toUpperCase() + "</code></td><td>" + row.length + "</td><td>" + esc(kindLabel(row)) + "</td><td>" + button("Inspect bytes", "sample-location", { id: String(row.offset) }) + "</td></tr>").join("") + '</tbody></table></div><p class="subtle">Showing ' + Math.min(6, rows.length) + " recorded locations. The current scan below provides fresh discoveries.</p>" : "") + '<p class="subtle">Whole-file identity read · graphics sampled · compression ' + (record.coverage.compression_work_limited ? "work limit reached" : "within scan budget") + ". A sample match does not certify an original commercial dump or gameplay behavior.</p></details></div>";
+    return '<div class="recorded-sample"><div class="card-heading"><h4>Recorded sample</h4><span class="badge good">Hash matched</span></div><p><strong>' + esc(record.labels[0]) + "</strong> · " + esc(record.system_id.toUpperCase()) + " · " + size(record.size) + '</p><p class="subtle">This file matches our offline measurements. The name comes from its supplied filename.</p><details><summary>Measured file facts & locations</summary><p>Checks and offsets describe this exact file. Candidate locations still need investigation before editing.</p><p>CRC32 <code>' + esc(record.crc32) + "</code> · " + esc(record.format) + "</p>" + (record.sha1 ? "<p>SHA-1 <code>" + esc(record.sha1) + "</code></p>" : "") + (structures.length ? "<h4>Measured structures</h4><ul>" + structures.map((row) => "<li>" + esc(row.kind.replaceAll("-", " ")) + " · " + row.count + " × " + row.stride + " bytes " + button("Inspect bytes", "sample-location", { id: String(row.offset) }) + "</li>").join("") + "</ul>" : "") + (fields.length ? '<dl class="field-row">' + fields.map(([key2, value]) => "<div><dt>" + esc(key2.replaceAll("_", " ")) + "</dt><dd>" + esc(String(value)) + "</dd></div>").join("") + "</dl>" : "") + (rows.length ? '<div class="table-wrap" role="region" tabindex="0" aria-label="Recorded sample resource locations"><table><thead><tr><th>Offset</th><th>Bytes</th><th>Finding</th><th></th></tr></thead><tbody>' + rows.slice(0, 6).map((row) => "<tr><td><code>0x" + row.offset.toString(16).toUpperCase() + "</code></td><td>" + row.length + "</td><td>" + esc(kindLabel(row)) + "</td><td>" + button("Inspect bytes", "sample-location", { id: String(row.offset) }) + "</td></tr>").join("") + '</tbody></table></div><p class="subtle">Showing ' + Math.min(6, rows.length) + " recorded locations. The current scan below provides fresh discoveries.</p>" : "") + '<p class="subtle">Whole-file identity read · graphics sampled · compression ' + (record.coverage.compression_work_limited ? "work limit reached" : "within scan budget") + ". A sample match does not certify an original commercial dump or gameplay behavior.</p></details></div>";
   }
 
   // romancer/ui/cartridge_verification.js
@@ -1597,7 +1597,7 @@
   function buttonsForRuntime(state2, buttons) {
     var _a, _b, _c, _d, _e;
     const sms = ((_a = state2.artifact) == null ? void 0 : _a.system_id) === "sms" && ((_e = (_d = (_c = (_b = state2.runtime) == null ? void 0 : _b.loaded) == null ? void 0 : _c.loaded) == null ? void 0 : _d.core) == null ? void 0 : _e.library_name) === "BlastEm";
-    return [...new Set(buttons.map((key) => sms && key === "b" ? "r" : key))];
+    return [...new Set(buttons.map((key2) => sms && key2 === "b" ? "r" : key2))];
   }
   var defaultKeys2 = { up: "ArrowUp", down: "ArrowDown", left: "ArrowLeft", right: "ArrowRight", a: "z", b: "x", start: "Enter", select: "Shift" };
   function padForSelection(pads, selection2 = -1) {
@@ -1643,18 +1643,18 @@
     control.addEventListener("keydown", (event) => {
       var _a2;
       if (event.target !== control) return;
-      const map = ((_a2 = ctx2.state.profile) == null ? void 0 : _a2.input_map) || defaultKeys2, key = Object.keys(map).find((k) => map[k] === event.key);
-      if (key) {
+      const map = ((_a2 = ctx2.state.profile) == null ? void 0 : _a2.input_map) || defaultKeys2, key2 = Object.keys(map).find((k) => map[k] === event.key);
+      if (key2) {
         event.preventDefault();
-        ctx2.state.heldButtons = [.../* @__PURE__ */ new Set([...ctx2.state.heldButtons || [], key])];
+        ctx2.state.heldButtons = [.../* @__PURE__ */ new Set([...ctx2.state.heldButtons || [], key2])];
       }
     }, options);
     control.addEventListener("keyup", (event) => {
       var _a2;
-      const map = ((_a2 = ctx2.state.profile) == null ? void 0 : _a2.input_map) || defaultKeys2, key = Object.keys(map).find((k) => map[k] === event.key);
-      if (key) {
+      const map = ((_a2 = ctx2.state.profile) == null ? void 0 : _a2.input_map) || defaultKeys2, key2 = Object.keys(map).find((k) => map[k] === event.key);
+      if (key2) {
         event.preventDefault();
-        ctx2.state.heldButtons = (ctx2.state.heldButtons || []).filter((k) => k !== key);
+        ctx2.state.heldButtons = (ctx2.state.heldButtons || []).filter((k) => k !== key2);
       }
     }, options);
     control.addEventListener("blur", () => {
@@ -1677,9 +1677,9 @@
     const groups = /* @__PURE__ */ new Map();
     ((result == null ? void 0 : result.matches) || []).forEach((match, index) => {
       if (match.height !== height) return;
-      const key = [match.x, match.y, match.height].join(":");
-      if (!groups.has(key)) groups.set(key, { x: match.x, y: match.y, height, choices: [] });
-      groups.get(key).choices.push({ index, ...match });
+      const key2 = [match.x, match.y, match.height].join(":");
+      if (!groups.has(key2)) groups.set(key2, { x: match.x, y: match.y, height, choices: [] });
+      groups.get(key2).choices.push({ index, ...match });
     });
     return [...groups.values()].sort((a, b) => a.y - b.y || a.x - b.x);
   }
@@ -2027,7 +2027,7 @@
     }).join("") + "</div></details>" + button("Save test setup for this revision", "check-save") + '<p class="subtle">Up to 2400 frames. Setup follows builds descended from this revision. A flat or unstable original is inconclusive; visual changes need review unless identical pixels are required. Record longer assertions in Routes.</p></details>' + (results.length ? '<details open><summary>Recent results</summary><div class="actions">' + results.slice().reverse().map((r) => button(r.status + " · " + r.evidence_id.slice(0, 8), "check-open", { id: r.evidence_id })).join("") + "</div></details>" : "") + (packet ? checkReport(packet) : "") + "</section>";
   }
   function checkReport(r) {
-    return '<section class="notice"><h4>' + esc(r.name || "Build check") + " · " + esc(r.status) + "</h4><p>" + esc(r.reason || "") + "</p>" + (r.runtime_trusted === false ? '<p class="notice warm">Historical imported report. Run fresh checks for current execution evidence.</p>' : "") + (r.changed_pixels !== void 0 ? "<p>" + r.changed_pixels + " of " + r.total_pixels + " pixels changed.</p>" : "") + (r.gameplay ? "<h5>Gameplay expectations " + badge(r.gameplay.status, r.gameplay.status === "PASS" ? "good" : "warm") + '</h5><div class="table-wrap"><table><thead><tr><th>Watch</th><th>Comparison</th><th>Original</th><th>Build</th><th>Result</th></tr></thead><tbody>' + r.gameplay.results.map((row) => "<tr><td>" + esc(row.rule.name) + "</td><td>" + esc({ value: "Final value", delta: "Last input change", same: "Same as original" }[row.rule.mode]) + "</td><td>" + esc(row.original) + (row.original !== row.repeat ? " / " + esc(row.repeat) + " on repeat" : "") + (row.rule.original === null ? "" : " (expected " + esc(row.rule.original) + ")") + "</td><td>" + esc(row.build) + (row.rule.build === null ? "" : " (expected " + esc(row.rule.build) + ")") + "</td><td>" + esc(row.status) + "</td></tr>").join("") + "</tbody></table></div>" : "") + (r.visual ? '<div class="visual-comparison">' + [["original_png_base64", "Original"], ["build_png_base64", "Build"], ["difference_png_base64", "Difference"]].map(([key, name2]) => "<figure><figcaption>" + name2 + '</figcaption><img src="data:image/png;base64,' + esc(r.visual[key]) + '" alt="' + name2 + ' check picture" loading="lazy"></figure>').join("") + "</div>" : "") + (r.runs ? "<p>" + r.runs.length + " fresh worker runs · " + r.runs.filter((s) => s.state_replay).length + " state replays verified · " + r.runs.filter((s) => s.worker_exit_code === 0).length + " clean exits</p>" : "") + '<p class="subtle">This covers the configured inputs and assertions. It does not certify a complete game.</p></section>';
+    return '<section class="notice"><h4>' + esc(r.name || "Build check") + " · " + esc(r.status) + "</h4><p>" + esc(r.reason || "") + "</p>" + (r.runtime_trusted === false ? '<p class="notice warm">Historical imported report. Run fresh checks for current execution evidence.</p>' : "") + (r.changed_pixels !== void 0 ? "<p>" + r.changed_pixels + " of " + r.total_pixels + " pixels changed.</p>" : "") + (r.gameplay ? "<h5>Gameplay expectations " + badge(r.gameplay.status, r.gameplay.status === "PASS" ? "good" : "warm") + '</h5><div class="table-wrap"><table><thead><tr><th>Watch</th><th>Comparison</th><th>Original</th><th>Build</th><th>Result</th></tr></thead><tbody>' + r.gameplay.results.map((row) => "<tr><td>" + esc(row.rule.name) + "</td><td>" + esc({ value: "Final value", delta: "Last input change", same: "Same as original" }[row.rule.mode]) + "</td><td>" + esc(row.original) + (row.original !== row.repeat ? " / " + esc(row.repeat) + " on repeat" : "") + (row.rule.original === null ? "" : " (expected " + esc(row.rule.original) + ")") + "</td><td>" + esc(row.build) + (row.rule.build === null ? "" : " (expected " + esc(row.rule.build) + ")") + "</td><td>" + esc(row.status) + "</td></tr>").join("") + "</tbody></table></div>" : "") + (r.visual ? '<div class="visual-comparison">' + [["original_png_base64", "Original"], ["build_png_base64", "Build"], ["difference_png_base64", "Difference"]].map(([key2, name2]) => "<figure><figcaption>" + name2 + '</figcaption><img src="data:image/png;base64,' + esc(r.visual[key2]) + '" alt="' + name2 + ' check picture" loading="lazy"></figure>').join("") + "</div>" : "") + (r.runs ? "<p>" + r.runs.length + " fresh worker runs · " + r.runs.filter((s) => s.state_replay).length + " state replays verified · " + r.runs.filter((s) => s.worker_exit_code === 0).length + " clean exits</p>" : "") + '<p class="subtle">This covers the configured inputs and assertions. It does not certify a complete game.</p></section>';
   }
   function mountBuildChecks(ctx2) {
     clearTimeout(ctx2.state.buildCheckTimer);
@@ -2083,20 +2083,20 @@
   var modes = [["value", "Final value"], ["delta", "Change during last input"], ["same", "Same as original"]];
   function expectationRows(ctx2, watches, count) {
     return Array.from({ length: count }, (_, i) => {
-      const key = "expect-" + i + "-", draft = (id, fallback) => ctx2.draft(key + id, fallback);
-      return '<fieldset class="expectation-fields"><legend>Gameplay check ' + (i + 1) + '</legend><div class="field-row">' + select(key + "watch", "Saved RAM watch", [["", "No watch selected"], ...watches.map((w, j) => [j, w.name])], draft("watch", "")) + select(key + "mode", "What to compare", modes, draft("mode", "value")) + select(key + "endian", "Byte order", [["little", "Little endian"], ["big", "Big endian"]], draft("endian", "little")) + field(key + "original", "Expected original", draft("original", ""), { type: "number" }) + field(key + "build", "Expected build", draft("build", ""), { type: "number" }) + "</div></fieldset>";
+      const key2 = "expect-" + i + "-", draft = (id, fallback) => ctx2.draft(key2 + id, fallback);
+      return '<fieldset class="expectation-fields"><legend>Gameplay check ' + (i + 1) + '</legend><div class="field-row">' + select(key2 + "watch", "Saved RAM watch", [["", "No watch selected"], ...watches.map((w, j) => [j, w.name])], draft("watch", "")) + select(key2 + "mode", "What to compare", modes, draft("mode", "value")) + select(key2 + "endian", "Byte order", [["little", "Little endian"], ["big", "Big endian"]], draft("endian", "little")) + field(key2 + "original", "Expected original", draft("original", ""), { type: "number" }) + field(key2 + "build", "Expected build", draft("build", ""), { type: "number" }) + "</div></fieldset>";
     }).join("");
   }
   function readExpectations(watches, count) {
     const rules = [];
     for (let i = 0; i < count; i++) {
-      const key = "expect-" + i + "-", index = read(key + "watch");
+      const key2 = "expect-" + i + "-", index = read(key2 + "watch");
       if (index === "") continue;
-      const watch = watches[Number(index)], mode = read(key + "mode"), endian = read(key + "endian");
+      const watch = watches[Number(index)], mode = read(key2 + "mode"), endian = read(key2 + "endian");
       if (!watch) throw Error("Choose a saved RAM watch.");
       const expected = (side) => {
         if (mode === "same") return null;
-        const raw = read(key + side), value = Number(raw);
+        const raw = read(key2 + side), value = Number(raw);
         if (!raw.trim() || !Number.isSafeInteger(value)) throw Error("Enter a whole number for the original and build, or choose Same as original.");
         return value;
       };
@@ -2176,7 +2176,7 @@
     const { state: state2 } = ctx2, scope = selectionKey(state2), packet = state2.researchOpen, restore = state2.researchRestore;
     if ((restore == null ? void 0 : restore.scope) === scope && restore.kind === kind) {
       state2.researchRestore = null;
-      for (const [key, value] of Object.entries(restore.fields)) ctx2.setDraft(key, value);
+      for (const [key2, value] of Object.entries(restore.fields)) ctx2.setDraft(key2, value);
       delete state2.results[kind + ".inspect"];
       state2.pending = null;
       return "";
@@ -2189,19 +2189,19 @@
     }
     const keys2 = { assets: "asset-schema", script: "script-schema", levels: "level-definition", sound: "sound-definition" };
     const wanted = kind === "tables" ? { "table-name": d.definition.name, "table-offset": String(d.definition.offset), "table-count": String(d.definition.count), "table-stride": String(d.definition.stride), "table-fields": JSON.stringify(d.definition.fields) } : { [keys2[kind]]: JSON.stringify(d, null, 2) };
-    const prior = Object.fromEntries(Object.keys(wanted).map((key) => [key, ctx2.draft(key, null)]));
+    const prior = Object.fromEntries(Object.keys(wanted).map((key2) => [key2, ctx2.draft(key2, null)]));
     const page = state2.page, ownsSetup = () => {
       var _a2;
-      return selectionKey(state2) === scope && state2.page === page && state2.researchOpen === packet && ((_a2 = ctx2.isCurrentRender) == null ? void 0 : _a2.call(ctx2)) !== false && Object.entries(prior).every(([key, value]) => ctx2.draft(key, null) === value);
+      return selectionKey(state2) === scope && state2.page === page && state2.researchOpen === packet && ((_a2 = ctx2.isCurrentRender) == null ? void 0 : _a2.call(ctx2)) !== false && Object.entries(prior).every(([key2, value]) => ctx2.draft(key2, null) === value);
     };
-    const differs = Object.keys(wanted).some((key) => prior[key] !== null && String(prior[key]) !== wanted[key]);
+    const differs = Object.keys(wanted).some((key2) => prior[key2] !== null && String(prior[key2]) !== wanted[key2]);
     if (differs && !packet.confirmed) {
       ctx2.use({
         "research-keep-setup": () => {
           var _a2;
           if (!ownsSetup()) return;
           state2.researchOpen = null;
-          for (const key of ["connectedAssetSetup", "connectedAnimation", "connectedTableJump", "connectedLevelJump"]) if (((_a2 = state2[key]) == null ? void 0 : _a2.scope) === scope) state2[key] = null;
+          for (const key2 of ["connectedAssetSetup", "connectedAnimation", "connectedTableJump", "connectedLevelJump"]) if (((_a2 = state2[key2]) == null ? void 0 : _a2.scope) === scope) state2[key2] = null;
           return ctx2.render();
         },
         "research-load-setup": async () => {
@@ -2226,7 +2226,7 @@
         "research-restore-setup": () => {
           const backups = JSON.parse(ctx2.draft("research-previous-setup", "[]")), last = backups.at(-1);
           if ((last == null ? void 0 : last.sha256) !== state2.artifact.sha256) throw Error("The recovery setup belongs to another ROM.");
-          for (const [key, value] of Object.entries(last.fields)) ctx2.setDraft(key, value);
+          for (const [key2, value] of Object.entries(last.fields)) ctx2.setDraft(key2, value);
           state2.researchOpen = null;
           return ctx2.render();
         }
@@ -2234,7 +2234,7 @@
       return '<section class="card"><h2>Load saved resource setup?</h2><p>This editor has a different setup draft. Keep it, or load the checked saved definition after storing a recovery copy. Existing document-specific edits stay separate.</p>' + button("Keep current draft", "research-keep-setup") + button("Load saved setup", "research-load-setup") + "</section>";
     }
     state2.researchOpen = null;
-    for (const [key, value] of Object.entries(wanted)) ctx2.setDraft(key, value);
+    for (const [key2, value] of Object.entries(wanted)) ctx2.setDraft(key2, value);
     delete state2.results[kind + ".inspect"];
     state2.candidateReview = null;
     state2.pending = null;
@@ -2274,7 +2274,7 @@
     const fill = (note) => {
       var _a2;
       state2.researchEditing = { scope, id: (note == null ? void 0 : note.id) || null };
-      for (const [key, value] of Object.entries({ title: (note == null ? void 0 : note.title) || "", offset: (note == null ? void 0 : note.offset) ?? ((_a2 = state2.hexDraft) == null ? void 0 : _a2.selected) ?? 0, length: (note == null ? void 0 : note.length) ?? 1, category: (note == null ? void 0 : note.category) || "other", text: (note == null ? void 0 : note.text) || "", reference: (note == null ? void 0 : note.reference) || "" })) ctx2.setDraft("research-note-" + key, String(value));
+      for (const [key2, value] of Object.entries({ title: (note == null ? void 0 : note.title) || "", offset: (note == null ? void 0 : note.offset) ?? ((_a2 = state2.hexDraft) == null ? void 0 : _a2.selected) ?? 0, length: (note == null ? void 0 : note.length) ?? 1, category: (note == null ? void 0 : note.category) || "other", text: (note == null ? void 0 : note.text) || "", reference: (note == null ? void 0 : note.reference) || "" })) ctx2.setDraft("research-note-" + key2, String(value));
     };
     const showNote = async () => {
       var _a2, _b2, _c2;
@@ -2522,9 +2522,9 @@
     if (!text || !Number.isSafeInteger(value)) throw new Error("Enter a whole number for " + id + ".");
     return value;
   }
-  function stored(ctx2, key, fallback) {
+  function stored(ctx2, key2, fallback) {
     try {
-      return JSON.parse(ctx2.draft(key, JSON.stringify(fallback)));
+      return JSON.parse(ctx2.draft(key2, JSON.stringify(fallback)));
     } catch {
       return fallback;
     }
@@ -2560,7 +2560,7 @@
       state2.pending = null;
       state2.tablePreview = { scope: selectionKey(state2), document_id: proposal.inspection.document_id };
       const d = proposal.definition;
-      for (const [key, value] of Object.entries({ "table-name": d.name, "table-offset": d.offset, "table-count": d.count, "table-stride": d.stride, "table-fields": JSON.stringify(d.fields) })) ctx2.setDraft(key, typeof value === "string" ? value : String(value));
+      for (const [key2, value] of Object.entries({ "table-name": d.name, "table-offset": d.offset, "table-count": d.count, "table-stride": d.stride, "table-fields": JSON.stringify(d.fields) })) ctx2.setDraft(key2, typeof value === "string" ? value : String(value));
     }
     if (((_d = state2.connectedTableJump) == null ? void 0 : _d.scope) === selectionKey(state2)) {
       const d = (_f = (_e = artifact.descriptors) == null ? void 0 : _e.tables) == null ? void 0 : _f.definition;
@@ -2599,9 +2599,9 @@
       for (const row of model.rows) for (const [index, cell] of row.cells.entries()) {
         const node = document.getElementById(inputId(row.index, index));
         if (!node) continue;
-        const after = integer3(node.id), key = row.index + ":" + cell.field;
-        if (after === cell.value) result.delete(key);
-        else result.set(key, { row: row.index, field: cell.field, before: cell.value, after });
+        const after = integer3(node.id), key2 = row.index + ":" + cell.field;
+        if (after === cell.value) result.delete(key2);
+        else result.set(key2, { row: row.index, field: cell.field, before: cell.value, after });
       }
       return [...result.values()];
     }
@@ -3628,11 +3628,11 @@
       ctx2.state.pixelHistories = /* @__PURE__ */ new Map();
       ctx2.state.pixelHistoryScope = scope;
     }
-    const key = bitmap + ":" + index;
-    let history3 = ctx2.state.pixelHistories.get(key);
-    if (!history3) history3 = new PixelHistory(scope + ":" + key, pixels);
-    ctx2.state.pixelHistories.delete(key);
-    ctx2.state.pixelHistories.set(key, history3);
+    const key2 = bitmap + ":" + index;
+    let history3 = ctx2.state.pixelHistories.get(key2);
+    if (!history3) history3 = new PixelHistory(scope + ":" + key2, pixels);
+    ctx2.state.pixelHistories.delete(key2);
+    ctx2.state.pixelHistories.set(key2, history3);
     while (ctx2.state.pixelHistories.size > 32) ctx2.state.pixelHistories.delete(ctx2.state.pixelHistories.keys().next().value);
     return history3;
   }
@@ -3765,13 +3765,13 @@
     if (Object.keys(brush).sort().join(",") !== "flip_x,flip_y,palette_bank,tile_index") throw Error("Provide tile, palette and both flip values.");
     const bitmap = doc.bitmaps.find((r) => r.id === map.bitmap_id), palette2 = doc.palettes.find((r) => r.id === map.palette_id), entry = map.entries[index];
     if (!entry) throw Error("Choose a declared map cell.");
-    for (const [key, value] of Object.entries(brush)) {
-      if (!["tile_index", "palette_bank", "flip_x", "flip_y"].includes(key) || !Number.isInteger(value) || value < 0) throw Error("Invalid map brush value.");
-      const field2 = map.fields[key];
-      if (field2.kind === "constant" && value !== field2.value) throw Error(key + " is constant in this declaration.");
+    for (const [key2, value] of Object.entries(brush)) {
+      if (!["tile_index", "palette_bank", "flip_x", "flip_y"].includes(key2) || !Number.isInteger(value) || value < 0) throw Error("Invalid map brush value.");
+      const field2 = map.fields[key2];
+      if (field2.kind === "constant" && value !== field2.value) throw Error(key2 + " is constant in this declaration.");
       if (field2.kind === "bits") {
         const shift = Math.log2(field2.mask & -field2.mask), max = field2.mask >>> shift;
-        if (value > max) throw Error(key + " exceeds its declared storage field.");
+        if (value > max) throw Error(key2 + " exceeds its declared storage field.");
       }
     }
     if (brush.tile_index >= bitmap.count) throw Error("Choose an existing tile.");
@@ -3806,8 +3806,8 @@
     }
     return image;
   }
-  function flipSelect(ctx2, map, key, label) {
-    const field2 = map.fields[key], id = "map-" + key.replaceAll("_", "-");
+  function flipSelect(ctx2, map, key2, label) {
+    const field2 = map.fields[key2], id = "map-" + key2.replaceAll("_", "-");
     return field2.kind === "constant" ? `<p>${esc(label)}: ${field2.value ? "On" : "Off"} (fixed)<input id="${id}" type="hidden" value="${field2.value}"></p>` : select(id, label, [["0", "Off"], ["1", "On"]], ctx2.draft(id, "0"));
   }
   function tilemapControls(ctx2, doc, map) {
@@ -3962,8 +3962,8 @@
 
   // romancer/ui/asset_controls.js
   function stage(ctx2, change) {
-    const changes = json("asset-changes"), key = (c) => [c.kind, c.bitmap_id, c.cell_index, c.palette_id, c.bank, c.index, c.tilemap_id, c.entry_index, c.font_id, c.glyph_id].join(":");
-    const filtered = changes.filter((c) => key(c) !== key(change));
+    const changes = json("asset-changes"), key2 = (c) => [c.kind, c.bitmap_id, c.cell_index, c.palette_id, c.bank, c.index, c.tilemap_id, c.entry_index, c.font_id, c.glyph_id].join(":");
+    const filtered = changes.filter((c) => key2(c) !== key2(change));
     filtered.push(change);
     ctx2.setDraft("asset-changes", JSON.stringify(filtered, null, 2));
     ctx2.state.assetAcknowledgements = [];
@@ -5383,9 +5383,9 @@ ${font ? `<section class="card"><h3>Font metrics · ${esc(font.id)}</h3><div cla
         return ctx2.navigate("resources");
       }
     });
-    const table = (rows, key) => {
-      const writer = key === "sampled_writes";
-      const cells = (items) => items.map((row) => `<tr><td>${button((writer ? "Inspect code " : "Inspect ROM bytes ") + hex2(row.file_offset), "follow-open", { id: String(row.file_offset), name: writer ? "writer" : "read" })}</td><td>${row[key]}</td><td>${row.resources.map((v) => esc(v.name)).join(", ") || "No saved definition"}</td></tr>`).join("");
+    const table = (rows, key2) => {
+      const writer = key2 === "sampled_writes";
+      const cells = (items) => items.map((row) => `<tr><td>${button((writer ? "Inspect code " : "Inspect ROM bytes ") + hex2(row.file_offset), "follow-open", { id: String(row.file_offset), name: writer ? "writer" : "read" })}</td><td>${row[key2]}</td><td>${row.resources.map((v) => esc(v.name)).join(", ") || "No saved definition"}</td></tr>`).join("");
       const grid = (items) => `<div class="table-wrap"><table><thead><tr><th>Source location</th><th>Sampled accesses</th><th>Declared resource</th></tr></thead><tbody>${cells(items)}</tbody></table></div>`;
       return rows.length ? grid(rows.slice(0, 6)) + (rows.length > 6 ? `<details><summary>More mapped locations (${rows.length - 6})</summary>${grid(rows.slice(6))}</details>` : "") : "<p>No mapped locations in this capture.</p>";
     };
@@ -6238,7 +6238,7 @@ ${state2.artifact.system_id ? `<details><summary>Advanced byte options</summary>
       "catalog-open": (node) => ctx2.run("resource.inspect", { ...ctx2.sourceParams(), offset: Number(node.dataset.id), length: Math.min(256, Number(node.dataset.name)) }),
       "definitions-reuse": async () => {
         await ctx2.run("resources.reuse_definitions", ctx2.sourceParams(), { render: false });
-        for (const key of ["assets.inspect", "script.inspect", "tables.inspect", "levels.inspect", "sound.inspect"]) delete state2.results[key];
+        for (const key2 of ["assets.inspect", "script.inspect", "tables.inspect", "levels.inspect", "sound.inspect"]) delete state2.results[key2];
         await ctx2.render();
         ctx2.notify("Resource setup rechecked against this build.");
       },
@@ -6266,7 +6266,7 @@ ${state2.artifact.system_id ? `<details><summary>Advanced byte options</summary>
         state2.paint = null;
         delete state2.results["assets.inspect"];
         delete state2.results["assets.plan"];
-        for (const key of Object.keys(state2.drafts)) if (key.endsWith(":assets:asset-schema") || key.endsWith(":assets:asset-changes")) delete state2.drafts[key];
+        for (const key2 of Object.keys(state2.drafts)) if (key2.endsWith(":assets:asset-schema") || key2.endsWith(":assets:asset-changes")) delete state2.drafts[key2];
         await ctx2.navigate("assets");
       },
       "resource-region": (node) => ctx2.run("resource.inspect", { ...ctx2.sourceParams(), offset: Number(node.dataset.id), length: 256 }),
@@ -6792,7 +6792,7 @@ ${state2.artifact.system_id ? `<details><summary>Advanced byte options</summary>
     const map = prefix === "text" ? { system_id: "system", offset: "offset", capacity: "capacity", count: "count", stride: "stride", pointer_offset: "pointer", encoding: "encoding", terminator: "terminator", padding: "padding" } : { system_id: "system", offset: "offset", count: "count", codec: "codec" };
     ctx2.state.resourcePrefill = null;
     ctx2.state.openDeclaration = prefix;
-    for (const [key, suffix] of Object.entries(map)) if (key in candidate.config) ctx2.setDraft(prefix + "-" + suffix, candidate.config[key] === null ? "" : String(candidate.config[key]));
+    for (const [key2, suffix] of Object.entries(map)) if (key2 in candidate.config) ctx2.setDraft(prefix + "-" + suffix, candidate.config[key2] === null ? "" : String(candidate.config[key2]));
   }
 
   // romancer/ui/views/scripts.js
@@ -6869,7 +6869,7 @@ ${state2.artifact.system_id ? `<details><summary>Advanced byte options</summary>
       },
       "script-discard": () => {
         state2.pending = null;
-        for (const key of Object.keys(state2.drafts)) if (key.includes("script-segment-")) delete state2.drafts[key];
+        for (const key2 of Object.keys(state2.drafts)) if (key2.includes("script-segment-")) delete state2.drafts[key2];
         delete state2.results["script.plan"];
         ctx2.render();
       },
@@ -7088,8 +7088,8 @@ ${state2.artifact.system_id ? `<details><summary>Advanced byte options</summary>
         transparent++;
         continue;
       }
-      const r = rgba[i * 4], g = rgba[i * 4 + 1], b = rgba[i * 4 + 2], key = r << 16 | g << 8 | b;
-      let entry = seen.get(key);
+      const r = rgba[i * 4], g = rgba[i * 4 + 1], b = rgba[i * 4 + 2], key2 = r << 16 | g << 8 | b;
+      let entry = seen.get(key2);
       if (!entry) {
         let best = Infinity, index = 0;
         palette2.forEach(([pr2, pg2, pb2], candidate) => {
@@ -7102,7 +7102,7 @@ ${state2.artifact.system_id ? `<details><summary>Advanced byte options</summary>
         const [pr, pg, pb] = palette2[index];
         const same = Math.max(Math.abs(r - pr), Math.abs(g - pg), Math.abs(b - pb)) <= sameColorTolerance;
         entry = { from: [r, g, b], index, to: palette2[index], same, pixels: 0 };
-        seen.set(key, entry);
+        seen.set(key2, entry);
       }
       entry.pixels++;
       pixels[i] = entry.index;
@@ -7516,12 +7516,12 @@ ${state2.artifact.system_id ? `<details><summary>Advanced byte options</summary>
       state2.paint = null;
       ctx2.setDraft("paint-buffer", "");
     }
-    const key = document2 == null ? void 0 : document2.document_id;
-    if (((_i = state2.paint) == null ? void 0 : _i.document_id) !== key) state2.paint = null;
+    const key2 = document2 == null ? void 0 : document2.document_id;
+    if (((_i = state2.paint) == null ? void 0 : _i.document_id) !== key2) state2.paint = null;
     if ((document2 == null ? void 0 : document2.ok) && !state2.paint) {
       try {
         const saved = JSON.parse(ctx2.draft("paint-buffer", "null")), savedBitmap = document2.bitmaps.find((b) => b.id === (saved == null ? void 0 : saved.bitmap_id));
-        if ((saved == null ? void 0 : saved.document_id) === key && (savedBitmap == null ? void 0 : savedBitmap.cells[saved.cell_index]) && Array.isArray(saved.pixels) && saved.pixels.length === savedBitmap.width * savedBitmap.height) {
+        if ((saved == null ? void 0 : saved.document_id) === key2 && (savedBitmap == null ? void 0 : savedBitmap.cells[saved.cell_index]) && Array.isArray(saved.pixels) && saved.pixels.length === savedBitmap.width * savedBitmap.height) {
           state2.paint = saved;
           state2.assetBitmapId = saved.bitmap_id;
         }
@@ -7552,7 +7552,7 @@ ${state2.artifact.system_id ? `<details><summary>Advanced byte options</summary>
         const rect = node.getBoundingClientRect(), x = Math.floor((event.clientX - rect.left) / rect.width * bitmap.width), y = Math.floor((event.clientY - rect.top) / rect.height * bitmap.height);
         const color = Number(read("paint-color"));
         if (!Number.isInteger(color) || color < 0 || color >= literalColorCount(bitmap, palette2)) throw new Error("Select a palette index within the declared color count.");
-        if (!state2.paint) state2.paint = { document_id: key, bitmap_id: bitmap.id, cell_index: selected, pixels: [...bitmap.cells[selected].pixels] };
+        if (!state2.paint) state2.paint = { document_id: key2, bitmap_id: bitmap.id, cell_index: selected, pixels: [...bitmap.cells[selected].pixels] };
         state2.paint.pixels[y * bitmap.width + x] = color;
         state2.assetAcknowledgements = [];
         state2.pending = null;
@@ -7563,11 +7563,11 @@ ${state2.artifact.system_id ? `<details><summary>Advanced byte options</summary>
         var _a2;
         const signature = JSON.stringify({ schema: json("asset-schema"), edits: request2() }), generation = state2.assetEditRevision || 0;
         const result = await ctx2.run("assets.plan", { ...ctx2.sourceParams(), ...JSON.parse(signature) }, { render: false });
-        if (((_a2 = state2.results["assets.inspect"]) == null ? void 0 : _a2.document_id) !== key || (state2.assetEditRevision || 0) !== generation || JSON.stringify({ schema: json("asset-schema"), edits: request2() }) !== signature) {
+        if (((_a2 = state2.results["assets.inspect"]) == null ? void 0 : _a2.document_id) !== key2 || (state2.assetEditRevision || 0) !== generation || JSON.stringify({ schema: json("asset-schema"), edits: request2() }) !== signature) {
           ctx2.notify("Graphics changed during review. Review them again.");
           return;
         }
-        state2.pending = { kind: "assets", plan_id: result.workbench_plan_id, artifact_id: state2.artifact.artifact_id, document_id: key, signature };
+        state2.pending = { kind: "assets", plan_id: result.workbench_plan_id, artifact_id: state2.artifact.artifact_id, document_id: key2, signature };
         await ctx2.render();
       },
       "asset-acknowledge": async () => {
@@ -7581,7 +7581,7 @@ ${state2.artifact.system_id ? `<details><summary>Advanced byte options</summary>
       "asset-apply": async () => {
         var _a2;
         const reviewed = state2.pending;
-        if ((reviewed == null ? void 0 : reviewed.kind) !== "assets" || reviewed.artifact_id !== state2.artifact.artifact_id || reviewed.document_id !== key || ((_a2 = state2.results["assets.inspect"]) == null ? void 0 : _a2.document_id) !== key || reviewed.signature !== JSON.stringify({ schema: json("asset-schema"), edits: request2() })) throw Error("Review the current graphics changes first.");
+        if ((reviewed == null ? void 0 : reviewed.kind) !== "assets" || reviewed.artifact_id !== state2.artifact.artifact_id || reviewed.document_id !== key2 || ((_a2 = state2.results["assets.inspect"]) == null ? void 0 : _a2.document_id) !== key2 || reviewed.signature !== JSON.stringify({ schema: json("asset-schema"), edits: request2() })) throw Error("Review the current graphics changes first.");
         await ctx2.run("structured.apply", { ...ctx2.projectParams(), plan_id: reviewed.plan_id }, { render: false });
         if (state2.pending !== reviewed || reviewed.signature !== JSON.stringify({ schema: json("asset-schema"), edits: request2() })) {
           ctx2.notify("Build created. Your newer graphics edits are still staged.");
@@ -7989,7 +7989,7 @@ ${state2.artifact.system_id ? `<details><summary>Advanced byte options</summary>
     if (!evidence2) return "";
     const report2 = evidence2.report || evidence2, trusted = evidence2.runtime_trusted === true && evidence2.authentication === "current_application" || evidence2.runtime_trusted !== false && report2.origin === "owned_native_worker" && report2.worker_close_acknowledged === true && report2.worker_exit_code === 0 && !!report2.evidence_id, trustLabel = evidence2.runtime_trusted === false ? "Historical imported report" : trusted ? "Current local execution" : "Unverified report", rows = (report2.observations || []).filter((o) => o.kind === "frame_region" && !o.pass);
     if (!rows.length) return "";
-    return `<section class="card"><h3>Screenshot differences</h3><p>${badge(trustLabel, trusted ? "good" : "neutral")} ${esc(evidence2.evidence_id || report2.evidence_id || "")}</p>${rows.map((r) => `<p>Step ${r.step + 1} · region ${r.region.x}, ${r.region.y} · ${r.region.width} × ${r.region.height} · ${r.changed_pixels ?? "Unknown"} changed pixels${r.reason ? " · " + esc(r.reason) : ""}</p>${r.visual ? `<div class="visual-comparison">${[["expected_png_base64", "Expected"], ["actual_png_base64", "Actual"], ["difference_png_base64", "Difference"]].map(([key, label]) => `<figure><figcaption>${label}</figcaption><img src="data:image/png;base64,${esc(r.visual[key])}" alt="${label} screenshot region" loading="lazy"></figure>`).join("")}</div>` : ""}<details><summary>Measured frame identity</summary><code>${esc(r.actual_frame_sha256)}</code></details>`).join("")}</section>`;
+    return `<section class="card"><h3>Screenshot differences</h3><p>${badge(trustLabel, trusted ? "good" : "neutral")} ${esc(evidence2.evidence_id || report2.evidence_id || "")}</p>${rows.map((r) => `<p>Step ${r.step + 1} · region ${r.region.x}, ${r.region.y} · ${r.region.width} × ${r.region.height} · ${r.changed_pixels ?? "Unknown"} changed pixels${r.reason ? " · " + esc(r.reason) : ""}</p>${r.visual ? `<div class="visual-comparison">${[["expected_png_base64", "Expected"], ["actual_png_base64", "Actual"], ["difference_png_base64", "Difference"]].map(([key2, label]) => `<figure><figcaption>${label}</figcaption><img src="data:image/png;base64,${esc(r.visual[key2])}" alt="${label} screenshot region" loading="lazy"></figure>`).join("")}</div>` : ""}<details><summary>Measured frame identity</summary><code>${esc(r.actual_frame_sha256)}</code></details>`).join("")}</section>`;
   }
   async function suitePictures(ctx2, suite) {
     var _a;
@@ -8775,9 +8775,9 @@ ${state2.artifact.system_id ? `<details><summary>Advanced byte options</summary>
     const seen = /* @__PURE__ */ new Set();
     for (const c of value.changes) {
       if (!c || typeof c !== "object" || Object.keys(c).sort().join(",") !== "after,before,command_index,field,script_id") throw Error("Invalid command change.");
-      const script = doc.scripts.find((s) => s.id === c.script_id), cmd = Number.isSafeInteger(c.command_index) && (script == null ? void 0 : script.commands[c.command_index]), f = cmd == null ? void 0 : cmd.fields.find((f2) => f2.name === c.field), key = c.script_id + ":" + c.command_index + ":" + c.field;
-      if (!(script == null ? void 0 : script.editable) || !f || !Number.isSafeInteger(c.before) || c.before !== f.value || !Number.isSafeInteger(c.after) || c.after < f.minimum || c.after > f.maximum || seen.has(key)) throw Error("Command change is stale, duplicated or outside its bounds.");
-      seen.add(key);
+      const script = doc.scripts.find((s) => s.id === c.script_id), cmd = Number.isSafeInteger(c.command_index) && (script == null ? void 0 : script.commands[c.command_index]), f = cmd == null ? void 0 : cmd.fields.find((f2) => f2.name === c.field), key2 = c.script_id + ":" + c.command_index + ":" + c.field;
+      if (!(script == null ? void 0 : script.editable) || !f || !Number.isSafeInteger(c.before) || c.before !== f.value || !Number.isSafeInteger(c.after) || c.after < f.minimum || c.after > f.maximum || seen.has(key2)) throw Error("Command change is stale, duplicated or outside its bounds.");
+      seen.add(key2);
     }
     return value.changes;
   }
@@ -8957,10 +8957,10 @@ ${state2.artifact.system_id ? `<details><summary>Advanced byte options</summary>
     var _a;
     const { state: state2 } = ctx2, scope = selectionKey(state2), params = { ...ctx2.sourceParams() }, current3 = () => selectionKey(state2) === scope;
     const result = matchingFinder(state2, state2.valueSearch) ? state2.valueSearch : null, video = matchingFinder(state2, state2.valueVideo) ? state2.valueVideo : null;
-    const keep = async (operation, parameters, key) => {
+    const keep = async (operation, parameters, key2) => {
       const next = await ctx2.run(operation, { ...params, ...parameters }, { render: false });
       if (!current3()) return;
-      state2[key] = { ...next, selection_scope: scope };
+      state2[key2] = { ...next, selection_scope: scope };
       delete state2.results[operation];
       return ctx2.render();
     };
@@ -9088,7 +9088,7 @@ ${state2.artifact.system_id ? `<details><summary>Advanced byte options</summary>
       await ctx2.render();
     } });
     const domains = Object.keys((doc == null ? void 0 : doc.domains) || { cpu: 0 });
-    return `<details class="card hardware-reference"><summary>Hardware & address help</summary>${doc ? `<p><strong>${esc(doc.cpu)}</strong> · ${esc(doc.endian)}-endian CPU convention</p><p>${esc(doc.mapping)}</p><p>${esc(doc.graphics)}</p>${doc.storage_formats ? `<details><summary>Standard graphics formats</summary><dl>${Object.entries(doc.storage_formats).map(([key, value]) => `<dt>${esc(key[0].toUpperCase() + key.slice(1))}</dt><dd>${esc(value)}</dd>`).join("")}</dl><p class="subtle">${esc(doc.storage_scope)}</p></details>` : ""}` : "<p>Finish a ROM scan for the system overview. Address help is available now.</p>"}<div class="field-row">${select("hardware-domain", "Address domain", domains.map((domain) => [domain, { cpu: "CPU address", ppu: "NES PPU address", vram: "Physical VRAM offset", apu: "SNES audio CPU address" }[domain] || domain]), ctx2.draft("hardware-domain", "cpu"))}${field("hardware-address", "Address or offset", ctx2.draft("hardware-address", "0x8000"))}${button("Explain address", "hardware-explain")}</div>${(result == null ? void 0 : result.ok) ? `<div class="notice"><strong>${esc(result.label)}</strong><p>${esc(result.note)}</p><p>This describes a hardware range. It does not identify a game value or resolve a ROM file offset.</p></div>` : ""}<p>For file bytes, use Address explorer with a checked mapping. Native memory snapshots use offsets within the core’s exposed region.</p>${doc ? `<details><summary>Technical references</summary>${doc.references.filter((url) => /^https?:\/\//i.test(url)).map((url, index) => `<p><a href="${esc(url)}" target="_blank" rel="noreferrer noopener">Reference ${index + 1}</a></p>`).join("")}</details>` : ""}</details>`;
+    return `<details class="card hardware-reference"><summary>Hardware & address help</summary>${doc ? `<p><strong>${esc(doc.cpu)}</strong> · ${esc(doc.endian)}-endian CPU convention</p><p>${esc(doc.mapping)}</p><p>${esc(doc.graphics)}</p>${doc.storage_formats ? `<details><summary>Standard graphics formats</summary><dl>${Object.entries(doc.storage_formats).map(([key2, value]) => `<dt>${esc(key2[0].toUpperCase() + key2.slice(1))}</dt><dd>${esc(value)}</dd>`).join("")}</dl><p class="subtle">${esc(doc.storage_scope)}</p></details>` : ""}` : "<p>Finish a ROM scan for the system overview. Address help is available now.</p>"}<div class="field-row">${select("hardware-domain", "Address domain", domains.map((domain) => [domain, { cpu: "CPU address", ppu: "NES PPU address", vram: "Physical VRAM offset", apu: "SNES audio CPU address" }[domain] || domain]), ctx2.draft("hardware-domain", "cpu"))}${field("hardware-address", "Address or offset", ctx2.draft("hardware-address", "0x8000"))}${button("Explain address", "hardware-explain")}</div>${(result == null ? void 0 : result.ok) ? `<div class="notice"><strong>${esc(result.label)}</strong><p>${esc(result.note)}</p><p>This describes a hardware range. It does not identify a game value or resolve a ROM file offset.</p></div>` : ""}<p>For file bytes, use Address explorer with a checked mapping. Native memory snapshots use offsets within the core’s exposed region.</p>${doc ? `<details><summary>Technical references</summary>${doc.references.filter((url) => /^https?:\/\//i.test(url)).map((url, index) => `<p><a href="${esc(url)}" target="_blank" rel="noreferrer noopener">Reference ${index + 1}</a></p>`).join("")}</details>` : ""}</details>`;
   }
 
   // romancer/ui/views/debug.js
@@ -9101,14 +9101,14 @@ ${state2.artifact.system_id ? `<details><summary>Advanced byte options</summary>
     const references = ((_a = state2.debugReferences) == null ? void 0 : _a.scope) === scope && state2.debugReferences.result.source_sha256 === source.sha256 ? state2.debugReferences.result : null;
     const mapped = ((_b = state2.debugAddress) == null ? void 0 : _b.scope) === scope && state2.debugAddress.result.source_sha256 === source.sha256 && state2.debugAddress.result.artifact_id === source.artifact_id ? state2.debugAddress.result : null;
     const resolved = (mapped == null ? void 0 : mapped.ok) === true && mapped.status === "RESOLVED" && Number.isSafeInteger(mapped.offset) && mapped.offset >= 0 && mapped.offset < source.size;
-    const keep = async (operation, parameters, key) => {
+    const keep = async (operation, parameters, key2) => {
       if (!current3()) throw Error("The selected source changed. Run this investigation again.");
       const generations = state2.debugRequestGeneration ??= {};
-      const generation = generations[key] = (generations[key] || 0) + 1;
-      delete state2[key];
+      const generation = generations[key2] = (generations[key2] || 0) + 1;
+      delete state2[key2];
       const result2 = await ctx2.run(operation, { ...params, ...parameters }, { render: false });
-      if (!current3() || generations[key] !== generation) return;
-      state2[key] = { scope, result: result2 };
+      if (!current3() || generations[key2] !== generation) return;
+      state2[key2] = { scope, result: result2 };
       return ctx2.render();
     };
     const jump = (offset) => {
@@ -9519,10 +9519,10 @@ ${state2.artifact.system_id ? `<details><summary>Advanced byte options</summary>
   }
   function formValues() {
     const result = {};
-    for (const [key, id] of Object.entries(settingIds)) {
+    for (const [key2, id] of Object.entries(settingIds)) {
       const node = document.getElementById(id);
       if (!node) throw Error("Settings controls are no longer visible. Reopen Settings.");
-      result[key] = typeof DEFAULT_SETTINGS[key] === "boolean" ? node.checked : typeof DEFAULT_SETTINGS[key] === "number" ? node.value.trim() ? Number(node.value) : NaN : node.value;
+      result[key2] = typeof DEFAULT_SETTINGS[key2] === "boolean" ? node.checked : typeof DEFAULT_SETTINGS[key2] === "number" ? node.value.trim() ? Number(node.value) : NaN : node.value;
     }
     return result;
   }
@@ -9551,8 +9551,8 @@ ${state2.artifact.system_id ? `<details><summary>Advanced byte options</summary>
       await ctx2.render();
     }
   }
-  function checkbox(editor, key, label, hint = "") {
-    return `<label class="settings-check" for="${settingIds[key]}"><input type="checkbox" id="${settingIds[key]}" ${editor.values[key] ? "checked" : ""}><span>${esc(label)}${hint ? `<small>${esc(hint)}</small>` : ""}</span></label>`;
+  function checkbox(editor, key2, label, hint = "") {
+    return `<label class="settings-check" for="${settingIds[key2]}"><input type="checkbox" id="${settingIds[key2]}" ${editor.values[key2] ? "checked" : ""}><span>${esc(label)}${hint ? `<small>${esc(hint)}</small>` : ""}</span></label>`;
   }
   function settingsForm(editor) {
     const v = editor.values, disabled = editor.busy || !editor.loaded;
@@ -9616,10 +9616,10 @@ ${state2.artifact.system_id ? `<details><summary>Advanced byte options</summary>
  <tr><td>Server</td><td>Authenticated loopback session</td></tr></tbody></table></div><div class="notice">${esc(c.runtime_note)}</div></section>
  <section class="card"><h3>Systems</h3><p>NES · SNES · GEN · Game Boy · Game Boy Color · Master System (basic)</p><p class="subtle">Declare text and graphics for your source. Select a saved core setup to playtest.</p>${button("About & credit", "about", { icon: "shield" })}</section></div>
  <section class="card"><h3>System support matrix</h3><div class="table-wrap"><table><thead><tr><th>Family</th>${columns.map(([, label]) => `<th>${label}</th>`).join("")}</tr></thead><tbody>
- ${packs.map((pack) => `<tr><td><strong>${esc(pack.label)}${pack.release_focus ? "" : " (advanced)"}</strong><br><small>${esc(pack.formats.join(", "))}</small></td>${columns.map(([key]) => {
-      const capability = key === "runtime_control" ? setups[pack.id] : pack.capabilities[key];
+ ${packs.map((pack) => `<tr><td><strong>${esc(pack.label)}${pack.release_focus ? "" : " (advanced)"}</strong><br><small>${esc(pack.formats.join(", "))}</small></td>${columns.map(([key2]) => {
+      const capability = key2 === "runtime_control" ? setups[pack.id] : pack.capabilities[key2];
       const label = capability.status === "supported" ? "Available" : capability.status === "experimental" ? "Header-based" : capability.status;
-      return `<td title="${esc(capability.reason)}">${badge(label, capability.tone || (capability.status === "supported" ? "good" : "neutral"))}${key === "runtime_control" ? `<div class="actions">${button(capability.status === "Ready" ? "Open setup" : "Set up", "settings-setup", { id: pack.id })}</div>` : ""}</td>`;
+      return `<td title="${esc(capability.reason)}">${badge(label, capability.tone || (capability.status === "supported" ? "good" : "neutral"))}${key2 === "runtime_control" ? `<div class="actions">${button(capability.status === "Ready" ? "Open setup" : "Set up", "settings-setup", { id: pack.id })}</div>` : ""}</td>`;
     }).join("")}</tr>`).join("")}</tbody></table></div>
  <details><summary>What these statuses mean</summary><p>Available describes the listed editing feature. Header-based identification, including SNES, can remain ambiguous. Ready means included or saved core inputs were checked; it does not certify every game.</p><p>Choose core is a setup step for this workspace. Open Set up to find a local core. ROM health checks live in Resources.</p></details></section>
  ${report(c.systems, "Current system registry")}</details>`;
@@ -9628,17 +9628,17 @@ ${state2.artifact.system_id ? `<details><summary>Advanced byte options</summary>
     var _a;
     const editor = ctx2.state.settingsEditor;
     if (!editor) return;
-    for (const [key, id] of Object.entries(settingIds)) {
+    for (const [key2, id] of Object.entries(settingIds)) {
       const node = document.getElementById(id);
       node == null ? void 0 : node.addEventListener("input", () => {
         if (editor.busy || ctx2.state.settingsEditor !== editor) return;
-        editor.values[key] = typeof DEFAULT_SETTINGS[key] === "boolean" ? node.checked : typeof DEFAULT_SETTINGS[key] === "number" ? Number(node.value) : node.value;
+        editor.values[key2] = typeof DEFAULT_SETTINGS[key2] === "boolean" ? node.checked : typeof DEFAULT_SETTINGS[key2] === "number" ? Number(node.value) : node.value;
         editor.dirty = true;
         editor.error = "";
         const status = document.getElementById("settings-form-status");
         if (status) status.textContent = "Unapplied changes";
         const volume = document.getElementById("settings-volume-value");
-        if (volume && key === "volume") volume.textContent = node.value + "%";
+        if (volume && key2 === "volume") volume.textContent = node.value + "%";
       });
     }
     (_a = document.getElementById("settings-form")) == null ? void 0 : _a.addEventListener("submit", (event) => {
@@ -9768,9 +9768,9 @@ ${state2.artifact.system_id ? `<details><summary>Advanced byte options</summary>
     const seen = /* @__PURE__ */ new Set();
     for (const c of saved.changes) {
       if (!c || typeof c !== "object" || Array.isArray(c)) throw Error("Saved audio edits contain an invalid change.");
-      const key = JSON.stringify([c.kind, c.song_id ?? c.sample_id, c.index, c.field]);
-      if (seen.has(key)) throw Error("Saved audio edits contain duplicate changes.");
-      seen.add(key);
+      const key2 = JSON.stringify([c.kind, c.song_id ?? c.sample_id, c.index, c.field]);
+      if (seen.has(key2)) throw Error("Saved audio edits contain duplicate changes.");
+      seen.add(key2);
       if (c.kind === "note") result = stageNote(doc, result, c.song_id, c.index, c.field, c.value);
       else if (c.kind === "sample") {
         if (!doc.samples.some((s) => s.id === c.sample_id) || !["gain", "reverse", "silence", "replace_wav"].includes(c.operation)) throw Error("Saved audio edits reference an unsupported sample.");
@@ -9805,16 +9805,16 @@ ${state2.artifact.system_id ? `<details><summary>Advanced byte options</summary>
     c.fillStyle = "#0b151d";
     c.fillRect(0, 0, width, height);
     c.font = "12px sans-serif";
-    for (let key = first; key <= last; key++) {
-      const y = 10 + (last - key) * keyHeight;
-      c.strokeStyle = key % 12 === 0 ? "#637a86" : "#263e49";
+    for (let key2 = first; key2 <= last; key2++) {
+      const y = 10 + (last - key2) * keyHeight;
+      c.strokeStyle = key2 % 12 === 0 ? "#637a86" : "#263e49";
       c.beginPath();
       c.moveTo(44, y);
       c.lineTo(width - 8, y);
       c.stroke();
-      if (key % 12 === 0 || range < 16) {
+      if (key2 % 12 === 0 || range < 16) {
         c.fillStyle = "#d6e5e8";
-        c.fillText(String(key), 8, y + keyHeight * 0.7);
+        c.fillText(String(key2), 8, y + keyHeight * 0.7);
       }
     }
     for (const note of notes) {
@@ -10180,6 +10180,429 @@ ${state2.artifact.system_id ? `<details><summary>Advanced byte options</summary>
   var KEY_BUTTONS = { ArrowUp: "up", ArrowDown: "down", ArrowLeft: "left", ArrowRight: "right", z: "a", x: "b", a: "x", s: "y", q: "l", w: "r", Enter: "start", Shift: "select" };
   var offsetText = (value) => "0x" + Number(value).toString(16).toUpperCase().padStart(6, "0");
 
+  // romancer/ui/level_map.js
+  var TOOLS = [["pick", "Pick a picture"], ["paint", "Paint"], ["erase", "Unpaint"]];
+  var ZOOMS = [1, 2, 3, 4];
+  var key = (col, row) => col + "," + row;
+  function placeAt(view, zoom, x, y) {
+    const size2 = view.cell * zoom, col = Math.floor(x / size2), row = Math.floor(y / size2);
+    return col >= 0 && row >= 0 && col < view.width && row < view.height ? [col, row] : null;
+  }
+  function units(view) {
+    const out = [{ id: "cells", label: "Single cells", width: 1, height: 1, left: 0, top: 0 }], blocks = view.blocks;
+    if (blocks) {
+      out.push({ id: "blocks", label: `Blocks (${blocks.width} by ${blocks.height} cells)`, ...blocks });
+      if (blocks.larger) out.push({ id: "larger", label: `Larger blocks (${blocks.larger.width} by ${blocks.larger.height} cells)`, ...blocks.larger });
+    }
+    return out;
+  }
+  var floorTo = (value, size2, start) => value - ((value - start) % size2 + size2) % size2;
+  function snap(place, unit) {
+    return [floorTo(place[0], unit.width, unit.left), floorTo(place[1], unit.height, unit.top)];
+  }
+  function brushFrom(a, b, unit = { width: 1, height: 1, left: 0, top: 0 }) {
+    const first = snap([Math.min(a[0], b[0]), Math.min(a[1], b[1])], unit), last = snap([Math.max(a[0], b[0]), Math.max(a[1], b[1])], unit);
+    return { col: first[0], row: first[1], width: last[0] - first[0] + unit.width, height: last[1] - first[1] + unit.height };
+  }
+  function stamp(view, brush, col, row) {
+    const out = [];
+    for (let dy = 0; dy < brush.height; dy++) for (let dx = 0; dx < brush.width; dx++) {
+      const c = col + dx, r = row + dy, fc = brush.col + dx, fr = brush.row + dy;
+      if (c < 0 || r < 0 || fc < 0 || fr < 0 || c >= view.width || r >= view.height || fc >= view.width || fr >= view.height) continue;
+      if (view.frames[r * view.width + c] < 0 || view.frames[fr * view.width + fc] < 0) continue;
+      if (view.status[r * view.width + c] === "u") continue;
+      if (c === fc && r === fr) continue;
+      out.push([c, r, fc, fr]);
+    }
+    return out;
+  }
+  var paintedCells = (painted) => [...painted.entries()].map(([place, from]) => {
+    const [col, row] = place.split(",").map(Number);
+    return { col, row, from };
+  });
+  function levelStatus(summary, playing) {
+    const rec = summary.level_recording, job = summary.level_job;
+    if (rec) return `Recording ${rec.name}: ${plural2(rec.captures, "moment")} captured${rec.captures >= rec.limit ? " (that is the most one recording holds; finish the map)" : ""}.`;
+    if ((job == null ? void 0 : job.state) === "running") return `${job.message} ${job.done} of ${job.total}.`;
+    if (job == null ? void 0 : job.message) return job.message;
+    return playing ? "Play to the start of the level, then start recording." : "";
+  }
+  var levelChange = (ed) => ed.proposal && ed.proposal.level && ed.level && ed.proposal.level.id === ed.level.id ? ed.proposal : null;
+  function levelsPart(ed) {
+    var _a;
+    const summary = ed.summary, levels = summary.levels || [], rec = summary.level_recording, job = summary.level_job, walking = ((_a = summary.recording) == null ? void 0 : _a.state) === "running";
+    const building = (job == null ? void 0 : job.state) === "running";
+    const actions3 = rec ? button("Finish the level map", "level-stop", { primary: true, icon: "check", disabled: walking, reason: "Wait until ROMancer stops playing." }) + button(walking ? "ROMancer is playing…" : "Let ROMancer walk right", "level-auto", { disabled: walking, reason: "Already playing." }) : button("Record a level map", "level-start", { icon: "plus", disabled: !ed.playing || building, reason: building ? "ROMancer is still putting the last map together." : "Choose Play and capture a moment above and play to the start of the level first." });
+    return `<div class="card-heading"><h3>Level maps</h3>${badge(plural2(levels.length, "level map"), levels.length ? "good" : "neutral")}</div>
+ <p class="subtle">A level map is the whole background of a level, put together while the game scrolls. Play to where the level starts, start recording, then play through it. ROMancer keeps a scene every time the screen moves and lays them side by side.</p>
+ <div class="actions">${actions3}</div>
+ <p class="subtle" id="level-status" role="status" aria-live="polite">${esc(levelStatus(summary, ed.playing))}</p>
+ ${building ? `<progress max="${job.total}" value="${job.done}" aria-label="Putting the map together"></progress>` : ""}
+ <div class="scene-strip" role="group" aria-label="Level maps">${levels.map((row) => {
+      var _a2, _b;
+      return `<button type="button" class="scene-thumb level-thumb ${((_a2 = ed.level) == null ? void 0 : _a2.id) === row.id ? "selected" : ""}" data-action="level-open" data-id="${row.id}" aria-pressed="${((_b = ed.level) == null ? void 0 : _b.id) === row.id}"><img alt="" data-picture="${esc(row.image)}" width="${row.pixel_width}" height="${row.pixel_height}"><span>${esc(row.name)} · ${row.planes[0].width} by ${row.planes[0].height} cells</span></button>`;
+    }).join("")}</div>`;
+  }
+  function levelPart(ed, verdict, keep) {
+    const level = ed.level;
+    if (!level || !level.view) return "";
+    const view = level.view, change = levelChange(ed), painted = level.painted.size, brush = level.brush;
+    const planes = view.planes.length > 1 ? `<label>Layer <select id="level-plane" aria-label="Layer of the level">${view.planes.map((p) => `<option value="${p.index}" ${p.index === view.plane ? "selected" : ""}>${esc(p.name)} (${p.width} by ${p.height})</option>`).join("")}</select></label>` : "";
+    const choices = units(view), unitPart = choices.length > 1 ? `<label>Brush snaps to <select id="level-unit" aria-label="What the brush snaps to">${choices.map((u) => `<option value="${u.id}" ${u.id === level.unit ? "selected" : ""}>${esc(u.label)}</option>`).join("")}</select></label>` : "";
+    const zoom = `<label>Zoom <select id="level-zoom" aria-label="Zoom">${ZOOMS.map((z) => `<option value="${z}" ${z === level.zoom ? "selected" : ""}>${z}x</option>`).join("")}</select></label>`;
+    const tools = TOOLS.map(([id, label]) => `<button type="button" class="scene-mode ${level.tool === id ? "active" : ""}" data-action="level-tool" data-id="${id}" aria-pressed="${level.tool === id}">${label}</button>`).join("");
+    const hint = level.tool === "pick" ? "Click a place to take its picture as your brush, or drag to take a block of places (a platform, a tree)." : !brush ? "Pick a picture from the map first." : level.tool === "paint" ? "Click or drag on the map to put your brush there." : "Click or drag over painted places to take the paint off.";
+    const brushText = brush ? `Brush: ${brush.width} by ${brush.height} ${brush.width * brush.height === 1 ? "place" : "places"} from column ${brush.col + 1}, row ${brush.row + 1}.` : "No brush yet.";
+    const built = view.blocks ? ` This level is built from blocks of ${view.blocks.width} by ${view.blocks.height} cells${view.blocks.larger ? `, laid out in larger blocks of ${view.blocks.larger.width} by ${view.blocks.larger.height}` : ""}. Paint a whole block onto a whole block and ROMancer looks for the level's own list of blocks, so that only that place changes.` : "";
+    const locked = view.status.includes("u") ? " Places marked with a cross cannot be changed: ROMancer has not seen where the game gets them from." : "";
+    const after = view.after ? `<label class="level-toggle"><input type="checkbox" id="level-after" ${level.showAfter ? "checked" : ""}> Show the map with the changes</label>` : "";
+    const propose2 = button("Show what changes", "level-propose", { primary: true, disabled: !painted, reason: "Paint at least one place first." }) + button("Clear paint", "level-clear", { disabled: !painted && !change });
+    return `<div class="card-heading"><h3>${esc(view.name)}</h3>${badge(`${view.width} by ${view.height} cells · ${plural2(view.scenes.length, "capture")}`, "neutral")}</div>
+ <div class="actions level-bar">${planes}${zoom}${unitPart}${after}${button("Save map as PNG", "level-export", { icon: "download" })}${button("Remove this level map", "level-forget")}${button("Close", "level-close")}</div>
+ <div class="scene-modes" role="group" aria-label="Tool">${tools}</div>
+ <p class="subtle" role="status">${hint}${built}${locked}</p>
+ <div class="level-scroll" id="level-scroll" tabindex="0" aria-label="The level map. Scroll to move around."><canvas id="level-canvas" class="level-canvas" width="${view.width * view.cell * level.zoom}" height="${view.height * view.cell * level.zoom}" role="img" aria-label="Map of ${esc(view.name)}"></canvas></div>
+ <p class="subtle" id="level-where" role="status">${brushText} ${painted ? plural2(painted, "place") + " painted." : ""}</p>
+ ${change ? verdict(change) : ""}
+ ${change && view.unshown ? `<p class="notice warm" role="status">${view.unshown === view.pending.filter((cell) => cell.change === change.id).length ? "The places you painted" : plural2(view.unshown, "place") + " you painted"} ${view.unshown === 1 ? "does" : "do"} not look different on the map after the replay. The change may show somewhere else in the level. Look at the map before you keep it.</p>` : ""}
+ <div class="actions">${change ? keep(change, propose2) : propose2}${button("Open this place in its scene", "level-goto", { disabled: !level.last, reason: "Click a place on the map first." })}</div>
+ <p class="subtle">A place on the map is a background cell of the scene that showed it. If the game builds that cell from a block it also uses elsewhere, every place that uses the block changes; the map shows them before you keep the change.</p>`;
+  }
+  async function drawLevel(ctx2, ed, picture2) {
+    const level = ed.level, canvas = document.getElementById("level-canvas");
+    if (!level || !level.view || !canvas) return;
+    const view = level.view, zoom = level.zoom, size2 = view.cell * zoom, context = canvas.getContext("2d");
+    const imageKey = level.showAfter && view.after ? view.after : view.image;
+    let image = null;
+    try {
+      image = await picture2(imageKey);
+    } catch {
+      try {
+        image = await picture2(view.image);
+      } catch {
+      }
+    }
+    if (ed.level !== level || !canvas.isConnected) return;
+    context.imageSmoothingEnabled = false;
+    context.clearRect(0, 0, canvas.width, canvas.height);
+    if (image) context.drawImage(image, 0, 0, canvas.width, canvas.height);
+    context.lineWidth = 1;
+    context.strokeStyle = "rgba(255,255,255,.55)";
+    context.fillStyle = "rgba(255,255,255,.8)";
+    context.font = "12px sans-serif";
+    context.setLineDash([6, 4]);
+    for (const [first] of view.sections.slice(1)) {
+      const x = first * size2 - size2 * 2 + 0.5;
+      context.beginPath();
+      context.moveTo(x, 0);
+      context.lineTo(x, canvas.height);
+      context.stroke();
+      context.fillText("another area", x + 6, 14);
+    }
+    context.setLineDash([]);
+    context.strokeStyle = "rgba(255,255,255,.35)";
+    context.beginPath();
+    for (let row = 0; row < view.height; row++) for (let col = 0; col < view.width; col++) {
+      if (view.status[row * view.width + col] !== "u") continue;
+      const x = col * size2, y = row * size2;
+      context.moveTo(x + 2, y + 2);
+      context.lineTo(x + size2 - 2, y + size2 - 2);
+      context.moveTo(x + size2 - 2, y + 2);
+      context.lineTo(x + 2, y + size2 - 2);
+    }
+    context.stroke();
+    context.strokeStyle = "#ffd166";
+    for (const cell of view.pending) context.strokeRect(cell.col * size2 + 0.5, cell.row * size2 + 0.5, size2 - 1, size2 - 1);
+    if (image && level.painted.size) {
+      const source = await picture2(view.image).catch(() => null);
+      if (ed.level !== level || !canvas.isConnected) return;
+      for (const [place, from] of level.painted) {
+        const [col, row] = place.split(",").map(Number);
+        if (source) context.drawImage(source, from[0] * view.cell, from[1] * view.cell, view.cell, view.cell, col * size2, row * size2, size2, size2);
+      }
+      context.strokeStyle = "#4cc9f0";
+      for (const place of level.painted.keys()) {
+        const [col, row] = place.split(",").map(Number);
+        context.strokeRect(col * size2 + 0.5, row * size2 + 0.5, size2 - 1, size2 - 1);
+      }
+    }
+    if (level.brush && level.tool === "pick") {
+      context.strokeStyle = "#ffffff";
+      context.setLineDash([4, 3]);
+      context.strokeRect(level.brush.col * size2 + 0.5, level.brush.row * size2 + 0.5, level.brush.width * size2 - 1, level.brush.height * size2 - 1);
+      context.setLineDash([]);
+    }
+    if (level.drag) {
+      const box = brushFrom(level.drag.from, level.drag.to, units(view).find((u) => u.id === level.unit) || units(view)[0]);
+      context.strokeStyle = "#ffffff";
+      context.strokeRect(box.col * size2 + 0.5, box.row * size2 + 0.5, box.width * size2 - 1, box.height * size2 - 1);
+    }
+  }
+  function levelTools(ctx2, ed, host) {
+    const redraw = () => drawLevel(ctx2, ed, (key2) => host.picture(key2));
+    const load = async (id, plane = 0) => {
+      var _a;
+      const view = await host.call("level", { level_id: id, plane });
+      const same = ed.level && ed.level.id === id && ((_a = ed.level.view) == null ? void 0 : _a.plane) === view.plane;
+      const unitIds = units(view).map((u) => u.id);
+      ed.level = {
+        id,
+        view,
+        unit: same && unitIds.includes(ed.level.unit) ? ed.level.unit : unitIds[unitIds.length - 1],
+        tool: same ? ed.level.tool : "pick",
+        brush: same ? ed.level.brush : null,
+        painted: same ? ed.level.painted : /* @__PURE__ */ new Map(),
+        zoom: same ? ed.level.zoom : view.height * view.cell > 300 ? 1 : 2,
+        showAfter: same ? ed.level.showAfter : true,
+        last: same ? ed.level.last : null,
+        drag: null
+      };
+    };
+    const reload = async () => {
+      if (!ed.level) return;
+      try {
+        await load(ed.level.id, ed.level.view.plane);
+      } catch {
+        ed.level = null;
+      }
+      host.update(["scene-level"]);
+    };
+    const watch = () => {
+      clearTimeout(ed.levelPoll);
+      const tick = async () => {
+        var _a, _b, _c, _d, _e, _f, _g, _h, _i, _j;
+        if (!host.current()) return;
+        try {
+          const summary = await host.call("open");
+          if (!host.current()) return;
+          const before = (_a = ed.summary.level_job) == null ? void 0 : _a.state, walked = (_b = ed.summary.recording) == null ? void 0 : _b.state;
+          ed.summary = summary;
+          const busy = summary.level_recording || ((_c = summary.level_job) == null ? void 0 : _c.state) === "running" || ((_d = summary.recording) == null ? void 0 : _d.state) === "running";
+          if (before === "running" && ((_e = summary.level_job) == null ? void 0 : _e.state) === "finished" && summary.level_job.level_id) {
+            await load(summary.level_job.level_id);
+            host.update(["scene-gallery", "scene-levels", "scene-level"]);
+            ctx2.notify(summary.level_job.message);
+            return;
+          }
+          if (before === "running" && ((_f = summary.level_job) == null ? void 0 : _f.state) === "failed") {
+            host.update(["scene-gallery", "scene-levels"]);
+            ctx2.notify(summary.level_job.message, true);
+            return;
+          }
+          if (walked === "running" && ((_g = summary.recording) == null ? void 0 : _g.state) !== "running" && ((_h = summary.recording) == null ? void 0 : _h.message)) ctx2.notify(summary.recording.message, summary.recording.state === "failed");
+          const stopped = walked === "running" && ((_i = summary.recording) == null ? void 0 : _i.state) !== "running";
+          if (!stopped && ed.playing && summary.level_recording && ((_j = summary.recording) == null ? void 0 : _j.state) !== "running") {
+            const status = document.getElementById("level-status");
+            if (status) status.textContent = levelStatus(summary, true);
+          } else host.update(["scene-levels"]);
+          if (busy) ed.levelPoll = setTimeout(tick, 700);
+        } catch (error) {
+          ctx2.notify(error.message, true);
+        }
+      };
+      ed.levelPoll = setTimeout(tick, 500);
+    };
+    const handlers = {
+      "level-start": async () => {
+        ed.summary = await host.call("level_start", { name: "" });
+        host.update(["scene-levels"]);
+        watch();
+      },
+      "level-auto": async () => {
+        ed.summary = await host.call("level_auto", { steps: 6, direction: "right" });
+        host.update(["scene-levels"]);
+        watch();
+      },
+      "level-stop": async () => {
+        ed.summary = await host.call("level_stop");
+        host.update(["scene-levels"]);
+        watch();
+      },
+      "level-open": async (node) => {
+        var _a, _b;
+        if (((_a = ed.level) == null ? void 0 : _a.id) === node.dataset.id) return;
+        await host.dropPreview();
+        await load(node.dataset.id);
+        host.update(["scene-levels", "scene-level", "scene-changes"]);
+        (_b = document.getElementById("scene-level")) == null ? void 0 : _b.scrollIntoView({ block: "nearest" });
+      },
+      "level-close": async () => {
+        await host.dropPreview();
+        ed.level = null;
+        host.update(["scene-levels", "scene-level", "scene-changes"]);
+      },
+      "level-forget": async () => {
+        var _a;
+        const id = (_a = ed.level) == null ? void 0 : _a.id;
+        if (!id) return;
+        await host.dropPreview();
+        const summary = await host.call("level_forget", { level_id: id });
+        ed.level = null;
+        await host.refresh(summary);
+        host.update();
+      },
+      "level-export": async () => {
+        const level = ed.level;
+        if (!level) return;
+        const result = await host.call("level_export", { level_id: level.id, plane: level.view.plane, edited: !!(level.showAfter && level.view.after) });
+        const link = document.createElement("a");
+        link.href = "data:image/png;base64," + result.png_base64;
+        link.download = result.name;
+        document.body.append(link);
+        link.click();
+        link.remove();
+        ctx2.notify(`Saved ${result.name} (${result.width} by ${result.height} pixels).`);
+      },
+      "level-tool": (node) => {
+        if (!ed.level) return;
+        ed.level.tool = node.dataset.id;
+        host.update(["scene-level"]);
+      },
+      "level-clear": async () => {
+        if (!ed.level) return;
+        await host.dropPreview();
+        ed.level.painted = /* @__PURE__ */ new Map();
+        await reload();
+        host.update(["scene-changes"]);
+      },
+      "level-propose": async () => {
+        const level = ed.level;
+        if (!level || !level.painted.size) return;
+        await host.dropPreview();
+        const result = await host.call("level_paint", { level_id: level.id, plane: level.view.plane, cells: paintedCells(level.painted) });
+        if (!host.current()) return;
+        ed.proposal = result.change;
+        ed.inspect = null;
+        ed.summary.preview = result.change;
+        level.painted = /* @__PURE__ */ new Map();
+        level.showAfter = true;
+        await reload();
+        host.update(["scene-changes"]);
+        host.watchProposal();
+      },
+      "level-goto": async () => {
+        var _a;
+        const level = ed.level;
+        if (!level || !level.last) return;
+        const place = await host.call("level_place", { level_id: level.id, plane: level.view.plane, col: level.last[0], row: level.last[1] });
+        await host.dropPreview();
+        ed.mode = "background";
+        ed.layer = place.layer;
+        await host.loadScene(place.scene_id);
+        host.update();
+        (_a = document.getElementById("scene-stage")) == null ? void 0 : _a.scrollIntoView({ block: "nearest" });
+      }
+    };
+    const mount13 = () => {
+      var _a, _b, _c;
+      const main = document.getElementById("main");
+      if (!main || main.dataset.levelMounted) return;
+      main.dataset.levelMounted = "true";
+      const at = (event) => {
+        const canvas = document.getElementById("level-canvas"), level = ed.level;
+        if (!canvas || !(level == null ? void 0 : level.view) || event.target !== canvas) return null;
+        const box = canvas.getBoundingClientRect();
+        return placeAt(level.view, level.zoom, (event.clientX - box.left) * canvas.width / box.width, (event.clientY - box.top) * canvas.height / box.height);
+      };
+      const unitOf = (level) => units(level.view).find((u) => u.id === level.unit) || units(level.view)[0];
+      const apply = (place) => {
+        const level = ed.level;
+        if (!level || !place) return false;
+        if (level.tool === "paint" && level.brush) {
+          let changed2 = false;
+          const corner = snap(place, unitOf(level));
+          for (const [c, r, fc, fr] of stamp(level.view, level.brush, corner[0], corner[1])) {
+            const k = key(c, r);
+            if (String(level.painted.get(k)) !== String([fc, fr])) {
+              level.painted.set(k, [fc, fr]);
+              changed2 = true;
+            }
+          }
+          return changed2;
+        }
+        if (level.tool === "erase") return level.painted.delete(key(place[0], place[1]));
+        return false;
+      };
+      const where = () => {
+        const node = document.getElementById("level-where"), level = ed.level;
+        if (node && level) node.textContent = `${level.brush ? `Brush: ${level.brush.width} by ${level.brush.height} from column ${level.brush.col + 1}, row ${level.brush.row + 1}.` : "No brush yet."} ${level.painted.size ? plural2(level.painted.size, "place") + " painted." : ""}`;
+      };
+      main.addEventListener("pointerdown", (event) => {
+        var _a2, _b2;
+        const place = at(event), level = ed.level;
+        if (!place || !level) return;
+        event.preventDefault();
+        (_b2 = (_a2 = event.target).setPointerCapture) == null ? void 0 : _b2.call(_a2, event.pointerId);
+        level.last = place;
+        if (level.tool === "pick") {
+          level.drag = { from: place, to: place };
+        } else {
+          level.stroke = true;
+          if (apply(place)) {
+            where();
+          }
+        }
+        void redraw();
+      });
+      main.addEventListener("pointermove", (event) => {
+        const level = ed.level;
+        if (!level || !level.drag && !level.stroke) return;
+        const place = at(event);
+        if (!place) return;
+        if (level.drag) {
+          if (String(level.drag.to) === String(place)) return;
+          level.drag.to = place;
+          void redraw();
+        } else if (apply(place)) {
+          where();
+          void redraw();
+        }
+      });
+      const finish = () => {
+        const level = ed.level;
+        if (!level) return;
+        if (level.drag) {
+          level.brush = brushFrom(level.drag.from, level.drag.to, unitOf(level));
+          level.drag = null;
+          level.tool = "paint";
+          host.update(["scene-level"]);
+        } else if (level.stroke) {
+          level.stroke = false;
+          host.update(["scene-level"]);
+        }
+      };
+      main.addEventListener("pointerup", finish);
+      main.addEventListener("pointercancel", finish);
+      main.addEventListener("change", async (event) => {
+        const level = ed.level;
+        if (!level) return;
+        if (event.target.id === "level-zoom") {
+          level.zoom = Number(event.target.value);
+          host.update(["scene-level"]);
+        }
+        if (event.target.id === "level-unit") {
+          level.unit = event.target.value;
+          level.brush = null;
+          level.tool = "pick";
+          host.update(["scene-level"]);
+        }
+        if (event.target.id === "level-after") {
+          level.showAfter = event.target.checked;
+          void redraw();
+        }
+        if (event.target.id === "level-plane") {
+          await host.dropPreview();
+          const id = level.id;
+          ed.level = null;
+          await load(id, Number(event.target.value));
+          host.update(["scene-level", "scene-changes"]);
+        }
+      });
+      if (((_a = ed.summary) == null ? void 0 : _a.level_recording) || ((_c = (_b = ed.summary) == null ? void 0 : _b.level_job) == null ? void 0 : _c.state) === "running") watch();
+    };
+    return { handlers, mount: mount13, reload, redraw, watch };
+  }
+
   // romancer/ui/scene_graphics.js
   var MODES = [["colors", "Colors", "Change a color of the palette"], ["graphics", "Graphics", "Redraw a picture, pixel by pixel"], ["background", "Background", "Change which picture a background cell shows"]];
   function parsePixels(text, bits2) {
@@ -10316,6 +10739,7 @@ ${state2.artifact.system_id ? `<details><summary>Advanced byte options</summary>
     if (!ed) return;
     ed.ticket++;
     ed.playing = false;
+    clearTimeout(ed.levelPoll);
     clearTimeout(ed.poll);
     clearTimeout(ed.proposeTimer);
     clearTimeout(ed.lookPoll);
@@ -10323,11 +10747,11 @@ ${state2.artifact.system_id ? `<details><summary>Advanced byte options</summary>
   }
   var current2 = (ctx2, ed) => ctx2.state.sceneEditor === ed && ctx2.state.page === "scenes";
   var call = (ctx2, ed, operation, more = {}) => ctx2.api.call("edits." + operation, { ...ed.params, ...more });
-  function picture(ctx2, ed, key) {
-    const id = ed.scope + "|" + key;
+  function picture(ctx2, ed, key2) {
+    const id = ed.scope + "|" + key2;
     let loading = pictures.get(id);
     if (!loading) {
-      loading = call(ctx2, ed, "image", { key }).then((result) => new Promise((resolve, reject) => {
+      loading = call(ctx2, ed, "image", { key: key2 }).then((result) => new Promise((resolve, reject) => {
         const image = new Image();
         image.onload = () => resolve(image);
         image.onerror = () => reject(new Error("This picture could not be shown."));
@@ -10347,11 +10771,11 @@ ${state2.artifact.system_id ? `<details><summary>Advanced byte options</summary>
   var shownChange = (ed) => ed.proposal || ed.inspect;
   function galleryPart(ed) {
     const summary = ed.summary, recording = summary.recording, running = (recording == null ? void 0 : recording.state) === "running", engine = summary.engine;
-    return `<div class="card-heading"><h3>Scenes</h3>${badge(plural2(summary.scenes.length, "scene") + " recorded", summary.scenes.length ? "good" : "neutral")}</div>
+    return `<div class="card-heading"><h3>Scenes</h3>${badge(plural2(summary.scenes.filter((row) => row.origin !== "level").length, "scene") + " recorded", summary.scenes.length ? "good" : "neutral")}</div>
  <p class="subtle">A scene is a moment of the game that ROMancer has watched. When you change something, every scene that uses the same data is shown. Scenes you haven't recorded can't be shown, so record the places you care about.</p>
  <div class="actions">${running ? button("Stop recording", "scene-record-stop") : button("Record more scenes", "scene-record", { primary: !summary.scenes.length, icon: "plus", disabled: !engine.installed, reason: engine.reason })}${button(ed.playing ? "Stop playing" : "Play and capture a moment", "scene-play-toggle", { icon: "playtest", disabled: !engine.installed || running, reason: engine.installed ? "Wait for recording to finish, or stop it." : engine.reason })}</div>
  ${recording ? `<div class="scene-progress" role="status" aria-live="polite">${running ? `<progress max="${recording.total}" value="${recording.done}" aria-label="Recording progress"></progress>` : ""}<span>${esc(recording.message)}${running && recording.found ? " " + plural2(recording.found, "new scene") + " so far." : ""}</span></div>` : ""}
- <div class="scene-strip" role="group" aria-label="Recorded scenes">${summary.scenes.map((row) => `<button type="button" class="scene-thumb ${row.id === ed.sceneId ? "selected" : ""}" data-action="scene-open" data-id="${row.id}" aria-pressed="${row.id === ed.sceneId}"><img alt="" data-picture="${esc(row.image)}" width="${row.width}" height="${row.height}"><span>${esc(row.label)}</span></button>`).join("") || `<p class="subtle">No scenes yet. Record more scenes lets the game play by itself for a few minutes; Play and capture lets you go where you want.</p>`}</div>`;
+ <div class="scene-strip" role="group" aria-label="Recorded scenes">${summary.scenes.filter((row) => row.origin !== "level" || row.id === ed.sceneId).map((row) => `<button type="button" class="scene-thumb ${row.id === ed.sceneId ? "selected" : ""}" data-action="scene-open" data-id="${row.id}" aria-pressed="${row.id === ed.sceneId}"><img alt="" data-picture="${esc(row.image)}" width="${row.width}" height="${row.height}"><span>${esc(row.label)}</span></button>`).join("") || `<p class="subtle">No scenes yet. Record more scenes lets the game play by itself for a few minutes; Play and capture lets you go where you want.</p>`}</div>`;
   }
   function playPart(ed) {
     if (!ed.playing) return "";
@@ -10450,7 +10874,7 @@ ${state2.artifact.system_id ? `<details><summary>Advanced byte options</summary>
   }
   var SHEET_COLS = 10;
   var SHEET_CELL = 36;
-  var TOOLS = [["pencil", "Pencil"], ["pick", "Pick color"], ["fill", "Fill"]];
+  var TOOLS2 = [["pencil", "Pencil"], ["pick", "Pick color"], ["fill", "Fill"]];
   var BRUSH_TOOLS = [["paint", "Paint"], ["pick", "Pick from the scene"], ["erase", "Unpaint"]];
   var READING = '<p class="subtle" role="status">Reading the pictures of this scene…</p>';
   var tileById = (ed, id) => {
@@ -10531,7 +10955,7 @@ ${state2.artifact.system_id ? `<details><summary>Advanced byte options</summary>
  <p id="scene-tile-status" class="subtle" role="status" aria-live="polite">${esc(tileStatus(ed, tile))}</p>
  <div class="scene-inks" role="group" aria-label="Colors of this picture's palette">${palette2.map((color, index) => `<button type="button" class="scene-ink ${index === state2.ink ? "selected" : ""}" data-action="scene-ink" data-id="${index}" aria-pressed="${index === state2.ink}" aria-label="${inkName(index)}" title="${inkName(index)}"><span class="scene-chip" data-color="${hex8(color)}"></span></button>`).join("")}</div>
  <p class="subtle">A picture can only use the colors of its palette${clear ? "; the first one is see-through" : ""}.</p>
- <div class="actions" role="group" aria-label="Drawing tools">${TOOLS.map(([id, label]) => `<button type="button" class="${state2.tool === id ? "selected" : ""}" data-action="scene-tool" data-id="${id}" aria-pressed="${state2.tool === id}">${label}</button>`).join("")}${button("Flip sideways", "scene-tile-flip", { id: "h" })}${button("Flip upside down", "scene-tile-flip", { id: "v" })}${button("Undo", "scene-tile-undo")}${button("Start over", "scene-tile-reset")}</div>
+ <div class="actions" role="group" aria-label="Drawing tools">${TOOLS2.map(([id, label]) => `<button type="button" class="${state2.tool === id ? "selected" : ""}" data-action="scene-tool" data-id="${id}" aria-pressed="${state2.tool === id}">${label}</button>`).join("")}${button("Flip sideways", "scene-tile-flip", { id: "h" })}${button("Flip upside down", "scene-tile-flip", { id: "v" })}${button("Undo", "scene-tile-undo")}${button("Start over", "scene-tile-reset")}</div>
  ${tile.lines > 1 ? `<label class="scene-line"><span>Shown with palette</span><select data-tile-line aria-label="Palette to show this picture with">${Array.from({ length: tile.lines }, (_, line) => `<option value="${line}" ${line === state2.line ? "selected" : ""}>Palette ${line + 1}</option>`).join("")}</select></label><p class="subtle">This only changes how the picture is shown here. The game chooses the palette wherever it draws the picture.</p>` : ""}
  <div class="actions">${button("Save as PNG", "scene-tile-export", { icon: "download" })}${button("Load a PNG", "scene-tile-import")}<input type="file" id="scene-tile-file" accept="image/png" hidden aria-label="PNG picture to load, 8 by 8 pixels"></div>
  ${scopePart(ed, tile.uses, "picture", ed.gfx.private_copy)}
@@ -10725,15 +11149,15 @@ ${state2.artifact.system_id ? `<details><summary>Advanced byte options</summary>
     drawBrush(ed);
     drawOverlay(ed);
   }
-  var PARTS = { "scene-gallery": galleryPart, "scene-play-panel": playPart, "scene-stage": stagePart, "scene-palette": (ed) => ed.mode === "colors" ? palettePart(ed) : sheetPart(ed), "scene-picker": (ed) => ed.mode === "graphics" ? tilePart(ed) : ed.mode === "background" ? brushPart(ed) : pickerPart(ed), "scene-changes": changesPart };
+  var PARTS = { "scene-gallery": galleryPart, "scene-levels": levelsPart, "scene-level": (ed) => levelPart(ed, verdictPart, keepPart), "scene-play-panel": playPart, "scene-stage": stagePart, "scene-palette": (ed) => ed.mode === "colors" ? palettePart(ed) : sheetPart(ed), "scene-picker": (ed) => ed.mode === "graphics" ? tilePart(ed) : ed.mode === "background" ? brushPart(ed) : pickerPart(ed), "scene-changes": changesPart };
   function paint(root) {
     for (const node of root.querySelectorAll("[data-color]")) node.style.backgroundColor = node.dataset.color;
   }
   function loadPictures(ctx2, ed, root) {
     for (const node of root.querySelectorAll("img[data-picture]")) {
-      const key = node.dataset.picture;
-      picture(ctx2, ed, key).then((image) => {
-        if (node.isConnected && node.dataset.picture === key) node.src = image.src;
+      const key2 = node.dataset.picture;
+      picture(ctx2, ed, key2).then((image) => {
+        if (node.isConnected && node.dataset.picture === key2) node.src = image.src;
       }).catch(() => {
       });
     }
@@ -10743,9 +11167,9 @@ ${state2.artifact.system_id ? `<details><summary>Advanced byte options</summary>
     const canvas = document.getElementById("scene-canvas");
     if (!canvas || !ed.view) return;
     const own = (_a = ed.proposal) == null ? void 0 : _a.affected.find((row) => row.scene_id === ed.sceneId && row.after);
-    const key = ed.showOriginal ? ed.view.scene.image : own ? own.after : ed.view.look.image;
+    const key2 = ed.showOriginal ? ed.view.scene.image : own ? own.after : ed.view.look.image;
     try {
-      const image = await picture(ctx2, ed, key);
+      const image = await picture(ctx2, ed, key2);
       if (!canvas.isConnected) return;
       canvas.getContext("2d").drawImage(image, 0, 0, canvas.width, canvas.height);
       if (!ed.pixels || ed.pixels.id !== ed.sceneId) {
@@ -10762,8 +11186,9 @@ ${state2.artifact.system_id ? `<details><summary>Advanced byte options</summary>
   }
   var PAGE_PARTS = Object.keys(PARTS).filter((id) => id !== "scene-play-panel");
   function update(ctx2, ed, ids = PAGE_PARTS) {
-    var _a, _b;
+    var _a, _b, _c;
     if (!current2(ctx2, ed) || !ed.summary) return;
+    if (ids.includes("scene-play-panel") && !ids.includes("scene-levels")) ids = [...ids, "scene-levels"];
     const focused = document.activeElement, focusKey = ((_a = focused == null ? void 0 : focused.dataset) == null ? void 0 : _a.action) ? [focused.dataset.action, focused.dataset.id || "", focused.dataset.slot || ""].join("|") : null;
     for (const id of ids) {
       const node = document.getElementById(id);
@@ -10774,11 +11199,12 @@ ${state2.artifact.system_id ? `<details><summary>Advanced byte options</summary>
       paint(node);
       loadPictures(ctx2, ed, node);
       if (had && focusKey) {
-        const [action, key, slot] = focusKey.split("|");
-        (_b = [...node.querySelectorAll("[data-action]")].find((candidate) => candidate.dataset.action === action && (candidate.dataset.id || "") === key && (candidate.dataset.slot || "") === slot)) == null ? void 0 : _b.focus({ preventScroll: true });
+        const [action, key2, slot] = focusKey.split("|");
+        (_b = [...node.querySelectorAll("[data-action]")].find((candidate) => candidate.dataset.action === action && (candidate.dataset.id || "") === key2 && (candidate.dataset.slot || "") === slot)) == null ? void 0 : _b.focus({ preventScroll: true });
       }
     }
     if (ids.includes("scene-stage")) void drawStage(ctx2, ed);
+    if (ids.includes("scene-level")) void ((_c = ed.levelTools) == null ? void 0 : _c.redraw());
     drawExtras(ed);
     watchLook(ctx2, ed);
   }
@@ -10837,6 +11263,13 @@ ${state2.artifact.system_id ? `<details><summary>Advanced byte options</summary>
     ed.proposal = ed.summary.preview && ((_b = ed.proposal) == null ? void 0 : _b.id) === ed.summary.preview.id ? ed.proposal : ed.summary.preview;
     if (ed.inspect && !ed.summary.changes.changes.some((change) => change.id === ed.inspect.id)) ed.inspect = null;
     await loadScene(ctx2, ed, ed.sceneId);
+    if (ed.level) {
+      try {
+        ed.level.view = await call(ctx2, ed, "level", { level_id: ed.level.id, plane: ed.level.view.plane });
+      } catch {
+        ed.level = null;
+      }
+    }
   }
   async function dropPreview(ctx2, ed) {
     clearTimeout(ed.proposeTimer);
@@ -10852,7 +11285,7 @@ ${state2.artifact.system_id ? `<details><summary>Advanced byte options</summary>
   function watchProposal(ctx2, ed) {
     clearTimeout(ed.poll);
     const tick = async () => {
-      var _a;
+      var _a, _b;
       if (!current2(ctx2, ed) || !ed.proposal || !ed.proposal.working) return;
       try {
         const id = ed.proposal.id, change = (await call(ctx2, ed, "change", { change_id: id })).change;
@@ -10860,6 +11293,7 @@ ${state2.artifact.system_id ? `<details><summary>Advanced byte options</summary>
         const settled = !change.working, stage3 = change.planning !== ed.proposal.planning || !!change.error !== !!ed.proposal.error;
         ed.proposal = change;
         updateAlso(ctx2, ed);
+        if (change.level && (settled || stage3)) void ((_b = ed.levelTools) == null ? void 0 : _b.reload());
         const png = change.import && change.import.what !== "edit" ? ["scene-palette"] : [];
         if (stage3 && !settled) update(ctx2, ed, ["scene-picker", ...png]);
         else if (png.length && !settled && change.planning) update(ctx2, ed, png);
@@ -10964,7 +11398,7 @@ ${state2.artifact.system_id ? `<details><summary>Advanced byte options</summary>
           };
           image.src = "data:image/png;base64," + packet.png_base64;
         }
-        if (status) status.textContent = "Playing. Capture the moment when the screen shows what you want to edit.";
+        if (status) status.textContent = packet.level_captures !== null && packet.level_captures !== void 0 ? `Recording the level: ${plural2(packet.level_captures, "moment")} captured. Play through the level, then choose Finish the level map.` : "Playing. Capture the moment when the screen shows what you want to edit.";
         due = Math.max(due + (taps.length ? 10 : 4) * 1e3 / 60, performance.now() - 50);
         await new Promise((resolve) => setTimeout(resolve, Math.max(0, due - performance.now())));
       } catch (error) {
@@ -11154,7 +11588,7 @@ ${state2.artifact.system_id ? `<details><summary>Advanced byte options</summary>
     picker == null ? void 0 : picker.addEventListener("pointerleave", lift);
     picker == null ? void 0 : picker.addEventListener("keydown", (event) => {
       if (event.target.id !== "scene-tile-editor" || !ed.tile) return;
-      const state2 = ed.tile, tile = selectedTile(ed), move = { ArrowLeft: [-1, 0], ArrowRight: [1, 0], ArrowUp: [0, -1], ArrowDown: [0, 1] }[event.key], key = event.key.toLowerCase();
+      const state2 = ed.tile, tile = selectedTile(ed), move = { ArrowLeft: [-1, 0], ArrowRight: [1, 0], ArrowUp: [0, -1], ArrowDown: [0, 1] }[event.key], key2 = event.key.toLowerCase();
       const refocus = () => {
         var _a;
         return (_a = document.getElementById("scene-tile-editor")) == null ? void 0 : _a.focus({ preventScroll: true });
@@ -11168,15 +11602,15 @@ ${state2.artifact.system_id ? `<details><summary>Advanced byte options</summary>
         event.preventDefault();
         useTool(ctx2, ed, state2.cx, state2.cy);
         refocus();
-      } else if ((event.ctrlKey || event.metaKey) && key === "z") {
+      } else if ((event.ctrlKey || event.metaKey) && key2 === "z") {
         event.preventDefault();
         if (state2.undo.length) {
           state2.draft = state2.undo.pop();
           editedTile(ctx2, ed);
         }
-      } else if (!event.ctrlKey && !event.metaKey && !event.altKey && { p: "pencil", i: "pick", f: "fill" }[key]) {
+      } else if (!event.ctrlKey && !event.metaKey && !event.altKey && { p: "pencil", i: "pick", f: "fill" }[key2]) {
         event.preventDefault();
-        state2.tool = { p: "pencil", i: "pick", f: "fill" }[key];
+        state2.tool = { p: "pencil", i: "pick", f: "fill" }[key2];
         update(ctx2, ed, ["scene-picker"]);
         refocus();
       } else if (/^[1-9]$/.test(event.key) && tile && Number(event.key) <= 1 << tile.bits) {
@@ -11535,7 +11969,22 @@ ${state2.artifact.system_id ? `<details><summary>Advanced byte options</summary>
       failure = error.message;
       ed.summary = null;
     }
+    ed.levelTools = levelTools(ctx2, ed, {
+      call: (operation, more) => call(ctx2, ed, operation, more),
+      update: (ids) => update(ctx2, ed, ids),
+      refresh: (summary) => refresh(ctx2, ed, summary),
+      dropPreview: () => dropPreview(ctx2, ed),
+      watchProposal: () => watchProposal(ctx2, ed),
+      picture: (key2) => picture(ctx2, ed, key2),
+      loadScene: (id) => loadScene(ctx2, ed, id),
+      current: () => current2(ctx2, ed)
+    });
+    if (ctx2.state.openLevels) {
+      ctx2.state.openLevels = false;
+      ed.scrollToLevels = true;
+    }
     ctx2.use({
+      ...ed.levelTools.handlers,
       "scene-open": async (node) => {
         if (node.dataset.id === ed.sceneId) return;
         await dropPreview(ctx2, ed);
@@ -11722,6 +12171,8 @@ ${state2.artifact.system_id ? `<details><summary>Advanced byte options</summary>
     return `${title}${engine.installed ? "" : `<div class="notice warm" role="status">${esc(engine.reason)}</div>`}
  <section class="card" id="scene-gallery" aria-label="Scenes">${galleryPart(ed)}</section>
  <section class="card" id="scene-play-panel" aria-label="Play the game" ${ed.playing ? "" : "hidden"}>${playPart(ed)}</section>
+ <section class="card" id="scene-levels" aria-label="Level maps">${levelsPart(ed)}</section>
+ <section class="card" id="scene-level" aria-label="Level map" ${ed.level ? "" : "hidden"}>${levelPart(ed, verdictPart, keepPart)}</section>
  <div class="scene-layout"><section class="card" id="scene-stage" aria-label="Scene picture">${stagePart(ed)}</section>
  <div class="scene-side"><section class="card" id="scene-picker" aria-label="Editor">${PARTS["scene-picker"](ed)}</section><section class="card" id="scene-palette" aria-label="Colors and pictures in this scene" ${ed.view ? "" : "hidden"}>${PARTS["scene-palette"](ed)}</section><section class="card" id="scene-changes" aria-label="Change list">${changesPart(ed)}</section></div></div>`;
   }
@@ -11729,16 +12180,16 @@ ${state2.artifact.system_id ? `<details><summary>Advanced byte options</summary>
     const pad = document.getElementById("scene-controller");
     if (!pad || pad.dataset.mounted) return;
     pad.dataset.mounted = "true";
-    const key = (event) => KEY_BUTTONS[event.key] || KEY_BUTTONS[event.key.toLowerCase()];
+    const key2 = (event) => KEY_BUTTONS[event.key] || KEY_BUTTONS[event.key.toLowerCase()];
     pad.addEventListener("keydown", (event) => {
-      const name2 = key(event);
+      const name2 = key2(event);
       if (name2) {
         event.preventDefault();
         ed.held.add(name2);
       }
     });
     pad.addEventListener("keyup", (event) => {
-      const name2 = key(event);
+      const name2 = key2(event);
       if (name2) {
         event.preventDefault();
         ed.held.delete(name2);
@@ -11748,7 +12199,7 @@ ${state2.artifact.system_id ? `<details><summary>Advanced byte options</summary>
     pad.addEventListener("pointerdown", () => pad.focus());
   }
   function mount12(ctx2) {
-    var _a, _b;
+    var _a, _b, _c, _d, _e;
     const ed = ctx2.state.sceneEditor, main = document.getElementById("main");
     if (!ed || !ed.summary || !main) return;
     paint(main);
@@ -11757,6 +12208,13 @@ ${state2.artifact.system_id ? `<details><summary>Advanced byte options</summary>
     drawExtras(ed);
     mountGraphics(ctx2, ed);
     watchLook(ctx2, ed);
+    delete main.dataset.levelMounted;
+    (_a = ed.levelTools) == null ? void 0 : _a.mount();
+    void ((_b = ed.levelTools) == null ? void 0 : _b.redraw());
+    if (ed.scrollToLevels) {
+      ed.scrollToLevels = false;
+      (_c = document.getElementById("scene-levels")) == null ? void 0 : _c.scrollIntoView({ block: "start" });
+    }
     const picker = document.getElementById("scene-picker");
     picker == null ? void 0 : picker.addEventListener("input", (event) => {
       const node = event.target, swatch = selectedSwatch(ed);
@@ -11794,8 +12252,8 @@ ${state2.artifact.system_id ? `<details><summary>Advanced byte options</summary>
       mountController2(ctx2, ed);
       void playLoop(ctx2, ed);
     }
-    if (((_a = ed.summary.recording) == null ? void 0 : _a.state) === "running") watchRecording(ctx2, ed);
-    if ((_b = ed.proposal) == null ? void 0 : _b.working) watchProposal(ctx2, ed);
+    if (((_d = ed.summary.recording) == null ? void 0 : _d.state) === "running") watchRecording(ctx2, ed);
+    if ((_e = ed.proposal) == null ? void 0 : _e.working) watchProposal(ctx2, ed);
   }
 
   // romancer/ui/app.js
@@ -11910,17 +12368,17 @@ ${state2.artifact.system_id ? `<details><summary>Advanced byte options</summary>
   function saveDraft(id, value) {
     invalidateAssetSceneDraft(id);
     if (!state.project || !state.artifact) return;
-    const project_id = state.project.project_id, artifact_id = state.artifact.artifact_id, key = draftFieldKey(id), full = [project_id, artifact_id, key].join(":");
+    const project_id = state.project.project_id, artifact_id = state.artifact.artifact_id, key2 = draftFieldKey(id), full = [project_id, artifact_id, key2].join(":");
     state.drafts[full] = value;
-    lastDraft = { project_id, artifact_id, key, full };
+    lastDraft = { project_id, artifact_id, key: key2, full };
     draftWrites.enqueue(full, async () => {
       let record = draftRevisions.get(full);
-      if (!record) record = await api.call("drafts.get", { project_id, artifact_id, key });
+      if (!record) record = await api.call("drafts.get", { project_id, artifact_id, key: key2 });
       try {
-        record = await api.call("drafts.save", { project_id, artifact_id, key, revision: record.revision, value });
+        record = await api.call("drafts.save", { project_id, artifact_id, key: key2, revision: record.revision, value });
       } catch (error) {
         try {
-          const saved = await api.call("drafts.get", { project_id, artifact_id, key });
+          const saved = await api.call("drafts.get", { project_id, artifact_id, key: key2 });
           if (JSON.stringify(saved.value) !== JSON.stringify(value)) throw error;
           record = saved;
         } catch {
@@ -11933,18 +12391,18 @@ ${state2.artifact.system_id ? `<details><summary>Advanced byte options</summary>
   async function moveDraft(direction) {
     await flushDrafts();
     if (!lastDraft) throw new Error("Edit a field first.");
-    const { project_id, artifact_id, key, full } = lastDraft, record = draftRevisions.get(full);
-    const result = await api.call("drafts.move", { project_id, artifact_id, key, revision: record.revision, direction });
+    const { project_id, artifact_id, key: key2, full } = lastDraft, record = draftRevisions.get(full);
+    const result = await api.call("drafts.move", { project_id, artifact_id, key: key2, revision: record.revision, direction });
     draftRevisions.set(full, result);
     state.drafts[full] = result.value;
     state.pending = null;
-    if (key.endsWith(":paint-buffer")) {
+    if (key2.endsWith(":paint-buffer")) {
       state.paint = null;
       state.pixelHistories = null;
       state.pixelHistoryScope = null;
     }
-    if (key.endsWith(":level-changes")) state.levelEditor = null;
-    if (key.endsWith(":hex-changes")) {
+    if (key2.endsWith(":level-changes")) state.levelEditor = null;
+    if (key2.endsWith(":hex-changes")) {
       state.hexDraft = null;
       state.hexReview = null;
     }
@@ -12129,6 +12587,11 @@ ${state2.artifact.system_id ? `<details><summary>Advanced byte options</summary>
         document.getElementById("modal").close();
         return navigate(node.dataset.id);
       },
+      "open-levels": () => {
+        document.getElementById("modal").close();
+        state.openLevels = true;
+        return navigate("scenes");
+      },
       "close-modal": () => document.getElementById("modal").close(),
       "import": () => {
         state.droppedImportFile = null;
@@ -12235,7 +12698,7 @@ ${state2.artifact.system_id ? `<details><summary>Advanced byte options</summary>
     const revision = ++renderRevision, previousScroll = ((_f = document.getElementById("main")) == null ? void 0 : _f.scrollTop) || 0, renderScope = [(_g = state.project) == null ? void 0 : _g.project_id, (_h = state.artifact) == null ? void 0 : _h.artifact_id, state.page].join(":"), details = rememberDetails(document.getElementById("main"));
     actions2 = baseActions();
     const project = state.project, artifacts = project ? [...project.sources, ...project.builds] : [];
-    document.getElementById("app").innerHTML = `<div class="shell"><aside class="sidebar"><a class="brand" href="#" data-action="navigate" data-id="overview"><img src="/mark.svg" alt=""><div><strong>ROMancer</strong><small>By RetchEWretched</small></div></a><div class="nav-label">Basic</div><nav aria-label="Workbench">${BASIC_PAGES.map((k) => k === "levels" ? `<button class="nav-item nav-coming-soon" disabled title="Visual level editing is coming soon">${icon("levels")}<span>Levels <small>Coming soon</small></span></button>` : `<button class="nav-item ${state.page === k ? "active" : ""}" data-action="navigate" data-id="${k}" title="${names6[k]}" ${state.page === k ? 'aria-current="page"' : ""}>${icon(k)}<span>${names6[k]}</span></button>`).join("")}<details class="more-tools" ${getSettings().advancedTools || ADVANCED_PAGES.includes(state.page) ? "open" : ""}><summary title="Advanced investigation and testing">Advanced</summary>${ADVANCED_PAGES.map((k) => `<button class="nav-item ${state.page === k ? "active" : ""}" data-action="navigate" data-id="${k}" title="${names6[k]}">${icon(k)}<span>${names6[k]}</span></button>`).join("")}</details></nav><div class="sidebar-bottom"><button class="nav-item" data-action="navigate" data-id="help" title="Help">${icon("shield")}<span>Help</span></button><button class="nav-item" data-action="projects-manage" title="Projects">${icon("folder")}<span>Projects</span></button><button class="nav-item ${state.page === "settings" ? "active" : ""}" data-action="navigate" data-id="settings" title="Settings">${icon("settings")}<span>Settings</span></button><button class="nav-item" data-action="about" title="About ROMancer">${icon("shield")}<span>About</span></button><div class="local-label"><span class="dot"></span>Runs on your computer</div></div></aside><header class="topbar"><div class="project-control">${icon("folder")}<div><small>ACTIVE PROJECT</small><br><select id="project-select" aria-label="Active project"><option value="">Choose a project</option>${state.projects.map((p) => `<option value="${p.project_id}" ${(project == null ? void 0 : project.project_id) === p.project_id ? "selected" : ""}>${esc(p.name)}</option>`).join("")}</select></div>${button("New project", "new-project", { icon: "plus", class: "compact" })}</div>${artifacts.length ? `<div class="project-control source-selector"><div><small>${((_i = state.artifact) == null ? void 0 : _i.kind) === "source" ? "ORIGINAL ROM" : "BUILD"}</small><br><select id="artifact-select" aria-label="Selected source or build">${[["Original ROMs", project.sources], ["Builds", project.builds]].filter(([, rows]) => rows.length).map(([label, rows]) => `<optgroup label="${label}">${rows.map((a) => {
+    document.getElementById("app").innerHTML = `<div class="shell"><aside class="sidebar"><a class="brand" href="#" data-action="navigate" data-id="overview"><img src="/mark.svg" alt=""><div><strong>ROMancer</strong><small>By RetchEWretched</small></div></a><div class="nav-label">Basic</div><nav aria-label="Workbench">${BASIC_PAGES.map((k) => k === "levels" ? `<button class="nav-item" data-action="open-levels" title="Level maps: record a level, see the whole map and paint on it" ${state.artifact ? "" : "disabled"}>${icon("levels")}<span>Levels</span></button>` : `<button class="nav-item ${state.page === k ? "active" : ""}" data-action="navigate" data-id="${k}" title="${names6[k]}" ${state.page === k ? 'aria-current="page"' : ""}>${icon(k)}<span>${names6[k]}</span></button>`).join("")}<details class="more-tools" ${getSettings().advancedTools || ADVANCED_PAGES.includes(state.page) ? "open" : ""}><summary title="Advanced investigation and testing">Advanced</summary>${ADVANCED_PAGES.map((k) => `<button class="nav-item ${state.page === k ? "active" : ""}" data-action="navigate" data-id="${k}" title="${names6[k]}">${icon(k)}<span>${names6[k]}</span></button>`).join("")}</details></nav><div class="sidebar-bottom"><button class="nav-item" data-action="navigate" data-id="help" title="Help">${icon("shield")}<span>Help</span></button><button class="nav-item" data-action="projects-manage" title="Projects">${icon("folder")}<span>Projects</span></button><button class="nav-item ${state.page === "settings" ? "active" : ""}" data-action="navigate" data-id="settings" title="Settings">${icon("settings")}<span>Settings</span></button><button class="nav-item" data-action="about" title="About ROMancer">${icon("shield")}<span>About</span></button><div class="local-label"><span class="dot"></span>Runs on your computer</div></div></aside><header class="topbar"><div class="project-control">${icon("folder")}<div><small>ACTIVE PROJECT</small><br><select id="project-select" aria-label="Active project"><option value="">Choose a project</option>${state.projects.map((p) => `<option value="${p.project_id}" ${(project == null ? void 0 : project.project_id) === p.project_id ? "selected" : ""}>${esc(p.name)}</option>`).join("")}</select></div>${button("New project", "new-project", { icon: "plus", class: "compact" })}</div>${artifacts.length ? `<div class="project-control source-selector"><div><small>${((_i = state.artifact) == null ? void 0 : _i.kind) === "source" ? "ORIGINAL ROM" : "BUILD"}</small><br><select id="artifact-select" aria-label="Selected source or build">${[["Original ROMs", project.sources], ["Builds", project.builds]].filter(([, rows]) => rows.length).map(([label, rows]) => `<optgroup label="${label}">${rows.map((a) => {
       var _a2;
       return `<option value="${a.artifact_id}" ${((_a2 = state.artifact) == null ? void 0 : _a2.artifact_id) === a.artifact_id ? "selected" : ""}>${esc(a.name)}</option>`;
     }).join("")}</optgroup>`).join("")}</select></div></div>` : ""}<label class="search">${icon("search")}<input id="global-search" placeholder="Search workspace" aria-label="Search workspace"><kbd>Ctrl K</kbd><button type="button" data-action="workspace-search" aria-label="Go: search workspace" class="search-go">Go</button></label></header><main id="main" tabindex="-1"><div class="loading">Opening ${names6[state.page]}…</div></main>${jobTray()}</div>`;

@@ -43,6 +43,7 @@ from . import palette_trace as pt
 from . import provenance as pv
 from . import scene_graphics as sg
 from . import scene_png as sp
+from .level_session import LEVEL_EVERY, LEVEL_GAP, LevelTools
 from .libretro_frontend import BUTTON_IDS, LibretroError
 from .trace_cores import SYSTEM_LABELS, TraceCoreMissing, TraceFrontend, core_options, header_skip, trace_core_for
 
@@ -75,6 +76,14 @@ def explore(frame: int, variant: int = 0):
         held.append('b' if variant % 2 else 'a')
     if frame % 70 < 4:
         held.append('a' if variant % 2 else 'b')
+    return held
+
+
+def walk(frame: int, direction: str = 'right'):
+    """Deterministic play for recording a level: keep going one way and jump now and then. No Start, so nothing pauses."""
+    held = [direction]
+    if frame % 48 < 14:
+        held.append('a' if (frame // 48) % 2 else 'b')
     return held
 
 
@@ -337,6 +346,7 @@ class _Host:
         size = len(self.session.checkpoints[0][1])
         self.session.keep = max(40, min(600, 96 * 1024 ** 2 // max(size, 1)))
         self.inputs = array('H', [0] * primed)
+        self.level_look, self.level_frame = None, -10 ** 9
         self.known = []     # (palette source hash, fingerprint) of scenes already in the store
         for path in (self.store / 'scenes').glob('*.scene'):
             try:
@@ -357,6 +367,25 @@ class _Host:
         start = self.session.frame
         self.session.run(len(masks), lambda f: _names(masks[f - start]))
         self.inputs.extend(masks)
+
+    def play_level(self, masks, label: str) -> list:
+        """Advance, looking at the screen every few frames and keeping a scene whenever it has moved."""
+        metas = []
+        for start in range(0, len(masks), LEVEL_EVERY):
+            self.advance(masks[start:start + LEVEL_EVERY])
+            frame = self.frame()
+            look = _fingerprint(frame.width, frame.height, frame.rgb)
+            last = self.level_look
+            if last is not None and len(last) == len(look) and sum(
+                    1 for i in range(0, len(look), 3) if look[i:i + 3] != last[i:i + 3]) < 3:
+                continue                                  # the screen stood still (a few blinking pixels at most)
+            if len(set(frame.rgb[i:i + 3] for i in range(0, len(frame.rgb), 3 * 97))) < 2:
+                continue                                  # a blank screen between rooms
+            if self.session.frame - self.level_frame < LEVEL_GAP:
+                continue                                  # the last capture is still close enough to place this one
+            metas.append(self.record(label, 'level', only_new=False))
+            self.level_look, self.level_frame = look, self.session.frame
+        return metas
 
     def frame(self):
         if self.fe.last_frame is None:
@@ -413,19 +442,31 @@ class _Host:
             if kind == 'stop':
                 continue
             if kind == 'explore':
-                _, steps, variant = command
+                _, steps, variant, *level = command
                 for step in range(steps):
                     if conn.poll() and conn.recv()[0] in ('stop', 'close'):
                         break
                     start = self.session.frame
-                    self.advance(array('H', [_mask(explore(f, variant)) for f in range(start, start + STEP_FRAMES)]))
+                    if level and level[0]:              # a level is being recorded: walk on, and capture as the screen moves
+                        masks = array('H', [_mask(walk(f, level[1] if len(level) > 1 else 'right'))
+                                            for f in range(start, start + STEP_FRAMES)])
+                    else:
+                        masks = array('H', [_mask(explore(f, variant)) for f in range(start, start + STEP_FRAMES)])
+                    if level and level[0]:
+                        conn.send(('step', step + 1, steps, None, self.session.frame, self.play_level(masks, level[0])))
+                        continue
+                    self.advance(masks)
                     conn.send(('step', step + 1, steps, self.record('', 'explore', only_new=True), self.session.frame))
                 conn.send(('done', self.session.frame))
             elif kind == 'play':
-                _, frames, mask = command
-                self.advance(array('H', [mask]) * frames)
+                _, frames, mask, *level = command
+                metas = []
+                if level and level[0]:
+                    metas = self.play_level(array('H', [mask]) * frames, level[0])
+                else:
+                    self.advance(array('H', [mask]) * frames)
                 frame = self.frame()
-                conn.send(('frame', png_bytes(frame.width, frame.height, frame.rgb), self.session.frame, frame.width, frame.height))
+                conn.send(('frame', png_bytes(frame.width, frame.height, frame.rgb), self.session.frame, frame.width, frame.height, metas))
             elif kind == 'capture':
                 conn.send(('scene', self.record(command[1], 'play', only_new=False), self.session.frame))
 
@@ -693,7 +734,7 @@ def picker_for(fmt: str) -> dict:
 
 # ----------------------------------------------------------------- the session
 
-class EditSession:
+class EditSession(LevelTools):
     """Scenes, palettes and the pending change list for one ROM."""
 
     def __init__(self, store, rom_path, system_id: str, *, core=None, workers=None, options=None):
@@ -741,6 +782,7 @@ class EditSession:
         for folder in ('scenes', 'runs', 'renders', 'work'):
             (self.store / folder).mkdir(parents=True, exist_ok=True)
         self._load()
+        self._levels_init()
 
     # ---- store
 
@@ -877,7 +919,7 @@ class EditSession:
         with self.lock:
             if self.recording and self.recording['state'] == 'running':
                 return self.summary()
-            if len(self.scenes) >= MAX_SCENES:
+            if len(self.scenes) - len(self.level_scene_ids()) >= MAX_SCENES:
                 raise ValueError(f'This game already has {MAX_SCENES} recorded scenes. Remove some before recording more.')
             self.recording = {'state': 'running', 'done': 0, 'total': steps, 'found': 0, 'message': 'Starting the game…'}
         thread = threading.Thread(target=self._record_worker, args=(steps, restart), name='romancer-scenes', daemon=True)
@@ -906,7 +948,7 @@ class EditSession:
                             self._add_scene(self.store / 'scenes' / (meta['id'] + '.scene'))
                             recording['found'] += 1
                         recording['done'] = done
-                        if len(self.scenes) >= MAX_SCENES or recording.get('stop'):
+                        if len(self.scenes) - len(self.level_scene_ids()) >= MAX_SCENES or recording.get('stop'):
                             conn.send(('stop',))
                     elif event[0] == 'done':
                         self.live['frame'] = event[1]
@@ -946,10 +988,12 @@ class EditSession:
                     threading.Thread(target=self._start_in_background, name='romancer-live', daemon=True).start()
                     return {'busy': True, 'message': 'Catching up to where you left off…', 'progress': None}
                 self._start_host()
-            self._host[1].send(('play', frames, mask))
-            _, png, frame, width, height = self._receive()
+            self._host[1].send(('play', frames, mask, self.level_play_label()))
+            _, png, frame, width, height, metas = self._receive()
             self.live['frame'] = frame
-            return {'busy': False, 'png_base64': base64.b64encode(png).decode(), 'frame': frame, 'width': width, 'height': height}
+            self._level_captured(metas)
+            return {'busy': False, 'png_base64': base64.b64encode(png).decode(), 'frame': frame, 'width': width, 'height': height,
+                    'level_captures': len(self.level_rec['scene_ids']) if self.level_rec else None}
         finally:
             self.host_lock.release()
 
@@ -969,7 +1013,7 @@ class EditSession:
         with self.host_lock:
             if not (self._host and self._host[0].is_alive()):
                 raise ValueError('Play the game first, then capture the moment you want.')
-            if len(self.scenes) >= MAX_SCENES:
+            if len(self.scenes) - len(self.level_scene_ids()) >= MAX_SCENES:
                 raise ValueError(f'This game already has {MAX_SCENES} recorded scenes. Remove some before capturing more.')
             self._host[1].send(('capture', str(label)[:80]))
             _, meta, frame = self._receive()
@@ -979,6 +1023,8 @@ class EditSession:
     def forget_scene(self, scene_id: str) -> dict:
         with self.lock:
             self._scene(scene_id)
+            if scene_id in self.level_scene_ids():
+                raise ValueError('This scene is part of a level map. Remove the level map to remove its scenes.')
             if any(c['scene_id'] == scene_id for c in self._active()):
                 raise ValueError('A pending change was made in this scene. Undo that change first.')
             for suffix in ('.scene', '.png'):
@@ -1003,12 +1049,13 @@ class EditSession:
         with self.lock:
             scenes = [{'id': sid, 'label': self._label(sid), 'frame': m['frame'], 'origin': m.get('origin', 'explore'),
                        'image': 'scene:' + sid, 'width': m['width'], 'height': m['height']} for sid, m in self.meta.items()]
+            levels = self.level_summary()
             recording = dict(self.recording) if self.recording else None
             return {'system': self.system, 'system_label': SYSTEM_LABELS.get(self.system, self.system),
                     'engine': {'installed': bool(self.core), 'reason': self.core_error},
                     'scenes': scenes, 'scene_limit': MAX_SCENES, 'recording': recording, 'live': dict(self.live),
                     'changes': self.change_list(), 'preview': self._change_view(self.preview) if self.preview else None,
-                    'private_copy': _private_copy_support()}
+                    'private_copy': _private_copy_support(), **levels}
 
     def _swatch_key(self, swatch: pt.Swatch) -> str:
         return 'color:' + ','.join(str(s['offset'] + self.skip) for s in swatch.sources if s)
@@ -1099,6 +1146,11 @@ class EditSession:
 
     def image(self, key: str) -> bytes:
         kind, _, name = str(key).partition(':')
+        if kind in ('level', 'levelafter'):
+            parts = name.split(':')
+            if len(parts) != (2 if kind == 'level' else 3) or not all(part.isalnum() for part in parts):
+                raise ValueError('unknown picture')
+            return self.level_image(parts[0], int(parts[1]), parts[2] if kind == 'levelafter' else '')
         if kind not in ('scene', 'render') or not name.isalnum():
             raise ValueError('unknown picture')
         path = self.store / ('scenes' if kind == 'scene' else 'renders') / (name + '.png')
@@ -1268,6 +1320,8 @@ class EditSession:
         if change['method'] == 'import':
             self._planned_import(change, result, writes)
             return
+        if change.get('level'):
+            self._planned_level(change, result)
         offsets = set(change.get('expect_offsets') or ())
         if result.get('block_range'):
             first, last = result['block_range']
@@ -1428,9 +1482,10 @@ class EditSession:
                     continue
                 for record in change.get('tiles', ()):
                     pending[sg.tile_id(record['domain'], record['address'], record['format'])] = (record, change['id'])
-                if change['kind'] == 'background' and change['scene_id'] == scene_id:
+                if change['kind'] == 'background':
                     for cell in change.get('cells', ()):
-                        cells.setdefault(int(cell['layer']), []).append({**cell, 'change': change['id']})
+                        if cell.get('scene_id', change['scene_id']) == scene_id:
+                            cells.setdefault(int(cell['layer']), []).append({**cell, 'change': change['id']})
             tiles = []
             for tile in base['tiles']:
                 hit = pending.get(tile['id'])
@@ -1862,7 +1917,7 @@ class EditSession:
                 'cells': change.get('cells', []) if full else [], 'cell_count': len(change.get('cells', ())),
                 'every_scene': bool(change.get('every_scene')), 'tried': change.get('tried', []) if full else [],
                 'grows': max(0, (change.get('rom_size') or 0) - len(self.rom)),
-                'import': change.get('import') if full else None,
+                'import': change.get('import') if full else None, 'level': change.get('level'),
                 'details': [{'file_offset': o, 'before': a, 'after': b} for o, a, b in change['writes'][:64]] if full else []}
 
     def _checks(self, change: dict, working: int) -> tuple[list, bool]:
@@ -2147,6 +2202,16 @@ class EditSessionTools:
                 p['scene_id'], p['cells'])}),
             'edits.find_color': (base + ' scene_id domain entry colors', lambda p, c: {'ok': True, 'change': self.session(p).find_color(
                 p['scene_id'], p['domain'], p['entry'], p['colors'])}),
+            'edits.level_start': (base + ' name', lambda p, c: self._summary(self.session(p), self.session(p).level_start(p['name']))),
+            'edits.level_auto': (base + ' steps direction', lambda p, c: self._summary(self.session(p), self.session(p).level_auto(p['steps'], p['direction']))),
+            'edits.level_stop': (base, lambda p, c: self._summary(self.session(p), self.session(p).level_stop())),
+            'edits.level_forget': (base + ' level_id', lambda p, c: self._summary(self.session(p), self.session(p).level_forget(p['level_id']))),
+            'edits.level': (base + ' level_id plane', lambda p, c: {'ok': True, **self.session(p).level_view(p['level_id'], p['plane'])}),
+            'edits.level_place': (base + ' level_id plane col row', lambda p, c: {'ok': True, **self.session(p).level_place(
+                p['level_id'], p['plane'], p['col'], p['row'])}),
+            'edits.level_paint': (base + ' level_id plane cells', lambda p, c: {'ok': True, 'change': self.session(p).propose_level(
+                p['level_id'], p['plane'], p['cells'])}),
+            'edits.level_export': (base + ' level_id plane edited', self._export_level),
             'edits.change': (base + ' change_id', lambda p, c: {'ok': True, 'change': self.session(p).change(p['change_id'])}),
             'edits.keep': (base + ' change_id', lambda p, c: self._summary(self.session(p), self.session(p).keep(p['change_id']))),
             'edits.remove': (base + ' change_id', lambda p, c: self._summary(self.session(p), self.session(p).remove(p['change_id']))),
@@ -2157,6 +2222,10 @@ class EditSessionTools:
 
     def _export_picture(self, p, c):
         out = self.session(p).export_picture(p['scene_id'], p['what'], p['layer'])
+        return {'ok': True, **{k: v for k, v in out.items() if k != 'png'}, 'png_base64': base64.b64encode(out['png']).decode()}
+
+    def _export_level(self, p, c):
+        out = self.session(p).export_level(p['level_id'], p['plane'], bool(p['edited']))
         return {'ok': True, **{k: v for k, v in out.items() if k != 'png'}, 'png_base64': base64.b64encode(out['png']).decode()}
 
     def _import_picture(self, p, c):

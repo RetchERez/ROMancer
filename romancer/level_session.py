@@ -1,0 +1,534 @@
+"""Level maps in an EditSession: record one while the game scrolls, show it, and change it.
+
+A level is a list of scenes captured while the game was played, and the map
+level_map.stitch puts together from them. Only the captures the map needs are
+kept. The stitched map is stored beside the scenes (levels/<id>.json and one
+PNG for each plane), so opening a level does not read every scene again.
+
+An edit made on the map is a background cell edit in the scene that shows
+that place. Places in several scenes are planned one scene after another by
+scene_graphics (`what: 'level'`), each confirmed by replay, and offered as one
+change. Every recorded scene that uses the changed bytes is then replayed, as
+for any change, and the level picture is redrawn from those replays so the
+map shows every place that changes.
+"""
+from __future__ import annotations
+
+import hashlib
+import io
+import json
+import os
+import threading
+import time
+import uuid
+
+from . import graphics_trace as gt
+from . import level_layout as ll
+from . import level_map as lm
+from . import scene_graphics as sg
+
+LEVEL_EVERY = 4             # frames between looks at the screen while a level is recorded
+LEVEL_GAP = 12              # frames between two captures at least
+MAX_LEVEL_CAPTURES = 600    # captures in one recording, before the map is put together
+MAX_LEVEL_SCENES = 120      # captures a finished level may keep
+MAX_LEVELS = 24
+MAX_PLANES = 3
+MIN_PLANE_CELLS = 200
+MAX_LEVEL_CELLS = 256       # places painted in one change
+
+
+class LevelTools:
+    """Mixed into EditSession."""
+
+    # ---- store
+
+    def _levels_init(self) -> None:
+        self.levels: list[dict] = []
+        self.level_rec: dict | None = None
+        self.level_job: dict | None = None
+        self._level_cache: dict = {}
+        (self.store / 'levels').mkdir(parents=True, exist_ok=True)
+        for path in sorted((self.store / 'levels').glob('*.json')):
+            try:
+                level = json.loads(path.read_text())
+            except (ValueError, OSError):
+                continue
+            if level.get('rom_sha') == self.rom_sha and all(sid in self.scenes for sid in level.get('scene_ids', ())):
+                self.levels.append(level)
+        self.levels.sort(key=lambda level: level.get('created', 0))
+
+    def _level_save(self, level: dict) -> None:
+        temporary = self.store / 'levels' / (level['id'] + '.tmp')
+        temporary.write_text(json.dumps(level, separators=(',', ':')))
+        os.replace(temporary, self.store / 'levels' / (level['id'] + '.json'))
+
+    def _level(self, level_id: str) -> dict:
+        for level in self.levels:
+            if level['id'] == level_id:
+                return level
+        raise ValueError('That level map is no longer stored. Record it again.')
+
+    def level_scene_ids(self) -> set:
+        ids = {sid for level in self.levels for sid in level['scene_ids']}
+        if self.level_rec:
+            ids.update(self.level_rec['scene_ids'])
+        return ids
+
+    def level_summary(self) -> dict:
+        return {'levels': [{'id': level['id'], 'name': level['name'], 'scenes': len(level['scene_ids']),
+                            'planes': [{'name': p['name'], 'width': p['width'], 'height': p['height'], 'cell': p['px']}
+                                       for p in level['planes']],
+                            'image': f"level:{level['id']}:0", 'pixel_width': level['planes'][0]['width'] * level['planes'][0]['px'],
+                            'pixel_height': level['planes'][0]['height'] * level['planes'][0]['px']} for level in self.levels],
+                'level_limit': MAX_LEVELS,
+                'level_recording': {'name': self.level_rec['name'], 'captures': len(self.level_rec['scene_ids']),
+                                    'limit': MAX_LEVEL_CAPTURES} if self.level_rec else None,
+                'level_job': dict(self.level_job) if self.level_job else None}
+
+    # ---- recording
+
+    def level_start(self, name: str = '') -> dict:
+        """Begin keeping captures of the live game as it is played; level_stop puts the map together."""
+        self._require_core()
+        with self.lock:
+            if self.level_job and self.level_job['state'] == 'running':
+                raise ValueError('ROMancer is still putting the last level map together. Wait for it to finish.')
+            if self.level_rec:
+                return self.summary()
+            if len(self.levels) >= MAX_LEVELS:
+                raise ValueError(f'This game already has {MAX_LEVELS} level maps. Remove one before recording another.')
+            if not (self._host and self._host[0].is_alive()):
+                raise ValueError('Play the game to the start of the level first, then start recording the level.')
+            number = len(self.levels) + 1
+            self.level_rec = {'id': uuid.uuid4().hex[:16], 'name': str(name).strip()[:60] or f'Level map {number}', 'scene_ids': []}
+            self.level_job = None
+        return self.summary()
+
+    def _level_captured(self, metas) -> None:
+        """Take the scenes the host captured during a play step into the recording (the host lock is held)."""
+        for meta in metas or ():
+            self._add_scene(self.store / 'scenes' / (meta['id'] + '.scene'))
+            if self.level_rec is not None and meta['id'] not in self.level_rec['scene_ids']:
+                self.level_rec['scene_ids'].append(meta['id'])
+
+    def level_play_label(self):
+        """What play() passes to the host so it captures as it goes, or None when no level is being recorded."""
+        rec = self.level_rec
+        if rec is None or len(rec['scene_ids']) >= MAX_LEVEL_CAPTURES:
+            return None
+        return rec['name']
+
+    def level_auto(self, steps: int = 6, direction: str = 'right', *, wait: bool = False) -> dict:
+        """Let ROMancer walk on in one direction, jumping now and then, while the level is recorded."""
+        self._require_core()
+        steps = max(1, min(40, int(steps)))
+        if direction not in ('right', 'left', 'up', 'down'):
+            raise ValueError('Choose right, left, up or down.')
+        with self.lock:
+            if self.level_rec is None:
+                raise ValueError('Start recording a level first.')
+            if self.recording and self.recording['state'] == 'running':
+                return self.summary()
+            self.recording = {'state': 'running', 'done': 0, 'total': steps, 'found': 0, 'message': 'Playing the level…'}
+
+        def work():
+            recording = self.recording
+            try:
+                with self.host_lock:
+                    self._start_host()
+                    _, conn, variant = self._host
+                    conn.send(('explore', steps, variant, self.level_rec['name'], direction))
+                    while True:
+                        event = self._receive()
+                        if event[0] == 'step':
+                            self.live['frame'] = event[4]
+                            self._level_captured(event[5] if len(event) > 5 else ())
+                            recording['done'] = event[1]
+                            recording['found'] = len(self.level_rec['scene_ids'])
+                            if recording.get('stop') or len(self.level_rec['scene_ids']) >= MAX_LEVEL_CAPTURES:
+                                conn.send(('stop',))
+                        elif event[0] == 'done':
+                            self.live['frame'] = event[1]
+                            break
+                recording.update(state='finished', message=f"Captured {recording['found']} moments of the level.")
+            except (RuntimeError, ValueError, OSError) as error:
+                recording.update(state='failed', message=str(error))
+        thread = threading.Thread(target=work, name='romancer-level-play', daemon=True)
+        thread.start()
+        if wait:
+            thread.join()
+        return self.summary()
+
+    def level_stop(self, *, wait: bool = False) -> dict:
+        """Put the map together from what was captured; runs in the background and reports through level_job."""
+        with self.lock:
+            rec = self.level_rec
+            if rec is None:
+                return self.summary()
+            if self.recording and self.recording['state'] == 'running':
+                raise ValueError('ROMancer is still playing. Stop it first.')
+            self.level_rec = None
+            self.level_job = {'state': 'running', 'done': 0, 'total': len(rec['scene_ids']), 'message': 'Putting the map together…',
+                              'level_id': None}
+        thread = threading.Thread(target=self._level_build, args=(rec,), name='romancer-level', daemon=True)
+        thread.start()
+        if wait:
+            thread.join()
+        return self.summary()
+
+    def _level_frames(self, scene_ids, job=None) -> list:
+        frames = []
+        for number, scene_id in enumerate(scene_ids):
+            meta = self.meta[scene_id]
+            graphics = sg.SceneGraphics(self._scene(scene_id), self.system, self.rom, self.rgb[scene_id], meta['width'], meta['height'])
+            graphics.layers()
+            frames.append(lm.Frame(scene_id, graphics, meta['frame']))
+            if job is not None:
+                job['done'] = number + 1
+        return frames
+
+    def _level_build(self, rec: dict) -> None:
+        job = self.level_job
+        try:
+            ids = [sid for sid in rec['scene_ids'] if sid in self.scenes]
+            if len(ids) < 2:
+                raise ValueError('Nothing was captured. Start recording, then play so that the screen scrolls.')
+            frames = self._level_frames(ids, job)
+            job['message'] = 'Laying the captures side by side…'
+            planes = [p for p in lm.stitch(frames, self.system) if len(p.cells) >= MIN_PLANE_CELLS][:MAX_PLANES]
+            if not planes:
+                raise ValueError('ROMancer could not find a background that scrolled in what was captured.')
+            keep = planes[0].cover()
+            if len(keep) > MAX_LEVEL_SCENES:
+                raise ValueError('This recording covers more of the game than one level map can hold. Record a shorter stretch.')
+            index = {old: new for new, old in enumerate(keep)}
+            stored = []
+            for plane in planes:
+                plane.windows = {index[n]: w for n, w in plane.windows.items() if n in index}
+                for window in plane.windows.values():
+                    for spot in list(window.cells.values()) + list(window.weak.values()):
+                        spot.frame = index[spot.frame]
+                plane.assign()
+            kept = [frames[n] for n in keep]
+            job['message'] = 'Drawing the map with every layer…'
+            screens = {n: lm.screen_picture(frame.graphics, self.system) for n, frame in enumerate(kept)}
+            planes = [p for p in planes if len(p.cells) >= MIN_PLANE_CELLS]
+            level = {'id': rec['id'], 'name': rec['name'], 'created': time.time(), 'rom_sha': self.rom_sha,
+                     'scene_ids': [f.scene_id for f in kept], 'planes': []}
+            for number, plane in enumerate(planes):
+                left, top, right, bottom = plane.bounds()
+                status = {}
+                for (column, row), spot in plane.cells.items():
+                    cell = kept[spot.frame].graphics.layers()[spot.layer].layer.cell(spot.x, spot.y)
+                    status[(column, row)] = (cell.status[:1] or 'u')
+                # the first map shows every layer the game drew; the others show their own layer alone
+                plane.picture(kept, screens if number == 0 else None).save(self.store / 'levels' / f"{level['id']}-{number}.png")
+                level['planes'].append({
+                    'name': plane.name, 'px': plane.px, 'left': left, 'top': top, 'width': right - left, 'height': bottom - top,
+                    'blocks': self._level_blocks(plane, kept, left, top),
+                    'sections': [[a - left, b - left] for a, b in plane.sections],
+                    'windows': {str(n): [w.section, w.across, w.down, w.first, w.last] for n, w in plane.windows.items()},
+                    'cells': [[c - left, r - top, s.frame, s.layer, s.x, s.y, status[(c, r)]] for (c, r), s in sorted(plane.cells.items())]})
+            with self.lock:
+                self._level_save(level)
+                self.levels.append(level)
+                drop = [sid for sid in ids if sid not in level['scene_ids']]
+            self._forget_many(drop)
+            job.update(state='finished', level_id=level['id'], message=f"{level['name']} is ready: "
+                       f"{level['planes'][0]['width']} by {level['planes'][0]['height']} cells from {len(kept)} captures.")
+        except (ValueError, OSError, KeyError) as error:
+            self._forget_many([sid for sid in rec['scene_ids'] if sid in self.scenes])
+            job.update(state='failed', message=str(error))
+
+    def _level_blocks(self, plane, kept, left: int, top: int):
+        """How the level is built from blocks, for snapping the brush: {'width', 'height', 'left', 'top'} in map cells counted
+        from the map's corner, with 'larger' in the same form when the blocks are laid out by larger ones; None when it is not."""
+        skip = gt.rom_skip(self.rom, self.system)
+        groups: dict = {}
+        for (column, row), spot in plane.cells.items():
+            groups.setdefault((spot.frame, spot.layer), ((column - left, row - top), spot))
+        counts: dict = {}
+        for (column, row), spot in plane.cells.items():
+            counts[(spot.frame, spot.layer)] = counts.get((spot.frame, spot.layer), 0) + 1
+        votes: dict = {}
+        richest = None
+        for key, ((column, row), spot) in groups.items():
+            layer = kept[key[0]].graphics.layers()[key[1]].layer
+            grid = ll.find_grid(ll.cell_sources(layer, skip), layer.width, layer.height)
+            if grid is None:
+                continue
+            shape = (grid.width, grid.height, (column - (spot.x - grid.left)) % grid.width, (row - (spot.y - grid.top)) % grid.height)
+            votes[shape] = votes.get(shape, 0) + counts[key]
+            kinds = len(set(grid.first.values()))
+            if richest is None or kinds > richest[0]:
+                richest = (kinds, grid, column, row, spot)
+        if not votes:
+            return None
+        width, height, across, down = max(votes, key=votes.get)
+        hint = {'width': width, 'height': height, 'left': across, 'top': down}
+        _, grid, column, row, spot = richest
+        if (grid.width, grid.height) == (width, height):
+            table = ll.find_entries(self.rom, grid)
+            larger = None
+            if table is not None:
+                larger = ll.find_grid(table.placed, max(at[0] for at in grid.first) + 1, max(at[1] for at in grid.first) + 1)
+            if larger is not None and (larger.width, larger.height) == (table.width, table.height):
+                wide, tall = larger.width * width, larger.height * height
+                x0, y0 = grid.left + larger.left * width, grid.top + larger.top * height
+                hint['larger'] = {'width': wide, 'height': tall, 'left': (column - (spot.x - x0)) % wide, 'top': (row - (spot.y - y0)) % tall}
+        return hint
+
+    def _forget_many(self, scene_ids) -> None:
+        """Remove captures no level needs, in one go."""
+        with self.lock:
+            used = {c['scene_id'] for c in self._active()}
+            gone = [sid for sid in scene_ids if sid in self.scenes and sid not in used]
+            if not gone:
+                return
+            for sid in gone:
+                for suffix in ('.scene', '.png'):
+                    (self.store / 'scenes' / (sid + suffix)).unlink(missing_ok=True)
+                for table in (self.scenes, self.meta, self.rgb):
+                    table.pop(sid, None)
+                for cache in (self._graphics_cache, self._editable, self._chr_used):
+                    cache.pop(sid, None)
+                for change in self.changes:
+                    change['affected'].pop(sid, None)
+            self._sources = {k: v for k, v in self._sources.items() if k[0] not in set(gone)}
+            self.impact = type(self.impact)()
+            for scene in self.scenes.values():
+                self.impact.add(scene)
+            self._views.clear()
+            self._persist()
+
+    def level_forget(self, level_id: str) -> dict:
+        with self.lock:
+            level = self._level(level_id)
+            if any(c.get('level', {}).get('id') == level_id for c in self._active()):
+                raise ValueError('A pending change was made on this level map. Undo that change first.')
+            self.levels.remove(level)
+            self._level_cache.pop(level_id, None)
+            for path in (self.store / 'levels').glob(level_id + '*'):
+                path.unlink(missing_ok=True)
+            others = {sid for other in self.levels for sid in other['scene_ids']}
+        self._forget_many([sid for sid in level['scene_ids'] if sid not in others])
+        return self.summary()
+
+    # ---- the map
+
+    def _level_plane(self, level: dict, number: int) -> lm.Plane:
+        """The stored plane as a level_map.Plane (cells counted from its top left corner)."""
+        key = (level['id'], number)
+        plane = self._level_cache.get(key)
+        if plane is None:
+            if not 0 <= number < len(level['planes']):
+                raise ValueError('That layer is not part of this level map.')
+            stored = level['planes'][number]
+            plane = lm.Plane(stored['name'], stored['px'])
+            shift = stored['left'] * stored['px'], stored['top'] * stored['px']
+            for n, (section, across, down, first, last) in stored['windows'].items():
+                plane.windows[int(n)] = lm.Window(section, across - shift[0], down - shift[1], first, last, {})
+            for column, row, frame, layer, x, y, _ in stored['cells']:
+                plane.cells[(column, row)] = lm.Spot(frame, layer, x, y)
+            self._level_cache[key] = plane
+        return plane
+
+    def level_view(self, level_id: str, plane: int = 0) -> dict:
+        with self.lock:
+            level = self._level(level_id)
+            number = int(plane)
+            if not 0 <= number < len(level['planes']):
+                raise ValueError('That layer is not part of this level map.')
+            stored = level['planes'][number]
+            width, height = stored['width'], stored['height']
+            frames = [-1] * (width * height)
+            status = ['.'] * (width * height)
+            for column, row, frame, _, _, _, letter in stored['cells']:
+                frames[row * width + column] = frame
+                status[row * width + column] = letter
+            pending, after = [], None
+            for change in self._active():
+                mark = change.get('level')
+                if not mark or mark['id'] != level_id or mark['plane'] != number or change.get('error'):
+                    continue
+                pending += [{'col': c, 'row': r, 'change': change['id']} for c, r in mark['places']]
+            preview = self.preview
+            shown = preview if preview and not preview.get('planning') and not preview.get('error') else None
+            changes = ([shown] if shown else []) + [c for c in self.changes if c is not shown]
+            ready = [c for c in changes if any(sid in level['scene_ids'] and r.get('state') == 'done' and r.get('pixels', 0) > 0
+                                               for sid, r in c['affected'].items())]
+            if ready:
+                stamp = hashlib.sha1(repr([(c['id'], sorted((sid, r.get('key')) for sid, r in c['affected'].items()
+                                                              if r.get('state') == 'done')) for c in ready]).encode()).hexdigest()[:16]
+                after = f'levelafter:{level_id}:{number}:{stamp}'
+            working = any(c['affected'] and any(r.get('state') == 'working' for r in c['affected'].values())
+                          for c in changes) or bool(preview and preview.get('planning'))
+            unshown = 0
+            if after and shown and not working and shown.get('level', {}).get('id') == level_id and shown['level']['plane'] == number:
+                # Did the places that were painted change on the map? A change that the replay confirmed in video
+                # memory but that shows somewhere else is said plainly.
+                differ = self._level_changed(level_id, number, after.rsplit(':', 1)[1])
+                unshown = sum(1 for place in shown['level']['places'] if tuple(place) not in differ)
+            return {'id': level_id, 'name': level['name'], 'plane': number, 'unshown': unshown,
+                    'planes': [{'index': k, 'name': p['name'], 'width': p['width'], 'height': p['height'], 'cell': p['px']}
+                               for k, p in enumerate(level['planes'])],
+                    'width': width, 'height': height, 'cell': stored['px'], 'sections': stored['sections'], 'blocks': stored.get('blocks'),
+                    'image': f'level:{level_id}:{number}', 'after': after, 'frames': frames, 'status': ''.join(status),
+                    'scenes': [{'id': sid, 'label': self._label(sid)} for sid in level['scene_ids']],
+                    'pending': pending, 'working': working}
+
+    def level_place(self, level_id: str, plane: int, col: int, row: int) -> dict:
+        """Which scene, layer and cell a place on the map is, for opening it in the scene editors."""
+        with self.lock:
+            level = self._level(level_id)
+            spot = self._level_plane(level, int(plane)).cells.get((int(col), int(row)))
+            if spot is None:
+                raise ValueError('No capture showed that part of the level.')
+            return {'scene_id': level['scene_ids'][spot.frame], 'layer': spot.layer, 'x': spot.x, 'y': spot.y}
+
+    def level_image(self, level_id: str, plane: int, stamp: str = '') -> bytes:
+        """PNG of the map as recorded, or (with a stamp from level_view) with every pending change drawn in."""
+        with self.lock:
+            level = self._level(level_id)
+            number = int(plane)
+            path = self.store / 'levels' / f'{level_id}-{number}.png'
+            if not path.is_file():
+                raise ValueError('That picture is no longer stored. Record the level again.')
+            if not stamp:
+                return path.read_bytes()
+            cached = self.store / 'levels' / f'{level_id}-{number}-after-{stamp}.png'
+            if cached.is_file():
+                return cached.read_bytes()
+            from PIL import Image
+            picture = Image.open(path).convert('RGB')
+            mapped = self._level_plane(level, number)
+            shots = {}
+            for frame, scene_id in enumerate(level['scene_ids']):
+                look = self._look(scene_id)
+                if look.get('state') == 'same' or not look.get('image', '').startswith('render:'):
+                    continue
+                after = self.store / 'renders' / (look['image'].split(':', 1)[1] + '.png')
+                if not after.is_file():
+                    continue
+                meta = self.meta[scene_id]
+                rgb = Image.open(after).convert('RGB')
+                if rgb.size != (meta['width'], meta['height']):
+                    continue
+                shots[frame] = (meta['width'], meta['height'], self.rgb[scene_id], rgb.tobytes())
+            places = mapped.changed(picture, shots)
+            for old in (self.store / 'levels').glob(f'{level_id}-{number}-after-*'):
+                old.unlink(missing_ok=True)
+            out = io.BytesIO()
+            picture.save(out, 'PNG')
+            cached.write_bytes(out.getvalue())
+            cached.with_suffix('.json').write_text(json.dumps(places))
+            return out.getvalue()
+
+    def _level_changed(self, level_id: str, number: int, stamp: str) -> set:
+        """Places of the map that look different with the pending changes drawn in."""
+        self.level_image(level_id, number, stamp)
+        try:
+            return {tuple(place) for place in json.loads((self.store / 'levels' / f'{level_id}-{number}-after-{stamp}.json').read_text())}
+        except (OSError, ValueError):
+            return set()
+
+    def export_level(self, level_id: str, plane: int = 0, edited: bool = False) -> dict:
+        with self.lock:
+            level = self._level(level_id)
+            view = self.level_view(level_id, plane)
+            stamp = view['after'].rsplit(':', 1)[1] if edited and view['after'] else ''
+            name = ''.join(ch if ch.isalnum() else '-' for ch in level['name']).strip('-').lower() or 'level'
+            return {'png': self.level_image(level_id, plane, stamp), 'name': f"{name}{'-edited' if stamp else ''}.png",
+                    'width': view['width'] * view['cell'], 'height': view['height'] * view['cell']}
+
+    # ---- changes
+
+    def propose_level(self, level_id: str, plane: int, cells) -> dict:
+        """Plan copying the picture of one place on the map to others: [{'col', 'row', 'from': [col, row]}]."""
+        with self.lock:
+            self._require_core()
+            level = self._level(level_id)
+            number = int(plane)
+            mapped = self._level_plane(level, number)
+            groups: dict = {}
+            places, seen = [], set()
+            nes = self.system == 'nes'
+            for item in cells:
+                col, row = int(item['col']), int(item['row'])
+                if (col, row) in seen:
+                    continue
+                seen.add((col, row))
+                target = mapped.cells.get((col, row))
+                source = mapped.cells.get((int(item['from'][0]), int(item['from'][1])))
+                if target is None or source is None:
+                    raise ValueError('No capture showed that part of the level, so it cannot be painted.')
+                t_scene, s_scene = level['scene_ids'][target.frame], level['scene_ids'][source.frame]
+                t_graphics = self._graphics(t_scene)
+                t_view = t_graphics.layers()[target.layer]
+                now = t_view.layer.cell(target.x, target.y)
+                s_graphics = self._graphics(s_scene)
+                s_view = s_graphics.layers()[source.layer]
+                want = s_view.layer.cell(source.x, source.y)
+                fmt = s_view.layer.tile_format
+                pixels = s_graphics.tile_pixels(s_view.layer.tile_domain, want.tile_address, fmt)
+                address = None
+                if t_view.layer.tile_format == fmt:
+                    if t_graphics.tile_pixels(t_view.layer.tile_domain, want.tile_address, fmt) == pixels:
+                        address = want.tile_address
+                    else:               # the same picture may be loaded somewhere else at that point of the level
+                        for other in t_view.layer.cells:
+                            if t_graphics.tile_pixels(t_view.layer.tile_domain, other.tile_address, fmt) == pixels:
+                                address = other.tile_address
+                                break
+                if address is None:
+                    raise ValueError('The picture you chose is not loaded at that point of the level, so the game cannot '
+                                     'show it there. Choose a picture from nearer that place.')
+                change = {'layer': target.layer, 'x': target.x, 'y': target.y,
+                          'tile': sg.tile_id(t_view.layer.tile_domain, address, fmt), 'scene_id': t_scene,
+                          'like': {'scene_id': s_scene, 'layer': source.layer, 'x': source.x, 'y': source.y}}
+                if len(now.addresses) > 1 and not nes:
+                    change.update(hflip=want.hflip, vflip=want.vflip, line=want.palette)
+                if now.status == 'unknown':
+                    raise ValueError(sg.CELL_REASONS['unknown'])
+                sg.hardware_tile(t_view, now, t_view.layer.tile_domain, address, fmt)
+                if (now.tile_address, now.hflip, now.vflip, now.palette) == (address, change.get('hflip', now.hflip),
+                                                                           change.get('vflip', now.vflip), change.get('line', now.palette)):
+                    continue
+                change['from'] = {'tile': sg.tile_id(t_view.layer.tile_domain, now.tile_address, t_view.layer.tile_format),
+                                  'hflip': now.hflip, 'vflip': now.vflip, 'line': now.palette}
+                groups.setdefault(t_scene, []).append(change)
+                places.append([col, row])
+            if not places:
+                raise ValueError('Those places already look like that. Paint a different picture first.')
+            if len(places) > MAX_LEVEL_CELLS:
+                raise ValueError(f'That is too many places for one change. Paint up to {MAX_LEVEL_CELLS} at a time.')
+            order = sorted(groups, key=lambda sid: -len(groups[sid]))
+            key = 'level:' + level_id + ':' + hashlib.sha1(repr(sorted(map(tuple, places))).encode()).hexdigest()[:16]
+            offsets = set()
+            for sid in order:
+                layers = self._graphics(sid).layers()
+                for c in groups[sid]:
+                    offsets.update(s['offset'] for s in layers[c['layer']].layer.cell(c['x'], c['y']).sources if s)
+            count = len(places)
+            change = {'kind': 'background', 'key': key, 'scene_id': order[0],
+                      'title': f"{count} place{'s' if count != 1 else ''} in {level['name']}",
+                      'swatch': None, 'from_rgb': None, 'to_rgb': None, 'writes': [], 'scope': 'all',
+                      'cells': [c for sid in order for c in groups[sid]], 'extra_scenes': list(level['scene_ids']),
+                      'level': {'id': level_id, 'plane': number, 'places': places, 'name': level['name']},
+                      'planning': True, 'plan_task': 'graphics', 'expect_offsets': sorted(offsets) or None,
+                      'plan_job': {'what': 'level', 'scene_id': order[0], 'avoid': self._avoid(key),
+                                   'groups': [{'scene_id': sid, 'cells': groups[sid]} for sid in order]}}
+            return self._propose(change)
+
+    def _planned_level(self, change: dict, result: dict) -> None:
+        """After scene_graphics planned a level change: the scene it was first confirmed in, and what was left out."""
+        if result.get('scene_id'):
+            change['scene_id'] = result['scene_id']
+        skipped = result.get('skipped') or []
+        if skipped:
+            gone = {s['scene_id'] for s in skipped}
+            left = sum(s['cells'] for s in skipped)
+            change['cells'] = [c for c in change['cells'] if c.get('scene_id') not in gone]
+            reasons = list(dict.fromkeys(s['reason'] for s in skipped))
+            change['notes'] = list(change.get('notes', [])) + [
+                f"{left} place{'s were' if left != 1 else ' was'} left out: " + ' '.join(reasons)]

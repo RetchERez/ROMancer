@@ -301,3 +301,9 @@ html[data-theme="light"] .scene-thumb.flagged,html[data-theme="light"] .scene-re
 .scene-png{margin-top:14px;padding-top:12px;border-top:1px solid var(--line)}.scene-png h4{margin:0 0 6px}.scene-png .actions{margin:8px 0}
 .scene-png-colors .scene-chip{width:16px;height:16px;vertical-align:-3px;border:1px solid var(--control-line);border-radius:2px}.scene-png-colors caption{text-align:left;font-weight:600;padding-bottom:4px}
 .scene-png-skipped ul{margin:6px 0;padding-left:20px}.scene-png-skipped li{margin:4px 0}
+
+/* Level maps */
+.level-scroll { overflow: auto; max-height: 70vh; border: 1px solid var(--line); border-radius: 8px; background: #181820; }
+.level-canvas { display: block; image-rendering: pixelated; cursor: crosshair; touch-action: none; }
+.level-bar label, .level-toggle { display: inline-flex; align-items: center; gap: 6px; }
+.level-thumb img { max-width: 320px; height: 72px; object-fit: cover; object-position: left top; }

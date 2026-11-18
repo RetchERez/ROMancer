@@ -5,6 +5,7 @@ import {playtestCreatedBuild} from '../build_handoff.js';
 import {icon} from '../icons.js';
 import {esc,button,badge,heading,requireProject,empty} from '../common.js';
 import {plural,hex,parseHex,levelIndex,snapColor,pickerSummary,swatchesForPixel,groupSwatches,sameColors,swatchLabel,changeLine,KEY_BUTTONS,offsetText} from '../scene_editor.js';
+import {levelsPart,levelPart,levelTools} from '../level_map.js';
 import {MODES,parsePixels,pixelText,tilePalette,sameTile,flipTile,fillTile,importPixels,tileRgba,howLabel,cellAt,cellRects,bandGrid,sharedCells,cellState,builtCellsNote,layerLabel,bestLayer,checkTone,expandGraphics} from '../scene_graphics.js';
 
 const pictures=new Map();
@@ -16,7 +17,7 @@ function editorFor(ctx){
  if(state.sceneEditor?.scope!==scope){stopLoops(state.sceneEditor);state.sceneEditor={scope,params:ctx.sourceParams(),summary:null,sceneId:null,view:null,selected:null,draft:null,proposal:null,inspect:null,matches:[],scopeChoice:'all',playing:false,held:new Set(),ticket:0,mode:'colors',gfx:null,tile:null,hits:[],sheetAll:false,brush:{tile:null,hflip:false,vflip:false,line:-1,tool:'paint'},painted:new Map(),layer:0,cursor:null};}
  return state.sceneEditor;
 }
-function stopLoops(ed){if(!ed)return;ed.ticket++;ed.playing=false;clearTimeout(ed.poll);clearTimeout(ed.proposeTimer);clearTimeout(ed.lookPoll);clearTimeout(ed.recordPoll);}
+function stopLoops(ed){if(!ed)return;ed.ticket++;ed.playing=false;clearTimeout(ed.levelPoll);clearTimeout(ed.poll);clearTimeout(ed.proposeTimer);clearTimeout(ed.lookPoll);clearTimeout(ed.recordPoll);}
 const current=(ctx,ed)=>ctx.state.sceneEditor===ed&&ctx.state.page==='scenes';
 const call=(ctx,ed,operation,more={})=>ctx.api.call('edits.'+operation,{...ed.params,...more});
 function picture(ctx,ed,key){
@@ -36,11 +37,11 @@ const shownChange=ed=>ed.proposal||ed.inspect;
 
 function galleryPart(ed){
  const summary=ed.summary,recording=summary.recording,running=recording?.state==='running',engine=summary.engine;
- return `<div class="card-heading"><h3>Scenes</h3>${badge(plural(summary.scenes.length,'scene')+' recorded',summary.scenes.length?'good':'neutral')}</div>
+ return `<div class="card-heading"><h3>Scenes</h3>${badge(plural(summary.scenes.filter(row=>row.origin!=='level').length,'scene')+' recorded',summary.scenes.length?'good':'neutral')}</div>
  <p class="subtle">A scene is a moment of the game that ROMancer has watched. When you change something, every scene that uses the same data is shown. Scenes you haven't recorded can't be shown, so record the places you care about.</p>
  <div class="actions">${running?button('Stop recording','scene-record-stop'):button('Record more scenes','scene-record',{primary:!summary.scenes.length,icon:'plus',disabled:!engine.installed,reason:engine.reason})}${button(ed.playing?'Stop playing':'Play and capture a moment','scene-play-toggle',{icon:'playtest',disabled:!engine.installed||running,reason:engine.installed?'Wait for recording to finish, or stop it.':engine.reason})}</div>
  ${recording?`<div class="scene-progress" role="status" aria-live="polite">${running?`<progress max="${recording.total}" value="${recording.done}" aria-label="Recording progress"></progress>`:''}<span>${esc(recording.message)}${running&&recording.found?' '+plural(recording.found,'new scene')+' so far.':''}</span></div>`:''}
- <div class="scene-strip" role="group" aria-label="Recorded scenes">${summary.scenes.map(row=>`<button type="button" class="scene-thumb ${row.id===ed.sceneId?'selected':''}" data-action="scene-open" data-id="${row.id}" aria-pressed="${row.id===ed.sceneId}"><img alt="" data-picture="${esc(row.image)}" width="${row.width}" height="${row.height}"><span>${esc(row.label)}</span></button>`).join('')||`<p class="subtle">No scenes yet. Record more scenes lets the game play by itself for a few minutes; Play and capture lets you go where you want.</p>`}</div>`;
+ <div class="scene-strip" role="group" aria-label="Recorded scenes">${summary.scenes.filter(row=>row.origin!=='level'||row.id===ed.sceneId).map(row=>`<button type="button" class="scene-thumb ${row.id===ed.sceneId?'selected':''}" data-action="scene-open" data-id="${row.id}" aria-pressed="${row.id===ed.sceneId}"><img alt="" data-picture="${esc(row.image)}" width="${row.width}" height="${row.height}"><span>${esc(row.label)}</span></button>`).join('')||`<p class="subtle">No scenes yet. Record more scenes lets the game play by itself for a few minutes; Play and capture lets you go where you want.</p>`}</div>`;
 }
 function playPart(ed){
  if(!ed.playing)return '';
@@ -316,7 +317,7 @@ function drawOverlay(ed){
 }
 function drawExtras(ed){drawSheet(ed);drawEditor(ed);drawBrush(ed);drawOverlay(ed);}
 
-const PARTS={'scene-gallery':galleryPart,'scene-play-panel':playPart,'scene-stage':stagePart,'scene-palette':ed=>ed.mode==='colors'?palettePart(ed):sheetPart(ed),'scene-picker':ed=>ed.mode==='graphics'?tilePart(ed):ed.mode==='background'?brushPart(ed):pickerPart(ed),'scene-changes':changesPart};
+const PARTS={'scene-gallery':galleryPart,'scene-levels':levelsPart,'scene-level':ed=>levelPart(ed,verdictPart,keepPart),'scene-play-panel':playPart,'scene-stage':stagePart,'scene-palette':ed=>ed.mode==='colors'?palettePart(ed):sheetPart(ed),'scene-picker':ed=>ed.mode==='graphics'?tilePart(ed):ed.mode==='background'?brushPart(ed):pickerPart(ed),'scene-changes':changesPart};
 
 function paint(root){for(const node of root.querySelectorAll('[data-color]'))node.style.backgroundColor=node.dataset.color;}
 function loadPictures(ctx,ed,root){
@@ -339,6 +340,7 @@ async function drawStage(ctx,ed){
 const PAGE_PARTS=Object.keys(PARTS).filter(id=>id!=='scene-play-panel');
 function update(ctx,ed,ids=PAGE_PARTS){
  if(!current(ctx,ed)||!ed.summary)return;
+ if(ids.includes('scene-play-panel')&&!ids.includes('scene-levels'))ids=[...ids,'scene-levels'];      // recording a level needs the game playing
  const focused=document.activeElement,focusKey=focused?.dataset?.action?[focused.dataset.action,focused.dataset.id||'',focused.dataset.slot||''].join('|'):null;
  for(const id of ids){
   const node=document.getElementById(id);if(!node)continue;
@@ -346,6 +348,7 @@ function update(ctx,ed,ids=PAGE_PARTS){
   if(had&&focusKey){const [action,key,slot]=focusKey.split('|');[...node.querySelectorAll('[data-action]')].find(candidate=>candidate.dataset.action===action&&(candidate.dataset.id||'')===key&&(candidate.dataset.slot||'')===slot)?.focus({preventScroll:true});}
  }
  if(ids.includes('scene-stage'))void drawStage(ctx,ed);
+ if(ids.includes('scene-level'))void ed.levelTools?.redraw();
  drawExtras(ed);
  watchLook(ctx,ed);
 }
@@ -380,6 +383,7 @@ async function refresh(ctx,ed,summary){
  ed.proposal=ed.summary.preview&&ed.proposal?.id===ed.summary.preview.id?ed.proposal:ed.summary.preview;
  if(ed.inspect&&!ed.summary.changes.changes.some(change=>change.id===ed.inspect.id))ed.inspect=null;
  await loadScene(ctx,ed,ed.sceneId);
+ if(ed.level){try{ed.level.view=await call(ctx,ed,'level',{level_id:ed.level.id,plane:ed.level.view.plane});}catch{ed.level=null;}}
 }
 async function dropPreview(ctx,ed){
  clearTimeout(ed.proposeTimer);
@@ -393,6 +397,7 @@ function watchProposal(ctx,ed){
    const id=ed.proposal.id,change=(await call(ctx,ed,'change',{change_id:id})).change;
    if(!current(ctx,ed)||ed.proposal?.id!==id)return;
    const settled=!change.working,stage=change.planning!==ed.proposal.planning||!!change.error!==!!ed.proposal.error;ed.proposal=change;updateAlso(ctx,ed);
+   if(change.level&&(settled||stage))void ed.levelTools?.reload();
    const png=change.import&&change.import.what!=='edit'?['scene-palette']:[];
    if(stage&&!settled)update(ctx,ed,['scene-picker',...png]);
    else if(png.length&&!settled&&change.planning)update(ctx,ed,png);
@@ -444,7 +449,7 @@ async function playLoop(ctx,ed){
    if(packet.busy){if(status)status.textContent=packet.message+(packet.progress?` (${Math.round(100*packet.progress[0]/Math.max(1,packet.progress[1]))}%)`:'');await new Promise(resolve=>setTimeout(resolve,400));due=performance.now();continue;}
    const canvas=document.getElementById('scene-play-canvas');
    if(canvas){if(canvas.width!==packet.width||canvas.height!==packet.height){canvas.width=packet.width;canvas.height=packet.height;}const image=new Image();image.onload=()=>{if(canvas.isConnected)canvas.getContext('2d').drawImage(image,0,0);};image.src='data:image/png;base64,'+packet.png_base64;}
-   if(status)status.textContent='Playing. Capture the moment when the screen shows what you want to edit.';
+   if(status)status.textContent=packet.level_captures!==null&&packet.level_captures!==undefined?`Recording the level: ${plural(packet.level_captures,'moment')} captured. Play through the level, then choose Finish the level map.`:'Playing. Capture the moment when the screen shows what you want to edit.';
    due=Math.max(due+(taps.length?10:4)*1000/60,performance.now()-50);await new Promise(resolve=>setTimeout(resolve,Math.max(0,due-performance.now())));
   }catch(error){ed.playing=false;ctx.notify(error.message,true);update(ctx,ed,['scene-gallery','scene-play-panel']);break;}
  }
@@ -693,7 +698,11 @@ export async function render(ctx){
  if(!state.artifact)return empty('Import a game first','Open a project and choose the ROM whose colors you want to change.');
  const ed=editorFor(ctx);let failure='';
  try{await refresh(ctx,ed);}catch(error){failure=error.message;ed.summary=null;}
+ ed.levelTools=levelTools(ctx,ed,{call:(operation,more)=>call(ctx,ed,operation,more),update:ids=>update(ctx,ed,ids),refresh:summary=>refresh(ctx,ed,summary),
+  dropPreview:()=>dropPreview(ctx,ed),watchProposal:()=>watchProposal(ctx,ed),picture:key=>picture(ctx,ed,key),loadScene:id=>loadScene(ctx,ed,id),current:()=>current(ctx,ed)});
+ if(ctx.state.openLevels){ctx.state.openLevels=false;ed.scrollToLevels=true;}
  ctx.use({
+  ...ed.levelTools.handlers,
   'scene-open':async node=>{if(node.dataset.id===ed.sceneId)return;await dropPreview(ctx,ed);ed.inspect=null;ed.selected=null;ed.draft=null;ed.showOriginal=false;await loadScene(ctx,ed,node.dataset.id);update(ctx,ed);},
   'scene-select':async node=>{const id=node.dataset.id;if(ed.proposal&&ed.proposal.swatch!==id)await dropPreview(ctx,ed);ed.selected=id;ed.matches=[];const swatch=selectedSwatch(ed);ed.draft=(ed.proposal?.swatch===id?ed.proposal.to_rgb:swatch.pending||swatch.colors).map(color=>[...color]);update(ctx,ed,['scene-stage','scene-palette','scene-picker','scene-changes']);},
   'scene-pick-pixel':async(node,event)=>{
@@ -750,6 +759,8 @@ export async function render(ctx){
  return `${title}${engine.installed?'':`<div class="notice warm" role="status">${esc(engine.reason)}</div>`}
  <section class="card" id="scene-gallery" aria-label="Scenes">${galleryPart(ed)}</section>
  <section class="card" id="scene-play-panel" aria-label="Play the game" ${ed.playing?'':'hidden'}>${playPart(ed)}</section>
+ <section class="card" id="scene-levels" aria-label="Level maps">${levelsPart(ed)}</section>
+ <section class="card" id="scene-level" aria-label="Level map" ${ed.level?'':'hidden'}>${levelPart(ed,verdictPart,keepPart)}</section>
  <div class="scene-layout"><section class="card" id="scene-stage" aria-label="Scene picture">${stagePart(ed)}</section>
  <div class="scene-side"><section class="card" id="scene-picker" aria-label="Editor">${PARTS['scene-picker'](ed)}</section><section class="card" id="scene-palette" aria-label="Colors and pictures in this scene" ${ed.view?'':'hidden'}>${PARTS['scene-palette'](ed)}</section><section class="card" id="scene-changes" aria-label="Change list">${changesPart(ed)}</section></div></div>`;
 }
@@ -764,6 +775,8 @@ function mountController(ctx,ed){
 export function mount(ctx){
  const ed=ctx.state.sceneEditor,main=document.getElementById('main');if(!ed||!ed.summary||!main)return;
  paint(main);loadPictures(ctx,ed,main);void drawStage(ctx,ed);drawExtras(ed);mountGraphics(ctx,ed);watchLook(ctx,ed);
+ delete main.dataset.levelMounted;ed.levelTools?.mount();void ed.levelTools?.redraw();
+ if(ed.scrollToLevels){ed.scrollToLevels=false;document.getElementById('scene-levels')?.scrollIntoView({block:'start'});}
  const picker=document.getElementById('scene-picker');
  picker?.addEventListener('input',event=>{
   const node=event.target,swatch=selectedSwatch(ed);if(ed.mode!=='colors'||!swatch||!ed.draft)return;const levels=ed.view.pickers[swatch.format].levels;

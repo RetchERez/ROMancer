@@ -39,7 +39,12 @@ TILE_DOMAINS = ('vram', 'chr', 'vram4')      # palette memory is left out of til
 SYSTEM_NAMES = {'nes': 'NES', 'snes': 'Super NES', 'genesis': 'Mega Drive', 'sms': 'Master System', 'gb': 'Game Boy',
                 'gbc': 'Game Boy Color'}
 
+DEBUG_LAYOUT = bool(__import__('os').environ.get('ROMANCER_DEBUG_LAYOUT'))
+MAX_LAYOUT_TRIES = 20       # replays spent on one block before giving up on the level's own list
+
 METHODS = {
+    'layout': 'The level is built from blocks, and the ROM lists which block goes where. Your change was made in that list, '
+              'so a whole block changes, and only in the places the game reads that entry for.',
     'direct': 'This picture is stored as plain picture data in the ROM. Your version is written straight over it.',
     'direct-packed': 'The bytes of this picture sit inside packed data in the ROM, but your version could be written straight '
                      'over them without packing anything again. Bytes the packed data uses more than once change everywhere '
@@ -905,7 +910,7 @@ def _stored_tile(record: dict, system: str):
 def plan_task(job: dict) -> dict:
     """Plan one edit and confirm it by replaying the scene. Returns {'writes', 'method', 'in_scene', ...} or {'error'}."""
     try:
-        return {'tile': _plan_tile, 'tiles': _plan_tiles, 'cells': _plan_cells, 'color': _plan_color}[job['what']](job)
+        return {'tile': _plan_tile, 'tiles': _plan_tiles, 'cells': _plan_cells, 'level': _plan_level, 'color': _plan_color}[job['what']](job)
     except ValueError as error:
         return {'error': str(error)}
     except Exception as error:
@@ -1509,6 +1514,258 @@ def _plan_cells(job: dict) -> dict:
                          + ('some of the cells' if missed and (plan.verified or {}).get('verified') else 'the cells')
                          + ' as painted in this scene, so the change is not offered. The game may redraw them from somewhere else.')
     return _plan_out(plan, rom, 'cells')
+
+
+def _plan_layout(job: dict) -> dict:
+    """Put another block of the level where a block is, by changing the ROM's list of which block goes where.
+
+    Every painted cell names the place whose picture it should show (`like`).
+    level_layout finds the blocks the layer is built from and the places in
+    the ROM that hold a row or column of block numbers. One byte of such a
+    place is changed, the game is replayed from the start of the recording,
+    and the place counts only when the whole block on screen then shows the
+    block that was asked for. Raises ValueError('') when the layer is not
+    built that way, and ValueError with the reason when it is but no place
+    was confirmed.
+    """
+    from . import edit_session as es
+    from . import level_layout as ll
+    wanted = [item for item in job['cells'] if item.get('like')]
+    if not wanted or len(wanted) != len(job['cells']):
+        raise ValueError('')
+    scene, trail, rom, make, buttons, header, rgb = _setup(job)
+    system = job['system']
+    skip = gt.rom_skip(rom, system)
+    layers = gt.layers(scene, system)
+    grids, others = {}, {}
+
+    def grid_of(number):
+        if number not in grids:
+            layer = layers[number]
+            grids[number] = ll.find_grid(ll.cell_sources(layer, skip), layer.width, layer.height)
+        return grids[number]
+
+    def source_layer(like):
+        if like['scene_id'] == job['scene_id']:
+            return layers[int(like['layer'])]
+        if like['scene_id'] not in others:
+            other, _, _ = es.read_scene(Path(job['store']) / 'scenes' / (like['scene_id'] + '.scene'))
+            others[like['scene_id']] = gt.layers(other, system)
+        return others[like['scene_id']][int(like['layer'])]
+
+    blocks: dict = {}
+    for item in wanted:
+        number = int(item['layer'])
+        grid = grid_of(number)
+        if grid is None:
+            raise ValueError('')
+        x, y = int(item['x']), int(item['y'])
+        at = grid.block(x, y)
+        inside = grid.inside(x, y)
+        mine = grid.first.get(at)
+        like = item['like']
+        there = source_layer(like)
+        sources = ll.cell_sources(there, skip)
+        lx, ly = int(like['x']), int(like['y'])
+        k = inside[1] * grid.width + inside[0]
+        origin = sources.get((lx, ly))
+        if mine is None or origin is None:
+            raise ValueError('')
+        origin -= grid.pattern[k]
+        corner = (lx - inside[0], ly - inside[1])
+        whole = all(sources.get((corner[0] + dx, corner[1] + dy)) == origin + grid.pattern[dy * grid.width + dx]
+                    for dy in range(grid.height) for dx in range(grid.width))
+        if not whole or (origin - mine) % grid.step:
+            raise ValueError('This level is built from blocks of %d by %d cells. Pick a whole block and paint it onto a whole block '
+                             '(the same corner of the block you picked onto the same corner of the block you paint).' % (grid.width, grid.height))
+        entry = blocks.setdefault((number, at), origin)
+        if entry != origin:
+            raise ValueError('Two of the places you painted are in one block of the level and ask for different blocks. '
+                             'Paint a whole block at a time.')
+    start = pv.Scene(scene.id, scene.frame, scene.screen_sha256, scene.checkpoints[:1], scene.snapshot)
+    writes, expect, tried, entries = {}, {}, 0, {}
+
+    def cells_of(number, at, origin):
+        grid, layer = grids[number], layers[number]
+        out = {}
+        for dy in range(grid.height):
+            for dx in range(grid.width):
+                cell = layer.cell(grid.left + at[0] * grid.width + dx, grid.top + at[1] * grid.height + dy)
+                out[cell.addresses[0]] = rom[origin + grid.pattern[dy * grid.width + dx]]
+        return out
+
+    def attempt(places, delta, target, domain):
+        """The ROM byte among these that, moved by delta, makes the replay show the target and disturbs the least else.
+
+        The first place that changes nothing but the block is taken at once. A place that also changes other
+        parts of the screen (a piece the game uses in several places) is kept only if no later place does better.
+        """
+        nonlocal tried
+        best = None
+        for place in list(dict.fromkeys(places)):
+            value = rom[place] + delta
+            if not 0 <= value <= 255 or place in writes or tried >= MAX_LAYOUT_TRIES * max(1, len(blocks)):
+                continue
+            tried += 1
+            _progress(job, 'Looking for where the level says which block goes here…', tried, 0)
+            plan = gt.EditPlan('layout', gt.with_checksums(rom, [(place, rom[place], value)], system), len(rom), {domain: dict(target)})
+            result = gt.verify_plan(make, rom, plan, start, expect=plan.expect, domains=TILE_DOMAINS, buttons_for=buttons)
+            extra = sum((result.get('unplanned') or {}).values())
+            if DEBUG_LAYOUT:
+                print(f'layout try {place:#x}: {rom[place]:#x} -> {value:#x} as_planned {result.get("as_planned")} verified '
+                      f'{result.get("verified")} missed {sum(len(v) for v in (result.get("missed") or {}).values())} of {len(target)} '
+                      f'unplanned {result.get("unplanned")}', flush=True)
+            if not result.get('as_planned'):
+                continue
+            if best is None or extra < best[0]:
+                best = (extra, (place, rom[place], value))
+            if extra <= len(target):                 # the block's own palette bytes at most: nothing else moved
+                break
+        return best[1] if best else None
+
+    def listed(grid, at):
+        """ROM bytes that may hold the number of block `at` in a list of blocks: in the ROM itself, then by way of memory."""
+        places = []
+        through = ll.runs(grid, *at)
+        if DEBUG_LAYOUT:
+            for kind, index, numbers in through:
+                print(f'  {kind} {index} {numbers} whole-run hits {ll.find_rows(rom, numbers)} pieces '
+                      f'{[(begin, len(piece), len(ll.find_rows(rom, piece, 4 if len(piece) > 2 else 8))) for begin, piece in ll.windows(numbers, index)[:8]]}', flush=True)
+        for kind, index, numbers in through:
+            for begin, piece in ll.windows(numbers, index)[:8]:
+                places += [offset + index - begin for offset, base in ll.find_rows(rom, piece, 4 if len(piece) > 2 else 8)]
+        for kind, index, numbers in through:
+            for begin, piece in ll.windows(numbers, index)[:4]:
+                places += [row[index - begin] for row in ll.find_in_memory(scene.snapshot, piece, skip, 4) if row[index - begin] is not None]
+        return places
+
+    # Larger blocks first: when every block of a larger block was painted and together they are another larger block,
+    # the level's list of larger blocks is changed, and only that place changes.
+    done, large = set(), 0
+    for number in sorted({number for number, _ in blocks}):
+        grid = grids[number]
+        entries[number] = ll.find_entries(rom, grid)
+        table = entries[number]
+        if table is None:
+            continue
+        columns = max(at[0] for at in grid.first) + 1
+        rows = max(at[1] for at in grid.first) + 1
+        larger = ll.find_grid(table.placed, columns, rows)
+        if larger is None or (larger.width, larger.height) != (table.width, table.height):
+            continue
+        lowest = min(grid.first.values())
+        for at in sorted({larger.block(*block) for layer_number, block in blocks if layer_number == number}):
+            members = [(larger.left + at[0] * larger.width + dx, larger.top + at[1] * larger.height + dy) for dx, dy in table.inside]
+            if at not in larger.first or any((number, member) not in blocks for member in members):
+                continue
+            wish = tuple((blocks[(number, member)] - lowest) // grid.step for member in members)
+            entry = table.entry(rom, wish)
+            if entry is None:
+                continue
+            delta = (entry - larger.first[at]) // larger.step
+            if not delta:
+                continue
+            target = {}
+            for member in members:
+                target.update(cells_of(number, member, blocks[(number, member)]))
+            if DEBUG_LAYOUT:
+                print(f'larger block {at}: wish {wish} entry {entry:#x} delta {delta} places {[hex(v) for v in listed(larger, at)[:8]]}', flush=True)
+            found = attempt(listed(larger, at), delta, target, layers[number].cells[0].domain)
+            if found is None:
+                continue
+            writes[found[0]] = (found[1], found[2])
+            expect.setdefault(layers[number].cells[0].domain, {}).update(target)
+            done.update((number, member) for member in members)
+            large += 1
+    for (number, at), origin in blocks.items():
+        if (number, at) in done:
+            continue
+        grid, layer = grids[number], layers[number]
+        mine = grid.first[at]
+        delta = (origin - mine) // grid.step
+        if not delta:
+            continue
+        target = cells_of(number, at, origin)
+        places = listed(grid, at)
+        shared = entries.get(number)
+        if shared is not None and at in shared.placed:      # a table of larger blocks: every place that uses the larger block changes
+            places.append(shared.placed[at])
+        if DEBUG_LAYOUT:
+            print(f'block {at}: delta {delta} places {[hex(v) for v in places[:10]]} table {None if shared is None else (len(shared.placed), at in shared.placed)} grid {grid.width}x{grid.height} step {grid.step} blocks {len(grid.first)} runs {[(k, i, len(n)) for k, i, n in ll.runs(grid, *at)]}', flush=True)
+        found = attempt(places, delta, target, layer.cells[0].domain)
+        if found is None:
+            raise ValueError('ROMancer found the blocks this level is built from, but not a place in the ROM where changing the '
+                             'block number put your block here when the game was replayed. The level may be packed.')
+        writes[found[0]] = (found[1], found[2])
+        expect.setdefault(layer.cells[0].domain, {}).update(target)
+    if not writes:
+        raise ValueError('These places already show that block. Pick a different block first.')
+    plan = gt.EditPlan('layout', gt.with_checksums(rom, [(o, a, b) for o, (a, b) in sorted(writes.items())], system), len(rom), expect)
+    plan.verified = gt.verify_plan(make, rom, plan, start, expect=expect, domains=TILE_DOMAINS, buttons_for=buttons)
+    if not plan.verified.get('as_planned'):
+        raise ValueError('Each block could be changed on its own, but not all of them together. Paint fewer blocks in one change.')
+    small = len(writes) - large
+    first = grids[next(iter(blocks))[0]]
+    if large:
+        table = next(e for e in entries.values() if e is not None)
+        plan.notes.append(f"{large} larger block{'s' if large != 1 else ''} of {first.width * table.width} by {first.height * table.height} cells "
+                          "changed in the level's own list of blocks.")
+    if small:
+        plan.notes.append(f"{small} block{'s' if small != 1 else ''} of {first.width} by {first.height} cells changed where the ROM "
+                          'says which block goes there.')
+    unplanned = sum((plan.verified.get('unplanned') or {}).values())
+    if unplanned > 2 * sum(len(v) for v in expect.values()):
+        plan.notes.append('Other places of the level changed with it, because the game uses the same stored piece there. '
+                          'The level map shows them.')
+    return _plan_out(plan, rom, 'layout')
+
+
+def _plan_level(job: dict) -> dict:
+    """Places painted on a level map: the cells of each scene are planned and confirmed in that scene, then put together.
+
+    Each scene's cells are planned against the unchanged ROM, exactly as a
+    background change made in that scene would be. A scene whose plan needs a
+    ROM byte that an earlier scene's plan already set to something else is
+    left out with the reason, as is one that cannot be changed at all; the
+    rest are still offered. The result is the first confirmed scene's, with
+    the bytes of all of them.
+    """
+    merged, first, skipped, parts, size = {}, None, [], [], 0
+    groups = job['groups']
+    for number, group in enumerate(groups):
+        sub = {**job, 'what': 'cells', 'scene_id': group['scene_id'], 'cells': group['cells']}
+        count = len(group['cells'])
+        if len(groups) > 1:
+            _progress(job, f'Planning the places in capture {number + 1} of {len(groups)}…', number, len(groups))
+        try:
+            try:
+                result = _plan_layout(sub)          # where the level says which block goes here, when that can be found
+            except ValueError as error:
+                why = str(error)
+                try:
+                    result = _plan_cells(sub)       # otherwise the stored cell or block itself, wherever it is used
+                except ValueError as second:
+                    raise ValueError((why + ' ' if why else '') + str(second)) from None
+                if why:
+                    result['notes'] = list(result.get('notes', [])) + [why]
+        except ValueError as error:
+            skipped.append({'scene_id': group['scene_id'], 'cells': count, 'reason': str(error)})
+            continue
+        if any(o in merged and merged[o][1] != b for o, _, b in result['writes']):
+            skipped.append({'scene_id': group['scene_id'], 'cells': count,
+                            'reason': 'They are packed in the ROM together with other places you painted, and ROMancer cannot '
+                                      'yet pack both in one change. Keep this change, then paint them as the next one.'})
+            continue
+        for o, a, b in result['writes']:
+            merged.setdefault(o, [a, b])
+        size = max(size, result.get('rom_size') or 0)
+        parts.append({'scene_id': group['scene_id'], 'cells': count, 'method': result['method']})
+        if first is None:
+            first = dict(result, scene_id=group['scene_id'])
+    if first is None:
+        raise ValueError(skipped[0]['reason'])
+    first.update(writes=[[o, a, b] for o, (a, b) in sorted(merged.items())], rom_size=size, skipped=skipped, parts=parts)
+    return first
 
 
 def _plan_built_cells(job: dict, built: list, rom: bytes, scene, system: str, layers: list, verify, expect: dict,

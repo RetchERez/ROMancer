@@ -1,9 +1,40 @@
-ROMancer v1.3.0
+ROMancer v1.4.0
 By RetchEWretched
 
 ROMancer is a local ROM editing, investigation and playtesting workbench.
 It supports NES, SNES, Genesis / Mega Drive, Master System, Game Boy and
 Game Boy Color cartridge formats. Everyday work runs offline.
+
+NEW IN v1.4.0
+
+Level maps. Choose Levels, play to where a level starts, choose Record a
+level map and play through it. ROMancer keeps a scene every time the screen
+moves and puts them together into one map of the level that shows every
+background layer. Save map as PNG saves it.
+- Paint on the map. Pick a place (or drag over a block of places) as your
+  brush and paint it somewhere else. The brush snaps to the blocks the level
+  is built from. Show what changes replays the game, and the map then shows
+  every place that changes before you keep anything.
+- A block in one place. Most games build a level from blocks and keep a list
+  of which block goes where. When ROMancer finds that list (in the ROM, or by
+  following the level through the game's memory back to the ROM), a whole
+  block is changed in that list. It tries the places it found one after
+  another by replay and keeps the one that changes the least besides your
+  block. Measured on 42 well-known games
+  that were played automatically: a level map was put together on 39, and a
+  block was changed in the level's own list and confirmed by replay on 16:
+  Castlevania, Castlevania III, Metroid, Metroid II, Mega Man 3, Super Mario
+  Bros. 3, Contra, Ninja Gaiden, DuckTales, Kid Icarus, Ghosts'n Goblins,
+  Batman, Blaster Master, Adventure Island, Link's Awakening and Sonic The
+  Hedgehog (Master System). On 3 more the block itself was changed.
+  trace/COVERAGE.md has the result for every game.
+- When the list is not found, the block itself is changed, as a background
+  change always did: every place that uses the block changes, and the map
+  shows them.
+- Know the limits. A map shows what was played through; places no capture
+  showed are dark. A level packed in a form ROMancer does not know can be
+  viewed and its blocks repainted, but a block cannot be moved to one place.
+  Moving objects (enemies, items) are not part of a level map.
 
 NEW IN v1.3.0
 
@@ -121,8 +152,9 @@ that was. The draft shows whether the image fits. Save playable
 copy opens the new build in Playtest. Technical details shows the graphics,
 tile placement and checksum bytes.
 
-Visual level editing is coming soon. The Levels entry is disabled in this
-release. Read-only layout research and measured locations remain available.
+Levels opens the level maps of Scenes & colors (see NEW IN v1.4.0). The older
+level editor that needed a hand-made definition for each game stays switched
+off. Read-only layout research and measured locations remain available.
 Generic graphics tilemaps remain available as graphics resources.
 
 The built-in catalog recognizes all 942 supplied exact ROM revisions.
@@ -161,7 +193,7 @@ available. The supplied Pokemon Red and Blue revisions share a
 
 START ON WINDOWS
 
-1. Extract ROMancer-v1.3.0-Windows.zip in Windows File Explorer.
+1. Extract ROMancer-v1.4.0-Windows.zip in Windows File Explorer.
 2. Double-click ROMancer.exe in the extracted folder.
    Keep ROMancer.exe, ROM Catalog.html and the ROMancer Files folder together.
 3. Open an original workshop or choose New project and import your own cartridge image.
@@ -182,8 +214,8 @@ SHA-256 is checked and later captures work offline. No ROM data is uploaded.
 
 START ON LINUX
 
-1. Extract ROMancer-v1.3.0-Linux-x86_64.tar.gz:  tar xf ROMancer-v1.3.0-Linux-x86_64.tar.gz
-2. Run ./ROMancer-v1.3.0-Linux-x86_64/ROMancer.sh
+1. Extract ROMancer-v1.4.0-Linux-x86_64.tar.gz:  tar xf ROMancer-v1.4.0-Linux-x86_64.tar.gz
+2. Run ./ROMancer-v1.4.0-Linux-x86_64/ROMancer.sh
    (./ROMancer.sh --install-desktop adds ROMancer to your application menu).
 
 The Linux x86-64 package includes Python, Pillow and the same six engines built

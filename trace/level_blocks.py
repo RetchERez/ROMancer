@@ -1,0 +1,185 @@
+"""Measure block placement on a level map of one catalog ROM.
+
+    python -B trace/level_blocks.py <corpus index.json> <sha256 or name prefix> <out.json> [--steps 6] [--png folder]
+
+Records a level the way trace/level_roundtrip.py does, then puts one whole
+block of the level where another block is, through the level map, and waits
+for the replay checks. Up to --tries places are tried. The result says which
+way the change was made ('layout' is the level's own list of blocks: only
+that place changes), whether replay confirmed it, and how many places of the
+map changed.
+"""
+from __future__ import annotations
+
+import argparse
+import io
+import json
+import os
+import shutil
+import sys
+import tempfile
+import time
+from pathlib import Path
+
+ROOT = Path(__file__).resolve().parents[1]
+sys.path.insert(0, str(ROOT))
+sys.path.insert(0, str(ROOT / 'trace'))
+
+
+def record_level(session, steps: int, intro: int) -> dict | None:
+    session.record(intro, wait=True)
+    for scene_id in list(session.scenes):
+        session.forget_scene(scene_id)
+    while session.play(1, []).get('busy'):
+        time.sleep(0.2)
+    session.level_start('Measured level')
+    for attempt in range(3):
+        session.level_auto(2, wait=True)
+        if len(session.level_rec['scene_ids']) >= 3:
+            break
+        for buttons, frames in ((['start'], 4), ([], 90)):
+            while session.play(frames, buttons).get('busy'):
+                time.sleep(0.2)
+    session.level_auto(max(1, steps - 2), wait=True)
+    session.level_stop(wait=True)
+    job = session.level_job
+    return session._level(job['level_id']) if job['state'] == 'finished' else None
+
+
+def measure(index: Path, key: str, steps: int, png, tries: int, intro: int = 8) -> dict:
+    from png_roundtrip import load_rom, settle
+    from romancer.edit_session import EditSession
+    from romancer import graphics_trace as gt
+    from romancer import level_layout as ll
+    from PIL import Image, ImageChops
+    sha, name, system, data, suffix = load_rom(index, key)
+    out = {'sha256': sha, 'name': name, 'system': system}
+    temp = Path(tempfile.mkdtemp(prefix='romancer-blocks-'))
+    rom = temp / ('game' + suffix)
+    rom.write_bytes(data)
+    session = EditSession(temp / 'store', rom, system)
+    try:
+        level = record_level(session, steps, intro)
+        if level is None:
+            out['error'] = session.level_job['message']
+            return out
+        view = session.level_view(level['id'], 0)
+        out['map'] = [view['width'], view['height'], len(level['scene_ids'])]
+        mapped = session._level_plane(level, 0)
+        where = {(spot.frame, spot.layer, spot.x, spot.y): place for place, spot in mapped.cells.items()}
+        skip = gt.rom_skip(session.rom, system)
+        small, large = [], []           # (first offset in its table, [map places row by row]) of blocks the map shows whole
+        for frame in sorted({spot.frame for spot in mapped.cells.values()}):
+            graphics = session._graphics(level['scene_ids'][frame])
+            for number, layer_view in enumerate(graphics.layers()):
+                layer = layer_view.layer
+                grid = ll.find_grid(ll.cell_sources(layer, skip), layer.width, layer.height)
+                if grid is None:
+                    continue
+                out.setdefault('grid', [grid.width, grid.height, grid.step, round(grid.share, 2)])
+
+                def places(x, y, wide, tall):
+                    found = [where.get((frame, number, x + dx, y + dy)) for dy in range(tall) for dx in range(wide)]
+                    return None if any(p is None for p in found) else found
+                for at, first in grid.first.items():
+                    got = places(grid.left + at[0] * grid.width, grid.top + at[1] * grid.height, grid.width, grid.height)
+                    if got:
+                        small.append((first, got))
+                table = ll.find_entries(session.rom, grid)
+                if table is None:
+                    continue
+                larger = ll.find_grid(table.placed, max(a[0] for a in grid.first) + 1, max(a[1] for a in grid.first) + 1)
+                out.setdefault('larger', [table.width, table.height])
+                if larger is None:
+                    continue
+                for at, first in larger.first.items():
+                    got = places(grid.left + (larger.left + at[0] * larger.width) * grid.width,
+                                 grid.top + (larger.top + at[1] * larger.height) * grid.height,
+                                 larger.width * grid.width, larger.height * grid.height)
+                    if got:
+                        large.append((first, got))
+
+        def pairs(blocks, count):
+            """Paint jobs: a block onto a place that shows a different block, spread over the map."""
+            jobs = []
+            kinds = {}
+            for first, got in blocks:
+                kinds.setdefault(first, []).append(got)
+            common = sorted(kinds, key=lambda k: -len(kinds[k]))
+            # the commonest block is often empty space, and its number may mean something else to the game: start with
+            # the blocks after it, and come to it last
+            order = [(1, 2), (2, 3), (3, 1), (2, 1), (4, 2), (3, 4), (5, 1), (1, 3), (4, 1), (2, 4), (1, 0), (0, 1)]
+            for turn, (target_kind, source_kind) in enumerate(order):
+                if max(target_kind, source_kind) >= len(common):
+                    continue
+                first, other = common[target_kind], common[source_kind]
+                places = kinds[first]
+                target, source = places[(turn * 7 + len(places) // 2) % len(places)], kinds[other][0]      # a different place each time
+                jobs.append([{'col': p[0], 'row': p[1], 'from': list(q)} for p, q in zip(target, source)])
+            return jobs[:count]
+        out['whole_blocks'] = [len(small), len(large)]
+        trials = pairs(large, tries) + pairs(small, tries)
+        if 'grid' not in out:
+            out['blocks'] = {'skipped_test': 'the level is not built from blocks that are copied from the ROM'}
+            return out
+        out['blocks'] = {'tried': 0, 'results': []}
+        before = Image.open(io.BytesIO(session.level_image(level['id'], 0))).convert('RGB')
+        if png:
+            before.save(Path(png) / f'{sha[:12]}-blocks-before.png')
+        for cells in trials:
+            out['blocks']['tried'] += 1
+            started = time.time()
+            try:
+                change = session.propose_level(level['id'], 0, cells)
+                done = settle(session, change)
+            except (ValueError, TimeoutError) as error:
+                out['blocks']['results'].append({'error': str(error)[:300]})
+                continue
+            result = {'cells': len(cells), 'seconds': round(time.time() - started, 1), 'error': done['error'][:300], 'verified': done['verified'],
+                      'method': done.get('method'), 'notes': [n[:200] for n in done.get('notes', [])],
+                      'checks': [[c.get('name'), c.get('state')] for c in done.get('checks', [])]}
+            if not done['error']:
+                after = session.level_view(level['id'], 0)
+                result['painted_places_that_did_not_change'] = after['unshown']
+                if after['after']:
+                    picture = Image.open(io.BytesIO(session.image(after['after']))).convert('RGB')
+                    px = view['cell']
+                    result['places_changed'] = sum(
+                        1 for row in range(view['height']) for col in range(view['width'])
+                        if ImageChops.difference(before.crop((col * px, row * px, col * px + px, row * px + px)),
+                                                 picture.crop((col * px, row * px, col * px + px, row * px + px))).getbbox())
+                    if png:
+                        picture.save(Path(png) / f'{sha[:12]}-blocks-after.png')
+            out['blocks']['results'].append(result)
+            if done.get('method') == 'layout' and done['verified'] and not done['error'] and not result.get('painted_places_that_did_not_change'):
+                out['blocks']['layout_confirmed'] = True
+                out['blocks']['places_changed'] = result.get('places_changed')
+                break
+            session.remove(done['id'])
+        return out
+    finally:
+        session.close()
+        shutil.rmtree(temp, ignore_errors=True)
+
+
+def main() -> None:
+    parser = argparse.ArgumentParser()
+    parser.add_argument('index', type=Path)
+    parser.add_argument('key')
+    parser.add_argument('out', type=Path)
+    parser.add_argument('--steps', type=int, default=6)
+    parser.add_argument('--tries', type=int, default=4)
+    parser.add_argument('--png', type=Path)
+    args = parser.parse_args()
+    os.environ.setdefault('ROMANCER_TRACE_CORES', str(ROOT.parent / 'trace-win'))
+    os.environ.setdefault('ROMANCER_TRACE_WORKERS', '2')
+    try:
+        result = measure(args.index, args.key, args.steps, args.png, args.tries)
+    except Exception as error:
+        result = {'sha256': args.key, 'error': f'{type(error).__name__}: {error}'[:400]}
+    args.out.write_text(json.dumps(result, indent=1))
+    print(json.dumps(result, indent=1))
+
+
+if __name__ == '__main__':
+    main()
