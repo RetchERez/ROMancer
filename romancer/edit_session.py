@@ -1537,6 +1537,48 @@ class EditSession:
             number = list(self.scenes).index(scene_id) + 1
             return {**out, 'what': what, 'name': f'scene-{number}-{name}.png'}
 
+    def export_everything(self) -> dict:
+        """One ZIP with the graphics of every recorded scene, each as PNG.
+
+        For each scene: its pictures as one sheet, and every background layer
+        laid out the way the game shows it (the files Save pictures as PNG and
+        Save background as PNG give, so any of them can be drawn on and loaded
+        back in its scene). A text file lists what is in the ZIP.
+        """
+        import io
+        import zipfile
+        with self.lock:
+            out = io.BytesIO()
+            listing, scenes, files = [], 0, 0
+            with zipfile.ZipFile(out, 'w', zipfile.ZIP_DEFLATED) as archive:
+                for scene_id in list(self.scenes):
+                    try:
+                        sheet = self.export_picture(scene_id, 'sheet')
+                    except ValueError:
+                        continue
+                    scenes += 1
+                    folder = sheet['name'].rsplit('-pictures.png', 1)[0]
+                    archive.writestr(f'{folder}/{sheet["name"]}', sheet['png'])
+                    files += 1
+                    listing.append(f'{folder}: {self._label(scene_id)}')
+                    listing.append(f'  {sheet["name"]}  {sheet["width"]} by {sheet["height"]} pixels, {sheet["pictures"]} pictures')
+                    for layer in self.graphics_view(scene_id)['layers']:
+                        try:
+                            picture = self.export_picture(scene_id, 'layer', layer['index'])
+                        except ValueError:
+                            continue                          # a layer with no flat picture (Mode 7)
+                        archive.writestr(f'{folder}/{picture["name"]}', picture['png'])
+                        files += 1
+                        listing.append(f'  {picture["name"]}  {picture["width"]} by {picture["height"]} pixels, background layer {layer["name"]}')
+                if not files:
+                    raise ValueError('There is nothing to save yet. Record a scene first.')
+                archive.writestr('CONTENTS.txt', '\r\n'.join(
+                    ['Graphics saved by ROMancer from the recorded scenes of one game.',
+                     'A scene folder holds the pictures of that scene as one sheet and each background layer.',
+                     'To change the game, draw on one of these PNGs, keep its size, and load it back in that scene',
+                     'with Load pictures PNG or Load background PNG.', ''] + listing) + '\r\n')
+            return {'zip': out.getvalue(), 'name': 'romancer-graphics.zip', 'scenes': scenes, 'files': files}
+
     def import_picture(self, scene_id: str, what: str, layer: int, raw: bytes) -> dict:
         """Read a PNG saved by export_picture back in and plan every picture that differs as one change.
 
@@ -2143,6 +2185,7 @@ class EditSessionTools:
                 p['scene_id'], p['tile'], p['pixels'], p['scope'])}),
             'edits.export_picture': (base + ' scene_id what layer', self._export_picture),
             'edits.import_picture': (base + ' scene_id what layer png_base64', self._import_picture),
+            'edits.export_everything': (base, self._export_everything),
             'edits.propose_cells': (base + ' scene_id cells', lambda p, c: {'ok': True, 'change': self.session(p).propose_cells(
                 p['scene_id'], p['cells'])}),
             'edits.find_color': (base + ' scene_id domain entry colors', lambda p, c: {'ok': True, 'change': self.session(p).find_color(
@@ -2158,6 +2201,10 @@ class EditSessionTools:
     def _export_picture(self, p, c):
         out = self.session(p).export_picture(p['scene_id'], p['what'], p['layer'])
         return {'ok': True, **{k: v for k, v in out.items() if k != 'png'}, 'png_base64': base64.b64encode(out['png']).decode()}
+
+    def _export_everything(self, p, c):
+        out = self.session(p).export_everything()
+        return {'ok': True, **{k: v for k, v in out.items() if k != 'zip'}, 'zip_base64': base64.b64encode(out['zip']).decode()}
 
     def _import_picture(self, p, c):
         text = p['png_base64']

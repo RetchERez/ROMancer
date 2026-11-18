@@ -62,7 +62,7 @@ try {
             }
         } catch {}
     }
-    $romancerArgs=@('-I','-B','-m','romancer.workbench_server','--workspace',('"'+$Workspace+'"'),'--no-browser')
+    $romancerArgs=@('-I','-B','-m','romancer.workbench_server','--workspace',('"'+$Workspace+'"'),'--no-browser','--stop-when-closed')
     $romancerProcess=Start-Process -FilePath $romancerPython -ArgumentList $romancerArgs -WorkingDirectory (Join-Path $PSScriptRoot 'app') -WindowStyle Hidden -PassThru -RedirectStandardOutput (Join-Path $Workspace 'server.log') -RedirectStandardError (Join-Path $Workspace 'server-errors.log')
     $romancerReady=$false;$romancerDeadline=[DateTime]::UtcNow.AddSeconds(20)
     while ([DateTime]::UtcNow -lt $romancerDeadline) {

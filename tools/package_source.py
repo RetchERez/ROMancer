@@ -715,6 +715,7 @@ APPROVED_FILES = frozenset({
     'tests/test_save_seed.py',
     'tests/test_scene_composite.py',
     'tests/test_scene_png.py',
+    'tests/test_window_close.py',
     'tests/test_script.py',
     'tests/test_script_cli.py',
     'tests/test_script_patch.py',

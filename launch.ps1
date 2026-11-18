@@ -60,7 +60,7 @@ if (Test-Path -LiteralPath $romancerConnection) {
         }
     } catch {}
 }
-$romancerArguments = @('-B','-m','romancer.workbench_server','--workspace',('"' + $Workspace + '"'),'--port',[string]$Port,'--no-browser')
+$romancerArguments = @('-B','-m','romancer.workbench_server','--workspace',('"' + $Workspace + '"'),'--port',[string]$Port,'--no-browser','--stop-when-closed')
 $romancerProcess = Start-Process -FilePath $romancerPython -ArgumentList $romancerArguments -WorkingDirectory $romancerRoot -WindowStyle Hidden -PassThru -RedirectStandardOutput (Join-Path $Workspace 'server.log') -RedirectStandardError (Join-Path $Workspace 'server-errors.log')
 $romancerDeadline = [DateTime]::UtcNow.AddSeconds(15)
 $romancerReady = $false

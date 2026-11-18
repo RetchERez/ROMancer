@@ -2843,6 +2843,15 @@
         clearTimeout(timer);
       }
     },
+    // Told to the service as the page goes away, so that it can stop once the last window has closed. keepalive lets the
+    // request outlive the page.
+    closing() {
+      try {
+        fetch("/api/call", { method: "POST", keepalive: true, headers: headers(), body: JSON.stringify({ operation: "system.ui_closed", parameters: {} }) }).catch(() => {
+        });
+      } catch {
+      }
+    },
     async call(operation, parameters = {}) {
       const result = await request("/api/call", { method: "POST", body: JSON.stringify({ operation, parameters }) });
       if (result.ok === false && result.error) throw Object.assign(new Error(typeof result.error === "string" ? result.error : result.error.message || "Operation blocked"), { result });
@@ -10349,7 +10358,7 @@ ${state2.artifact.system_id ? `<details><summary>Advanced byte options</summary>
     const summary = ed.summary, recording = summary.recording, running = (recording == null ? void 0 : recording.state) === "running", engine = summary.engine;
     return `<div class="card-heading"><h3>Scenes</h3>${badge(plural2(summary.scenes.length, "scene") + " recorded", summary.scenes.length ? "good" : "neutral")}</div>
  <p class="subtle">A scene is a moment of the game that ROMancer has watched. When you change something, every scene that uses the same data is shown. Scenes you haven't recorded can't be shown, so record the places you care about.</p>
- <div class="actions">${running ? button("Stop recording", "scene-record-stop") : button("Record more scenes", "scene-record", { primary: !summary.scenes.length, icon: "plus", disabled: !engine.installed, reason: engine.reason })}${button(ed.playing ? "Stop playing" : "Play and capture a moment", "scene-play-toggle", { icon: "playtest", disabled: !engine.installed || running, reason: engine.installed ? "Wait for recording to finish, or stop it." : engine.reason })}</div>
+ <div class="actions">${running ? button("Stop recording", "scene-record-stop") : button("Record more scenes", "scene-record", { primary: !summary.scenes.length, icon: "plus", disabled: !engine.installed, reason: engine.reason })}${button(ed.playing ? "Stop playing" : "Play and capture a moment", "scene-play-toggle", { icon: "playtest", disabled: !engine.installed || running, reason: engine.installed ? "Wait for recording to finish, or stop it." : engine.reason })}${button("Save all graphics (ZIP)", "scene-save-everything", { icon: "download", disabled: !summary.scenes.length, reason: "Record a scene first." })}</div>
  ${recording ? `<div class="scene-progress" role="status" aria-live="polite">${running ? `<progress max="${recording.total}" value="${recording.done}" aria-label="Recording progress"></progress>` : ""}<span>${esc(recording.message)}${running && recording.found ? " " + plural2(recording.found, "new scene") + " so far." : ""}</span></div>` : ""}
  <div class="scene-strip" role="group" aria-label="Recorded scenes">${summary.scenes.map((row) => `<button type="button" class="scene-thumb ${row.id === ed.sceneId ? "selected" : ""}" data-action="scene-open" data-id="${row.id}" aria-pressed="${row.id === ed.sceneId}"><img alt="" data-picture="${esc(row.image)}" width="${row.width}" height="${row.height}"><span>${esc(row.label)}</span></button>`).join("") || `<p class="subtle">No scenes yet. Record more scenes lets the game play by itself for a few minutes; Play and capture lets you go where you want.</p>`}</div>`;
   }
@@ -11393,6 +11402,19 @@ ${state2.artifact.system_id ? `<details><summary>Advanced byte options</summary>
         setTimeout(() => URL.revokeObjectURL(url), 1e3);
         ctx2.notify(`${result.name} saved: ${result.width} by ${result.height} pixels, ${plural2(result.pictures, "picture")}${result.indexed ? ", with the scene’s " + result.colors + " colors as its palette" : ""}. Keep that size when you draw on it.`);
       },
+      "scene-save-everything": async () => {
+        ctx2.notify("Saving the graphics of every scene…");
+        const result = await call(ctx2, ed, "export_everything");
+        if (!current2(ctx2, ed)) return;
+        const bytes = Uint8Array.from(atob(result.zip_base64), (ch) => ch.charCodeAt(0)), url = URL.createObjectURL(new Blob([bytes], { type: "application/zip" })), link = document.createElement("a");
+        link.href = url;
+        link.download = result.name;
+        document.body.append(link);
+        link.click();
+        link.remove();
+        setTimeout(() => URL.revokeObjectURL(url), 1e3);
+        ctx2.notify(`${result.name} saved: ${plural2(result.files, "PNG file")} from ${plural2(result.scenes, "scene")}. CONTENTS.txt inside lists them.`);
+      },
       "scene-png-load": (node) => {
         var _a;
         ed.pngWhat = node.dataset.id;
@@ -12397,8 +12419,16 @@ ${state2.artifact.system_id ? `<details><summary>Advanced byte options</summary>
       notify(error.message, true);
     }
   });
+  var windowOpen = () => {
+    api.call("system.ui_alive").catch(() => {
+    });
+  };
+  windowOpen();
+  setInterval(windowOpen, 15e3);
+  window.addEventListener("pageshow", windowOpen);
   window.addEventListener("pagehide", () => {
     var _a, _b, _c, _d;
+    api.closing();
     clearTimeout(state.buildCheckTimer);
     clearTimeout(locationTimer);
     rememberLocation();

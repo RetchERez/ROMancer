@@ -102,7 +102,7 @@ PY
 fi
 
 cd "$APP"
-setsid "$PY" -I -B -m romancer.workbench_server --workspace "$WORKSPACE" --port 0 --no-browser \
+setsid "$PY" -I -B -m romancer.workbench_server --workspace "$WORKSPACE" --port 0 --no-browser --stop-when-closed \
     > "$WORKSPACE/server.log" 2> "$WORKSPACE/server-errors.log" < /dev/null &
 PID=$!
 

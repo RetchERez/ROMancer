@@ -65,6 +65,8 @@ class WorkbenchAPI:
             'coverage.status':('query system_filter page limit',self._coverage_status),
             'system.ui_ready':('launch_id',lambda p,c:self._ui_startup(p,True)),
             'system.ui_status':('launch_id',lambda p,c:self._ui_startup(p,False)),
+            'system.ui_alive':('',lambda p,c:self._ui_window(False)),
+            'system.ui_closed':('',lambda p,c:self._ui_window(True)),
             'recipes.list':('project_id artifact_id',self._recipes_list),
             'recipes.from_plan':('project_id artifact_id plan_id name',self._recipe_from_plan),
             'recipes.import':('project_id artifact_id recipe',self._recipe_import),
@@ -522,6 +524,14 @@ class WorkbenchAPI:
             from .debugger_failures import NativeCaptureError
             if isinstance(exc,NativeCaptureError):result.update(error_code=exc.code,remedy=exc.remedy,native_exit_code=exc.exit_code)
             return result
+
+    def _ui_window(self,closing):
+        """A window says it is open (every few seconds) or that it is closing. workbench_server stops the service some
+        time after the last window closed, when it was started with --stop-when-closed."""
+        import time
+        if closing:self.ui_closed=time.monotonic()
+        else:self.ui_seen=time.monotonic()
+        return {'ok':True}
 
     def _ui_startup(self,p,mark):
         launch=p['launch_id']

@@ -1,9 +1,22 @@
-ROMancer v1.3.0
+ROMancer v1.3.1
 By RetchEWretched
 
 ROMancer is a local ROM editing, investigation and playtesting workbench.
 It supports NES, SNES, Genesis / Mega Drive, Master System, Game Boy and
 Game Boy Color cartridge formats. Everyday work runs offline.
+
+NEW IN v1.3.1
+
+- Closing the window stops ROMancer. The local service used to keep running
+  after the window was closed. It now stops by itself about 45 seconds after
+  the last ROMancer window closes (a reload does not stop it), and after ten
+  minutes if a window was closed without being able to say so. A client that
+  only uses the local API and never opens a window is left running.
+- Save all graphics (ZIP). In Scenes & colors, one button saves the pictures
+  and every background layer of every recorded scene as PNG files in one
+  ZIP, with a list of what is in it. Each PNG is the same file Save pictures
+  as PNG or Save background as PNG gives for that scene, so any of them can
+  be drawn on and loaded back in its scene.
 
 NEW IN v1.3.0
 
@@ -161,7 +174,7 @@ available. The supplied Pokemon Red and Blue revisions share a
 
 START ON WINDOWS
 
-1. Extract ROMancer-v1.3.0-Windows.zip in Windows File Explorer.
+1. Extract ROMancer-v1.3.1-Windows.zip in Windows File Explorer.
 2. Double-click ROMancer.exe in the extracted folder.
    Keep ROMancer.exe, ROM Catalog.html and the ROMancer Files folder together.
 3. Open an original workshop or choose New project and import your own cartridge image.
@@ -182,8 +195,8 @@ SHA-256 is checked and later captures work offline. No ROM data is uploaded.
 
 START ON LINUX
 
-1. Extract ROMancer-v1.3.0-Linux-x86_64.tar.gz:  tar xf ROMancer-v1.3.0-Linux-x86_64.tar.gz
-2. Run ./ROMancer-v1.3.0-Linux-x86_64/ROMancer.sh
+1. Extract ROMancer-v1.3.1-Linux-x86_64.tar.gz:  tar xf ROMancer-v1.3.1-Linux-x86_64.tar.gz
+2. Run ./ROMancer-v1.3.1-Linux-x86_64/ROMancer.sh
    (./ROMancer.sh --install-desktop adds ROMancer to your application menu).
 
 The Linux x86-64 package includes Python, Pillow and the same six engines built

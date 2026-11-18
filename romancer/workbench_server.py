@@ -189,13 +189,38 @@ def create_server(workspace:Path,port:int=0):
     return server
 
 
-def serve(workspace:Path,port:int=0,open_browser:bool=True):
+WINDOW_GRACE=45    # seconds after a window said it was closing with no window heard from since (a reload is back sooner)
+WINDOW_QUIET=600   # seconds without a word from any window: the window was closed without a chance to say so
+
+
+def window_gone(seen,closed,now):
+    """Whether every window has closed. `seen` is when a window last said it was open, `closed` when one last said it
+    was closing (None when never). No window ever opened is not a closed window: a client that only uses the API keeps
+    the service for as long as it likes."""
+    if seen is None:return False
+    if closed is not None and closed>=seen and now-closed>WINDOW_GRACE:return True
+    return now-seen>WINDOW_QUIET
+
+
+def _stop_when_closed(server):
+    import threading,time
+    def watch():
+        while True:
+            time.sleep(1)
+            if window_gone(getattr(server.api,'ui_seen',None),getattr(server.api,'ui_closed',None),time.monotonic()):
+                print('The ROMancer window was closed. Stopping the local service.',flush=True)
+                server.shutdown();return
+    threading.Thread(target=watch,name='romancer-window-watch',daemon=True).start()
+
+
+def serve(workspace:Path,port:int=0,open_browser:bool=True,stop_when_closed:bool=False):
     server=create_server(workspace,port);url='http://127.0.0.1:'+str(server.server_port)+'/#token='+server.session_token
     write_json(Path(workspace)/'connection.json',{'url':url,'pid':os.getpid(),'port':server.server_port,
                'application_root':str(Path(__file__).resolve().parents[1])})
     print(ROMANCER_RELEASE_NAME+' • By RetchEWretched',flush=True)
     print(url,flush=True)
     if open_browser:webbrowser.open(url)
+    if stop_when_closed:_stop_when_closed(server)
     try:server.serve_forever(poll_interval=.25)
     except KeyboardInterrupt:pass
     finally:server.server_close();server.api.close()
@@ -205,7 +230,8 @@ def main():
     parser=argparse.ArgumentParser(description='ROMancer local workbench — By RetchEWretched')
     parser.add_argument('--workspace',type=Path,default=Path.home()/'Documents'/'ROMancer Projects')
     parser.add_argument('--port',type=int,default=0);parser.add_argument('--no-browser',action='store_true')
-    args=parser.parse_args();serve(args.workspace,args.port,not args.no_browser)
+    parser.add_argument('--stop-when-closed',action='store_true',help='stop the service after the last ROMancer window has closed')
+    args=parser.parse_args();serve(args.workspace,args.port,not args.no_browser,args.stop_when_closed)
 
 
 if __name__=='__main__':main()
