@@ -896,6 +896,9 @@
     },
     {
       "id": "scenes-colors",
+      "image": "270-scenes-colors",
+      "image_alt": "Scenes & colors in Colors mode: a recorded scene, a new color chosen for one palette entry, and the Also changes strip listing the other recorded scenes",
+      "caption": "Colors mode. A new color is chosen on the right; Also changes shows every recorded scene that uses the same color, replayed with the change.",
       "title": "Change a color and see every scene it touches",
       "part": "Basic",
       "kicker": "SCENES AND COLORS / NEW IN v1.1",
@@ -948,6 +951,9 @@
     },
     {
       "id": "scenes-graphics",
+      "image": "271-scenes-graphics",
+      "image_alt": "Scenes & colors in Graphics mode: one 8 by 8 picture opened from the scene and redrawn, with the scenes that use it listed below",
+      "caption": "Graphics mode. Click a pixel in the scene to open the picture under it, redraw it, then choose Show what changes.",
       "title": "Redraw a picture or repaint the background",
       "part": "Basic",
       "kicker": "SCENES AND COLORS / NEW IN v1.1",

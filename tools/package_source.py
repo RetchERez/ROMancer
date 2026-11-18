@@ -935,6 +935,8 @@ APPROVED_FILES = frozenset({
     'user-guide/screenshots/34-menu-contrast.png',
     'user-guide/screenshots/36-patch-compatibility-preview.png',
     'user-guide/screenshots/41-guide-search.png',
+    'user-guide/screenshots/270-scenes-colors.png',
+    'user-guide/screenshots/271-scenes-graphics.png',
     'user-guide/screenshots/45-changes-only.png',
     'user-guide/screenshots/46-brush-build-review.png',
     'user-guide/screenshots/47-search-files.png',
