@@ -161,3 +161,100 @@ Swept with a tracing engine that is not shipped, so not counted anywhere above.
 | gbc | Kirby - Tilt 'n' Tumble (USA) | mgba_gbc_trace_libretro.dll |
 
 <!-- graphics coverage: end -->
+
+## PNG out and back in
+
+Measured with `trace/png_sweep.py` on 942 of the 942 catalog ROMs. For each ROM, scenes were recorded, the scene with the most pictures on screen was saved as PNG (the pictures and every background layer), each PNG was read straight back, then up to 6 pictures on screen were drawn on in the pictures PNG and it was loaded. A picture counts as confirmed only when a replay of the real game shows it as drawn.
+
+| What | ROMs |
+|---|---|
+| Scenes recorded | 939 of 942 |
+| Pictures saved as PNG | 939 |
+| ... as a palette PNG with the colors of the scene | 939 |
+| ... read straight back with nothing reported as changed (as saved, and converted to plain RGB) | 939 |
+| At least one background layer saved as PNG | 930 |
+| ... every saved layer read straight back unchanged | 930 |
+| Loaded an edited pictures PNG | 939 |
+| ... at least one drawn picture confirmed by replay | 887 |
+| ... every drawn picture confirmed | 721 |
+| ... and the change also holds when the game is played from power-on | 844 |
+| Loaded an edited background PNG | 897 |
+| ... at least one drawn picture confirmed | 785 |
+
+Pictures drawn on across all ROMs: 5,363; confirmed: 4,622.
+
+| System | Loaded | Some confirmed | All confirmed |
+|---|---|---|---|
+| NES | 229 | 197 | 181 |
+| Super NES | 289 | 283 | 222 |
+| Mega Drive | 139 | 134 | 118 |
+| Master System | 49 | 49 | 41 |
+| Game Boy | 139 | 134 | 100 |
+| Game Boy Color | 94 | 90 | 59 |
+
+How the confirmed pictures were changed: written in place 2,020, swapped in by a patch 1,573, written in place inside packed data 519, packed again 438, packed again and moved 72.
+
+### No drawn picture confirmed: 52
+
+| ROM | System | Why |
+|---|---|---|
+| Bionic Commando (USA) | gb | ROMancer could not find a way to change this picture that the real game confirmed, so nothing is changed. It is unpacked or drawn by the game while it runs. What was tried: no known packing reproduces this picture. the p |
+| Donkey Kong Land (USA, Europe) (SGB Enhanced) | gb | ROMancer could not find a way to change this picture that the real game confirmed, so nothing is changed. It is unpacked or drawn by the game while it runs. What was tried: Two bytes of this tile come from one ROM byte a |
+| Monster Max (Europe) (En,Fr,De,Es,It,Nl) | gb | ROMancer could not find a way to change this picture that the real game confirmed, so nothing is changed. It is unpacked or drawn by the game while it runs. What was tried: no known packing reproduces this picture. ROM b |
+| Parodius (Europe) | gb | ROMancer could not find a way to change this picture that the real game confirmed, so nothing is changed. It is unpacked or drawn by the game while it runs. What was tried: A ROM byte behind this tile also feeds a byte t |
+| Pop'n TwinBee (Europe) | gb | ROMancer could not find a way to change this picture that the real game confirmed, so nothing is changed. It is unpacked or drawn by the game while it runs. What was tried: no known packing reproduces this picture. the p |
+|  - Dark Duel Stories (USA) | gbc | ROMancer could not find a way to change this picture that the real game confirmed, so nothing is changed. It is unpacked or drawn by the game while it runs. What was tried: no known packing reproduces this picture. the p |
+| Croc 2 (USA, Europe) | gbc | ROMancer could not find a way to change this picture that the real game confirmed, so nothing is changed. It is unpacked or drawn by the game while it runs. What was tried: A ROM byte behind this tile also feeds a byte t |
+| Harry Potter and the Sorcerer's Stone (USA, Europe) (En,Fr,De,Es,It,Nl,Pt,Sv,No,Da,Fi) | gbc | ROMancer could not find a way to change this picture that the real game confirmed, so nothing is changed. It is unpacked or drawn by the game while it runs. What was tried: no known packing reproduces this picture. the p |
+| Metal Gear Solid (USA) | gbc | ROMancer could not find a way to change this picture that the real game confirmed, so nothing is changed. It is unpacked or drawn by the game while it runs. What was tried: no known packing reproduces this picture. the p |
+| Elemental Master (USA) | genesis | ROMancer could not find a way to change this picture that the real game confirmed, so nothing is changed. It is unpacked or drawn by the game while it runs. What was tried: A ROM byte behind this tile also feeds a byte t |
+| Flicky (USA, Europe) | genesis | ROMancer could not find a way to change this picture that the real game confirmed, so nothing is changed. It is unpacked or drawn by the game while it runs. What was tried: no known packing reproduces this picture. the p |
+| James Pond - Underwater Agent (USA, Europe) | genesis | ROMancer could not find a way to change this picture that the real game confirmed, so nothing is changed. It is unpacked or drawn by the game while it runs. What was tried: no known packing reproduces this picture. the p |
+| James Pond II - Codename - Robocod (USA, Europe) | genesis | ROMancer could not find a way to change this picture that the real game confirmed, so nothing is changed. It is unpacked or drawn by the game while it runs. What was tried: no known packing reproduces this picture. the p |
+| Red Zone (USA, Europe) | genesis | ROMancer could not find a way to change this picture that the real game confirmed, so nothing is changed. It is unpacked or drawn by the game while it runs. What was tried: no known packing reproduces this picture. the p |
+|  (USA) | nes | ROMancer wrote this picture into the ROM, but replaying the game did not show a change in this scene, so it was left out. |
+| Alfred Chicken (USA) | nes | ROMancer could not find a way to change this picture that the real game confirmed, so nothing is changed. It is unpacked or drawn by the game while it runs. What was tried: no known packing reproduces this picture. The p |
+| Castelian (USA) | nes | ROMancer could not find a way to change this picture that the real game confirmed, so nothing is changed. It is unpacked or drawn by the game while it runs. What was tried: no known packing reproduces this picture. The p |
+| Chip 'n Dale - Rescue Rangers 2 (USA) | nes | ROMancer wrote this picture into the ROM, but replaying the game did not show a change in this scene, so it was left out. |
+| Deja Vu (USA) | nes | ROMancer wrote this picture into the ROM, but replaying the game did not show a change in this scene, so it was left out. |
+| Donkey Kong Classics (USA, Europe) | nes | ROMancer wrote this picture into the ROM, but replaying the game did not show a change in this scene, so it was left out. |
+| Double Dragon III - The Sacred Stones (USA) | nes | ROMancer wrote this picture into the ROM, but replaying the game did not show a change in this scene, so it was left out. |
+| Dragon Fighter (USA) | nes | ROMancer wrote this picture into the ROM, but replaying the game did not show a change in this scene, so it was left out. |
+| Dragon Warrior (USA) (Rev 1) | nes | ROMancer wrote this picture into the ROM, but replaying the game did not show a change in this scene, so it was left out. |
+| Fire 'n Ice (USA) | nes | ROMancer wrote this picture into the ROM, but replaying the game did not show a change in this scene, so it was left out. |
+| Flintstones, The - The Rescue of Dino & Hoppy (USA) | nes | ROMancer wrote this picture into the ROM, but replaying the game did not show a change in this scene, so it was left out. |
+| Gemfire (USA) | nes | ROMancer wrote this picture into the ROM, but replaying the game did not show a change in this scene, so it was left out. |
+| Gremlins 2 - The New Batch (USA) | nes | ROMancer wrote this picture into the ROM, but replaying the game did not show a change in this scene, so it was left out. |
+| Gun Nac (USA) | nes | ROMancer wrote this picture into the ROM, but replaying the game did not show a change in this scene, so it was left out. |
+| Jetsons, The - Cogswell's Caper (USA) | nes | ROMancer wrote this picture into the ROM, but replaying the game did not show a change in this scene, so it was left out. |
+| Kabuki - Quantum Fighter (USA) | nes | ROMancer wrote this picture into the ROM, but replaying the game did not show a change in this scene, so it was left out. |
+| KickMaster (USA) | nes | ROMancer wrote this picture into the ROM, but replaying the game did not show a change in this scene, so it was left out. |
+| Kirby's Adventure (USA) (Rev 1) | nes | ROMancer wrote this picture into the ROM, but replaying the game did not show a change in this scene, so it was left out. |
+| Krion Conquest, The (USA) | nes | ROMancer wrote this picture into the ROM, but replaying the game did not show a change in this scene, so it was left out. |
+| Mafat Conspiracy, The (USA) | nes | ROMancer wrote this picture into the ROM, but replaying the game did not show a change in this scene, so it was left out. |
+| Metal Storm (USA) | nes | ROMancer wrote this picture into the ROM, but replaying the game did not show a change in this scene, so it was left out. |
+| Monster in My Pocket (USA) | nes | ROMancer wrote this picture into the ROM, but replaying the game did not show a change in this scene, so it was left out. |
+| Nintendo World Cup (USA) (Rev 1) | nes | ROMancer wrote this picture into the ROM, but replaying the game did not show a change in this scene, so it was left out. |
+| StarTropics (USA) | nes | ROMancer wrote this picture into the ROM, but replaying the game did not show a change in this scene, so it was left out. |
+| Tecmo Super Bowl (USA) | nes | ROMancer wrote this picture into the ROM, but replaying the game did not show a change in this scene, so it was left out. |
+| Tiny Toon Adventures 2 - Trouble in Wackyland (USA) | nes | ROMancer wrote this picture into the ROM, but replaying the game did not show a change in this scene, so it was left out. |
+| Town & Country Surf Designs - Thrilla's Surfari (USA) | nes | ROMancer wrote this picture into the ROM, but replaying the game did not show a change in this scene, so it was left out. |
+| Ufouria - The Saga (Europe) | nes | ROMancer wrote this picture into the ROM, but replaying the game did not show a change in this scene, so it was left out. |
+| Wacky Races (USA) | nes | ROMancer wrote this picture into the ROM, but replaying the game did not show a change in this scene, so it was left out. |
+| Whomp 'Em (USA) | nes | ROMancer wrote this picture into the ROM, but replaying the game did not show a change in this scene, so it was left out. |
+| Wrath of the Black Manta (USA) (Rev 1) | nes | ROMancer wrote this picture into the ROM, but replaying the game did not show a change in this scene, so it was left out. |
+| Young Indiana Jones Chronicles, The (USA) | nes | ROMancer wrote this picture into the ROM, but replaying the game did not show a change in this scene, so it was left out. |
+| Cybernator (USA) | snes | ROMancer could not find a way to change this picture that the real game confirmed, so nothing is changed. It is unpacked or drawn by the game while it runs. What was tried: no known packing reproduces this picture. the p |
+| Out of This World (USA) | snes | ROMancer could not find a way to change this picture that the real game confirmed, so nothing is changed. It is unpacked or drawn by the game while it runs. What was tried: no known packing reproduces this picture. the p |
+| Pilotwings (USA) | snes | ROMancer could not find a way to change this picture that the real game confirmed, so nothing is changed. It is unpacked or drawn by the game while it runs. What was tried: A ROM byte behind this tile also feeds a byte t |
+| Star Fox (USA) (Rev 2) | snes | ROMancer could not find a way to change this picture that the real game confirmed, so nothing is changed. It is unpacked or drawn by the game while it runs. What was tried: no known packing reproduces this picture. the p |
+| Stunt Race FX (USA) (Rev 1) | snes | ROMancer could not find a way to change this picture that the real game confirmed, so nothing is changed. It is unpacked or drawn by the game while it runs. What was tried: no known packing reproduces this picture. the p |
+| WeaponLord (USA) | snes | ROMancer could not find a way to change this picture that the real game confirmed, so nothing is changed. It is unpacked or drawn by the game while it runs. What was tried: A ROM byte behind this tile also feeds a byte t |
+
+### Not measured: 3
+
+| ROM | Why |
+|---|---|
+| QuackShot Starring Donald Duck (World) (Rev A) | no scene was recorded |
+| Top Gear 3000 (USA) | ValueError: This scene holds no pictures to save. |
+| Kirby - Tilt 'n' Tumble (USA) | no scene was recorded |

@@ -15,6 +15,8 @@ By **RetchEWretched**. Edit ROMs, preview changes, playtest builds, and export p
 - **Tile and background editing.** In the same editor, redraw a picture pixel by pixel or paint pictures into background cells. Packed graphics are re-packed when ROMancer recognises the packing; otherwise the build gets a small run-time patch, shown both in the scene and from power-on.
 - **Accurate catalog.** The catalog now lists 942 cartridge dumps that match the No-Intro reference lists exactly, under their No-Intro names. Fan translations, re-release dumps and entries that did not boot were removed.
 
+New in v1.3.0: any recorded scene can save its pictures and background layers as PNG and load an edited PNG back as one replay-checked change (saving works on 939 of 942 ROMs; an edited PNG had at least one picture confirmed on 887).
+
 Measured across all 942 catalog entries: a color edit was confirmed by replay on 939 ROMs, a picture edit on 936 and a background edit on 922. Per-ROM results are in [trace/COVERAGE.md](../trace/COVERAGE.md); limits are in the [release notes](https://github.com/RetchERez/ROMancer/releases/tag/v1.3.0).
 
 ## Get started on Windows

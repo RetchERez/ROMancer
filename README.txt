@@ -11,7 +11,10 @@ Graphics of any game as PNG, out and back in. In Scenes & colors, every
 recorded scene can save its pictures as one PNG and each background layer as
 a picture, with the scene's colors as the palette. Load an edited PNG and
 ROMancer works out which pictures changed, checks them by replaying the
-game, and offers them as one change. @@MEASURED@@
+game, and offers them as one change. Measured on the whole catalog:
+saving works on 939 of 942 ROMs and every saved PNG reads back unchanged;
+a PNG with up to six pictures drawn on had at least one confirmed by replay
+on 887 ROMs and every one on 721 (4,622 of 5,363 pictures in all).
 - Colors that are not in a picture's palette line are listed with the color
   they became, as in the battle background editor.
 - A picture that cannot be changed is left out with the reason; the rest are
