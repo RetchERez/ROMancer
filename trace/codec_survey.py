@@ -494,17 +494,20 @@ def verify_one(sha, index, dumpdir, outdir, frames, codecs=None):
                     row.update(path=plan.kind, verified=r['verified'], as_planned=r.get('as_planned'),
                                missed={k: len(v) for k, v in r.get('missed', {}).items()}, unplanned=r.get('unplanned', {}),
                                unplanned_in_block=inside,
+                               reads_on_alike=(plan.kind != 'reencode' or gfx_codecs.CODECS[block.codec]['terminated']
+                                               or gfx_codecs.reads_on_alike(block.codec, rom, plan.apply(rom), block.start,
+                                                                            len(block.decoded))),
                                old_stream=plan.details.get('old_stream'), new_stream=plan.details.get('new_stream'))
                 except ValueError as e:
                     row['error'] = str(e)[:300]
-                if row.get('as_planned') and not row.get('unplanned_in_block'):
+                if row.get('as_planned') and sound(row):
                     break
-            if any(r.get('as_planned') and not r.get('unplanned_in_block') for r in tries):
+            if any(r.get('as_planned') and sound(r) for r in tries):
                 break
         result['tries'] = tries
-        good = (next((r for r in tries if r.get('as_planned') and not r.get('unplanned_in_block')), None)
+        good = (next((r for r in tries if r.get('as_planned') and sound(r)), None)
                 or next((r for r in tries if r.get('as_planned')), None))
-        result['clean'] = bool(good and not good.get('unplanned_in_block'))
+        result['clean'] = bool(good and sound(good))
         result['confirmed'] = bool(good)
         result['codec'] = good['codec'] if good else next((r['codec'] for r in tries if r['codec']), None)
         result['path'] = good['path'] if good else None
@@ -516,6 +519,11 @@ def verify_one(sha, index, dumpdir, outdir, frames, codecs=None):
     out.write_text(json.dumps(result, indent=1))
     import shutil
     shutil.rmtree(work, ignore_errors=True)
+
+
+def sound(row):
+    """A replayed edit left the rest of its block alone, and what follows a bare stream still unpacks as before."""
+    return not row.get('unplanned_in_block') and row.get('reads_on_alike', True)
 
 
 def a_targets(system):

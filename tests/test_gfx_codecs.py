@@ -488,6 +488,45 @@ class SameSize(unittest.TestCase):
             self.assertEqual(len(stream), len(like))
             self.assertEqual(gc.decode(name, stream, 0, len(raw))[0][:len(raw)], bytes(edited))
 
+    def test_a_replaced_front_part_lets_the_game_read_on(self):
+        # The recognised block may be the front of a longer stream. Its replacement then has to end at
+        # the same place in its last flag byte, with the flags that follow kept, or the rest unpacks wrong.
+        name = 'lzss-00-raw'
+        read_on = same_size = 0
+        for seed in range(12):
+            rng = random.Random(70 + seed)
+            front = bytearray(sample(400 + seed, seed=70 + seed))
+            rest = bytes(rng.randrange(256) for _ in range(150))       # noise: literals, nothing copied from the front
+            full = gc.encode(name, bytes(front) + rest)
+            used = gc.decode(name, full, 0, len(front))[1]
+            like = full[:used]
+            edited = bytearray(front)
+            edited[200:232] = bytes(32)                                 # packs smaller
+            try:
+                stream = gc.encode(name, bytes(edited), like=like)
+            except ValueError:
+                continue
+            same_size += 1
+            self.assertEqual(len(stream), len(like))
+            rom, new = full + bytes(64), stream + full[used:] + bytes(64)
+            alike = gc.reads_on_alike(name, rom, new, 0, len(front), more=len(rest))
+            whole = gc.decode(name, new, 0, len(front) + len(rest))[0]
+            self.assertEqual(alike, whole[len(front):] == rest)
+            read_on += alike
+        counts = (same_size, read_on)
+        self.assertGreaterEqual(same_size, 5, counts)
+        self.assertGreaterEqual(read_on, 4, counts)
+
+    def test_reads_on_alike_notices_a_shifted_flag_byte(self):
+        name = 'lzss-00-raw'
+        rng = random.Random(90)
+        front = sample(300, seed=91)
+        rest = bytes(rng.randrange(256) for _ in range(100))
+        full = gc.encode(name, front + rest)
+        moved = bytes([full[0] ^ 0xFF]) + full[1:]      # the first flag byte turned over: what follows unpacks differently
+        self.assertFalse(gc.reads_on_alike(name, full + bytes(64), moved + bytes(64), 0, 1))
+        self.assertTrue(gc.reads_on_alike(name, full + bytes(64), full + bytes(64), 0, len(front)))
+
 
 class Packers(unittest.TestCase):
     """The bit-stream packers of gfx_packers."""

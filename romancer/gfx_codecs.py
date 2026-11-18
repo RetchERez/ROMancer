@@ -1624,7 +1624,8 @@ class _Registry(dict):
                 made['exact'] = True
                 made['sized'] = True
                 if name.startswith('lz~'):
-                    made['encode'] = lambda raw, size=None, _e=enc: _e(raw, None, size)
+                    made['encode'] = lambda raw, size=None, like=None, _e=enc: _e(raw, None, size, like)
+                    made['likes'] = True
             elif gfx_families.features(name):
                 made['commands'] = gfx_families.features(name)
             if name.startswith('lz~') and not name.startswith('lz~n.'):
@@ -1647,8 +1648,9 @@ for _fill in (0x00, 0x20):
     # written by the family's encoder: the cheapest parse, lengthened to the size of the stream it replaces
     CODECS[f'lzss-{_fill:02x}-raw']['sized'] = True
     CODECS[f'lzss-{_fill:02x}-raw']['encode'] = (
-        lambda raw, size=None, _p=gfx_families.lz_parse('lz~n.l1.oku.rfee' + ('+20' if _fill else '') + '.m3.n'):
-        gfx_families.lz_encode(_p, raw, None, size))
+        lambda raw, size=None, like=None, _p=gfx_families.lz_parse('lz~n.l1.oku.rfee' + ('+20' if _fill else '') + '.m3.n'):
+        gfx_families.lz_encode(_p, raw, None, size, like))
+    CODECS[f'lzss-{_fill:02x}-raw']['likes'] = True
 CODECS['lz5'] = {'decode': _lz5_decode, 'encode': _lz5_encode, 'terminated': True}
 CODECS['konami-snes'] = {'decode': _bind(_konami_snes_decode, True), 'encode': _bind(_konami_snes_encode, True),
                          'terminated': True, 'peek': ('konami-snes-body', 2)}
@@ -1750,7 +1752,8 @@ def encode(codec: str, raw: bytes, like: bytes | None = None) -> bytes:
     elif like is not None and entry.get('exact'):
         # A bare stream has no end of its own: the game stops by a count kept elsewhere, and what
         # follows may be the rest of the same stream. Only a stream of exactly the old size is safe.
-        stream = entry['encode'](bytes(raw), len(like)) if entry.get('sized') else entry['encode'](bytes(raw))
+        stream = (entry['encode'](bytes(raw), len(like), like) if entry.get('likes') else
+                  entry['encode'](bytes(raw), len(like)) if entry.get('sized') else entry['encode'](bytes(raw)))
         if len(stream) != len(like):
             raise ValueError(f'The edited data packs to {len(stream)} bytes and must be exactly {len(like)}: this '
                              'format has no end marker, so it can only be rewritten in the same space.')
@@ -1760,6 +1763,21 @@ def encode(codec: str, raw: bytes, like: bytes | None = None) -> bytes:
     if again[:len(raw)] != bytes(raw) or (entry['terminated'] and (again != bytes(raw) or used != len(stream))):
         raise ValueError(f'{codec} encoder output failed its round-trip check')
     return stream
+
+
+def reads_on_alike(codec: str, rom: bytes, edited: bytes, start: int, size: int, more: int = 0x400) -> bool:
+    """A bare stream at `start` was replaced in `edited`. True when unpacking on past the block
+    (`size` bytes of output) gives the same bytes from both ROMs: a game that keeps reading after
+    the recognised stretch then sees what it saw before."""
+    try:
+        a = decode(codec, rom, start, size + more)[0]
+    except (ValueError, IndexError):
+        return True         # nothing follows that this codec can read
+    try:
+        b = CODECS[codec]['decode'](edited, start, size + more)[0]
+    except (ValueError, IndexError):
+        return False
+    return a[size:] == b[size:]
 
 
 def order_for(system: str) -> list[str]:

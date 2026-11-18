@@ -191,12 +191,15 @@ def lz_decode(p, data, start=0, limit=MAX_OUT, notes=None):
     return bytes(out), pos - start
 
 
-def lz_encode(p, raw, allowed=None, size=None):
+def lz_encode(p, raw, allowed=None, size=None, like=None):
     """Cheapest split into literals (9 bits) and pairs (17 bits).
 
     `allowed`: what lz_features() found in the stream being replaced. A copy of 00 bytes from
     before the start of the output is only written when the original did the same (or the
     format's ring starts filled, where it is always safe): a game need not handle it.
+    `size`, `like` (bare streams only): the stream being replaced and its length. The result is
+    lengthened to that size, and made to end at the same place in its last flag byte with the
+    same flags after it: the game may read on into what follows with that byte.
     """
     raw = bytes(raw)
     n = len(raw)
@@ -258,8 +261,15 @@ def lz_encode(p, raw, allowed=None, size=None):
                 c, k = cost[i + length] + 17, length
         cost[i], step[i] = c, k
     msb, lit = p['msb'], p['lit']
+    tail = None
     if size is not None and p['header'] == 'n' and p['end'] == 'n':
-        _lz_pad(step, n, minlen, size)
+        if like is not None:
+            tail = lz_tail(p, like, n)
+        # with the old stream's place in its flag byte when that can be had; else the size alone
+        # (right when the stream really ends there; the caller can tell by unpacking on past it)
+        if not (tail and _lz_pad(step, n, minlen, size, tail[0] % 8)):
+            tail = None
+            _lz_pad(step, n, minlen, size)
     body = bytearray()
     i = 0
     tokens = 8
@@ -279,6 +289,10 @@ def lz_encode(p, raw, allowed=None, size=None):
             off = (p['init'] + i - dist) & mask if ring else dist - bias
             body += bytes(_lz_unpair(p, off, step[i] - p['minlen']))
         i += step[i]
+    if tail and tokens == tail[0] % 8 and tokens:
+        # the flags of whatever the game reads after this stream, as the old last flag byte had them
+        keep = (0xFF >> tokens) if msb else (0xFF << tokens & 0xFF)
+        body[flag_at] = body[flag_at] & ~keep & 0xFF | tail[1] & keep
     if p['end'] == 'z':
         # a pair whose offset field is 0; it needs a flag bit of its own
         if tokens == 8:
@@ -296,12 +310,13 @@ def lz_encode(p, raw, allowed=None, size=None):
     return (bytes((v & 0xFF, v >> 8)) if head[:2] == 'le' else bytes((v >> 8, v & 0xFF))) + bytes(body)
 
 
-def _lz_pad(step, n, minlen, size):
+def _lz_pad(step, n, minlen, size, phase=None):
     """Make the parse in `step` longer until the stream is `size` bytes: a bare stream has no end
     of its own, so its replacement must fill the same space. A copy gives up bytes at its end to
     literals (each one byte and one flag more), or becomes literals altogether (which moves the
     flag count without the same cost, so that a size a new flag byte would jump over is still
-    reached). Left as it is when the stream is already that long or longer, or no mix fits."""
+    reached). `phase`: the count of flags, modulo 8, the result must have (see lz_encode).
+    Left as it is, and False, when the stream is already longer or no mix fits."""
     pairs = []
     lits = 0
     i = 0
@@ -312,8 +327,11 @@ def _lz_pad(step, n, minlen, size):
             pairs.append((step[i], i))
         i += step[i]
     count = len(pairs)
-    if lits + 2 * count + (lits + count + 7) // 8 >= size:
-        return
+    now = lits + 2 * count + (lits + count + 7) // 8
+    if now == size and (phase is None or (lits + count) % 8 == phase):
+        return True
+    if now > size:
+        return False
     by_length = sorted(pairs)
     room = sum(k - minlen for k, _ in pairs)
     forced = 0
@@ -324,7 +342,7 @@ def _lz_pad(step, n, minlen, size):
         tokens = lits + count + burst * (minlen - 1)
         for shrink in range(forced, room + 1):
             total = lo + shrink + (tokens + shrink + 7) // 8
-            if total >= size:
+            if total > size or (total == size and (phase is None or (tokens + shrink) % 8 == phase)):
                 break
         else:
             continue
@@ -341,7 +359,32 @@ def _lz_pad(step, n, minlen, size):
                 for j in range(at + k - take, at + k):
                     step[j] = 1
                 left -= take
-        return
+        return True
+    return False
+
+
+def lz_tail(p, stream, n):
+    """(flags used, last flag byte) at the point where bare `stream` has unpacked `n` bytes; None if it never does."""
+    pos = out = tokens = 0
+    flags = 0
+    msb, lit, minlen = p['msb'], p['lit'], p['minlen']
+    while out < n:
+        if tokens % 8 == 0:
+            if pos >= len(stream):
+                return None
+            flags = stream[pos]
+            pos += 1
+        bit = tokens % 8
+        tokens += 1
+        if ((flags >> (7 - bit) if msb else flags >> bit) & 1) == lit:
+            pos += 1
+            out += 1
+        else:
+            if pos + 2 > len(stream):
+                return None
+            out += _lz_pair(p, stream[pos], stream[pos + 1])[1] + minlen
+            pos += 2
+    return tokens, flags
 
 
 def lz_features(p, stream):
