@@ -666,6 +666,43 @@ def _stop_workers():
             pass
 
 
+def _die_with_parent():
+    """Windows: put this process in a job that ends with it, so workers cannot outlive a sweep that is killed outright."""
+    if os.name != 'nt':
+        return None
+    try:
+        import ctypes
+        from ctypes import wintypes
+        kernel = ctypes.WinDLL('kernel32', use_last_error=True)
+
+        class Basic(ctypes.Structure):
+            _fields_ = [('PerProcessUserTimeLimit', ctypes.c_int64), ('PerJobUserTimeLimit', ctypes.c_int64),
+                        ('LimitFlags', wintypes.DWORD), ('MinimumWorkingSetSize', ctypes.c_size_t),
+                        ('MaximumWorkingSetSize', ctypes.c_size_t), ('ActiveProcessLimit', wintypes.DWORD),
+                        ('Affinity', ctypes.c_size_t), ('PriorityClass', wintypes.DWORD), ('SchedulingClass', wintypes.DWORD)]
+
+        class Extended(ctypes.Structure):
+            _fields_ = [('BasicLimitInformation', Basic), ('IoInfo', ctypes.c_uint64 * 6), ('ProcessMemoryLimit', ctypes.c_size_t),
+                        ('JobMemoryLimit', ctypes.c_size_t), ('PeakProcessMemoryUsed', ctypes.c_size_t),
+                        ('PeakJobMemoryUsed', ctypes.c_size_t)]
+
+        kernel.CreateJobObjectW.restype = wintypes.HANDLE
+        kernel.CreateJobObjectW.argtypes = [ctypes.c_void_p, wintypes.LPCWSTR]
+        kernel.SetInformationJobObject.argtypes = [wintypes.HANDLE, ctypes.c_int, ctypes.c_void_p, wintypes.DWORD]
+        kernel.AssignProcessToJobObject.argtypes = [wintypes.HANDLE, wintypes.HANDLE]
+        kernel.GetCurrentProcess.restype = wintypes.HANDLE
+        job = kernel.CreateJobObjectW(None, None)
+        info = Extended()
+        info.BasicLimitInformation.LimitFlags = 0x2000      # JOB_OBJECT_LIMIT_KILL_ON_JOB_CLOSE
+        if not job or not kernel.SetInformationJobObject(job, 9, ctypes.byref(info), ctypes.sizeof(info)):
+            return None
+        if not kernel.AssignProcessToJobObject(job, kernel.GetCurrentProcess()):
+            return None
+        return job                                          # kept open for the life of the sweep
+    except (OSError, AttributeError, ValueError):
+        return None
+
+
 def _options_for(a, system, sha):
     """The editor's engine options for this ROM, then the ones given on the command line."""
     from romancer.trace_cores import core_options
@@ -744,6 +781,7 @@ def main():
     if a.reverse:
         todo.reverse()
     done = 0
+    job = _die_with_parent()   # noqa: F841 (the handle must stay open)
     atexit.register(_stop_workers)
     for sig in (signal.SIGINT, signal.SIGTERM) + ((signal.SIGBREAK,) if hasattr(signal, 'SIGBREAK') else ()):
         signal.signal(sig, lambda *_: (_stop_workers(), os._exit(1)))
