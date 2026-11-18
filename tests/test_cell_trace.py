@@ -79,7 +79,7 @@ class BlockGame:
         expect = plan.expect if expect is None else expect
         missed = [i for i, v in expect.get('vram', {}).items() if after[i] != v]
         planned = set(expect.get('vram', {}))
-        result = {'verified': bool(changed), 'changed': {'vram': changed} if changed else {}, 'by': 'memory',
+        result = {'verified': bool(changed), 'changed': {'vram': changed} if changed else {}, 'by': 'memory', 'from_frame': 0,
                   'as_planned': bool(changed) and not missed, 'missed': {'vram': missed} if missed else {},
                   'unplanned': {'vram': n} if (n := sum(i not in planned for i in changed)) else {}}
         plan.verified = result
@@ -252,6 +252,26 @@ class PlanCellEditTests(unittest.TestCase):
                               radius=0)
         self.assertIn('base the game adds to every cell', str(caught.exception))
 
+    def test_a_stored_piece_must_also_hold_from_the_start_of_the_recording(self):
+        cell = self.layer.cell(4, 9)                      # PLAIN + 36, with a base added
+        seen = []
+
+        def confirm(plan, expect=None):
+            seen.append(plan.details['source_offset'])
+            result = self.game.verify(plan, expect)
+            if plan.details['source_offset'] == PLAIN + 36:           # played from the start, this byte sends the game elsewhere
+                result = dict(result, as_planned=False)
+            return result
+        with self.assertRaises(ValueError) as caught:
+            self.plan(cell, confirm=confirm)
+        self.assertEqual(seen, [PLAIN + 36])
+        self.assertIn('not when the recording is replayed from its start', str(caught.exception))
+        plan = self.plan(cell, confirm=self.game.verify)
+        self.assertTrue(plan.details['from_start'])
+        # a place written in place is not asked for it: its source is traced, not found by trying
+        self.assertEqual(self.plan(self.layer.cell(3, 8), confirm=confirm).kind, 'direct')
+        self.assertEqual(seen, [PLAIN + 36])
+
     def test_failure_says_what_was_tried(self):
         cell = self.layer.cell(2, 0)
         with self.assertRaises(ValueError) as caught:
@@ -310,6 +330,21 @@ class BuiltCellsInTheEditorTests(unittest.TestCase):
         self.assertTrue(out['in_scene']['as_planned'])
         self.assertEqual(out['in_scene']['unplanned'], {'vram': len(plan.details['also_cells'])})
         self.assertIn('cells-built', self.sg.METHODS)
+
+    def test_the_replay_from_the_start_is_asked_for_each_piece(self):
+        built, expect = self.built((2, 0))
+        asked = []
+
+        def confirm(plan, wanted=None):
+            asked.append(plan.details['source_offset'])
+            return self.game.verify(plan, wanted)
+        plan = self.sg._plan_built_cells({}, built, self.game.rom, self.scene, 'gb', self.layers, self.game.verify, expect, confirm)
+        self.assertEqual(asked, [plan.details['source_offset']])
+        self.assertTrue(plan.details['from_start'])
+        refuse = lambda plan, wanted=None: dict(self.game.verify(plan, wanted), as_planned=False)
+        with self.assertRaises(ValueError) as caught:
+            self.sg._plan_built_cells({}, built, self.game.rom, self.scene, 'gb', self.layers, self.game.verify, expect, refuse)
+        self.assertIn('cannot be changed here', str(caught.exception))
 
     def test_several_cells_are_replayed_together(self):
         # two cells of different blocks: both pieces change, and the cells of every use of either are listed
@@ -383,6 +418,7 @@ class SweepTests(unittest.TestCase):
         m = self.gs.measure_map_edit(self.game.rom, 'gb', [self.scene, chosen], chosen, None)
         self.assertTrue(m['as_planned'])
         self.assertEqual((m['scene_frame'], m['path'], m['source']), (900, 'direct', 'rom'))
+        self.assertEqual(m['from_start'], {'as_planned': True, 'outside_maps': 0})
         self.assertEqual([(t['scene_frame'], t['phase'], t['candidates']) for t in m['scenes']], [(1800, 'stored', 0)])
 
     def test_a_cell_that_shows_a_blank_tile_is_the_last_resort_and_says_so(self):
@@ -439,6 +475,7 @@ class SweepTests(unittest.TestCase):
         m = self.gs.measure_map_edit(self.game.rom, 'gb', [chosen], chosen, None)
         self.assertTrue(m['as_planned'])
         self.assertEqual((m['path'], m['relation'], m['phase']), ('cell-source', 'copy', 'computed'))
+        self.assertEqual(m['from_start'], {'as_planned': True, 'outside_maps': 0})
         self.assertGreater(m['also_cells'], 0)
         self.assertEqual(m['outside_maps'], 0)
 
@@ -468,6 +505,7 @@ class SweepTests(unittest.TestCase):
         import tempfile
         from pathlib import Path
         done = {'scene_frame': 900, 'as_planned': True, 'path': 'cell-source', 'also_cells': 3, 'outside_maps': 0,
+                'from_start': {'as_planned': True, 'outside_maps': 0},
                 'scenes': [{'scene_frame': 1800}]}
         missed = {'scene_frame': 1800, 'candidates': 0, 'computed_candidates': 5,
                   'scenes': [{'scene_frame': 1800, 'layers': 1, 'attempts': [{'source': 'derived', 'error': 'x'}]}]}
@@ -487,9 +525,10 @@ class SweepTests(unittest.TestCase):
             self.assertEqual(totals['gb']['map_edit_cause'], {'computed': 1})
             self.assertEqual(totals['gb']['map_edit_in_another_scene'], 1)
             self.assertEqual(totals['gb']['map_edit_on_a_blank_tile'], 0)
+            self.assertEqual(totals['gb']['map_edit_as_planned_from_power_on_too'], 1)
             text = self.report.section(totals, results, {'b' * 64: 'Game B (USA)'}, {'gb': {'map_edit_as_planned': 0}})
             self.assertIn('| gb | Game B (USA) | computed (0 stored and 1 computed cells tried in 1 scene) |', text)
-            self.assertIn('| gb | 2 | 1 | 0 | 0 | 0 | 1 | 1 | 1 | 0 | 1 |', text)
+            self.assertIn('| gb | 2 | 1 | 0 | 0 | 0 | 1 | 1 | 1 | 0 | 1 | 1 |', text)
             self.assertIn('before this one: gb 0 (all 0)', text)
             self.assertNotIn('Game A', text)
             page = Path(folder) / 'COVERAGE.md'

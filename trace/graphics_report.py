@@ -47,7 +47,7 @@ def table(totals) -> list:
 
 
 def rom_name(result: dict, titles: dict) -> str:
-    name = titles.get(result['sha256']) or result['member'].split('!')[-1]
+    name = titles.get(result['sha256']) or result['member'].split('.zip!')[-1]
     return name.rsplit('.', 1)[0] if '.' in name[-5:] else name
 
 
@@ -80,16 +80,23 @@ def section(totals: dict, results: list, titles: dict, before: dict | None = Non
               'counts the ROMs where that happened, by any path).',
               '- **on a blank tile**: of the confirmed edits, those made on a cell that shows a tile of one flat color, '
               'because no sampled scene had a stored cell with a picture in it (a cleared screen). They are counted in '
-              '"confirmed" and "in place".', '',
+              '"confirmed" and "in place".',
+              '- **also from power-on**: of the confirmed edits, those where the whole recorded run, replayed from '
+              'power-on with the edited ROM, also ends with the cell as planned. A separate fact from "confirmed" '
+              '(which is the replay from a checkpoint before the scene), except for a stored piece: because that '
+              'place is found by trying, it is counted only when it holds from power-on too with nothing outside the '
+              'background maps changed.', '',
               '| System | traced | confirmed | ' + ' | '.join(name for name, _ in CELL_PATHS)
-              + ' | in another scene than the tile edit | other cells change too | on a blank tile | not confirmed |',
-              '|---' * (len(CELL_PATHS) + 7) + '|']
-    total = [0] * (len(CELL_PATHS) + 6)
+              + ' | in another scene than the tile edit | other cells change too | on a blank tile | also from power-on '
+              '| not confirmed |',
+              '|---' * (len(CELL_PATHS) + 8) + '|']
+    total = [0] * (len(CELL_PATHS) + 7)
     for system, s in totals.items():
         paths = s.get('map_edit_path', {})
         row = [s['traced'], s['map_edit_as_planned']] + [paths.get(key, 0) for _, key in CELL_PATHS] + [
             s.get('map_edit_in_another_scene', 0), s.get('map_edit_other_cells_change_too', 0),
-            s.get('map_edit_on_a_blank_tile', 0), s['traced'] - s['map_edit_as_planned']]
+            s.get('map_edit_on_a_blank_tile', 0), s.get('map_edit_as_planned_from_power_on_too', 0),
+            s['traced'] - s['map_edit_as_planned']]
         total = [a + b for a, b in zip(total, row)]
         lines.append(f'| {system} | ' + ' | '.join(map(str, row)) + ' |')
     lines.append('| all | ' + ' | '.join(map(str, total)) + ' |')

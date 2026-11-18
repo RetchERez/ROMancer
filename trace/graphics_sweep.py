@@ -317,7 +317,10 @@ def measure_map(rom, system, scene, fe_for, buttons=explore, lay=None, phase='st
     phase 'stored' tries cells whose tile number is a ROM byte, then code
     values, written in place; phase 'computed' tries cells the game computes
     (a packed map, or cells built from a stored piece); phase 'blank' is
-    'stored' for cells that show a blank tile. `as_planned` is true
+    'stored' for cells that show a blank tile. `from_start` in the result is
+    the same edit replayed from the first checkpoint of the run (power-on):
+    whether the cell is as planned there too, and how many bytes outside the
+    maps differ. A stored piece counts only when both hold. `as_planned` is true
     only when the replay with the edited ROM left exactly the planned bytes
     in the cell.
     """
@@ -338,6 +341,13 @@ def measure_map(rom, system, scene, fe_for, buttons=explore, lay=None, phase='st
     def verify(plan, expect=None):
         return gt.verify_plan(fe_for, rom, plan, short if plan.kind == 'cell-source' else quick, expect=expect,
                               buttons_for=buttons)
+    # The whole recorded run with the edit, from its first checkpoint (power-on). A stored piece must hold there
+    # too (cell_trace.plan_cell_edit); for the other paths it is recorded beside the result, as a separate fact.
+    start = pv.Scene(scene.id, scene.frame, scene.screen_sha256, scene.checkpoints[:1], scene.snapshot)
+    start.video = quick.video
+
+    def from_start(plan, expect=None):
+        return gt.verify_plan(fe_for, rom, plan, start, expect=expect, buttons_for=buttons)
     kinds = (('derived', ('reencode', 'cell-source')),) if phase == 'computed' else (('rom', ('direct',)), ('code', ('direct',)))
     # A layer the registers say is not drawn (a Mega Drive window of no size, a Super NES layer that is switched
     # off) is not a background: its "map" may be tile data or anything else that sits at that address.
@@ -364,7 +374,7 @@ def measure_map(rom, system, scene, fe_for, buttons=explore, lay=None, phase='st
                 attempts.append(entry)
                 try:
                     plan = ct.plan_cell_edit(c, bytes(new), rom, scene, system, verify=verify, layers=lay, paths=paths,
-                                             max_probes=4 if slow else 6)
+                                             max_probes=4 if slow else 6, confirm=from_start)
                 except ValueError as e:
                     entry['error'] = str(e)[:400]
                     continue
@@ -374,6 +384,12 @@ def measure_map(rom, system, scene, fe_for, buttons=explore, lay=None, phase='st
                            outside_maps=plan.details['outside_maps'], **brief(plan.verified))
                 if phase == 'blank':
                     hit['blank_tile'] = True
+                if plan.details.get('from_start') or plan.verified.get('from_frame') == scene.checkpoints[0][0]:
+                    hit['from_start'] = {'as_planned': True, 'outside_maps': plan.details['outside_maps']}
+                else:
+                    far = from_start(plan, plan.expect)
+                    hit['from_start'] = {'as_planned': bool(far.get('as_planned')),
+                                         'outside_maps': ct.side_effects(far, plan.expect, lay, system)['outside_maps']}
                 if plan.kind == 'cell-source':
                     hit['relation'] = plan.details.get('relation')
                 elif 'block' in plan.details:
@@ -786,6 +802,9 @@ def report(outdir):
             s['map_edit_path'][path] = s['map_edit_path'].get(path, 0) + 1
         s['map_edit_in_another_scene'] = sum(any(t['scene_frame'] != m['scene_frame'] for t in m.get('scenes', ())) for m in done)
         s['map_edit_on_a_blank_tile'] = sum(bool(m.get('blank_tile')) for m in done)
+        s['map_edit_as_planned_from_power_on_too'] = sum(bool(m.get('from_start', {}).get('as_planned')) for m in done)
+        s['map_edit_from_power_on_only_the_maps_change'] = sum(
+            bool(m.get('from_start', {}).get('as_planned')) and not m['from_start']['outside_maps'] for m in done)
         s['map_edit_other_cells_change_too'] = sum(bool(m.get('also_cells')) for m in done)
         s['map_edit_changes_outside_the_maps'] = sum(bool(m.get('outside_maps')) for m in done)
         s['map_edit_cause'] = {}

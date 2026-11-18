@@ -31,6 +31,7 @@ from types import SimpleNamespace
 from . import cell_trace as ct
 from . import graphics_trace as gt
 from . import palette_trace as pt
+from . import provenance as pv
 
 SEGMENT = 16            # pixels of a screen line looked for in a layer line
 MAX_TILES = 2600
@@ -1090,9 +1091,17 @@ def _plan_cells(job: dict) -> dict:
         else:
             failure = ('The game builds this part of the background while it runs, and ROMancer could not find it '
                        'packed in the ROM in a form it knows.')
+        # A stored piece is found by trying, so it must also hold over the longest replay there is: from the
+        # earliest savestate of the recording that replays faithfully.
+        start = pv.Scene(scene.id, scene.frame, scene.screen_sha256, scene.checkpoints[:1], scene.snapshot)
+
+        def confirm(plan, wanted=None):
+            calls[0] += 1
+            _progress(job, 'Replaying the game from the start of the recording…', calls[0], 0)
+            return gt.verify_plan(make, rom, plan, start, expect=wanted, domains=TILE_DOMAINS, buttons_for=buttons)
         try:
-            return _plan_out(_plan_built_cells(job, built, rom, scene, system, [v.layer for v in layers], verify, expect), rom,
-                             'cells-built')
+            return _plan_out(_plan_built_cells(job, built, rom, scene, system, [v.layer for v in layers], verify, expect,
+                                               confirm if len(scene.checkpoints) > 1 else None), rom, 'cells-built')
         except ValueError as error:
             raise ValueError((failure or 'ROMancer packed your background back into the ROM, but replaying the game did not '
                               'show it as painted.') + ' ' + str(error)) from None
@@ -1106,12 +1115,14 @@ def _plan_cells(job: dict) -> dict:
     return _plan_out(plan, rom, 'cells')
 
 
-def _plan_built_cells(job: dict, built: list, rom: bytes, scene, system: str, layers: list, verify, expect: dict):
+def _plan_built_cells(job: dict, built: list, rom: bytes, scene, system: str, layers: list, verify, expect: dict,
+                      confirm=None):
     """Cells the game builds from stored pieces (blocks, tables): find each piece by replay and change it there.
 
     cell_trace.plan_cell_edit confirms every cell on its own; several cells
     are then replayed together, and the plan is kept only when all of them
-    come out as painted. Other cells built from the same pieces change too:
+    come out as painted. `confirm` is the replay from the start of the
+    recording that each piece must pass as well. Other cells built from the same pieces change too:
     plan.details['also_cells'] lists them and a note says how many.
     """
     if len(built) > MAX_BUILT_CELLS:
@@ -1122,7 +1133,8 @@ def _plan_built_cells(job: dict, built: list, rom: bytes, scene, system: str, la
     for number, (cell, new) in enumerate(built):
         _progress(job, 'Looking for the stored piece the game builds this cell from…', number, len(built))
         try:
-            plan = ct.plan_cell_edit(cell, new, rom, scene, system, verify=verify, layers=layers, paths=('cell-source',))
+            plan = ct.plan_cell_edit(cell, new, rom, scene, system, verify=verify, layers=layers, paths=('cell-source',),
+                                     confirm=confirm)
         except ValueError:
             raise ValueError('ROMancer also looked for a stored piece the game builds ' + ('this cell' if one else 'these cells')
                              + ' from, and replaying the game confirmed none. ' + ('This cell' if one else 'These cells')

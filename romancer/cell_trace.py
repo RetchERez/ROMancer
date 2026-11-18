@@ -22,7 +22,12 @@ cell-source   the game builds the cell from a stored piece: a block (metatile) d
               built from the same stored piece changes with it; the plan lists them (`also_cells`), and it
               is refused when anything outside the background maps changes. A place the game adds to the
               cell (rather than copies) is also refused when a quarter of the layer moves with it: that is
-              the base the game adds to every cell it draws, not a piece of this background.
+              the base the game adds to every cell it draws, not a piece of this background. Because the
+              place is found by trying, it must hold over the longest replay there is as well: with
+              `confirm` (a replay from the first checkpoint of the recording, power-on when the recording
+              began there) the cell must again come out as planned with nothing outside the maps changed.
+              A byte that gives the cell from a moment before the scene but sends the game another way
+              when it is played from the start is not a piece of the background.
 
 A plan is returned only when the replay showed the planned bytes in video
 memory. Nothing here is a guess that reaches the user unconfirmed.
@@ -153,13 +158,16 @@ def _source_candidates(cell, k: int, rom: bytes, skip: int, radius: int) -> list
 
 def plan_cell_edit(cell, new: bytes, rom: bytes, scene, system: str, *, verify: Callable, layers: Iterable | None = None,
                    paths: Iterable[str] = PATHS, radius: int = 3, max_probes: int = 6, max_candidates: int = 6,
-                   avoid: Iterable[tuple[int, int]] = ()) -> gt.EditPlan:
+                   avoid: Iterable[tuple[int, int]] = (), confirm: Callable | None = None) -> gt.EditPlan:
     """Make `cell` store `new`, confirmed by replay. Raises ValueError (saying what was tried) when no path is.
 
     `verify(plan, expect)` must return graphics_trace.verify_plan's result
-    for an EditPlan replayed in `scene`. The returned plan has
-    plan.verified set, plan.kind naming the path, and plan.details with
-    'also_cells' / 'outside_maps' (side_effects) and 'tried'.
+    for an EditPlan replayed in `scene`. `confirm(plan, expect)` is the same
+    for the longest replay available (from the first checkpoint only); a
+    cell-source place must pass it too, and plan.details['from_start'] then
+    says so. The returned plan has plan.verified set, plan.kind naming the
+    path, and plan.details with 'also_cells' / 'outside_maps' (side_effects)
+    and 'tried'.
     """
     new = bytes(new)
     changed = [k for k in range(len(cell.stored)) if new[k] != cell.stored[k]]
@@ -234,6 +242,13 @@ def plan_cell_edit(cell, new: bytes, rom: bytes, scene, system: str, *, verify: 
                 tried.append(f'cell-source at {off:#x}: the cell came out as planned, but so did {len(effects["also_cells"])} '
                              'other cells: the byte is a base the game adds to every cell, not a piece of this background')
                 continue
+            if confirm is not None:
+                far = confirm(plan, expect)
+                if not far.get('as_planned') or side_effects(far, expect, layers, system)['outside_maps']:
+                    tried.append(f'cell-source at {off:#x}: the cell came out as planned from shortly before the scene, '
+                                 'but not when the recording is replayed from its start')
+                    continue
+                plan.details['from_start'] = True
             plan.notes.append('The game builds this cell from a stored piece; the piece was changed.')
             return finish(plan, 'cell-source')
         tried.append(f'cell-source: none of {probes} ROM bytes around the traced source gave the planned cell')

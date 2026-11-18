@@ -149,7 +149,12 @@ has to move, the scene is replayed, and the place counts only when the cell
 then holds exactly the planned value. Two things are refused even then: a
 place that also changes video memory outside the background maps, and a
 byte the game adds to every cell it draws (a quarter of the layer moves
-with it).
+with it). And because the place is found by trying, not traced, it must
+hold over the longest replay there is: the recording replayed from its
+first savestate (power-on, when it began there) must end with the cell as
+planned and nothing outside the maps changed. A byte that gives the cell
+from a moment before the scene, but sends the game another way when it is
+played from the start, is not a piece of the background.
 
 Changing a stored piece changes every place the game draws with it. The
 plan lists the other cells of the scene that changed (`also_cells`), the
