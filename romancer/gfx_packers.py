@@ -182,8 +182,23 @@ def rnc_info(stream: bytes) -> dict:
     return {'leeway': stream[16], 'chunks': stream[17]}
 
 
+def rnc_leeway(stream: bytes) -> int:
+    """How far the output of an RNC stream runs ahead of the packed bytes still to be read when the
+    packed data sits at the end of the buffer it is unpacked into (the header's leeway byte: a
+    game that unpacks in place leaves that much room)."""
+    marks: list = []
+    decode = rnc1_decode if stream[3] == 1 else rnc2_decode
+    out, used = decode(stream, 0, _RNC_MOST, marks)
+    slack = len(out) - (used - RNC_HEADER)
+    return max(0, max((o - i for o, i in marks), default=0) - slack)
+
+
 def _rnc_wrap(method, raw, body, chunks, like):
     leeway = like['leeway'] if like else 0
+    head = b'RNC' + bytes([method]) + len(raw).to_bytes(4, 'big') + len(body).to_bytes(4, 'big') + bytes(6)
+    # the room this stream needs, when that is more than the stream it replaces asked for
+    need = rnc_leeway(head + bytes(body))
+    leeway = min(0xFF, max(leeway, need + 2 if need else 0))
     head = b'RNC' + bytes([method]) + len(raw).to_bytes(4, 'big') + len(body).to_bytes(4, 'big') \
         + crc16_arc(raw).to_bytes(2, 'big') + crc16_arc(body).to_bytes(2, 'big') + bytes((leeway, chunks & 0xFF))
     return head + bytes(body)
@@ -257,7 +272,7 @@ def _rnc1_value(bits, table):
     raise ValueError('no such code')
 
 
-def rnc1_decode(data, start=0, limit=MAX_OUT):
+def rnc1_decode(data, start=0, limit=MAX_OUT, marks=None):
     size, packed = _rnc_header(data, start, 1, limit)
     bits = _Words(data, start + RNC_HEADER, start + RNC_HEADER + packed)
     bits.read(2)
@@ -285,6 +300,8 @@ def rnc1_decode(data, start=0, limit=MAX_OUT):
                     out.append(out[-back])
             if len(out) > size:
                 raise ValueError('more data than the header says')
+            if marks is not None:
+                marks.append((len(out), bits.pos - start - RNC_HEADER))
     if len(out) != size:
         raise ValueError('more data than the header says')
     return bytes(out), RNC_HEADER + packed
@@ -522,7 +539,7 @@ class _ByteBits:
         return self.cur >> self.left & 1
 
 
-def rnc2_decode(data, start=0, limit=MAX_OUT):
+def rnc2_decode(data, start=0, limit=MAX_OUT, marks=None):
     size, packed = _rnc_header(data, start, 2, limit)
     s = _ByteBits(data, start + RNC_HEADER, start + RNC_HEADER + packed)
     bit, byte = s.bit, s.byte
@@ -531,6 +548,8 @@ def rnc2_decode(data, start=0, limit=MAX_OUT):
     while True:
         if len(out) > size:
             raise ValueError('more data than the header says')
+        if marks is not None:
+            marks.append((len(out), s.pos - start - RNC_HEADER))
         if not bit():
             out.append(byte())
             continue

@@ -539,7 +539,7 @@ class Packers(unittest.TestCase):
         # fetched when a bit is wanted, so the stream is: 0D, 'A', 'B', distance - 1, E0, length byte 00.
         body = bytes((0x0D, 0x41, 0x42, 0x01, 0xE0, 0x00))
         sums = gp.crc16_arc(b'ABAB').to_bytes(2, 'big') + gp.crc16_arc(body).to_bytes(2, 'big')
-        head = b'RNC\x02' + (4).to_bytes(4, 'big') + len(body).to_bytes(4, 'big') + sums + bytes((0, 1))
+        head = b'RNC\x02' + (4).to_bytes(4, 'big') + len(body).to_bytes(4, 'big') + sums + bytes((4, 1))     # leeway: six packed bytes for four
         self.assertEqual(gc.decode('rnc2', head + body + b'tail'), (b'ABAB', 18 + len(body)))
         self.assertEqual(gc.encode('rnc2', b'ABAB'), head + body)
 
@@ -569,6 +569,23 @@ class Packers(unittest.TestCase):
                 like = bytearray(stream)
                 like[16] = 9
                 self.assertEqual(gc.encode(name, raw, like=bytes(like))[16], 9)
+
+    def test_rnc_leeway_covers_what_the_stream_needs(self):
+        rng = random.Random(62)
+        noise = bytes(rng.randrange(256) for _ in range(900))       # packs larger than it is: output overtakes input
+        for name in ('rnc1', 'rnc2'):
+            for raw in (noise, sample(3000, seed=63), bytes(500) + noise):
+                stream = gc.encode(name, raw)
+                with self.subTest(codec=name, size=len(raw)):
+                    need = gp.rnc_leeway(stream)
+                    self.assertGreaterEqual(stream[16], need)
+                    # unpacked in place: the packed data at the end of a buffer of size + leeway bytes is
+                    # never overtaken by the output
+                    marks = []
+                    out, used = gp.CODECS[name]['decode'](stream, 0, 0x10000, marks)
+                    base = len(out) + stream[16] - (used - 18)
+                    self.assertTrue(all(o <= base + i for o, i in marks))
+            self.assertGreater(gp.rnc_leeway(gc.encode(name, noise)), 0)
 
     def test_rnc1_many_chunks_and_long_literal_runs(self):
         rng = random.Random(53)
