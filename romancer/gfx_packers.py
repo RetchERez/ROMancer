@@ -17,6 +17,70 @@ RNC_HEADER = 18
 _RNC_MOST = 0x40000         # larger "unpacked sizes" are taken for chance, not for a stream
 
 
+def common_prefix(raw: bytes, a: int, b: int, most: int) -> int:
+    """How many bytes raw[a:] and raw[b:] share (a < b), up to `most` and the end of the data."""
+    most = min(most, len(raw) - b)
+    if most <= 0 or raw[a] != raw[b]:
+        return 0
+    k = 1
+    step = 8
+    while k < most:                     # doubling strides while they agree, then halving on the first miss
+        step = min(step, most - k)
+        if raw[a + k:a + k + step] == raw[b + k:b + k + step]:
+            k += step
+            step *= 2
+        elif step == 1:
+            break
+        else:
+            step //= 2
+    return k
+
+
+class MatchFinder:
+    """Longest earlier match at a position, asked for in rising order of position (so that an
+    encoder that skips over a long copy does not pay for the positions inside it)."""
+
+    def __init__(self, raw: bytes, max_dist: int, max_len: int, min_len: int = 3, chain: int = 48):
+        self.raw, self.max_dist, self.max_len, self.min_len, self.chain = raw, max_dist, max_len, min_len, chain
+        self.key = min(min_len, 3)
+        self.index: dict[bytes, list[int]] = {}
+        self.filled = 0             # positions below this are in the index
+        self.memo: dict[int, tuple] = {}
+
+    def at(self, i: int) -> tuple:
+        hit = self.memo.get(i)
+        if hit is not None:
+            return hit
+        raw, key, index = self.raw, self.key, self.index
+        while self.filled + key <= i:
+            index.setdefault(raw[self.filled:self.filled + key], []).append(self.filled)
+            self.filled += 1
+        best = (0, 0)
+        tried = 0
+        for at in reversed(index.get(raw[i:i + key], ())):
+            dist = i - at
+            if dist > self.max_dist or tried >= self.chain:
+                break
+            tried += 1
+            k = best[0]
+            if k and raw[at + k:at + k + 1] != raw[i + k:i + k + 1]:
+                continue
+            k = common_prefix(raw, at, i, self.max_len)
+            if k > best[0]:
+                best = (k, dist)
+                if k >= self.max_len:
+                    break
+        for dist in range(1, key):          # nearer than the key reaches: runs
+            if i - dist >= 0:
+                k = common_prefix(raw, i - dist, i, self.max_len)
+                if k > best[0]:
+                    best = (k, dist)
+        if best[0] < self.min_len:
+            best = (0, 0)
+        self.memo[i] = best
+        return best
+
+
 def lz_matches(raw: bytes, max_dist: int, max_len: int, min_len: int = 3, chain: int = 48):
     """Longest earlier match at every position: a list of (length, distance), (0, 0) where there is none."""
     n = len(raw)
@@ -53,6 +117,40 @@ def lz_matches(raw: bytes, max_dist: int, max_len: int, min_len: int = 3, chain:
                 if k > best[0]:
                     best = (k, dist)
         out[i] = best if best[0] >= min_len else (0, 0)
+    return out
+
+
+def lz_ladder(raw: bytes, max_dist: int, max_len: int, min_len: int = 2, chain: int = 96):
+    """At every position, the matches worth choosing between: [(length, distance)] with both rising,
+    each the nearest match of its length (a nearer copy costs fewer bits in most formats)."""
+    n = len(raw)
+    out = [()] * n
+    index: dict[bytes, list[int]] = {}
+    key = min(min_len, 3)
+    for i in range(n):
+        if i >= key:
+            index.setdefault(raw[i - key:i], []).append(i - key)
+        steps = []
+        top = min_len - 1
+        for dist in range(1, key):                  # nearer than the key reaches: runs
+            if i - dist >= 0 and top < max_len:
+                k = common_prefix(raw, i - dist, i, max_len)
+                if k > top:
+                    top = k
+                    steps.append((k, dist))
+        tried = 0
+        for at in reversed(index.get(raw[i:i + key], ())):
+            dist = i - at
+            if dist > max_dist or tried >= chain or top >= max_len:
+                break
+            tried += 1
+            if raw[at + top:at + top + 1] != raw[i + top:i + top + 1] and top >= key:
+                continue                            # cannot be longer than what is already had
+            k = common_prefix(raw, at, i, max_len)
+            if k > top:
+                top = k
+                steps.append((k, dist))
+        out[i] = tuple(steps)
     return out
 
 
@@ -272,29 +370,86 @@ def _symbol(value):
     return n, value - (1 << (n - 1)), n - 1
 
 
+def _rnc1_parse(raw, ladder, run_bits, dist_bits, len_bits):
+    """Cheapest split into literals and copies under the given code widths ({symbol: bits}; a
+    copy also pays `run_bits` for the count of literals in front of it). Returns the tuples
+    (literal bytes, (length, distance) or None), the last one without a copy."""
+    n = len(raw)
+    INF = 1 << 60
+    spare_d = max(dist_bits.values()) + 2
+    spare_l = max(len_bits.values()) + 2
+    cost = [INF] * (n + 1)
+    step = [(1, 0)] * (n + 1)
+    cost[n] = 0
+    for i in range(n - 1, -1, -1):
+        c, how = cost[i + 1] + 8, (1, 0)
+        low = 2
+        for k, dist in ladder[i]:
+            d = dist - 1
+            ds = d if d < 2 else d.bit_length()
+            dcost = run_bits + dist_bits.get(ds, spare_d) + (ds - 1 if ds >= 2 else 0)
+            for length in (range(low, k + 1) if k <= 12 else list(range(low, 13)) + [k - 1, k]):
+                if length < low:
+                    continue
+                v = length - 2
+                ls = v if v < 2 else v.bit_length()
+                bits = dcost + len_bits.get(ls, spare_l) + (ls - 1 if ls >= 2 else 0)
+                if cost[i + length] + bits < c:
+                    c, how = cost[i + length] + bits, (length, dist)
+            low = k + 1
+        cost[i], step[i] = c, how
+    tuples = []
+    i = start = 0
+    while i < n:
+        k, dist = step[i]
+        if k > 1:
+            tuples.append((raw[start:i], (k, dist)))
+            i += k
+            start = i
+        else:
+            i += 1
+            if i - start >= 0x7000:         # more than one count can say: close the chunk here
+                tuples.append((raw[start:i], None))
+                start = i
+    tuples.append((raw[start:n], None))
+    return tuples
+
+
+def _rnc1_widths(tuples):
+    """Code widths the tuples would get: (average bits of a literal count, {distance symbol: bits}, {length symbol: bits})."""
+    fr, fd, fl = {}, {}, {}
+    for lit, match in tuples:
+        sym = _symbol(len(lit))[0]
+        fr[sym] = fr.get(sym, 0) + 1
+        if match:
+            sym = _symbol(match[1] - 1)[0]
+            fd[sym] = fd.get(sym, 0) + 1
+            sym = _symbol(match[0] - 2)[0]
+            fl[sym] = fl.get(sym, 0) + 1
+    wr = _code_lengths(fr)
+    runs = sum(fr.values())
+    return (sum(wr[x] * fr[x] for x in fr) / runs if runs else 3), _code_lengths(fd) or {0: 4}, _code_lengths(fl) or {0: 4}
+
+
 def rnc1_encode(raw, like=None, size=None):
+    """Three rounds of: cheapest parse under the code widths of the round before, then new widths; the smallest wins."""
     raw = bytes(raw)
     n = len(raw)
     if not 0 < n <= _RNC_MOST:
         raise ValueError('data is too long for this codec')
-    found = lz_matches(raw, 0x1000, 0x102, 3)
-    # tuples of (literal bytes, match or None); a chunk is a run of tuples whose last has no match
-    tuples = []
-    i = start = 0
-    while i < n:
-        k, dist = found[i]
-        if k and i + 1 < n and found[i + 1][0] > k + 1:
-            k = 0                           # a longer match starts one byte on
-        if k and i - start < 0x7000:
-            tuples.append((raw[start:i], (k, dist)))
-            i += k
-            start = i
-        elif i - start >= 0x7000:
-            tuples.append((raw[start:i], None))
-            start = i
-        else:
-            i += 1
-    tuples.append((raw[start:n], None))
+    ladder = lz_ladder(raw, 0x8000, 0x1000, 2, chain=128)
+    widths = (3, {x: 4 + (x > 8) for x in range(16)}, {x: 3 + (x > 3) for x in range(16)})
+    best = None
+    for _ in range(3):
+        tuples = _rnc1_parse(raw, ladder, *widths)
+        stream = _rnc1_emit(raw, tuples, like)
+        if best is None or len(stream) < len(best):
+            best = stream
+        widths = _rnc1_widths(tuples)
+    return best
+
+
+def _rnc1_emit(raw, tuples, like):
     chunks, cur = [], []
     for t in tuples:
         cur.append(t)
@@ -463,12 +618,45 @@ def _rnc2_high(w, high):
         w.bits(1, high >> 2 & 1, 1, high >> 1 & 1, 0, high & 1)
 
 
+def _rnc2_high_bits(high):
+    return 1 if high == 0 else 3 if high == 1 else 4 if high < 4 else 5 if high < 8 else 6
+
+
+def _rnc2_cost(length, dist):
+    """Bits a copy takes, or None when the format has no such copy."""
+    if length == 2:
+        return 11 if dist <= 256 else None
+    high = _rnc2_high_bits((dist - 1) >> 8) + 8
+    if length == 3:
+        return 4 + high
+    if length <= 8:
+        return 2 + len(_RNC2_LEN[length]) + high
+    return 12 + high
+
+
 def rnc2_encode(raw, like=None, size=None):
+    """The cheapest split into literals (9 bits) and copies; runs of twelve literals or more go out as blocks."""
     raw = bytes(raw)
     n = len(raw)
     if not 0 < n <= _RNC_MOST:
         raise ValueError('data is too long for this codec')
-    found = lz_matches(raw, 0x1000, 263, 2)
+    ladder = lz_ladder(raw, 0x1000, 263, 2)
+    INF = 1 << 60
+    cost = [INF] * (n + 1)
+    step = [(1, 0)] * (n + 1)
+    cost[n] = 0
+    for i in range(n - 1, -1, -1):
+        c, how = cost[i + 1] + 9, (1, 0)
+        low = 2
+        for k, dist in ladder[i]:
+            for length in range(low, k + 1) if k <= 12 else list(range(low, min(k, 12) + 1)) + [k - 1, k]:
+                if length < low:
+                    continue
+                bits = _rnc2_cost(length, dist)
+                if bits is not None and cost[i + length] + bits < c:
+                    c, how = cost[i + length] + bits, (length, dist)
+            low = k + 1
+        cost[i], step[i] = c, how
     w = _ByteBitWriter()
     w.bits(0, 0)
     i = 0
@@ -490,12 +678,8 @@ def rnc2_encode(raw, like=None, size=None):
         run = 0
 
     while i < n:
-        k, dist = found[i]
-        if k == 2 and dist > 256:
-            k = 0
-        if k and i + 1 < n and found[i + 1][0] > k + 1:
-            k = 0
-        if not k:
+        k, dist = step[i]
+        if k == 1:
             run += 1
             i += 1
             continue
