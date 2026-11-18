@@ -34,6 +34,7 @@ APPROVED_FILES = frozenset({
     'romancer/gfx_codecs.py',
     'romancer/gfx_families.py',
     'romancer/gfx_overlay8.py',
+    'romancer/gfx_packers.py',
     'romancer/graphics_trace.py',
     'romancer/palette_trace.py',
     'romancer/provenance.py',
