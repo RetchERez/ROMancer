@@ -1,24 +1,24 @@
 | System | Traced / in catalog | Palette verified | ram-only | traced | located | derived | none | errors | Graphics direct | derived | none |
 |---|---|---|---|---|---|---|---|---|---|---|---|
 | gb | 139 / 139 | 138 | 0 | 1 | 0 | 0 | 0 | 0 | 128 | 11 | 0 |
-| gbc | 95 / 95 | 95 | 0 | 0 | 0 | 0 | 0 | 0 | 79 | 16 | 0 |
+| gbc | 95 / 95 | 94 | 0 | 0 | 0 | 0 | 1 | 0 | 78 | 16 | 1 |
 | genesis | 140 / 140 | 139 | 0 | 0 | 0 | 0 | 1 | 0 | 78 | 62 | 0 |
 | nes | 229 / 229 | 229 | 0 | 0 | 0 | 0 | 0 | 0 | 215 | 14 | 0 |
 | sms | 49 / 49 | 49 | 0 | 0 | 0 | 0 | 0 | 0 | 46 | 3 | 0 |
 | snes | 290 / 290 | 290 | 0 | 0 | 0 | 0 | 0 | 0 | 262 | 28 | 0 |
-| all | 942 / 942 | 940 | 0 | 1 | 0 | 0 | 1 | 0 | 808 | 134 | 0 |
+| all | 942 / 942 | 939 | 0 | 1 | 0 | 0 | 2 | 0 | 807 | 134 | 1 |
 
 ## How the verified edits were found
 
 | System | traced | other scene | plain copy | code number | measured | needed the second input script | needed a scene between the main ones |
 |---|---|---|---|---|---|---|---|
 | gb | 134 | 1 | 1 | 1 | 1 | 1 | 2 |
-| gbc | 91 | 0 | 4 | 0 | 0 | 0 | 1 |
+| gbc | 90 | 0 | 4 | 0 | 0 | 0 | 1 |
 | genesis | 132 | 0 | 7 | 0 | 0 | 0 | 5 |
 | nes | 229 | 0 | 0 | 0 | 0 | 0 | 0 |
 | sms | 49 | 0 | 0 | 0 | 0 | 0 | 1 |
 | snes | 286 | 0 | 4 | 0 | 0 | 1 | 0 |
-| all | 921 | 1 | 16 | 1 | 1 | 2 | 9 |
+| all | 920 | 1 | 16 | 1 | 1 | 2 | 9 |
 
 ## gb: 1 not verified
 
@@ -27,6 +27,14 @@ By cause: inexact source 1
 | ROM | Palette | Cause |
 |---|---|---|
 | Wario Blast Featuring Bomberman! (USA, Europe) (SGB Enhanced) | traced | inexact source: the traced bytes move the color but not to the planned value (shared code value or partial source). Looked at by hand: one table byte is the final value of all three shade registers, and the program also compares the palette with that same number in six places to end its fades, so changing the table byte alone changes how the game runs. An edit would have to change those compares too. |
+
+## gbc: 1 not verified
+
+By cause: not available 1
+
+| ROM | Palette | Cause |
+|---|---|---|
+| Kirby - Tilt 'n' Tumble (USA) | none | not available: this cartridge needs a tracing engine that is not included in the packages |
 
 ## genesis: 1 not verified
 

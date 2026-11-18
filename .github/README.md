@@ -4,13 +4,18 @@
 
 By **RetchEWretched**. Edit ROMs, preview changes, playtest builds, and export patches offline.
 
+## New in v1.2
+
+- **Scenes & colors reaches more games.** The color search now finds stored palettes and colors a cartridge chip prepares, background cells built from blocks can be changed through the stored block, and more packed graphics formats are re-packed after an edit.
+- **Fixes.** Window title, message spacing, a proofread user guide, and the Extras ZIP is back.
+
 ## New in v1.1
 
 - **Scenes & colors editor.** Record moments of the game, change a color, and the **Also changes** strip replays every recorded scene that uses the same data in the real engine, so you see what else changes before you save. Works on all six systems without a game-specific definition.
 - **Tile and background editing.** In the same editor, redraw a picture pixel by pixel or paint pictures into background cells. Packed graphics are re-packed when ROMancer recognises the packing; otherwise the build gets a small run-time patch, shown both in the scene and from power-on.
 - **Accurate catalog.** The catalog now lists 942 cartridge dumps that match the No-Intro reference lists exactly, under their No-Intro names. Fan translations, re-release dumps and entries that did not boot were removed.
 
-Measured across the catalog (938 of 942 entries have a result): a color edit was confirmed by replay on 906 ROMs and a picture edit on 916. Per-ROM results are in [trace/COVERAGE.md](../trace/COVERAGE.md); limits are in the [release notes](https://github.com/RetchERez/ROMancer/releases/tag/v1.2.0).
+Measured across all 942 catalog entries: a color edit was confirmed by replay on 939 ROMs, a picture edit on 936 and a background edit on 922. Per-ROM results are in [trace/COVERAGE.md](../trace/COVERAGE.md); limits are in the [release notes](https://github.com/RetchERez/ROMancer/releases/tag/v1.2.0).
 
 ## Get started on Windows
 

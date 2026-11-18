@@ -5,10 +5,20 @@ ROMancer is a local ROM editing, investigation and playtesting workbench.
 It supports NES, SNES, Genesis / Mega Drive, Master System, Game Boy and
 Game Boy Color cartridge formats. Everyday work runs offline.
 
-NEW IN v1.1.1
+NEW IN v1.2.0
 
-A fix-up release. See the release notes on GitHub for the short list of
-corrections. The editors and the catalog are the same as in v1.1.0.
+Scenes & colors works on more games.
+- Colors. "Let ROMancer look for it" now also finds a stored copy of the
+  palette and places other scenes traced the color to, so colors that the
+  game fades or that a cartridge chip prepares can be changed.
+- Background. Cells the game builds from blocks can be changed through the
+  stored block. ROMancer says so first, because every place that uses the
+  block changes with it.
+- Packed pictures. More packing formats are recognised and packed again
+  after an edit.
+Also in this release: the window title shows the version you are running,
+about 80 messages got back the space before a number, the user guide was
+proofread, and the Extras ZIP is back with the current catalog page.
 
 NEW IN v1.1.0
 
@@ -47,17 +57,18 @@ packaged release loads only the pinned tracing builds.
 Also new: a battle background editor for Phantasy Star II (below).
 
 What to expect from Scenes & colors. It was measured on development builds of
-the tracing engines across the catalog; 938 of the 942 entries have a result.
-- Colors: an edit was confirmed by replay on 906 of 938 (trace/COVERAGE.md
-  lists every other ROM with the reason).
-- Pictures: an edit was confirmed by replay on 916 of 938. On 744 the picture
+the tracing engines across all 942 catalog entries (trace/COVERAGE.md has the
+result for every ROM and the reason for each one that failed).
+- Colors: an edit was confirmed by replay on 939 of 942.
+- Pictures: an edit was confirmed by replay on 936 of 941. On 798 the picture
   is changed where it is stored. Packed pictures are unpacked and re-packed
-  when ROMancer recognises the packing (confirmed on 128 ROMs). Otherwise the
+  when ROMancer recognises the packing (confirmed on 195 ROMs). Otherwise the
   build gets a small run-time patch that swaps the picture in as the game
-  loads it, and the editor shows the result both in the scene and from
+  loads it (confirmed on 632, on 499 of them with nothing else changed from
+  power-on), and the editor shows the result both in the scene and from
   power-on.
-- Background cells: confirmed on 680 of 938.
-- "Only in this scene" is rarely available: it was confirmed on 50 ROMs.
+- Background cells: confirmed on 922 of 941.
+- "Only in this scene" is rarely available: it was confirmed on 70 ROMs.
   Expect a change to apply everywhere the data is used.
 - Colors and pictures that the game works out while it runs can be locked.
 - Super NES replays are slow. With many recorded scenes, Show what changes
