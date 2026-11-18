@@ -45,6 +45,7 @@ APPROVED_FILES = frozenset({
     'tests/test_edit_session.py',
     'tests/test_gfx_codecs.py',
     'tests/test_graphics_trace.py',
+    'tests/test_palette_search.py',
     'tests/test_trace_packaging.py',
     'tests/ui_scene_editor.mjs',
     'tests/ui_scene_graphics.mjs',
