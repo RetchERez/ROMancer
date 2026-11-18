@@ -28,6 +28,7 @@ from dataclasses import replace
 from pathlib import Path
 from types import SimpleNamespace
 
+from . import cell_trace as ct
 from . import graphics_trace as gt
 from . import palette_trace as pt
 
@@ -52,10 +53,14 @@ METHODS = {
                     'The original data stays as it is.',
     'cells': 'These background cells are stored as plain data in the ROM. Your version is written straight over them.',
     'cells-reencode': 'This part of the background is packed in the ROM. ROMancer unpacked it, changed it and packed it again.',
+    'cells-built': 'The game builds this part of the background from a stored piece that it uses again and again (a block of '
+                   'cells, or a table it reads the pictures from). ROMancer changed the piece, so every place the game draws '
+                   'with it changes too; the checks above count them.',
 }
+MAX_BUILT_CELLS = 6      # each cell built from a stored piece costs several replays to find that piece
 CELL_REASONS = {
     'derived': 'The game builds this part of the background while it runs. ROMancer will try to find it packed in the '
-               'ROM; if it cannot, this cell cannot be changed here.',
+               'ROM, or the stored piece the game builds it from; if it cannot, this cell cannot be changed here.',
     'unknown': 'ROMancer has not seen where this part of the background comes from. It was drawn before recording '
                'started, or it is unused.',
 }
@@ -1026,7 +1031,7 @@ def _plan_cells(job: dict) -> dict:
     view = SceneGraphics(scene, system, rom, rgb, header['width'], header['height'])
     layers = view.layers()
     skip = gt.rom_skip(rom, system)
-    writes, expect, packed, domain = {}, {}, {}, None
+    writes, expect, packed, domain, built = {}, {}, {}, None, []
     for item in job['cells']:
         layer_view = layers[int(item['layer'])]
         layer = layer_view.layer
@@ -1058,6 +1063,7 @@ def _plan_cells(job: dict) -> dict:
                 writes[offset] = (old, value)
         else:
             packed.update(changed)
+            built.append((cell, bytes(new)))
     if not writes and not packed:
         raise ValueError('These cells already look like that. Paint a different picture first.')
     calls = [0]
@@ -1072,15 +1078,24 @@ def _plan_cells(job: dict) -> dict:
         _progress(job, 'Looking for this part of the background packed in the ROM…')
         low, high = min(packed), max(packed)
         block = gt.find_compressed_block(scene, rom, system, domain, low, high - low + 1)
-        if block is None:
-            raise ValueError('The game builds this part of the background while it runs, and ROMancer could not find it '
-                             'packed in the ROM in a form it knows. These cells cannot be changed here.')
-        plan = gt.plan_block_edit(block, packed, rom, system, verify=verify, avoid=[tuple(r) for r in job.get('avoid', [])],
-                                  max_candidates=6 if gt.CPU[system] not in ('sm83', '6502') else 24)
-        if not _good(verify(plan)):
-            raise ValueError('ROMancer packed your background back into the ROM, but replaying the game did not show it '
-                             'as painted, so it is not offered.')
-        return _plan_out(plan, rom, 'cells-reencode')
+        failure = None
+        if block is not None:
+            try:
+                plan = gt.plan_block_edit(block, packed, rom, system, verify=verify, avoid=[tuple(r) for r in job.get('avoid', [])],
+                                          max_candidates=6 if gt.CPU[system] not in ('sm83', '6502') else 24)
+                if _good(verify(plan)):
+                    return _plan_out(plan, rom, 'cells-reencode')
+            except ValueError as error:
+                failure = str(error)
+        else:
+            failure = ('The game builds this part of the background while it runs, and ROMancer could not find it '
+                       'packed in the ROM in a form it knows.')
+        try:
+            return _plan_out(_plan_built_cells(job, built, rom, scene, system, [v.layer for v in layers], verify, expect), rom,
+                             'cells-built')
+        except ValueError as error:
+            raise ValueError((failure or 'ROMancer packed your background back into the ROM, but replaying the game did not '
+                              'show it as painted.') + ' ' + str(error)) from None
     _progress(job, 'Replaying the game to check the background…')
     plan = gt.EditPlan('direct', gt.with_checksums(rom, [(o, a, b) for o, (a, b) in sorted(writes.items())], system), len(rom), expect)
     if not _good(verify(plan)):
@@ -1089,6 +1104,55 @@ def _plan_cells(job: dict) -> dict:
                          + ('some of the cells' if missed and (plan.verified or {}).get('verified') else 'the cells')
                          + ' as painted in this scene, so the change is not offered. The game may redraw them from somewhere else.')
     return _plan_out(plan, rom, 'cells')
+
+
+def _plan_built_cells(job: dict, built: list, rom: bytes, scene, system: str, layers: list, verify, expect: dict):
+    """Cells the game builds from stored pieces (blocks, tables): find each piece by replay and change it there.
+
+    cell_trace.plan_cell_edit confirms every cell on its own; several cells
+    are then replayed together, and the plan is kept only when all of them
+    come out as painted. Other cells built from the same pieces change too:
+    plan.details['also_cells'] lists them and a note says how many.
+    """
+    if len(built) > MAX_BUILT_CELLS:
+        raise ValueError(f'These cells are not stored one by one in the ROM. ROMancer can look for the stored pieces the game '
+                         f'builds them from, but only for up to {MAX_BUILT_CELLS} cells in one change. Paint fewer cells.')
+    one = len(built) == 1
+    merged, plans = {}, []
+    for number, (cell, new) in enumerate(built):
+        _progress(job, 'Looking for the stored piece the game builds this cell from…', number, len(built))
+        try:
+            plan = ct.plan_cell_edit(cell, new, rom, scene, system, verify=verify, layers=layers, paths=('cell-source',))
+        except ValueError:
+            raise ValueError('ROMancer also looked for a stored piece the game builds ' + ('this cell' if one else 'these cells')
+                             + ' from, and replaying the game confirmed none. ' + ('This cell' if one else 'These cells')
+                             + ' cannot be changed here.') from None
+        plans.append(plan)
+        for offset, old, value in plan.writes:
+            if offset != plan.details['source_offset']:
+                continue                             # a header checksum: worked out again for the cells together
+            if merged.get(offset, (old, value))[1] != value:
+                raise ValueError('Two of the cells you painted are built from the same stored piece, so they cannot be given '
+                                 'different pictures. Paint them the same, or one at a time.')
+            merged[offset] = (old, value)
+    if one:
+        return plans[0]
+    data = sorted({plan.details['source_offset'] for plan in plans})
+    plan = gt.EditPlan('cell-source', gt.with_checksums(rom, [(o, *merged[o]) for o in data], system), len(rom), expect)
+    if not _good(verify(plan, expect)):
+        raise ValueError('Each of these cells could be changed on its own, but not all of them together: they are built from '
+                         'stored pieces that overlap. Paint them one at a time.')
+    effects = ct.side_effects(plan.verified, expect, layers, system)
+    if effects['outside_maps']:
+        raise ValueError('Changing these cells together also changed video memory outside the backgrounds, so the change is '
+                         'not offered. Paint them one at a time.')
+    plan.details.update(effects, path='cell-source', source_offsets=data)
+    others = len(effects['also_cells'])
+    plan.notes.append('The game builds these cells from stored pieces; the pieces were changed.')
+    if others:
+        plan.notes.append(f'{others} other background cell{"s" if others != 1 else ""} in this scene '
+                          f'change{"" if others != 1 else "s"} with them: the game builds them from the same stored pieces.')
+    return plan
 
 
 def _new_cell(cell, new: bytearray, options: dict) -> None:

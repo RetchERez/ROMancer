@@ -10,19 +10,28 @@ For each ROM: boot with the exploring input script, take a scene, and record
 * one causal tile edit: a tile on screen is redrawn, the ROM writes are
   planned (plan_tile_edit) and the scene is replayed with the edited ROM;
   the edit counts only when video memory then holds the planned bytes;
-* one causal map-cell edit, the same way;
+* one causal map-cell edit, the same way, by the first path that replays as
+  planned (romancer.cell_trace): written in place, re-packed, or through the
+  stored piece the game builds the cell from. Every layer of the scene is
+  looked at, and when the scene has no cell that can be changed, the other
+  scenes of the run are (including two taken between the main ones);
 * for a tile that cannot be written in place (computed or packed): which
   codec, if any, reproduces it, and whether the re-encode / relocate /
   overlay path replays as planned;
 * whether the codec-independent overlay fallback works for this game.
 
-Results are one JSON per ROM, so the sweep can be resumed.
+Results are one JSON per ROM, so the sweep can be resumed. Every ROM runs in
+its own process; the sweep ends those processes when it ends, however it ends.
 """
 import argparse
+import atexit
 import json
 import os
+import signal
+import subprocess
 import sys
 import tempfile
+import threading
 import time
 import traceback
 from pathlib import Path
@@ -32,7 +41,9 @@ sys.path.insert(0, str(HERE)); sys.path.insert(0, str(HERE.parent))
 
 STEP = 900
 SETTLE = 45          # frames before a scene at which video memory is sampled once more
-SWEEP_VERSION = 4
+SWEEP_VERSION = 5
+MAP_PICKS = 2        # background cells tried per layer and kind of source
+MAP_SECONDS = 300    # no new background cell is started after this long (per ROM)
 VIDEO_DOMAINS = ('vram', 'chr', 'vram4')
 
 
@@ -114,8 +125,16 @@ def trace(core, rom, suffix, system, frames, work, step=STEP, buttons=explore, o
     s = pv.TraceSession(fe, checkpoint_every=300 if fe_for.savestates else 10 ** 9)
     s.start()
     scenes = []
+    half = step // 2 if step - SETTLE > step // 2 > 0 else 0
     for _ in range(max(1, frames // step)):
-        s.run(step - SETTLE, buttons)
+        if half:
+            # A scene halfway to the next one, for the background-cell edit only (scene.map_only): title screens
+            # and menus are often up for a few seconds, and they are where a map is most often plain ROM data.
+            s.run(half, buttons)
+            extra = gt.scene_from_session(s, system)
+            extra.map_only = True
+            scenes.append(extra)
+        s.run(step - SETTLE - half, buttons)
         earlier = video_memory(s.lib)
         s.run(SETTLE, buttons)
         scene = gt.scene_from_session(s, system)
@@ -188,16 +207,26 @@ def confirmed(sections):
                 or ov.get('as_planned') or any(v.get('as_planned') for v in ov.get('variants', [])))
 
 
-def measure(rom, system, scenes, fe_for, result, buttons=explore):
+def measure(rom, system, scenes, fe_for, result, buttons=explore, map_only=False):
     """Measure the last scene; when no tile edit is confirmed there, the earlier scenes too.
 
     The sections of the first scene with a confirmed tile edit path (else of
     the last scene) become the result; `scene_frame` says which scene that
-    was and `scenes_tried` lists every frame measured.
+    was and `scenes_tried` lists every frame measured. `map_only` skips the
+    tile sections and measures the background-cell edit alone, starting at
+    the last scene.
     """
+    if map_only:
+        last = [sc for sc in scenes if not getattr(sc, 'map_only', False)][-1]
+        result['scene_frame'] = last.frame
+        from romancer import graphics_trace as gt
+        result['layers'] = [{'name': l.name, 'size': [l.width, l.height], 'layout_source': l.layout_source,
+                             'cells': l.status_counts()} for l in gt.layers(last, system)]
+        result['map_edit'] = measure_map_edit(rom, system, scenes, last, fe_for, buttons)
+        return
     tried = []
     chosen = None
-    for scene in reversed(scenes):
+    for scene in reversed([sc for sc in scenes if not getattr(sc, 'map_only', False)]):
         sections = measure_scene(rom, system, scene, fe_for, buttons)
         tried.append(scene.frame)
         if chosen is None:
@@ -208,6 +237,150 @@ def measure(rom, system, scenes, fe_for, result, buttons=explore):
     result.update(chosen[1])
     result['scene_frame'] = chosen[0].frame
     result['scenes_tried'] = tried
+    result['map_edit'] = measure_map_edit(rom, system, scenes, chosen[0], fe_for, buttons)
+
+
+def measure_map_edit(rom, system, scenes, chosen, fe_for, buttons=explore, seconds=MAP_SECONDS):
+    """One background-cell edit for this ROM: in the chosen scene if it has a cell that can be changed, else in another.
+
+    A background cell is a separate question from a tile. A scene the game
+    draws cell by cell, a fade or a blank map has nothing to change, while
+    the title screen a few seconds earlier is plain ROM data. Order: cells
+    stored in the ROM, in the chosen scene and then the others (latest
+    first); then cells the game computes, the same way. The first edit that
+    replays as planned is the result; `scenes` in it lists what was tried in
+    every scene before that.
+    """
+    deadline = time.perf_counter() + seconds
+    order = [chosen] + [sc for sc in reversed(scenes) if sc is not chosen]
+    tried = []
+    for phase in ('stored', 'computed'):
+        for scene in order:
+            if phase == 'computed' and time.perf_counter() > deadline:
+                break
+            m = measure_map(rom, system, scene, fe_for, buttons, phase=phase, deadline=deadline)
+            if m.get('as_planned'):
+                m['scenes'] = tried
+                return m
+            tried.append(m)
+    out = {'scene_frame': chosen.frame, 'candidates': sum(t['candidates'] for t in tried if t['phase'] == 'stored'),
+           'computed_candidates': sum(t['computed_candidates'] for t in tried if t['phase'] == 'computed'),
+           'scenes': tried}
+    if time.perf_counter() > deadline:
+        out['stopped'] = f'no new cell after {seconds} seconds'
+    return out
+
+
+def map_candidates(scene, system, lay, status, most=MAP_PICKS):
+    """[(layer, how many cells qualify, [cells to try])] for cells whose tile number has `status`.
+
+    A cell qualifies when its tile number's source is not a 00/FF coincidence
+    and the tile it shows holds a picture (filler cells say little, and a
+    whole blank map is often one ROM byte written everywhere). The cells to
+    try come from the middle of the map and from different ROM bytes.
+    """
+    from romancer import graphics_trace as gt, cell_trace as ct
+    doms = scene.snapshot.domains
+    out = []
+    for layer in lay:
+        tiles = doms.get(layer.tile_domain)
+        size = gt.TILE_FORMATS[layer.tile_format][1]
+
+        def pictured(c):
+            if tiles is None or tiles.data is None or c.tile_address < 0:
+                return True
+            return len(set(tiles.data[c.tile_address:c.tile_address + size])) > 1
+        cells = [c for c in layer.cells if ct.tile_status(c) == status and not ct.tile_source(c)['weak'] and pictured(c)]
+        seen, picked = set(), []
+        start = len(cells) // 3
+        for c in cells[start:] + cells[:start]:
+            key = ct.tile_source(c)['offset']
+            if key in seen:
+                continue
+            seen.add(key)
+            picked.append(c)
+            if len(picked) >= most:
+                break
+        out.append((layer, len(cells), picked))
+    return out
+
+
+def measure_map(rom, system, scene, fe_for, buttons=explore, lay=None, phase='stored', deadline=None):
+    """One background-cell edit in this scene, by the first path the replay confirms (romancer.cell_trace).
+
+    The edit is the smallest there is: the cell's tile number plus one.
+    phase 'stored' tries cells whose tile number is a ROM byte, then code
+    values, written in place; phase 'computed' tries cells the game computes
+    (a packed map, or cells built from a stored piece). `as_planned` is true
+    only when the replay with the edited ROM left exactly the planned bytes
+    in the cell.
+    """
+    from romancer import graphics_trace as gt, cell_trace as ct
+    from romancer import provenance as pv
+    t0 = time.perf_counter()
+    lay = gt.layers(scene, system) if lay is None else lay
+    slow = gt.CPU[system] in ('65816', '68000')
+    before = [c for c in scene.checkpoints if c[0] < scene.frame] or scene.checkpoints[:1]
+    quick = pv.Scene(scene.id, scene.frame, scene.screen_sha256,
+                     sorted({c[0]: c for c in scene.checkpoints[:1] + before[-2:]}.values()), scene.snapshot)
+    quick.video = getattr(scene, 'video', None)
+    # A probe that changes nothing is replayed from every checkpoint given; two bound that cost.
+    short = pv.Scene(scene.id, scene.frame, scene.screen_sha256,
+                     sorted({c[0]: c for c in scene.checkpoints[:1] + before[-1:]}.values()), scene.snapshot)
+    short.video = quick.video
+
+    def verify(plan, expect=None):
+        return gt.verify_plan(fe_for, rom, plan, short if plan.kind == 'cell-source' else quick, expect=expect,
+                              buttons_for=buttons)
+    kinds = (('rom', ('direct',)), ('code', ('direct',))) if phase == 'stored' else (('derived', ('reencode', 'cell-source')),)
+    # A layer the registers say is not drawn (a Mega Drive window of no size, a Super NES layer that is switched
+    # off) is not a background: its "map" may be tile data or anything else that sits at that address.
+    drawn = [layer for layer in lay if layer.shown is not False]
+    picks = [(status, paths, map_candidates(scene, system, drawn, status)) for status, paths in kinds]
+    count = sum(n for _, _, found in picks for _, n, _ in found)
+    result = {'scene_frame': scene.frame, 'phase': phase, 'layers': len(drawn),
+              'candidates': count if phase == 'stored' else 0, 'computed_candidates': count if phase == 'computed' else 0}
+    attempts = result['attempts'] = []
+    spare = None
+    for status, paths, found in picks:
+        for layer, _, picked in found:
+            for c in picked:
+                if deadline is not None and time.perf_counter() > deadline:
+                    result['stopped'] = 'out of time'
+                    break
+                k = ct.tile_bytes(c)[0]
+                new = bytearray(c.stored)
+                new[k] = (new[k] + 1) & 0xFF
+                entry = {'layer': layer.name, 'cell': [c.x, c.y], 'source': status}
+                attempts.append(entry)
+                try:
+                    plan = ct.plan_cell_edit(c, bytes(new), rom, scene, system, verify=verify, layers=lay, paths=paths,
+                                             max_probes=4 if slow else 6)
+                except ValueError as e:
+                    entry['error'] = str(e)[:400]
+                    continue
+                entry['path'] = plan.details['path']
+                hit = dict(layer=layer.name, cell=[c.x, c.y], source=status, path=plan.details['path'],
+                           writes=len(plan.writes), also_cells=len(plan.details['also_cells']),
+                           outside_maps=plan.details['outside_maps'], **brief(plan.verified))
+                if plan.kind == 'cell-source':
+                    hit['relation'] = plan.details.get('relation')
+                elif 'block' in plan.details:
+                    hit['codec'] = plan.details['block'].get('codec')
+                if hit['outside_maps']:
+                    # As planned, but video memory outside the maps changed too (a code value used for more than
+                    # this cell, or a game that takes another course). A cell without that is the better evidence:
+                    # keep this one in hand and try the rest.
+                    entry['outside_maps'] = hit['outside_maps']
+                    spare = spare or hit
+                    continue
+                result.update(hit)
+                result['seconds'] = round(time.perf_counter() - t0, 1)
+                return result
+    if spare:
+        result.update(spare)
+    result['seconds'] = round(time.perf_counter() - t0, 1)
+    return result
 
 
 def measure_scene(rom, system, scene, fe_for, buttons=explore):
@@ -341,32 +514,6 @@ def measure_scene(rom, system, scene, fe_for, buttons=explore):
             private['error'] = str(e)[:240]
     result['private_copy'] = private
 
-    # ---- one map cell edit, replayed --------------------------------------
-    cell_result = {}
-    for layer in lay[:1]:
-        cands = [c for c in layer.cells if c.editable and c.sources[0] and not c.sources[0]['weak']]
-        cell_result['candidates'] = len(cands)
-        for c in cands[len(cands) // 2:len(cands) // 2 + 3]:
-            if system in ('gb', 'gbc', 'nes'):
-                number = (c.stored[0] + 1) & 0xFF
-            else:
-                number = (c.tile + 1) & 0xFF
-            try:
-                writes = gt.plan_tilemap_edit(c, rom, tile=number)
-            except ValueError as e:
-                cell_result['refused'] = str(e)[:80]
-                continue
-            new = bytearray(c.stored)
-            for o, _, n in writes:
-                for k, src in enumerate(c.sources):
-                    if src and src['offset'] + gt.rom_skip(rom, system) == o:
-                        new[k] = n
-            r = verify(gt.with_checksums(rom, writes, system), gt.expect_for(c, bytes(new)))
-            cell_result.update(cell=[c.x, c.y], writes=len(writes), **brief(r))
-            if r.get('as_planned'):
-                break
-    result['map_edit'] = cell_result
-
     # ---- tiles that cannot be written in place ----------------------------
     hard = [t for t in shown if t.status == 'derived'] or [t for t in live if t.status == 'derived']
     hard.sort(key=lambda t: not settled(t))
@@ -446,7 +593,8 @@ def measure_scene(rom, system, scene, fe_for, buttons=explore):
     return result
 
 
-def one(sha, entry, core, system, frames, outdir, options=None, retry_options=None, fallback_cores=(), core_for=()):
+def one(sha, entry, core, system, frames, outdir, options=None, retry_options=None, fallback_cores=(), core_for=(),
+        map_only=False):
     """Trace and measure one ROM.
 
     The engine is first asked to load the ROM as it is. When it refuses the
@@ -487,9 +635,11 @@ def one(sha, entry, core, system, frames, outdir, options=None, retry_options=No
             break
         if rejected:
             result['engines_that_refused'] = rejected
-        result['distinct_screens'] = len({sc.screen_sha256 for sc in scenes})
+        result['distinct_screens'] = len({sc.screen_sha256 for sc in scenes if not getattr(sc, 'map_only', False)})
         result['savestates'] = fe_for.savestates
-        measure(rom, system, scenes, fe_for, result)
+        measure(rom, system, scenes, fe_for, result, map_only=map_only)
+        if map_only:
+            result['map_only'] = True
         result['ok'] = True
     except Exception as e:  # recorded, never hidden
         result['ok'] = False
@@ -552,6 +702,52 @@ def overlay_outcome(overlay):
     return best
 
 
+MAP_CAUSES = {
+    'no layer': 'no background layer is drawn in any sampled scene (or the registers that place the layers were not '
+                'captured)',
+    'nothing drawn': 'no sampled scene has a background cell that shows a picture and was written while tracing '
+                     '(blank or untouched maps)',
+    'computed': 'every pictured cell is computed by the game (unpacked or built at run time); no packed form ROMancer '
+                'knows and no stored piece near the traced source gave the planned cell',
+    'shared source': 'cells trace to ROM bytes, but each such byte also feeds a byte that must stay (run-length or '
+                     'packed data), and the computed cells could not be changed either',
+    'no effect': 'cells trace to ROM bytes or code values, but the replay with those bytes changed did not show the '
+                 'planned cell (drawn before the first checkpoint that replays, a coincidence of values, or code that '
+                 'is shared)',
+    'out of time': 'the time allowed for the background-cell edit ran out before a cell was confirmed',
+}
+
+
+def map_cause(r):
+    """(cause, detail) for a result whose background-cell edit is not confirmed, else None. Causes: MAP_CAUSES."""
+    m = r.get('map_edit') or {}
+    if m.get('as_planned'):
+        return None
+    scenes = m.get('scenes')
+    if scenes is None:                      # results from before sweep version 5: one scene, first layer, in place only
+        if not r.get('layers'):
+            return 'no layer', ''
+        if not m.get('candidates'):
+            cells = r['layers'][0]['cells']
+            return ('computed' if cells['derived'] else 'nothing drawn'), 'first layer only'
+        return ('shared source' if 'refused' in m and 'verified' not in m else 'no effect'), 'first layer only'
+    if not any(t.get('layers') for t in scenes):
+        return 'no layer', ''
+    attempts = [a for t in scenes for a in t.get('attempts', [])]
+    if not attempts:
+        return ('out of time' if m.get('stopped') else 'nothing drawn'), ''
+    stored = [a for a in attempts if a['source'] != 'derived']
+    computed = [a for a in attempts if a['source'] == 'derived']
+    detail = f'{len(stored)} stored and {len(computed)} computed cells tried in {len({t["scene_frame"] for t in scenes})} scenes'
+    if not stored:
+        return 'computed', detail
+    if all('also feeds a byte' in a.get('error', '') or 'come from one ROM byte' in a.get('error', '') for a in stored):
+        return 'shared source', detail
+    if m.get('stopped') and not computed:
+        return 'out of time', detail
+    return 'no effect', detail
+
+
 def report(outdir):
     """Totals over every result in OUTDIR, by system."""
     rows = [json.loads(p.read_text()) for p in Path(outdir).glob('*.json')]
@@ -571,6 +767,19 @@ def report(outdir):
         s['tile_edit_no_candidate'] = sum(not r['tile_edit'].get('candidates') for r in ok)
         s['map_edit_as_planned'] = sum(bool(r['map_edit'].get('as_planned')) for r in ok)
         s['map_edit_no_candidate'] = sum(not r['map_edit'].get('candidates') for r in ok)
+        done = [r['map_edit'] for r in ok if r['map_edit'].get('as_planned')]
+        s['map_edit_path'] = {}
+        for m in done:
+            path = m.get('path', 'direct')
+            s['map_edit_path'][path] = s['map_edit_path'].get(path, 0) + 1
+        s['map_edit_in_another_scene'] = sum(bool(m.get('scenes')) for m in done)
+        s['map_edit_other_cells_change_too'] = sum(bool(m.get('also_cells')) for m in done)
+        s['map_edit_changes_outside_the_maps'] = sum(bool(m.get('outside_maps')) for m in done)
+        s['map_edit_cause'] = {}
+        for r in ok:
+            cause = map_cause(r)
+            if cause:
+                s['map_edit_cause'][cause[0]] = s['map_edit_cause'].get(cause[0], 0) + 1
         hard = [r for r in ok if 'tile' in r['derived_edit']]
         s['hard_tile_roms'] = len(hard)
         codecs = {}
@@ -628,24 +837,107 @@ def report(outdir):
     return out
 
 
+_CHILDREN = set()
+_CHILDREN_LOCK = threading.Lock()
+_STOP = threading.Event()
+
+
+def _end_children():
+    """Kill every ROM process still running. Registered with atexit and called on SIGINT/SIGTERM/SIGBREAK."""
+    _STOP.set()
+    with _CHILDREN_LOCK:
+        running = list(_CHILDREN)
+    for proc in running:
+        try:
+            proc.kill()
+        except OSError:
+            pass
+    for proc in running:
+        try:
+            proc.wait(timeout=10)
+        except (OSError, subprocess.TimeoutExpired):
+            pass
+
+
+def _tie_children_to_this_process():
+    """Windows: a job object that ends every process in it when its last handle closes.
+
+    The sweep puts itself in the job, so the ROM processes it starts are in
+    it too, and they die with the sweep even when the sweep is killed
+    outright (when no atexit handler runs). Returns the handle, which must
+    stay open for as long as the sweep lives, or None where this is not
+    available. Elsewhere the handlers in main() do the job.
+    """
+    if os.name != 'nt':
+        return None
+    try:
+        import ctypes
+        from ctypes import wintypes
+        k32 = ctypes.WinDLL('kernel32', use_last_error=True)
+
+        class Basic(ctypes.Structure):
+            _fields_ = [('PerProcessUserTimeLimit', ctypes.c_int64), ('PerJobUserTimeLimit', ctypes.c_int64),
+                        ('LimitFlags', wintypes.DWORD), ('MinimumWorkingSetSize', ctypes.c_size_t),
+                        ('MaximumWorkingSetSize', ctypes.c_size_t), ('ActiveProcessLimit', wintypes.DWORD),
+                        ('Affinity', ctypes.c_size_t), ('PriorityClass', wintypes.DWORD), ('SchedulingClass', wintypes.DWORD)]
+
+        class Counters(ctypes.Structure):
+            _fields_ = [(n, ctypes.c_uint64) for n in ('Read', 'Write', 'Other', 'ReadBytes', 'WriteBytes', 'OtherBytes')]
+
+        class Extended(ctypes.Structure):
+            _fields_ = [('Basic', Basic), ('Io', Counters), ('ProcessMemoryLimit', ctypes.c_size_t),
+                        ('JobMemoryLimit', ctypes.c_size_t), ('PeakProcessMemoryUsed', ctypes.c_size_t),
+                        ('PeakJobMemoryUsed', ctypes.c_size_t)]
+        k32.CreateJobObjectW.restype = wintypes.HANDLE
+        k32.CreateJobObjectW.argtypes = [ctypes.c_void_p, wintypes.LPCWSTR]
+        k32.SetInformationJobObject.argtypes = [wintypes.HANDLE, ctypes.c_int, ctypes.c_void_p, wintypes.DWORD]
+        k32.AssignProcessToJobObject.argtypes = [wintypes.HANDLE, wintypes.HANDLE]
+        k32.GetCurrentProcess.restype = wintypes.HANDLE
+        job = k32.CreateJobObjectW(None, None)
+        if not job:
+            return None
+        info = Extended()
+        info.Basic.LimitFlags = 0x2000                      # JOB_OBJECT_LIMIT_KILL_ON_JOB_CLOSE
+        if not k32.SetInformationJobObject(job, 9, ctypes.byref(info), ctypes.sizeof(info)):   # extended limit information
+            return None
+        if not k32.AssignProcessToJobObject(job, k32.GetCurrentProcess()):
+            return None
+        return job
+    except (OSError, AttributeError, ImportError):
+        return None
+
+
 def _run_one(args):
     """Run one ROM in its own process, so an engine crash or hang costs only that ROM."""
-    import subprocess
     sha, a = args
     out = Path(a.outdir) / f'{sha}.json'
     if out.exists():
         return sha, 'cached'
+    if _STOP.is_set():
+        return sha, 'not run'
     cmd = [sys.executable, '-B', str(Path(__file__).resolve()), a.index, a.outdir, '--core', a.core,
            '--frames', str(a.frames), '--one', sha]
+    if a.map_only:
+        cmd.append('--map-only')
     for flag, values in (('--option', a.option), ('--retry-option', a.retry_option), ('--fallback-core', a.fallback_core),
                          ('--core-for', a.core_for)):
         for v in values or []:
             cmd += [flag, v]
+    proc = subprocess.Popen(cmd, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+    with _CHILDREN_LOCK:
+        _CHILDREN.add(proc)
     try:
-        code = subprocess.run(cmd, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL, timeout=a.timeout).returncode
+        code = proc.wait(timeout=a.timeout)
         problem = None if out.exists() else f'the engine process ended with code {code} and left no result'
     except subprocess.TimeoutExpired:
+        proc.kill()
+        proc.wait()
         problem = f'no result after {a.timeout} seconds'
+    finally:
+        with _CHILDREN_LOCK:
+            _CHILDREN.discard(proc)
+    if _STOP.is_set() and not out.exists():
+        return sha, 'not run'                # the sweep is ending: this ROM was cut short, not measured
     if problem and not out.exists():
         entry = json.loads(Path(a.index).read_text())[sha]
         out.write_text(json.dumps({'sha256': sha, 'system': entry['system_id'], 'member': entry['member'],
@@ -661,7 +953,7 @@ def main():
     ap.add_argument('--core')
     ap.add_argument('--jobs', type=int, default=4)
     ap.add_argument('--frames', type=int, default=1800)
-    ap.add_argument('--timeout', type=int, default=900, help='seconds allowed per ROM')
+    ap.add_argument('--timeout', type=int, default=2400, help='seconds allowed per ROM')
     ap.add_argument('--option', action='append', help='core option key=value, always applied (repeatable)')
     ap.add_argument('--retry-option', action='append',
                     help='core option key=value applied only when the engine refuses the ROM without it (repeatable)')
@@ -669,6 +961,9 @@ def main():
                     help='another engine to try when the first refuses the ROM (repeatable)')
     ap.add_argument('--core-for', action='append', help='TEXT=ENGINE: ROMs whose name contains TEXT use this engine (repeatable)')
     ap.add_argument('--only', help='comma-separated sha256 prefixes')
+    ap.add_argument('--map-only', action='store_true',
+                    help='measure only the background-cell edit (to re-ask that one question; the results hold no tile '
+                         'sections, so --report and graphics_report.py do not take them)')
     ap.add_argument('--reverse', action='store_true', help='take the ROMs in reverse order (a second sweep helping the first)')
     ap.add_argument('--one', help='run this one sha256 in this process (used by the sweep itself)')
     ap.add_argument('--report', action='store_true', help='print totals for OUTDIR and exit')
@@ -681,7 +976,7 @@ def main():
         entry = index[a.one]
         pairs = lambda xs: dict(o.split('=', 1) for o in xs or [])
         one(a.one, entry, a.core, entry['system_id'], a.frames, a.outdir, pairs(a.option), pairs(a.retry_option),
-            a.fallback_core or (), [tuple(x.split('=', 1)) for x in a.core_for or []])
+            a.fallback_core or (), [tuple(x.split('=', 1)) for x in a.core_for or []], map_only=a.map_only)
         return
     if not a.system or not a.core:
         ap.error('--system and --core are required')
@@ -692,11 +987,25 @@ def main():
     if a.reverse:
         todo.reverse()
     from concurrent.futures import ThreadPoolExecutor
+    job = _tie_children_to_this_process()     # kept in a name: closing the handle would end this process too
+    atexit.register(_end_children)
+
+    def stop(signum, frame):
+        _end_children()
+        raise SystemExit(f'graphics_sweep: stopped by signal {signum}; every ROM process was ended')
+    for name in ('SIGINT', 'SIGTERM', 'SIGBREAK'):
+        if hasattr(signal, name):
+            signal.signal(getattr(signal, name), stop)
     done = 0
-    with ThreadPoolExecutor(a.jobs) as pool:
+    pool = ThreadPoolExecutor(a.jobs)
+    try:
         for sha, state in pool.map(_run_one, [(sha, a) for sha, _ in todo]):
             done += 1
             print(f'{done}/{len(todo)} {sha[:12]} {state}', flush=True)
+    finally:
+        _end_children()
+        pool.shutdown(wait=True, cancel_futures=True)
+    del job
 
 
 if __name__ == '__main__':

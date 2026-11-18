@@ -318,6 +318,7 @@ class Layer:
     scroll_x: int = 0
     scroll_y: int = 0
     notes: list = field(default_factory=list)
+    shown: bool | None = None    # False when the registers say the chip does not draw this layer now; None when not known
 
     def cell(self, x: int, y: int) -> MapCell:
         return self.cells[y * self.width + x]
@@ -331,7 +332,7 @@ class Layer:
     def to_dict(self) -> dict:
         return {'system': self.system, 'name': self.name, 'width': self.width, 'height': self.height,
                 'tile_format': self.tile_format, 'tile_domain': self.tile_domain, 'layout_source': self.layout_source,
-                'scroll_x': self.scroll_x, 'scroll_y': self.scroll_y, 'notes': list(self.notes),
+                'scroll_x': self.scroll_x, 'scroll_y': self.scroll_y, 'notes': list(self.notes), 'shown': self.shown,
                 'cells': [c.to_dict() for c in self.cells]}
 
 
@@ -388,11 +389,16 @@ def capture_video(session, system: str) -> dict | None:
                 return [state[r + o + 2 * k] | state[r + o + 2 * k + 1] << 8 for k in range(n)]
             mode = state[r + 51]
             if mode <= 7:
-                return {'system': system, 'source': 'savestate', 'bg_mode': mode, 'bg3_priority': state[r + 50],
-                        'bg_tilesize': list(state[r + 46:r + 50]), 'bg_scaddr': u16(59, 4),
-                        'bg_scsize': list(state[r + 67:r + 71]), 'bg_tdaddr': u16(71, 4), 'bg_hofs': u16(84, 4),
-                        'bg_vofs': u16(92, 4), 'oam_tdaddr': u16(37)[0], 'oam_nameselect': state[r + 36],
-                        'display_disabled': state[r + 33]}
+                video = {'system': system, 'source': 'savestate', 'bg_mode': mode, 'bg3_priority': state[r + 50],
+                         'bg_tilesize': list(state[r + 46:r + 50]), 'bg_scaddr': u16(59, 4),
+                         'bg_scsize': list(state[r + 67:r + 71]), 'bg_tdaddr': u16(71, 4), 'bg_hofs': u16(84, 4),
+                         'bg_vofs': u16(92, 4), 'oam_tdaddr': u16(37)[0], 'oam_nameselect': state[r + 36],
+                         'display_disabled': state[r + 33]}
+                # Which layers the main and the sub screen draw ($212C/$212D): five flags each, BG1-BG4 and objects.
+                enabled = state[r + 158:r + 168]
+                if len(enabled) == 10 and all(v in (0, 1) for v in enabled):
+                    video['bg_enabled'], video['bgsub_enabled'] = list(enabled[:5]), list(enabled[5:])
+                return video
     if system in ('genesis', 'sms', 'gg') and 'blastem' in core:
         video = blastem_video(session.fe.serialize(), system)
         if video:
@@ -499,6 +505,9 @@ def _gb_layers(scene, system, video):
                 layer.scroll_x, layer.scroll_y = video['scx'], video['scy']
             else:
                 layer.scroll_x, layer.scroll_y = 7 - video['wx'], -video['wy']
+                layer.shown = video['wy'] < 144 and video['wx'] < 167      # switched on, but parked off the screen
+                if not layer.shown:
+                    layer.notes.append('The window is switched on but placed off the screen at this moment.')
         else:
             layer.notes.append('Which map and tile block are on screen was inferred from the tiles they use.')
         out.append(layer)
@@ -581,6 +590,10 @@ def _snes_layers(scene, system, video):
                                    vflip=bool(e & 0x8000), palette=e >> 10 & 7, priority=bool(e & 0x2000)))
         layer = Layer(system, f'BG{k + 1}', w, h, fmt, 'vram', cells, 'registers')
         layer.scroll_x, layer.scroll_y = video['bg_hofs'][k], video['bg_vofs'][k]
+        if 'bg_enabled' in video:
+            layer.shown = bool(video['bg_enabled'][k] or video['bgsub_enabled'][k])
+            if not layer.shown:
+                layer.notes.append('The game has this layer switched off at this moment.')
         if video['bg_tilesize'][k]:
             layer.notes.append('This layer draws 16x16 tiles: each cell also shows the three tiles after it.')
         out.append(layer)
@@ -614,6 +627,14 @@ def _genesis_layers(scene, system, video):
         layer = Layer(system, name, w, h, 'genesis-4bpp', 'vram', cells, source)
         if not video:
             layer.notes.append('Plane position and size are the common defaults, not read from the engine.')
+        elif name == 'window':
+            # The window replaces plane A left or right of a column and above or below a row (registers 17 and 18);
+            # with both at zero it covers nothing, and its table address may point at anything.
+            layer.shown = bool(regs[17] & 0x9F or regs[18] & 0x9F)
+            if not layer.shown:
+                layer.notes.append('The game does not show the window plane at this moment.')
+        else:
+            layer.shown = True
         out.append(layer)
     return out
 

@@ -29,6 +29,7 @@ READ_CHUNK_BYTES = 64 * 1024
 APPROVED_FILES = frozenset({
     # v1.1 "Scenes & colors": the editor, its tracing-engine loader and pins, and trace/ (the
     # GPL engines' hook scripts are the corresponding source changes and must ship).
+    'romancer/cell_trace.py',
     'romancer/edit_session.py',
     'romancer/gfx_codecs.py',
     'romancer/gfx_families.py',
@@ -42,6 +43,7 @@ APPROVED_FILES = frozenset({
     'romancer/ui/scene_editor.js',
     'romancer/ui/scene_graphics.js',
     'romancer/ui/views/scenes.js',
+    'tests/test_cell_trace.py',
     'tests/test_edit_session.py',
     'tests/test_gfx_codecs.py',
     'tests/test_graphics_trace.py',

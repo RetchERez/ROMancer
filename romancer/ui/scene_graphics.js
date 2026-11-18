@@ -65,6 +65,15 @@ export function sharedCells(layer,indices){
  return out;
 }
 export const cellState=(layer,index)=>({r:'plain',c:'plain',d:'packed',u:'locked'}[layer.cells.status[index]]||'locked');
+// Painted cells the game does not store one by one ('packed'): what will be tried for them, said before the user asks.
+// ROMancer looks for the map packed in the ROM, then for the stored piece (a block of cells, a table) the game builds
+// each cell from; the second search is done cell by cell, so it has a limit.
+export const BUILT_CELL_LIMIT=6;
+export function builtCellsNote(count){
+ if(!count)return '';
+ const one=count===1,it=one?'it':'them';
+ return ` ${count} painted cell${one?' is':'s are'} built by the game while it runs. ROMancer will look for ${it} packed in the ROM, or for the stored piece the game builds ${it} from, and say so if it cannot change ${it}. Changing a stored piece changes every place the game draws with it; the check counts them.${count>BUILT_CELL_LIMIT?` Stored pieces can be looked for in up to ${BUILT_CELL_LIMIT} cells at a time, so paint fewer cells if this is refused.`:''}`;
+}
 export function cellNow(layer,index,tileFor){
  const flags=layer.cells.flags[index];
  return {tile:tileFor(layer.cells.tile[index]),hflip:!!(flags&1),vflip:!!(flags&2),line:layer.cells.line[index]};

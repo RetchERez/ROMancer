@@ -1,5 +1,5 @@
 import assert from 'node:assert/strict';
-import {expandGraphics,MODES,parsePixels,pixelText,tilePalette,sameTile,flipTile,fillTile,nearestInk,importPixels,tileRgba,howLabel,bandAt,cellAt,cellRects,bandGrid,sharedCells,cellState,layerLabel,bestLayer,checkTone} from '../romancer/ui/scene_graphics.js';
+import {expandGraphics,MODES,parsePixels,pixelText,tilePalette,sameTile,flipTile,fillTile,nearestInk,importPixels,tileRgba,howLabel,bandAt,cellAt,cellRects,bandGrid,sharedCells,cellState,builtCellsNote,BUILT_CELL_LIMIT,layerLabel,bestLayer,checkTone} from '../romancer/ui/scene_graphics.js';
 import {changeLine} from '../romancer/ui/scene_editor.js';
 import {render} from '../romancer/ui/views/scenes.js';
 
@@ -38,6 +38,11 @@ assert.deepEqual(cellRects(layer,0,0,160,144).map(rect=>[rect.x,rect.y,rect.firs
 const [xs,ys]=bandGrid(layer,layer.bands[1],160);assert.equal(xs[0],3);assert.equal(xs[1],11);assert.equal(ys[0],21);
 assert.equal(sharedCells(layer,[3]).length,63,'cells stored in the same place in the ROM change together');assert.deepEqual(sharedCells(layer,[100]),[]);
 assert.equal(cellState(layer,0),'plain');assert.equal(cellState(layer,cells-1),'locked');
+// cells the game builds: the note names both searches, counts in the singular and plural, and states the limit only when it applies
+assert.equal(builtCellsNote(0),'');
+assert.match(builtCellsNote(1),/^ 1 painted cell is built by the game while it runs\. ROMancer will look for it packed in the ROM, or for the stored piece the game builds it from/);
+assert.match(builtCellsNote(3),/3 painted cells are built .* every place the game draws with it/);assert.doesNotMatch(builtCellsNote(BUILT_CELL_LIMIT),/paint fewer cells/);
+assert.match(builtCellsNote(BUILT_CELL_LIMIT+1),new RegExp(`up to ${BUILT_CELL_LIMIT} cells at a time, so paint fewer cells`));
 assert.match(layerLabel(layer),/Background \(seen on 97% of the screen\)/);
 assert.equal(bestLayer([{...layer,seen:10},{...layer,index:1,seen:60},{...layer,index:2,placed:false,seen:99}]).index,1);
 assert.equal(changeLine({planning:true,scope:'all',verdict:'Trying to pack your picture back into the ROM…'}),'Trying to pack your picture back into the ROM…');

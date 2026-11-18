@@ -132,6 +132,37 @@ game may have a transfer of its own under way (it works only while the
 interrupted program is waiting, where that can be told), and the planner
 tries the careful variants first.
 
+## Background cells the game builds: the stored piece
+
+A background cell holds a tile number. Where that number is a ROM byte it
+is written in place, and where the map is packed with a known codec it is
+unpacked, changed and packed again. Many games do neither: they build the
+screen from blocks of cells (a level is a grid of block numbers, and a
+table holds the cells of each block), or read the number from a table and
+add a base to it. Such a cell is tagged *derived*, and the tag names the
+last ROM byte the game read before writing it, which is usually the
+piece itself.
+
+`cell_trace.plan_cell_edit` therefore tries the ROM bytes at and around
+that traced byte, one at a time: the byte is moved by as much as the cell
+has to move, the scene is replayed, and the place counts only when the cell
+then holds exactly the planned value. Two things are refused even then: a
+place that also changes video memory outside the background maps, and a
+byte the game adds to every cell it draws (a quarter of the layer moves
+with it).
+
+Changing a stored piece changes every place the game draws with it. The
+plan lists the other cells of the scene that changed (`also_cells`), the
+editor says how many before the change is kept, and the "Also changes"
+strip re-renders every recorded scene whose trace names the changed bytes.
+
+Which picture a cell shows is its tile number. The cell's other stored byte
+(the NES attribute byte of a 4x4 block, or the upper byte with a palette or
+priority bit on the 16-bit systems) is often computed even when the tile
+number is a plain ROM byte. A change is planned byte by byte: painting a
+picture needs only the tile number, so such a cell is written in place, and
+the sweep picks its cells by the tile number (`cell_trace.tile_status`).
+
 ## What counts as confirmed
 
 Three facts are recorded for an edit, and they are kept apart:
