@@ -46,9 +46,16 @@ PALETTE = ('verified', 'ram-only', 'traced', 'located', 'derived', 'none', 'erro
 UNTRACED_CHIPS = ('SA-1', 'SuperFX', 'S-DD1', 'SPC7110', 'Cx4')
 
 
+def not_shipped(r):
+    """True for a result measured with a tracing engine that the packages do not include."""
+    return 'mgba' in str(r.get('core', ''))
+
+
 def classify(r):
     if not r.get('ok'):
         return 'error', 'error'
+    if not_shipped(r):
+        return 'none', 'none'
     live = r.get('palette_live', {})
     causal = r.get('causal') or {}
     if causal.get('verified'):
@@ -152,6 +159,8 @@ def cause(r, pal, chip):
     """Why this ROM's palette is not verified, in one line."""
     causal = r.get('causal') or {}
     attempts = causal.get('attempts', [])
+    if not_shipped(r):
+        return 'not available: this cartridge needs a tracing engine that is not included in the packages'
     if chip in UNTRACED_CHIPS and pal != 'verified':
         return f'coprocessor: the {chip} chip prepares these colors itself; only the main CPU is traced'
     if pal == 'error':
