@@ -71,6 +71,15 @@ def classify(r):
 
 HOW = ('traced', 'other scene', 'plain copy', 'code number', 'measured')
 
+# What a closer look at an unverified ROM found, by SHA-256. Added to the measured cause, never instead of it.
+STUDIED = {
+    '1af2d4b29552': 'Looked at by hand: one table byte is the final value of all three shade registers, and the program also '
+                    'compares the palette with that same number in six places to end its fades, so changing the table byte '
+                    'alone changes how the game runs. An edit would have to change those compares too.',
+    '44c96f106b96': 'Looked at by hand: the game never writes video memory in this engine with this dump, so there is '
+                    'nothing to trace or replay.',
+}
+
 
 def how_verified(r):
     """Which search verified this ROM's edit (see the module text), and whether it needed the second input script."""
@@ -208,7 +217,8 @@ def main():
         if chip:
             chips[chip].append((name, pal))
         if pal != 'verified':
-            unverified[r['system']].append((name, pal, cause(r, pal, chip)))
+            studied = next((text for prefix, text in STUDIED.items() if r.get('sha256', '').startswith(prefix)), '')
+            unverified[r['system']].append((name, pal, cause(r, pal, chip) + ('. ' + studied if studied else '')))
     total = Counter(v['system_id'] for v in (catalog or index).values())
     lines = [f"| System | Traced / in {'catalog' if catalog else 'corpus'} | Palette verified | ram-only | traced | located | derived | none | errors | Graphics direct | derived | none |",
              '|---|---|---|---|---|---|---|---|---|---|---|---|']
