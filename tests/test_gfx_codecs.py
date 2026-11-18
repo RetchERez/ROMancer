@@ -633,6 +633,48 @@ class Packers(unittest.TestCase):
         with self.assertRaises(ValueError):
             gc.decode('lz-konami-md', b'\x00\x09' + stream[2:])      # the size does not agree
 
+    def test_common_prefix(self):
+        raw = b'abcabcabcabX' + bytes(300) + b'Z'
+        self.assertEqual(gp.common_prefix(raw, 0, 3, 100), 8)       # abcabcab, then c against X
+        self.assertEqual(gp.common_prefix(raw, 0, 3, 5), 5)
+        self.assertEqual(gp.common_prefix(raw, 0, 1, 100), 0)
+        self.assertEqual(gp.common_prefix(raw, 12, 13, 1000), 299)   # a run overlapping itself, up to the Z
+        self.assertEqual(gp.common_prefix(raw, 12, len(raw) - 2, 1000), 1)
+
+    def test_match_finder_agrees_with_the_plain_search(self):
+        raw = sample(1500, seed=58)
+        plain = gp.lz_matches(raw, 400, 60, 3, chain=10 ** 6)
+        finder = gp.MatchFinder(raw, 400, 60, 3, chain=10 ** 6)
+        for i in range(0, len(raw), 3):         # asked for at some positions only, in rising order
+            k, dist = finder.at(i)
+            self.assertEqual(k, plain[i][0], i)
+            if k:
+                self.assertEqual(raw[i - dist:i - dist + k] if dist >= k else (raw[i - dist:i] * k)[:k], raw[i:i + k])
+
+    def test_ladder_rises_in_length_and_distance(self):
+        raw = sample(1200, seed=59)
+        ladder = gp.lz_ladder(raw, 500, 80, 2)
+        self.assertEqual(len(ladder), len(raw))
+        some = 0
+        for i, steps in enumerate(ladder):
+            for (k0, d0), (k1, d1) in zip(steps, steps[1:]):
+                self.assertTrue(k1 > k0 and d1 > d0)
+            for k, dist in steps:
+                some += 1
+                self.assertTrue(2 <= k <= 80 and 1 <= dist <= min(i, 500))
+                self.assertEqual(bytes(raw[i - dist + j] for j in range(k)), raw[i:i + k])
+        self.assertGreater(some, 100)
+
+    def test_rnc_encoders_pack_no_worse_than_a_plain_greedy_parse(self):
+        raw = sample(6000, seed=60)
+        self.assertLess(len(gc.encode('rnc1', raw)), len(raw) // 2)
+        self.assertLess(len(gc.encode('rnc2', raw)), len(raw) // 2)
+        # method 1 reaches further back than method 2's 4096-byte window
+        rng = random.Random(61)
+        block = bytes(rng.randrange(256) for _ in range(600))
+        far = block + bytes(rng.randrange(256) for _ in range(9000)) + block
+        self.assertLess(len(gc.encode('rnc1', far)), len(gc.encode('rnc2', far)) - 400)
+
     def test_magic_starts_are_the_nearest_streams_in_front(self):
         rom = bytearray(0x3000)
         for at in (0x100, 0x900, 0x2000):
