@@ -3,11 +3,29 @@
 No engine needed: the swatches and ROMs are built by hand. Every place these
 searches return is only a proposal; the editor and the coverage sweep write
 it and replay the game before calling it anything.
+
+The end-to-end test runs a real Game Boy Color game whose palette is faded
+through work RAM, so every color on screen is tagged 'computed'. It needs the
+tracing engines and the local ROM corpus, like tests/test_edit_session.py, and
+is skipped without them.
 """
+import os
+from pathlib import Path
+import shutil
+import tempfile
+import time
 import unittest
+from unittest import mock
 
 from romancer import palette_trace as pt
 from romancer.palette_trace import Swatch
+
+try:
+    from test_edit_session import TRACE_DIR, corpus_rom, tracing_ready
+except ImportError:                      # run as tests.test_palette_search
+    from tests.test_edit_session import TRACE_DIR, corpus_rom, tracing_ready
+
+FADED_GAME = 'Wendy - Every Witch Way (USA, Europe)'
 
 
 def line(domain, fmt, stored, status='derived', first=0, sources=None):
@@ -116,6 +134,49 @@ class MeasurementTests(unittest.TestCase):
         self.assertIsNone(pt.plan_by_measurement(low_only, self.rom, [11, 12, 13], b'\xE4', b'\x1B'))
         self.assertIsNone(pt.plan_by_measurement(self.measure, self.rom, [], b'\xE4', b'\x1B'))
         self.assertIsNone(pt.plan_by_measurement(self.measure, self.rom, [11], b'\xE4', b'\xE4'))
+
+
+@unittest.skipUnless(tracing_ready() and corpus_rom(FADED_GAME, 'gbc'), 'needs the Gambatte tracing engine and the local ROM corpus')
+class FindColorEndToEndTests(unittest.TestCase):
+    def test_the_editor_finds_a_faded_color_as_a_plain_copy_in_the_rom_and_a_replay_shows_it_on_screen(self):
+        from romancer.edit_session import EditSession
+        temp = Path(tempfile.mkdtemp(prefix='romancer-find-'))
+        data, suffix = corpus_rom(FADED_GAME, 'gbc')
+        rom = temp / ('game' + suffix)
+        rom.write_bytes(data)
+        with mock.patch.dict(os.environ, {'ROMANCER_TRACE_CORES': str(TRACE_DIR), 'ROMANCER_TRACE_WORKERS': '2'}):
+            session = EditSession(temp / 'store', rom, 'gbc')
+            try:
+                session.record(12, wait=True)
+                self.assertEqual(session.recording['state'], 'finished', session.recording)
+                target = None
+                for row in reversed(session.summary()['scenes']):
+                    view = session.scene_view(row['id'])
+                    locked = [s for s in view['swatches'] if s['status'] == 'derived' and any(s['colors'][0])]
+                    if len(locked) >= 16:
+                        self.assertTrue(all(s['findable'] and not s['editable'] for s in locked))
+                        self.assertFalse(any(s['findable'] for s in view['swatches'] if s['status'] == 'unknown' and not any(s['colors'][0])),
+                                         'an unused slot is not offered')
+                        target = (row['id'], locked[0])
+                        break
+                self.assertIsNotNone(target, 'a scene whose colors are all computed')
+                scene_id, swatch = target
+                wanted = [[255 - c for c in swatch['colors'][0]]]
+                change = session.find_color(scene_id, swatch['domain'], swatch['entry'], wanted)
+                deadline = time.monotonic() + 600
+                while change['planning'] and time.monotonic() < deadline:
+                    time.sleep(0.2)
+                    change = session.change(change['id'])
+                self.assertFalse(change['error'], change['error'])
+                self.assertTrue(any('plain colors' in note for note in change['notes']), change['notes'])
+                self.assertEqual(change['bytes'], 2)
+                self.assertTrue(session.wait(600))
+                change = session.change(change['id'])
+                self.assertTrue(change['verified'] and change['verified_here'], change['verdict'])
+                self.assertGreaterEqual(change['visible_count'], 1, 'the replayed screen shows the new color')
+            finally:
+                session.close()
+                shutil.rmtree(temp, ignore_errors=True)
 
 
 if __name__ == '__main__':

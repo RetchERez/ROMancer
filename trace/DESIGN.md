@@ -75,6 +75,41 @@ measured rather than assumed:
 - the editing path that applies: direct, re-encode, or relocate and
   repoint.
 
+## Colors the tags do not lead to: looking in the ROM
+
+A tag names the last ROM byte that went into a value. For most palettes that
+is the color itself. It is not when the game fades the palette through work
+RAM (every color is then *computed*, even at full brightness), when a
+cartridge coprocessor prepares the palette (SA-1, SuperFX: the hooks follow
+the main CPU only, so the colors arrive with no tag at all), or when the
+palette is put together from table bytes. The stored color is usually still
+in the ROM, and `romancer/palette_trace.py` looks for it in four ways, each a
+proposal that only a replay turns into an edit:
+
+- **Another scene.** A scene recorded a moment earlier or later often traced
+  the same entry, holding the same color, straight to the ROM.
+- **A plain copy of the palette line** (`stored_copies`). The longest stretch
+  of neighbouring entries, this one included, that the ROM holds byte for
+  byte. One repeated value is never accepted, and a copy next to the entry's
+  traced offsets comes first.
+- **A number in the program** (`constant_places`), for one-byte palettes: a
+  load-a-number instruction holding the value, with a neighbour of the same
+  palette set close by.
+- **Measurement** (`plan_by_measurement`). When single bytes are known to move
+  the entry but none is the color, every bit of those bytes and their
+  neighbours is flipped on its own and replayed. If the effects combine, the
+  flips that give the wanted color are written together and replayed once
+  more. A Game Boy shade register built two bits at a time from a fade table
+  is edited this way.
+
+The editor offers this as "let ROMancer look for it" on a locked color
+(`scene_graphics._plan_color`), and keeps the result only when the replay
+shows exactly the picked color in that entry and no other palette entry
+moved, except entries that held the same color and follow it. The coverage
+sweep runs the same searches, and also looks at a scene every 300 frames and
+plays a second input script before it gives up on a ROM, because a title
+screen that fades in and out can be blank at every coarser sample.
+
 ## Tiles the game computes: the overlay
 
 Some tiles are not stored anywhere in a form ROMancer can rewrite: the game
