@@ -4,7 +4,7 @@
     python -B trace/codec_survey.py match  INDEX.json DUMPDIR [--system S ...] [--codec NAME ...] [--out FILE]
     python -B trace/codec_survey.py search INDEX.json DUMPDIR MATCHES.json [--system S ...] [--out FILE]
     python -B trace/codec_survey.py family INDEX.json DUMPDIR [--out FILE]
-    python -B trace/codec_survey.py verify INDEX.json DUMPDIR OUTDIR [--system S ...] [--jobs N] [--only SHA,...]
+    python -B trace/codec_survey.py verify INDEX.json DUMPDIR OUTDIR [--system S ...] [--jobs N] [--only SHA,...] [--list FILE]
     python -B trace/codec_survey.py report OUTDIR [SWEEPDIR]
 
 dump    For every ROM whose sweep result (SWEEPDIR/<sha>.json) has a tile the
@@ -20,10 +20,12 @@ search  For ROMs `match` left unexplained, try every layout of the parameterised
 family  Group the ROMs no codec explains by the code around the instruction
         that wrote the tile (the unpacker): ROMs whose code shares enough byte
         runs are one family.
-verify  For ROMs that match offline: trace again, plan an edit through the
-        codec (plan_block_edit: re-encode in place or relocate) and replay it
-        (verify_plan). One JSON per ROM in OUTDIR; the shared sweep results
-        are never written.
+verify  For ROMs that match offline (or those named in --list): trace again and,
+        in each scene from the last back, plan an edit through the codec
+        (plan_block_edit: re-encode in place or relocate) and replay it
+        (verify_plan). `confirmed`: the planned bytes arrived; `clean`: and no
+        other byte of the block's stretch of video memory changed. One JSON per
+        ROM in OUTDIR; the shared sweep results are never written.
 report  Totals of OUTDIR by system; with SWEEPDIR, the count of ROMs with a
         replay-confirmed codec path before (the sweep) and after (either).
 """
@@ -50,7 +52,20 @@ CORE_ROOT = HERE.parent.parent / 'trace-win'
 TARGETS = 10
 
 
+# The pinned tracing engines (romancer/trace_core_pins.py), where a pack of them is unpacked beside the repository.
+PINNED = {'gb': 'gambatte_trace_libretro', 'gbc': 'gambatte_trace_libretro', 'nes': 'fceumm_trace_libretro',
+          'snes': 'bsnes_mercury_balanced_trace_libretro', 'genesis': 'blastem_trace_libretro',
+          'sms': 'blastem_trace_libretro'}
+PACK_ROOT = HERE.parent.parent / 'trace-packs'
+
+
 def core_for(system):
+    """The pinned engine when its pack is there (so that results are from the engines that ship), else a local build."""
+    import os
+    folder, suffix = ('windows-amd64', '.dll') if os.name == 'nt' else ('linux-x86_64', '.so')
+    pinned = PACK_ROOT / folder / (PINNED[system] + suffix)
+    if pinned.exists():
+        return str(pinned)
     return str(CORE_ROOT / CORES[system])
 
 
@@ -63,7 +78,14 @@ def informative(tile):
 
 
 def pick_targets(gt, scene, system, rom):
-    """The sweep's own target first, then other unpacked tiles spread over the ROM."""
+    """Tiles to recognise a packed block from: the sweep's own kind of target (a tile the game
+    computes) and tiles whose bytes are literals of a packed stream, spread over the ROM.
+
+    A byte-oriented packer copies literals straight from the stream, so the tracer names a ROM
+    byte for every byte of such a tile ("rom", layout "scattered") and the sweep edits the
+    literals where they are. That changes every other place the stream copies them to; a
+    block that is recognised can be re-packed instead, which is what is measured here.
+    """
     all_tiles = gt.tiles(scene, system, rom)
     used = gt.used_tile_addresses(scene, system)
     live = [t for t in all_tiles if not t.blank]
@@ -73,12 +95,18 @@ def pick_targets(gt, scene, system, rom):
         for c in layer.cells:
             uses[c.tile_address] = uses.get(c.tile_address, 0) + 1
     shown.sort(key=lambda t: -uses.get(t.addresses[0], 0))
-    hard = [t for t in shown if t.status == 'derived'] + [t for t in live if t.status == 'derived' and t.addresses[0] not in used]
-    hard = [t for t in hard if t.domain != 'chr_rom' and t.addresses[-1] - t.addresses[0] + 1 == len(t.addresses)]
+    ordered = shown + [t for t in live if t.addresses[0] not in used]
+    ordered = [t for t in ordered if t.domain != 'chr_rom' and t.addresses[-1] - t.addresses[0] + 1 == len(t.addresses)]
+    hard = [t for t in ordered if t.status == 'derived']
     # Tiles that hold a picture first: a tile of two flat colors is all 00 and FF bytes, whose tags
-    # say little, and it is as often cleared by code as unpacked. (The sort is stable: on screen and
+    # say little, and it is as often cleared by code as unpacked. (The sorts are stable: on screen and
     # most used still lead within each class.)
-    hard.sort(key=lambda t: not informative(t))
+    computed = [t for t in hard if informative(t)]
+    literal = [t for t in ordered if t.status == 'rom' and t.layout == 'scattered' and informative(t)
+               and t.addresses[0] in used]
+    mixed = [t for pair in zip(computed, literal) for t in pair]
+    n = min(len(computed), len(literal))
+    hard = mixed + computed[n:] + literal[n:] + [t for t in hard if not informative(t)]
     out, seen = [], set()
     for t in hard:
         offs = [s['offset'] for s in t.sources if s]
@@ -87,10 +115,11 @@ def pick_targets(gt, scene, system, rom):
             continue
         seen.add(key)
         out.append({'domain': t.domain, 'start': t.addresses[0], 'length': len(t.addresses), 'index': t.index,
-                    'on_screen': t.addresses[0] in used, 'format': t.format})
+                    'on_screen': t.addresses[0] in used, 'format': t.format, 'status': t.status})
         if len(out) >= TARGETS:
             break
-    return out, {'derived_on_screen': sum(t.status == 'derived' for t in shown), 'derived': sum(t.status == 'derived' for t in live)}
+    return out, {'derived_on_screen': sum(t.status == 'derived' for t in shown), 'derived': sum(t.status == 'derived' for t in live),
+                 'literal_on_screen': len(literal)}
 
 
 def dump_one(sha, index, dumpdir, frames):
@@ -401,7 +430,7 @@ def cmd_family(a):
 
 # ---- verify -----------------------------------------------------------------
 
-def verify_one(sha, index, dumpdir, outdir, frames):
+def verify_one(sha, index, dumpdir, outdir, frames, codecs=None):
     import trace_probe as tp
     import graphics_sweep as gs
     from romancer import graphics_trace as gt, provenance as pv, gfx_codecs
@@ -412,56 +441,70 @@ def verify_one(sha, index, dumpdir, outdir, frames):
     t0 = time.perf_counter()
     work = Path(tempfile.mkdtemp(prefix='cv'))
     try:
-        rec = pickle.loads((Path(dumpdir) / f'{sha}.pkl').read_bytes())
+        dump = Path(dumpdir) / f'{sha}.pkl'
+        rec = pickle.loads(dump.read_bytes()) if dump.exists() else {}
         rom, suf = tp.read_rom(entry['zip'] + '!' + entry['member'])
         scenes, fe_for = gs.trace(core_for(system), rom, suf, system, frames, work)
-        scene = scenes[-1]
-        result['same_scene'] = scene.screen_sha256 == rec.get('screen')
-        before = [c for c in scene.checkpoints if c[0] < scene.frame] or scene.checkpoints[:1]
-        quick = pv.Scene(scene.id, scene.frame, scene.screen_sha256,
-                         sorted({c[0]: c for c in scene.checkpoints[:1] + before[-2:]}.values()), scene.snapshot)
-        quick.video = getattr(scene, 'video', None)
-
-        def verify(plan, expect=None):
-            return gt.verify_plan(fe_for, rom, plan, quick, expect=expect, buttons_for=gs.explore)
+        result['same_scene'] = scenes[-1].screen_sha256 == rec.get('screen')
         tries = []
-        targets, _ = pick_targets(gt, scene, system, rom)
-        for t in targets[:a_targets(system)]:
-            tile = gt.tile_at(scene, system, t['start'], domain=t['domain'])
-            block = gt.find_compressed_block(scene, rom, system, t['domain'], t['start'], t['length'])
-            row = {'tile': t['index'], 'on_screen': t['on_screen'], 'codec': block.codec if block else None}
-            tries.append(row)
-            if block is None:
-                continue
-            row['block'] = block.to_dict()
-            new = gt.encode_tile(gs.redraw(tile), tile.format)
-            changes = {}
-            layout = gfx_codecs.CODECS[block.codec].get('map')
-            for k, addr in enumerate(tile.addresses):
-                if new[k] != tile.stored[k]:
-                    try:
-                        at = block.decoded_index(addr)
-                    except ValueError:
-                        continue     # a byte the game makes up itself (3bpp padding)
-                    if layout and gfx_codecs.map_index(layout, at) is None:
-                        continue     # the same, for a layout carried by the codec name
-                    changes[addr] = new[k]
-            if not changes:
-                row['error'] = 'nothing to change'
-                continue
-            try:
-                plan = gt.plan_block_edit(block, changes, rom, system, verify=verify,
-                                          max_candidates=24 if gt.CPU[system] in ('sm83', '6502') else 6)
-                r = verify(plan)
-                row.update(path=plan.kind, verified=r['verified'], as_planned=r.get('as_planned'),
-                           missed={k: len(v) for k, v in r.get('missed', {}).items()}, unplanned=r.get('unplanned', {}),
-                           old_stream=plan.details.get('old_stream'), new_stream=plan.details.get('new_stream'))
-            except ValueError as e:
-                row['error'] = str(e)[:300]
-            if row.get('as_planned'):
+        # The last scene first (the one the sweep measured), then the earlier ones: what a game has
+        # unpacked differs from screen to screen, and one confirmed block is what is asked.
+        for scene in reversed(scenes):
+            before = [c for c in scene.checkpoints if c[0] < scene.frame] or scene.checkpoints[:1]
+            quick = pv.Scene(scene.id, scene.frame, scene.screen_sha256,
+                             sorted({c[0]: c for c in scene.checkpoints[:1] + before[-2:]}.values()), scene.snapshot)
+            quick.video = getattr(scene, 'video', None)
+
+            def verify(plan, expect=None, quick=quick):
+                return gt.verify_plan(fe_for, rom, plan, quick, expect=expect, buttons_for=gs.explore)
+            targets, _ = pick_targets(gt, scene, system, rom)
+            for t in targets[:a_targets(system)]:
+                tile = gt.tile_at(scene, system, t['start'], domain=t['domain'])
+                block = gt.find_compressed_block(scene, rom, system, t['domain'], t['start'], t['length'], codecs)
+                row = {'frame': scene.frame, 'tile': t['index'], 'on_screen': t['on_screen'], 'status': t.get('status'),
+                       'codec': block.codec if block else None}
+                tries.append(row)
+                if block is None:
+                    continue
+                row['block'] = block.to_dict()
+                new = gt.encode_tile(gs.redraw(tile), tile.format)
+                changes = {}
+                layout = gfx_codecs.CODECS[block.codec].get('map')
+                for k, addr in enumerate(tile.addresses):
+                    if new[k] != tile.stored[k]:
+                        try:
+                            at = block.decoded_index(addr)
+                        except ValueError:
+                            continue     # a byte the game makes up itself (3bpp padding)
+                        if layout and gfx_codecs.map_index(layout, at) is None:
+                            continue     # the same, for a layout carried by the codec name
+                        changes[addr] = new[k]
+                if not changes:
+                    row['error'] = 'nothing to change'
+                    continue
+                try:
+                    plan = gt.plan_block_edit(block, changes, rom, system, verify=verify,
+                                              max_candidates=24 if gt.CPU[system] in ('sm83', '6502') else 6)
+                    r = verify(plan)
+                    # Other bytes that changed: inside the stretch of video memory the block was loaded to (the
+                    # re-packed stream did not unpack to the edited block: a fault) or elsewhere (the same data
+                    # loaded a second time, or a picture that moves and was caught a frame apart).
+                    span = range(block.domain_start, block.domain_start + block.last - block.first)
+                    inside = sum(i in span and i not in changes for i in r.get('changed', {}).get(block.domain, ()))
+                    row.update(path=plan.kind, verified=r['verified'], as_planned=r.get('as_planned'),
+                               missed={k: len(v) for k, v in r.get('missed', {}).items()}, unplanned=r.get('unplanned', {}),
+                               unplanned_in_block=inside,
+                               old_stream=plan.details.get('old_stream'), new_stream=plan.details.get('new_stream'))
+                except ValueError as e:
+                    row['error'] = str(e)[:300]
+                if row.get('as_planned') and not row.get('unplanned_in_block'):
+                    break
+            if any(r.get('as_planned') and not r.get('unplanned_in_block') for r in tries):
                 break
         result['tries'] = tries
-        good = next((r for r in tries if r.get('as_planned')), None)
+        good = (next((r for r in tries if r.get('as_planned') and not r.get('unplanned_in_block')), None)
+                or next((r for r in tries if r.get('as_planned')), None))
+        result['clean'] = bool(good and not good.get('unplanned_in_block'))
         result['confirmed'] = bool(good)
         result['codec'] = good['codec'] if good else next((r['codec'] for r in tries if r['codec']), None)
         result['path'] = good['path'] if good else None
@@ -482,7 +525,16 @@ def a_targets(system):
 def cmd_verify(a):
     index = json.loads(Path(a.index).read_text())
     Path(a.outdir).mkdir(parents=True, exist_ok=True)
+    hints = {}
     if a.matches:
+        # the codecs that explained a tile of the dumped scene: only those are tried (far quicker)
+        for r in json.loads(Path(a.matches).read_text()):
+            names = sorted({h['codec'] for h in r.get('hits', []) if h and 'codec' in h})
+            if names:
+                hints[r['sha256']] = names
+    if a.list:
+        shas = [line.split()[0] for line in Path(a.list).read_text().splitlines() if line.strip()]
+    elif a.matches:
         shas = [r['sha256'] for r in json.loads(Path(a.matches).read_text())
                 if any(h and 'codec' in h for h in r.get('hits', []))]
     else:
@@ -495,7 +547,8 @@ def cmd_verify(a):
     from concurrent.futures import ThreadPoolExecutor
 
     def run(sha):
-        code = _spawn(['verify1', a.index, a.dumpdir, a.outdir, sha, '--frames', str(a.frames)], a.timeout)
+        more = [x for name in hints.get(sha, ()) for x in ('--codec', name)]
+        code = _spawn(['verify1', a.index, a.dumpdir, a.outdir, sha, '--frames', str(a.frames)] + more, a.timeout)
         out = Path(a.outdir) / f'{sha}.json'
         if not out.exists():
             out.write_text(json.dumps({'sha256': sha, 'system': index[sha]['system_id'], 'member': index[sha]['member'],
@@ -573,8 +626,9 @@ def main():
     p.add_argument('--system', action='append'); p.add_argument('--jobs', type=int, default=3)
     p.add_argument('--frames', type=int, default=1800); p.add_argument('--timeout', type=int, default=900)
     p.add_argument('--only'); p.add_argument('--matches'); p.add_argument('--redo', action='store_true')
+    p.add_argument('--list', help='file of SHA-256s, one per line: verify these (a dump is not needed)')
     p = sub.add_parser('verify1'); p.add_argument('index'); p.add_argument('dumpdir'); p.add_argument('outdir'); p.add_argument('sha')
-    p.add_argument('--frames', type=int, default=1800)
+    p.add_argument('--frames', type=int, default=1800); p.add_argument('--codec', action='append')
     p = sub.add_parser('report'); p.add_argument('outdir'); p.add_argument('sweepdir', nargs='?')
     a = ap.parse_args()
     if a.cmd == 'dump':
@@ -590,7 +644,7 @@ def main():
     elif a.cmd == 'verify':
         cmd_verify(a)
     elif a.cmd == 'verify1':
-        verify_one(a.sha, json.loads(Path(a.index).read_text()), a.dumpdir, a.outdir, a.frames)
+        verify_one(a.sha, json.loads(Path(a.index).read_text()), a.dumpdir, a.outdir, a.frames, a.codec)
     elif a.cmd == 'report':
         cmd_report(a)
 

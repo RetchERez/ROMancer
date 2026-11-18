@@ -358,7 +358,8 @@ class Recognise(unittest.TestCase):
                  ('kosinski', '', 'genesis', 32), ('comper', '', 'genesis', 32), ('saxman', '', 'genesis', 32),
                  ('nemesis', '', 'genesis', 32), ('rle-konami', '1of2n', 'nes', 16), ('lz3', '0Z', 'gbc', 16),
                  ('lz5', '', 'snes', 32), ('konami-snes', '', 'snes', 32), ('lz~le16.l1.oku.b0.m3.s', '', 'snes', 32),
-                 ('rnc1', '', 'snes', 32), ('rnc2', '', 'genesis', 32)]
+                 ('rnc1', '', 'snes', 32), ('rnc2', '', 'genesis', 32), ('lz-ring256', '', 'snes', 32),
+                 ('lz-konami-md', '', 'genesis', 32)]
         for codec, text, system, tile in cases:
             k = gc.map_parse(text)[1] if text else 32
             raw = sample(768, seed=12 + len(codec), tile=k)
@@ -550,6 +551,48 @@ class Packers(unittest.TestCase):
                     gc.decode(name, stream[:4] + b'\x7F\xFF\xFF\xFF' + stream[8:])     # an absurd size
                 with self.assertRaises((ValueError, IndexError)):
                     gc.decode(name, stream[:len(stream) // 2])
+
+    def test_ring256_known_streams(self):
+        # literal A, literal B, three bytes from ring position EF (where A went): 31 bits, padded
+        stream = bytes((0x05, 0x00, 0xA0, 0xD0, 0x9D, 0xE2))
+        self.assertEqual(gc.decode('lz-ring256', stream + b'rest'), (b'ABABA', len(stream)))
+        self.assertEqual(gc.encode('lz-ring256', b'ABABA'), stream)
+        # a copy from a part of the ring nothing was written to yet reads the 20 it starts filled with
+        self.assertEqual(gc.decode('lz-ring256', bytes((0x04, 0x00, 0x00, 0x10))), (b'    ', 4))
+
+    def test_ring256_never_copies_from_further_back_than_the_ring(self):
+        rng = random.Random(56)
+        block = bytes(rng.randrange(256) for _ in range(300))
+        raw = block + block             # the repeat is 300 back: out of reach
+        stream = gc.encode('lz-ring256', raw)
+        self.assertEqual(gc.decode('lz-ring256', stream), (raw, len(stream)))
+        self.assertGreater(len(stream), 600)
+        near = block[:200] + block[:200]
+        self.assertLess(len(gc.encode('lz-ring256', near)), 280)
+
+    def test_konami_md_known_stream(self):
+        # flags 0C: literal A, literal B, command A2 (four bytes from two back), command 1F (the end)
+        stream = bytes((0x00, 0x06, 0x0C, 0x41, 0x42, 0xA2, 0x1F))
+        self.assertEqual(gc.decode('lz-konami-md', stream + b'rest'), (b'ABABAB', len(stream)))
+        self.assertEqual(gc.encode('lz-konami-md', b'ABABAB'), stream)
+        # a far copy: 0x25 0x10 is (5 + 3) bytes from (1 << 8 | 0x10) back; a literal run: C1 + nine bytes
+        head = bytes(range(1, 10))
+        filler = bytes((7,)) * 0x110
+        raw = head + filler + head[:8]
+        stream = gc.encode('lz-konami-md', raw)
+        self.assertEqual(gc.decode('lz-konami-md', stream), (raw, len(stream)))
+
+    def test_konami_md_never_writes_the_end_marker_as_a_copy(self):
+        # 34 bytes from less than 256 back would be command byte 1F, which ends the stream
+        rng = random.Random(57)
+        block = bytes(rng.randrange(256) for _ in range(34))
+        raw = block + bytes(rng.randrange(256) for _ in range(60)) + block
+        stream = gc.encode('lz-konami-md', raw)
+        self.assertEqual(gc.decode('lz-konami-md', stream), (raw, len(stream)))
+        with self.assertRaises(ValueError):
+            gc.decode('lz-konami-md', stream[:-1] + b'\x00')        # no end marker
+        with self.assertRaises(ValueError):
+            gc.decode('lz-konami-md', b'\x00\x09' + stream[2:])      # the size does not agree
 
     def test_magic_starts_are_the_nearest_streams_in_front(self):
         rom = bytearray(0x3000)

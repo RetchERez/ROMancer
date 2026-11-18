@@ -526,3 +526,216 @@ CODECS = {
     'rnc1': {'decode': rnc1_decode, 'encode': rnc1_encode, 'terminated': True, 'commands': rnc_info, 'magic': b'RNC\x01'},
     'rnc2': {'decode': rnc2_decode, 'encode': rnc2_encode, 'terminated': True, 'commands': rnc_info, 'magic': b'RNC\x02'},
 }
+
+
+# ---- bit-stream LZSS over a 256-byte ring (Quintet: ActRaiser, Soul Blazer, Illusion of Gaia, ...) ----
+# Unpacked size (16 bits, low byte first), then bits taken high bit first: 1 + eight bits is a
+# literal; 0 + eight bits (ring position) + four bits (length - 2) copies from the ring, which
+# starts filled with 20 and is written from position EF.
+
+class _MsbBits:
+    __slots__ = ('data', 'pos', 'bit')
+
+    def __init__(self, data, pos):
+        self.data, self.pos, self.bit = data, pos, 0
+
+    def read(self, n):
+        v = 0
+        data = self.data
+        for _ in range(n):
+            if self.pos >= len(data):
+                raise ValueError('stream is truncated')
+            v = v << 1 | (data[self.pos] >> (7 - self.bit) & 1)
+            self.bit += 1
+            if self.bit == 8:
+                self.bit = 0
+                self.pos += 1
+        return v
+
+    def used(self, start):
+        return self.pos - start + (1 if self.bit else 0)
+
+
+def ring256_decode(data, start=0, limit=MAX_OUT):
+    if start + 3 > len(data):
+        raise ValueError('stream is truncated')
+    size = data[start] | data[start + 1] << 8
+    if not 0 < size <= limit:
+        raise ValueError('size header is out of range')
+    bits = _MsbBits(data, start + 2)
+    out = bytearray()
+    while len(out) < size:
+        if bits.read(1):
+            out.append(bits.read(8))
+        else:
+            at = bits.read(8)
+            n = bits.read(4) + 2
+            here = len(out)
+            dist = (0xEF + here - at) & 0xFF or 0x100
+            for k in range(here - dist, here - dist + n):
+                out.append(out[k] if k >= 0 else 0x20)
+    del out[size:]
+    return bytes(out), bits.used(start)
+
+
+def ring256_encode(raw):
+    raw = bytes(raw)
+    n = len(raw)
+    if not 0 < n <= 0xFFFF:
+        raise ValueError('data is too long for this codec')
+    found = lz_matches(raw, 0x100, 17, 2)
+    INF = 1 << 60
+    cost = [INF] * (n + 1)
+    step = [1] * (n + 1)
+    cost[n] = 0
+    for i in range(n - 1, -1, -1):
+        c, k = cost[i + 1] + 9, 1
+        for length in range(2, found[i][0] + 1):
+            if cost[i + length] + 13 < c:
+                c, k = cost[i + length] + 13, length
+        cost[i], step[i] = c, k
+    acc = bits = 0
+    out = bytearray((n & 0xFF, n >> 8))
+    i = 0
+
+    def put(value, width):
+        nonlocal acc, bits
+        acc = acc << width | value
+        bits += width
+        while bits >= 8:
+            bits -= 8
+            out.append(acc >> bits & 0xFF)
+        acc &= (1 << bits) - 1
+
+    while i < n:
+        k = step[i]
+        if k == 1:
+            put(0x100 | raw[i], 9)
+        else:
+            put((0xEF + i - found[i][1]) & 0xFF, 9)
+            put(k - 2, 4)
+        i += k
+    if bits:
+        put(0, 8 - bits)
+    return bytes(out)
+
+
+# ---- flag-byte LZ with one-byte near copies and literal runs (Konami on the Mega Drive) ----
+# Unpacked size (16 bits, high byte first), then flag bytes taken low bit first: 0 is a literal;
+# 1 is a command byte c: 1F ends the stream; below 80 a copy of (c & 1F) + 3 bytes from
+# ((c & 60) << 3 | next byte) back; 80-BF a copy of (c >> 4 & 3) + 2 bytes from c & 0F back;
+# C0 and up (c & 3F) + 8 literal bytes.
+
+def lzkn_decode(data, start=0, limit=MAX_OUT):
+    n = len(data)
+    if start + 3 > n:
+        raise ValueError('stream is truncated')
+    size = data[start] << 8 | data[start + 1]
+    if not 0 < size <= limit:
+        raise ValueError('size header is out of range')
+    pos = start + 2
+    out = bytearray()
+    while True:
+        if pos >= n:
+            raise ValueError('stream is truncated')
+        flags = data[pos]
+        pos += 1
+        for bit in range(8):
+            if pos >= n:
+                raise ValueError('stream is truncated')
+            c = data[pos]
+            pos += 1
+            if not flags >> bit & 1:
+                out.append(c)
+                continue
+            if c == 0x1F:
+                if len(out) != size:
+                    raise ValueError('stream does not unpack to its stated size')
+                return bytes(out), pos - start
+            if c >= 0xC0:
+                count = (c & 0x3F) + 8
+                if pos + count > n:
+                    raise ValueError('stream is truncated')
+                out += data[pos:pos + count]
+                pos += count
+                continue
+            if c >= 0x80:
+                count, dist = (c >> 4 & 3) + 2, c & 0x0F
+            else:
+                if pos >= n:
+                    raise ValueError('stream is truncated')
+                count, dist = (c & 0x1F) + 3, (c & 0x60) << 3 | data[pos]
+                pos += 1
+            if not 0 < dist <= len(out):
+                raise ValueError('copy from before the start')
+            for _ in range(count):
+                out.append(out[-dist])
+            if len(out) > size:
+                raise ValueError('stream does not unpack to its stated size')
+
+
+def lzkn_encode(raw):
+    raw = bytes(raw)
+    n = len(raw)
+    if not 0 < n <= 0xFFFF:
+        raise ValueError('data is too long for this codec')
+    far = lz_matches(raw, 0x3FF, 34, 2)
+    near = lz_matches(raw, 0x0F, 5, 2)
+    INF = 1 << 60
+    cost = [INF] * (n + 1)
+    step = [(1, 0, 0)] * (n + 1)        # (bytes covered, kind: 0 literal 1 near 2 far 3 literal run, distance)
+    cost[n] = 0
+    for i in range(n - 1, -1, -1):
+        c, how = cost[i + 1] + 9, (1, 0, 0)
+        for length in range(2, near[i][0] + 1):
+            if cost[i + length] + 9 < c:
+                c, how = cost[i + length] + 9, (length, 1, near[i][1])
+        k, dist = far[i]
+        for length in range(3, k + 1):
+            if (length - 3) | (dist >> 3 & 0x60) == 0x1F:
+                continue                # that command byte is the end marker
+            if cost[i + length] + 17 < c:
+                c, how = cost[i + length] + 17, (length, 2, dist)
+        for length in (8, 16, 32, 71):
+            if i + length <= n and cost[i + length] + 9 + 8 * length < c:
+                c, how = cost[i + length] + 9 + 8 * length, (length, 3, 0)
+        cost[i], step[i] = c, how
+    out = bytearray((n >> 8, n & 0xFF))
+    tokens = 8
+    flag_at = 0
+    i = 0
+
+    def flag(bit):
+        nonlocal tokens, flag_at
+        if tokens == 8:
+            flag_at = len(out)
+            out.append(0)
+            tokens = 0
+        out[flag_at] |= bit << tokens
+        tokens += 1
+
+    while i < n:
+        length, kind, dist = step[i]
+        if kind == 0:
+            flag(0)
+            out.append(raw[i])
+        elif kind == 1:
+            flag(1)
+            out.append(0x80 | (length - 2) << 4 | dist)
+        elif kind == 2:
+            flag(1)
+            out += bytes(((length - 3) | (dist >> 3 & 0x60), dist & 0xFF))
+        else:
+            flag(1)
+            out.append(0xC0 | (length - 8))
+            out += raw[i:i + length]
+        i += length
+    flag(1)
+    out.append(0x1F)
+    return bytes(out)
+
+
+CODECS.update({
+    'lz-ring256': {'decode': ring256_decode, 'encode': ring256_encode, 'terminated': True},
+    'lz-konami-md': {'decode': lzkn_decode, 'encode': lzkn_encode, 'terminated': True},
+})
