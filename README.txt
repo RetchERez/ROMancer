@@ -1,4 +1,4 @@
-ROMancer v1.1.1
+ROMancer v1.2.0
 By RetchEWretched
 
 ROMancer is a local ROM editing, investigation and playtesting workbench.
@@ -111,7 +111,7 @@ available. The supplied Pokemon Red and Blue revisions share a
 
 START ON WINDOWS
 
-1. Extract ROMancer-v1.1.1-Windows.zip in Windows File Explorer.
+1. Extract ROMancer-v1.2.0-Windows.zip in Windows File Explorer.
 2. Double-click ROMancer.exe in the extracted folder.
    Keep ROMancer.exe, ROM Catalog.html and the ROMancer Files folder together.
 3. Open an original workshop or choose New project and import your own cartridge image.
@@ -132,8 +132,8 @@ SHA-256 is checked and later captures work offline. No ROM data is uploaded.
 
 START ON LINUX
 
-1. Extract ROMancer-v1.1.1-Linux-x86_64.tar.gz:  tar xf ROMancer-v1.1.1-Linux-x86_64.tar.gz
-2. Run ./ROMancer-v1.1.1-Linux-x86_64/ROMancer.sh
+1. Extract ROMancer-v1.2.0-Linux-x86_64.tar.gz:  tar xf ROMancer-v1.2.0-Linux-x86_64.tar.gz
+2. Run ./ROMancer-v1.2.0-Linux-x86_64/ROMancer.sh
    (./ROMancer.sh --install-desktop adds ROMancer to your application menu).
 
 The Linux x86-64 package includes Python, Pillow and the same six engines built
