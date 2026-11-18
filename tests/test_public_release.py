@@ -30,6 +30,18 @@ class PublicReleaseTests(unittest.TestCase):
         page=(Path(__file__).resolve().parents[1]/'romancer'/'ui'/'index.html').read_text(encoding='utf-8')
         self.assertIn('<title>'+ROMANCER_RELEASE_NAME+' — By RetchEWretched</title>',page)
 
+    def test_messages_keep_the_space_before_a_number(self):
+        # Messages such as "within15 seconds" and "at most32 scripts" reached v1.1.0.
+        import re
+        root=Path(__file__).resolve().parents[1]/'romancer'
+        glued=re.compile(r"[a-z,;:.] (?:most|least|than|within|exceeds|between|up to|first|need|needs)\d")
+        found=[]
+        for path in sorted(root.rglob('*')):
+            if path.suffix in ('.py','.js') and path.name!='app.bundle.js':
+                found+=[path.name+': '+match.group(0) for match in glued.finditer(path.read_text(encoding='utf-8'))]
+        self.assertEqual(found,[])
+        self.assertIn('within 15 seconds',(root/'ui'/'startup.js').read_text(encoding='utf-8'))
+
     def test_level_editing_is_excluded_from_the_release(self):
         from romancer.mcp_server import MCPServer
         with tempfile.TemporaryDirectory() as folder:

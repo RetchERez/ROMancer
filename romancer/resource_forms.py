@@ -16,7 +16,7 @@ TEMPLATES={'sms': 'tile8-rowplanar4-msb-v1', 'gb': 'tile8-paired2-msb-v1', 'gbc'
 def _source(path,sha):
     measured=_measure(path)
     if measured['sha256']!=sha:raise ValueError('source revision changed')
-    if not 1<=measured['size']<=64*1024**2:raise ValueError('declare a flat resource of at most64MiB')
+    if not 1<=measured['size']<=64*1024**2:raise ValueError('declare a flat resource of at most 64 MiB')
     return measured
 
 

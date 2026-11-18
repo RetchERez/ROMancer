@@ -239,7 +239,7 @@ class StudioTools:
                 packets.append(raw)
                 remaining -= frames
                 if sum(map(len, packets)) > 4 * 1024 ** 2:
-                    raise ValueError('native preview exceeds4MiB; request fewer frames')
+                    raise ValueError('native preview exceeds 4 MiB; request fewer frames')
             frame = self.api.runtime.request(project, 'capture', {}, cancelled=c)
         if frame.get('game_sha256') != row['sha256']:
             raise ValueError('native audio source changed')

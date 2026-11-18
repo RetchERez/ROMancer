@@ -20,7 +20,7 @@ def validate_pack(document):
     fields(p['match'],'mode guards')
     if p['match']['mode'] not in ('exact','guarded'):raise ValueError('Choose exact-source or explicitly guarded matching.')
     guards=p['match']['guards']
-    if type(guards) is not list or len(guards)>32 or (p['match']['mode']=='guarded' and not guards) or (p['match']['mode']=='exact' and guards):raise ValueError('Guarded packs need1–32 protected hash regions; exact packs use the complete source hash.')
+    if type(guards) is not list or len(guards)>32 or (p['match']['mode']=='guarded' and not guards) or (p['match']['mode']=='exact' and guards):raise ValueError('Guarded packs need 1–32 protected hash regions; exact packs use the complete source hash.')
     end=0;total=0
     for guard in sorted(guards,key=lambda g:g.get('offset',-1) if type(g) is dict else -1):
         fields(guard,'offset length sha256');offset=number(guard['offset'],0,p['origin']['size']-1);length=number(guard['length'],16,min(65536,p['origin']['size']-offset));total+=length
@@ -38,7 +38,7 @@ def _files(workspace):
     root=checked_path(Path(workspace)/'format-library')
     if not root.exists():return []
     values=sorted(root.glob('*.json'))
-    if len(values)>32:raise ValueError('The local format library exceeds32 packs.')
+    if len(values)>32:raise ValueError('The local format library exceeds 32 packs.')
     return [checked_path(p) for p in values]
 
 def library_stamp(workspace):
@@ -108,7 +108,7 @@ class FormatLibrary:
         _,row,path=self.api.source(p);require_supported(row);number(row['size'],1,64*1024**2);definitions={k:_definition(row,path,k) for k in KINDS if row.get('descriptors',{}).get(k)}
         if 'script' in definitions:
             for rule in definitions['script']['profile']['rules']:rule.pop('expected_hex',None)
-        if type(p['guards']) is not list or len(p['guards'])>32:raise ValueError('Use at most32 protected ranges.')
+        if type(p['guards']) is not list or len(p['guards'])>32:raise ValueError('Use at most 32 protected ranges.')
         guards=[]
         with path.open('rb') as stream:
             for g in p['guards']:

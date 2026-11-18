@@ -108,7 +108,7 @@ def encode_stream(raw,codec):
     if codec=='snes-lz2':
         from .snes_lz2 import encode_lz2
         return encode_lz2(raw)
-    if type(raw) is not bytes or not 1<=len(raw)<=OUTPUT_LIMIT or codec not in SIGNATURES:raise ValueError('choose nonempty decoded bytes up to1MiB and a supported codec')
+    if type(raw) is not bytes or not 1<=len(raw)<=OUTPUT_LIMIT or codec not in SIGNATURES:raise ValueError('choose nonempty decoded bytes up to 1 MiB and a supported codec')
     return (_encode_lz if codec=='lz10' else _encode_rle)(raw)
 
 

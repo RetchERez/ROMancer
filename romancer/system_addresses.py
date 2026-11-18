@@ -66,7 +66,7 @@ def translate(system_id, address, mapping, bank, source_size):
         fields(mapping,'id segments')
         if bank is not None or address>=0x400000:raise ValueError('Scattered Genesis mappings use explicit fixed bus windows, not a bank argument.')
         segments=mapping['segments']
-        if type(segments)is not list or not 1<=len(segments)<=16:raise ValueError('Declare1..16 mapped segments.')
+        if type(segments)is not list or not 1<=len(segments)<=16:raise ValueError('Declare 1..16 mapped segments.')
         physical=[];logical=[];matches=[]
         for segment in segments:
             fields(segment,'cpu_start file_offset length')

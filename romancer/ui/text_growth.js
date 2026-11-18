@@ -3,7 +3,7 @@ import {selectionKey} from './tool_inputs.js';
 import {esc,button,field,area,select,read,json} from './common.js';
 function integer(value){if(!/^-?(?:0x[0-9a-f]+|\d+)$/i.test(value.trim()))throw Error('Enter a whole decimal or hexadecimal number.');const s=value.trim(),n=s.startsWith('-')?-Number(s.slice(1)):Number(s);if(!Number.isSafeInteger(n))throw Error('Number is outside the supported range.');return n;}
 export function parseGrowthReferences(value){
- const rows=value.trim().split(/\n/).filter(s=>s.trim());if(rows.length>128)throw Error('Use at most128 extra references.');
+ const rows=value.trim().split(/\n/).filter(s=>s.trim());if(rows.length>128)throw Error('Use at most 128 extra references.');
  return rows.map(row=>{const p=row.trim().split(/[\s,]+/);if(p.length<4||p.length>5)throw Error('Each reference needs offset, width, byte order and adjustment.');const [offset,width,base,delta]=[integer(p[0]),integer(p[1]),integer(p[3]),p[4]===undefined?0:integer(p[4])];if(offset<0||offset>=64*1024**2||width<2||width>4||!['little','big'].includes(p[2])||Math.abs(base)>0xffffffff||delta!==0)throw Error('Reference encoding is outside supported bounds.');return {offset,width,endian:p[2],base,target_delta:delta};});
 }
 export function textGrowth(ctx,doc){

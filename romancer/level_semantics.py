@@ -5,7 +5,7 @@ KINDS=('walkable','solid','hazard','water','ladder','other')
 
 def collision_types(room):
     rows=room.get('collision_types',[])
-    if type(rows) is not list or len(rows)>256:raise ValueError('declare at most256 collision types')
+    if type(rows) is not list or len(rows)>256:raise ValueError('declare at most 256 collision types')
     if rows and room['collision'] is None:raise ValueError('collision labels need a declared collision grid')
     seen=set();limit=(1<<(8*room['collision']['entry_bytes']))-1 if room['collision'] else 255
     for row in rows:

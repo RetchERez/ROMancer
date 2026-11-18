@@ -13,12 +13,12 @@ def inspect_commands(raw,definition,sha,*,cancelled=lambda:False):
     if type(raw) is not bytes or not 1<=len(raw)<=64*1024**2 or hashlib.sha256(raw).hexdigest()!=sha:raise ValueError('Command source revision differs.')
     d=json.loads(canonical_bytes(definition,max_bytes=128*1024));fields(d,'schema_version source_sha256 name scripts commands');number(d['schema_version'],1,1);label(d['name'],80)
     if d['source_sha256']!=sha:raise ValueError('Command definition belongs to another source.')
-    if type(d['commands']) is not list or not 1<=len(d['commands'])<=256 or type(d['scripts']) is not list or not 1<=len(d['scripts'])<=32:raise ValueError('Declare1–256 commands and1–32 scripts.')
+    if type(d['commands']) is not list or not 1<=len(d['commands'])<=256 or type(d['scripts']) is not list or not 1<=len(d['scripts'])<=32:raise ValueError('Declare 1–256 commands and 1–32 scripts.')
     opcodes={}
     for command in d['commands']:
         fields(command,'opcode name length role fields');opcode=number(command['opcode'],0,255);label(command['name'],80);length=number(command['length'],1,32)
         if opcode in opcodes or command['role'] not in ROLES:raise ValueError('Duplicate opcode or unsupported command role.')
-        if type(command['fields']) is not list or len(command['fields'])>8:raise ValueError('Use at most8 named operands per command.')
+        if type(command['fields']) is not list or len(command['fields'])>8:raise ValueError('Use at most 8 named operands per command.')
         names=set();occupied={0}
         for f in command['fields']:
             fields(f,'name offset bytes endian minimum maximum target_base');label(f['name'],64)

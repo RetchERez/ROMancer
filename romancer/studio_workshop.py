@@ -19,7 +19,7 @@ class Assembler:
             address=self.labels[label]
             if relative:
                 value=address-(0x8000+at+1)
-                if not -128<=value<=127:raise ValueError('Studio branch exceeds6502 range: '+label)
+                if not -128<=value<=127:raise ValueError('Studio branch exceeds 6502 range: '+label)
                 self.code[at]=value&255
             else:self.code[at:at+2]=address.to_bytes(2,'little')
         if len(self.code)>=4096:raise ValueError('Studio program overlaps its resource region')

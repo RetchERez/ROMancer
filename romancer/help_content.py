@@ -70,7 +70,7 @@ TOPICS=(
         'The report excludes ROM/save bytes, credentials, personal paths, project names and raw errors.'], 'diagnostic support privacy error report'),
     _topic('visual-tests','Screenshot checkpoints','Compare a stable region of a measured frame.',[
         'Start recording inputs in Routes, then use Playtest to reach the screen to test.',
-        'Pause and capture a frame. In Screenshot checkpoints, drag a region up to256×256 pixels.',
+        'Pause and capture a frame. In Screenshot checkpoints, drag a region up to 256×256 pixels.',
         'Add screenshot checkpoint to the latest recorded input, then stop and save the recording.',
         'Replay using its recorded checkpoint. A failure shows expected, actual and difference images. Save a cold-start definition to use an original/build suite.'], 'screenshot region rgb regression checkpoint visual'),
     _topic('start','Getting started','Open a workshop or import your own ROM.',[
@@ -80,7 +80,7 @@ TOPICS=(
         'Use Playtest to check the build, then Export to prepare and verify a patch.'], 'open source build first project'),
     _topic('import','Import a ROM','Work on a project copy while keeping the original.',[
         'Choose Import ROM. Browse for a file or drop one file into the window.',
-        'Confirm the project name and file. Files up to64MiB can be uploaded; advanced path import supports larger owned images.',
+        'Confirm the project name and file. Files up to 64 MiB can be uploaded; advanced path import supports larger owned images.',
         'Check the detected system and revision in Resources. The filename alone does not establish the system.',
         'If identification is ambiguous, inspect the reported header issues before editing.'], 'drag drop file source header'),
     _topic('discovery','Find resources','Search known formats and inspect candidate matches.',[
@@ -125,7 +125,7 @@ TOPICS=(
         'Import your ROM and open Playtest. Use a matching saved local core setup.',
         'Check ROM runs120 frames in a fresh worker, measures video/audio and closes it. It does not certify gameplay.',
         'For regression, open More tools and Routes. Record controller input, add a measured frame or memory assertion, and stop recording.',
-        'Save a cold-start test, then open Regression. Choose up to8 routes, the original and build, then Run suite. The baseline must pass before the build is evaluated.',
+        'Save a cold-start test, then open Regression. Choose up to 8 routes, the original and build, then Run suite. The baseline must pass before the build is evaluated.',
         'A failure points to an expected result that changed. Baselines, coverage objectives and correct gameplay still need your definition.'], 'regression test ROM run emulator smoke baseline route crash'),
     _topic('debug','Troubleshoot a change','Compare exact bytes and measured runtime observations.',[
         'Compare the source and build to locate the changed bytes.',
@@ -203,7 +203,7 @@ TOPICS=(
 
 def help_topics(query='',topic=''):
     if type(query) is not str or len(query)>160 or type(topic) is not str or len(topic)>160:
-        raise ValueError('Keep help searches to160 characters.')
+        raise ValueError('Keep help searches to 160 characters.')
     query=query.casefold().strip()
     matches=[row for row in TOPICS if not query or query in ' '.join([row['title'],row['summary'],row['terms'],*row['steps']]).casefold()]
     selected=next((row for row in TOPICS if row['id']==topic),None)

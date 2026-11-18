@@ -16,7 +16,7 @@ export function clearProjectState(state){
 export function droppedSource(files){
  if(!files||files.length!==1)throw new Error('Drop one file at a time.');
  const file=files[0];if(!Number.isSafeInteger(file.size)||file.size<1)throw new Error('The selected file is empty. Choose a ROM file.');
- if(file.size>64*1024*1024)throw new Error('Files larger than64 MiB need Advanced path import.');
+ if(file.size>64*1024*1024)throw new Error('Files larger than 64 MiB need Advanced path import.');
  return file;
 }
 export function helpForError(message){

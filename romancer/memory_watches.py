@@ -8,7 +8,7 @@ from .script_schema import canonical_bytes
 
 def validate_watches(watches):
     watches=json.loads(canonical_bytes(watches,max_bytes=16384))
-    if type(watches) is not list or len(watches)>32:raise ValueError('save at most32 memory watches')
+    if type(watches) is not list or len(watches)>32:raise ValueError('save at most 32 memory watches')
     names=set()
     for watch in watches:
         fields(watch,'name region offset length');label(watch['name'],64)

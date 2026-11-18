@@ -25,13 +25,13 @@ export function pasteTile(clipboard,width,height,colorCount){
  return checkedPixels(clipboard.pixels,width,height,colorCount);
 }
 export function mergeCellChanges(changes,incoming){
- if(!Array.isArray(changes)||!Array.isArray(incoming)||changes.length>1024||incoming.length>1024)throw new Error('Review at most1024 asset changes at a time.');
+ if(!Array.isArray(changes)||!Array.isArray(incoming)||changes.length>1024||incoming.length>1024)throw new Error('Review at most 1024 asset changes at a time.');
  const keys=new Set();
  for(const change of incoming){
   if(change.kind!=='cell'||typeof change.bitmap_id!=='string'||!Number.isSafeInteger(change.cell_index)||change.cell_index<0||!Array.isArray(change.before_pixels)||!Array.isArray(change.after_pixels)||change.before_pixels.length!==change.after_pixels.length||change.before_pixels.length>1024)throw new Error('Invalid staged tile change.');
   keys.add(change.bitmap_id+':'+change.cell_index);
  }
  const merged=[...changes.filter(change=>change.kind!=='cell'||!keys.has(change.bitmap_id+':'+change.cell_index)),...incoming.filter(change=>JSON.stringify(change.before_pixels)!==JSON.stringify(change.after_pixels))];
- if(merged.length>1024)throw new Error('Review at most1024 asset changes at a time.');
+ if(merged.length>1024)throw new Error('Review at most 1024 asset changes at a time.');
  return JSON.parse(JSON.stringify(merged));
 }

@@ -9,7 +9,7 @@ MAX_SAMPLES=65536
 def decode_sample(raw,codec,initial_level=64):
     if codec not in CODECS or type(raw) is not bytes or not 1<=len(raw)<=65536:raise ValueError('unsupported sample codec or byte budget')
     number(initial_level,0,127)
-    if codec=='nes-dpcm' and len(raw)>MAX_SAMPLES//8 or codec=='snes-brr' and len(raw)//9*16>MAX_SAMPLES:raise ValueError('decoded sample exceeds65536points')
+    if codec=='nes-dpcm' and len(raw)>MAX_SAMPLES//8 or codec=='snes-brr' and len(raw)//9*16>MAX_SAMPLES:raise ValueError('decoded sample exceeds 65536 points')
     if codec=='pcm-u8':values=[(n-128)*256 for n in raw]
     elif codec=='pcm-s8':values=[(n if n<128 else n-256)*256 for n in raw]
     elif codec in ('pcm-s16le','pcm-s16be'):
@@ -39,7 +39,7 @@ def decode_sample(raw,codec,initial_level=64):
                     elif filter_id==2:v+=2*p1+((-3*p1)>>5)-p2+(p2>>4)
                     elif filter_id==3:v+=2*p1+((-13*p1)>>6)-p2+((3*p2)>>4)
                     v=max(-32768,min(32767,v));out=((v*2+32768)&65535)-32768;p2,p1=p1,out//2;values.append(out)
-    if len(values)>MAX_SAMPLES:raise ValueError('decoded sample exceeds65536points')
+    if len(values)>MAX_SAMPLES:raise ValueError('decoded sample exceeds 65536 points')
     return values
 
 
