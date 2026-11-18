@@ -31,6 +31,8 @@ Families:
   saxman           Sega Saxman (Okumura LZSS behind a packed-size word)
   rle-sega-planes  Sega Master System plane run-length (Phantasy Star and many more)
   rnc1, rnc2       "RNC" streams, methods 1 and 2 (gfx_packers)
+  lz-ring256       bit-stream LZSS over a 256-byte ring (Quintet: ActRaiser, Soul Blazer, Illusion of Gaia, Robotrek)
+  lz-konami-md     Konami on the Mega Drive (Contra Hard Corps): flag-byte LZ with near copies and literal runs
   raw              stored as it is
   lz~... rle~...   members of the parameterised families in gfx_families, named by their parameters
   <codec>|<map>    any codec whose output the game lays into video memory with made-up
@@ -1682,11 +1684,12 @@ for _name, _member in ALIASES.items():
 
 # Codecs worth trying first on each system (all the fixed ones are tried in the end).
 PREFERRED = {
-    'snes': ('lz2', 'lz2-le', 'lz3', 'hal', 'lz5', 'konami-snes', 'lzss-00-le16', 'lzss-20-le16'),
+    'snes': ('lz2', 'lz2-le', 'lz3', 'hal', 'lz5', 'konami-snes', 'lzss-00-le16', 'lzss-20-le16', 'rnc1', 'rnc2'),
     'gb': ('hal', 'lz3', 'lz2', 'rle-konami', 'rle-escape', 'packbits'),
     'gbc': ('lz3', 'hal', 'lz2', 'rle-konami', 'rle-escape', 'packbits'),
     'nes': ('rle-konami', 'rle-escape', 'hal', 'lz2', 'packbits'),
-    'genesis': ('nemesis', 'kosinski', 'enigma', 'comper', 'kosinski-moduled', 'saxman', 'lzss-00-le16'),
+    'genesis': ('nemesis', 'kosinski', 'enigma', 'comper', 'kosinski-moduled', 'saxman', 'lzss-00-le16', 'rnc1', 'rnc2',
+                'lz-konami-md'),
     'sms': ('rle-sega-planes', 'rle-pairs', 'packbits', 'lzss-00-le16'),
 }
 # Members of the parameterised families found in real games by trace/codec_survey.py search;
