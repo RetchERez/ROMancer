@@ -574,7 +574,8 @@ def cmd_report(a):
     """Per system: ROMs whose packed graphics were re-packed (or moved) and replayed as planned.
 
     before  the sweep's own result or an earlier verify run (--also DIR, repeatable)
-    after   before, or a result in OUTDIR that is confirmed and sound (see `sound`)
+    after   before, or a result in OUTDIR that is confirmed and sound (see `sound`) through a
+            codec other than plain "raw"
     """
     keep = None
     if a.catalog:
@@ -609,12 +610,15 @@ def cmd_report(a):
     out = {}
     for system in sorted(set(system_of.values())):
         rs = [r for r in rows if r['system'] == system]
-        good = {r['sha256'] for r in rs if r.get('confirmed') and r.get('clean', True)}
+        every = {r['sha256'] for r in rs if r.get('confirmed') and r.get('clean', True)}
+        # A tile whose bytes are stream literals may also turn out to be stored as it is (codec "raw", no
+        # layout): the edit is then a plain write, which is not re-packing and is counted apart.
+        good = {r['sha256'] for r in rs if r['sha256'] in every and r.get('codec') != 'raw'}
         was = {sha for sha in before if system_of[sha] == system}
         new = good - was
         s = {'roms': sum(v == system for v in system_of.values()), 'verified_here': len(rs),
              'errors': sum(not r.get('ok') for r in rs), 'confirmed_before': len(was), 'confirmed_after': len(was | good),
-             'new_here': len(new),
+             'new_here': len(new), 'stored_as_it_is_here': len(every - good - was),
              'new_by_codec': dict(Counter(r['codec'] for r in rs if r['sha256'] in new).most_common()),
              'new_by_path': dict(Counter(r['path'] for r in rs if r['sha256'] in new)),
              'confirmed_here_not_sound': sum(bool(r.get('confirmed')) and not r.get('clean', True) for r in rs)}
@@ -628,7 +632,8 @@ def cmd_report(a):
                         why[(t.get('error') or ('replayed, not as planned' if 'as_planned' in t else 'no plan'))[:70]] += 1
         s['unconfirmed_reasons'] = dict(why.most_common(6))
         out[system] = s
-    total = {k: sum(s[k] for s in out.values()) for k in ('roms', 'verified_here', 'confirmed_before', 'confirmed_after', 'new_here')}
+    total = {k: sum(s[k] for s in out.values()) for k in ('roms', 'verified_here', 'confirmed_before', 'confirmed_after', 'new_here',
+                                                          'stored_as_it_is_here', 'confirmed_here_not_sound')}
     out['all'] = total
     print(json.dumps(out, indent=1))
     if a.json:
