@@ -76,6 +76,7 @@ APPROVED_FILES = frozenset({
     'linux/package_linux.sh',
     'linux/build_cores_linux.sh',
     'linux/write_linux_pins.py',
+    'linux/ci_smoke.sh',
     'linux/README-LINUX.txt',
     'linux/ENGINES-NOTICES.txt',
     'linux/romancer.ico',
