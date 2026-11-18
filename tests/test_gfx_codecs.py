@@ -9,6 +9,7 @@ sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 
 from romancer import gfx_codecs as gc  # noqa: E402
 from romancer import gfx_families as gf  # noqa: E402
+from romancer import gfx_packers as gp  # noqa: E402
 
 
 def sample(n, seed=1, tile=0):
@@ -193,8 +194,11 @@ class RoundTrips(unittest.TestCase):
             stream = gc.encode(name, raw)
             with self.subTest(codec=name):
                 self.assertEqual(gc.encode(name, raw, like=stream), stream)
+                flat = gc.encode(name, bytes(300), like=stream)     # packs far smaller: lengthened, not left short
+                self.assertEqual(len(flat), len(stream))
+                self.assertEqual(gc.decode(name, flat, 0, 300)[0][:300], bytes(300))
                 with self.assertRaises(ValueError):
-                    gc.encode(name, bytes(300), like=stream)        # packs far smaller: refused, not left short
+                    gc.encode(name, raw, like=stream[:-9])          # packs larger: refused
 
     def test_cheapest_parse_encoders_beat_plain_greedy(self):
         raw = sample(4096, seed=43)
@@ -353,7 +357,8 @@ class Recognise(unittest.TestCase):
         cases = [('rle-sega-planes', '', 'sms', 32), ('lz2', '3bpp', 'snes', 32), ('hal', '', 'gb', 16),
                  ('kosinski', '', 'genesis', 32), ('comper', '', 'genesis', 32), ('saxman', '', 'genesis', 32),
                  ('nemesis', '', 'genesis', 32), ('rle-konami', '1of2n', 'nes', 16), ('lz3', '0Z', 'gbc', 16),
-                 ('lz5', '', 'snes', 32), ('konami-snes', '', 'snes', 32), ('lz~le16.l1.oku.b0.m3.s', '', 'snes', 32)]
+                 ('lz5', '', 'snes', 32), ('konami-snes', '', 'snes', 32), ('lz~le16.l1.oku.b0.m3.s', '', 'snes', 32),
+                 ('rnc1', '', 'snes', 32), ('rnc2', '', 'genesis', 32)]
         for codec, text, system, tile in cases:
             k = gc.map_parse(text)[1] if text else 32
             raw = sample(768, seed=12 + len(codec), tile=k)
@@ -439,6 +444,127 @@ class Recognise(unittest.TestCase):
                 self.assertIsNotNone(hit)
                 self.assertEqual(hit['codec'], codec)
                 self.assertEqual(hit['start'], 0x4321)
+
+
+class SameSize(unittest.TestCase):
+    """A bare stream is replaced by one of exactly its size: the encoders lengthen a shorter result."""
+
+    NAMES = ('lzss-00-raw', 'lzss-20-raw', 'packbits', 'lz~n.m0.L6hbe.b1.m2.n', 'lz~n.l1.L4lbe.b1.m3.n', 'rle~h.r0.l0.n.p1')
+
+    def test_shorter_results_are_lengthened(self):
+        for name in self.NAMES:
+            reached = 0
+            for seed in range(4):
+                raw = sample(700, seed=seed + 60)
+                base = gc.encode(name, raw)
+                for extra in (0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 17, 40, 100):
+                    like = base + bytes(extra)
+                    try:
+                        stream = gc.encode(name, raw, like=like)
+                    except ValueError:
+                        continue        # refused, never left short
+                    reached += 1
+                    self.assertEqual(len(stream), len(like), name)
+                    self.assertEqual(gc.decode(name, stream, 0, len(raw))[0][:len(raw)], raw, name)
+            with self.subTest(codec=name):
+                self.assertGreaterEqual(reached, 48)        # of 52
+
+    def test_longer_results_are_refused(self):
+        raw = sample(700, seed=64)
+        for name in self.NAMES:
+            with self.subTest(codec=name):
+                with self.assertRaises(ValueError):
+                    gc.encode(name, raw, like=gc.encode(name, raw)[:-1])
+
+    def test_a_small_edit_usually_fits_back(self):
+        # the common case: one tile redrawn inside a block
+        raw = bytearray(sample(1500, seed=65))
+        for name in ('lzss-00-raw', 'packbits'):
+            like = gc.encode(name, bytes(raw))
+            edited = bytearray(raw)
+            edited[700:716] = bytes(16)         # a tile made flat packs smaller
+            stream = gc.encode(name, bytes(edited), like=like)
+            self.assertEqual(len(stream), len(like))
+            self.assertEqual(gc.decode(name, stream, 0, len(raw))[0][:len(raw)], bytes(edited))
+
+
+class Packers(unittest.TestCase):
+    """The bit-stream packers of gfx_packers."""
+
+    def test_checksum_is_crc16_arc(self):
+        self.assertEqual(gp.crc16_arc(b'123456789'), 0xBB3D)
+
+    def test_rnc2_known_stream(self):
+        # two skipped bits; literal A; literal B; two bytes from two back; the end. Bit bytes are
+        # fetched when a bit is wanted, so the stream is: 0D, 'A', 'B', distance - 1, E0, length byte 00.
+        body = bytes((0x0D, 0x41, 0x42, 0x01, 0xE0, 0x00))
+        sums = gp.crc16_arc(b'ABAB').to_bytes(2, 'big') + gp.crc16_arc(body).to_bytes(2, 'big')
+        head = b'RNC\x02' + (4).to_bytes(4, 'big') + len(body).to_bytes(4, 'big') + sums + bytes((0, 1))
+        self.assertEqual(gc.decode('rnc2', head + body + b'tail'), (b'ABAB', 18 + len(body)))
+        self.assertEqual(gc.encode('rnc2', b'ABAB'), head + body)
+
+    def test_rnc2_every_copy_form(self):
+        # lengths 2 to 263 at distances that need every form of the distance's high bits
+        rng = random.Random(51)
+        for length in (2, 3, 4, 5, 6, 7, 8, 9, 40, 263):
+            for dist in (1, 2, 255, 256, 257, 600, 800, 1100, 2000, 2300, 3000, 4096):
+                noise = bytes(rng.randrange(256) for _ in range(dist + length + 7))
+                tail = noise[len(noise) - dist:len(noise) - dist + length] if dist >= length else (noise[-dist:] * length)[:length]
+                raw = noise + tail
+                with self.subTest(length=length, dist=dist):
+                    stream = gc.encode('rnc2', raw)
+                    self.assertEqual(gc.decode('rnc2', stream), (raw, len(stream)))
+
+    def test_rnc_header_fields(self):
+        raw = sample(3000, seed=52)
+        for name, method in (('rnc1', 1), ('rnc2', 2)):
+            stream = gc.encode(name, raw)
+            with self.subTest(codec=name):
+                self.assertEqual(stream[:4], b'RNC' + bytes([method]))
+                self.assertEqual(int.from_bytes(stream[4:8], 'big'), len(raw))
+                self.assertEqual(int.from_bytes(stream[8:12], 'big'), len(stream) - 18)
+                self.assertEqual(int.from_bytes(stream[12:14], 'big'), gp.crc16_arc(raw))
+                self.assertEqual(int.from_bytes(stream[14:16], 'big'), gp.crc16_arc(stream[18:]))
+                # the replaced stream's leeway byte is kept
+                like = bytearray(stream)
+                like[16] = 9
+                self.assertEqual(gc.encode(name, raw, like=bytes(like))[16], 9)
+
+    def test_rnc1_many_chunks_and_long_literal_runs(self):
+        rng = random.Random(53)
+        noise = bytes(rng.randrange(256) for _ in range(0x7400))      # longer than one literal count can say
+        pairs = b''.join(bytes((rng.randrange(256), rng.randrange(256))) * 3 for _ in range(0x900))   # > 0x7FF copies
+        for raw in (noise, pairs, noise + pairs):
+            stream = gc.encode('rnc1', raw)
+            self.assertEqual(gc.decode('rnc1', stream, 0, 0x20000), (raw, len(stream)))
+            self.assertGreaterEqual(stream[17], 1)
+
+    def test_rnc_rejects_what_is_not_a_stream(self):
+        raw = sample(500, seed=54)
+        for name in ('rnc1', 'rnc2'):
+            stream = gc.encode(name, raw)
+            with self.subTest(codec=name):
+                with self.assertRaises(ValueError):
+                    gc.decode(name, b'RNX' + stream[3:])
+                with self.assertRaises(ValueError):
+                    gc.decode(name, stream[:4] + b'\x7F\xFF\xFF\xFF' + stream[8:])     # an absurd size
+                with self.assertRaises((ValueError, IndexError)):
+                    gc.decode(name, stream[:len(stream) // 2])
+
+    def test_magic_starts_are_the_nearest_streams_in_front(self):
+        rom = bytearray(0x3000)
+        for at in (0x100, 0x900, 0x2000):
+            rom[at:at + 4] = b'RNC\x01'
+        self.assertEqual(gc.magic_starts(bytes(rom), 0, b'RNC\x01', [0x950]), [0x900, 0x100])
+        self.assertEqual(gc.magic_starts(bytes(rom), 0x10, b'RNC\x01', [0x1FF0, 0x8F0]), [0x1FF0, 0x8F0, 0xF0])
+        self.assertEqual(gc.magic_starts(bytes(rom), 0, b'RNC\x02', [0x950]), [])
+
+    def test_matches_are_real(self):
+        raw = sample(2000, seed=55)
+        for i, (k, dist) in enumerate(gp.lz_matches(raw, 300, 40, 2)):
+            if k:
+                self.assertTrue(2 <= k <= 40 and 1 <= dist <= 300 and dist <= i)
+                self.assertEqual(bytes(raw[i - dist + j] for j in range(k)), raw[i:i + k])
 
 
 if __name__ == '__main__':

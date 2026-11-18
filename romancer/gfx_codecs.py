@@ -30,6 +30,7 @@ Families:
   kosinski-moduled Sega Kosinski in 4 KB modules (Sonic 3 & Knuckles)
   saxman           Sega Saxman (Okumura LZSS behind a packed-size word)
   rle-sega-planes  Sega Master System plane run-length (Phantasy Star and many more)
+  rnc1, rnc2       "RNC" streams, methods 1 and 2 (gfx_packers)
   raw              stored as it is
   lz~... rle~...   members of the parameterised families in gfx_families, named by their parameters
   <codec>|<map>    any codec whose output the game lays into video memory with made-up
@@ -43,7 +44,7 @@ from __future__ import annotations
 import bisect
 from collections import Counter
 
-from . import gfx_families
+from . import gfx_families, gfx_packers
 
 MAX_OUT = 0x10000
 
@@ -1195,24 +1196,46 @@ def _runs(raw, cap):
         i += k
 
 
-def _packbits_encode(raw):
-    out = bytearray()
+def _packbits_encode(raw, size=None):
+    """`size`: the stream being replaced was that long; this one is lengthened to match (a bare
+    stream has no end of its own) by splitting literal blocks and runs."""
+    tokens = []         # bytes (a literal block) or (value, count)
     lit = bytearray()
 
     def flush():
         for p in range(0, len(lit), 128):
-            chunk = lit[p:p + 128]
-            out.append(len(chunk) - 1)
-            out.extend(chunk)
+            tokens.append(bytes(lit[p:p + 128]))
         lit.clear()
 
     for value, k in _runs(raw, 128):
         if k >= 3:
             flush()
-            out += bytes((257 - k, value))
+            tokens.append((value, k))
         else:
             lit += bytes([value]) * k
     flush()
+    now = sum(len(t) + 1 if isinstance(t, bytes) else 2 for t in tokens)
+    i = 0
+    while size is not None and now < size and i < len(tokens):
+        t = tokens[i]
+        if isinstance(t, bytes) and len(t) >= 2:
+            tokens[i:i + 1] = [t[:1], t[1:]]            # one byte more
+            now += 1
+        elif not isinstance(t, bytes) and t[1] >= 4 and size - now >= 2:
+            tokens[i:i + 1] = [(t[0], 2), (t[0], t[1] - 2)]     # two bytes more
+            now += 2
+        elif not isinstance(t, bytes) and t[1] - 1 <= size - now:
+            tokens[i] = bytes([t[0]]) * t[1]            # a run written out
+            now += t[1] - 1
+        else:
+            i += 1
+    out = bytearray()
+    for t in tokens:
+        if isinstance(t, bytes):
+            out.append(len(t) - 1)
+            out += t
+        else:
+            out += bytes((257 - t[1], t[0]))
     return bytes(out)
 
 
@@ -1599,7 +1622,9 @@ class _Registry(dict):
             made = {'decode': dec, 'encode': enc, 'terminated': terminated}
             if not terminated:
                 made['exact'] = True
-                made['sized'] = name.startswith('rle~')
+                made['sized'] = True
+                if name.startswith('lz~'):
+                    made['encode'] = lambda raw, size=None, _e=enc: _e(raw, None, size)
             elif gfx_families.features(name):
                 made['commands'] = gfx_families.features(name)
             if name.startswith('lz~') and not name.startswith('lz~n.'):
@@ -1619,6 +1644,11 @@ for _fill in (0x00, 0x20):
                                                  'encode': _bind(_lzss_encode, _fill, _header), 'terminated': _header != 'raw'}
     CODECS[f'lzss-{_fill:02x}-le16']['peek'] = (f'lzss-{_fill:02x}-raw', 2)
     CODECS[f'lzss-{_fill:02x}-raw']['exact'] = True
+    # written by the family's encoder: the cheapest parse, lengthened to the size of the stream it replaces
+    CODECS[f'lzss-{_fill:02x}-raw']['sized'] = True
+    CODECS[f'lzss-{_fill:02x}-raw']['encode'] = (
+        lambda raw, size=None, _p=gfx_families.lz_parse('lz~n.l1.oku.rfee' + ('+20' if _fill else '') + '.m3.n'):
+        gfx_families.lz_encode(_p, raw, None, size))
 CODECS['lz5'] = {'decode': _lz5_decode, 'encode': _lz5_encode, 'terminated': True}
 CODECS['konami-snes'] = {'decode': _bind(_konami_snes_decode, True), 'encode': _bind(_konami_snes_encode, True),
                          'terminated': True, 'peek': ('konami-snes-body', 2)}
@@ -1631,10 +1661,12 @@ CODECS['enigma'] = {'decode': _enigma_decode, 'encode': _enigma_encode, 'termina
 CODECS['comper'] = {'decode': _comper_decode, 'encode': _comper_encode, 'terminated': True}
 CODECS['rle-konami'] = {'decode': _konami_decode, 'encode': _konami_encode, 'terminated': True}
 CODECS['rle-pairs'] = {'decode': _pairs_decode, 'encode': _pairs_encode, 'terminated': True}
-CODECS['packbits'] = {'decode': _packbits_decode, 'encode': _packbits_encode, 'terminated': False, 'exact': True}
+CODECS['packbits'] = {'decode': _packbits_decode, 'encode': _packbits_encode, 'terminated': False, 'exact': True,
+                      'sized': True}
 CODECS['rle-escape'] = {'decode': _bind(_escape_decode, True), 'encode': _escape_encode, 'terminated': True,
                         'peek': ('rle-escape-body', 0)}
 CODECS.made['rle-escape-body'] = {'decode': _bind(_escape_decode, False), 'encode': _escape_encode, 'terminated': False}
+CODECS.update(gfx_packers.CODECS)
 CODECS['raw'] = {'decode': _raw_decode, 'encode': lambda raw: bytes(raw), 'terminated': False}
 
 # Named members of the parameterised families (gfx_families): formats met in real games.
@@ -1791,6 +1823,24 @@ def stream_anchors(d, start: int, length: int, window: int = 0x4000, gap: int = 
     return moved
 
 
+def magic_starts(rom, skip, magic, anchors, most=3, reach=0x40000):
+    """Where streams that open with `magic` begin (header excluded offsets), nearest in front of each anchor first.
+
+    A stream that says what it is needs no guessing: the tile's bytes name stream bytes they were
+    computed from, and the stream is one of the few that begin before those.
+    """
+    out = []
+    for anchor in anchors:
+        at = skip + anchor + 1
+        for _ in range(most):
+            at = rom.rfind(magic, max(skip, at - reach), at + len(magic) - 1)
+            if at < 0:
+                break
+            if at - skip not in out:
+                out.append(at - skip)
+    return out
+
+
 def _probe(d, start, length):
     target = bytes(d.data[start:start + length])
     if len(set(target)) > 2:
@@ -1943,8 +1993,11 @@ def recognise(d, rom: bytes, skip: int, system: str, start: int, length: int, co
         terminated = entry['terminated']
         peek = entry.get('peek') or (None if terminated else (name, 0))
         seen = set()
-        for anchor in anchors:
-            for s in range(anchor, max(anchor - max(back, _HEAD.get(name, 0)), 0) - 1, -1):
+        starts = [s for anchor in anchors for s in range(anchor, max(anchor - max(back, _HEAD.get(name, 0)), 0) - 1, -1)]
+        if 'magic' in entry:
+            starts = magic_starts(rom, skip, entry['magic'], anchors)
+        for s in starts:
+            if True:
                 if s in seen:
                     continue
                 seen.add(s)

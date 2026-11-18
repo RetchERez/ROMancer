@@ -56,6 +56,12 @@ def core_for(system):
 
 # ---- dump -------------------------------------------------------------------
 
+def informative(tile):
+    """The tile has enough bytes other than 00 and FF, and enough different ones, to tell a codec's output from chance."""
+    stored = tile.stored
+    return len(set(stored)) >= 6 and 3 * sum(b not in (0x00, 0xFF) for b in stored) >= len(stored)
+
+
 def pick_targets(gt, scene, system, rom):
     """The sweep's own target first, then other unpacked tiles spread over the ROM."""
     all_tiles = gt.tiles(scene, system, rom)
@@ -69,6 +75,10 @@ def pick_targets(gt, scene, system, rom):
     shown.sort(key=lambda t: -uses.get(t.addresses[0], 0))
     hard = [t for t in shown if t.status == 'derived'] + [t for t in live if t.status == 'derived' and t.addresses[0] not in used]
     hard = [t for t in hard if t.domain != 'chr_rom' and t.addresses[-1] - t.addresses[0] + 1 == len(t.addresses)]
+    # Tiles that hold a picture first: a tile of two flat colors is all 00 and FF bytes, whose tags
+    # say little, and it is as often cleared by code as unpacked. (The sort is stable: on screen and
+    # most used still lead within each class.)
+    hard.sort(key=lambda t: not informative(t))
     out, seen = [], set()
     for t in hard:
         offs = [s['offset'] for s in t.sources if s]
@@ -170,6 +180,15 @@ def cmd_dump(a):
 
 # ---- match ------------------------------------------------------------------
 
+def repick(gt, rec, scene, rom):
+    """Choose the dump's targets again, as verify will choose them in the live scene (dumps made
+    before the order of pick_targets changed are then read the new way)."""
+    try:
+        rec['targets'] = pick_targets(gt, scene, rec['system'], rom)[0]
+    except Exception:
+        pass        # a dump without the video registers: keep the targets it was made with
+
+
 def match_one(path, index, codecs=None, limit=TARGETS):
     from romancer import graphics_trace as gt
     rec, scene = load_dump(path)
@@ -177,6 +196,7 @@ def match_one(path, index, codecs=None, limit=TARGETS):
         return rec, []
     rom, _ = read_rom(index, rec['sha256'])
     hits = []
+    repick(gt, rec, scene, rom)
     for t in rec['targets'][:limit]:
         try:
             block = gt.find_compressed_block(scene, rom, rec['system'], t['domain'], t['start'], t['length'], codecs)
@@ -243,8 +263,11 @@ def _search_worker(args):
     rec, scene = load_dump(path)
     rom, _ = read_rom(index, rec['sha256'])
     skip = gt.rom_skip(rom, rec['system'])
+    repick(gt, rec, scene, rom)
     rows = []
     for k in targets:
+        if k >= len(rec['targets']):
+            break
         t = rec['targets'][k]
         t0 = time.perf_counter()
         try:

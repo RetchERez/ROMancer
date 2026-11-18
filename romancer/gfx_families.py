@@ -258,6 +258,8 @@ def lz_encode(p, raw, allowed=None, size=None):
                 c, k = cost[i + length] + 17, length
         cost[i], step[i] = c, k
     msb, lit = p['msb'], p['lit']
+    if size is not None and p['header'] == 'n' and p['end'] == 'n':
+        _lz_pad(step, n, minlen, size)
     body = bytearray()
     i = 0
     tokens = 8
@@ -292,6 +294,54 @@ def lz_encode(p, raw, allowed=None, size=None):
     if v > 0xFFFF:
         raise ValueError('data is too long for this codec')
     return (bytes((v & 0xFF, v >> 8)) if head[:2] == 'le' else bytes((v >> 8, v & 0xFF))) + bytes(body)
+
+
+def _lz_pad(step, n, minlen, size):
+    """Make the parse in `step` longer until the stream is `size` bytes: a bare stream has no end
+    of its own, so its replacement must fill the same space. A copy gives up bytes at its end to
+    literals (each one byte and one flag more), or becomes literals altogether (which moves the
+    flag count without the same cost, so that a size a new flag byte would jump over is still
+    reached). Left as it is when the stream is already that long or longer, or no mix fits."""
+    pairs = []
+    lits = 0
+    i = 0
+    while i < n:
+        if step[i] == 1:
+            lits += 1
+        else:
+            pairs.append((step[i], i))
+        i += step[i]
+    count = len(pairs)
+    if lits + 2 * count + (lits + count + 7) // 8 >= size:
+        return
+    by_length = sorted(pairs)
+    room = sum(k - minlen for k, _ in pairs)
+    forced = 0
+    for burst in range(0, min(count, 24) + 1):      # copies turned into literals, shortest first
+        if burst:
+            forced += by_length[burst - 1][0] - minlen
+        lo = lits + burst * minlen + 2 * (count - burst)
+        tokens = lits + count + burst * (minlen - 1)
+        for shrink in range(forced, room + 1):
+            total = lo + shrink + (tokens + shrink + 7) // 8
+            if total >= size:
+                break
+        else:
+            continue
+        if total != size:
+            continue
+        left = shrink - forced
+        for k, at in by_length[:burst]:
+            for j in range(at, at + k):
+                step[j] = 1
+        for k, at in by_length[burst:]:
+            take = min(left, k - minlen)
+            if take:
+                step[at] = k - take
+                for j in range(at + k - take, at + k):
+                    step[j] = 1
+                left -= take
+        return
 
 
 def lz_features(p, stream):
