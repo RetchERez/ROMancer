@@ -18,7 +18,12 @@ For each ROM: boot with the exploring input script, take a scene, and record
 * for a tile that cannot be written in place (computed or packed): which
   codec, if any, reproduces it, and whether the re-encode / relocate /
   overlay path replays as planned;
-* whether the codec-independent overlay fallback works for this game.
+* whether the codec-independent overlay fallback works for this game;
+* one packed block re-packed (`repack`): the targets are picked as trace/codec_survey.py picks them
+  (tiles with a picture first; tiles made of stream literals as well as computed ones; every
+  sampled scene), the block is recognised, edited, packed again and replayed. It counts only
+  when the tile came out as planned, the rest of the block stayed as it was, and no unrelated
+  byte of video memory changed (a second copy of the same tile elsewhere is related).
 
 Results are one JSON per ROM, so the sweep can be resumed. Every ROM runs in
 its own process; the sweep ends those processes when it ends, however it ends.
@@ -44,6 +49,8 @@ SETTLE = 45          # frames before a scene at which video memory is sampled on
 SWEEP_VERSION = 5
 MAP_PICKS = {'stored': 4, 'computed': 2, 'blank': 2}     # background cells tried per layer and kind of source
 MAP_SECONDS = 300    # no new background cell is started after this long (per ROM)
+REPACK_TARGETS = 6   # tiles tried per scene for the packed re-pack, as codec_survey.a_targets
+REPACK_SECONDS = 300  # no new tile is started after this long (per ROM)
 VIDEO_DOMAINS = ('vram', 'chr', 'vram4')
 
 
@@ -238,6 +245,131 @@ def measure(rom, system, scenes, fe_for, result, buttons=explore, map_only=False
     result['scene_frame'] = chosen[0].frame
     result['scenes_tried'] = tried
     result['map_edit'] = measure_map_edit(rom, system, scenes, chosen[0], fe_for, buttons)
+    result['repack'] = measure_repack(rom, system, scenes, fe_for, buttons)
+
+
+def unrelated_changes(changed: dict, domain: str, planned, span) -> dict:
+    """Sort the bytes a re-pack's replay changed besides the planned ones.
+
+    `changed` is verify_plan's {domain: [indices]}, `planned` the edited
+    indices and `span` the stretch of `domain` the block was loaded to.
+    Returns {'in_block', 'copies', 'unrelated'}: other bytes of the block
+    itself (the new stream did not unpack to the edited block), whole
+    shifted copies of the edit elsewhere in the same domain (the game loads
+    the same tile to a second place: related), and everything else.
+    """
+    planned = sorted(planned)
+    inside = 0
+    outside = set()
+    other = 0
+    for name, indices in (changed or {}).items():
+        if name != domain:
+            other += len(indices)
+            continue
+        for i in indices:
+            if i in span:
+                inside += i not in planned
+            else:
+                outside.add(i)
+    copies = 0
+    while outside and planned:
+        shift = min(outside) - planned[0]
+        image = {a + shift for a in planned}
+        if not image <= outside:
+            break
+        outside -= image
+        copies += 1
+    return {'in_block': inside, 'copies': copies, 'unrelated': len(outside) + other}
+
+
+def measure_repack(rom, system, scenes, fe_for, buttons=explore, seconds=REPACK_SECONDS):
+    """One packed block of this ROM unpacked, edited, packed again and replayed (see the module text).
+
+    The same measurement as trace/codec_survey.py verify, with its target
+    picking (codec_survey.pick_targets), over every sampled scene, latest
+    first. `confirmed` is the strict fact: as planned, nothing else in the
+    block changed, what follows a bare stream still unpacks as before, and
+    no unrelated byte of video memory changed. A try that is as planned but
+    not all of that is kept in `tries` with its counts.
+    """
+    import codec_survey
+    from romancer import graphics_trace as gt, provenance as pv, gfx_codecs
+    t0 = time.perf_counter()
+    tries = []
+    out = {'confirmed': False, 'tries': tries}
+    for scene in reversed(scenes):
+        before = [c for c in scene.checkpoints if c[0] < scene.frame] or scene.checkpoints[:1]
+        quick = pv.Scene(scene.id, scene.frame, scene.screen_sha256,
+                         sorted({c[0]: c for c in scene.checkpoints[:1] + before[-2:]}.values()), scene.snapshot)
+        quick.video = getattr(scene, 'video', None)
+
+        def verify(plan, expect=None, quick=quick):
+            return gt.verify_plan(fe_for, rom, plan, quick, expect=expect, buttons_for=buttons)
+        targets, _ = codec_survey.pick_targets(gt, scene, system, rom)
+        for t in targets[:REPACK_TARGETS]:
+            if time.perf_counter() - t0 > seconds:
+                out['stopped'] = f'no new tile after {seconds} seconds'
+                break
+            tile = gt.tile_at(scene, system, t['start'], domain=t['domain'])
+            block = gt.find_compressed_block(scene, rom, system, t['domain'], t['start'], t['length'])
+            row = {'frame': scene.frame, 'tile': t['index'], 'on_screen': t['on_screen'], 'status': t.get('status'),
+                   'codec': block.codec if block else None}
+            tries.append(row)
+            if block is None:
+                continue
+            row['block'] = block.to_dict()
+            new = gt.encode_tile(redraw(tile), tile.format)
+            changes = {}
+            layout = gfx_codecs.CODECS[block.codec].get('map')
+            for k, addr in enumerate(tile.addresses):
+                if new[k] != tile.stored[k]:
+                    try:
+                        at = block.decoded_index(addr)
+                    except ValueError:
+                        continue     # a byte the game makes up itself (3bpp padding)
+                    if layout and gfx_codecs.map_index(layout, at) is None:
+                        continue     # the same, for a layout carried by the codec name
+                    changes[addr] = new[k]
+            if not changes:
+                row['error'] = 'nothing to change'
+                continue
+            try:
+                plan = gt.plan_block_edit(block, changes, rom, system, verify=verify,
+                                          max_candidates=24 if gt.CPU[system] in ('sm83', '6502') else 6)
+                r = verify(plan)
+                span = range(block.domain_start, block.domain_start + block.last - block.first)
+                effects = unrelated_changes(r.get('changed'), block.domain, changes, span)
+                row.update(path=plan.kind, verified=r['verified'], as_planned=r.get('as_planned'),
+                           missed={k: len(v) for k, v in r.get('missed', {}).items()}, unplanned=r.get('unplanned', {}),
+                           unplanned_in_block=effects['in_block'], copies_elsewhere=effects['copies'],
+                           unrelated=effects['unrelated'],
+                           reads_on_alike=(plan.kind != 'reencode' or gfx_codecs.CODECS[block.codec]['terminated']
+                                           or gfx_codecs.reads_on_alike(block.codec, rom, plan.apply(rom), block.start,
+                                                                        len(block.decoded))),
+                           old_stream=plan.details.get('old_stream'), new_stream=plan.details.get('new_stream'))
+            except ValueError as e:
+                row['error'] = str(e)[:300]
+            if repack_confirmed(row):
+                break
+        if any(repack_confirmed(r) for r in tries) or 'stopped' in out:
+            break
+    good = next((r for r in tries if repack_confirmed(r)), None)
+    loose = good or next((r for r in tries if r.get('as_planned') and codec_survey.sound(r)), None) \
+        or next((r for r in tries if r.get('as_planned')), None)
+    out.update(confirmed=bool(good), as_planned=bool(loose),
+               sound=bool(loose and codec_survey.sound(loose)),
+               codec=loose['codec'] if loose else next((r['codec'] for r in tries if r['codec']), None),
+               path=loose['path'] if loose else None, frame=loose['frame'] if loose else None,
+               unrelated=loose.get('unrelated') if loose else None,
+               copies_elsewhere=loose.get('copies_elsewhere') if loose else None,
+               targets=len(tries), seconds=round(time.perf_counter() - t0, 1))
+    return out
+
+
+def repack_confirmed(row) -> bool:
+    """A re-pack try that counts: as planned, the rest of its block untouched, what follows still unpacks, nothing unrelated changed."""
+    return bool(row.get('as_planned') and not row.get('unplanned_in_block') and row.get('reads_on_alike', True)
+                and not row.get('unrelated'))
 
 
 def measure_map_edit(rom, system, scenes, chosen, fe_for, buttons=explore, seconds=MAP_SECONDS):
@@ -740,7 +872,10 @@ MAP_CAUSES = {
                      'packed data), and the computed cells could not be changed either',
     'no effect': 'cells trace to ROM bytes or code values, but the replay with those bytes changed did not show the '
                  'planned cell (drawn before the first checkpoint that replays, a coincidence of values, or code that '
-                 'is shared)',
+                 'is shared), and the computed cells could not be changed either',
+    'not from power-on': 'a ROM byte near the traced source gives the planned cell when the scene is replayed from '
+                         'shortly before it, but not when the run is replayed from power-on (the byte is used for more '
+                         'than this background), and no other cell was confirmed',
     'out of time': 'the time allowed for the background-cell edit ran out before a cell was confirmed',
 }
 
@@ -767,6 +902,8 @@ def map_cause(r):
     computed = [a for a in attempts if a['source'] == 'derived']
     frames = len({t['scene_frame'] for t in scenes if t.get('attempts')})
     detail = f'{len(stored)} stored and {len(computed)} computed cells tried in {frames} scene{"s" if frames != 1 else ""}'
+    if any('replayed from its start' in a.get('error', '') for a in computed):
+        return 'not from power-on', detail
     if not stored:
         return 'computed', detail
     if all('also feeds a byte' in a.get('error', '') or 'come from one ROM byte' in a.get('error', '') for a in stored):
@@ -824,6 +961,23 @@ def report(outdir):
             p = r['derived_edit'].get('path') if r['derived_edit'].get('as_planned') else 'unconfirmed'
             paths[p] = paths.get(p, 0) + 1
         s['hard_tile_confirmed_path'] = paths
+        packs = [r['repack'] for r in ok if r.get('repack')]
+        s['repack_measured'] = len(packs)
+        s['repack_block_recognised'] = sum(bool(p.get('codec')) for p in packs)
+        # A tile made of stream literals may turn out to be stored as it is (codec "raw", no layout): the edit is
+        # then a plain write, which is not re-packing and is counted apart (as trace/codec_survey.py report does).
+        s['repack_confirmed'] = sum(bool(p.get('confirmed')) and p.get('codec') != 'raw' for p in packs)
+        s['repack_stored_as_it_is'] = sum(bool(p.get('confirmed')) and p.get('codec') == 'raw' for p in packs)
+        s['repack_as_planned_but_unrelated_bytes_changed'] = sum(
+            bool(p.get('as_planned') and p.get('sound') and not p.get('confirmed')) for p in packs)
+        s['repack_as_planned_but_block_not_sound'] = sum(bool(p.get('as_planned') and not p.get('sound')) for p in packs)
+        s['repack_with_a_second_copy_elsewhere'] = sum(bool(p.get('confirmed') and p.get('copies_elsewhere'))
+                                                        and p.get('codec') != 'raw' for p in packs)
+        s['repack_codec'], s['repack_path'] = {}, {}
+        for p in packs:
+            if p.get('confirmed') and p.get('codec') != 'raw':
+                s['repack_codec'][p['codec']] = s['repack_codec'].get(p['codec'], 0) + 1
+                s['repack_path'][p['path']] = s['repack_path'].get(p['path'], 0) + 1
         tried = [r for r in ok if r.get('private_copy')]
         s['private_copy_tried'] = len(tried)
         s['private_copy_as_planned'] = sum(bool(r['private_copy'].get('as_planned')) for r in tried)

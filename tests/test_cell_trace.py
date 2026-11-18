@@ -499,7 +499,28 @@ class SweepTests(unittest.TestCase):
         self.assertEqual(self.gs.map_cause(old)[0], 'computed')
         self.assertEqual(self.gs.map_cause({'layers': [], 'map_edit': {}})[0], 'no layer')
         self.assertTrue(all(cause in self.gs.MAP_CAUSES for cause in ('computed', 'no effect', 'nothing drawn', 'no layer',
-                                                                      'shared source', 'out of time')))
+                                                                      'shared source', 'out of time', 'not from power-on')))
+        broke = {'scenes': [{'scene_frame': 9, 'layers': 1, 'attempts': [
+            {'source': 'derived', 'error': 'cell-source at 0x10: ... but not when the recording is replayed from its start'},
+            {'source': 'rom', 'error': 'direct: the replay did not show the cell as planned'}]}]}
+        self.assertEqual(self.gs.map_cause({'map_edit': broke})[0], 'not from power-on')
+
+    def test_a_repack_counts_only_when_nothing_unrelated_changed(self):
+        span = range(0x100, 0x200)
+        planned = [0x110, 0x112, 0x115]
+        sort = lambda changed: self.gs.unrelated_changes(changed, 'vram', planned, span)
+        self.assertEqual(sort({'vram': planned}), {'in_block': 0, 'copies': 0, 'unrelated': 0})
+        self.assertEqual(sort({'vram': planned + [0x120]}), {'in_block': 1, 'copies': 0, 'unrelated': 0})
+        # the same tile loaded to two more places: whole shifted copies of the edit
+        twice = planned + [a + 0x400 for a in planned] + [a + 0x900 for a in planned]
+        self.assertEqual(sort({'vram': twice}), {'in_block': 0, 'copies': 2, 'unrelated': 0})
+        # a partial copy, a stray byte, another domain: unrelated
+        self.assertEqual(sort({'vram': planned + [0x510, 0x512]})['unrelated'], 2)
+        self.assertEqual(sort({'vram': twice + [0x3000], 'chr': [1, 2]}), {'in_block': 0, 'copies': 2, 'unrelated': 3})
+        good = {'as_planned': True, 'unplanned_in_block': 0, 'reads_on_alike': True, 'unrelated': 0}
+        self.assertTrue(self.gs.repack_confirmed(good))
+        for worse in ({'unrelated': 4}, {'unplanned_in_block': 1}, {'reads_on_alike': False}, {'as_planned': False}):
+            self.assertFalse(self.gs.repack_confirmed({**good, **worse}), worse)
 
     def test_the_coverage_section_is_replaced_in_place(self):
         import tempfile
@@ -516,6 +537,10 @@ class SweepTests(unittest.TestCase):
                     'tile_edit': {'as_planned': True, 'verified': True, 'candidates': 1}, 'derived_edit': {},
                     'overlay': {}, 'private_copy': {}, 'layers': [], 'map_edit': map_edit}
         results = [result('a' * 64, 'Game A', done), result('b' * 64, 'Game B', missed)]
+        results[0]['repack'] = {'confirmed': True, 'as_planned': True, 'sound': True, 'codec': 'lz2', 'path': 'relocate',
+                                'copies_elsewhere': 1}
+        results[1]['repack'] = {'confirmed': False, 'as_planned': True, 'sound': True, 'codec': 'rnc1', 'path': 'reencode',
+                                'unrelated': 9}
         with tempfile.TemporaryDirectory() as folder:
             for r in results:
                 (Path(folder) / (r['sha256'] + '.json')).write_text(json.dumps(r))
@@ -524,12 +549,16 @@ class SweepTests(unittest.TestCase):
             self.assertEqual(totals['gb']['map_edit_path'], {'cell-source': 1})
             self.assertEqual(totals['gb']['map_edit_cause'], {'computed': 1})
             self.assertEqual(totals['gb']['map_edit_in_another_scene'], 1)
+            self.assertEqual((totals['gb']['repack_confirmed'], totals['gb']['repack_as_planned_but_unrelated_bytes_changed'],
+                              totals['gb']['repack_codec'], totals['gb']['repack_path']), (1, 1, {'lz2': 1}, {'relocate': 1}))
             self.assertEqual(totals['gb']['map_edit_on_a_blank_tile'], 0)
             self.assertEqual(totals['gb']['map_edit_as_planned_from_power_on_too'], 1)
             text = self.report.section(totals, results, {'b' * 64: 'Game B (USA)'}, {'gb': {'map_edit_as_planned': 0}})
             self.assertIn('| gb | Game B (USA) | computed (0 stored and 1 computed cells tried in 1 scene) |', text)
             self.assertIn('| gb | 2 | 1 | 0 | 0 | 0 | 1 | 1 | 1 | 0 | 1 | 1 |', text)
             self.assertIn('before this one: gb 0 (all 0)', text)
+            self.assertIn('| gb | 2 | 1 | 1 | 1 | 0 | 1 | 0 |', text)
+            self.assertIn('Confirmed re-packs by codec: lz2 1.', text)
             self.assertNotIn('Game A', text)
             page = Path(folder) / 'COVERAGE.md'
             page.write_text('| palette table |\n', encoding='utf-8')

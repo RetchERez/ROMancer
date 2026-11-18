@@ -1,7 +1,7 @@
 """Total graphics_sweep results for the ROMs that are in the catalog.
 
     python -B trace/graphics_report.py SWEEPDIR [--catalog knowledge/rom_samples.json] [--json OUT.json]
-                                       [--markdown trace/COVERAGE.md] [--before OLD.json]
+                                       [--markdown trace/COVERAGE.md] [--before OLD.json] [--before-label TEXT]
 
 Uses graphics_sweep.report on the results whose SHA-256 is in the catalog, then prints one
 line per system and a total: ROMs traced, a tile edit confirmed by any path (in place,
@@ -29,7 +29,7 @@ import graphics_sweep  # noqa: E402
 
 COLUMNS = (('ROMs', 'roms'), ('traced', 'traced'), ('any tile path', 'any_tile_path_confirmed'),
            ('tile in place', 'tile_edit_as_planned'), ('background cell', 'map_edit_as_planned'),
-           ('re-packed', None), ('run-time patch', 'overlay_as_planned'), ('patch clean from power-on', 'overlay_clean_from_boot'),
+           ('hard tile re-packed', None), ('packed block re-packed', 'repack_confirmed'), ('run-time patch', 'overlay_as_planned'), ('patch clean from power-on', 'overlay_clean_from_boot'),
            ('only this scene tried', 'private_copy_tried'), ('only this scene', 'private_copy_as_planned'))
 BEGIN = '<!-- graphics coverage: begin (written by trace/graphics_report.py; do not edit by hand) -->'
 END = '<!-- graphics coverage: end -->'
@@ -51,7 +51,7 @@ def rom_name(result: dict, titles: dict) -> str:
     return name.rsplit('.', 1)[0] if '.' in name[-5:] else name
 
 
-def section(totals: dict, results: list, titles: dict, before: dict | None = None) -> str:
+def section(totals: dict, results: list, titles: dict, before: dict | None = None, before_label: str = 'the sweep before this one') -> str:
     """The graphics part of the coverage document, as Markdown."""
     lines = [BEGIN, '', '## Graphics: what a replay confirmed', '',
              'From `trace/graphics_sweep.py` (one result per ROM; totals by `trace/graphics_report.py`). Every count is an '
@@ -62,11 +62,37 @@ def section(totals: dict, results: list, titles: dict, before: dict | None = Non
              'run-time patch.',
              '- **tile in place**: the tile is ROM bytes and was written where it is.',
              '- **background cell**: one cell of a background map was made to show another tile (see below for how).',
-             '- **re-packed**: a tile the game unpacks was changed by unpacking, editing and packing its data again.',
+             '- **hard tile re-packed**: the one tile picked as hardest to write in place (computed by the game, most '
+             'used on screen) was changed by unpacking, editing and packing its data again in the same place.',
+             '- **packed block re-packed**: one packed block of the ROM was recognised, unpacked, edited, packed again '
+             '(in place, or moved with its pointer) and replayed. The tiles tried are picked as `trace/codec_survey.py` '
+             'picks them: tiles with a picture first, tiles made of stream literals as well as computed ones, in every '
+             'sampled scene. Counted only when the tile came out as planned, nothing else in the block changed, what '
+             'follows a bare stream still unpacks as before, and no unrelated byte of video memory changed (a whole '
+             'second copy of the same edit elsewhere is related, and is counted below).',
              '- **run-time patch**: the fallback routine on the vertical-blank interrupt swapped the tile in; '
              '**clean from power-on** when the whole run from power-on then differs only as planned.',
              '- **only this scene**: a private copy of shared tile data, with the one reference moved.', '']
     lines += table(totals)
+    lines += ['', '### Packed blocks', '',
+              'A block that turns out to be stored as it is (no packing) is a plain write and is counted apart.', '',
+              '| System | block recognised | re-packed, confirmed | of those: moved | of those: a second copy changed too '
+              '| stored as it is, confirmed | as planned, but unrelated bytes changed | as planned, but the block was not left sound |',
+              '|---' * 8 + '|']
+    keys = ('repack_block_recognised', 'repack_confirmed', None, 'repack_with_a_second_copy_elsewhere', 'repack_stored_as_it_is',
+            'repack_as_planned_but_unrelated_bytes_changed', 'repack_as_planned_but_block_not_sound')
+    sums = [0] * len(keys)
+    for system, s in totals.items():
+        row = [s.get('repack_path', {}).get('relocate', 0) if key is None else s.get(key, 0) for key in keys]
+        sums = [a + b for a, b in zip(sums, row)]
+        lines.append(f'| {system} | ' + ' | '.join(map(str, row)) + ' |')
+    lines.append('| all | ' + ' | '.join(map(str, sums)) + ' |')
+    codecs = {}
+    for s in totals.values():
+        for name, n in s.get('repack_codec', {}).items():
+            codecs[name] = codecs.get(name, 0) + n
+    if codecs:
+        lines += ['', 'Confirmed re-packs by codec: ' + ', '.join(f'{name} {n}' for name, n in sorted(codecs.items(), key=lambda kv: (-kv[1], kv[0]))) + '.']
     lines += ['', '### Background cells', '',
               'The edit is the smallest there is: one cell, tile number plus one. Every layer of the scene is looked '
               'at, and when the scene chosen for the tile edit has no cell that can be changed, the other sampled '
@@ -102,7 +128,7 @@ def section(totals: dict, results: list, titles: dict, before: dict | None = Non
     lines.append('| all | ' + ' | '.join(map(str, total)) + ' |')
     if before:
         was = {k: v.get('map_edit_as_planned', 0) for k, v in before.items()}
-        lines += ['', 'Background cells confirmed in the sweep before this one: '
+        lines += ['', f'Background cells confirmed in {before_label}: '
                   + ', '.join(f'{k} {was.get(k, 0)}' for k in totals) + f' (all {sum(was.get(k, 0) for k in totals)}).']
     failing = sorted(((r['system'], rom_name(r, titles), graphics_sweep.map_cause(r)) for r in results
                       if r.get('ok') and not r['map_edit'].get('as_planned')), key=lambda row: (row[0], row[2][0], row[1].lower()))
@@ -140,6 +166,7 @@ def main():
     ap.add_argument('sweep'); ap.add_argument('--catalog'); ap.add_argument('--json')
     ap.add_argument('--markdown', help='coverage document whose graphics section is rewritten')
     ap.add_argument('--before', help='--json output of an earlier sweep, for the before/after line')
+    ap.add_argument('--before-label', default='the sweep before this one', help='what to call that earlier sweep')
     a = ap.parse_args()
     keep, titles = None, {}
     if a.catalog:
@@ -157,7 +184,7 @@ def main():
         Path(a.json).write_text(json.dumps(totals, indent=1) + '\n', encoding='utf-8', newline='\n')
     if a.markdown:
         before = json.loads(Path(a.before).read_text(encoding='utf-8')) if a.before else None
-        write_section(Path(a.markdown), section(totals, results, titles, before))
+        write_section(Path(a.markdown), section(totals, results, titles, before, a.before_label))
     print('\n'.join(table(totals)))
 
 
