@@ -1132,7 +1132,11 @@ def _plan_color(job: dict) -> dict:
             data, _ = trail.replay(path, start)
             changed = [i for i, (a, b) in enumerate(zip(base[swatch.domain], data[swatch.domain])) if a != b]
             if changed:
-                return bytes(data[swatch.domain][i] for i in sorted(slots)), [i for i in changed if i not in slots], bool(slots & set(changed))
+                # Another entry that held this same color and now holds the new one is the same stored color, loaded twice.
+                twin = lambda i: (base[swatch.domain][i - i % size:i - i % size + size] == swatch.stored
+                                  and data[swatch.domain][i - i % size:i - i % size + size] == wanted)
+                return (bytes(data[swatch.domain][i] for i in sorted(slots)),
+                        [i for i in changed if i not in slots and not twin(i)], bool(slots & set(changed)))
         return None, [], False
 
     job['step'] = 'Checking whether the color is stored next to where it was traced…'
@@ -1146,6 +1150,19 @@ def _plan_color(job: dict) -> dict:
         after, others, hit = replay(direct)
         if hit and after == wanted and not others:
             return {'writes': [list(w) for w in direct], 'method': 'color', 'notes': notes, 'as_planned': True}
+    job['step'] = 'Looking in the ROM for a plain copy of this palette and replaying to check…'
+    _progress(job, job['step'])
+    for place in pt.found_places(swatch, pt.swatches(scene, system), body, system, job.get('hints') or ()):
+        try:
+            writes = [(o + lead, a, b) for o, a, b in pt.plan_at(swatch, target, body, place['offsets'])]
+        except (ValueError, IndexError):
+            continue
+        if not writes:
+            continue
+        after, others, hit = replay(writes)
+        if hit and after == wanted and not others:
+            return {'writes': [list(w) for w in writes], 'method': 'color', 'notes': [place['note']], 'as_planned': True,
+                    'place': [o + lead for o in place['offsets']]}
     job['step'] = 'Changing nearby bytes one at a time and replaying, to see which ones this color comes from…'
     _progress(job, job['step'])
 
@@ -1181,6 +1198,15 @@ def _plan_color(job: dict) -> dict:
                     'place': list(range(start, start + size)),
                     'notes': ['The game dims or blends this color in this scene, so here it shows as a shade of the color '
                               'you picked. The pictures below are the real result.']}
+    # Not one stored color: perhaps put together from several bytes. Measure what each bit does and solve for the color.
+    job['step'] = 'Measuring what each nearby bit does to this color…'
+    solved = pt.plan_by_measurement(lambda writes: replay(writes)[0], rom, hits, swatch.stored, wanted)
+    if solved:
+        after, others, hit = replay(solved)
+        if hit and not others and after == wanted:
+            return {'writes': [list(w) for w in solved], 'method': 'color', 'as_planned': True, 'place': [w[0] for w in solved],
+                    'notes': ['The game builds this color from several bytes of a table. ROMancer measured what each one does '
+                              'and changed the ones that give your color.']}
     raise ValueError('ROMancer found bytes that change this color, but writing your color there did not give a clean '
                      'result in the replay (other colors moved, or this one did not follow). It is left locked.')
 

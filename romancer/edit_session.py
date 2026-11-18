@@ -1022,6 +1022,26 @@ class EditSession:
             return [s for s in every if s.domain in known]
         return every
 
+    def _findable(self, swatch: pt.Swatch) -> bool:
+        """A locked color the search may still find: computed ones, and ones in use whose origin was not seen
+        (set by a cartridge coprocessor, or before recording started)."""
+        return bool(self.core) and (swatch.status == 'derived' or (swatch.status == 'unknown' and any(swatch.stored)))
+
+    def _traced_elsewhere(self, swatch: pt.Swatch) -> list:
+        """Tracing offsets where another recorded scene loads this entry, holding this same color, straight from the ROM."""
+        size = len(swatch.stored)
+        first, found = swatch.entry * size, []
+        for scene in self.scenes.values():
+            domain = scene.snapshot.domains.get(swatch.domain)
+            if domain is None or domain.data is None or bytes(domain.data[first:first + size]) != swatch.stored:
+                continue
+            tags = domain.tags[first:first + size]
+            if all(pv.tag_kind(t) in (pv.RT_ROM, pv.RT_IMM) and not t & pv.RT_WEAK for t in tags):
+                offsets = [pv.tag_offset(t) for t in tags]
+                if offsets not in found:
+                    found.append(offsets)
+        return found[:4]
+
     def _uses(self, swatch: pt.Swatch) -> set:
         scenes = set()
         for source in swatch.sources:
@@ -1049,7 +1069,7 @@ class EditSession:
                     'id': f'{swatch.domain}:{swatch.entry}', 'domain': swatch.domain, 'entry': swatch.entry, 'group': swatch.group,
                     'name': _swatch_name(swatch, line.get(swatch.domain, 16)), 'format': swatch.format, 'colors': swatch.rgb,
                     'editable': swatch.editable, 'status': swatch.status, 'locked_reason': reason,
-                    'findable': swatch.status == 'derived' and bool(self.core),
+                    'findable': self._findable(swatch),
                     'elsewhere': [] if swatch.editable else self._elsewhere(scene_id, swatch),
                     'uses': len(uses), 'notes': list(swatch.notes),
                     'pending': change['to_rgb'] if change else None, 'pending_change': change['id'] if change else None,
@@ -1469,7 +1489,7 @@ class EditSession:
             swatch = next((s for s in self._swatches(scene_id) if s.domain == domain and s.entry == entry), None)
             if swatch is None:
                 raise ValueError('That color is not part of this scene.')
-            if swatch.status != 'derived':
+            if not self._findable(swatch):
                 raise ValueError(LOCK_REASONS['unknown'] if not swatch.editable else 'This color can be changed directly.')
             colors = [[max(0, min(255, int(v))) for v in rgb] for rgb in colors]
             if len(colors) != len(swatch.rgb) or any(len(rgb) != 3 for rgb in colors):
@@ -1481,7 +1501,8 @@ class EditSession:
             change = {'kind': 'color', 'key': f'find:{domain}:{entry}@{scene_id}', 'scene_id': scene_id, 'title': _swatch_name(swatch, line),
                       'swatch': f'{domain}:{entry}', 'from_rgb': swatch.rgb, 'to_rgb': _decode_stored(swatch.format, wanted),
                       'writes': [], 'scope': 'all', 'found': True, 'planning': True, 'plan_task': 'graphics', 'plan_kind': 'color',
-                      'plan_job': {'what': 'color', 'scene_id': scene_id, 'domain': domain, 'entry': int(entry), 'colors': colors}}
+                      'plan_job': {'what': 'color', 'scene_id': scene_id, 'domain': domain, 'entry': int(entry), 'colors': colors,
+                                   'hints': self._traced_elsewhere(swatch)}}
             return self._propose(change)
 
     def propose_color(self, scene_id: str, domain: str, entry: int, colors, scope: str = 'all') -> dict:

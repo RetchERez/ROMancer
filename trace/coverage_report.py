@@ -21,7 +21,15 @@ Graphics status per ROM, from VRAM tags:
   derived   - most are computed: compressed or generated (needs a codec or relocation)
   none      - VRAM was not traced
 
-Every ROM that is not verified is listed with the reason.
+Every ROM that is not verified is listed with the reason, and the verified ones are counted by
+how the edit was found:
+  traced       - the entry's own tags led to the ROM bytes (one entry, or a whole scene at once)
+  other scene  - another scene of the same run traced the same color straight to the ROM
+  plain copy   - the palette line sits in the ROM as plain colors (palette_trace.stored_copies);
+                 this is how colors prepared by an SNES coprocessor or faded through RAM are reached
+  code number  - the color is a number in the program (palette_trace.constant_places)
+  measured     - put together from several ROM bytes; each bit's effect was measured by replay
+The same searches serve the editor's "let ROMancer look for it" (scene_graphics._plan_color).
 """
 import argparse
 import io
@@ -59,6 +67,24 @@ def classify(r):
     direct, derived = v.get('rom', 0) + v.get('code', 0), v.get('derived', 0)
     gfx = 'none' if direct + derived == 0 else 'direct' if direct >= derived else 'derived'
     return pal, gfx
+
+
+HOW = ('traced', 'other scene', 'plain copy', 'code number', 'measured')
+
+
+def how_verified(r):
+    """Which search verified this ROM's edit (see the module text), and whether it needed the second input script."""
+    causal = r.get('causal') or {}
+    mode, how = causal.get('mode', ''), causal.get('how', '')
+    if mode == 'measured':
+        found = 'measured'
+    elif mode == 'search':
+        found = 'other scene' if how == 'other scene' else 'code number' if how == 'constant in code' else 'plain copy'
+    elif mode == 'search-bulk':
+        found = 'plain copy'
+    else:
+        found = 'traced'
+    return found, r.get('script', 'explore') != 'explore', causal.get('scenes') == 'between'
 
 
 def snes_chip(rom):
@@ -128,6 +154,9 @@ def cause(r, pal, chip):
         return 'engine: ' + e.split('\n')[0][:110]
     if pal == 'ram-only':
         return 'not on screen: edited colors reached palette RAM, but no sampled scene draws with them'
+    if pal == 'none' and not (r.get('palette_live') or {}).get('unknown') and len(r.get('runs') or ()) > 1 and all(
+            run.get('distinct_screens', 0) <= 1 for run in r['runs']):
+        return 'no picture: the game never left a blank or static screen with either input script (it may not run in this engine)'
     if pal == 'traced':
         if any(a.get('entry_moved') or a.get('entries_moved') for a in attempts):
             return 'inexact source: the traced bytes move the color but not to the planned value (shared code value or partial source)'
@@ -158,12 +187,15 @@ def main():
     if a.catalog:
         catalog = {r['sha256']: r for r in json.loads(Path(a.catalog).read_text(encoding='utf-8'))['records']}
         rows = [r for r in rows if r.get('sha256') in catalog]
-    per = defaultdict(lambda: {'pal': Counter(), 'gfx': Counter(), 'n': 0})
+    per = defaultdict(lambda: {'pal': Counter(), 'gfx': Counter(), 'n': 0, 'how': Counter()})
     unverified = defaultdict(list)
     chips = defaultdict(list)
     for r in rows:
         pal, gfx = classify(r)
         s = per[r['system']]; s['n'] += 1; s['pal'][pal] += 1; s['gfx'][gfx] += 1
+        if pal == 'verified':
+            found, second, between = how_verified(r)
+            s['how'][found] += 1; s['how']['second script'] += second; s['how']['scene between'] += between
         chip = ''
         if r['system'] == 'snes' and not a.no_chips and r.get('sha256') in index:
             try:
@@ -194,6 +226,11 @@ def main():
         missing = sorted(catalog[sha]['labels'][0] for sha in set(catalog) - {r.get('sha256') for r in rows})
         if missing:
             text += f'\n\nIn the catalog but not swept ({len(missing)}): ' + '; '.join(missing)
+    columns = HOW + ('second script', 'scene between')
+    text += ('\n\n## How the verified edits were found\n\n| System | ' + ' | '.join(HOW)
+             + ' | needed the second input script | needed a scene between the main ones |\n|---|' + '---|' * len(columns) + '\n')
+    text += '\n'.join(f"| {system} | " + ' | '.join(str(per[system]['how'][k]) for k in columns) + ' |' for system in sorted(per))
+    text += '\n| all | ' + ' | '.join(str(sum(v['how'][k] for v in per.values())) for k in columns) + ' |'
     for system in sorted(unverified):
         items = unverified[system]
         groups = Counter(c.split(':')[0] for _n, _p, c in items)
