@@ -197,7 +197,7 @@ def _make_tile(system, d, domain, index, addresses, fmt, group) -> Tile:
     return tile
 
 
-def tiles(scene: Scene, system: str, rom: bytes | None = None, fmt: str | None = None) -> list[Tile]:
+def tiles(scene: Scene, system: str, rom: bytes | None = None, fmt: str | None = None, chr_bases: dict | None = None) -> list[Tile]:
     """Every tile slot the video hardware holds in this scene.
 
     NES games with CHR-ROM keep no tile copy in RAM: the pattern slots map
@@ -238,6 +238,9 @@ def tiles(scene: Scene, system: str, rom: bytes | None = None, fmt: str | None =
             if tag_kind(t) != pv.RT_ROM:
                 continue
             base = tag_offset(t)
+            shown = None if chr_bases is None else chr_bases.get(slot)
+            if shown is not None and shown != base:      # the bank the screen was drawn from (scene_graphics works it out)
+                base = shown
             for k in range(64):
                 o = base + k * 16
                 raw = rom[skip + o:skip + o + 16]
@@ -248,7 +251,9 @@ def tiles(scene: Scene, system: str, rom: bytes | None = None, fmt: str | None =
                 out.append(Tile(system, 'chr_rom', n, list(range(n * 16, n * 16 + 16)), fmt, bytes(raw),
                                 decode_tile(bytes(raw), fmt), sources, 'rom', 'plain',
                                 f'pattern table ${(slot // 4) * 0x1000:04X}',
-                                ['The picture chip reads this tile straight from the ROM.']))
+                                ['The picture chip reads this tile straight from the ROM.'] +
+                                (['The game switches picture banks while the screen is drawn. This is the bank the recorded '
+                                  'screen shows.'] if shown is not None and shown == base and shown != tag_offset(t) else [])))
         return out
     d = doms.get('vram')
     if d is None or d.data is None:
@@ -980,15 +985,20 @@ def verify_plan(make_frontend: Callable[[bytes], object], rom: bytes, plan, scen
         # when the replayed picture differs from the scene's and the same replay with the unedited ROM
         # reproduces the scene's picture exactly.
         before = [c for c in scene.checkpoints if c[0] < scene.frame]
-        if before:
-            short = Scene(scene.id, scene.frame, scene.screen_sha256, before[-1:], scene.snapshot)
+        # A savestate can carry what the cartridge had mapped when it was made, so an edit to the picture data may
+        # only show when the game is replayed from further back. Step back one savestate at a time, down to the
+        # first one, until the edit shows.
+        for start in reversed(before):
+            short = Scene(scene.id, scene.frame, scene.screen_sha256, [start], scene.snapshot)
             shots: list = []
             for data in (edited, rom):
                 pv.verify_edit(lambda d: _Tap(make_frontend(d), shots), rom, data, short, [], buttons_for)
-            if len(shots) == 2 and shots[0][1] and shots[1][1]:
-                result['replay_is_repeatable'] = shots[1][1] == scene.screen_sha256
-                if result['replay_is_repeatable'] and shots[0][1] != scene.screen_sha256:
-                    result.update(verified=True, by='screen', screen_sha256=shots[0][1], from_frame=before[-1][0])
+            if len(shots) != 2 or not shots[0][1] or not shots[1][1]:
+                continue
+            result['replay_is_repeatable'] = shots[1][1] == scene.screen_sha256
+            if result['replay_is_repeatable'] and shots[0][1] != scene.screen_sha256:
+                result.update(verified=True, by='screen', screen_sha256=shots[0][1], from_frame=start[0])
+                break
     missed = {}
     planned = set()
     if expect:

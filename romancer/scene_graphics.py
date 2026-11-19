@@ -147,6 +147,9 @@ class SceneGraphics:
         self._lists: dict = {}
         self._layers = None
         self._sprites = None
+        self.chr_bases = None           # NES: {pattern slot: ROM offset of the bank the screen was drawn from}, once settled
+        self._chr_settled = False
+        self._placing = False
 
     # ---- colors
 
@@ -233,9 +236,12 @@ class SceneGraphics:
 
     def tile_list(self, fmt: str | None = None) -> dict:
         fmt = fmt or gt.SYSTEM_TILE_FORMAT[self.system]
+        if self.system == 'nes' and not self._chr_settled and not self._placing:
+            self.layers()                   # which bank the screen shows is settled there; every reader must agree on it
         found = self._lists.get(fmt)
         if found is None:
-            found = self._lists[fmt] = {(t.domain, t.addresses[0]): t for t in gt.tiles(self.scene, self.system, self.rom, fmt)}
+            found = self._lists[fmt] = {(t.domain, t.addresses[0]): t
+                                        for t in gt.tiles(self.scene, self.system, self.rom, fmt, self.chr_bases)}
         return found
 
     def tile(self, domain: str, address: int, fmt: str):
@@ -267,6 +273,7 @@ class SceneGraphics:
     def layers(self) -> list:
         if self._layers is None:
             self._layers = []
+            self._placing = True
             try:
                 found = gt.layers(self.scene, self.system)
             except Exception:
@@ -283,7 +290,92 @@ class SceneGraphics:
                 self._layers.append(view)
             for view in self._layers:
                 self._place(view)
+            self._placing = False
+            if not self._chr_settled:
+                self._chr_settled = True
+                if self._settle_chr():          # the pictures came from other banks: read them again and place again
+                    self._lists, self._tiles, self._pixels, self._layers = {}, {}, {}, None
+                    return self.layers()
         return self._layers
+
+    def _settle_chr(self) -> bool:
+        """NES with picture data in ROM: find the bank the recorded screen was really drawn from.
+
+        The picture chip reads tiles straight from the cartridge, and the
+        cartridge can switch banks while the screen is drawn (one bank for
+        the status bar, another for the level). The scene knows the banks
+        mapped when the frame ended, which may not be the ones most of the
+        screen shows. For each of the eight pattern slots, the background
+        cells that disagree with the recorded screen are compared with the
+        same tile numbers in every bank of the ROM; a bank that explains
+        most of them, where the recorded bank explains few, is taken.
+        Returns True when a slot changed.
+        """
+        chart = self.domains.get('chr_map')
+        if self.system != 'nes' or chart is None or self.rom[:4] != b'NES\x1a':
+            return False
+        skip = gt.rom_skip(self.rom, self.system)
+        first = self.rom[4] * 16384
+        size = self.rom[5] * 8192
+        if size < 0x800:
+            return False
+        fmt = gt.SYSTEM_TILE_FORMAT[self.system]
+        samples: dict = {}          # slot -> [(offset within the bank, palette table, the 8 lines of the screen)]
+        for view in self._layers:
+            if view.rows is None or not view.lines or view.layer.tile_domain != 'chr_rom':
+                continue
+            for sy in range(0, self.height - 7, 8):
+                if view.lines[sy] is None:
+                    continue
+                for sx in range(0, self.width - 7, 8):
+                    at = self.locate(view, sx + 4, sy + 4)
+                    if at is None:
+                        continue
+                    mx, my, cell = at
+                    x0, y0 = sx + 4 - mx % 8, sy + 4 - my % 8
+                    if x0 < 0 or y0 < 0 or x0 + 8 > self.width or y0 + 8 > self.height or view.lines[y0] != view.lines[sy]:
+                        continue
+                    shown = [self.screen[y0 + k][x0:x0 + 8] for k in range(8)]
+                    if len(set(b''.join(shown))) < 2:
+                        continue                # one flat color fits any empty tile in any bank
+                    samples.setdefault(cell.tile_address // 0x400, []).append(
+                        (cell.tile_address % 0x400, self._table('bg', view.rule, cell.palette), shown))
+        if not samples:
+            return False
+
+        def fits(base, sample):
+            within, table, shown = sample
+            raw = self.rom[skip + base + within:skip + base + within + 16]
+            if len(raw) < 16:
+                return False
+            pixels = bytes(gt.decode_tile(raw, fmt))
+            same = sum(1 for k in range(8) for p, q in zip(pixels[k * 8:k * 8 + 8].translate(table), shown[k]) if p == q)
+            return same >= 60
+
+        bases = {}
+        for slot, cells in samples.items():
+            if slot >= len(chart.tags) or pv.tag_kind(chart.tags[slot]) != pv.RT_ROM:
+                continue
+            mapped = pv.tag_offset(chart.tags[slot])
+            step = max(1, len(cells) // 40)
+            some = cells[::step][:40]
+            now = sum(1 for sample in some if fits(mapped, sample))
+            if now * 10 >= len(some) * 8:
+                continue                        # the recorded bank already explains the screen
+            probe = some[::max(1, len(some) // 6)][:6]
+            best = None
+            for base in range(first, first + size, 0x400):
+                if base == mapped or sum(1 for sample in probe if fits(base, sample)) * 2 < len(probe):
+                    continue
+                count = sum(1 for sample in some if fits(base, sample))
+                if best is None or count > best[0]:
+                    best = (count, base)
+            if best is not None and best[0] * 10 >= len(some) * 6 and best[0] >= now + max(3, len(some) // 4):
+                bases[slot] = best[1]
+        if not bases:
+            return False
+        self.chr_bases = bases
+        return True
 
     def _subtile(self, view, cell, qx: int, qy: int) -> int:
         """Address of the tile a cell shows in quadrant (qx, qy); only 16x16 cells have more than one."""
@@ -691,6 +783,47 @@ class SceneGraphics:
         my = (y + view.lines[y][1]) % (layer.height * view.px)
         return mx, my, layer.cell(mx // view.px, my // view.px)
 
+    def _on_screen(self, view) -> list:
+        """The cells of a layer that the recorded screen really shows.
+
+        A layer holds more than the screen: the part scrolled out of view, a
+        second table the game is filling ahead, cells behind a status bar.
+        A cell counts when it lies on the screen where the layer was found
+        and most of its pixels there are the layer's own. A layer that was
+        not found on the screen keeps all its cells, so nothing is hidden
+        from the list.
+        """
+        layer = view.layer
+        if view.rows is None or not view.lines or view.source == 'none':
+            return list(layer.cells)
+        px = view.px
+        wide = layer.width * px
+        found, seen = [], set()
+        for sy in range(0, self.height, px):
+            for sx in range(0, self.width, px):
+                y, x = min(sy + px // 2, self.height - 1), min(sx + px // 2, self.width - 1)
+                at = self.locate(view, x, y)
+                if at is None:
+                    continue
+                mx, my, cell = at
+                key = (cell.x, cell.y)
+                if key in seen:
+                    continue
+                x0, y0 = x - mx % px, y - my % px
+                same = total = 0
+                for dy in range(0, px, 2):
+                    if not 0 <= y0 + dy < self.height or view.lines[y0 + dy] != view.lines[y]:
+                        continue
+                    row, line = view.rows[(my - my % px + dy) % len(view.rows)], self.screen[y0 + dy]
+                    for dx in range(0, px, 2):
+                        if 0 <= x0 + dx < self.width:
+                            total += 1
+                            same += row[(mx - mx % px + dx) % wide] == line[x0 + dx]
+                if total and same * 4 >= total * 3:
+                    seen.add(key)
+                    found.append(cell)
+        return found or list(layer.cells)
+
     # ---- what the screen lists
 
     def view(self, uses, pending_tiles: dict, pending_cells: dict) -> dict:
@@ -702,7 +835,7 @@ class SceneGraphics:
             status = ''.join(c.status[:1] or 'u' for c in layer.cells)
             skip = gt.rom_skip(self.rom, self.system)
             quads = [(qx, qy) for qy in range(view.px // 8) for qx in range(view.px // 8)]
-            for cell in layer.cells:
+            for cell in self._on_screen(view):
                 for qx, qy in quads:
                     shown.setdefault((layer.tile_domain, self._subtile(view, cell, qx, qy), layer.tile_format), ('bg', number, cell.palette))
             layers.append({
