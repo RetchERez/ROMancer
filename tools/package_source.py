@@ -144,6 +144,7 @@ APPROVED_FILES = frozenset({
     '.gitattributes',
     '.github/ISSUE_TEMPLATE/bug_report.yml',
     '.github/README.md',
+    '.github/screenshots/phantasy-star-battle-floor.png',
     '.github/screenshots/sonic-green-hill-palette.png',
     '.github/screenshots/top-gear-3000-playtest.png',
     '.github/screenshots/scenes-png-import.png',
