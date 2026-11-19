@@ -17,10 +17,10 @@ class PublicReleaseTests(unittest.TestCase):
             api=WorkbenchAPI(Path(folder))
             try:
                 value=api.dispatch('system.capabilities',{})
-                self.assertEqual(value['release_name'],'ROMancer v1.3.1')
-                self.assertEqual(value['version'],'1.3.1')
-                self.assertEqual(value['target_version'],'1.3.1')
-                self.assertEqual(value['build_label'],'v1.3.1')
+                self.assertEqual(value['release_name'],'ROMancer v1.3.2')
+                self.assertEqual(value['version'],'1.3.2')
+                self.assertEqual(value['target_version'],'1.3.2')
+                self.assertEqual(value['build_label'],'v1.3.2')
                 self.assertEqual(value['release_status'],'RELEASE')
             finally:api.close()
 
