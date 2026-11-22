@@ -72,6 +72,17 @@ class Picture:
         else:
             self.indexed = False
 
+    def square(self, left: int, top: int, slots: list, rgb: list, indexed: bool) -> None:
+        """Put one 8x8 square: 64 palette numbers and 64 colors in screen order."""
+        if not indexed:
+            self.indexed = False
+            slots = [slot if 0 <= slot < len(self.colors) else 0 for slot in slots]
+        at = top * self.width + left
+        for row in range(0, 64, 8):
+            self.slots[at:at + 8] = slots[row:row + 8]
+            self.rgb[at:at + 8] = rgb[row:row + 8]
+            at += self.width
+
     def png(self) -> bytes:
         Image = _image()
         if self.indexed and self.colors:
@@ -109,9 +120,9 @@ def export_sheet(graphics, view: dict) -> dict:
     for number, tile in enumerate(layout['tiles']):
         left, top = number % COLUMNS * 8, number // COLUMNS * 8
         pixels = _current(tile)
-        for k, value in enumerate(pixels):
-            slot = _slot(tile['pal'], tile['line'], value)
-            picture.put(left + k % 8, top + k // 8, slot, _rgb(colors, slot, value, tile['bits']))
+        slots = [_slot(tile['pal'], tile['line'], value) for value in pixels]
+        picture.square(left, top, slots, [_rgb(colors, slot, value, tile['bits']) for slot, value in zip(slots, pixels)],
+                       all(0 <= slot < len(colors) for slot in slots))
     return {'png': picture.png(), 'width': picture.width, 'height': picture.height, 'pictures': len(layout['tiles']),
             'indexed': picture.indexed, 'colors': len(colors)}
 
@@ -191,7 +202,7 @@ def export_layer(graphics, view: dict, number: int) -> dict:
     picture = Picture(layer.width * layer_view.px, layer.height * layer_view.px, colors)
     known = _layer_tiles(view, layer_view)
     bits = gt.TILE_FORMATS[layer.tile_format][0]
-    cache = {}
+    cache, squares = {}, {}
     now = _cells_now(view, layer_view, number) if layer_view.px == 8 else {}
     for cx, cy, qx, qy, address, cell in places:
         if now:
@@ -207,10 +218,15 @@ def export_layer(graphics, view: dict, number: int) -> dict:
                 pixels = list(raw) if raw is not None else [0] * 64
             cache[address] = pixels
         left, top = cx * layer_view.px + qx * 8, cy * layer_view.px + qy * 8
-        for k, value in enumerate(pixels):
-            x, y = _place(k, cell)
-            slot = _slot(layer_view.rule, cell.palette, value)
-            picture.put(left + x, top + y, slot, _rgb(colors, slot, value, bits))
+        look = (address, cell.hflip, cell.vflip, cell.palette)
+        square = squares.get(look)
+        if square is None:
+            # one 8x8 square as it lands on the layer, worked out once for every cell that shows it the same way
+            slots = [_slot(layer_view.rule, cell.palette, value) for value in _turned(pixels, cell.hflip, cell.vflip)]
+            turned = _turned(pixels, cell.hflip, cell.vflip)
+            square = squares[look] = (slots, [_rgb(colors, slot, value, bits) for slot, value in zip(slots, turned)],
+                                      all(0 <= slot < len(colors) for slot in slots))
+        picture.square(left, top, *square)
     return {'png': picture.png(), 'width': picture.width, 'height': picture.height, 'pictures': len(cache),
             'indexed': picture.indexed, 'colors': len(colors), 'layer': layer.name}
 

@@ -48,6 +48,8 @@ from .trace_cores import SYSTEM_LABELS, TraceCoreMissing, TraceFrontend, core_op
 
 STEP_FRAMES = 300          # auto-explore looks at the screen this often
 MAX_SCENES = 160
+GRAPHICS_KEPT = 8          # scenes whose worked-out pictures and layers stay in memory
+VIEWS_KEPT = 24            # scenes whose list of pictures stays ready, so going back to one does not wait
 CHECKPOINT_EVERY = 60
 MEMORY_DOMAINS = ('wram', 'hram', 'ram', 'sram')   # traced, but not what the screen is drawn from
 _BUTTON_NAMES = sorted(BUTTON_IDS, key=BUTTON_IDS.get)
@@ -1378,7 +1380,7 @@ class EditSession:
         if found is None:
             meta = self.meta[scene_id]
             found = sg.SceneGraphics(self._scene(scene_id), self.system, self.rom, self.rgb[scene_id], meta['width'], meta['height'])
-            while len(self._graphics_cache) >= 3:
+            while len(self._graphics_cache) >= GRAPHICS_KEPT:
                 self._graphics_cache.pop(next(iter(self._graphics_cache)))
             self._graphics_cache[scene_id] = found
         return found
@@ -1405,10 +1407,11 @@ class EditSession:
         if tile.domain == 'chr_rom':
             first = tile.sources[0]['offset']
             return {sid for sid in self.scenes if first in self._chr_tiles(sid)}
-        users = set()
+        users, by_offset = set(), self.impact._by_offset
         for source in tile.sources:
             if source:
-                users.update(self.impact.users(source['offset'], source['offset'] + 1))
+                for scene_id, _ in by_offset.get(source['offset'], ()):
+                    users.add(scene_id)
         return users
 
     def graphics_view(self, scene_id: str) -> dict:
@@ -1419,7 +1422,7 @@ class EditSession:
             base = self._views.get(key)
             if base is None:
                 base = graphics.view(lambda tile: len(self._tile_users(tile)), {}, {})
-                if len(self._views) >= 3:
+                if len(self._views) >= VIEWS_KEPT:
                     self._views.pop(next(iter(self._views)))
                 self._views[key] = base
             pending, cells = {}, {}

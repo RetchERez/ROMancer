@@ -1,9 +1,23 @@
-ROMancer v1.3.7
+ROMancer v1.3.8
 By RetchEWretched
 
 ROMancer is a local ROM editing, investigation and playtesting workbench.
 It supports NES, SNES, Genesis / Mega Drive, Master System, Game Boy and
 Game Boy Color cartridge formats. Everyday work runs offline.
+
+NEW IN v1.3.8
+
+Faster Scenes & colors. Going back to a scene you already opened no longer
+waits: ROMancer keeps the worked-out pictures and layers of more scenes
+ready (it kept 3, which five or six recorded scenes overflowed). Saving
+PNGs is quicker too. Nothing about what is saved or checked has changed.
+- Measured on 7 games with 2 to 6 recorded scenes: opening every scene a
+  second time took up to 7.9 seconds before and now takes under a tenth of
+  a second.
+- Save all graphics (ZIP) took 0.2 to 5.2 seconds before and takes 0.1 to
+  0.7 seconds now.
+- Opening a scene for the first time takes as long as before, and so does
+  the replay that checks a change.
 
 NEW IN v1.3.7
 
@@ -248,7 +262,7 @@ available. The supplied Pokemon Red and Blue revisions share a
 
 START ON WINDOWS
 
-1. Extract ROMancer-v1.3.7-Windows.zip in Windows File Explorer.
+1. Extract ROMancer-v1.3.8-Windows.zip in Windows File Explorer.
 2. Double-click ROMancer.exe in the extracted folder.
    Keep ROMancer.exe, ROM Catalog.html and the ROMancer Files folder together.
 3. Open an original workshop or choose New project and import your own cartridge image.
@@ -269,8 +283,8 @@ SHA-256 is checked and later captures work offline. No ROM data is uploaded.
 
 START ON LINUX
 
-1. Extract ROMancer-v1.3.7-Linux-x86_64.tar.gz:  tar xf ROMancer-v1.3.7-Linux-x86_64.tar.gz
-2. Run ./ROMancer-v1.3.7-Linux-x86_64/ROMancer.sh
+1. Extract ROMancer-v1.3.8-Linux-x86_64.tar.gz:  tar xf ROMancer-v1.3.8-Linux-x86_64.tar.gz
+2. Run ./ROMancer-v1.3.8-Linux-x86_64/ROMancer.sh
    (./ROMancer.sh --install-desktop adds ROMancer to your application menu).
 
 The Linux x86-64 package includes Python, Pillow and the same six engines built

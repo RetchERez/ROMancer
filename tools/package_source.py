@@ -72,6 +72,7 @@ APPROVED_FILES = frozenset({
     'trace/png_roundtrip.py',
     'trace/png_move.py',
     'trace/png_sprites.py',
+    'trace/scene_speed.py',
     'trace/png_sweep.py',
     'trace/patch_blastem.py',
     'trace/patch_bsnes.py',
