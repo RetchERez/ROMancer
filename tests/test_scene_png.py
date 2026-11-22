@@ -202,6 +202,42 @@ class ScenePngTests(unittest.TestCase):
         self.assertIn('1 picture you changed cannot be changed and was left out', text)
 
 
+class SpriteObjectTests(unittest.TestCase):
+    """Two sprites side by side make one object (the right one mirrored); a third stands alone."""
+
+    def setUp(self):
+        self.g = FakeGraphics()
+        self.g.width, self.g.height = 256, 224
+        def sprite(x, y, address, hflip=False, line=0):
+            return SimpleNamespace(x=x, y=y, cols=1, rows=1, tiles=[address], hflip=hflip, vflip=False, line=line,
+                                   domain='vram', fmt=FMT, guess=False)
+        self.g.sprites = lambda: [sprite(10, 20, 0), sprite(18, 20, 64, hflip=True), sprite(100, 50, 32, line=1),
+                                  sprite(300, 50, 32), sprite(40, 90, 4096)]      # off screen; a picture the scene does not list
+
+    def test_touching_sprites_are_one_object_and_the_png_reads_back_unchanged(self):
+        objects, _ = sp.sprite_objects(self.g, self.g.view)
+        self.assertEqual([(o['left'], o['top'], o['width'], o['height'], len(o['sprites'])) for o in objects],
+                         [(10, 20, 16, 8, 2), (100, 50, 8, 8, 1)])
+        out = sp.export_sprites(self.g, self.g.view)
+        self.assertEqual((out['width'], out['height'], out['objects'], out['pictures']), (48, 24, 2, 3))
+        wanted, report = sp.read_sprites(self.g, self.g.view, out['png'])
+        self.assertEqual(wanted, {})
+        self.assertEqual(len(report.covered), 3)
+
+    def test_a_pixel_drawn_on_an_object_goes_to_the_sprite_that_shows_it_with_its_flip(self):
+        out = sp.export_sprites(self.g, self.g.view)
+        # the first pixel of the right half of the first object is the last pixel of the first row of the mirrored picture
+        wanted, _ = sp.read_sprites(self.g, self.g.view, edit(out['png'], {(16, 8): 5, (2, 2): 0}))
+        c = [(x * y) % 3 for y in range(8) for x in range(8)]
+        c[7] = 5
+        self.assertEqual(wanted, {'vram:64:' + FMT: c}, 'the gap between objects belongs to no picture')
+
+    def test_no_sprites_is_said_plainly(self):
+        self.g.sprites = lambda: []
+        with self.assertRaises(ValueError):
+            sp.export_sprites(self.g, self.g.view)
+
+
 class ChecksumFieldTests(unittest.TestCase):
     def test_both_bytes_of_a_checksum_count_when_a_probe_moved_one(self):
         from romancer import scene_graphics as sg

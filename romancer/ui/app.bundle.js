@@ -10508,6 +10508,8 @@ ${state2.artifact.system_id ? `<details><summary>Advanced byte options</summary>
     return `<section class="scene-png" aria-label="Save and load as PNG"><h4>Save and load as PNG</h4>
  <p class="subtle">Save every picture of this scene as one PNG, or a background layer the way the game lays it out. The PNG carries this scene's own colors. Draw on it in any image program, keep its size, and load it back. ROMancer finds the pictures you changed and replays the game to check them.</p>
  <div class="actions">${button("Save pictures as PNG", "scene-png-save", { id: "sheet", icon: "download", disabled: busy })}${button("Load pictures PNG", "scene-png-load", { id: "sheet", disabled: busy })}</div>
+ ${`<div class="actions">${button("Save sprites as PNG", "scene-png-save", { id: "sprites", icon: "download", disabled: busy })}${button("Load sprites PNG", "scene-png-load", { id: "sprites", disabled: busy })}</div>
+ <p class="subtle">The sprites PNG shows each character and object put together the way the game shows it, not as loose 8 by 8 pieces.</p>`}
  ${layers.length ? `${layers.length > 1 ? `<label class="scene-line"><span>Background layer</span><select data-png-layer aria-label="Background layer to save or load">${layers.map((row) => `<option value="${row.index}" ${row === layer ? "selected" : ""}>${esc(layerLabel(row))}</option>`).join("")}</select></label>` : ""}
  <div class="actions">${button("Save background as PNG", "scene-png-save", { id: "layer", icon: "download", disabled: busy })}${button("Load background PNG", "scene-png-load", { id: "layer", disabled: busy })}</div>
  <p class="subtle">A background shows one picture in many places. Change it the same way wherever it shows, or draw it once on the pictures PNG.</p>` : ""}
@@ -11404,7 +11406,7 @@ ${state2.artifact.system_id ? `<details><summary>Advanced byte options</summary>
         link.click();
         link.remove();
         setTimeout(() => URL.revokeObjectURL(url), 1e3);
-        ctx2.notify(`${result.name} saved: ${result.width} by ${result.height} pixels, ${plural2(result.pictures, "picture")}${result.indexed ? ", with the scene’s " + result.colors + " colors as its palette" : ""}. Keep that size when you draw on it.`);
+        ctx2.notify(`${result.name} saved: ${result.width} by ${result.height} pixels, ${result.objects ? plural2(result.objects, "object") + " made of " : ""}${plural2(result.pictures, "picture")}${result.indexed ? ", with the scene’s " + result.colors + " colors as its palette" : ""}. Keep that size when you draw on it.`);
       },
       "scene-save-everything": async () => {
         ctx2.notify("Saving the graphics of every scene…");

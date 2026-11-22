@@ -1532,8 +1532,11 @@ class EditSession:
             elif what == 'layer':
                 out = sp.export_layer(graphics, view, int(layer))
                 name = 'background-' + ''.join(ch if ch.isalnum() else '-' for ch in out['layer']).strip('-').lower()
+            elif what == 'sprites':
+                out = sp.export_sprites(graphics, view)
+                name = 'sprites'
             else:
-                raise ValueError('Choose the pictures or a background layer to save.')
+                raise ValueError('Choose the pictures, the sprites or a background layer to save.')
             number = list(self.scenes).index(scene_id) + 1
             return {**out, 'what': what, 'name': f'scene-{number}-{name}.png'}
 
@@ -1562,6 +1565,13 @@ class EditSession:
                     files += 1
                     listing.append(f'{folder}: {self._label(scene_id)}')
                     listing.append(f'  {sheet["name"]}  {sheet["width"]} by {sheet["height"]} pixels, {sheet["pictures"]} pictures')
+                    try:
+                        whole = self.export_picture(scene_id, 'sprites')
+                        archive.writestr(f'{folder}/{whole["name"]}', whole['png'])
+                        files += 1
+                        listing.append(f'  {whole["name"]}  {whole["width"]} by {whole["height"]} pixels, {whole["objects"]} objects made of sprites')
+                    except ValueError:
+                        pass                                  # no sprites on that screen
                     for layer in self.graphics_view(scene_id)['layers']:
                         try:
                             picture = self.export_picture(scene_id, 'layer', layer['index'])
@@ -1593,8 +1603,10 @@ class EditSession:
                 wanted, report = sp.read_sheet(graphics, view, raw)
             elif what == 'layer':
                 wanted, report, moves = sp.read_layer(graphics, view, int(layer), raw)
+            elif what == 'sprites':
+                wanted, report = sp.read_sprites(graphics, view, raw)
             else:
-                raise ValueError('Choose the pictures or a background layer to read in.')
+                raise ValueError('Choose the pictures, the sprites or a background layer to read in.')
             refused = []
             if moves:                # a picture the layer cannot show in that cell is not a move: it is left out, with the reason
                 layers = graphics.layers()

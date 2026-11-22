@@ -438,6 +438,178 @@ def read_layer(graphics, view: dict, number: int, raw: bytes) -> tuple:
     return wanted, report, moves
 
 
+# ----------------------------------------------------------------- sprites, put together as the objects they make
+
+GAP = 8                     # pixels between two objects on the sprites PNG
+ROW = 320                   # the sheet is at most about this wide
+MAX_OBJECTS = 96
+
+
+def sprite_objects(graphics, view: dict) -> tuple:
+    """([object], {tile id: tile}): the sprites on screen, grouped into the objects they make.
+
+    The console draws a character from several small sprites side by side.
+    Sprites whose boxes touch or overlap are one object: {'left', 'top',
+    'width', 'height' (screen pixels), 'sprites': [(sprite, [tile id])]} with
+    the sprites in the console's order, the front one first.
+    """
+    known = {tile['id']: tile for tile in view['tiles']}
+    found = []
+    for sprite in graphics.sprites():
+        if sprite.guess and sprite.cols > 1:
+            continue
+        wide, tall = sprite.cols * 8, sprite.rows * 8
+        if sprite.x + wide <= 0 or sprite.y + tall <= 0 or sprite.x >= graphics.width or sprite.y >= graphics.height:
+            continue
+        ids = [sg.tile_id(sprite.domain, address, sprite.fmt) for address in sprite.tiles]
+        if all(ident in known for ident in ids):
+            found.append((sprite, ids))
+    group = list(range(len(found)))
+
+    def root(k):
+        while group[k] != k:
+            group[k] = group[group[k]]
+            k = group[k]
+        return k
+    for a in range(len(found)):
+        sa = found[a][0]
+        for b in range(a + 1, len(found)):
+            sb = found[b][0]
+            if (sa.x - 1 < sb.x + sb.cols * 8 and sb.x - 1 < sa.x + sa.cols * 8
+                    and sa.y - 1 < sb.y + sb.rows * 8 and sb.y - 1 < sa.y + sa.rows * 8):
+                group[root(a)] = root(b)
+    sets: dict = {}
+    for k, item in enumerate(found):
+        sets.setdefault(root(k), []).append(item)
+    objects = []
+    for members in sets.values():
+        left = min(s.x for s, _ in members)
+        top = min(s.y for s, _ in members)
+        right = max(s.x + s.cols * 8 for s, _ in members)
+        bottom = max(s.y + s.rows * 8 for s, _ in members)
+        if right - left <= ROW and bottom - top <= ROW:
+            objects.append({'left': left, 'top': top, 'width': right - left, 'height': bottom - top, 'sprites': members})
+    objects.sort(key=lambda o: (o['top'], o['left']))
+    return objects[:MAX_OBJECTS], known
+
+
+def sprite_layout(objects: list) -> tuple:
+    """([(x, y) of each object on the sheet], sheet width, sheet height): rows of objects, a gap between them."""
+    places, x, y, tall, wide = [], GAP, GAP, 0, GAP
+    for obj in objects:
+        if x > GAP and x + obj['width'] + GAP > ROW:
+            x, y, tall = GAP, y + tall + GAP, 0
+        places.append((x, y))
+        x += obj['width'] + GAP
+        tall = max(tall, obj['height'])
+        wide = max(wide, x)
+    return places, wide, y + tall + GAP
+
+
+def _sprite_at(obj: dict, known: dict, x: int, y: int, shown: dict):
+    """(sprite, tile id, pixel number in the tile, value) that an object shows at one of its pixels, or None outside every sprite.
+
+    Where sprites overlap the front one with something drawn there is
+    shown. A pixel that is empty in all of them belongs to the front one.
+    """
+    first = None
+    for sprite, ids in obj['sprites']:
+        lx, ly = obj['left'] + x - sprite.x, obj['top'] + y - sprite.y
+        wide, tall = sprite.cols * 8, sprite.rows * 8
+        if not (0 <= lx < wide and 0 <= ly < tall):
+            continue
+        if sprite.hflip:
+            lx = wide - 1 - lx
+        if sprite.vflip:
+            ly = tall - 1 - ly
+        ident = ids[(ly // 8) * sprite.cols + lx // 8]
+        k = (ly % 8) * 8 + lx % 8
+        pixels = shown.get(ident)
+        if pixels is None:
+            pixels = shown[ident] = _current(known[ident])
+        value = pixels[k]
+        if value:
+            return sprite, ident, k, value
+        if first is None:
+            first = (sprite, ident, k, 0)
+    return first
+
+
+def export_sprites(graphics, view: dict) -> dict:
+    """One PNG with every object the sprites on screen make, each put together as the game shows it."""
+    objects, known = sprite_objects(graphics, view)
+    if not objects:
+        raise ValueError('ROMancer found no sprites on this screen to save.')
+    places, width, height = sprite_layout(objects)
+    colors = _palette(graphics)
+    picture = Picture(width, height, colors)
+    sprite, ids = objects[0]['sprites'][0]
+    empty = _slot(known[ids[0]]['pal'], sprite.line, 0)
+    blank = _rgb(colors, empty, 0, known[ids[0]]['bits'])
+    for y in range(height):
+        for x in range(width):
+            picture.put(x, y, empty, blank)
+    shown: dict = {}
+    for obj, (left, top) in zip(objects, places):
+        for y in range(obj['height']):
+            for x in range(obj['width']):
+                hit = _sprite_at(obj, known, x, y, shown)
+                if hit is None:
+                    continue
+                sprite, ident, k, value = hit
+                tile = known[ident]
+                slot = _slot(tile['pal'], sprite.line, value)
+                picture.put(left + x, top + y, slot, _rgb(colors, slot, value, tile['bits']))
+    return {'png': picture.png(), 'width': width, 'height': height, 'pictures': len({i for o in objects for _, ids in o['sprites'] for i in ids}),
+            'objects': len(objects), 'indexed': picture.indexed, 'colors': len(colors)}
+
+
+def read_sprites(graphics, view: dict, raw: bytes) -> tuple:
+    """({tile id: new pixels} for the pictures drawn on, Report) from a PNG saved by export_sprites.
+
+    A pixel drawn on an object goes to the picture of the sprite that shows
+    it there. Pixels drawn between objects, outside every sprite, are not
+    part of any picture and are left alone.
+    """
+    objects, known = sprite_objects(graphics, view)
+    if not objects:
+        raise ValueError('ROMancer found no sprites on this screen, so there is nothing to load a sprites PNG into.')
+    places, width, height = sprite_layout(objects)
+    colors = _palette(graphics)
+    image = Imported(raw, width, height, colors)
+    report = Report()
+    edits: dict = {}
+    covered = set()
+    shown: dict = {}
+    for obj, (left, top) in zip(objects, places):
+        for y in range(obj['height']):
+            for x in range(obj['width']):
+                hit = _sprite_at(obj, known, x, y, shown)
+                if hit is None:
+                    continue
+                sprite, ident, k, now = hit
+                covered.add(ident)
+                tile = known[ident]
+                new = _value(image.at(left + x, top + y), tile['pal'], sprite.line, tile['bits'], colors, now, report)
+                if new == now:
+                    continue
+                marks = edits.setdefault(ident, {})
+                if k in marks and marks[k] != new:
+                    report.conflict_cells += 1
+                marks[k] = new
+    wanted = {}
+    for ident, marks in edits.items():
+        pixels = list(shown[ident])
+        for k, value in marks.items():
+            pixels[k] = value
+        if pixels != sg.parse_pixels(known[ident]['pixels'], known[ident]['format']):
+            wanted[ident] = pixels
+    report.conflicts = 1 if report.conflict_cells else 0
+    report.by_number = image.by_number
+    report.covered = covered
+    return wanted, report
+
+
 def summary(report: Report, wanted: int, skipped: list) -> str:
     def plural(n, word):
         return f'{n:,} {word}{"" if n == 1 else "s"}'

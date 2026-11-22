@@ -1,9 +1,23 @@
-ROMancer v1.3.6
+ROMancer v1.3.7
 By RetchEWretched
 
 ROMancer is a local ROM editing, investigation and playtesting workbench.
 It supports NES, SNES, Genesis / Mega Drive, Master System, Game Boy and
 Game Boy Color cartridge formats. Everyday work runs offline.
+
+NEW IN v1.3.7
+
+Sprites as whole objects. A character on screen is put together from
+several small sprites. Save sprites as PNG, under the pictures of a scene,
+saves every character and object on the screen as the game shows it, each
+one put together, with the scene's colors as the palette. Draw on it and
+load it with Load sprites PNG: each pixel goes back to the picture of the
+sprite that shows it, mirrored pieces included, and the change is checked
+by replay like any other.
+- Save all graphics (ZIP) includes the sprites PNG of every scene.
+- On 80 catalog games picked at random, 73 had sprites on a recorded
+  screen. All 73 saved and read back unchanged. A drawn-on object was
+  confirmed by replay on 61.
 
 NEW IN v1.3.6
 
@@ -234,7 +248,7 @@ available. The supplied Pokemon Red and Blue revisions share a
 
 START ON WINDOWS
 
-1. Extract ROMancer-v1.3.6-Windows.zip in Windows File Explorer.
+1. Extract ROMancer-v1.3.7-Windows.zip in Windows File Explorer.
 2. Double-click ROMancer.exe in the extracted folder.
    Keep ROMancer.exe, ROM Catalog.html and the ROMancer Files folder together.
 3. Open an original workshop or choose New project and import your own cartridge image.
@@ -255,8 +269,8 @@ SHA-256 is checked and later captures work offline. No ROM data is uploaded.
 
 START ON LINUX
 
-1. Extract ROMancer-v1.3.6-Linux-x86_64.tar.gz:  tar xf ROMancer-v1.3.6-Linux-x86_64.tar.gz
-2. Run ./ROMancer-v1.3.6-Linux-x86_64/ROMancer.sh
+1. Extract ROMancer-v1.3.7-Linux-x86_64.tar.gz:  tar xf ROMancer-v1.3.7-Linux-x86_64.tar.gz
+2. Run ./ROMancer-v1.3.7-Linux-x86_64/ROMancer.sh
    (./ROMancer.sh --install-desktop adds ROMancer to your application menu).
 
 The Linux x86-64 package includes Python, Pillow and the same six engines built
