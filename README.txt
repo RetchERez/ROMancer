@@ -1,9 +1,26 @@
-ROMancer v1.3.8
+ROMancer v1.3.9
 By RetchEWretched
 
 ROMancer is a local ROM editing, investigation and playtesting workbench.
 It supports NES, SNES, Genesis / Mega Drive, Master System, Game Boy and
 Game Boy Color cartridge formats. Everyday work runs offline.
+
+NEW IN v1.3.9
+
+The whole catalog measured again. Every one of the 942 catalog ROMs was
+put through the PNG measurement again with everything since v1.3.0 in
+place. The numbers in trace/COVERAGE.md are the new ones.
+- Saving works on 939 of 942 ROMs, as before, and every saved PNG reads
+  back unchanged. A background layer now saves on all 939 (930 before):
+  the 9 more are the Mode 7 layers.
+- A pictures PNG with up to six pictures drawn on had at least one
+  confirmed by replay on 897 ROMs (887 before) and every one on 769 (721
+  before): 4,729 of 5,315 pictures in all.
+- An edited background PNG was confirmed on 800 ROMs (785 before).
+- By system the gain is on the NES and the Super NES. A few games on the
+  Mega Drive, Super NES and Game Boy did slightly worse than in v1.3.0;
+  the tables in trace/COVERAGE.md show each system.
+- No behaviour changed since v1.3.8.
 
 NEW IN v1.3.8
 
@@ -262,7 +279,7 @@ available. The supplied Pokemon Red and Blue revisions share a
 
 START ON WINDOWS
 
-1. Extract ROMancer-v1.3.8-Windows.zip in Windows File Explorer.
+1. Extract ROMancer-v1.3.9-Windows.zip in Windows File Explorer.
 2. Double-click ROMancer.exe in the extracted folder.
    Keep ROMancer.exe, ROM Catalog.html and the ROMancer Files folder together.
 3. Open an original workshop or choose New project and import your own cartridge image.
@@ -283,8 +300,8 @@ SHA-256 is checked and later captures work offline. No ROM data is uploaded.
 
 START ON LINUX
 
-1. Extract ROMancer-v1.3.8-Linux-x86_64.tar.gz:  tar xf ROMancer-v1.3.8-Linux-x86_64.tar.gz
-2. Run ./ROMancer-v1.3.8-Linux-x86_64/ROMancer.sh
+1. Extract ROMancer-v1.3.9-Linux-x86_64.tar.gz:  tar xf ROMancer-v1.3.9-Linux-x86_64.tar.gz
+2. Run ./ROMancer-v1.3.9-Linux-x86_64/ROMancer.sh
    (./ROMancer.sh --install-desktop adds ROMancer to your application menu).
 
 The Linux x86-64 package includes Python, Pillow and the same six engines built
