@@ -1361,7 +1361,7 @@ class EditSession:
                 found.update(range(0x1A4, 0x1A8))        # the header's "end of ROM" field follows the ROM's size
                 if found - set(range(0x1A4, 0x1A8)):
                     found.update((0x18E, 0x18F))         # both bytes of the checksum word, whichever the probes moved
-            self._checksum_bytes = found
+            self._checksum_bytes = sg.whole_checksums(found, self.system)
         return self._checksum_bytes
 
     def _avoid(self, key: str = '') -> list:

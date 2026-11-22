@@ -1180,7 +1180,21 @@ def _checksum_places(rom: bytes, system: str) -> set:
     if system == 'genesis':
         found.update(range(0x1A4, 0x1A8))
         found.update((0x18E, 0x18F))
-    return found
+    return whole_checksums(found, system)
+
+
+def whole_checksums(found: set, system: str) -> set:
+    """Every byte of the checksum fields that these bytes belong to.
+
+    A checksum is a 16-bit sum, and a probe that changes one ROM byte usually
+    moves only its low byte: the high byte moves only on a carry. Two edits
+    then looked as if they needed the same ROM byte when all they shared was
+    the other half of the checksum. The fields are two bytes on an even
+    address (Game Boy 0x14E, Master System 0x7FFA, Mega Drive 0x18E); the
+    Super NES keeps the sum and its complement in four.
+    """
+    size = 4 if system == 'snes' else 2
+    return {start + k for o in found for start in (o - o % size,) for k in range(size)} | set(found)
 
 
 def _plan_tiles(job: dict) -> dict:

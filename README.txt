@@ -1,9 +1,21 @@
-ROMancer v1.3.3
+ROMancer v1.3.4
 By RetchEWretched
 
 ROMancer is a local ROM editing, investigation and playtesting workbench.
 It supports NES, SNES, Genesis / Mega Drive, Master System, Game Boy and
 Game Boy Color cartridge formats. Everyday work runs offline.
+
+NEW IN v1.3.4
+
+One PNG, pictures stored in different ways. A PNG often changes some
+pictures that are written straight into the ROM and others that need the
+swap-in patch. On Game Boy, Game Boy Color and Master System games the two
+groups were refused as needing "the same place in the ROM" when the only
+byte they both touched was the other half of the header checksum, and half
+the pictures were left out. The checksum is now treated as one field on
+every system (two bytes; four on the Super NES). Of the 51 catalog games
+this stopped, 39 now confirm every picture drawn and 42 confirm more than
+before. The same fix applies to two kept changes in the change list.
 
 NEW IN v1.3.3
 
@@ -191,7 +203,7 @@ available. The supplied Pokemon Red and Blue revisions share a
 
 START ON WINDOWS
 
-1. Extract ROMancer-v1.3.3-Windows.zip in Windows File Explorer.
+1. Extract ROMancer-v1.3.4-Windows.zip in Windows File Explorer.
 2. Double-click ROMancer.exe in the extracted folder.
    Keep ROMancer.exe, ROM Catalog.html and the ROMancer Files folder together.
 3. Open an original workshop or choose New project and import your own cartridge image.
@@ -212,8 +224,8 @@ SHA-256 is checked and later captures work offline. No ROM data is uploaded.
 
 START ON LINUX
 
-1. Extract ROMancer-v1.3.3-Linux-x86_64.tar.gz:  tar xf ROMancer-v1.3.3-Linux-x86_64.tar.gz
-2. Run ./ROMancer-v1.3.3-Linux-x86_64/ROMancer.sh
+1. Extract ROMancer-v1.3.4-Linux-x86_64.tar.gz:  tar xf ROMancer-v1.3.4-Linux-x86_64.tar.gz
+2. Run ./ROMancer-v1.3.4-Linux-x86_64/ROMancer.sh
    (./ROMancer.sh --install-desktop adds ROMancer to your application menu).
 
 The Linux x86-64 package includes Python, Pillow and the same six engines built

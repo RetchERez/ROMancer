@@ -163,5 +163,16 @@ class ScenePngTests(unittest.TestCase):
         self.assertIn('1 picture you changed cannot be changed and was left out', text)
 
 
+class ChecksumFieldTests(unittest.TestCase):
+    def test_both_bytes_of_a_checksum_count_when_a_probe_moved_one(self):
+        from romancer import scene_graphics as sg
+        self.assertEqual(sg.whole_checksums({0x14F}, 'gb'), {0x14E, 0x14F})
+        self.assertEqual(sg.whole_checksums({0x14E}, 'gbc'), {0x14E, 0x14F})
+        self.assertEqual(sg.whole_checksums({0x7FFB}, 'sms'), {0x7FFA, 0x7FFB})
+        self.assertEqual(sg.whole_checksums({0x18F, 0x1A4}, 'genesis'), {0x18E, 0x18F, 0x1A4, 0x1A5})
+        self.assertEqual(sg.whole_checksums({0x7FDE}, 'snes'), {0x7FDC, 0x7FDD, 0x7FDE, 0x7FDF})
+        self.assertEqual(sg.whole_checksums(set(), 'nes'), set())
+
+
 if __name__ == '__main__':
     unittest.main()
