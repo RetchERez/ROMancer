@@ -72,6 +72,17 @@ class Picture:
         else:
             self.indexed = False
 
+    def square(self, left: int, top: int, slots: list, rgb: list, indexed: bool) -> None:
+        """Put one 8x8 square: 64 palette numbers and 64 colors in screen order."""
+        if not indexed:
+            self.indexed = False
+            slots = [slot if 0 <= slot < len(self.colors) else 0 for slot in slots]
+        at = top * self.width + left
+        for row in range(0, 64, 8):
+            self.slots[at:at + 8] = slots[row:row + 8]
+            self.rgb[at:at + 8] = rgb[row:row + 8]
+            at += self.width
+
     def png(self) -> bytes:
         Image = _image()
         if self.indexed and self.colors:
@@ -109,9 +120,9 @@ def export_sheet(graphics, view: dict) -> dict:
     for number, tile in enumerate(layout['tiles']):
         left, top = number % COLUMNS * 8, number // COLUMNS * 8
         pixels = _current(tile)
-        for k, value in enumerate(pixels):
-            slot = _slot(tile['pal'], tile['line'], value)
-            picture.put(left + k % 8, top + k // 8, slot, _rgb(colors, slot, value, tile['bits']))
+        slots = [_slot(tile['pal'], tile['line'], value) for value in pixels]
+        picture.square(left, top, slots, [_rgb(colors, slot, value, tile['bits']) for slot, value in zip(slots, pixels)],
+                       all(0 <= slot < len(colors) for slot in slots))
     return {'png': picture.png(), 'width': picture.width, 'height': picture.height, 'pictures': len(layout['tiles']),
             'indexed': picture.indexed, 'colors': len(colors)}
 
@@ -123,8 +134,6 @@ def layer_cells(graphics, number: int):
         raise ValueError('That background layer is not part of this scene.')
     view = layers[number]
     layer = view.layer
-    if layer.tile_format == 'snes-mode7':
-        raise ValueError('This layer is drawn in perspective (Mode 7), so it has no flat picture to save. Use the sheet instead.')
     if layer.width * view.px > MAX_SIDE or layer.height * view.px > MAX_SIDE:
         raise ValueError('This background layer is too large to save as one picture. Use the sheet instead.')
     quads = view.px // 8
@@ -136,6 +145,33 @@ def layer_cells(graphics, number: int):
                 for qx in range(quads):
                     places.append((cx, cy, qx, qy, graphics._subtile(view, cell, qx, qy), cell))
     return view, places
+
+
+def _cells_now(view: dict, layer_view, number: int) -> dict:
+    """{(cell x, cell y): (tile address, hflip, vflip, palette line)} with the background changes that are kept or shown.
+
+    A cell painted in the Background editor, or moved by an earlier PNG, is
+    part of what the scene looks like now, so a saved PNG shows it and a
+    loaded PNG is compared with it.
+    """
+    layer = layer_view.layer
+    now = {(cell.x, cell.y): (cell.tile_address, cell.hflip, cell.vflip, cell.palette) for cell in layer.cells}
+    row = next((entry for entry in view['layers'] if entry['index'] == number), None)
+    for item in (row or {}).get('pending', ()):
+        at = (int(item['x']), int(item['y']))
+        if at not in now:
+            continue
+        address, hflip, vflip, line = now[at]
+        if item.get('tile') is not None:
+            address = sg.parse_tile_id(item['tile'])[1]
+        if item.get('hflip') is not None:
+            hflip = bool(item['hflip'])
+        if item.get('vflip') is not None:
+            vflip = bool(item['vflip'])
+        if item.get('line') is not None:
+            line = int(item['line'])
+        now[at] = (address, hflip, vflip, line)
+    return now
 
 
 def _layer_tiles(view: dict, layer_view) -> dict:
@@ -150,6 +186,15 @@ def _place(k: int, cell) -> tuple:
     return (7 - x if cell.hflip else x), (7 - y if cell.vflip else y)
 
 
+def _turned(pixels, hflip: bool, vflip: bool) -> tuple:
+    """A picture as it lands on the layer: the 64 values in screen order, with these flips."""
+    out = [0] * 64
+    for k, value in enumerate(pixels):
+        x, y = k % 8, k // 8
+        out[(7 - y if vflip else y) * 8 + (7 - x if hflip else x)] = value
+    return tuple(out)
+
+
 def export_layer(graphics, view: dict, number: int) -> dict:
     layer_view, places = layer_cells(graphics, number)
     layer = layer_view.layer
@@ -157,8 +202,12 @@ def export_layer(graphics, view: dict, number: int) -> dict:
     picture = Picture(layer.width * layer_view.px, layer.height * layer_view.px, colors)
     known = _layer_tiles(view, layer_view)
     bits = gt.TILE_FORMATS[layer.tile_format][0]
-    cache = {}
+    cache, squares = {}, {}
+    now = _cells_now(view, layer_view, number) if layer_view.px == 8 else {}
     for cx, cy, qx, qy, address, cell in places:
+        if now:
+            address, hflip, vflip, line = now[(cx, cy)]
+            cell = _Cell(hflip, vflip, line)
         pixels = cache.get(address)
         if pixels is None:
             tile = known.get(address)
@@ -169,10 +218,15 @@ def export_layer(graphics, view: dict, number: int) -> dict:
                 pixels = list(raw) if raw is not None else [0] * 64
             cache[address] = pixels
         left, top = cx * layer_view.px + qx * 8, cy * layer_view.px + qy * 8
-        for k, value in enumerate(pixels):
-            x, y = _place(k, cell)
-            slot = _slot(layer_view.rule, cell.palette, value)
-            picture.put(left + x, top + y, slot, _rgb(colors, slot, value, bits))
+        look = (address, cell.hflip, cell.vflip, cell.palette)
+        square = squares.get(look)
+        if square is None:
+            # one 8x8 square as it lands on the layer, worked out once for every cell that shows it the same way
+            slots = [_slot(layer_view.rule, cell.palette, value) for value in _turned(pixels, cell.hflip, cell.vflip)]
+            turned = _turned(pixels, cell.hflip, cell.vflip)
+            square = squares[look] = (slots, [_rgb(colors, slot, value, bits) for slot, value in zip(slots, turned)],
+                                      all(0 <= slot < len(colors) for slot in slots))
+        picture.square(left, top, *square)
     return {'png': picture.png(), 'width': picture.width, 'height': picture.height, 'pictures': len(cache),
             'indexed': picture.indexed, 'colors': len(colors), 'layer': layer.name}
 
@@ -213,7 +267,17 @@ class Imported:
         return (self.slots[k] if self.slots is not None else None), tuple(self.rgb[k]), self.clear[k]
 
 
+class _Cell:
+    """A cell as it is now: how its picture is turned and which palette line it uses."""
+
+    def __init__(self, hflip: bool, vflip: bool, palette: int):
+        self.hflip, self.vflip, self.palette = hflip, vflip, palette
+
+
 class Report:
+    moved = 0               # cells that now show another picture that the scene already has
+    recolored = 0           # of those, cells that keep the palette of where they were put (NES)
+
     def __init__(self):
         self.off = {}           # (from rgb, to rgb) -> pixels
         self.clear = 0
@@ -269,7 +333,43 @@ def read_sheet(graphics, view: dict, raw: bytes) -> tuple:
     return wanted, report
 
 
+def _exact(image, left: int, top: int, rule, line: int, bits: int, colors: list):
+    """The 64 values, in screen order, of an 8x8 square of the PNG if every pixel is a color of this palette line; else None."""
+    count = min(1 << bits, rule[2] or (1 << bits))
+    first = _slot(rule, line, 0)
+    table = None
+    out = []
+    for y in range(8):
+        for x in range(8):
+            slot, rgb, clear = image.at(left + x, top + y)
+            if clear:
+                return None
+            if slot is not None:
+                if not first <= slot < first + count:
+                    return None
+                out.append(slot - first)
+                continue
+            if table is None:
+                table = {}
+                for value in range(count):
+                    table.setdefault(_rgb(colors, first + value, value, bits), value)
+            value = table.get(rgb)
+            if value is None:
+                return None
+            out.append(value)
+    return tuple(out)
+
+
 def read_layer(graphics, view: dict, number: int, raw: bytes) -> tuple:
+    """({tile id: new pixels} for pictures drawn differently, Report, [cell changes] for cells that show another picture).
+
+    A cell of the PNG that no longer matches the scene is one of two things.
+    If its 8x8 square is exactly a picture the scene already has (turned any
+    way the layer allows, in any of its palette lines), the cell was given
+    that picture: a background change, which leaves the pictures alone. That
+    is how a PNG moves, copies or rearranges parts of a background. Any
+    other difference is a picture that was drawn on, as before.
+    """
     layer_view, places = layer_cells(graphics, number)
     layer = layer_view.layer
     colors = _palette(graphics)
@@ -277,8 +377,18 @@ def read_layer(graphics, view: dict, number: int, raw: bytes) -> tuple:
     report = Report()
     known = _layer_tiles(view, layer_view)
     bits = gt.TILE_FORMATS[layer.tile_format][0]
-    votes, shown = {}, {}
+    row = next((entry for entry in view['layers'] if entry['index'] == number), {})
+    plain = layer_view.px == 8
+    now_cells = _cells_now(view, layer_view, number) if plain else {}
+    flips = [(False, False)] + ([(True, False), (False, True), (True, True)] if row.get('flips') else [])
+    nes = graphics.system == 'nes'          # there one palette choice covers 2 by 2 cells: a cell cannot take its own
+    lines = range(4 if nes else int(row.get('lines') or 1))
+    looks = None            # {64 values in screen order: (tile address, hflip, vflip)} for every picture of the layer
+    votes, shown, moves = {}, {}, []
     for cx, cy, qx, qy, address, cell in places:
+        if plain:
+            address, hflip, vflip, line = now_cells[(cx, cy)]
+            cell = _Cell(hflip, vflip, line)
         tile = known.get(address)
         if tile is None:
             continue
@@ -286,6 +396,39 @@ def read_layer(graphics, view: dict, number: int, raw: bytes) -> tuple:
         if now is None:
             now = shown[tile['id']] = _current(tile)
         left, top = cx * layer_view.px + qx * 8, cy * layer_view.px + qy * 8
+        if plain:
+            # exactly the same square as the scene shows now: nothing to do, and nothing to report
+            if _exact(image, left, top, layer_view.rule, cell.palette, bits, colors) == _turned(now, cell.hflip, cell.vflip):
+                continue
+            if looks is None:
+                looks = {}
+                for other in known.values():
+                    pixels = _current(other)
+                    for hflip, vflip in flips:
+                        looks.setdefault(_turned(pixels, hflip, vflip), (other['address'], hflip, vflip))
+            found = None
+            for line in [cell.palette] + [k for k in lines if k != cell.palette]:
+                square = _exact(image, left, top, layer_view.rule, line, bits, colors)
+                hit = looks.get(square) if square is not None else None
+                if hit is not None and (hit[0], hit[1], hit[2], line) != (address, cell.hflip, cell.vflip, cell.palette):
+                    found = (hit, line)
+                    break
+            if found is not None:
+                (other, hflip, vflip), line = found
+                move = {'layer': number, 'x': cx, 'y': cy, 'tile': sg.tile_id(layer.tile_domain, other, layer.tile_format)}
+                if row.get('flips'):
+                    move.update(hflip=hflip, vflip=vflip)
+                if line != cell.palette:
+                    if nes:
+                        if other == address:
+                            found = None            # only its colors differ, and the cell cannot be given other colors
+                        else:
+                            report.recolored += 1   # the picture goes there; it keeps the colors of the place it was put
+                    else:
+                        move['line'] = line
+                if found is not None:
+                    moves.append(move)
+                    continue
         new = [0] * 64
         for k in range(64):
             x, y = _place(k, cell)
@@ -307,6 +450,179 @@ def read_layer(graphics, view: dict, number: int, raw: bytes) -> tuple:
             wanted[ident] = final
     report.by_number = image.by_number
     report.covered = set(shown)
+    report.moved = len(moves)
+    return wanted, report, moves
+
+
+# ----------------------------------------------------------------- sprites, put together as the objects they make
+
+GAP = 8                     # pixels between two objects on the sprites PNG
+ROW = 320                   # the sheet is at most about this wide
+MAX_OBJECTS = 96
+
+
+def sprite_objects(graphics, view: dict) -> tuple:
+    """([object], {tile id: tile}): the sprites on screen, grouped into the objects they make.
+
+    The console draws a character from several small sprites side by side.
+    Sprites whose boxes touch or overlap are one object: {'left', 'top',
+    'width', 'height' (screen pixels), 'sprites': [(sprite, [tile id])]} with
+    the sprites in the console's order, the front one first.
+    """
+    known = {tile['id']: tile for tile in view['tiles']}
+    found = []
+    for sprite in graphics.sprites():
+        if sprite.guess and sprite.cols > 1:
+            continue
+        wide, tall = sprite.cols * 8, sprite.rows * 8
+        if sprite.x + wide <= 0 or sprite.y + tall <= 0 or sprite.x >= graphics.width or sprite.y >= graphics.height:
+            continue
+        ids = [sg.tile_id(sprite.domain, address, sprite.fmt) for address in sprite.tiles]
+        if all(ident in known for ident in ids):
+            found.append((sprite, ids))
+    group = list(range(len(found)))
+
+    def root(k):
+        while group[k] != k:
+            group[k] = group[group[k]]
+            k = group[k]
+        return k
+    for a in range(len(found)):
+        sa = found[a][0]
+        for b in range(a + 1, len(found)):
+            sb = found[b][0]
+            if (sa.x - 1 < sb.x + sb.cols * 8 and sb.x - 1 < sa.x + sa.cols * 8
+                    and sa.y - 1 < sb.y + sb.rows * 8 and sb.y - 1 < sa.y + sa.rows * 8):
+                group[root(a)] = root(b)
+    sets: dict = {}
+    for k, item in enumerate(found):
+        sets.setdefault(root(k), []).append(item)
+    objects = []
+    for members in sets.values():
+        left = min(s.x for s, _ in members)
+        top = min(s.y for s, _ in members)
+        right = max(s.x + s.cols * 8 for s, _ in members)
+        bottom = max(s.y + s.rows * 8 for s, _ in members)
+        if right - left <= ROW and bottom - top <= ROW:
+            objects.append({'left': left, 'top': top, 'width': right - left, 'height': bottom - top, 'sprites': members})
+    objects.sort(key=lambda o: (o['top'], o['left']))
+    return objects[:MAX_OBJECTS], known
+
+
+def sprite_layout(objects: list) -> tuple:
+    """([(x, y) of each object on the sheet], sheet width, sheet height): rows of objects, a gap between them."""
+    places, x, y, tall, wide = [], GAP, GAP, 0, GAP
+    for obj in objects:
+        if x > GAP and x + obj['width'] + GAP > ROW:
+            x, y, tall = GAP, y + tall + GAP, 0
+        places.append((x, y))
+        x += obj['width'] + GAP
+        tall = max(tall, obj['height'])
+        wide = max(wide, x)
+    return places, wide, y + tall + GAP
+
+
+def _sprite_at(obj: dict, known: dict, x: int, y: int, shown: dict):
+    """(sprite, tile id, pixel number in the tile, value) that an object shows at one of its pixels, or None outside every sprite.
+
+    Where sprites overlap the front one with something drawn there is
+    shown. A pixel that is empty in all of them belongs to the front one.
+    """
+    first = None
+    for sprite, ids in obj['sprites']:
+        lx, ly = obj['left'] + x - sprite.x, obj['top'] + y - sprite.y
+        wide, tall = sprite.cols * 8, sprite.rows * 8
+        if not (0 <= lx < wide and 0 <= ly < tall):
+            continue
+        if sprite.hflip:
+            lx = wide - 1 - lx
+        if sprite.vflip:
+            ly = tall - 1 - ly
+        ident = ids[(ly // 8) * sprite.cols + lx // 8]
+        k = (ly % 8) * 8 + lx % 8
+        pixels = shown.get(ident)
+        if pixels is None:
+            pixels = shown[ident] = _current(known[ident])
+        value = pixels[k]
+        if value:
+            return sprite, ident, k, value
+        if first is None:
+            first = (sprite, ident, k, 0)
+    return first
+
+
+def export_sprites(graphics, view: dict) -> dict:
+    """One PNG with every object the sprites on screen make, each put together as the game shows it."""
+    objects, known = sprite_objects(graphics, view)
+    if not objects:
+        raise ValueError('ROMancer found no sprites on this screen to save.')
+    places, width, height = sprite_layout(objects)
+    colors = _palette(graphics)
+    picture = Picture(width, height, colors)
+    sprite, ids = objects[0]['sprites'][0]
+    empty = _slot(known[ids[0]]['pal'], sprite.line, 0)
+    blank = _rgb(colors, empty, 0, known[ids[0]]['bits'])
+    for y in range(height):
+        for x in range(width):
+            picture.put(x, y, empty, blank)
+    shown: dict = {}
+    for obj, (left, top) in zip(objects, places):
+        for y in range(obj['height']):
+            for x in range(obj['width']):
+                hit = _sprite_at(obj, known, x, y, shown)
+                if hit is None:
+                    continue
+                sprite, ident, k, value = hit
+                tile = known[ident]
+                slot = _slot(tile['pal'], sprite.line, value)
+                picture.put(left + x, top + y, slot, _rgb(colors, slot, value, tile['bits']))
+    return {'png': picture.png(), 'width': width, 'height': height, 'pictures': len({i for o in objects for _, ids in o['sprites'] for i in ids}),
+            'objects': len(objects), 'indexed': picture.indexed, 'colors': len(colors)}
+
+
+def read_sprites(graphics, view: dict, raw: bytes) -> tuple:
+    """({tile id: new pixels} for the pictures drawn on, Report) from a PNG saved by export_sprites.
+
+    A pixel drawn on an object goes to the picture of the sprite that shows
+    it there. Pixels drawn between objects, outside every sprite, are not
+    part of any picture and are left alone.
+    """
+    objects, known = sprite_objects(graphics, view)
+    if not objects:
+        raise ValueError('ROMancer found no sprites on this screen, so there is nothing to load a sprites PNG into.')
+    places, width, height = sprite_layout(objects)
+    colors = _palette(graphics)
+    image = Imported(raw, width, height, colors)
+    report = Report()
+    edits: dict = {}
+    covered = set()
+    shown: dict = {}
+    for obj, (left, top) in zip(objects, places):
+        for y in range(obj['height']):
+            for x in range(obj['width']):
+                hit = _sprite_at(obj, known, x, y, shown)
+                if hit is None:
+                    continue
+                sprite, ident, k, now = hit
+                covered.add(ident)
+                tile = known[ident]
+                new = _value(image.at(left + x, top + y), tile['pal'], sprite.line, tile['bits'], colors, now, report)
+                if new == now:
+                    continue
+                marks = edits.setdefault(ident, {})
+                if k in marks and marks[k] != new:
+                    report.conflict_cells += 1
+                marks[k] = new
+    wanted = {}
+    for ident, marks in edits.items():
+        pixels = list(shown[ident])
+        for k, value in marks.items():
+            pixels[k] = value
+        if pixels != sg.parse_pixels(known[ident]['pixels'], known[ident]['format']):
+            wanted[ident] = pixels
+    report.conflicts = 1 if report.conflict_cells else 0
+    report.by_number = image.by_number
+    report.covered = covered
     return wanted, report
 
 

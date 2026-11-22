@@ -29,8 +29,10 @@ class FakeGraphics:
         cells = [(0, 0, False, False), (32, 1, False, False), (0, 0, True, False),
                  (64, 0, False, True), (32, 1, False, False), (0, 0, False, False)]
         self.layer = SimpleNamespace(width=3, height=2, tile_format=FMT, tile_domain='vram', name='plane A',
-                                     cells=[SimpleNamespace(tile_address=a, palette=p, hflip=h, vflip=v) for a, p, h, v in cells])
-        self.view = {'tiles': self.tiles}
+                                     cells=[SimpleNamespace(tile_address=a, palette=p, hflip=h, vflip=v, x=k % 3, y=k // 3)
+                                            for k, (a, p, h, v) in enumerate(cells)])
+        self.system = 'genesis'
+        self.view = {'tiles': self.tiles, 'layers': [{'index': 0, 'flips': True, 'lines': 2, 'pending': []}]}
 
     def layers(self):
         return [SimpleNamespace(layer=self.layer, px=8, rule=(0, 16, 16))]
@@ -124,20 +126,57 @@ class ScenePngTests(unittest.TestCase):
         self.assertEqual([image.getpixel((x, 0)) for x in range(8)], a[:8])
         self.assertEqual([image.getpixel((16 + x, 0)) for x in range(8)], a[:8][::-1], 'the third cell shows picture A flipped sideways')
         self.assertEqual(image.getpixel((0, 8 + 7)), [(x * y) % 3 for y in range(8) for x in range(8)][0], 'upside down: last row is the first')
-        wanted, report = sp.read_layer(self.g, self.g.view, 0, out['png'])
+        wanted, report, moves = sp.read_layer(self.g, self.g.view, 0, out['png'])
         self.assertEqual((wanted, report.conflicts), ({}, 0))
+        self.assertEqual(moves, [])
         self.assertEqual(report.covered, {t['id'] for t in self.g.tiles})
         # draw on the flipped cell only: pixel (0, 0) of that cell is pixel (7, 0) of picture A
-        wanted, report = sp.read_layer(self.g, self.g.view, 0, edit(out['png'], {(16, 0): 9}))
+        wanted, report, moves = sp.read_layer(self.g, self.g.view, 0, edit(out['png'], {(16, 0): 9}))
         self.assertEqual(list(wanted), ['vram:0:' + FMT])
         self.assertEqual(wanted['vram:0:' + FMT][7], 9)
         self.assertEqual(report.conflicts, 0, 'one place drawn and the others left alone is not a disagreement')
         # two places drawn differently: the version drawn most often wins and the other place is counted
         both = edit(out['png'], {(0, 0): 9, (16 + 7, 0): 9, (16, 8): 5})        # cells 0 and 2 agree (pixel 0 = 9); cell 5 differs
-        wanted, report = sp.read_layer(self.g, self.g.view, 0, both)
+        wanted, report, moves = sp.read_layer(self.g, self.g.view, 0, both)
         self.assertEqual(wanted['vram:0:' + FMT][0], 9)
         self.assertEqual((report.conflicts, report.conflict_cells), (1, 1))
         self.assertIn('drew differently', sp.summary(report, 1, []))
+
+    def test_a_cell_given_a_picture_the_scene_already_has_is_a_background_change_not_a_redraw(self):
+        from PIL import Image
+        out = sp.export_layer(self.g, self.g.view, 0)
+        image = Image.open(io.BytesIO(out['png']))
+
+        def paste(source, target, turn=None):
+            square = image.crop((source[0] * 8, source[1] * 8, source[0] * 8 + 8, source[1] * 8 + 8))
+            if turn is not None:
+                square = square.transpose(turn)
+            image.paste(square, (target[0] * 8, target[1] * 8))
+        paste((1, 0), (2, 1))                                   # picture B (palette line 1) copied over the last cell
+        paste((0, 0), (1, 1), Image.FLIP_TOP_BOTTOM)            # picture A, upside down, over the second cell of row 2
+        raw = io.BytesIO()
+        image.save(raw, format='PNG')
+        wanted, report, moves = sp.read_layer(self.g, self.g.view, 0, raw.getvalue())
+        self.assertEqual(wanted, {}, 'no picture was drawn on')
+        self.assertEqual(report.moved, 2)
+        self.assertEqual(report.off, {})
+        self.assertEqual(sorted(moves, key=lambda m: m['x']), [
+            {'layer': 0, 'x': 1, 'y': 1, 'tile': 'vram:0:' + FMT, 'hflip': False, 'vflip': True, 'line': 0},
+            {'layer': 0, 'x': 2, 'y': 1, 'tile': 'vram:32:' + FMT, 'hflip': False, 'vflip': False, 'line': 1}])
+        # a moved cell and a drawn pixel in one PNG: both are found, each as what it is
+        image.putpixel((0, 0), 9)
+        raw = io.BytesIO()
+        image.save(raw, format='PNG')
+        wanted, report, moves = sp.read_layer(self.g, self.g.view, 0, raw.getvalue())
+        self.assertEqual(len(moves), 2)
+        self.assertEqual(list(wanted), ['vram:0:' + FMT])
+        # once the moves are kept, the saved PNG shows them and loading it again finds nothing to do
+        self.g.view['layers'][0]['pending'] = [dict(move, change='c1') for move in moves]
+        again = sp.export_layer(self.g, self.g.view, 0)
+        shown = Image.open(io.BytesIO(again['png']))
+        self.assertEqual(shown.crop((16, 8, 24, 16)).tobytes(), shown.crop((8, 0, 16, 8)).tobytes())
+        wanted, report, moves = sp.read_layer(self.g, self.g.view, 0, again['png'])
+        self.assertEqual((wanted, moves), ({}, []))
 
     def test_what_you_kept_shows_in_the_next_png_and_drawing_it_back_takes_it_out_again(self):
         changed = [9] + [(x + y) % 4 for y in range(8) for x in range(8)][1:]
@@ -161,6 +200,53 @@ class ScenePngTests(unittest.TestCase):
         self.assertIn('1 color in it is not in the palette line', text)
         self.assertIn('2 pixels were changed to the nearest color', text)
         self.assertIn('1 picture you changed cannot be changed and was left out', text)
+
+
+class SpriteObjectTests(unittest.TestCase):
+    """Two sprites side by side make one object (the right one mirrored); a third stands alone."""
+
+    def setUp(self):
+        self.g = FakeGraphics()
+        self.g.width, self.g.height = 256, 224
+        def sprite(x, y, address, hflip=False, line=0):
+            return SimpleNamespace(x=x, y=y, cols=1, rows=1, tiles=[address], hflip=hflip, vflip=False, line=line,
+                                   domain='vram', fmt=FMT, guess=False)
+        self.g.sprites = lambda: [sprite(10, 20, 0), sprite(18, 20, 64, hflip=True), sprite(100, 50, 32, line=1),
+                                  sprite(300, 50, 32), sprite(40, 90, 4096)]      # off screen; a picture the scene does not list
+
+    def test_touching_sprites_are_one_object_and_the_png_reads_back_unchanged(self):
+        objects, _ = sp.sprite_objects(self.g, self.g.view)
+        self.assertEqual([(o['left'], o['top'], o['width'], o['height'], len(o['sprites'])) for o in objects],
+                         [(10, 20, 16, 8, 2), (100, 50, 8, 8, 1)])
+        out = sp.export_sprites(self.g, self.g.view)
+        self.assertEqual((out['width'], out['height'], out['objects'], out['pictures']), (48, 24, 2, 3))
+        wanted, report = sp.read_sprites(self.g, self.g.view, out['png'])
+        self.assertEqual(wanted, {})
+        self.assertEqual(len(report.covered), 3)
+
+    def test_a_pixel_drawn_on_an_object_goes_to_the_sprite_that_shows_it_with_its_flip(self):
+        out = sp.export_sprites(self.g, self.g.view)
+        # the first pixel of the right half of the first object is the last pixel of the first row of the mirrored picture
+        wanted, _ = sp.read_sprites(self.g, self.g.view, edit(out['png'], {(16, 8): 5, (2, 2): 0}))
+        c = [(x * y) % 3 for y in range(8) for x in range(8)]
+        c[7] = 5
+        self.assertEqual(wanted, {'vram:64:' + FMT: c}, 'the gap between objects belongs to no picture')
+
+    def test_no_sprites_is_said_plainly(self):
+        self.g.sprites = lambda: []
+        with self.assertRaises(ValueError):
+            sp.export_sprites(self.g, self.g.view)
+
+
+class ChecksumFieldTests(unittest.TestCase):
+    def test_both_bytes_of_a_checksum_count_when_a_probe_moved_one(self):
+        from romancer import scene_graphics as sg
+        self.assertEqual(sg.whole_checksums({0x14F}, 'gb'), {0x14E, 0x14F})
+        self.assertEqual(sg.whole_checksums({0x14E}, 'gbc'), {0x14E, 0x14F})
+        self.assertEqual(sg.whole_checksums({0x7FFB}, 'sms'), {0x7FFA, 0x7FFB})
+        self.assertEqual(sg.whole_checksums({0x18F, 0x1A4}, 'genesis'), {0x18E, 0x18F, 0x1A4, 0x1A5})
+        self.assertEqual(sg.whole_checksums({0x7FDE}, 'snes'), {0x7FDC, 0x7FDD, 0x7FDE, 0x7FDF})
+        self.assertEqual(sg.whole_checksums(set(), 'nes'), set())
 
 
 if __name__ == '__main__':

@@ -1,43 +1,127 @@
-ROMancer v1.4.0
+ROMancer v1.3.9
 By RetchEWretched
 
 ROMancer is a local ROM editing, investigation and playtesting workbench.
 It supports NES, SNES, Genesis / Mega Drive, Master System, Game Boy and
 Game Boy Color cartridge formats. Everyday work runs offline.
 
-NEW IN v1.4.0
+NEW IN v1.3.9
 
-Level maps. Choose Levels, play to where a level starts, choose Record a
-level map and play through it. ROMancer keeps a scene every time the screen
-moves and puts them together into one map of the level that shows every
-background layer. Save map as PNG saves it.
-- Paint on the map. Pick a place (or drag over a block of places) as your
-  brush and paint it somewhere else. The brush snaps to the blocks the level
-  is built from. Show what changes replays the game, and the map then shows
-  every place that changes before you keep anything.
-- All layers or one. When a game draws a level on several background
-  layers, Show picks all layers together or one alone, and Paint on picks
-  whether a change is made on all layers or on one.
-- A block in one place. Most games build a level from blocks and keep a list
-  of which block goes where. When ROMancer finds that list (in the ROM, or by
-  following the level through the game's memory back to the ROM), a whole
-  block is changed in that list. It tries the places it found one after
-  another by replay and keeps the one that changes the least besides your
-  block. Measured on 42 well-known games
-  that were played automatically: a level map was put together on 39, and a
-  block was changed in the level's own list and confirmed by replay on 16:
-  Castlevania, Castlevania III, Metroid, Metroid II, Mega Man 3, Super Mario
-  Bros. 3, Contra, Ninja Gaiden, DuckTales, Kid Icarus, Ghosts'n Goblins,
-  Batman, Blaster Master, Adventure Island, Link's Awakening and Sonic The
-  Hedgehog (Master System). On 3 more the block itself was changed.
-  trace/COVERAGE.md has the result for every game.
-- When the list is not found, the block itself is changed, as a background
-  change always did: every place that uses the block changes, and the map
-  shows them.
-- Know the limits. A map shows what was played through; places no capture
-  showed are dark. A level packed in a form ROMancer does not know can be
-  viewed and its blocks repainted, but a block cannot be moved to one place.
-  Moving objects (enemies, items) are not part of a level map.
+The whole catalog measured again. Every one of the 942 catalog ROMs was
+put through the PNG measurement again with everything since v1.3.0 in
+place. The numbers in trace/COVERAGE.md are the new ones.
+- Saving works on 939 of 942 ROMs, as before, and every saved PNG reads
+  back unchanged. A background layer now saves on all 939 (930 before):
+  the 9 more are the Mode 7 layers.
+- A pictures PNG with up to six pictures drawn on had at least one
+  confirmed by replay on 897 ROMs (887 before) and every one on 769 (721
+  before): 4,729 of 5,315 pictures in all.
+- An edited background PNG was confirmed on 800 ROMs (785 before).
+- By system the gain is on the NES and the Super NES. A few games on the
+  Mega Drive, Super NES and Game Boy did slightly worse than in v1.3.0;
+  the tables in trace/COVERAGE.md show each system.
+- No behaviour changed since v1.3.8.
+
+NEW IN v1.3.8
+
+Faster Scenes & colors. Going back to a scene you already opened no longer
+waits: ROMancer keeps the worked-out pictures and layers of more scenes
+ready (it kept 3, which five or six recorded scenes overflowed). Saving
+PNGs is quicker too. Nothing about what is saved or checked has changed.
+- Measured on 7 games with 2 to 6 recorded scenes: opening every scene a
+  second time took up to 7.9 seconds before and now takes under a tenth of
+  a second.
+- Save all graphics (ZIP) took 0.2 to 5.2 seconds before and takes 0.1 to
+  0.7 seconds now.
+- Opening a scene for the first time takes as long as before, and so does
+  the replay that checks a change.
+
+NEW IN v1.3.7
+
+Sprites as whole objects. A character on screen is put together from
+several small sprites. Save sprites as PNG, under the pictures of a scene,
+saves every character and object on the screen as the game shows it, each
+one put together, with the scene's colors as the palette. Draw on it and
+load it with Load sprites PNG: each pixel goes back to the picture of the
+sprite that shows it, mirrored pieces included, and the change is checked
+by replay like any other.
+- Save all graphics (ZIP) includes the sprites PNG of every scene.
+- On 80 catalog games picked at random, 73 had sprites on a recorded
+  screen. All 73 saved and read back unchanged. A drawn-on object was
+  confirmed by replay on 61.
+
+NEW IN v1.3.6
+
+Mode 7 layers as a flat PNG. A Super NES Mode 7 layer is the floor the game
+tilts and turns: the track in a racing game, the map under an airship. Save
+background as PNG now saves it laid flat, 1024 by 1024 pixels, as the game
+stores it before it is drawn in perspective, with the scene's colors as
+the palette. It reads back unchanged.
+- On the 9 catalog games with a Mode 7 layer in a recorded scene, the layer
+  saved and read back unchanged on all 9.
+- Drawing on the pictures of a Mode 7 layer is confirmed where the game
+  keeps them stored plainly: 3 of the 9. The other 6 keep them packed in a
+  form ROMancer does not pack again yet, and say so when the PNG is loaded.
+
+NEW IN v1.3.5
+
+A background PNG can rearrange the background. Until now a loaded PNG could
+only redraw pictures. Copy the 8 by 8 square of one cell over another cell
+(move a window, repeat a tree, clear a sign) and load the PNG: where a
+square is exactly a picture the scene already has, turned any way the layer
+allows and in any of its palette lines, ROMancer gives that cell that
+picture. That is a background change, checked by replay like one painted
+in the Background editor, and it leaves the pictures themselves alone.
+- Squares you drew on are still read as pictures drawn on. If one PNG has
+  both, the cells come first: keep that change, then load the PNG again.
+- On the NES one palette choice covers a block of 2 by 2 cells, so a moved
+  picture keeps the colors of the place it was put, and the report says so.
+- A saved background PNG now shows background changes you have kept.
+- Layers with 16 by 16 cells are not rearranged this way yet.
+Measured on 80 catalog games across the six systems: one cell copied over
+another was read as a moved cell and confirmed by replay on 71.
+
+NEW IN v1.3.4
+
+One PNG, pictures stored in different ways. A PNG often changes some
+pictures that are written straight into the ROM and others that need the
+swap-in patch. On Game Boy, Game Boy Color and Master System games the two
+groups were refused as needing "the same place in the ROM" when the only
+byte they both touched was the other half of the header checksum, and half
+the pictures were left out. The checksum is now treated as one field on
+every system (two bytes; four on the Super NES). Of the 51 catalog games
+this stopped, 39 now confirm every picture drawn and 42 confirm more than
+before. The same fix applies to two kept changes in the change list.
+
+NEW IN v1.3.3
+
+Picture edits work on more NES games. These concern games that keep their
+pictures in the cartridge ROM, where the proof of an edit is that the
+replayed screen looks different.
+- The check looks further back. An edit to the picture data sometimes only
+  shows when the game is replayed from an earlier save point, or from
+  power-on. The check now steps back until the edit shows.
+- The bank the screen shows. Some games switch picture banks while the
+  screen is drawn. ROMancer now works out, from the recorded screen, which
+  bank each part of the pattern table was really drawn from, so the pictures
+  listed, the picture you edit and the bytes written agree with what you see.
+- A picture is marked as on screen only when the recorded screen shows it
+  (all systems).
+Of the 32 NES games in which no picture from an edited PNG was confirmed
+before, 13 now confirm every picture drawn. 19 still confirm none.
+
+NEW IN v1.3.2
+
+- Closing the window stops ROMancer. The local service used to keep running
+  after the window was closed. It now stops by itself about 45 seconds after
+  the last ROMancer window closes (a reload does not stop it), and after ten
+  minutes if a window was closed without being able to say so. A client that
+  only uses the local API and never opens a window is left running.
+- Save all graphics (ZIP). In Scenes & colors, one button saves the pictures
+  and every background layer of every recorded scene as PNG files in one
+  ZIP, with a list of what is in it. Each PNG is the same file Save pictures
+  as PNG or Save background as PNG gives for that scene, so any of them can
+  be drawn on and loaded back in its scene.
 
 NEW IN v1.3.0
 
@@ -155,9 +239,8 @@ that was. The draft shows whether the image fits. Save playable
 copy opens the new build in Playtest. Technical details shows the graphics,
 tile placement and checksum bytes.
 
-Levels opens the level maps of Scenes & colors (see NEW IN v1.4.0). The older
-level editor that needed a hand-made definition for each game stays switched
-off. Read-only layout research and measured locations remain available.
+Visual level editing is coming soon. The Levels entry is disabled in this
+release. Read-only layout research and measured locations remain available.
 Generic graphics tilemaps remain available as graphics resources.
 
 The built-in catalog recognizes all 942 supplied exact ROM revisions.
@@ -196,7 +279,7 @@ available. The supplied Pokemon Red and Blue revisions share a
 
 START ON WINDOWS
 
-1. Extract ROMancer-v1.4.0-Windows.zip in Windows File Explorer.
+1. Extract ROMancer-v1.3.9-Windows.zip in Windows File Explorer.
 2. Double-click ROMancer.exe in the extracted folder.
    Keep ROMancer.exe, ROM Catalog.html and the ROMancer Files folder together.
 3. Open an original workshop or choose New project and import your own cartridge image.
@@ -217,8 +300,8 @@ SHA-256 is checked and later captures work offline. No ROM data is uploaded.
 
 START ON LINUX
 
-1. Extract ROMancer-v1.4.0-Linux-x86_64.tar.gz:  tar xf ROMancer-v1.4.0-Linux-x86_64.tar.gz
-2. Run ./ROMancer-v1.4.0-Linux-x86_64/ROMancer.sh
+1. Extract ROMancer-v1.3.9-Linux-x86_64.tar.gz:  tar xf ROMancer-v1.3.9-Linux-x86_64.tar.gz
+2. Run ./ROMancer-v1.3.9-Linux-x86_64/ROMancer.sh
    (./ROMancer.sh --install-desktop adds ROMancer to your application menu).
 
 The Linux x86-64 package includes Python, Pillow and the same six engines built

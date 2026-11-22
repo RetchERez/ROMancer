@@ -49,6 +49,8 @@ from .trace_cores import SYSTEM_LABELS, TraceCoreMissing, TraceFrontend, core_op
 
 STEP_FRAMES = 300          # auto-explore looks at the screen this often
 MAX_SCENES = 160
+GRAPHICS_KEPT = 8          # scenes whose worked-out pictures and layers stay in memory
+VIEWS_KEPT = 24            # scenes whose list of pictures stays ready, so going back to one does not wait
 CHECKPOINT_EVERY = 60
 MEMORY_DOMAINS = ('wram', 'hram', 'ram', 'sram')   # traced, but not what the screen is drawn from
 _BUTTON_NAMES = sorted(BUTTON_IDS, key=BUTTON_IDS.get)
@@ -1415,7 +1417,7 @@ class EditSession(LevelTools):
                 found.update(range(0x1A4, 0x1A8))        # the header's "end of ROM" field follows the ROM's size
                 if found - set(range(0x1A4, 0x1A8)):
                     found.update((0x18E, 0x18F))         # both bytes of the checksum word, whichever the probes moved
-            self._checksum_bytes = found
+            self._checksum_bytes = sg.whole_checksums(found, self.system)
         return self._checksum_bytes
 
     def _avoid(self, key: str = '') -> list:
@@ -1432,7 +1434,7 @@ class EditSession(LevelTools):
         if found is None:
             meta = self.meta[scene_id]
             found = sg.SceneGraphics(self._scene(scene_id), self.system, self.rom, self.rgb[scene_id], meta['width'], meta['height'])
-            while len(self._graphics_cache) >= 3:
+            while len(self._graphics_cache) >= GRAPHICS_KEPT:
                 self._graphics_cache.pop(next(iter(self._graphics_cache)))
             self._graphics_cache[scene_id] = found
         return found
@@ -1459,10 +1461,11 @@ class EditSession(LevelTools):
         if tile.domain == 'chr_rom':
             first = tile.sources[0]['offset']
             return {sid for sid in self.scenes if first in self._chr_tiles(sid)}
-        users = set()
+        users, by_offset = set(), self.impact._by_offset
         for source in tile.sources:
             if source:
-                users.update(self.impact.users(source['offset'], source['offset'] + 1))
+                for scene_id, _ in by_offset.get(source['offset'], ()):
+                    users.add(scene_id)
         return users
 
     def graphics_view(self, scene_id: str) -> dict:
@@ -1473,7 +1476,7 @@ class EditSession(LevelTools):
             base = self._views.get(key)
             if base is None:
                 base = graphics.view(lambda tile: len(self._tile_users(tile)), {}, {})
-                if len(self._views) >= 3:
+                if len(self._views) >= VIEWS_KEPT:
                     self._views.pop(next(iter(self._views)))
                 self._views[key] = base
             pending, cells = {}, {}
@@ -1587,8 +1590,11 @@ class EditSession(LevelTools):
             elif what == 'layer':
                 out = sp.export_layer(graphics, view, int(layer))
                 name = 'background-' + ''.join(ch if ch.isalnum() else '-' for ch in out['layer']).strip('-').lower()
+            elif what == 'sprites':
+                out = sp.export_sprites(graphics, view)
+                name = 'sprites'
             else:
-                raise ValueError('Choose the pictures or a background layer to save.')
+                raise ValueError('Choose the pictures, the sprites or a background layer to save.')
             number = list(self.scenes).index(scene_id) + 1
             return {**out, 'what': what, 'name': f'scene-{number}-{name}.png'}
 
@@ -1621,6 +1627,13 @@ class EditSession(LevelTools):
                     files += 1
                     listing.append(f'{folder}: {self._label(scene_id)}')
                     listing.append(f'  {sheet["name"]}  {sheet["width"]} by {sheet["height"]} pixels, {sheet["pictures"]} pictures')
+                    try:
+                        whole = self.export_picture(scene_id, 'sprites')
+                        archive.writestr(f'{folder}/{whole["name"]}', whole['png'])
+                        files += 1
+                        listing.append(f'  {whole["name"]}  {whole["width"]} by {whole["height"]} pixels, {whole["objects"]} objects made of sprites')
+                    except ValueError:
+                        pass                                  # no sprites on that screen
                     for layer in self.graphics_view(scene_id)['layers']:
                         try:
                             picture = self.export_picture(scene_id, 'layer', layer['index'])
@@ -1655,12 +1668,54 @@ class EditSession(LevelTools):
             self._require_core()
             graphics = self._graphics(scene_id)
             view = self.graphics_view(scene_id)
+            moves = []
             if what == 'sheet':
                 wanted, report = sp.read_sheet(graphics, view, raw)
             elif what == 'layer':
-                wanted, report = sp.read_layer(graphics, view, int(layer), raw)
+                wanted, report, moves = sp.read_layer(graphics, view, int(layer), raw)
+            elif what == 'sprites':
+                wanted, report = sp.read_sprites(graphics, view, raw)
             else:
-                raise ValueError('Choose the pictures or a background layer to read in.')
+                raise ValueError('Choose the pictures, the sprites or a background layer to read in.')
+            refused = []
+            if moves:                # a picture the layer cannot show in that cell is not a move: it is left out, with the reason
+                layers = graphics.layers()
+                able = []
+                for move in moves:
+                    current = layers[move['layer']].layer.cell(move['x'], move['y'])
+                    try:
+                        sg.hardware_tile(layers[move['layer']], current, *sg.parse_tile_id(move['tile']))
+                        if current.status == 'unknown':
+                            raise ValueError(sg.CELL_REASONS['unknown'])
+                        able.append(move)
+                    except ValueError as error:
+                        refused.append({'tile': move['tile'], 'name': f"Cell {move['x'] + 1}, {move['y'] + 1}", 'reason': str(error)})
+                moves = able
+            if refused and not moves and not wanted:
+                return {'what': what, 'summary': 'PNG read. ' + refused[0]['reason'], 'colors': [], 'off_colors': 0,
+                        'by_number': bool(report.by_number), 'skipped': refused, 'pictures': 0, 'change': None}
+            if moves:
+                # Cells that were given another picture of the scene: a background change, checked by replay like one
+                # painted in the Background editor. Pictures that were also drawn on are read in after this is kept.
+                if len(moves) > 2048:
+                    raise ValueError(f'This PNG gives {len(moves):,} cells another picture. ROMancer checks up to 2,048 at a '
+                                     'time. Rearrange a smaller part, keep it, then load the rest.')
+                count = len(moves)
+                text = (f'PNG read: {count:,} cell{"s" if count != 1 else ""} of the background now show{"" if count != 1 else "s"} '
+                        'another picture that this scene already has, so the background is changed and no picture is redrawn.')
+                if report.recolored:
+                    text += (f' {report.recolored:,} of them keep{"s" if report.recolored == 1 else ""} the colors of the place '
+                             'they were put: on the NES one palette choice covers a block of 2 by 2 cells.')
+                if wanted:
+                    text += (f' {len(wanted):,} picture{"s were" if len(wanted) != 1 else " was"} also drawn on: keep this change, '
+                             'then load the same PNG again to change ' + ('them.' if len(wanted) != 1 else 'it.'))
+                info = {'what': what, 'summary': text, 'colors': [], 'off_colors': 0, 'by_number': bool(report.by_number),
+                        'skipped': refused, 'moved': count, 'redrawn': len(wanted)}
+                change = self.propose_cells(scene_id, moves)
+                if self.preview is not None and self.preview['id'] == change['id']:
+                    self.preview['title'] = f'{count:,} background cell{"s" if count != 1 else ""} from a PNG'
+                    change = self._change_view(self.preview)
+                return {**info, 'pictures': 0, 'change': change}
             key = 'import:' + scene_id
             earlier = next((c for c in self.changes if c['key'] == key), None)
             if earlier is not None:                  # pictures of the earlier PNG that this one does not show stay as they are
