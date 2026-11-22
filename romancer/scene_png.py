@@ -123,8 +123,6 @@ def layer_cells(graphics, number: int):
         raise ValueError('That background layer is not part of this scene.')
     view = layers[number]
     layer = view.layer
-    if layer.tile_format == 'snes-mode7':
-        raise ValueError('This layer is drawn in perspective (Mode 7), so it has no flat picture to save. Use the sheet instead.')
     if layer.width * view.px > MAX_SIDE or layer.height * view.px > MAX_SIDE:
         raise ValueError('This background layer is too large to save as one picture. Use the sheet instead.')
     quads = view.px // 8

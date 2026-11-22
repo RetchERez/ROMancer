@@ -1,9 +1,22 @@
-ROMancer v1.3.5
+ROMancer v1.3.6
 By RetchEWretched
 
 ROMancer is a local ROM editing, investigation and playtesting workbench.
 It supports NES, SNES, Genesis / Mega Drive, Master System, Game Boy and
 Game Boy Color cartridge formats. Everyday work runs offline.
+
+NEW IN v1.3.6
+
+Mode 7 layers as a flat PNG. A Super NES Mode 7 layer is the floor the game
+tilts and turns: the track in a racing game, the map under an airship. Save
+background as PNG now saves it laid flat, 1024 by 1024 pixels, as the game
+stores it before it is drawn in perspective, with the scene's colors as
+the palette. It reads back unchanged.
+- On the 9 catalog games with a Mode 7 layer in a recorded scene, the layer
+  saved and read back unchanged on all 9.
+- Drawing on the pictures of a Mode 7 layer is confirmed where the game
+  keeps them stored plainly: 3 of the 9. The other 6 keep them packed in a
+  form ROMancer does not pack again yet, and say so when the PNG is loaded.
 
 NEW IN v1.3.5
 
@@ -221,7 +234,7 @@ available. The supplied Pokemon Red and Blue revisions share a
 
 START ON WINDOWS
 
-1. Extract ROMancer-v1.3.5-Windows.zip in Windows File Explorer.
+1. Extract ROMancer-v1.3.6-Windows.zip in Windows File Explorer.
 2. Double-click ROMancer.exe in the extracted folder.
    Keep ROMancer.exe, ROM Catalog.html and the ROMancer Files folder together.
 3. Open an original workshop or choose New project and import your own cartridge image.
@@ -242,8 +255,8 @@ SHA-256 is checked and later captures work offline. No ROM data is uploaded.
 
 START ON LINUX
 
-1. Extract ROMancer-v1.3.5-Linux-x86_64.tar.gz:  tar xf ROMancer-v1.3.5-Linux-x86_64.tar.gz
-2. Run ./ROMancer-v1.3.5-Linux-x86_64/ROMancer.sh
+1. Extract ROMancer-v1.3.6-Linux-x86_64.tar.gz:  tar xf ROMancer-v1.3.6-Linux-x86_64.tar.gz
+2. Run ./ROMancer-v1.3.6-Linux-x86_64/ROMancer.sh
    (./ROMancer.sh --install-desktop adds ROMancer to your application menu).
 
 The Linux x86-64 package includes Python, Pillow and the same six engines built
