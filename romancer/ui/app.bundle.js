@@ -11265,6 +11265,10 @@ ${state2.artifact.system_id ? `<details><summary>Advanced byte options</summary>
         if (!current2(ctx2, ed)) return;
         ed.pngBusy = "";
         ed.pngReport = result;
+        if (result.change && result.change.kind === "background" && ed.mode !== "background") {
+          ed.mode = "background";
+          ed.painted = /* @__PURE__ */ new Map();
+        }
         if (result.change) {
           ed.proposal = result.change;
           ed.inspect = null;

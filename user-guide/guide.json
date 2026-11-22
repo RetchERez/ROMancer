@@ -1,6 +1,6 @@
 {
   "schema_version": 1,
-  "product": "ROMancer v1.3.4",
+  "product": "ROMancer v1.3.5",
   "subtitle": "A practical guide to the current editing tools: small first edits, advanced workflows, actual editing and appearance examples, a glossary and an alphabetical index.",
   "scope": "This guide covers the six supported cartridge systems. The offline catalog identifies 942 exact revisions. Recognized ROM formats can be inspected and edited as bytes without a catalog match. Game-specific editors use checked definitions.",
   "basic_summary": "Start the application, choose saved preferences, identify a source, make a focused edit, preserve progress and export a checked patch. These procedures build the habits used throughout the guide.",
@@ -962,6 +962,7 @@
         "Open <b>Scenes &amp; colors</b>, choose a scene and choose <b>Graphics</b> above it. Click a picture in the scene, or choose it from the list.",
         "Redraw the picture pixel by pixel with the colors of its palette. You can also save it as an 8 by 8 PNG, edit it in any drawing program and load it back.",
         "To change many pictures at once, use <b>Save pictures as PNG</b> under the pictures of the scene. It saves every picture as one PNG with the scene's colors as its palette. <b>Save background as PNG</b> saves a background layer the way the game lays it out. Draw on the PNG, keep its size, and load it back with <b>Load pictures PNG</b> or <b>Load background PNG</b>. ROMancer lists any color that is not in a picture's palette line, replays the game to check, and offers the pictures you changed as one change.",
+        "A background PNG can also rearrange the background. Copy the 8 by 8 square of one cell over another cell and load the PNG: ROMancer reads that as the cell being given that picture, and no picture is redrawn.",
         "<b>Save all graphics (ZIP)</b>, above the scenes, saves the pictures and background layers of every recorded scene in one file, with a list of what is in it.",
         "To change the background instead, choose <b>Background</b>. Choose the picture to paint with, then paint it into the cells of the layer.",
         "Choose <b>Show what changes</b> and read the <b>Also changes</b> strip, then <b>Keep this change</b>. <b>Review and save</b> writes a separate build, as it does for colors."

@@ -70,6 +70,7 @@ APPROVED_FILES = frozenset({
     'trace/graphics_sweep.py',
     'trace/palette_state_check.py',
     'trace/png_roundtrip.py',
+    'trace/png_move.py',
     'trace/png_sweep.py',
     'trace/patch_blastem.py',
     'trace/patch_bsnes.py',

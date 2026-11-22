@@ -567,6 +567,7 @@ function mountGraphics(ctx,ed){
    const result=await call(ctx,ed,'import_picture',{scene_id:ed.sceneId,what,layer,png_base64:btoa(text)});
    if(!current(ctx,ed))return;
    ed.pngBusy='';ed.pngReport=result;
+   if(result.change&&result.change.kind==='background'&&ed.mode!=='background'){ed.mode='background';ed.painted=new Map();}       // cells were rearranged: the Background editor shows and keeps it
    if(result.change){ed.proposal=result.change;ed.inspect=null;ed.summary.preview=result.change;ed.showOriginal=false;update(ctx,ed,['scene-stage','scene-picker','scene-palette','scene-changes']);watchProposal(ctx,ed);}
    else update(ctx,ed,['scene-palette']);
   }catch(error){ed.pngBusy='';ed.pngReport={summary:error.message,off_colors:1};if(current(ctx,ed))update(ctx,ed,['scene-palette']);}

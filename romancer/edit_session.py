@@ -1588,12 +1588,52 @@ class EditSession:
             self._require_core()
             graphics = self._graphics(scene_id)
             view = self.graphics_view(scene_id)
+            moves = []
             if what == 'sheet':
                 wanted, report = sp.read_sheet(graphics, view, raw)
             elif what == 'layer':
-                wanted, report = sp.read_layer(graphics, view, int(layer), raw)
+                wanted, report, moves = sp.read_layer(graphics, view, int(layer), raw)
             else:
                 raise ValueError('Choose the pictures or a background layer to read in.')
+            refused = []
+            if moves:                # a picture the layer cannot show in that cell is not a move: it is left out, with the reason
+                layers = graphics.layers()
+                able = []
+                for move in moves:
+                    current = layers[move['layer']].layer.cell(move['x'], move['y'])
+                    try:
+                        sg.hardware_tile(layers[move['layer']], current, *sg.parse_tile_id(move['tile']))
+                        if current.status == 'unknown':
+                            raise ValueError(sg.CELL_REASONS['unknown'])
+                        able.append(move)
+                    except ValueError as error:
+                        refused.append({'tile': move['tile'], 'name': f"Cell {move['x'] + 1}, {move['y'] + 1}", 'reason': str(error)})
+                moves = able
+            if refused and not moves and not wanted:
+                return {'what': what, 'summary': 'PNG read. ' + refused[0]['reason'], 'colors': [], 'off_colors': 0,
+                        'by_number': bool(report.by_number), 'skipped': refused, 'pictures': 0, 'change': None}
+            if moves:
+                # Cells that were given another picture of the scene: a background change, checked by replay like one
+                # painted in the Background editor. Pictures that were also drawn on are read in after this is kept.
+                if len(moves) > 2048:
+                    raise ValueError(f'This PNG gives {len(moves):,} cells another picture. ROMancer checks up to 2,048 at a '
+                                     'time. Rearrange a smaller part, keep it, then load the rest.')
+                count = len(moves)
+                text = (f'PNG read: {count:,} cell{"s" if count != 1 else ""} of the background now show{"" if count != 1 else "s"} '
+                        'another picture that this scene already has, so the background is changed and no picture is redrawn.')
+                if report.recolored:
+                    text += (f' {report.recolored:,} of them keep{"s" if report.recolored == 1 else ""} the colors of the place '
+                             'they were put: on the NES one palette choice covers a block of 2 by 2 cells.')
+                if wanted:
+                    text += (f' {len(wanted):,} picture{"s were" if len(wanted) != 1 else " was"} also drawn on: keep this change, '
+                             'then load the same PNG again to change ' + ('them.' if len(wanted) != 1 else 'it.'))
+                info = {'what': what, 'summary': text, 'colors': [], 'off_colors': 0, 'by_number': bool(report.by_number),
+                        'skipped': refused, 'moved': count, 'redrawn': len(wanted)}
+                change = self.propose_cells(scene_id, moves)
+                if self.preview is not None and self.preview['id'] == change['id']:
+                    self.preview['title'] = f'{count:,} background cell{"s" if count != 1 else ""} from a PNG'
+                    change = self._change_view(self.preview)
+                return {**info, 'pictures': 0, 'change': change}
             key = 'import:' + scene_id
             earlier = next((c for c in self.changes if c['key'] == key), None)
             if earlier is not None:                  # pictures of the earlier PNG that this one does not show stay as they are

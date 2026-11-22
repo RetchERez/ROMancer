@@ -138,6 +138,33 @@ def layer_cells(graphics, number: int):
     return view, places
 
 
+def _cells_now(view: dict, layer_view, number: int) -> dict:
+    """{(cell x, cell y): (tile address, hflip, vflip, palette line)} with the background changes that are kept or shown.
+
+    A cell painted in the Background editor, or moved by an earlier PNG, is
+    part of what the scene looks like now, so a saved PNG shows it and a
+    loaded PNG is compared with it.
+    """
+    layer = layer_view.layer
+    now = {(cell.x, cell.y): (cell.tile_address, cell.hflip, cell.vflip, cell.palette) for cell in layer.cells}
+    row = next((entry for entry in view['layers'] if entry['index'] == number), None)
+    for item in (row or {}).get('pending', ()):
+        at = (int(item['x']), int(item['y']))
+        if at not in now:
+            continue
+        address, hflip, vflip, line = now[at]
+        if item.get('tile') is not None:
+            address = sg.parse_tile_id(item['tile'])[1]
+        if item.get('hflip') is not None:
+            hflip = bool(item['hflip'])
+        if item.get('vflip') is not None:
+            vflip = bool(item['vflip'])
+        if item.get('line') is not None:
+            line = int(item['line'])
+        now[at] = (address, hflip, vflip, line)
+    return now
+
+
 def _layer_tiles(view: dict, layer_view) -> dict:
     layer = layer_view.layer
     return {tile['address']: tile for tile in view['tiles']
@@ -150,6 +177,15 @@ def _place(k: int, cell) -> tuple:
     return (7 - x if cell.hflip else x), (7 - y if cell.vflip else y)
 
 
+def _turned(pixels, hflip: bool, vflip: bool) -> tuple:
+    """A picture as it lands on the layer: the 64 values in screen order, with these flips."""
+    out = [0] * 64
+    for k, value in enumerate(pixels):
+        x, y = k % 8, k // 8
+        out[(7 - y if vflip else y) * 8 + (7 - x if hflip else x)] = value
+    return tuple(out)
+
+
 def export_layer(graphics, view: dict, number: int) -> dict:
     layer_view, places = layer_cells(graphics, number)
     layer = layer_view.layer
@@ -158,7 +194,11 @@ def export_layer(graphics, view: dict, number: int) -> dict:
     known = _layer_tiles(view, layer_view)
     bits = gt.TILE_FORMATS[layer.tile_format][0]
     cache = {}
+    now = _cells_now(view, layer_view, number) if layer_view.px == 8 else {}
     for cx, cy, qx, qy, address, cell in places:
+        if now:
+            address, hflip, vflip, line = now[(cx, cy)]
+            cell = _Cell(hflip, vflip, line)
         pixels = cache.get(address)
         if pixels is None:
             tile = known.get(address)
@@ -213,7 +253,17 @@ class Imported:
         return (self.slots[k] if self.slots is not None else None), tuple(self.rgb[k]), self.clear[k]
 
 
+class _Cell:
+    """A cell as it is now: how its picture is turned and which palette line it uses."""
+
+    def __init__(self, hflip: bool, vflip: bool, palette: int):
+        self.hflip, self.vflip, self.palette = hflip, vflip, palette
+
+
 class Report:
+    moved = 0               # cells that now show another picture that the scene already has
+    recolored = 0           # of those, cells that keep the palette of where they were put (NES)
+
     def __init__(self):
         self.off = {}           # (from rgb, to rgb) -> pixels
         self.clear = 0
@@ -269,7 +319,43 @@ def read_sheet(graphics, view: dict, raw: bytes) -> tuple:
     return wanted, report
 
 
+def _exact(image, left: int, top: int, rule, line: int, bits: int, colors: list):
+    """The 64 values, in screen order, of an 8x8 square of the PNG if every pixel is a color of this palette line; else None."""
+    count = min(1 << bits, rule[2] or (1 << bits))
+    first = _slot(rule, line, 0)
+    table = None
+    out = []
+    for y in range(8):
+        for x in range(8):
+            slot, rgb, clear = image.at(left + x, top + y)
+            if clear:
+                return None
+            if slot is not None:
+                if not first <= slot < first + count:
+                    return None
+                out.append(slot - first)
+                continue
+            if table is None:
+                table = {}
+                for value in range(count):
+                    table.setdefault(_rgb(colors, first + value, value, bits), value)
+            value = table.get(rgb)
+            if value is None:
+                return None
+            out.append(value)
+    return tuple(out)
+
+
 def read_layer(graphics, view: dict, number: int, raw: bytes) -> tuple:
+    """({tile id: new pixels} for pictures drawn differently, Report, [cell changes] for cells that show another picture).
+
+    A cell of the PNG that no longer matches the scene is one of two things.
+    If its 8x8 square is exactly a picture the scene already has (turned any
+    way the layer allows, in any of its palette lines), the cell was given
+    that picture: a background change, which leaves the pictures alone. That
+    is how a PNG moves, copies or rearranges parts of a background. Any
+    other difference is a picture that was drawn on, as before.
+    """
     layer_view, places = layer_cells(graphics, number)
     layer = layer_view.layer
     colors = _palette(graphics)
@@ -277,8 +363,18 @@ def read_layer(graphics, view: dict, number: int, raw: bytes) -> tuple:
     report = Report()
     known = _layer_tiles(view, layer_view)
     bits = gt.TILE_FORMATS[layer.tile_format][0]
-    votes, shown = {}, {}
+    row = next((entry for entry in view['layers'] if entry['index'] == number), {})
+    plain = layer_view.px == 8
+    now_cells = _cells_now(view, layer_view, number) if plain else {}
+    flips = [(False, False)] + ([(True, False), (False, True), (True, True)] if row.get('flips') else [])
+    nes = graphics.system == 'nes'          # there one palette choice covers 2 by 2 cells: a cell cannot take its own
+    lines = range(4 if nes else int(row.get('lines') or 1))
+    looks = None            # {64 values in screen order: (tile address, hflip, vflip)} for every picture of the layer
+    votes, shown, moves = {}, {}, []
     for cx, cy, qx, qy, address, cell in places:
+        if plain:
+            address, hflip, vflip, line = now_cells[(cx, cy)]
+            cell = _Cell(hflip, vflip, line)
         tile = known.get(address)
         if tile is None:
             continue
@@ -286,6 +382,39 @@ def read_layer(graphics, view: dict, number: int, raw: bytes) -> tuple:
         if now is None:
             now = shown[tile['id']] = _current(tile)
         left, top = cx * layer_view.px + qx * 8, cy * layer_view.px + qy * 8
+        if plain:
+            # exactly the same square as the scene shows now: nothing to do, and nothing to report
+            if _exact(image, left, top, layer_view.rule, cell.palette, bits, colors) == _turned(now, cell.hflip, cell.vflip):
+                continue
+            if looks is None:
+                looks = {}
+                for other in known.values():
+                    pixels = _current(other)
+                    for hflip, vflip in flips:
+                        looks.setdefault(_turned(pixels, hflip, vflip), (other['address'], hflip, vflip))
+            found = None
+            for line in [cell.palette] + [k for k in lines if k != cell.palette]:
+                square = _exact(image, left, top, layer_view.rule, line, bits, colors)
+                hit = looks.get(square) if square is not None else None
+                if hit is not None and (hit[0], hit[1], hit[2], line) != (address, cell.hflip, cell.vflip, cell.palette):
+                    found = (hit, line)
+                    break
+            if found is not None:
+                (other, hflip, vflip), line = found
+                move = {'layer': number, 'x': cx, 'y': cy, 'tile': sg.tile_id(layer.tile_domain, other, layer.tile_format)}
+                if row.get('flips'):
+                    move.update(hflip=hflip, vflip=vflip)
+                if line != cell.palette:
+                    if nes:
+                        if other == address:
+                            found = None            # only its colors differ, and the cell cannot be given other colors
+                        else:
+                            report.recolored += 1   # the picture goes there; it keeps the colors of the place it was put
+                    else:
+                        move['line'] = line
+                if found is not None:
+                    moves.append(move)
+                    continue
         new = [0] * 64
         for k in range(64):
             x, y = _place(k, cell)
@@ -307,7 +436,8 @@ def read_layer(graphics, view: dict, number: int, raw: bytes) -> tuple:
             wanted[ident] = final
     report.by_number = image.by_number
     report.covered = set(shown)
-    return wanted, report
+    report.moved = len(moves)
+    return wanted, report, moves
 
 
 def summary(report: Report, wanted: int, skipped: list) -> str:
