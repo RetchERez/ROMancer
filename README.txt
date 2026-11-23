@@ -239,9 +239,10 @@ that was. The draft shows whether the image fits. Save playable
 copy opens the new build in Playtest. Technical details shows the graphics,
 tile placement and checksum bytes.
 
-Visual level editing is coming soon. The Levels entry is disabled in this
-release. Read-only layout research and measured locations remain available.
-Generic graphics tilemaps remain available as graphics resources.
+Levels opens the level maps in Scenes & colors: record a level while you
+play, then paint whole blocks on its map. Read-only layout research and
+measured locations remain available. Generic graphics tilemaps remain
+available as graphics resources.
 
 The built-in catalog recognizes all 942 supplied exact ROM revisions.
 See knowledge/ROM-CATALOG.md for the full list. The portable Windows ZIP
