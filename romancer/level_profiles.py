@@ -164,6 +164,197 @@ class Castlevania:
                 writes.append((row['byte'], old, (old & ~0x06 & 0xFF) | int(trigger) << 1))
         return [w for w in writes if w[1] != w[2]]
 
+    # ---- level length (layout bank 4; tables bank 7)
+    # A stage floor is (pages + 1) screens of 256 pixels. Layout: master table $FAFF -> floor list (bank 4) -> pointer
+    # (data - $18); 6 blocks of 32 pixels per column, 8 columns per screen. Scroll limit: $FB8C (high nibble floor 0, low
+    # nibble floor 1). Zones: (pages + 1) * 4 + 2 entries. Things placed by world x that move with their screen: hidden
+    # treasure, breakable blocks, stairs ($FBC8), the boss lock ($FC3A), the left limit ($FB9F) and the courtyard gate ($CF5B).
+    BANK4 = 0x10000
+    MAX_PAGES = 5           # the longest stage the game has: candle states ($0190 per zone) must stay below the stack
+    ZONES_START, ZONES_END = 0xD2CD, 0xD6A1
+
+    def _b4(self, address: int) -> int:
+        return self.rom[HEADER_NES + self.BANK4 + (address - 0x8000)]
+
+    def _offset4(self, address: int) -> int:
+        return HEADER_NES + self.BANK4 + (address - 0x8000)
+
+    def pages(self, stage: int, floor: int) -> int:
+        limit = self._at(0xFB8C + stage)
+        return limit >> 4 if floor == 0 else limit & 15
+
+    def layout_word(self, stage: int, floor: int) -> int:
+        """CPU address (bank 4) of the floor's layout pointer."""
+        return self._word(0xFAFF + stage * 2) + floor * 2
+
+    def layout(self, stage: int, floor: int) -> int:
+        word = self.layout_word(stage, floor)
+        return (self._b4(word) | self._b4(word + 1) << 8) + 0x18
+
+    def zone_word(self, stage: int, floor: int) -> int:
+        return self._word(0xD26B + stage * 2) + floor * 2
+
+    def _zone_tables(self) -> dict:
+        """{table address: its bytes} for every zone table, each running to the next one."""
+        need = {}
+        for st in range(19):
+            for fl in (0, 1):
+                start = self.zone_table(st, fl)
+                need[start] = max(need.get(start, 0), ((self.pages(st, fl) + 1) * 4 + 2) * 2)
+        starts = sorted(need)
+        ends = starts[1:] + [self.ZONES_END]
+        # a table is what the game can read of it: to the next table, or further where a long stage reads on into the next
+        return {start: bytes(self._at(start + i) for i in range(max(end - start, need[start])))
+                for start, end in zip(starts, ends)}
+
+    def screen_items(self, stage: int, floor: int) -> list:
+        """[(offset of the byte that holds the page, low bits mask, current x, what)] for things placed by world x."""
+        items = []
+        for row in self.treasures(stage, floor):
+            items.append((row['byte'] + 1, row['x'] - self.ZONE - 1, 'hidden treasure'))
+        for row in self.blocks(stage, floor):
+            items.append((row['byte'] + 1, row['x'] - self.ZONE - 1 - 8, 'breakable block'))
+        address = self._word(0xFBC8 + stage * 2)
+        for number in range(32):                    # stairs: 2 bytes, 0 ends the list; page is the low 3 bits of byte 1
+            first = self._b6(address) if address < 0xC000 else self._at(address)
+            if first == 0:
+                break
+            if (first >> 2) & 1 == floor:
+                where = address + 1
+                value = self._b6(where) if where < 0xC000 else self._at(where)
+                offset = self._offset6(where) if where < 0xC000 else self.offset(where)
+                items.append((offset, (value & 7) << 8 | (value & 0xF8), 'stairs'))
+            address += 2
+        return items
+
+    def resize_writes(self, stage: int, floor: int, at: int, delta: int) -> dict:
+        """Writes that remove `-delta` screens starting at screen `at`, or repeat screen `at` `delta` more times right after
+        it, with everything placed in later screens moved along. Returns {'writes': [(offset, old, new)], 'pages': new pages,
+        'notes': [...]}."""
+        stage, floor, at, delta = int(stage), int(floor), int(at), int(delta)
+        pages = self.pages(stage, floor)
+        new_pages = pages + delta
+        if not 0 <= at <= pages:
+            raise ValueError('That screen is not part of this stage.')
+        if delta == 0:
+            raise ValueError('Choose how many screens to add or remove.')
+        if delta < 0 and (at - delta > pages or at == 0):
+            raise ValueError('The first and the last screen hold the way in and the way out, so they stay. Choose a screen in between.')
+        if not 0 <= new_pages <= self.MAX_PAGES:
+            raise ValueError(f'A stage can be 1 to {self.MAX_PAGES + 1} screens long here (the longest the game has).')
+        writes, notes = {}, []
+
+        def put(offset, value):
+            writes[offset] = value & 0xFF
+
+        # which screens move: removing [at, at - delta) moves later screens left; repeating `at` moves later ones right
+        boundary = (at - delta if delta < 0 else at + 1) * 256
+        removed = range(at * 256, (at - delta) * 256) if delta < 0 else range(0)
+        for offset, x, what in self.screen_items(stage, floor):
+            if x in removed:
+                if what == 'stairs':
+                    raise ValueError('That screen has stairs the level needs, so it cannot be removed. Choose another screen.')
+                put(offset, (self.rom[offset] & 0xF8) | 7)          # out of reach: past the end of any stage
+                notes.append(f'The {what} on a removed screen can no longer be reached.')
+            elif x >= boundary:
+                page = ((self.rom[offset] & 7) + delta)
+                if not 0 <= page <= 7:
+                    raise ValueError('Something in this stage would move past where the game can place it.')
+                put(offset, (self.rom[offset] & 0xF8) | page)
+
+        def shift_page(offset, low_nibble_page):            # a page number in a nibble, moved if it is past the boundary
+            value = self.rom[offset]
+            page = value & 15 if low_nibble_page else value >> 4
+            if page != 15 and page * 256 >= boundary:
+                page += delta
+                put(offset, (value & 0xF0 | page) if low_nibble_page else (page << 4 | value & 15))
+        lock = self._at(0xFC3A + stage)
+        if lock != 0xFF and lock >> 4 == floor:
+            shift_page(self.offset(0xFC3A + stage), True)
+        left = self._at(0xFB9F + stage)
+        if left != 0xFF:
+            shift_page(self.offset(0xFB9F + stage), floor != 0)
+        gates = {0: 0xCF5B, 0x10: 0xCF5E}
+        if stage in gates and floor == 0:
+            page_at = self.offset(gates[stage] + 2)
+            if self.rom[page_at] * 256 + self.rom[page_at - 1] >= boundary:
+                put(page_at, self.rom[page_at] + delta)
+
+        # scroll limit
+        limit = self.offset(0xFB8C + stage)
+        value = self.rom[limit]
+        put(limit, (new_pages << 4 | value & 15) if floor == 0 else (value & 0xF0 | new_pages))
+
+        # layout: columns of 6 bytes, 8 columns a screen
+        data = self.layout(stage, floor)
+        columns = [bytes(self._b4(data + 6 * c + r) for r in range(6)) for c in range((pages + 1) * 8)]
+        if delta < 0:
+            new = columns[:at * 8] + columns[(at - delta) * 8:]
+            new += columns[-8:] * (-delta)                   # what the game reads past the end stays a copy of the last screen
+            for i, byte in enumerate(b''.join(new)):
+                put(self._offset4(data) + i, byte)
+        else:
+            new = columns[:(at + 1) * 8] + columns[at * 8:(at + 1) * 8] * delta + columns[(at + 1) * 8:]
+            before = bytes(self._b4(data - 0x18 + i) for i in range(0x18))
+            after = bytes(self._b4(data + len(columns) * 6 + i) for i in range(48))
+            block = before + b''.join(new) + after
+            start = self._free4(len(block))
+            for i, byte in enumerate(block):
+                put(self._offset4(start) + i, byte)
+            word = self._offset4(self.layout_word(stage, floor))
+            put(word, start & 0xFF)
+            put(word + 1, start >> 8)
+
+        # zones: 4 a screen, then 2 read ahead of the end
+        table = self.zone_table(stage, floor)
+        count = (pages + 1) * 4 + 2
+        zones = [bytes(self._at(table + 2 * i + k) for k in range(2)) for i in range(count)]
+        if delta < 0:
+            new_zones = zones[:at * 4] + zones[(at - delta) * 4:]
+            new_zones += [b'\0\0'] * (count - len(new_zones))
+            for i, pair in enumerate(new_zones):
+                put(self.offset(table) + 2 * i, pair[0])
+                put(self.offset(table) + 2 * i + 1, pair[1])
+        else:
+            new_zones = zones[:(at + 1) * 4] + zones[at * 4:(at + 1) * 4] * delta + zones[(at + 1) * 4:]
+            self._repack_zones(table, b''.join(new_zones), put)
+        out = [(offset, self.rom[offset], value) for offset, value in sorted(writes.items()) if self.rom[offset] != value]
+        return {'writes': out, 'pages': new_pages, 'notes': notes}
+
+    def _free4(self, size: int) -> int:
+        """Start of the unused space at the end of bank 4 ($B408 onward, all $FF) that fits `size` bytes."""
+        start = 0xB408
+        if any(self._b4(start + i) != 0xFF for i in range(size)) or start + size > 0xC000:
+            raise ValueError('There is no room left in the game for a longer layout.')
+        return start
+
+    def _repack_zones(self, table: int, grown: bytes, put) -> None:
+        """Lay every zone table out again in the same space, sharing bytes where tables overlap, so a grown table fits.
+        Every other table keeps exactly its bytes; only the pointers to them change."""
+        tables = self._zone_tables()
+        tables[table] = grown
+        order = sorted(tables, key=lambda start: -len(tables[start]))
+        blob = b''
+        where = {}
+        for start in order:
+            body = tables[start]
+            found = next((i for i in range(0, len(blob) - len(body) + 1, 2) if blob[i:i + len(body)] == body), None)
+            if found is None:
+                overlap = next((k for k in range(min(len(blob), len(body)) // 2 * 2, 0, -2) if blob[-k:] == body[:k]), 0)
+                found = len(blob) - overlap
+                blob += body[overlap:]
+            where[start] = found
+        if len(blob) > self.ZONES_END - self.ZONES_START:
+            raise ValueError('There is not enough room in the game for that many more screens.')
+        for i, byte in enumerate(blob):
+            put(self.offset(self.ZONES_START + i), byte)
+        for stage in range(19):
+            for floor in (0, 1):
+                word = self.zone_word(stage, floor)
+                new = self.ZONES_START + where[self.zone_table(stage, floor)]
+                put(self.offset(word), new & 0xFF)
+                put(self.offset(word + 1), new >> 8)
+
     def drop_name(self, drop: int) -> str:
         low = drop & 0x0F
         return self.DROPS.get(low, f'Item {low:#04x}')

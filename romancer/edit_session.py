@@ -2373,6 +2373,9 @@ class EditSessionTools:
             'edits.level_compare': (base + ' level_id', lambda p, c: {'ok': True, **self.session(p).level_compare(
                 p['level_id'], p.get('x'), p.get('y'))}),
             'edits.level_compare_file': (base + ' level_id', self._compare_file),
+            'edits.level_screen_at': (base + ' level_id x', lambda p, c: {'ok': True, **self.session(p).level_screen_at(p['level_id'], p['x'])}),
+            'edits.level_length': (base + ' level_id stage floor screen delta', lambda p, c: {'ok': True, 'change': self.session(p).propose_level_length(
+                p['level_id'], p['stage'], p['floor'], p['screen'], p['delta'])}),
             'edits.level_secret': (base + ' level_id kind number stage floor', lambda p, c: {'ok': True, 'change': self.session(p).propose_level_secret(
                 p['level_id'], p['kind'], p['number'], p['stage'], p['floor'], p.get('item'), p.get('treasure'), p.get('trigger'))}),
             'edits.play': (base + ' frames buttons', lambda p, c: {'ok': True, **self.session(p).play(p['frames'], p['buttons'])}),

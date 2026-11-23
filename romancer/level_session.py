@@ -623,6 +623,110 @@ class LevelTools:
             result = {'state': 'warn', 'text': f'The change could not be watched in the game: {error}'}
         change['object_check'] = result
 
+    def level_screen_at(self, level_id: str, x: float) -> dict:
+        """Which screen of which part of the level a map spot is on (for making a part longer or shorter)."""
+        with self.lock:
+            level = self._level(level_id)
+            context = self._profile_context(level)
+            if context is None:
+                raise ValueError('ROMancer does not know how long the parts of this game are yet.')
+            profile, parts = context
+            x = float(x)
+            part = min(parts, key=lambda p: 0 if p['left'] <= x < p['right'] else min(abs(x - p['left']), abs(x - p['right'])))
+            origin = part['dx'] + profile.ZONE + 1                  # map x of the part's stage x 0
+            pages = profile.pages(part['stage'], part['floor'])
+            screen = max(0, min(pages, int((x - origin) // 256)))
+            return {'stage': part['stage'], 'floor': part['floor'], 'section': part['section'], 'screen': screen,
+                    'screens': pages + 1, 'map_left': origin + screen * 256, 'most': profile.MAX_PAGES + 1}
+
+    def propose_level_length(self, level_id: str, stage: int, floor: int, screen: int, delta: int) -> dict:
+        """Remove screens from a part of the level, or repeat one; everything after moves along with it."""
+        with self.lock:
+            level = self._level(level_id)
+            context = self._profile_context(level)
+            if context is None:
+                raise ValueError('ROMancer does not know how long the parts of this game are yet.')
+            profile = context[0]
+            if any(c.get('length') for c in self._active()):
+                raise ValueError('ROMancer changes the length of one part of the level at a time. Keep or cancel the other length change, save, and then make the next one.')
+            stage, floor, screen, delta = int(stage), int(floor), int(screen), int(delta)
+            before = profile.pages(stage, floor) + 1
+            result = profile.resize_writes(stage, floor, screen, delta)
+            count = abs(delta)
+            title = (f'Screen {screen + 1} repeated {count} more time{"s" if count > 1 else ""} ({before} to {before + delta} screens)' if delta > 0 else
+                     f'{count} screen{"s" if count > 1 else ""} removed from screen {screen + 1} ({before} to {before + delta} screens)')
+            change = self.propose_writes(level['scene_ids'][0], result['writes'], title, kind='level-object')
+            stored = self._find(change['id'])
+            stored['length'] = True
+            stored['object_check'] = {'state': 'working', 'text': 'Playing the game from the start on the old and the new length…'}
+            expect = {'stage': stage, 'floor': floor, 'old': before - 1, 'new': before - 1 + delta, 'notes': result['notes']}
+        threading.Thread(target=self._check_length, args=(stored, level, expect), name='romancer-length-check', daemon=True).start()
+        return self.change(change['id'])
+
+    def _check_length(self, change: dict, level: dict, expect: dict) -> None:
+        """Play the recorded walk on the old and the new game: how far this part scrolls, and when the next part starts."""
+        from array import array
+        import zlib
+        from . import edit_session as es
+        try:
+            meta = self.meta[level['scene_ids'][0]]
+            run_dir = self.store / 'runs' / meta['run']
+            inputs = array('H')
+            inputs.frombytes((run_dir / 'inputs.bin').read_bytes())
+            start = min(meta['checkpoints'])
+            state = zlib.decompress((run_dir / f'{start}.st').read_bytes())
+            end = len(inputs)
+            path = self.store / 'work' / f'length-{change["id"]}.bin'
+            path.parent.mkdir(parents=True, exist_ok=True)
+            path.write_bytes(self._rom_with([change]))
+            runs = []
+            for rom_path in (self.rom_path, path):
+                fe = es._frontend(self._cfg(), rom_path)
+                furthest, left_at, been = 0, None, False
+                try:
+                    if int(fe.lib.retro_serialize_size()) <= 0:
+                        fe.run_frame([])
+                    fe.unserialize(state)
+                    session = es._Session(fe, checkpoint_every=10 ** 9)
+                    session.frame = start
+                    frame = start
+                    while frame < end:
+                        session.run(4, lambda f: es._names(inputs[f]) if f < len(inputs) else ())
+                        frame += 4
+                        snap = session.snapshot()
+                        ram = next((snap.domains[n].data for n in ('wram', 'ram') if n in snap.domains and snap.domains[n].data is not None), None)
+                        if ram is None:
+                            continue
+                        camera = ram[0x2E] | ram[0x2F] << 8
+                        if ram[0x28] == expect['stage'] and ram[0x46] == expect['floor'] and camera < 0x8000:
+                            been = been or camera > 0           # really played (the attract mode shows stages too)
+                            furthest = max(furthest, camera) if been else furthest
+                        elif been and ram[0x28] == expect['stage'] + 1:
+                            left_at = frame
+                            break
+                finally:
+                    es._close(fe)
+                runs.append((furthest, left_at))
+            path.unlink(missing_ok=True)
+            (old_far, old_left), (new_far, new_left) = runs
+            wanted = expect['new'] * 256
+            screens = lambda far: far // 256 + 1
+            if new_far == wanted or (expect['new'] < expect['old'] and new_far == wanted):
+                text = f'Played from the start, this part now scrolls through {screens(new_far)} screens (it was {screens(old_far)}).'
+                if old_left and new_left:
+                    seconds = round(abs(new_left - old_left) / 60, 1)
+                    text += f' The next part starts {seconds} seconds {"later" if new_left > old_left else "earlier"}.'
+                result = {'state': 'good', 'text': text}
+            elif new_far < wanted and expect['new'] > expect['old'] and new_far >= old_far:
+                result = {'state': 'warn', 'text': f"The recorded walk doesn't reach the end of this part, so the new length couldn't be watched to the end (it got {screens(new_far)} screens in). Use Play from here to walk it."}
+            else:
+                result = {'state': 'bad', 'text': f'Played from the start, this part scrolls through {screens(new_far)} screens, not the {expect["new"] + 1} chosen.'}
+            if expect['notes']:
+                result['text'] += ' ' + ' '.join(sorted(set(expect['notes'])))
+        except Exception as error:
+            result = {'state': 'warn', 'text': f'The change could not be watched in the game: {error}'}
+        change['object_check'] = result
+
     def level_capture_at(self, level: dict, x: float, y: float) -> str:
         """The capture that shows this map spot nearest the middle of its screen (the earliest such, on a tie)."""
         plane = self._level_plane(level, 0)
