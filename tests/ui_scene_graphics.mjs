@@ -82,7 +82,7 @@ ed.tile={id:tile.id,draft:parsePixels(tile.pixels,2),undo:[],ink:1,tool:'pencil'
 assert.match(html,/<h3>Picture 290<\/h3>[\s\S]*Used in 3 scenes/);assert.match(html,/Can be changed in place/);
 assert.match(html,/id="scene-tile-editor"[^>]*tabindex="0" role="application" aria-label="Picture editor, 8 by 8 pixels\. Arrow keys move/);
 assert.equal((html.match(/data-action="scene-ink"/g)||[]).length,4,'only the colors of the picture\'s palette are offered');
-for(const word of ['Pencil','Pick color','Fill','Flip sideways','Flip upside down','Undo','Start over','Save as PNG','Load a PNG','Show what changes'])assert.match(html,new RegExp('>'+word+'<'),word);
+for(const word of ['Pencil','Pick color','Fill','Flip sideways','Flip upside down','Undo','Start over','Save as PNG','Load a PNG','Check in the game'])assert.match(html,new RegExp('>'+word+'<'),word);
 assert.match(html,/Everywhere this picture is used \(3 recorded scenes\)/);assert.match(html,/value="only_this"\s+>/);
 assert.match(html,/Shown with palette/);assert.match(html,/<option value="2" selected>Palette 3<\/option>/);
 let outside=html.replace(/<details>[\s\S]*?<\/details>/g,'');
@@ -91,12 +91,12 @@ assert.match(html,/<details><summary>Details<\/summary>[\s\S]*0x00A747/);
 // The two facts of a picture change are shown separately, and a patched change says the patch runs everywhere.
 const check=(name,stateName,textOf)=>({name,state:stateName,text:textOf});
 ed.proposal={id:'c2',kind:'graphics',title:'Picture 291',state:'preview',scene_id:'s1',swatch:null,from_rgb:null,to_rgb:null,scope:'all',bytes:186,affected:[],working:0,scene_count:4,visible_count:2,verified:true,verified_here:true,badge:'Used in 4 scenes',coverage:"Seen in 4 of 4 recorded scenes; 2 look different. Scenes you haven't recorded can't be shown.",planning:false,error:'',notes:[],details:[{file_offset:120,before:1,after:2},{file_offset:524288,before:null,after:7}],grows:0,every_scene:true,tried:[],tiles:[],cells:[],cell_count:0,method:'overlay',
- method_text:'This picture is unpacked by the game while it runs, in a way ROMancer cannot pack again. ROMancer adds a small patch that swaps your picture in after the game has loaded it.',
- checks:[check('In this scene','good','Works in this scene: the game was replayed and the picture came out exactly as you made it.'),check('From power-on','warn','ROMancer also replayed the game from power-on: your change is there, and other things changed too (12 other bytes of video memory). Look at the pictures below before keeping it.')],verdict:'x'};
+ method_text:"The game unpacks this picture in a way that can't be packed again, so a small patch swaps your picture in after the game loads it.",
+ checks:[check('In this scene','good','The game was replayed to this moment and the change came out exactly as you drew it.'),check('From the start','warn','Played from the start, your change is there, but 12 other bytes of video memory changed as well. Look at the pictures below before you keep it.')],summary:'This change works, but other things changed too. Look at the pictures before you keep it.',verdict:'x'};
 ed.tile.id=packed.id;summary.preview=ed.proposal;html=await render(ctx);
-assert.match(html,/<strong>In this scene\.<\/strong> Works in this scene: the game was replayed/);
-assert.match(html,/class="notice warm"><strong>From power-on\.<\/strong> ROMancer also replayed the game from power-on: your change is there, and other things changed too/);
-assert.match(html,/adds a small patch that swaps your picture in/);assert.match(html,/every recorded scene was re-rendered/);
+assert.match(html,/class="notice warm">This change works, but other things changed too/);                 // one line on top
+assert.match(html,/<summary>Details<\/summary><ul><li class="notice">The game was replayed to this moment[\s\S]*Played from the start, your change is there/);
+assert.match(html,/a small patch swaps your picture in/);assert.match(html,/every recorded scene was redrawn/);
 assert.match(html,/data-action="scene-keep"/);assert.match(html,/<td>new<\/td><td>07<\/td>/,'bytes added past the old end of the ROM have no old value');
 ed.proposal={...ed.proposal,planning:true,working:1,checks:[],verdict:'Trying to pack your picture back into the ROM…',progress:{text:'Trying to pack your picture back into the ROM…',done:3}};summary.preview=ed.proposal;html=await render(ctx);
 assert.match(html,/Trying to pack your picture back into the ROM… \(replay 3\)/);assert.match(html,/data-action="scene-keep"[^>]*disabled/);
@@ -108,7 +108,7 @@ assert.match(html,/This picture can't be changed here\. ROMancer has not seen wh
 ed.mode='background';ed.tile=null;ed.brush.tile=tile.id;ed.painted=new Map([[3,{index:3,cx:3,cy:0,tile:tile.id,hflip:false,vflip:false,line:-1}]]);html=await render(ctx);
 assert.match(html,/<h3>Paint the background<\/h3>[\s\S]*1 cell painted/);
 assert.match(html,/<strong>63 other cells in this scene are stored in the same place in the ROM and will change too<\/strong>/);
-for(const word of ['Paint','Pick from the scene','Unpaint','Flip sideways','Flip upside down','Show what changes','Clear painting'])assert.match(html,new RegExp('>'+word+'<'),word);
+for(const word of ['Paint','Pick from the scene','Unpaint','Flip sideways','Flip upside down','Check in the game','Clear painting'])assert.match(html,new RegExp('>'+word+'<'),word);
 assert.match(html,/Keep each cell's palette/);assert.match(html,/924 cells can be changed directly, 90 are built by the game while it runs, and 10 are locked/);
 assert.match(html,/id="scene-stagewrap" tabindex="0"/,'the scene can be painted with the keyboard');
 gfx.layers=[{...layer,placed:false,placed_by:'none',bands:[]}];html=await render(ctx);

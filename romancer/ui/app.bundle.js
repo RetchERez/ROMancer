@@ -1878,7 +1878,7 @@
     const v = esc(s.latest.version), page = esc(s.latest.page || "");
     const notes = `<button type="button" data-update="notes">What’s new</button>`;
     if (!s.can_apply) return `<strong>Update ready: v${v}</strong><span>${esc(s.reason || "Download it from the release page.")}</span>${notes}<a href="${page}" target="_blank" rel="noopener">Release page</a><button type="button" data-update="hide" aria-label="Hide until next start">Later</button>`;
-    if (s.task === "downloading") return `<strong>Downloading v${v}${percent(s.progress)}</strong><span>You can keep working. ROMancer restarts when it is done.</span>`;
+    if (s.task === "downloading") return `<strong>Downloading v${v}${percent(s.progress)}</strong><span>You can keep working, and ROMancer restarts when it's done.</span>`;
     if (s.task === "unpacking") return `<strong>Checking v${v}</strong><span>Every file is checked against the release before anything is changed.</span>`;
     if (s.task === "restarting") return `<strong>Restarting to update to v${v}</strong>`;
     if (wanted && s.ready && s.busy) return `<strong>v${v} is ready</strong><span>${esc(s.busy)} ROMancer restarts by itself as soon as it can.</span><button type="button" data-update="cancel">Not now</button>`;
@@ -10339,14 +10339,14 @@ ${state2.artifact.system_id ? `<details><summary>Advanced byte options</summary>
   function changeLine(change) {
     if (change.planning) return change.scope === "only_this" || !change.verdict ? "Working out how to change only this scene…" : change.verdict;
     if (change.error) return change.error;
-    if (change.working) return `Re-rendering ${plural2(change.working, "scene")} in the real game…`;
+    if (change.working) return `Redrawing ${plural2(change.working, "scene")} in the real game…`;
     return `${change.badge}. ${plural2(change.visible_count, "scene")} ${change.visible_count === 1 ? "looks" : "look"} different.`;
   }
   var KEY_BUTTONS = { ArrowUp: "up", ArrowDown: "down", ArrowLeft: "left", ArrowRight: "right", z: "a", x: "b", a: "x", s: "y", q: "l", w: "r", Enter: "start", Shift: "select" };
   var offsetText = (value) => "0x" + Number(value).toString(16).toUpperCase().padStart(6, "0");
 
   // romancer/ui/level_map.js
-  var TOOLS = [["pick", "Pick a picture"], ["paint", "Paint"], ["erase", "Unpaint"]];
+  var TOOLS = [["pick", "Copy"], ["paint", "Paint"], ["erase", "Erase"]];
   var ZOOMS = [1, 2, 3, 4];
   var key = (col, row) => col + "," + row;
   function placeAt(view2, zoom, x, y) {
@@ -10354,10 +10354,10 @@ ${state2.artifact.system_id ? `<details><summary>Advanced byte options</summary>
     return col >= 0 && row >= 0 && col < view2.width && row < view2.height ? [col, row] : null;
   }
   function units(view2) {
-    const out = [{ id: "cells", label: "Single cells", width: 1, height: 1, left: 0, top: 0 }], blocks = view2.blocks;
+    const out = [{ id: "cells", label: "Single tiles", width: 1, height: 1, left: 0, top: 0 }], blocks = view2.blocks;
     if (blocks) {
-      out.push({ id: "blocks", label: `Blocks (${blocks.width} by ${blocks.height} cells)`, ...blocks });
-      if (blocks.larger) out.push({ id: "larger", label: `Larger blocks (${blocks.larger.width} by ${blocks.larger.height} cells)`, ...blocks.larger });
+      out.push({ id: "blocks", label: `Whole blocks (${blocks.width}×${blocks.height})`, ...blocks });
+      if (blocks.larger) out.push({ id: "larger", label: `Big blocks (${blocks.larger.width}×${blocks.larger.height})`, ...blocks.larger });
     }
     return out;
   }
@@ -10388,7 +10388,7 @@ ${state2.artifact.system_id ? `<details><summary>Advanced byte options</summary>
   var layerChoices = (view2) => view2.plane === 0 && view2.planes.length > 1 ? [["all", "All layers"], ...view2.planes.map((plane) => [String(plane.index), plane.name + " only"])] : [];
   function steps2(level, change) {
     const at = change ? change.working || change.error ? 2 : 3 : level.painted.size ? 2 : level.brush ? 1 : 0;
-    return [["Pick", "Click a place on the map, or drag over several, to take it as your brush."], ["Paint", "Click or drag where the brush should go."], ["Check", "Choose Show what changes. ROMancer replays the game."], ["Keep", "Look at the map, then keep the change or cancel it."]].map(([name2, text], index) => ({ name: name2, text, now: index === at, done: index < at }));
+    return [["Copy", "Copy a piece of the map"], ["Paint", "Paint it somewhere else"], ["Check", "Check it in the game"], ["Keep", "Keep it or cancel"]].map(([name2, text], index) => ({ name: name2, text, now: index === at, done: index < at }));
   }
   var paintedCells = (painted) => [...painted.entries()].map(([place, from]) => {
     const [col, row] = place.split(",").map(Number);
@@ -10396,54 +10396,53 @@ ${state2.artifact.system_id ? `<details><summary>Advanced byte options</summary>
   });
   function levelStatus(summary, playing) {
     const rec = summary.level_recording, job = summary.level_job;
-    if (rec) return `Recording ${rec.name}: ${plural2(rec.captures, "moment")} captured${rec.captures >= rec.limit ? " (that is the most one recording holds; finish the map)" : ""}.`;
+    if (rec) return rec.captures >= rec.limit ? `That's as much as one map can hold, so finish it now (${plural2(rec.captures, "screen")}).` : `Recording the level, ${plural2(rec.captures, "screen")} so far. Play to the end of it, then finish the map.`;
     if ((job == null ? void 0 : job.state) === "running") return `${job.message} ${job.done} of ${job.total}.`;
     if (job == null ? void 0 : job.message) return job.message;
-    return playing ? "Play to the start of the level, then start recording." : "";
+    return playing ? "Play to where the level starts, then record it." : "";
   }
   var levelChange = (ed) => ed.proposal && ed.proposal.level && ed.level && ed.proposal.level.id === ed.level.id ? ed.proposal : null;
   function levelsPart(ed) {
     var _a;
     const summary = ed.summary, levels = summary.levels || [], rec = summary.level_recording, job = summary.level_job, walking = ((_a = summary.recording) == null ? void 0 : _a.state) === "running";
     const building = (job == null ? void 0 : job.state) === "running";
-    const actions3 = rec ? button("Finish the level map", "level-stop", { primary: true, icon: "check", disabled: walking, reason: "Wait until ROMancer stops playing." }) + button(walking ? "ROMancer is playing…" : "Let ROMancer walk right", "level-auto", { disabled: walking, reason: "Already playing." }) : button("Record a level map", "level-start", { icon: "plus", disabled: !ed.playing || building, reason: building ? "ROMancer is still putting the last map together." : "Choose Play and capture a moment above and play to the start of the level first." });
+    const actions3 = rec ? button("Finish the map", "level-stop", { primary: true, icon: "check", disabled: walking, reason: "Wait for the walk to finish." }) + button(walking ? "Walking…" : "Walk right for me", "level-auto", { disabled: walking, reason: "Already walking." }) : button("Record a level map", "level-start", { icon: "plus", disabled: !ed.playing || building, reason: building ? "The last map is still being put together." : "Start playing above and get to where the level starts first." });
     return `<div class="card-heading"><h3>Level maps</h3>${badge(plural2(levels.length, "level map"), levels.length ? "good" : "neutral")}</div>
- <p class="subtle">A level map is the whole background of a level, put together while the game scrolls. Play to where the level starts, start recording, then play through it. ROMancer keeps a scene every time the screen moves and lays them side by side.</p>
+ <p class="subtle">Record a level while you play and you get a map of the whole level that you can paint on.</p>
  <div class="actions">${actions3}</div>
  <p class="subtle" id="level-status" role="status" aria-live="polite">${esc(levelStatus(summary, ed.playing))}</p>
  ${building ? `<progress max="${job.total}" value="${job.done}" aria-label="Putting the map together"></progress>` : ""}
  <div class="scene-strip" role="group" aria-label="Level maps">${levels.map((row) => {
       var _a2, _b;
-      return `<button type="button" class="scene-thumb level-thumb ${((_a2 = ed.level) == null ? void 0 : _a2.id) === row.id ? "selected" : ""}" data-action="level-open" data-id="${row.id}" aria-pressed="${((_b = ed.level) == null ? void 0 : _b.id) === row.id}"><img alt="" data-picture="${esc(row.image)}" width="${row.pixel_width}" height="${row.pixel_height}"><span>${esc(row.name)} · ${row.planes[0].width} by ${row.planes[0].height} cells</span></button>`;
+      return `<button type="button" class="scene-thumb level-thumb ${((_a2 = ed.level) == null ? void 0 : _a2.id) === row.id ? "selected" : ""}" data-action="level-open" data-id="${row.id}" aria-pressed="${((_b = ed.level) == null ? void 0 : _b.id) === row.id}"><img alt="" data-picture="${esc(row.image)}" width="${row.pixel_width}" height="${row.pixel_height}"><span>${esc(row.name)}</span></button>`;
     }).join("")}</div>`;
   }
   function levelPart(ed, verdict, keep) {
     const level = ed.level;
     if (!level || !level.view) return "";
     const view2 = level.view, change = levelChange(ed), painted = level.painted.size, brush = level.brush;
-    const planes = view2.planes.length > 1 ? `<label>Show <select id="level-plane" aria-label="Which layers the map shows">${view2.planes.map((p) => `<option value="${p.index}" ${p.index === view2.plane ? "selected" : ""}>${p.index === 0 ? "All layers together" : esc(p.name) + " alone"}</option>`).join("")}</select></label>` : "";
+    const planes = view2.planes.length > 1 ? `<label>Show <select id="level-plane" aria-label="Which layers the map shows">${view2.planes.map((p) => `<option value="${p.index}" ${p.index === view2.plane ? "selected" : ""}>${p.index === 0 ? "All layers" : esc(p.name) + " only"}</option>`).join("")}</select></label>` : "";
     const choices = layerChoices(view2), paintOn = choices.length ? `<label>Paint on <select id="level-layers" aria-label="Which layers a change is made on">${choices.map(([value, label]) => `<option value="${value}" ${value === level.paintOn ? "selected" : ""}>${esc(label)}</option>`).join("")}</select></label>` : "";
     const guide = `<ol class="level-steps" aria-label="How to change the level">${steps2(level, change).map((step) => `<li class="${step.now ? "now" : step.done ? "done" : ""}"${step.now ? ' aria-current="step"' : ""}><strong>${step.name}</strong><span>${step.text}</span></li>`).join("")}</ol>`;
-    const sizes = units(view2), unitPart = sizes.length > 1 ? `<label>Brush snaps to <select id="level-unit" aria-label="What the brush snaps to">${sizes.map((u) => `<option value="${u.id}" ${u.id === level.unit ? "selected" : ""}>${esc(u.label)}</option>`).join("")}</select></label>` : "";
+    const sizes = units(view2), unitPart = sizes.length > 1 ? `<label>Brush size <select id="level-unit" aria-label="Brush size">${sizes.map((u) => `<option value="${u.id}" ${u.id === level.unit ? "selected" : ""}>${esc(u.label)}</option>`).join("")}</select></label>` : "";
     const zoom = `<label>Zoom <select id="level-zoom" aria-label="Zoom">${ZOOMS.map((z) => `<option value="${z}" ${z === level.zoom ? "selected" : ""}>${z}x</option>`).join("")}</select></label>`;
     const tools = TOOLS.map(([id, label]) => `<button type="button" class="scene-mode ${level.tool === id ? "active" : ""}" data-action="level-tool" data-id="${id}" aria-pressed="${level.tool === id}">${label}</button>`).join("");
-    const hint = level.tool === "pick" ? "Click a place to take its picture as your brush, or drag to take a block of places (a platform, a tree)." : !brush ? "Pick a picture from the map first." : level.tool === "paint" ? "Click or drag on the map to put your brush there." : "Click or drag over painted places to take the paint off.";
-    const brushText = brush ? `Brush: ${brush.width} by ${brush.height} ${brush.width * brush.height === 1 ? "place" : "places"} from column ${brush.col + 1}, row ${brush.row + 1}.` : "No brush yet.";
-    const built = view2.blocks ? ` This level is built from blocks of ${view2.blocks.width} by ${view2.blocks.height} cells${view2.blocks.larger ? `, laid out in larger blocks of ${view2.blocks.larger.width} by ${view2.blocks.larger.height}` : ""}. Paint a whole block onto a whole block and ROMancer looks for the level's own list of blocks, so that only that place changes.` : "";
-    const locked = view2.status.includes("u") ? " Places marked with a cross cannot be changed: ROMancer has not seen where the game gets them from." : "";
-    const after = view2.after ? `<label class="level-toggle"><input type="checkbox" id="level-after" ${level.showAfter ? "checked" : ""}> Show the map with the changes</label>` : "";
-    const propose2 = button("Show what changes", "level-propose", { primary: true, disabled: !painted, reason: "Paint at least one place first." }) + button("Clear paint", "level-clear", { disabled: !painted && !change });
-    return `<div class="card-heading"><h3>${esc(view2.name)}</h3>${badge(`${view2.width} by ${view2.height} cells · ${plural2(view2.scenes.length, "capture")}`, "neutral")}</div>
+    const hint = level.tool === "pick" ? "Click a spot on the map to copy it, or drag across a bigger piece like a platform or a tree." : !brush ? "Copy something from the map first." : level.tool === "paint" ? "Click or drag where you want it." : "Click or drag over your paint to remove it.";
+    const brushText = brush ? `Copied a ${brush.width}×${brush.height} piece.` : "Nothing copied yet.";
+    const built = view2.blocks ? " The brush moves in whole blocks, the way this level is built, so a change can stay in one spot." : "";
+    const locked = view2.status.includes("u") ? " Spots with a cross can't be changed yet." : "";
+    const after = view2.after ? `<label class="level-toggle"><input type="checkbox" id="level-after" ${level.showAfter ? "checked" : ""}> Show my changes</label>` : "";
+    const propose2 = button("Check in the game", "level-propose", { primary: true, disabled: !painted, reason: "Paint something first." }) + button("Clear paint", "level-clear", { disabled: !painted && !change });
+    return `<div class="card-heading"><h3>${esc(view2.name)}</h3>${badge(`${view2.width}×${view2.height} tiles`, "neutral")}</div>
  ${guide}
- <div class="actions level-bar">${planes}${paintOn}${zoom}${unitPart}${after}${button("Save map as PNG", "level-export", { icon: "download" })}${button("Remove this level map", "level-forget")}${button("Close", "level-close")}</div>
+ <div class="actions level-bar">${planes}${paintOn}${zoom}${unitPart}${after}${button("Save map as PNG", "level-export", { icon: "download" })}${button("Delete map", "level-forget")}${button("Close", "level-close")}</div>
  <div class="scene-modes" role="group" aria-label="Tool">${tools}</div>
  <p class="subtle" role="status">${hint}${built}${locked}</p>
  <div class="level-scroll" id="level-scroll" tabindex="0" aria-label="The level map. Scroll to move around."><canvas id="level-canvas" class="level-canvas" width="${view2.width * view2.cell * level.zoom}" height="${view2.height * view2.cell * level.zoom}" role="img" aria-label="Map of ${esc(view2.name)}"></canvas></div>
- <p class="subtle" id="level-where" role="status">${brushText} ${painted ? plural2(painted, "place") + " painted." : ""}</p>
+ <p class="subtle" id="level-where" role="status">${brushText} ${painted ? plural2(painted, "tile") + " painted." : ""}</p>
  ${change ? verdict(change) : ""}
- ${change && view2.unshown ? `<p class="notice warm" role="status">${view2.unshown === view2.pending.filter((cell) => cell.change === change.id).length ? "The places you painted" : plural2(view2.unshown, "place") + " you painted"} ${view2.unshown === 1 ? "does" : "do"} not look different on the map after the replay. The change may show somewhere else in the level. Look at the map before you keep it.</p>` : ""}
- <div class="actions">${change ? keep(change, propose2) : propose2}${button("Open this place in its scene", "level-goto", { disabled: !level.last, reason: "Click a place on the map first." })}</div>
- <p class="subtle">A place on the map is a background cell of the scene that showed it. If the game builds that cell from a block it also uses elsewhere, every place that uses the block changes; the map shows them before you keep the change.</p>`;
+ ${change && view2.unshown ? `<p class="notice warm" role="status">Some of what you painted doesn't show on the map after the check. It may appear somewhere else in the level, so look over the map before you keep it.</p>` : ""}
+ <div class="actions">${change ? keep(change, propose2) : propose2}${button("Open in its scene", "level-goto", { disabled: !level.last, reason: "Click a spot on the map first." })}</div>`;
   }
   async function drawLevel(ctx2, ed, picture2) {
     const level = ed.level, canvas = document.getElementById("level-canvas");
@@ -10474,7 +10473,7 @@ ${state2.artifact.system_id ? `<details><summary>Advanced byte options</summary>
       context.moveTo(x, 0);
       context.lineTo(x, canvas.height);
       context.stroke();
-      context.fillText("another area", x + 6, 14);
+      context.fillText("separate area", x + 6, 14);
     }
     context.setLineDash([]);
     context.strokeStyle = "rgba(255,255,255,.35)";
@@ -10965,7 +10964,11 @@ ${state2.artifact.system_id ? `<details><summary>Advanced byte options</summary>
   var byteText = (value) => value === null || value === void 0 ? "new" : value.toString(16).toUpperCase().padStart(2, "0");
   function verdictPart(change) {
     var _a, _b;
-    if (((_a = change.checks) == null ? void 0 : _a.length) && !change.error && !change.planning) return `<div role="status" aria-live="polite">${change.checks.map((check) => `<p class="${checkTone2(check.state)}"><strong>${esc(check.name)}.</strong> ${esc(check.text)}</p>`).join("")}</div>${change.method_text ? `<p class="subtle">${esc(change.method_text)}${change.grows ? ` The ROM file gets ${plural2(change.grows, "byte")} longer to make room.` : ""}${change.every_scene ? " The patch runs all the time, so every recorded scene was re-rendered, not only the ones that show this picture." : ""}</p>` : ""}`;
+    if (((_a = change.checks) == null ? void 0 : _a.length) && !change.error && !change.planning) {
+      const worst = change.checks.some((check) => check.state === "bad") ? "bad" : change.checks.some((check) => check.state === "warn") ? "warn" : change.checks.some((check) => check.state === "working") ? "working" : "good";
+      const extra = [change.method_text, change.grows ? `The ROM file gets ${plural2(change.grows, "byte")} longer to make room.` : "", change.every_scene ? "The patch runs all the time, so every recorded scene was redrawn." : ""].filter(Boolean).join(" ");
+      return `<div role="status" aria-live="polite"><p class="${checkTone2(worst)}">${esc(change.summary || change.verdict)}</p><details class="check-details"><summary>Details</summary><ul>${change.checks.map((check) => `<li class="${checkTone2(check.state)}">${esc(check.text)}</li>`).join("")}</ul>${extra ? `<p class="subtle">${esc(extra)}</p>` : ""}</details></div>`;
+    }
     const tone = change.error || !change.working && !change.verified ? "notice warm" : "notice";
     return `<p class="${tone}" role="status" aria-live="polite">${esc(change.verdict)}${change.planning && ((_b = change.progress) == null ? void 0 : _b.done) ? ` (replay ${change.progress.done})` : ""}</p>`;
   }
@@ -11041,7 +11044,7 @@ ${state2.artifact.system_id ? `<details><summary>Advanced byte options</summary>
  <p class="subtle">${esc(picker.help)}</p>${pickerControls(ed, swatch, picker)}
  <fieldset class="scene-scope"><legend>Where should it change?</legend><label><input type="radio" name="scene-scope" value="all" ${ed.scopeChoice === "all" || !support.available ? "checked" : ""}> Everywhere this color is used (${plural2(swatch.uses, "recorded scene")})</label><label class="${support.available ? "" : "scene-disabled"}"><input type="radio" name="scene-scope" value="only_this" ${support.available ? "" : "disabled"} ${ed.scopeChoice === "only_this" && support.available ? "checked" : ""}> Only in this scene</label>${support.available ? '<p class="subtle">Only this scene gives it a private copy of the data. ROMancer checks by replay that the other scenes stay as they are.</p>' : `<p class="subtle">${esc(support.reason)}</p>`}</fieldset>
  ${proposal ? `<p class="${proposal.error || !proposal.working && !proposal.verified ? "notice warm" : "notice"}" role="status" aria-live="polite">${esc(proposal.verdict)}</p>` : ""}
- <div class="actions">${proposal ? button("Keep this change", "scene-keep", { primary: true, icon: "check", disabled: !ready, reason: proposal.error ? "This change could not be made." : "Wait until every scene has been re-rendered." }) + button("Cancel", "scene-cancel") : button("Show what changes", "scene-propose", { primary: true, disabled: unchanged, reason: "Choose a different color first." })}</div>
+ <div class="actions">${proposal ? button("Keep this change", "scene-keep", { primary: true, icon: "check", disabled: !ready, reason: proposal.error ? "This change could not be made." : "Wait until every scene has been redrawn." }) + button("Cancel", "scene-cancel") : button("Check in the game", "scene-propose", { primary: true, disabled: unchanged, reason: "Choose a different color first." })}</div>
  <details><summary>Details</summary><p>This color is read from ${plural2(swatch.details.filter(Boolean).length, "byte")} of the ROM${swatch.status === "code" ? ", written as a value inside the game code" : ""}.</p><ul>${swatch.details.filter(Boolean).map((row) => `<li>Place in the file: ${offsetText(row.file_offset)}</li>`).join("")}</ul>${swatch.notes.map((note) => `<p>${esc(note)}</p>`).join("")}</details>`;
   }
   function changesPart(ed) {
@@ -11121,7 +11124,7 @@ ${state2.artifact.system_id ? `<details><summary>Advanced byte options</summary>
   function keepPart(proposal, propose2) {
     if (!proposal) return propose2;
     const ready = !proposal.working && !proposal.error;
-    return button("Keep this change", "scene-keep", { primary: true, icon: "check", disabled: !ready, reason: proposal.error ? "This change could not be made." : "Wait until every scene has been re-rendered." }) + button("Cancel", "scene-cancel");
+    return button("Keep this change", "scene-keep", { primary: true, icon: "check", disabled: !ready, reason: proposal.error ? "This change could not be made." : "Wait until every scene has been redrawn." }) + button("Cancel", "scene-cancel");
   }
   function tilePart(ed) {
     if (!ed.view) return "";
@@ -11143,7 +11146,7 @@ ${state2.artifact.system_id ? `<details><summary>Advanced byte options</summary>
  <div class="actions">${button("Save as PNG", "scene-tile-export", { icon: "download" })}${button("Load a PNG", "scene-tile-import")}<input type="file" id="scene-tile-file" accept="image/png" hidden aria-label="PNG picture to load, 8 by 8 pixels"></div>
  ${scopePart(ed, tile.uses, "picture", ed.gfx.private_copy)}
  ${proposal ? verdictPart(proposal) : ""}
- <div class="actions">${keepPart(proposal, button("Show what changes", "scene-tile-propose", { primary: true }))}</div>
+ <div class="actions">${keepPart(proposal, button("Check in the game", "scene-tile-propose", { primary: true }))}</div>
  <details><summary>Details</summary><p>${tile.bits} bits per pixel (${1 << tile.bits} colors), held at video memory address ${offsetText(tile.address)}.${tile.details.length ? ` First byte in the file: ${offsetText(tile.details[0])}.` : ""}</p>${tile.notes.map((note) => `<p>${esc(note)}</p>`).join("")}</details>`;
   }
   function tileStatus(ed, tile) {
@@ -11165,7 +11168,7 @@ ${state2.artifact.system_id ? `<details><summary>Advanced byte options</summary>
  ${layer.lines > 1 ? `<label class="scene-line"><span>Palette</span><select data-bg-line aria-label="Palette for painted cells"><option value="-1" ${brush.line < 0 ? "selected" : ""}>Keep each cell's palette</option>${Array.from({ length: layer.lines }, (_, line) => `<option value="${line}" ${line === brush.line ? "selected" : ""}>Palette ${line + 1}</option>`).join("")}</select></label>${layer.line_note ? `<p class="subtle">${esc(layer.line_note)}</p>` : ""}` : ""}
  ${painted.length ? `<p role="status">${plural2(painted.length, "cell")} painted.${shared.length ? ` <strong>${plural2(shared.length, "other cell")} in this scene ${shared.length === 1 ? "is" : "are"} stored in the same place in the ROM and will change too</strong> (outlined with dashes).` : ""}${esc(builtCellsNote(packed))}</p>` : '<p class="subtle">Nothing painted yet.</p>'}
  ${proposal ? verdictPart(proposal) : ""}
- <div class="actions">${keepPart(proposal, button("Show what changes", "scene-bg-propose", { primary: true, disabled: !painted.length, reason: "Paint at least one cell first." }) + button("Clear painting", "scene-bg-clear", { disabled: !painted.length, reason: "Nothing is painted." }))}</div>
+ <div class="actions">${keepPart(proposal, button("Check in the game", "scene-bg-propose", { primary: true, disabled: !painted.length, reason: "Paint at least one cell first." }) + button("Clear painting", "scene-bg-clear", { disabled: !painted.length, reason: "Nothing is painted." }))}</div>
  <p class="subtle">In this layer ${plural2(plain, "cell")} can be changed directly, ${layer.counts.derived} ${layer.counts.derived === 1 ? "is" : "are"} built by the game while it runs, and ${layer.counts.unknown} ${layer.counts.unknown === 1 ? "is" : "are"} locked (shaded) because ROMancer has not seen where ${layer.counts.unknown === 1 ? "it comes" : "they come"} from.</p>
  <details><summary>Details</summary><p>${layer.width} by ${layer.height} cells of ${layer.cell} by ${layer.cell} pixels. ${layer.placed_by === "picture" ? "Placed by matching it against the recorded screen." : layer.placed_by === "registers" ? "Placed from the game's scroll registers." : "Not placed."}</p>${layer.notes.map((note) => `<p>${esc(note)}</p>`).join("")}</details>`;
   }
@@ -11581,7 +11584,7 @@ ${state2.artifact.system_id ? `<details><summary>Advanced byte options</summary>
           };
           image.src = "data:image/png;base64," + packet.png_base64;
         }
-        if (status) status.textContent = packet.level_captures !== null && packet.level_captures !== void 0 ? `Recording the level: ${plural2(packet.level_captures, "moment")} captured. Play through the level, then choose Finish the level map.` : "Playing. Capture the moment when the screen shows what you want to edit.";
+        if (status) status.textContent = packet.level_captures !== null && packet.level_captures !== void 0 ? `Recording the level, ${plural2(packet.level_captures, "screen")} so far. Play to the end of it, then finish the map.` : "The game is running. Capture the moment when the screen shows what you want to change.";
         due = Math.max(due + (taps.length ? 10 : 4) * 1e3 / 60, performance.now() - 50);
         await new Promise((resolve) => setTimeout(resolve, Math.max(0, due - performance.now())));
       } catch (error) {
@@ -11680,7 +11683,7 @@ ${state2.artifact.system_id ? `<details><summary>Advanced byte options</summary>
     if (cellState(layer, cell.index) === "locked") {
       if (!ed.dragging || !ed.warned) {
         ed.warned = true;
-        ctx2.notify("That cell is locked: ROMancer has not seen where this part of the background comes from.");
+        ctx2.notify("That cell can't be changed, because where the game gets it from hasn't been found.");
       }
       return;
     }
@@ -11834,7 +11837,7 @@ ${state2.artifact.system_id ? `<details><summary>Advanced byte options</summary>
           remember(ed);
           ed.tile.draft = importPixels(context.getImageData(0, 0, 8, 8).data, tilePalette(tile, ed.gfx.colors, ed.tile.line));
           editedTile(ctx2, ed);
-          ctx2.notify(image.naturalWidth === 8 && image.naturalHeight === 8 ? "Picture loaded. Each pixel took the nearest color of this palette." : "That PNG is not 8 by 8 pixels, so only its top-left 8 by 8 pixels were used. Each pixel took the nearest color of this palette.");
+          ctx2.notify(image.naturalWidth === 8 && image.naturalHeight === 8 ? "The picture was loaded, and each pixel took the nearest color in this palette." : "That PNG is not 8 by 8 pixels, so only its top-left corner was used, and each pixel took the nearest color in this palette.");
         };
         image.onerror = () => {
           URL.revokeObjectURL(url);
@@ -11993,7 +11996,7 @@ ${state2.artifact.system_id ? `<details><summary>Advanced byte options</summary>
           link.click();
           link.remove();
           setTimeout(() => URL.revokeObjectURL(url), 1e3);
-          ctx2.notify("Saved as an 8 by 8 PNG. Edit it in any drawing program and load it back.");
+          ctx2.notify("Saved as an 8 by 8 PNG that you can edit in any drawing program and load back.");
         }, "image/png");
       },
       "scene-tile-import": () => {
@@ -12036,7 +12039,7 @@ ${state2.artifact.system_id ? `<details><summary>Advanced byte options</summary>
         const tile = selectedTile(ed);
         if (!tile || !ed.tile) return;
         if (sameTile(ed.tile.draft, tilePixels(tile, true))) {
-          ctx2.notify("Draw something different first. The picture is still as the game has it.");
+          ctx2.notify("The picture is still the same as in the game, so draw something different first.");
           return;
         }
         const result = await call(ctx2, ed, "propose_tile", { scene_id: ed.sceneId, tile: tile.id, pixels: pixelText(ed.tile.draft, tile.bits), scope: ed.scopeChoice });
@@ -12135,7 +12138,7 @@ ${state2.artifact.system_id ? `<details><summary>Advanced byte options</summary>
  <h3>Everything that changes</h3><div class="scene-review-grid">${review.scenes.map((scene) => `<figure class="${scene.visible ? "flagged" : ""}"><figcaption><strong>${esc(scene.label)}</strong><small>${scene.state === "working" ? "Re-rendering…" : scene.visible ? "Looks different" : "Uses changed data; nothing visible at this moment"}</small></figcaption><div class="scene-pair"><div><small>Before</small><img alt="Before" data-picture="${esc(scene.before)}" width="${scene.width}" height="${scene.height}"></div><div><small>After</small><img alt="After" data-picture="${esc(scene.after)}" width="${scene.width}" height="${scene.height}"></div></div></figure>`).join("")}</div>
  <p class="subtle">${esc(review.writes_note)}</p>
  ${review.grows ? `<p class="notice">One of these changes needs more room than the ROM has, so the saved build is ${plural2(review.grows, "byte")} longer than the original.</p>` : ""}<details><summary>Details</summary><p>${plural2(review.bytes, "byte")} will be written.</p>${review.details.map((change) => `<p><strong>${esc(change.title)}</strong></p><div class="table-wrap"><table><thead><tr><th>Place in the file</th><th>Before</th><th>After</th></tr></thead><tbody>${change.writes.map((row) => `<tr><td>${offsetText(row.file_offset)}</td><td>${byteText(row.before)}</td><td>${byteText(row.after)}</td></tr>`).join("")}</tbody></table></div>`).join("")}</details>
- <div class="actions">${button(review.ready ? "Save as a new build" : "Re-rendering scenes…", "scene-save", { primary: true, icon: "download", disabled: !review.ready, reason: "Every scene is being re-rendered with all changes together." })}${button("Keep editing", "close-modal")}</div>`;
+ <div class="actions">${button(review.ready ? "Save as a new build" : "Re-rendering scenes…", "scene-save", { primary: true, icon: "download", disabled: !review.ready, reason: "Every scene is being redrawn with all your changes together." })}${button("Keep editing", "close-modal")}</div>`;
   }
   async function reviewDialog(ctx2, ed) {
     let review = await call(ctx2, ed, "review"), signature = "";
@@ -12262,7 +12265,7 @@ ${state2.artifact.system_id ? `<details><summary>Advanced byte options</summary>
         ed.proposal = null;
         await refresh(ctx2, ed, summary);
         update(ctx2, ed);
-        ctx2.notify("Added to the change list. Nothing is written until you review and save.");
+        ctx2.notify("Added to your changes. Nothing is saved until you choose Review and save.");
       },
       "scene-cancel": async () => {
         await dropPreview(ctx2, ed);
@@ -12344,7 +12347,7 @@ ${state2.artifact.system_id ? `<details><summary>Advanced byte options</summary>
         ed.selected = null;
         await loadScene(ctx2, ed, result.scene_id);
         update(ctx2, ed, ["scene-gallery", "scene-stage", "scene-palette", "scene-picker", "scene-changes"]);
-        ctx2.notify("Captured. This moment is now a scene you can edit.");
+        ctx2.notify("This moment is now a scene you can edit.");
       },
       "scene-review": () => reviewDialog(ctx2, ed),
       "scene-save": async () => {

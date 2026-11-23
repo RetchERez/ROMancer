@@ -1968,7 +1968,7 @@ class EditSession(LevelTools):
                 continue
             visible = result.get('pixels', 0) > 0
             if result['state'] == 'working':
-                status = 'Re-rendering…'
+                status = 'Redrawing…'
             elif result['state'] == 'failed':
                 status = 'Could not be replayed'
             elif not result.get('verified'):
@@ -2010,15 +2010,16 @@ class EditSession(LevelTools):
                             + ('' if working else f'; {visible} look{"s" if visible == 1 else ""} different') +
                             ". Scenes you haven't recorded can't be shown.",
                 'planning': planning, 'error': failed, 'notes': change.get('notes', []),
-                'verdict': ((progress or {}).get('text') or ('Finding where this scene loads the data from, so only this scene changes…'
+                'verdict': ((progress or {}).get('text') or ('Finding where this scene loads its data from, so only this scene changes…'
                                                                if change.get('scope') == 'only_this' else
                                                                'Looking for where the game keeps this color…' if change.get('found') else
                                                                'Working out how to make this change…') if planning else
                             failed if failed else
-                            ' '.join(c['text'] for c in checks) if checks else
-                            'Re-rendering every scene that uses this…' if working else
-                            'Checked: the real game was replayed with this change and the color changed.' if verified else
-                            'Not confirmed: the replay did not show this change. It may not do what you expect.'),
+                            self._summary(checks) if checks else
+                            'Redrawing every scene that uses this…' if working else
+                            'This change works. The game was replayed and the color changed.' if verified else
+                            "This change didn't show up when the game was replayed, so it may not do what you expect."),
+                'summary': self._summary(checks) if checks else '',
                 'checks': checks, 'method': method, 'method_text': sg.METHODS.get(method, '') if picture else '',
                 'progress': progress, 'found': bool(change.get('found')), 'shown_rgb': change.get('shown_rgb'),
                 'tiles': [{'id': sg.tile_id(t['domain'], t['address'], t['format']), 'from': t['from'], 'to': t['pixels']}
@@ -2037,43 +2038,57 @@ class EditSession(LevelTools):
         planned = bool(here.get('as_planned') or (by_screen and here.get('verified')))
         what = 'background' if change['kind'] == 'background' else 'picture'
         extra = sum(here.get('unplanned', {}).values())
-        text = ('Works in this scene: the game was replayed and the screen changed.' if planned and by_screen else
-                f'Works in this scene: the game was replayed and the {what} came out exactly as you made it.' if planned else
-                f'Not confirmed in this scene: the replay did not show the {what} as you made it.')
+        text = ('The game was replayed to this moment and the screen changed.' if planned and by_screen else
+                'The game was replayed to this moment and the change came out exactly as you drew it.' if planned else
+                "When the game was replayed to this moment, the change didn't come out as you drew it.")
         if planned and extra:
-            text += f' {extra} other byte{"s" if extra != 1 else ""} of video memory changed with it in this scene.'
+            text += f' It also changed {extra} other byte{"s" if extra != 1 else ""} of video memory here.'
         checks = [{'name': 'In this scene', 'state': 'good' if planned and not extra else 'warn' if planned else 'bad', 'text': text}]
         own = change['affected'].get(change['scene_id'], {})
-        lead = 'ROMancer also replayed the game from power-on: '
         if own.get('state') == 'working' or not own:
-            power = {'state': 'working', 'text': 'Now replaying the game from power-on to see what else changes…'}
+            power = {'state': 'working', 'text': 'Playing the whole game from the start to see what else changes…'}
         elif own.get('state') == 'failed':
-            power = {'state': 'bad', 'text': lead + 'that replay could not be done. ' + str(own.get('error', ''))}
+            power = {'state': 'bad', 'text': "The game couldn't be played from the start to check this. " + str(own.get('error', ''))}
         elif by_screen or 'as_planned' not in own:
-            power = ({'state': 'good', 'text': lead + 'the change shows in this scene.'} if own.get('verified') and own.get('pixels') else
-                     {'state': 'bad', 'text': lead + 'the change did not show in this scene.'})
+            power = ({'state': 'good', 'text': 'Played from the start, the change shows here too.'} if own.get('verified') and own.get('pixels') else
+                     {'state': 'bad', 'text': "Played from the start, the change doesn't show here."})
         else:
             others = sum(own.get('unplanned', {}).values())
             late = own.get('late')
             if own.get('as_planned') and not others:
-                power = {'state': 'good', 'text': lead + 'clean. Only what you changed is different'
-                         + (f' (the game reaches this moment {late} frame{"s" if late != 1 else ""} later).' if late else '.')}
+                power = {'state': 'good', 'text': 'Played from the start, only what you changed is different.'
+                         + (f' The game gets to this moment {late} frame{"s" if late != 1 else ""} later.' if late else '')}
             elif own.get('as_planned'):
-                power = {'state': 'warn', 'text': lead + f'your change is there, and other things changed too ({others} other '
-                         f'byte{"s" if others != 1 else ""} of video memory). Look at the pictures below before keeping it.'}
+                power = {'state': 'warn', 'text': f'Played from the start, your change is there, but {others} other '
+                         f'byte{"s" if others != 1 else ""} of video memory changed as well. Look at the pictures below before you keep it.'}
             else:
-                power = {'state': 'bad', 'text': lead + f'the {what} did not come out as you made it that way. '
-                         'It works from the moment before this scene, but not when the whole game is played up to it.'}
-        checks.append({'name': 'From power-on', **power})
+                power = {'state': 'bad', 'text': "Played from the start, the change doesn't come out as you drew it. It only works "
+                         'when the game is started from just before this moment.'}
+        checks.append({'name': 'From the start', **power})
         other_scenes = [r for sid, r in change['affected'].items() if sid != change['scene_id'] and sid in self.scenes]
         if other_scenes and not working:
             seen = sum(1 for r in other_scenes if r.get('pixels'))
             checks.append({'name': 'Other scenes', 'state': 'warn' if seen else 'good',
-                           'text': f'{seen} other recorded scene{"s" if seen != 1 else ""} look{"s" if seen == 1 else ""} different; '
-                                   f'{"it is" if seen == 1 else "they are"} shown below.' if seen else
-                                   f'The {len(other_scenes)} other recorded scene{"s" if len(other_scenes) != 1 else ""} that '
-                                   f'{"were" if len(other_scenes) != 1 else "was"} re-rendered look{"s" if len(other_scenes) == 1 else ""} the same.'})
+                           'text': (f'{seen} other recorded scene{"s" if seen != 1 else ""} look{"s" if seen == 1 else ""} different. '
+                                    f'{"It is" if seen == 1 else "They are"} shown below.') if seen else
+                                   (f'The other recorded scene looks the same.' if len(other_scenes) == 1 else
+                                    f'The other {len(other_scenes)} recorded scenes look the same.')})
         return checks, planned and power['state'] in ('good', 'warn') and not working
+
+    @staticmethod
+    def _summary(checks: list) -> str:
+        """One plain line for the result of a check; the separate checks go under Details."""
+        states = {check['name']: check['state'] for check in checks}
+        here, start = states.get('In this scene'), states.get('From the start')
+        if here == 'bad':
+            return "This change didn't show up when the game was replayed."
+        if start == 'working':
+            return 'Checking the change in the game…'
+        if start == 'bad':
+            return 'This change only shows when the game starts from just before this moment.'
+        if here == 'warn' or start == 'warn' or states.get('Other scenes') == 'warn':
+            return 'This change works, but other things changed too. Look at the pictures before you keep it.'
+        return 'This change works. The game was replayed to check it.'
 
     def change_list(self) -> dict:
         with self.lock:
@@ -2170,7 +2185,7 @@ class EditSession(LevelTools):
             if not state or state['revision'] != self.revision or revision != self.revision:
                 raise ValueError('The change list changed after you reviewed it. Review it again before saving.')
             if not self.review()['ready']:
-                raise ValueError('Scenes are still being re-rendered. Wait for the review to finish.')
+                raise ValueError('The scenes are still being redrawn, so wait for that to finish.')
             edits = self._edits()
             if not edits:
                 raise ValueError('These changes leave the ROM as it is.')

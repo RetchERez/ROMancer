@@ -28,7 +28,7 @@ assert.deepEqual(swatchesForPixel([10,200,10],swatches),[]);
 assert.deepEqual(groupSwatches(swatches).map(group=>[group.name,group.items.length]),[['Background palette 0',2],['Background palette 2',1]]);
 assert.match(swatchLabel(swatches[0]),/can be changed, used in 3 scenes/);
 assert.match(swatchLabel(swatches[1]),/locked: The game works this color out/);
-assert.equal(changeLine({working:2}),'Re-rendering 2 scenes in the real game…');
+assert.equal(changeLine({working:2}),'Redrawing 2 scenes in the real game…');
 assert.equal(changeLine({working:0,badge:'Used in 14 scenes',visible_count:1}),'Used in 14 scenes. 1 scene looks different.');
 assert.equal(plural(1,'scene'),'1 scene');assert.equal(offsetText(42823),'0x00A747');assert.equal(KEY_BUTTONS.z,'a');
 assert.ok(BASIC_PAGES.includes('scenes'),'Scenes & colors is a basic editing screen.');

@@ -5,7 +5,7 @@
 import {esc,button,badge} from './common.js';
 import {plural} from './scene_editor.js';
 
-const TOOLS=[['pick','Pick a picture'],['paint','Paint'],['erase','Unpaint']];
+const TOOLS=[['pick','Copy'],['paint','Paint'],['erase','Erase']];
 const ZOOMS=[1,2,3,4];
 const key=(col,row)=>col+','+row;
 
@@ -18,9 +18,9 @@ export function placeAt(view,zoom,x,y){
 }
 // The units the brush can snap to: single cells, the level's blocks, and its larger blocks when it has them.
 export function units(view){
- const out=[{id:'cells',label:'Single cells',width:1,height:1,left:0,top:0}],blocks=view.blocks;
- if(blocks){out.push({id:'blocks',label:`Blocks (${blocks.width} by ${blocks.height} cells)`,...blocks});
-  if(blocks.larger)out.push({id:'larger',label:`Larger blocks (${blocks.larger.width} by ${blocks.larger.height} cells)`,...blocks.larger});}
+ const out=[{id:'cells',label:'Single tiles',width:1,height:1,left:0,top:0}],blocks=view.blocks;
+ if(blocks){out.push({id:'blocks',label:`Whole blocks (${blocks.width}×${blocks.height})`,...blocks});
+  if(blocks.larger)out.push({id:'larger',label:`Big blocks (${blocks.larger.width}×${blocks.larger.height})`,...blocks.larger});}
  return out;
 }
 const floorTo=(value,size,start)=>value-(((value-start)%size)+size)%size;
@@ -54,15 +54,15 @@ export const layerChoices=view=>view.plane===0&&view.planes.length>1?[['all','Al
 // The four steps of changing a level, and which one the user is on.
 export function steps(level,change){
  const at=change?(change.working||change.error?2:3):level.painted.size?2:level.brush?1:0;
- return [['Pick','Click a place on the map, or drag over several, to take it as your brush.'],['Paint','Click or drag where the brush should go.'],['Check','Choose Show what changes. ROMancer replays the game.'],['Keep','Look at the map, then keep the change or cancel it.']].map(([name,text],index)=>({name,text,now:index===at,done:index<at}));
+ return [['Copy','Copy a piece of the map'],['Paint','Paint it somewhere else'],['Check','Check it in the game'],['Keep','Keep it or cancel']].map(([name,text],index)=>({name,text,now:index===at,done:index<at}));
 }
 export const paintedCells=painted=>[...painted.entries()].map(([place,from])=>{const [col,row]=place.split(',').map(Number);return {col,row,from};});
 export function levelStatus(summary,playing){
  const rec=summary.level_recording,job=summary.level_job;
- if(rec)return `Recording ${rec.name}: ${plural(rec.captures,'moment')} captured${rec.captures>=rec.limit?' (that is the most one recording holds; finish the map)':''}.`;
+ if(rec)return rec.captures>=rec.limit?`That's as much as one map can hold, so finish it now (${plural(rec.captures,'screen')}).`:`Recording the level, ${plural(rec.captures,'screen')} so far. Play to the end of it, then finish the map.`;
  if(job?.state==='running')return `${job.message} ${job.done} of ${job.total}.`;
  if(job?.message)return job.message;
- return playing?'Play to the start of the level, then start recording.':'';
+ return playing?'Play to where the level starts, then record it.':'';
 }
 
 // ---- parts
@@ -72,43 +72,42 @@ export const levelChange=ed=>ed.proposal&&ed.proposal.level&&ed.level&&ed.propos
 export function levelsPart(ed){
  const summary=ed.summary,levels=summary.levels||[],rec=summary.level_recording,job=summary.level_job,walking=summary.recording?.state==='running';
  const building=job?.state==='running';
- const actions=rec?button('Finish the level map','level-stop',{primary:true,icon:'check',disabled:walking,reason:'Wait until ROMancer stops playing.'})+button(walking?'ROMancer is playing…':'Let ROMancer walk right','level-auto',{disabled:walking,reason:'Already playing.'}):
-  button('Record a level map','level-start',{icon:'plus',disabled:!ed.playing||building,reason:building?'ROMancer is still putting the last map together.':'Choose Play and capture a moment above and play to the start of the level first.'});
+ const actions=rec?button('Finish the map','level-stop',{primary:true,icon:'check',disabled:walking,reason:'Wait for the walk to finish.'})+button(walking?'Walking…':'Walk right for me','level-auto',{disabled:walking,reason:'Already walking.'}):
+  button('Record a level map','level-start',{icon:'plus',disabled:!ed.playing||building,reason:building?'The last map is still being put together.':'Start playing above and get to where the level starts first.'});
  return `<div class="card-heading"><h3>Level maps</h3>${badge(plural(levels.length,'level map'),levels.length?'good':'neutral')}</div>
- <p class="subtle">A level map is the whole background of a level, put together while the game scrolls. Play to where the level starts, start recording, then play through it. ROMancer keeps a scene every time the screen moves and lays them side by side.</p>
+ <p class="subtle">Record a level while you play and you get a map of the whole level that you can paint on.</p>
  <div class="actions">${actions}</div>
  <p class="subtle" id="level-status" role="status" aria-live="polite">${esc(levelStatus(summary,ed.playing))}</p>
  ${building?`<progress max="${job.total}" value="${job.done}" aria-label="Putting the map together"></progress>`:''}
- <div class="scene-strip" role="group" aria-label="Level maps">${levels.map(row=>`<button type="button" class="scene-thumb level-thumb ${ed.level?.id===row.id?'selected':''}" data-action="level-open" data-id="${row.id}" aria-pressed="${ed.level?.id===row.id}"><img alt="" data-picture="${esc(row.image)}" width="${row.pixel_width}" height="${row.pixel_height}"><span>${esc(row.name)} · ${row.planes[0].width} by ${row.planes[0].height} cells</span></button>`).join('')}</div>`;
+ <div class="scene-strip" role="group" aria-label="Level maps">${levels.map(row=>`<button type="button" class="scene-thumb level-thumb ${ed.level?.id===row.id?'selected':''}" data-action="level-open" data-id="${row.id}" aria-pressed="${ed.level?.id===row.id}"><img alt="" data-picture="${esc(row.image)}" width="${row.pixel_width}" height="${row.pixel_height}"><span>${esc(row.name)}</span></button>`).join('')}</div>`;
 }
 
 export function levelPart(ed,verdict,keep){
  const level=ed.level;if(!level||!level.view)return '';
  const view=level.view,change=levelChange(ed),painted=level.painted.size,brush=level.brush;
- const planes=view.planes.length>1?`<label>Show <select id="level-plane" aria-label="Which layers the map shows">${view.planes.map(p=>`<option value="${p.index}" ${p.index===view.plane?'selected':''}>${p.index===0?'All layers together':esc(p.name)+' alone'}</option>`).join('')}</select></label>`:'';
+ const planes=view.planes.length>1?`<label>Show <select id="level-plane" aria-label="Which layers the map shows">${view.planes.map(p=>`<option value="${p.index}" ${p.index===view.plane?'selected':''}>${p.index===0?'All layers':esc(p.name)+' only'}</option>`).join('')}</select></label>`:'';
  const choices=layerChoices(view),paintOn=choices.length?`<label>Paint on <select id="level-layers" aria-label="Which layers a change is made on">${choices.map(([value,label])=>`<option value="${value}" ${value===level.paintOn?'selected':''}>${esc(label)}</option>`).join('')}</select></label>`:'';
  const guide=`<ol class="level-steps" aria-label="How to change the level">${steps(level,change).map(step=>`<li class="${step.now?'now':step.done?'done':''}"${step.now?' aria-current="step"':''}><strong>${step.name}</strong><span>${step.text}</span></li>`).join('')}</ol>`;
- const sizes=units(view),unitPart=sizes.length>1?`<label>Brush snaps to <select id="level-unit" aria-label="What the brush snaps to">${sizes.map(u=>`<option value="${u.id}" ${u.id===level.unit?'selected':''}>${esc(u.label)}</option>`).join('')}</select></label>`:'';
+ const sizes=units(view),unitPart=sizes.length>1?`<label>Brush size <select id="level-unit" aria-label="Brush size">${sizes.map(u=>`<option value="${u.id}" ${u.id===level.unit?'selected':''}>${esc(u.label)}</option>`).join('')}</select></label>`:'';
  const zoom=`<label>Zoom <select id="level-zoom" aria-label="Zoom">${ZOOMS.map(z=>`<option value="${z}" ${z===level.zoom?'selected':''}>${z}x</option>`).join('')}</select></label>`;
  const tools=TOOLS.map(([id,label])=>`<button type="button" class="scene-mode ${level.tool===id?'active':''}" data-action="level-tool" data-id="${id}" aria-pressed="${level.tool===id}">${label}</button>`).join('');
- const hint=level.tool==='pick'?'Click a place to take its picture as your brush, or drag to take a block of places (a platform, a tree).':
-  !brush?'Pick a picture from the map first.':level.tool==='paint'?'Click or drag on the map to put your brush there.':'Click or drag over painted places to take the paint off.';
- const brushText=brush?`Brush: ${brush.width} by ${brush.height} ${brush.width*brush.height===1?'place':'places'} from column ${brush.col+1}, row ${brush.row+1}.`:'No brush yet.';
- const built=view.blocks?` This level is built from blocks of ${view.blocks.width} by ${view.blocks.height} cells${view.blocks.larger?`, laid out in larger blocks of ${view.blocks.larger.width} by ${view.blocks.larger.height}`:''}. Paint a whole block onto a whole block and ROMancer looks for the level's own list of blocks, so that only that place changes.`:'';
- const locked=view.status.includes('u')?' Places marked with a cross cannot be changed: ROMancer has not seen where the game gets them from.':'';
- const after=view.after?`<label class="level-toggle"><input type="checkbox" id="level-after" ${level.showAfter?'checked':''}> Show the map with the changes</label>`:'';
- const propose=button('Show what changes','level-propose',{primary:true,disabled:!painted,reason:'Paint at least one place first.'})+button('Clear paint','level-clear',{disabled:!painted&&!change});
- return `<div class="card-heading"><h3>${esc(view.name)}</h3>${badge(`${view.width} by ${view.height} cells · ${plural(view.scenes.length,'capture')}`,'neutral')}</div>
+ const hint=level.tool==='pick'?'Click a spot on the map to copy it, or drag across a bigger piece like a platform or a tree.':
+  !brush?'Copy something from the map first.':level.tool==='paint'?'Click or drag where you want it.':'Click or drag over your paint to remove it.';
+ const brushText=brush?`Copied a ${brush.width}×${brush.height} piece.`:'Nothing copied yet.';
+ const built=view.blocks?' The brush moves in whole blocks, the way this level is built, so a change can stay in one spot.':'';
+ const locked=view.status.includes('u')?" Spots with a cross can't be changed yet.":'';
+ const after=view.after?`<label class="level-toggle"><input type="checkbox" id="level-after" ${level.showAfter?'checked':''}> Show my changes</label>`:'';
+ const propose=button('Check in the game','level-propose',{primary:true,disabled:!painted,reason:'Paint something first.'})+button('Clear paint','level-clear',{disabled:!painted&&!change});
+ return `<div class="card-heading"><h3>${esc(view.name)}</h3>${badge(`${view.width}×${view.height} tiles`,'neutral')}</div>
  ${guide}
- <div class="actions level-bar">${planes}${paintOn}${zoom}${unitPart}${after}${button('Save map as PNG','level-export',{icon:'download'})}${button('Remove this level map','level-forget')}${button('Close','level-close')}</div>
+ <div class="actions level-bar">${planes}${paintOn}${zoom}${unitPart}${after}${button('Save map as PNG','level-export',{icon:'download'})}${button('Delete map','level-forget')}${button('Close','level-close')}</div>
  <div class="scene-modes" role="group" aria-label="Tool">${tools}</div>
  <p class="subtle" role="status">${hint}${built}${locked}</p>
  <div class="level-scroll" id="level-scroll" tabindex="0" aria-label="The level map. Scroll to move around."><canvas id="level-canvas" class="level-canvas" width="${view.width*view.cell*level.zoom}" height="${view.height*view.cell*level.zoom}" role="img" aria-label="Map of ${esc(view.name)}"></canvas></div>
- <p class="subtle" id="level-where" role="status">${brushText} ${painted?plural(painted,'place')+' painted.':''}</p>
+ <p class="subtle" id="level-where" role="status">${brushText} ${painted?plural(painted,'tile')+' painted.':''}</p>
  ${change?verdict(change):''}
- ${change&&view.unshown?`<p class="notice warm" role="status">${view.unshown===view.pending.filter(cell=>cell.change===change.id).length?'The places you painted':plural(view.unshown,'place')+' you painted'} ${view.unshown===1?'does':'do'} not look different on the map after the replay. The change may show somewhere else in the level. Look at the map before you keep it.</p>`:''}
- <div class="actions">${change?keep(change,propose):propose}${button('Open this place in its scene','level-goto',{disabled:!level.last,reason:'Click a place on the map first.'})}</div>
- <p class="subtle">A place on the map is a background cell of the scene that showed it. If the game builds that cell from a block it also uses elsewhere, every place that uses the block changes; the map shows them before you keep the change.</p>`;
+ ${change&&view.unshown?`<p class="notice warm" role="status">Some of what you painted doesn't show on the map after the check. It may appear somewhere else in the level, so look over the map before you keep it.</p>`:''}
+ <div class="actions">${change?keep(change,propose):propose}${button('Open in its scene','level-goto',{disabled:!level.last,reason:'Click a spot on the map first.'})}</div>`;
 }
 
 // ---- drawing
@@ -126,7 +125,7 @@ export async function drawLevel(ctx,ed,picture){
  context.lineWidth=1;
  // a room the game drew in the place of another starts a new section: mark where one ends and the next begins
  context.strokeStyle='rgba(255,255,255,.55)';context.fillStyle='rgba(255,255,255,.8)';context.font='12px sans-serif';context.setLineDash([6,4]);
- for(const [first] of view.sections.slice(1)){const x=first*size-size*2+.5;context.beginPath();context.moveTo(x,0);context.lineTo(x,canvas.height);context.stroke();context.fillText('another area',x+6,14);}
+ for(const [first] of view.sections.slice(1)){const x=first*size-size*2+.5;context.beginPath();context.moveTo(x,0);context.lineTo(x,canvas.height);context.stroke();context.fillText('separate area',x+6,14);}
  context.setLineDash([]);
  // places that cannot be changed
  context.strokeStyle='rgba(255,255,255,.35)';context.beginPath();

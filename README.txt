@@ -224,7 +224,7 @@ result for every ROM and the reason for each one that failed).
 - "Only in this scene" is rarely available: it was confirmed on 70 ROMs.
   Expect a change to apply everywhere the data is used.
 - Colors and pictures that the game works out while it runs can be locked.
-- Super NES replays are slow. With many recorded scenes, Show what changes
+- Super NES replays are slow. With many recorded scenes, Check in the game
   and Review and save can take minutes.
 - Kirby - Tilt 'n' Tumble: Scenes & colors is not available, because its tracing engine is not included.
 Playtest every build before sharing it.

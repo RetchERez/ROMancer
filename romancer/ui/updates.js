@@ -17,7 +17,7 @@ export function bannerHtml(s,wanted){
  const v=esc(s.latest.version),page=esc(s.latest.page||'');
  const notes=`<button type="button" data-update="notes">What’s new</button>`;
  if(!s.can_apply)return `<strong>Update ready: v${v}</strong><span>${esc(s.reason||'Download it from the release page.')}</span>${notes}<a href="${page}" target="_blank" rel="noopener">Release page</a><button type="button" data-update="hide" aria-label="Hide until next start">Later</button>`;
- if(s.task==='downloading')return `<strong>Downloading v${v}${percent(s.progress)}</strong><span>You can keep working. ROMancer restarts when it is done.</span>`;
+ if(s.task==='downloading')return `<strong>Downloading v${v}${percent(s.progress)}</strong><span>You can keep working, and ROMancer restarts when it's done.</span>`;
  if(s.task==='unpacking')return `<strong>Checking v${v}</strong><span>Every file is checked against the release before anything is changed.</span>`;
  if(s.task==='restarting')return `<strong>Restarting to update to v${v}</strong>`;
  if(wanted&&s.ready&&s.busy)return `<strong>v${v} is ready</strong><span>${esc(s.busy)} ROMancer restarts by itself as soon as it can.</span><button type="button" data-update="cancel">Not now</button>`;

@@ -80,6 +80,8 @@ APPROVED_FILES = frozenset({
     'trace/scene_speed.py',
     'trace/png_sweep.py',
     'trace/level_blocks.py',
+    'trace/level_collision.py',
+    'trace/level_objects_dump.py',
     'trace/level_report.py',
     'trace/level_roundtrip.py',
     'trace/patch_blastem.py',

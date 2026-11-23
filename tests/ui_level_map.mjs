@@ -16,8 +16,8 @@ assert.equal(placeAt(view,1,-1,4),null);
 // what the brush can snap to
 const [cells,blocks,larger]=units(view);
 assert.deepEqual([cells.id,blocks.id,larger.id],['cells','blocks','larger']);
-assert.match(blocks.label,/2 by 2 cells/);
-assert.match(larger.label,/4 by 4 cells/);
+assert.match(blocks.label,/Whole blocks \(2×2\)/);
+assert.match(larger.label,/Big blocks \(4×4\)/);
 assert.equal(units({...view,blocks:null}).length,1);
 assert.deepEqual(snap([4,3],cells),[4,3]);
 assert.deepEqual(snap([4,3],blocks),[3,2]);          // blocks start at column 1
@@ -46,9 +46,9 @@ assert.deepEqual(paintedCells(painted),[{col:3,row:2,from:[1,0]},{col:4,row:2,fr
 
 // status line
 assert.equal(levelStatus({level_recording:null,level_job:null},false),'');
-assert.match(levelStatus({level_recording:null,level_job:null},true),/start recording/);
-assert.match(levelStatus({level_recording:{name:'Level map 2',captures:1,limit:600},level_job:null},true),/Recording Level map 2: 1 moment captured\./);
-assert.match(levelStatus({level_recording:{name:'L',captures:600,limit:600},level_job:null},true),/finish the map/);
+assert.match(levelStatus({level_recording:null,level_job:null},true),/then record it/);
+assert.match(levelStatus({level_recording:{name:'Level map 2',captures:1,limit:600},level_job:null},true),/Recording the level, 1 screen so far\./);
+assert.match(levelStatus({level_recording:{name:'L',captures:600,limit:600},level_job:null},true),/finish it now/);
 assert.match(levelStatus({level_recording:null,level_job:{state:'running',message:'Putting the map together…',done:3,total:40}},false),/3 of 40/);
 assert.equal(levelStatus({level_recording:null,level_job:{state:'failed',message:'Nothing was captured.'}},false),'Nothing was captured.');
 
@@ -61,10 +61,10 @@ assert.match(html,/0 level maps/);
 html=levelsPart({summary,playing:true,level:null});
 assert.doesNotMatch(html.slice(html.indexOf('level-start')-200,html.indexOf('level-start')+200),/disabled/);
 html=levelsPart({summary:{...summary,level_recording:{name:'Level map 1',captures:12,limit:600}},playing:true,level:null});
-assert.match(html,/Finish the level map/);
-assert.match(html,/Let ROMancer walk right/);
+assert.match(html,/Finish the map/);
+assert.match(html,/Walk right for me/);
 html=levelsPart({summary:{...summary,levels:[{id:'lvl',name:'Stage <1>',scenes:9,planes:[{name:'Background',width:120,height:28,cell:8}],image:'level:lvl:0',pixel_width:960,pixel_height:224}]},playing:false,level:{id:'lvl'}});
-assert.match(html,/Stage &lt;1&gt; · 120 by 28 cells/);
+assert.match(html,/<span>Stage &lt;1&gt;<\/span>/);
 assert.match(html,/data-picture="level:lvl:0"/);
 assert.match(html,/aria-pressed="true"/);
 
@@ -74,15 +74,15 @@ const level={id:'lvl',view,unit:'blocks',tool:'pick',brush:null,painted:new Map(
 assert.equal(levelPart({level:null},verdict,keep),'');
 html=levelPart({level,proposal:null},verdict,keep);
 assert.match(html,/width="192" height="96"/);                         // 12 by 6 cells of 8 pixels at 2x
-assert.match(html,/built from blocks of 2 by 2 cells, laid out in larger blocks of 4 by 4/);
-assert.match(html,/Brush snaps to/);
-assert.match(html,/cannot be changed/);
-assert.match(html,/No brush yet\./);
-assert.match(html,/Show what changes/);
+assert.match(html,/The brush moves in whole blocks/);
+assert.match(html,/Brush size/);
+assert.match(html,/can't be changed yet/);
+assert.match(html,/Nothing copied yet\./);
+assert.match(html,/Check in the game/);
 assert.doesNotMatch(html,/KEEP/);
 level.brush=brush;level.tool='paint';level.painted=painted;
 html=levelPart({level,proposal:null},verdict,keep);
-assert.match(html,/Brush: 2 by 2 places from column 2, row 1\. 2 places painted\./);
+assert.match(html,/Copied a 2×2 piece\. 2 tiles painted\./);
 const proposal={id:'c1',level:{id:'lvl',plane:0,places:[[3,2]]},verdict:'Checked.'};
 assert.equal(levelChange({level,proposal}),proposal);
 assert.equal(levelChange({level,proposal:{id:'c2',level:{id:'other'}}}),null);
@@ -92,9 +92,9 @@ assert.match(html,/<p>Checked\.<\/p>/);
 assert.match(html,/KEEP/);
 assert.doesNotMatch(html,/not look different/);
 html=levelPart({level:{...level,view:{...view,unshown:1,pending:[{col:3,row:2,change:'c1'},{col:4,row:2,change:'c1'}]}},proposal},verdict,keep);
-assert.match(html,/1 place you painted does not look different on the map/);
+assert.match(html,/Some of what you painted doesn't show on the map after the check/);
 html=levelPart({level:{...level,view:{...view,unshown:2,pending:[{col:3,row:2,change:'c1'},{col:4,row:2,change:'c1'}]}},proposal},verdict,keep);
-assert.match(html,/The places you painted do not look different on the map/);
+assert.match(html,/Some of what you painted doesn't show on the map after the check/);
 // which layers a change is made on
 const two={...view,planes:[{index:0,name:'plane A',width,height,cell:8},{index:1,name:'plane B',width:20,height:6,cell:8}]};
 assert.deepEqual(layerChoices(view),[]);                                   // one layer: nothing to choose
@@ -105,8 +105,8 @@ assert.deepEqual(paintLayers(two,'all'),[0,1]);
 assert.deepEqual(paintLayers(two,'1'),[1]);
 assert.deepEqual(paintLayers({...two,plane:1},'all'),[1]);
 html=levelPart({level:{...level,view:two,paintOn:'1'},proposal:null},verdict,keep);
-assert.match(html,/All layers together/);
-assert.match(html,/plane B alone/);
+assert.match(html,/>All layers</);
+assert.match(html,/>plane B only</);
 assert.match(html,/Paint on/);
 assert.match(html,/<option value="1" selected>plane B only/);
 // the four steps
@@ -116,5 +116,5 @@ assert.deepEqual(steps({...fresh,brush},null).map(step=>step.now),[false,true,fa
 assert.deepEqual(steps({...fresh,brush,painted},null).map(step=>step.now),[false,false,true,false]);
 assert.deepEqual(steps(fresh,{working:1}).map(step=>step.now),[false,false,true,false]);
 assert.deepEqual(steps(fresh,{working:0,error:''}).map(step=>step.now),[false,false,false,true]);
-assert.match(levelPart({level:fresh,proposal:null},verdict,keep),/aria-current="step"><strong>Pick/);
+assert.match(levelPart({level:fresh,proposal:null},verdict,keep),/aria-current="step"><strong>Copy/);
 console.log('level map checks passed');

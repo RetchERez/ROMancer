@@ -85,6 +85,7 @@
         "Open <b>Settings</b>. Review appearance and startup preferences. <b>100%</b> is the standard interface size; it uses the more compact layout previously shown at 75%. Choose another offered size when useful.",
         "Choose <b>ROMancer (default)</b> for the original ROMancer teal palette and deeper menu/input surfaces; <b>Dark</b> for graphite or <b>Light</b> for grey panels on a light background. <b>Keep Advanced tools expanded</b> controls the navigation group.",
         "Review <b>Auto deep scan on ROM load</b>, enabled by default, and <b>Inspect gameplay graphics automatically</b>. Set <b>Remember my workspace</b> to reopen the last project, ROM, page and editing position. These preferences choose automatic work, not a new level of game-format verification.",
+        "Leave <b>Check for updates</b> on and ROMancer asks GitHub once a day whether a newer version is out. Nothing is downloaded until you choose to update, and <b>Check for updates now</b> asks straight away.",
         "Set <b>Volume</b> from 0 to 100, <b>Start game audio muted</b> and <b>Loop audio previews</b>. Choose <b>Apply</b> to save and continue, or <b>OK</b> to save and close. <b>Cancel</b> discards unapplied changes. <b>Restore defaults</b> prepares the standard choices; use Apply or OK to keep that reset."
       ],
       "result": "Applied preferences persist across launches for this workspace. The chosen theme and size make the controls comfortable to read, and automatic scan/audio behavior follows the saved choices.",
@@ -105,6 +106,10 @@
         {
           "title": "Basic and Advanced navigation",
           "text": "Basic keeps Overview, Text & layout, Graphics & fonts, Scenes & colors, Stats & data, Music & sound, Playtest and Export visible. Levels opens the level maps in Scenes &amp; colors. Expand Advanced for Game view, Resources/hex, Investigation, Recipes & definitions, Routes and Regression. A direct task opens the matching group automatically."
+        },
+        {
+          "title": "Updating ROMancer",
+          "text": "When a newer version is out, a banner above the status bar says <b>Update ready</b>. <b>What’s new</b> shows the release notes. <b>Update and restart</b> downloads the new version and checks it against the release’s checksums. It waits until nothing is being recorded or checked, then closes ROMancer, puts the new version in place and opens it again. Your projects are not touched, and if anything goes wrong the old version is put back and tells you why. <b>Later</b> hides the banner until the next start. If ROMancer can’t write to its own folder, or runs from source files, the banner links to the release page instead."
         }
       ],
       "related": [
@@ -907,7 +912,7 @@
         "Select your ROM in the top bar and open <b>Scenes &amp; colors</b>. A <b>scene</b> is a moment of the game that ROMancer has watched. To collect scenes, choose <b>Record more scenes</b> and the game plays by itself for a few minutes, or choose <b>Play and capture a moment</b>, play to the screen you want and choose <b>Capture this moment</b>. <b>Stop recording</b> ends a recording early.",
         "Choose a scene. Click a pixel in its picture, or choose a swatch under <b>Colors in this scene</b>. Pick the new color. The controls offer only colors the console can show: sliders on most systems, the console color chart on NES, and four shades on the original Game Boy.",
         "Under <b>Where should it change?</b>, keep <b>Everywhere this color is used</b>, or choose <b>Only in this scene</b> when it is offered. Only in this scene gives that scene its own copy of the color data. ROMancer then checks by replay that the other scenes stay as they are.",
-        "Choose <b>Show what changes</b>. The <b>Also changes</b> strip fills with every recorded scene that uses the same data. Each picture is the real game replayed with your change, not a guess. Scenes marked <b>Looks different</b> come first. Choose a picture to compare before and after.",
+        "Choose <b>Check in the game</b>. The <b>Also changes</b> strip fills with every recorded scene that uses the same data. Each picture is the real game replayed with your change, not a guess. Scenes marked <b>Looks different</b> come first. Choose a picture to compare before and after.",
         "Choose <b>Keep this change</b> to add it to the <b>Change list</b>, or <b>Cancel</b> to drop it. Nothing is written yet. In the list, <b>Show scenes</b> brings the pictures back and <b>Undo</b> removes the change.",
         "Choose <b>Review and save</b>. ROMancer replays every affected scene with all your changes together and lists everything that changes. <b>Save as a new build</b> writes a separate playable copy, then offers <b>Playtest saved build</b> and <b>Download patch</b>."
       ],
@@ -924,7 +929,7 @@
         },
         {
           "title": "When a change is not confirmed",
-          "text": "After you choose Show what changes, the real engine replays the scene with the edited bytes. If the color on screen does not become the one you picked, the editor says so, and the change is marked <b>Not confirmed by replay</b> in the Change list. Undo it unless you have a reason to keep it."
+          "text": "After you choose Check in the game, the real engine replays the scene with the edited bytes. If the color on screen does not become the one you picked, the editor says so, and the change is marked <b>Not confirmed by replay</b> in the Change list. Undo it unless you have a reason to keep it."
         },
         {
           "title": "Where scenes are kept",
@@ -953,7 +958,7 @@
       "id": "scenes-graphics",
       "image": "271-scenes-graphics",
       "image_alt": "Scenes & colors in Graphics mode: one 8 by 8 picture opened from the scene and redrawn, with the scenes that use it listed below",
-      "caption": "Graphics mode. Click a pixel in the scene to open the picture under it, redraw it, then choose Show what changes.",
+      "caption": "Graphics mode. Click a pixel in the scene to open the picture under it, redraw it, then choose Check in the game.",
       "title": "Redraw a picture or repaint the background",
       "part": "Basic",
       "kicker": "SCENES AND COLORS / NEW IN v1.1",
@@ -965,7 +970,7 @@
         "A background PNG can also rearrange the background. Copy the 8 by 8 square of one cell over another cell and load the PNG: ROMancer reads that as the cell being given that picture, and no picture is redrawn.",
         "<b>Save all graphics (ZIP)</b>, above the scenes, saves the pictures and background layers of every recorded scene in one file, with a list of what is in it.",
         "To change the background instead, choose <b>Background</b>. Choose the picture to paint with, then paint it into the cells of the layer.",
-        "Choose <b>Show what changes</b> and read the <b>Also changes</b> strip, then <b>Keep this change</b>. <b>Review and save</b> writes a separate build, as it does for colors."
+        "Choose <b>Check in the game</b> and read the <b>Also changes</b> strip, then <b>Keep this change</b>. <b>Review and save</b> writes a separate build, as it does for colors."
       ],
       "result": "The new build shows your picture or background. Your original ROM is unchanged.",
       "note": "A locked picture or cell cannot be changed here. The game builds it while it runs, or ROMancer has not seen where it comes from. A scene recorded at another moment may show it unlocked.",
@@ -976,7 +981,7 @@
         },
         {
           "title": "What to expect",
-          "text": "Measured across the catalog on development builds of the tracing engines, a color edit was confirmed by replay on 939 of 942 ROMs, a picture edit on 936 of 941 and a background edit on 922 of 941. <b>Only in this scene</b> is rarely available; expect a change to apply everywhere the data is used. Super NES replays are slow: with many recorded scenes, Show what changes and Review and save can take minutes."
+          "text": "Measured across the catalog on development builds of the tracing engines, a color edit was confirmed by replay on 939 of 942 ROMs, a picture edit on 936 of 941 and a background edit on 922 of 941. <b>Only in this scene</b> is rarely available; expect a change to apply everywhere the data is used. Super NES replays are slow: with many recorded scenes, Check in the game and Review and save can take minutes."
         }
       ],
       "related": [
@@ -995,29 +1000,29 @@
       "id": "level-maps",
       "image": "272-level-map",
       "image_alt": "A level map in Scenes & colors: the whole first stage laid out as one picture, a block picked as the brush and painted further along",
-      "caption": "A level map. Pick a block, paint it somewhere else, then choose Show what changes.",
+      "caption": "A level map. Copy a block, paint it somewhere else, then check it in the game.",
       "title": "See a whole level and change it",
       "part": "Basic",
       "kicker": "SCENES AND COLORS / NEW IN v1.4",
-      "intro": "A <b>level map</b> is the whole background of a level in one picture. ROMancer puts it together while the game scrolls, so it needs no definition for the game. You can save the map as a PNG, and paint on it: the real game is replayed and the map shows every place that changes before anything is saved.",
+      "intro": "A <b>level map</b> is a picture of a whole level that you can paint on. It is put together while you play, so it works without anything prepared for the game. You can save it as a PNG, and when you paint on it the real game is replayed so you can see every spot that changes before anything is saved.",
       "steps": [
-        "Choose <b>Levels</b> in the sidebar. Choose <b>Play and capture a moment</b> and play to where the level starts.",
-        "Choose <b>Record a level map</b>, then play through the level. ROMancer keeps a scene every time the screen moves. <b>Let ROMancer walk right</b> plays for you.",
-        "Choose <b>Finish the level map</b>. The map opens when it is ready. <b>Save map as PNG</b> saves the picture.",
-        "Choose <b>Pick a picture</b> and click a place on the map, or drag over several, to take it as your brush. When the level is built from blocks, the brush snaps to them.",
-        "If the level has more than one background layer, <b>Show</b> chooses all layers together or one alone, and <b>Paint on</b> chooses whether your change is made on all layers or on one.",
-        "Click or drag somewhere else to paint the brush there, then choose <b>Show what changes</b>. Read what ROMancer found, look at the map, then <b>Keep this change</b>. <b>Review and save</b> writes a separate build."
+        "Choose <b>Levels</b> in the sidebar. Start playing and get to where the level begins.",
+        "Choose <b>Record a level map</b> and play through the level. <b>Walk right for me</b> plays for you if you like.",
+        "Choose <b>Finish the map</b>. It opens when it is ready, and <b>Save map as PNG</b> saves the picture.",
+        "Choose <b>Copy</b> and click a spot on the map, or drag across a bigger piece such as a platform. In most games the brush moves in whole blocks, because that is how the level is built.",
+        "If the level has more than one background layer, <b>Show</b> picks whether you see all of them or just one, and <b>Paint on</b> picks which layers your change goes to.",
+        "Choose <b>Paint</b>, click or drag where you want the piece, then choose <b>Check in the game</b>. Look over the map, then choose <b>Keep this change</b>. <b>Review and save</b> writes a separate build."
       ],
-      "result": "The new build shows your change in the level. Your original ROM is unchanged.",
-      "note": "A map shows what was played through. Places no capture showed are dark. A room the game drew in the place of another starts a new section beside it. Enemies and items are not part of a level map.",
+      "result": "The new build has your change in the level. Your original ROM is not touched.",
+      "note": "A map shows what was played through, and spots no capture showed are hatched. A room the game draws in place of another appears beside it as a separate area. Enemies and items are not part of a level map yet.",
       "details": [
         {
-          "title": "One place, or everywhere a block is used",
-          "text": "Most games build a level from blocks and keep a list of which block goes where. When you paint a whole block onto a whole block, ROMancer looks for that list: in the ROM, and by following the level through the game's memory back to the ROM. It changes one entry, replays the game from the start of the recording, and keeps the change only when the block on screen is the one you asked for. Then only that place changes. When the list is not found, the block itself is changed, and every place that uses it changes with it. Either way the map shows every place that changed."
+          "title": "One spot, or everywhere a block is used",
+          "text": "Most games build a level from blocks and keep a list of which block goes where. When you paint a whole block onto a whole block, ROMancer looks for that list in the ROM, or follows the level through the game’s memory back to the ROM. It changes one entry and keeps it only if the replayed game shows your block where you painted it, so only that spot changes. If the list isn’t found, the block itself is changed, and every spot that uses it changes too. Either way the map shows every spot that changed."
         },
         {
           "title": "What to expect",
-          "text": "Measured on 42 well-known games that were played automatically, a level map was put together on 39. On 16 of them a block was changed in the level's own list and confirmed by replay, among them Castlevania, Metroid, Mega Man 3, Super Mario Bros. 3, Contra and Ninja Gaiden; on 3 more the block itself was changed. Games that keep a level packed in a form ROMancer does not know, and most Super NES and Mega Drive games, show their map but do not yet take a block in one place only."
+          "text": "On 42 well-known games played automatically, a level map was put together for 39. On 14 of them a block was changed in the level’s own list and confirmed by replay, including Castlevania, Castlevania III, Metroid, Contra, Ninja Gaiden, DuckTales and Adventure Island, and on 6 more the block itself was changed. Most Super NES and Mega Drive games show their map but can’t yet take a block in one spot only."
         }
       ],
       "related": [

@@ -43,28 +43,22 @@ DEBUG_LAYOUT = bool(__import__('os').environ.get('ROMANCER_DEBUG_LAYOUT'))
 MAX_LAYOUT_TRIES = 20       # replays spent on one block before giving up on the level's own list
 
 METHODS = {
-    'layout': 'The level is built from blocks, and the ROM lists which block goes where. Your change was made in that list, '
-              'so a whole block changes, and only in the places the game reads that entry for.',
-    'direct': 'This picture is stored as plain picture data in the ROM. Your version is written straight over it.',
-    'direct-packed': 'The bytes of this picture sit inside packed data in the ROM, but your version could be written straight '
-                     'over them without packing anything again. Bytes the packed data uses more than once change everywhere '
-                     'they are used; the checks above count them.',
-    'reencode': 'This picture is packed in the ROM. ROMancer unpacked the set it belongs to, changed it and packed it '
-                'again in the same place.',
-    'relocate': 'This picture is packed in the ROM, and the changed set no longer fits where it was. ROMancer wrote it '
-                'to unused space in the ROM and pointed the game at the new copy.',
-    'overlay': 'This picture is unpacked by the game while it runs, in a way ROMancer cannot pack again. ROMancer adds a '
-               'small patch that swaps your picture in after the game has loaded it.',
-    'private-copy': 'This scene gets its own copy of the data, and the game is pointed at the copy for this one use. '
-                    'The original data stays as it is.',
-    'import': 'These pictures came from a PNG you read in. Each one was changed the way the ROM keeps it: written straight '
-              'over plain picture data, packed again into its set, or swapped in by a small patch. The game was replayed '
-              'for each group and once more with all of them together.',
-    'cells': 'These background cells are stored as plain data in the ROM. Your version is written straight over them.',
-    'cells-reencode': 'This part of the background is packed in the ROM. ROMancer unpacked it, changed it and packed it again.',
-    'cells-built': 'The game builds this part of the background from a stored piece that it uses again and again (a block of '
-                   'cells, or a table it reads the pictures from). ROMancer changed the piece, so every place the game draws '
-                   'with it changes too; the checks above count them.',
+    'layout': "Changed in the level's own list of blocks, so only this spot in the level changes.",
+    'direct': 'Written straight over the picture in the ROM.',
+    'direct-packed': 'This picture sits inside packed data, but your version could be written straight over it without '
+                     'repacking. Bytes the packed data reuses change everywhere they are used, and the check counts them.',
+    'reencode': 'This picture is packed in the ROM, so its set was unpacked, changed and packed again in the same place.',
+    'relocate': "This picture is packed in the ROM and the changed set no longer fit, so it was written to unused space and "
+                'the game now reads the new copy.',
+    'overlay': "The game unpacks this picture in a way that can't be packed again, so a small patch swaps your picture in "
+               'after the game loads it.',
+    'private-copy': 'This scene gets its own copy of the data, and the game reads the copy here only. The original stays as it is.',
+    'import': 'These pictures came from your PNG. Each one was changed the way the ROM stores it, and the game was replayed '
+              'for each group and again with all of them together.',
+    'cells': 'Written straight over these background tiles in the ROM.',
+    'cells-reencode': 'This part of the background is packed in the ROM, so it was unpacked, changed and packed again.',
+    'cells-built': 'The game builds this part of the background from a piece it reuses, such as a block of tiles. That piece '
+                   'was changed, so everywhere the game draws it changes too.',
 }
 MAX_BUILT_CELLS = 6      # each cell built from a stored piece costs several replays to find that piece
 CELL_REASONS = {

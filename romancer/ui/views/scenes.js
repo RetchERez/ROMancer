@@ -49,7 +49,11 @@ function playPart(ed){
 }
 const byteText=value=>value===null||value===undefined?'new':value.toString(16).toUpperCase().padStart(2,'0');
 function verdictPart(change){
- if(change.checks?.length&&!change.error&&!change.planning)return `<div role="status" aria-live="polite">${change.checks.map(check=>`<p class="${checkTone(check.state)}"><strong>${esc(check.name)}.</strong> ${esc(check.text)}</p>`).join('')}</div>${change.method_text?`<p class="subtle">${esc(change.method_text)}${change.grows?` The ROM file gets ${plural(change.grows,'byte')} longer to make room.`:''}${change.every_scene?' The patch runs all the time, so every recorded scene was re-rendered, not only the ones that show this picture.':''}</p>`:''}`;
+ if(change.checks?.length&&!change.error&&!change.planning){
+  const worst=change.checks.some(check=>check.state==='bad')?'bad':change.checks.some(check=>check.state==='warn')?'warn':change.checks.some(check=>check.state==='working')?'working':'good';
+  const extra=[change.method_text,change.grows?`The ROM file gets ${plural(change.grows,'byte')} longer to make room.`:'',change.every_scene?'The patch runs all the time, so every recorded scene was redrawn.':''].filter(Boolean).join(' ');
+  return `<div role="status" aria-live="polite"><p class="${checkTone(worst)}">${esc(change.summary||change.verdict)}</p><details class="check-details"><summary>Details</summary><ul>${change.checks.map(check=>`<li class="${checkTone(check.state)}">${esc(check.text)}</li>`).join('')}</ul>${extra?`<p class="subtle">${esc(extra)}</p>`:''}</details></div>`;
+ }
  const tone=change.error||(!change.working&&!change.verified)?'notice warm':'notice';
  return `<p class="${tone}" role="status" aria-live="polite">${esc(change.verdict)}${change.planning&&change.progress?.done?` (replay ${change.progress.done})`:''}</p>`;
 }
@@ -113,7 +117,7 @@ function pickerPart(ed){
  <p class="subtle">${esc(picker.help)}</p>${pickerControls(ed,swatch,picker)}
  <fieldset class="scene-scope"><legend>Where should it change?</legend><label><input type="radio" name="scene-scope" value="all" ${ed.scopeChoice==='all'||!support.available?'checked':''}> Everywhere this color is used (${plural(swatch.uses,'recorded scene')})</label><label class="${support.available?'':'scene-disabled'}"><input type="radio" name="scene-scope" value="only_this" ${support.available?'':'disabled'} ${ed.scopeChoice==='only_this'&&support.available?'checked':''}> Only in this scene</label>${support.available?'<p class="subtle">Only this scene gives it a private copy of the data. ROMancer checks by replay that the other scenes stay as they are.</p>':`<p class="subtle">${esc(support.reason)}</p>`}</fieldset>
  ${proposal?`<p class="${proposal.error||(!proposal.working&&!proposal.verified)?'notice warm':'notice'}" role="status" aria-live="polite">${esc(proposal.verdict)}</p>`:''}
- <div class="actions">${proposal?button('Keep this change','scene-keep',{primary:true,icon:'check',disabled:!ready,reason:proposal.error?'This change could not be made.':'Wait until every scene has been re-rendered.'})+button('Cancel','scene-cancel'):button('Show what changes','scene-propose',{primary:true,disabled:unchanged,reason:'Choose a different color first.'})}</div>
+ <div class="actions">${proposal?button('Keep this change','scene-keep',{primary:true,icon:'check',disabled:!ready,reason:proposal.error?'This change could not be made.':'Wait until every scene has been redrawn.'})+button('Cancel','scene-cancel'):button('Check in the game','scene-propose',{primary:true,disabled:unchanged,reason:'Choose a different color first.'})}</div>
  <details><summary>Details</summary><p>This color is read from ${plural(swatch.details.filter(Boolean).length,'byte')} of the ROM${swatch.status==='code'?', written as a value inside the game code':''}.</p><ul>${swatch.details.filter(Boolean).map(row=>`<li>Place in the file: ${offsetText(row.file_offset)}</li>`).join('')}</ul>${swatch.notes.map(note=>`<p>${esc(note)}</p>`).join('')}</details>`;
 }
 function changesPart(ed){
@@ -181,7 +185,7 @@ function scopePart(ed,uses,what,support){
 function keepPart(proposal,propose){
  if(!proposal)return propose;
  const ready=!proposal.working&&!proposal.error;
- return button('Keep this change','scene-keep',{primary:true,icon:'check',disabled:!ready,reason:proposal.error?'This change could not be made.':'Wait until every scene has been re-rendered.'})+button('Cancel','scene-cancel');
+ return button('Keep this change','scene-keep',{primary:true,icon:'check',disabled:!ready,reason:proposal.error?'This change could not be made.':'Wait until every scene has been redrawn.'})+button('Cancel','scene-cancel');
 }
 function tilePart(ed){
  if(!ed.view)return '';
@@ -203,7 +207,7 @@ function tilePart(ed){
  <div class="actions">${button('Save as PNG','scene-tile-export',{icon:'download'})}${button('Load a PNG','scene-tile-import')}<input type="file" id="scene-tile-file" accept="image/png" hidden aria-label="PNG picture to load, 8 by 8 pixels"></div>
  ${scopePart(ed,tile.uses,'picture',ed.gfx.private_copy)}
  ${proposal?verdictPart(proposal):''}
- <div class="actions">${keepPart(proposal,button('Show what changes','scene-tile-propose',{primary:true}))}</div>
+ <div class="actions">${keepPart(proposal,button('Check in the game','scene-tile-propose',{primary:true}))}</div>
  <details><summary>Details</summary><p>${tile.bits} bits per pixel (${1<<tile.bits} colors), held at video memory address ${offsetText(tile.address)}.${tile.details.length?` First byte in the file: ${offsetText(tile.details[0])}.`:''}</p>${tile.notes.map(note=>`<p>${esc(note)}</p>`).join('')}</details>`;
 }
 function tileStatus(ed,tile){
@@ -225,7 +229,7 @@ function brushPart(ed){
  ${layer.lines>1?`<label class="scene-line"><span>Palette</span><select data-bg-line aria-label="Palette for painted cells"><option value="-1" ${brush.line<0?'selected':''}>Keep each cell's palette</option>${Array.from({length:layer.lines},(_,line)=>`<option value="${line}" ${line===brush.line?'selected':''}>Palette ${line+1}</option>`).join('')}</select></label>${layer.line_note?`<p class="subtle">${esc(layer.line_note)}</p>`:''}`:''}
  ${painted.length?`<p role="status">${plural(painted.length,'cell')} painted.${shared.length?` <strong>${plural(shared.length,'other cell')} in this scene ${shared.length===1?'is':'are'} stored in the same place in the ROM and will change too</strong> (outlined with dashes).`:''}${esc(builtCellsNote(packed))}</p>`:'<p class="subtle">Nothing painted yet.</p>'}
  ${proposal?verdictPart(proposal):''}
- <div class="actions">${keepPart(proposal,button('Show what changes','scene-bg-propose',{primary:true,disabled:!painted.length,reason:'Paint at least one cell first.'})+button('Clear painting','scene-bg-clear',{disabled:!painted.length,reason:'Nothing is painted.'}))}</div>
+ <div class="actions">${keepPart(proposal,button('Check in the game','scene-bg-propose',{primary:true,disabled:!painted.length,reason:'Paint at least one cell first.'})+button('Clear painting','scene-bg-clear',{disabled:!painted.length,reason:'Nothing is painted.'}))}</div>
  <p class="subtle">In this layer ${plural(plain,'cell')} can be changed directly, ${layer.counts.derived} ${layer.counts.derived===1?'is':'are'} built by the game while it runs, and ${layer.counts.unknown} ${layer.counts.unknown===1?'is':'are'} locked (shaded) because ROMancer has not seen where ${layer.counts.unknown===1?'it comes':'they come'} from.</p>
  <details><summary>Details</summary><p>${layer.width} by ${layer.height} cells of ${layer.cell} by ${layer.cell} pixels. ${layer.placed_by==='picture'?'Placed by matching it against the recorded screen.':layer.placed_by==='registers'?"Placed from the game's scroll registers.":'Not placed.'}</p>${layer.notes.map(note=>`<p>${esc(note)}</p>`).join('')}</details>`;
 }
@@ -451,7 +455,7 @@ async function playLoop(ctx,ed){
    if(packet.busy){if(status)status.textContent=packet.message+(packet.progress?` (${Math.round(100*packet.progress[0]/Math.max(1,packet.progress[1]))}%)`:'');await new Promise(resolve=>setTimeout(resolve,400));due=performance.now();continue;}
    const canvas=document.getElementById('scene-play-canvas');
    if(canvas){if(canvas.width!==packet.width||canvas.height!==packet.height){canvas.width=packet.width;canvas.height=packet.height;}const image=new Image();image.onload=()=>{if(canvas.isConnected)canvas.getContext('2d').drawImage(image,0,0);};image.src='data:image/png;base64,'+packet.png_base64;}
-   if(status)status.textContent=packet.level_captures!==null&&packet.level_captures!==undefined?`Recording the level: ${plural(packet.level_captures,'moment')} captured. Play through the level, then choose Finish the level map.`:'Playing. Capture the moment when the screen shows what you want to edit.';
+   if(status)status.textContent=packet.level_captures!==null&&packet.level_captures!==undefined?`Recording the level, ${plural(packet.level_captures,'screen')} so far. Play to the end of it, then finish the map.`:'The game is running. Capture the moment when the screen shows what you want to change.';
    due=Math.max(due+(taps.length?10:4)*1000/60,performance.now()-50);await new Promise(resolve=>setTimeout(resolve,Math.max(0,due-performance.now())));
   }catch(error){ed.playing=false;ctx.notify(error.message,true);update(ctx,ed,['scene-gallery','scene-play-panel']);break;}
  }
@@ -477,7 +481,7 @@ async function selectTile(ctx,ed,id,line){
  ed.tile={id,draft:tilePixels(tile),undo:[],ink:Math.min(1,(1<<tile.bits)-1),tool:'pencil',line:line??tile.line??0,cx:0,cy:0};
  update(ctx,ed,['scene-stage','scene-picker','scene-palette','scene-changes']);
 }
-// A drawing made after "Show what changes" replaces that preview; the list of changes is not touched.
+// A drawing made after "Check in the game" replaces that preview; the list of changes is not touched.
 function editedTile(ctx,ed){
  if(tileChange(ed))dropPreview(ctx,ed).then(()=>update(ctx,ed,['scene-stage','scene-picker','scene-changes'])).catch(()=>{});
  drawEditor(ed);drawOverlay(ed);
@@ -502,7 +506,7 @@ function paintCell(ctx,ed,cell){
  }
  if(cellChange(ed)){dropPreview(ctx,ed).then(()=>update(ctx,ed,['scene-stage','scene-picker','scene-changes'])).catch(()=>{});}
  if(brush.tool==='erase'){ed.painted.delete(cell.index);drawOverlay(ed);return;}
- if(cellState(layer,cell.index)==='locked'){if(!ed.dragging||!ed.warned){ed.warned=true;ctx.notify('That cell is locked: ROMancer has not seen where this part of the background comes from.');}return;}
+ if(cellState(layer,cell.index)==='locked'){if(!ed.dragging||!ed.warned){ed.warned=true;ctx.notify("That cell can't be changed, because where the game gets it from hasn't been found.");}return;}
  if(!brush.tile){if(!ed.warned){ed.warned=true;ctx.notify('Choose a picture to paint with first, from the pictures in this scene.');}return;}
  ed.painted.set(cell.index,{index:cell.index,cx:cell.cx,cy:cell.cy,tile:brush.tile,hflip:brush.hflip,vflip:brush.vflip,line:brush.line});
  drawOverlay(ed);
@@ -556,7 +560,7 @@ function mountGraphics(ctx,ed){
    image.onload=()=>{
     URL.revokeObjectURL(url);const buffer=document.createElement('canvas');buffer.width=8;buffer.height=8;const context=buffer.getContext('2d',{willReadFrequently:true});context.drawImage(image,0,0);
     remember(ed);ed.tile.draft=importPixels(context.getImageData(0,0,8,8).data,tilePalette(tile,ed.gfx.colors,ed.tile.line));editedTile(ctx,ed);
-    ctx.notify(image.naturalWidth===8&&image.naturalHeight===8?'Picture loaded. Each pixel took the nearest color of this palette.':'That PNG is not 8 by 8 pixels, so only its top-left 8 by 8 pixels were used. Each pixel took the nearest color of this palette.');
+    ctx.notify(image.naturalWidth===8&&image.naturalHeight===8?'The picture was loaded, and each pixel took the nearest color in this palette.':'That PNG is not 8 by 8 pixels, so only its top-left corner was used, and each pixel took the nearest color in this palette.');
    };
    image.onerror=()=>{URL.revokeObjectURL(url);ctx.notify('That file could not be read as a picture.',true);};image.src=url;node.value='';
   }
@@ -614,7 +618,7 @@ function graphicsHandlers(ctx,ed){
    const tile=selectedTile(ed);if(!tile)return;
    const buffer=document.createElement('canvas');buffer.width=8;buffer.height=8;
    buffer.getContext('2d').putImageData(new ImageData(tileRgba(ed.tile.draft,tilePalette(tile,ed.gfx.colors,ed.tile.line),tile.zero==='clear'),8,8),0,0);
-   buffer.toBlob(blob=>{if(!blob)return;const link=document.createElement('a'),url=URL.createObjectURL(blob);link.href=url;link.download=tile.name.replace(/[^A-Za-z0-9]+/g,'-').toLowerCase()+'.png';document.body.append(link);link.click();link.remove();setTimeout(()=>URL.revokeObjectURL(url),1000);ctx.notify('Saved as an 8 by 8 PNG. Edit it in any drawing program and load it back.');},'image/png');
+   buffer.toBlob(blob=>{if(!blob)return;const link=document.createElement('a'),url=URL.createObjectURL(blob);link.href=url;link.download=tile.name.replace(/[^A-Za-z0-9]+/g,'-').toLowerCase()+'.png';document.body.append(link);link.click();link.remove();setTimeout(()=>URL.revokeObjectURL(url),1000);ctx.notify('Saved as an 8 by 8 PNG that you can edit in any drawing program and load back.');},'image/png');
   },
   'scene-tile-import':()=>document.getElementById('scene-tile-file')?.click(),
   'scene-png-save':async node=>{
@@ -636,7 +640,7 @@ function graphicsHandlers(ctx,ed){
   'scene-png-load':node=>{ed.pngWhat=node.dataset.id;document.getElementById('scene-png-file')?.click();},
   'scene-tile-propose':async()=>{
    const tile=selectedTile(ed);if(!tile||!ed.tile)return;
-   if(sameTile(ed.tile.draft,tilePixels(tile,true))){ctx.notify('Draw something different first. The picture is still as the game has it.');return;}
+   if(sameTile(ed.tile.draft,tilePixels(tile,true))){ctx.notify('The picture is still the same as in the game, so draw something different first.');return;}
    const result=await call(ctx,ed,'propose_tile',{scene_id:ed.sceneId,tile:tile.id,pixels:pixelText(ed.tile.draft,tile.bits),scope:ed.scopeChoice});
    if(!current(ctx,ed))return;
    ed.proposal=result.change;ed.inspect=null;ed.summary.preview=result.change;ed.showOriginal=false;
@@ -689,7 +693,7 @@ function reviewBody(review){
  <h3>Everything that changes</h3><div class="scene-review-grid">${review.scenes.map(scene=>`<figure class="${scene.visible?'flagged':''}"><figcaption><strong>${esc(scene.label)}</strong><small>${scene.state==='working'?'Re-rendering…':scene.visible?'Looks different':'Uses changed data; nothing visible at this moment'}</small></figcaption><div class="scene-pair"><div><small>Before</small><img alt="Before" data-picture="${esc(scene.before)}" width="${scene.width}" height="${scene.height}"></div><div><small>After</small><img alt="After" data-picture="${esc(scene.after)}" width="${scene.width}" height="${scene.height}"></div></div></figure>`).join('')}</div>
  <p class="subtle">${esc(review.writes_note)}</p>
  ${review.grows?`<p class="notice">One of these changes needs more room than the ROM has, so the saved build is ${plural(review.grows,'byte')} longer than the original.</p>`:''}<details><summary>Details</summary><p>${plural(review.bytes,'byte')} will be written.</p>${review.details.map(change=>`<p><strong>${esc(change.title)}</strong></p><div class="table-wrap"><table><thead><tr><th>Place in the file</th><th>Before</th><th>After</th></tr></thead><tbody>${change.writes.map(row=>`<tr><td>${offsetText(row.file_offset)}</td><td>${byteText(row.before)}</td><td>${byteText(row.after)}</td></tr>`).join('')}</tbody></table></div>`).join('')}</details>
- <div class="actions">${button(review.ready?'Save as a new build':'Re-rendering scenes…','scene-save',{primary:true,icon:'download',disabled:!review.ready,reason:'Every scene is being re-rendered with all changes together.'})}${button('Keep editing','close-modal')}</div>`;
+ <div class="actions">${button(review.ready?'Save as a new build':'Re-rendering scenes…','scene-save',{primary:true,icon:'download',disabled:!review.ready,reason:'Every scene is being redrawn with all your changes together.'})}${button('Keep editing','close-modal')}</div>`;
 }
 async function reviewDialog(ctx,ed){
  let review=await call(ctx,ed,'review'),signature='';
@@ -741,7 +745,7 @@ export async function render(ctx){
   'scene-master':node=>{const picker=ed.view.pickers[selectedSwatch(ed).format];setDraft(ctx,ed,[[...picker.colors[Number(node.dataset.id)]]],{redraw:true});},
   'scene-shade':node=>{const picker=ed.view.pickers[selectedSwatch(ed).format],next=ed.draft.map(color=>[...color]);next[Number(node.dataset.slot)]=[...picker.colors[Number(node.dataset.id)]];setDraft(ctx,ed,next,{redraw:true});},
   'scene-propose':()=>propose(ctx,ed),
-  'scene-keep':async()=>{const id=ed.proposal?.id;if(!id)return;clearTimeout(ed.poll);const summary=await call(ctx,ed,'keep',{change_id:id});if(ed.proposal.kind==='background')ed.painted=new Map();ed.proposal=null;await refresh(ctx,ed,summary);update(ctx,ed);ctx.notify('Added to the change list. Nothing is written until you review and save.');},
+  'scene-keep':async()=>{const id=ed.proposal?.id;if(!id)return;clearTimeout(ed.poll);const summary=await call(ctx,ed,'keep',{change_id:id});if(ed.proposal.kind==='background')ed.painted=new Map();ed.proposal=null;await refresh(ctx,ed,summary);update(ctx,ed);ctx.notify('Added to your changes. Nothing is saved until you choose Review and save.');},
   'scene-cancel':async()=>{await dropPreview(ctx,ed);const swatch=selectedSwatch(ed);if(swatch)ed.draft=(swatch.pending||swatch.colors).map(color=>[...color]);await refresh(ctx,ed);update(ctx,ed);},
   'scene-undo':async node=>{const summary=await call(ctx,ed,'remove',{change_id:node.dataset.id});if(ed.inspect?.id===node.dataset.id)ed.inspect=null;await refresh(ctx,ed,summary);if(ed.tile&&selectedTile(ed)&&!tileChange(ed))ed.tile.draft=tilePixels(selectedTile(ed));const swatch=selectedSwatch(ed);if(swatch&&!ed.proposal)ed.draft=(swatch.pending||swatch.colors).map(color=>[...color]);update(ctx,ed);ctx.notify('Change undone.');},
   'scene-inspect':async node=>{if(ed.inspect?.id===node.dataset.id)ed.inspect=null;else{await dropPreview(ctx,ed);ed.inspect=(await call(ctx,ed,'change',{change_id:node.dataset.id})).change;}update(ctx,ed,['scene-stage','scene-picker','scene-changes']);document.getElementById('scene-also')?.scrollIntoView({block:'nearest'});},
@@ -753,7 +757,7 @@ export async function render(ctx){
   'scene-record-stop':async()=>{ed.summary=await call(ctx,ed,'record_stop');update(ctx,ed,['scene-gallery']);},
   'scene-play-toggle':()=>{ed.playing=!ed.playing;ed.held.clear();ed.taps=[];update(ctx,ed,['scene-gallery','scene-play-panel']);if(ed.playing){mountController(ctx,ed);document.getElementById('scene-controller')?.focus();void playLoop(ctx,ed);}else ed.ticket++;},
   'scene-tap':node=>{(ed.taps||=[]).push(node.dataset.id);},
-  'scene-capture':async()=>{const result=await call(ctx,ed,'capture',{label:''});await refresh(ctx,ed,result);await dropPreview(ctx,ed);ed.selected=null;await loadScene(ctx,ed,result.scene_id);update(ctx,ed,['scene-gallery','scene-stage','scene-palette','scene-picker','scene-changes']);ctx.notify('Captured. This moment is now a scene you can edit.');},
+  'scene-capture':async()=>{const result=await call(ctx,ed,'capture',{label:''});await refresh(ctx,ed,result);await dropPreview(ctx,ed);ed.selected=null;await loadScene(ctx,ed,result.scene_id);update(ctx,ed,['scene-gallery','scene-stage','scene-palette','scene-picker','scene-changes']);ctx.notify('This moment is now a scene you can edit.');},
   'scene-review':()=>reviewDialog(ctx,ed),
   'scene-save':async()=>{
    const result=await call(ctx,ed,'save',{revision:ed.review.revision});ed.review=null;ed.inspect=null;ed.proposal=null;

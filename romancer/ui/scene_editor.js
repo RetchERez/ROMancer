@@ -40,7 +40,7 @@ export function swatchLabel(swatch){
 export function changeLine(change){
  if(change.planning)return change.scope==='only_this'||!change.verdict?'Working out how to change only this scene…':change.verdict;
  if(change.error)return change.error;
- if(change.working)return `Re-rendering ${plural(change.working,'scene')} in the real game…`;
+ if(change.working)return `Redrawing ${plural(change.working,'scene')} in the real game…`;
  return `${change.badge}. ${plural(change.visible_count,'scene')} ${change.visible_count===1?'looks':'look'} different.`;
 }
 export const KEY_BUTTONS={ArrowUp:'up',ArrowDown:'down',ArrowLeft:'left',ArrowRight:'right',z:'a',x:'b',a:'x',s:'y',q:'l',w:'r',Enter:'start',Shift:'select'};
