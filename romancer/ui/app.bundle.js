@@ -10401,6 +10401,12 @@ ${state2.artifact.system_id ? `<details><summary>Advanced byte options</summary>
     if (job == null ? void 0 : job.message) return job.message;
     return playing ? "Play to where the level starts, then record it." : "";
   }
+  function objectLabel(item) {
+    if (item.kind === "enemy") return item.name;
+    if (item.kind === "treasure") return `${item.name} (${item.how.toLowerCase()})`;
+    if (item.kind === "block") return item.item ? `Breakable block with ${item.drop_name.toLowerCase()} inside` : "Breakable block, empty";
+    return item.name + ", drops " + item.drop_name;
+  }
   function objectAt(objects, x, y, reach = 12) {
     let best = null, dist = reach * reach;
     for (const item of objects || []) {
@@ -10438,15 +10444,17 @@ ${state2.artifact.system_id ? `<details><summary>Advanced byte options</summary>
     const guide = `<ol class="level-steps" aria-label="How to change the level">${steps2(level, change).map((step) => `<li class="${step.now ? "now" : step.done ? "done" : ""}"${step.now ? ' aria-current="step"' : ""}><strong>${step.name}</strong><span>${step.text}</span></li>`).join("")}</ol>`;
     const sizes = units(view2), unitPart = sizes.length > 1 ? `<label>Brush size <select id="level-unit" aria-label="Brush size">${sizes.map((u) => `<option value="${u.id}" ${u.id === level.unit ? "selected" : ""}>${esc(u.label)}</option>`).join("")}</select></label>` : "";
     const zoom = `<label>Zoom <select id="level-zoom" aria-label="Zoom">${ZOOMS.map((z) => `<option value="${z}" ${z === level.zoom ? "selected" : ""}>${z}x</option>`).join("")}</select></label>`;
-    const tools = [...TOOLS, ...((_a = level.objects) == null ? void 0 : _a.profile) ? [["objects", "Enemies and items"]] : [], ["play", "Play from here"], ["compare", "Before and after"]].map(([id, label]) => `<button type="button" class="scene-mode ${level.tool === id ? "active" : ""}" data-action="level-tool" data-id="${id}" aria-pressed="${level.tool === id}">${label}</button>`).join("");
-    const hint = level.tool === "compare" ? "Click a spot on the map. ROMancer replays your recorded walk from there on the original game and on the game with your kept changes, side by side." : level.tool === "play" ? "Click a spot on the map. The game starts there with your kept changes, so you can play it." : level.tool === "objects" ? "Click an enemy or a candle to see what it is and change it." : level.tool === "pick" ? "Click a spot on the map to copy it, or drag across a bigger piece like a platform or a tree." : !brush ? "Copy something from the map first." : level.tool === "paint" ? "Click or drag where you want it." : "Click or drag over your paint to remove it.";
+    const tools = [...TOOLS, ...((_a = level.objects) == null ? void 0 : _a.profile) ? [["objects", "Enemies, items and secrets"]] : [], ["play", "Play from here"], ["compare", "Before and after"]].map(([id, label]) => `<button type="button" class="scene-mode ${level.tool === id ? "active" : ""}" data-action="level-tool" data-id="${id}" aria-pressed="${level.tool === id}">${label}</button>`).join("");
+    const hint = level.tool === "objects" ? "Click an enemy, a candle, a breakable block (purple) or a hidden treasure (green) to see what it is and change it." : level.tool === "compare" ? "Click a spot on the map. ROMancer replays your recorded walk from there on the original game and on the game with your kept changes, side by side." : level.tool === "play" ? "Click a spot on the map. The game starts there with your kept changes, so you can play it." : level.tool === "objects" ? "Click an enemy or a candle to see what it is and change it." : level.tool === "pick" ? "Click a spot on the map to copy it, or drag across a bigger piece like a platform or a tree." : !brush ? "Copy something from the map first." : level.tool === "paint" ? "Click or drag where you want it." : "Click or drag over your paint to remove it.";
     const brushText = brush ? `Copied a ${brush.width}×${brush.height} piece.` : "Nothing copied yet.";
     const built = view2.blocks ? " The brush moves in whole blocks, the way this level is built, so a change can stay in one spot." : "";
     const locked = view2.status.includes("u") ? " Spots with a cross can't be changed yet." : "";
-    const known = ((_b = level.objects) == null ? void 0 : _b.profile) ? `<label class="level-toggle"><input type="checkbox" id="level-show-objects" ${level.showObjects ? "checked" : ""}> Show enemies and items (object layer)</label><label class="level-toggle"><input type="checkbox" id="level-show-solid" ${level.showSolid ? "checked" : ""}> Show what's solid</label>` : "";
+    const known = ((_b = level.objects) == null ? void 0 : _b.profile) ? `<label class="level-toggle"><input type="checkbox" id="level-show-objects" ${level.showObjects ? "checked" : ""}> Show enemies, items and secrets (object layer)</label><label class="level-toggle"><input type="checkbox" id="level-show-solid" ${level.showSolid ? "checked" : ""}> Show what's solid</label>` : "";
     const picked = level.picked, offered = level.choices;
     const job = level.compare, comparePanel = job ? `<div class="notice level-compare" role="group" aria-label="Before and after"><p><strong>Before and after</strong></p><p role="status">${esc(job.message)}${job.state === "running" ? ` (${Math.round(100 * job.done / Math.max(1, job.total))}%)` : ""}</p>${job.state === "finished" && level.compareGif ? `<img class="level-compare-picture" src="data:image/gif;base64,${level.compareGif}" width="${job.width}" height="${job.height}" alt="The recorded walk, the original game on the left and the changed game on the right">` : ""}<div class="actions">${job.state === "finished" && level.compareGif ? button("Save as GIF", "level-compare-save", { icon: "download", primary: true }) : ""}${job.state !== "running" ? button("Close", "level-compare-close") : ""}</div></div>` : "";
-    const objectPanel = level.tool === "objects" && picked ? `<div class="notice level-object" role="group" aria-label="${esc(picked.name)}"><p><strong>${esc(picked.name)}</strong>${picked.kind === "candle" ? `, drops ${esc(picked.drop_name)}` : ""}</p>${picked.kind === "candle" && picked.shared > 1 ? `<p class="subtle">This candle shares its settings with ${picked.shared - 1} other ${picked.shared === 2 ? "candle" : "candles"} in this stage, so a new drop is given to this one alone by pointing it at another of the game's candles at the same spot.</p>` : ""}${picked.kind === "candle" ? `<label>Drops <select id="level-object-drop">${((offered == null ? void 0 : offered.drops) || []).map((c) => `<option value="${c.index}" ${c.index === picked.index ? "selected" : ""}>${esc(c.name)}${c.drop & 240 && (c.drop & 15) === 1 ? " (colour " + (c.drop >> 4) + ")" : ""}</option>`).join("")}</select></label>` : `<label>Swap for <select id="level-object-enemy">${((offered == null ? void 0 : offered.enemies) || []).map((c) => `<option value="${c.index}" ${c.index === picked.index ? "selected" : ""}>${esc(c.name)} (height ${c.y})</option>`).join("")}</select></label>`}<div class="actions">${button("Check in the game", "level-object-apply", { primary: true })}${button(picked.kind === "candle" ? "Remove this candle" : "Remove this enemy", "level-object-remove")}</div></div>` : "";
+    const quest = (picked == null ? void 0 : picked.second_quest) ? '<p class="subtle">Only in the second quest (the harder game after the ending).</p>' : "";
+    const secretPanel = level.tool === "objects" && picked && (picked.kind === "block" || picked.kind === "treasure") ? `<div class="notice level-object" role="group" aria-label="${esc(objectLabel(picked))}"><p><strong>${esc(objectLabel(picked))}</strong></p>${quest}${picked.kind === "block" ? `<label>Inside <select id="level-secret-item">${(level.objects.block_items || []).map((c) => `<option value="${c.item}" ${c.item === picked.item ? "selected" : ""}>${esc(c.name)}</option>`).join("")}</select></label>` : `<label>Treasure <select id="level-secret-treasure">${(level.objects.treasures || []).map((c) => `<option value="${c.treasure}" ${c.treasure === picked.treasure ? "selected" : ""}>${esc(c.name)}</option>`).join("")}</select></label><label>Found by <select id="level-secret-trigger">${(level.objects.triggers || []).map((c) => `<option value="${c.trigger}" ${c.trigger === picked.trigger ? "selected" : ""}>${esc(c.name)}</option>`).join("")}</select></label>`}${picked.shared > 1 ? `<p class="subtle">This list is shared with ${picked.shared - 1} other ${picked.shared === 2 ? "stage" : "stages"}, so the change shows there too.</p>` : ""}<div class="actions">${button("Check in the game", "level-secret-apply", { primary: true })}</div></div>` : "";
+    const objectPanel = secretPanel ? secretPanel : level.tool === "objects" && picked && (picked.kind === "enemy" || picked.kind === "candle") ? `<div class="notice level-object" role="group" aria-label="${esc(picked.name)}"><p><strong>${esc(picked.name)}</strong>${picked.kind === "candle" ? `, drops ${esc(picked.drop_name)}` : ""}</p>${picked.kind === "candle" && picked.shared > 1 ? `<p class="subtle">This candle shares its settings with ${picked.shared - 1} other ${picked.shared === 2 ? "candle" : "candles"} in this stage, so a new drop is given to this one alone by pointing it at another of the game's candles at the same spot.</p>` : ""}${picked.kind === "candle" ? `<label>Drops <select id="level-object-drop">${((offered == null ? void 0 : offered.drops) || []).map((c) => `<option value="${c.index}" ${c.index === picked.index ? "selected" : ""}>${esc(c.name)}${c.drop & 240 && (c.drop & 15) === 1 ? " (colour " + (c.drop >> 4) + ")" : ""}</option>`).join("")}</select></label>` : `<label>Swap for <select id="level-object-enemy">${((offered == null ? void 0 : offered.enemies) || []).map((c) => `<option value="${c.index}" ${c.index === picked.index ? "selected" : ""}>${esc(c.name)} (height ${c.y})</option>`).join("")}</select></label>`}<div class="actions">${button("Check in the game", "level-object-apply", { primary: true })}${button(picked.kind === "candle" ? "Remove this candle" : "Remove this enemy", "level-object-remove")}</div></div>` : "";
     const after = view2.after ? `<label class="level-toggle"><input type="checkbox" id="level-after" ${level.showAfter ? "checked" : ""}> Show my changes</label>` : "";
     const propose2 = button("Check in the game", "level-propose", { primary: true, disabled: !painted, reason: "Paint something first." }) + button("Clear paint", "level-clear", { disabled: !painted && !change });
     return `<div class="card-heading"><h3>${esc(view2.name)}</h3>${badge(`${view2.width}×${view2.height} tiles`, "neutral")}</div>
@@ -10525,13 +10533,15 @@ ${state2.artifact.system_id ? `<details><summary>Advanced byte options</summary>
             context.globalAlpha = 1;
           } else image2.onload = () => void drawLevel(ctx2, ed, picture2);
         }
-        context.strokeStyle = item.kind === "enemy" ? "#ff5a5a" : "#ffd166";
+        context.strokeStyle = { enemy: "#ff5a5a", candle: "#ffd166", treasure: "#5ee6b0", block: "#c792ff" }[item.kind] || "#ffd166";
         context.lineWidth = item === level.picked ? 3 : 1.5;
+        if (item.kind === "treasure" || item.kind === "block") context.setLineDash([3 * zoom, 2 * zoom]);
         context.strokeRect(x - w / 2, y - h, w, h);
+        context.setLineDash([]);
         context.lineWidth = 1;
         if (item === level.picked) {
           context.fillStyle = "rgba(0,0,0,.7)";
-          const label = item.kind === "enemy" ? item.name : item.name + ", drops " + item.drop_name, width = context.measureText(label).width + 6;
+          const label = objectLabel(item), width = context.measureText(label).width + 6;
           context.fillRect(x - w / 2, y - h - 14 * zoom / 2 - 4, width, 12 + zoom);
           context.fillStyle = "#fff";
           context.fillText(label, x - w / 2 + 3, y - h - 6);
@@ -10780,6 +10790,30 @@ ${state2.artifact.system_id ? `<details><summary>Advanced byte options</summary>
         host.update(["scene-level", "scene-changes"]);
         host.watchProposal();
       },
+      "level-secret-apply": async () => {
+        const level = ed.level, picked = level == null ? void 0 : level.picked;
+        if (!picked) return;
+        const value = (id) => {
+          const node = document.getElementById(id);
+          return node ? Number(node.value) : null;
+        };
+        await host.dropPreview();
+        const result = await host.call("level_secret", {
+          level_id: level.id,
+          kind: picked.kind,
+          number: picked.number,
+          stage: picked.stage,
+          floor: picked.floor,
+          item: picked.kind === "block" ? value("level-secret-item") : null,
+          treasure: picked.kind === "treasure" ? value("level-secret-treasure") : null,
+          trigger: picked.kind === "treasure" ? value("level-secret-trigger") : null
+        });
+        if (!host.current()) return;
+        ed.proposal = result.change;
+        ed.summary.preview = result.change;
+        host.update(["scene-level", "scene-changes"]);
+        host.watchProposal();
+      },
       "level-object-remove": async () => {
         const level = ed.level, picked = level == null ? void 0 : level.picked;
         if (!picked) return;
@@ -10872,7 +10906,7 @@ ${state2.artifact.system_id ? `<details><summary>Advanced byte options</summary>
           level.picked = item;
           level.choices = null;
           host.update(["scene-level"]);
-          if (item) void host.call("level_object_choices", { level_id: level.id, zone: item.zone, stage: item.stage, floor: item.floor }).then((choices) => {
+          if (item && (item.kind === "enemy" || item.kind === "candle")) void host.call("level_object_choices", { level_id: level.id, zone: item.zone, stage: item.stage, floor: item.floor }).then((choices) => {
             if (ed.level === level && level.picked === item) {
               level.choices = choices;
               host.update(["scene-level"]);
@@ -10901,7 +10935,7 @@ ${state2.artifact.system_id ? `<details><summary>Advanced byte options</summary>
         if (level && canvas && event.target === canvas && level.showObjects && ((_a2 = level.objects) == null ? void 0 : _a2.objects)) {
           const box = canvas.getBoundingClientRect(), x = (event.clientX - box.left) * canvas.width / box.width / level.zoom, y = (event.clientY - box.top) * canvas.height / box.height / level.zoom;
           const item = objectAt(level.objects.objects, x, y);
-          canvas.title = item ? item.kind === "enemy" ? item.name : item.name + ", drops " + item.drop_name : "";
+          canvas.title = item ? objectLabel(item) : "";
         }
         if (!level || !level.drag && !level.stroke) return;
         const place = at(event);

@@ -28,8 +28,18 @@ class Castlevania:
     ENEMIES = {0x01: 'Zombies', 0x02: 'Zombies', 0x03: 'Zombies', 0x04: 'Zombies', 0x05: 'Zombies', 0x06: 'Zombies',
                0x51: 'Panther', 0x5E: 'Phantom Bat (boss)'}
     UNSURE = set()
-    DROPS = {0x0: 'Heart or whip upgrade', 0x1: 'Money bag', 0x4: 'Large heart', 0x8: 'Dagger', 0x9: 'Cross',
-             0xA: 'Rosary', 0xB: 'Holy water', 0xC: 'Double or triple shot', 0xD: 'Axe', 0xF: 'Stopwatch'}
+    # item codes, from the pickup code at $E73E (bank 7): 0 small heart (a weak whip gets the whip upgrade instead), 1 money
+    # bag, 3 whip upgrade, 4 large heart, 5 pot roast, 6 magic crystal, A rosary, C double or triple shot, E invisibility
+    # potion, and the rest set the subweapon (2 and 7 are numbers no subweapon uses)
+    DROPS = {0x0: 'Heart or whip upgrade', 0x1: 'Money bag', 0x2: 'Empty subweapon (0x02)', 0x3: 'Whip upgrade',
+             0x4: 'Large heart', 0x5: 'Pot roast', 0x6: 'Magic crystal (ends the stage)', 0x7: 'Empty subweapon (0x07)',
+             0x8: 'Dagger', 0x9: 'Cross', 0xA: 'Rosary', 0xB: 'Holy water', 0xC: 'Double or triple shot', 0xD: 'Axe',
+             0xE: 'Invisibility potion', 0xF: 'Stopwatch'}
+    # hidden treasure ($A63A, bank 6): 4 bytes each, table $FC14 by stage. What appears is byte 3; how it is found is
+    # bits 1-2 of byte 0 (jump table at $A67C)
+    TREASURES = {0: 'Money bag', 1: 'Extra life', 2: 'Crown', 3: 'Treasure chest', 4: 'Moai head'}
+    TRIGGERS = {0: 'Stand still there', 1: 'Crouch there', 2: 'Keep walking there', 3: 'Walk there'}
+    BANK6 = 0x18000
     SOLID = range(0x60, 0x6C)
     BREAKABLE = {0x66}
 
@@ -78,6 +88,82 @@ class Castlevania:
                         'enemy': self.enemy_record(enemy_index), 'candle': self.candle_record(candle_index)})
         return out
 
+    # ---- secrets: hidden treasure and breakable blocks (bank 6)
+    def _b6(self, address: int) -> int:
+        return self.rom[HEADER_NES + self.BANK6 + (address - 0x8000)]
+
+    def _offset6(self, address: int) -> int:
+        return HEADER_NES + self.BANK6 + (address - 0x8000)
+
+    def _list_users(self, table: int, stage: int) -> int:
+        pointer = self._word(table + stage * 2)
+        return sum(1 for other in range(19) if self._word(table + other * 2) == pointer)
+
+    def treasures(self, stage: int, floor: int) -> list:
+        """Hidden treasure of a stage floor. x is in stage pixels like the other objects; y is where Simon stands."""
+        address, out = self._word(0xFC14 + stage * 2), []
+        for number in range(16):
+            first = self._b6(address)
+            if first == 0xFF:
+                break
+            b1, b3 = self._b6(address + 1), self._b6(address + 3)
+            if first & 1 == floor:
+                out.append({'kind': 'treasure', 'number': number, 'x': ((b1 & 0x07) << 8 | (b1 & 0xF8)) + self.ZONE + 1,
+                            'y': first & 0xF0, 'treasure': b3, 'trigger': (first >> 1) & 3, 'second_quest': bool(first & 8),
+                            'name': 'Hidden ' + self.TREASURES.get(b3, f'treasure {b3:#04x}').lower(),
+                            'how': self.TRIGGERS[(first >> 1) & 3], 'byte': self._offset6(address),
+                            'shared': self._list_users(0xFC14, stage)})
+            address += 4
+        return out
+
+    def block_items(self) -> list:
+        """What a breakable block can hold: its 3-bit number picks an item code from the table at $AA4F."""
+        return [self._b6(0xAA4F + n) for n in range(8)]
+
+    def block_item_name(self, number: int) -> str:
+        return 'Nothing' if number == 0 else self.drop_name(self.block_items()[number])
+
+    def blocks(self, stage: int, floor: int) -> list:
+        """Breakable blocks that hold something ($A825, bank 6): 2 bytes each, table $FC4D by stage, 0 ends it."""
+        address, out = self._word(0xFC4D + stage * 2), []
+        for number in range(16):
+            b0 = self._b6(address)
+            if b0 == 0:
+                break
+            b1 = self._b6(address + 1)
+            if (b0 >> 3) & 1 == floor:
+                item = b0 & 7
+                out.append({'kind': 'block', 'number': number, 'x': ((b1 & 0x07) << 8 | (b1 & 0xF0)) + 8 + self.ZONE + 1,
+                            'y': (b0 & 0xF0) + 16, 'item': item, 'second_quest': bool(b1 & 8),
+                            'name': 'Breakable block', 'drop_name': self.block_item_name(item),
+                            'byte': self._offset6(address), 'shared': self._list_users(0xFC4D, stage)})
+            address += 2
+        return out
+
+    def secret_writes(self, kind: str, stage: int, floor: int, number: int, item=None, treasure=None, trigger=None) -> list:
+        """[(offset, old, new)] for a change to one secret."""
+        rows = self.blocks(stage, floor) if kind == 'block' else self.treasures(stage, floor)
+        row = next((r for r in rows if r['number'] == int(number)), None)
+        if row is None:
+            raise ValueError('That secret is not part of this stage.')
+        writes = []
+        if kind == 'block' and item is not None:
+            if not 0 <= int(item) <= 7:
+                raise ValueError('Choose one of the items a block can hold.')
+            old = self.rom[row['byte']]
+            writes.append((row['byte'], old, (old & 0xF8) | int(item)))
+        if kind == 'treasure':
+            if treasure is not None:
+                if int(treasure) not in self.TREASURES:
+                    raise ValueError('Choose one of the game\u2019s treasures.')
+                writes.append((row['byte'] + 3, self.rom[row['byte'] + 3], int(treasure)))
+            if trigger is not None:
+                if int(trigger) not in self.TRIGGERS:
+                    raise ValueError('Choose how the treasure is found.')
+                old = self.rom[row['byte']]
+                writes.append((row['byte'], old, (old & ~0x06 & 0xFF) | int(trigger) << 1))
+        return [w for w in writes if w[1] != w[2]]
+
     def drop_name(self, drop: int) -> str:
         low = drop & 0x0F
         return self.DROPS.get(low, f'Item {low:#04x}')
@@ -104,7 +190,7 @@ class Castlevania:
                             'drop_name': self.drop_name(c['drop']), 'x': base + c['dx'], 'y': c['y'],
                             'index': row['candle_index'], 'byte': row['candle_byte'],
                             'shared': self.candle_users(stage, floor, row['candle_index'], count)})
-        return out
+        return out + self.treasures(stage, floor) + self.blocks(stage, floor)
 
     def candle_users(self, stage: int, floor: int, index: int, count: int = 64) -> int:
         table = self.zone_table(stage, floor)

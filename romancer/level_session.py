@@ -436,10 +436,13 @@ class LevelTools:
                 tile = (cell.tile_address % 0x1000) // 16
                 role = profile.tile_role(tile)
                 roles[row * stored['width'] + column] = {'solid': 's', 'breakable': 'b'}.get(role, '.')
-            self._object_pictures(level, objects)
+            self._object_pictures(level, [o for o in objects if o['kind'] in ('enemy', 'candle')])
             return {'profile': profile.name, 'parts': [{k: part[k] for k in ('section', 'stage', 'floor')} for part in parts],
                     'objects': objects, 'roles': ''.join(roles),
-                    'enemy_choices': profile.enemy_choices()}
+                    'enemy_choices': profile.enemy_choices(),
+                    'block_items': [{'item': n, 'name': profile.block_item_name(n)} for n in range(8)],
+                    'treasures': [{'treasure': k, 'name': v} for k, v in profile.TREASURES.items()],
+                    'triggers': [{'trigger': k, 'name': v} for k, v in profile.TRIGGERS.items()]}
 
     def _object_pictures(self, level: dict, objects: list) -> None:
         """Give each object the picture the game draws for it: from a capture that shows that spot, the pixels where the
@@ -523,6 +526,102 @@ class LevelTools:
         stored['object_check'] = {'state': 'working', 'text': 'Playing the game from the start to see the change happen…'}
         threading.Thread(target=self._check_object, args=(stored, level, expect), name='romancer-object-check', daemon=True).start()
         return self.change(change['id'])
+
+    def propose_level_secret(self, level_id: str, kind: str, number: int, stage: int, floor: int,
+                             item=None, treasure=None, trigger=None) -> dict:
+        """Change what a breakable block holds, or what hidden treasure appears and how it is found."""
+        with self.lock:
+            level = self._level(level_id)
+            context = self._profile_context(level)
+            if context is None:
+                raise ValueError('ROMancer does not know the secrets of this game yet.')
+            profile = context[0]
+            if kind not in ('block', 'treasure'):
+                raise ValueError('Choose a breakable block or a hidden treasure.')
+            stage, floor, number = int(stage), int(floor), int(number)
+            writes = profile.secret_writes(kind, stage, floor, number, item, treasure, trigger)
+            if not writes:
+                raise ValueError('That is how the game already has it.')
+            if kind == 'block':
+                title = f'Breakable block holds: {profile.block_item_name(int(item))}'
+                expect = {'kind': 'block', 'number': number, 'stage': stage,
+                          'drop': None if int(item) == 0 else profile.block_items()[int(item)]}
+            else:
+                row = next(r for r in profile.treasures(stage, floor) if r['number'] == number)
+                shown = row['treasure'] if treasure is None else int(treasure)
+                how = row['trigger'] if trigger is None else int(trigger)
+                title = f'Hidden treasure: {profile.TREASURES[shown]}, {profile.TRIGGERS[how].lower()}'
+                expect = {'kind': 'treasure', 'number': number, 'stage': stage, 'treasure': shown}
+            change = self.propose_writes(level['scene_ids'][0], writes, title, kind='level-object')
+            stored = self._find(change['id'])
+            stored['object_check'] = {'state': 'working', 'text': 'Playing the game from the start to see the change happen…'}
+        threading.Thread(target=self._check_secret, args=(stored, level, expect), name='romancer-secret-check', daemon=True).start()
+        return self.change(change['id'])
+
+    def _check_secret(self, change: dict, level: dict, expect: dict) -> None:
+        """Replay the recorded walk with the change and watch for the secret being found: the game's own found-flags
+        ($0144 treasure, $0146 blocks, one bit per secret) and then what appeared."""
+        from array import array
+        import zlib
+        from . import edit_session as es
+        try:
+            meta = self.meta[level['scene_ids'][0]]
+            run_dir = self.store / 'runs' / meta['run']
+            inputs = array('H')
+            inputs.frombytes((run_dir / 'inputs.bin').read_bytes())
+            start = min(meta['checkpoints'])
+            state = zlib.decompress((run_dir / f'{start}.st').read_bytes())
+            end = min(len(inputs), max(self.meta[s]['frame'] for s in level['scene_ids']) + 120)
+            path = self.store / 'work' / f'secret-{change["id"]}.bin'
+            path.parent.mkdir(parents=True, exist_ok=True)
+            path.write_bytes(self._rom_with([change]))
+            fe = es._frontend(self._cfg(), path)
+            seen, found_at = None, None
+            bit = 1 << expect['number']
+            try:
+                if int(fe.lib.retro_serialize_size()) <= 0:
+                    fe.run_frame([])
+                fe.unserialize(state)
+                session = es._Session(fe, checkpoint_every=10 ** 9)
+                session.frame = start
+                frame = start
+                while frame < end:
+                    session.run(2, lambda f: es._names(inputs[f]) if f < len(inputs) else ())
+                    frame += 2
+                    snap = session.snapshot()
+                    ram = next((snap.domains[n].data for n in ('wram', 'ram') if n in snap.domains and snap.domains[n].data is not None), None)
+                    if ram is None or ram[0x28] != expect['stage']:
+                        continue
+                    flags = ram[0x144] if expect['kind'] == 'treasure' else ram[0x146]
+                    if not flags & bit:
+                        continue
+                    found_at = found_at or frame
+                    if expect['kind'] == 'treasure':
+                        hits = [ram[0x568 + x] for x in range(0x17, 0x1C) if ram[0x434 + x] == 2]
+                    else:
+                        hits = [ram[0x584 + x] for x in range(0x03, 0x1C) if ram[0x434 + x] == 0x2F]
+                    if hits:
+                        seen = hits[0]
+                        break
+                    if frame - found_at > 60:
+                        break
+            finally:
+                es._close(fe)
+            if found_at is None:
+                result = {'state': 'warn', 'text': "The recorded walk doesn't find this secret, so the change couldn't be watched in the game. Use Play from here to try it yourself."}
+            elif expect['kind'] == 'treasure':
+                ok = seen == expect['treasure']
+                result = {'state': 'good' if ok else 'bad', 'text': 'Played from the start, the secret is found and the chosen treasure appears.' if ok
+                          else 'Played from the start, the secret is found but a different treasure appears.'}
+            else:
+                wanted = expect['drop']
+                ok = (seen is None) if wanted is None else seen == wanted
+                result = {'state': 'good' if ok else 'bad', 'text': 'Played from the start, the block breaks and gives the chosen item.' if ok
+                          else 'Played from the start, the block breaks but gives something else.'}
+            path.unlink(missing_ok=True)
+        except Exception as error:
+            result = {'state': 'warn', 'text': f'The change could not be watched in the game: {error}'}
+        change['object_check'] = result
 
     def level_capture_at(self, level: dict, x: float, y: float) -> str:
         """The capture that shows this map spot nearest the middle of its screen (the earliest such, on a tie)."""
