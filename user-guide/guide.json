@@ -1014,7 +1014,7 @@
         "Choose <b>Paint</b>, click or drag where you want the piece, then choose <b>Check in the game</b>. Look over the map, then choose <b>Keep this change</b>. <b>Review and save</b> writes a separate build."
       ],
       "result": "The new build has your change in the level. Your original ROM is not touched.",
-      "note": "A map shows what was played through, and spots no capture showed are hatched. A room the game draws in place of another appears beside it as a separate area. Enemies and items are not part of a level map yet.",
+      "note": "A map shows what was played through, and spots no capture showed are hatched. A room the game draws in place of another appears beside it as a separate area. For Castlevania the map also shows the enemies, items and secrets, and you can change them (next chapter).",
       "details": [
         {
           "title": "One spot, or everywhere a block is used",
@@ -1023,12 +1023,58 @@
         {
           "title": "What to expect",
           "text": "On 42 well-known games played automatically, a level map was put together for 39. On 14 of them a block was changed in the level’s own list and confirmed by replay, including Castlevania, Castlevania III, Metroid, Contra, Ninja Gaiden, DuckTales and Adventure Island, and on 6 more the block itself was changed. Most Super NES and Mega Drive games show their map but can’t yet take a block in one spot only."
+        },
+        {
+          "title": "Play from here, and Before and after",
+          "text": "<b>Play from here</b> starts the game at the spot you click on the map, with the changes you kept, so you can play that part yourself. <b>Before and after</b> replays your recorded walk from a spot on the original game and on the game with your changes, side by side, and <b>Save as GIF</b> keeps the result. Both work for every game with a level map."
         }
       ],
       "related": [
         "scenes-colors",
         "scenes-graphics",
         "play"
+      ],
+      "terms": [
+        "term-scene",
+        "term-build"
+      ]
+    },
+    {
+      "id": "level-objects",
+      "image": "273-level-objects",
+      "image_alt": "The Castlevania hall on a level map with the object layer on: zombies and candles drawn as the game draws them, each in a box, and the panel for the picked candle",
+      "caption": "Castlevania on a level map. Every enemy, candle and secret is read from the game, and each change is checked in the game.",
+      "title": "Enemies, items, secrets and level length",
+      "part": "Basic",
+      "kicker": "SCENES AND COLORS / NEW IN v1.4",
+      "intro": "For <b>Castlevania</b>, ROMancer knows what is in each level: every enemy, every candle and the item inside it, the hidden treasure, the breakable blocks and how long each part of the level is. All of it is read from the game’s own tables, and every change is checked by playing the game.",
+      "steps": [
+        "Open a Castlevania level map. The object layer shows each enemy and candle as the game draws it, with a box around it. Breakable blocks have purple boxes and hidden treasure green ones. <b>Show what’s solid</b> marks the blocks Simon can stand on.",
+        "Choose <b>Enemies, items and secrets</b> and click something to see what it is. Point at anything on the map to see its name.",
+        "Change it: pick another item for a candle or a block, swap an enemy for another of the game’s enemies or remove it, or change which treasure appears and how it is found. Then choose <b>Check in the game</b>.",
+        "Choose <b>Longer or shorter</b> and click a screen of the level. <b>Repeat this screen</b> adds copies of it and <b>Remove this screen</b> takes it out. Enemies, candles, secrets and stairs on later screens move along.",
+        "Use <b>Play from here</b> to play the changed level yourself, or <b>Before and after</b> to watch the old and the new game side by side."
+      ],
+      "result": "The check says what the game really did, for example that the candle now holds a dagger, or that the next part of the level starts 4.7 seconds later.",
+      "note": "Other games keep the general level map tools for now: the layout and blocks, Play from here, and Before and after. Their enemies, items and secrets come in later updates.",
+      "details": [
+        {
+          "title": "How a change is checked",
+          "text": "A change to an enemy or a candle is checked by playing your recorded walk from the start and reading the game’s memory when that part of the level loads. A secret is checked when the walk finds it; when it doesn’t, ROMancer says so, and Play from here lets you try it yourself. A length change is checked by playing the walk on the old and the new game and comparing how far that part scrolls and when the next part starts."
+        },
+        {
+          "title": "Candles that share their settings",
+          "text": "The game reuses one candle’s settings in several places. To change one candle only, ROMancer points it at another of the game’s candles at the same spot that holds the item you chose, so the others keep theirs."
+        },
+        {
+          "title": "Limits",
+          "text": "A part of the level can be 1 to 6 screens long, the longest the game has. The first and the last screen stay, because they hold the way in and the way out, and a screen with stairs can’t be removed. Make one length change at a time: keep it and save, then make the next."
+        }
+      ],
+      "related": [
+        "level-maps",
+        "play",
+        "scenes-colors"
       ],
       "terms": [
         "term-scene",
@@ -5606,6 +5652,7 @@
     "investigation",
     "known-music",
     "level-maps",
+    "level-objects",
     "mcp",
     "native-accesses",
     "native-graphics-trails",
