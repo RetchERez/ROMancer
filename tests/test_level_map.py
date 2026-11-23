@@ -230,6 +230,9 @@ class StitchTests(unittest.TestCase):
         plain.windows = {0: lm.Window(0, 0, 0, 0, 224, cells(range(0, 28)))}
         plain.same_split()
         self.assertEqual(min(row for _, row in plain.windows[0].cells), 0)
+        empty = lm.Plane('Background', PX)                       # nothing left after the status bar was trimmed
+        empty.same_split()
+        self.assertEqual(empty.windows, {})
 
     def test_a_small_hole_closed_in_by_the_map_is_filled_from_the_layer(self):
         seen = {(column, row): lm.Spot(0, 0, column, row) for column in range(10) for row in range(6)}

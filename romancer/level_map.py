@@ -36,6 +36,7 @@ CELL_MATCH = 0.85
 WEAK_MATCH = 0.3        # below CELL_MATCH something covers the cell; above this the layer is still the likeliest one there       # share of a cell's pixels that must agree with the screen, where two layers share one map
 BREAK = 0.25            # share of overlapping cells that may disagree before a new section starts
 GAP = 4                 # empty columns between sections
+TABLE_OFF = 0.35        # share that may disagree when a capture is moved one table width
 HOLE_CELLS = 24         # the largest closed-in group of covered places that is filled from the layer
 FADED = 0.35            # a capture darker than this share of the recording's middle brightness is a fade
 DIMMER = 0.8            # a capture that shows known places darker than this share of before is a fade
@@ -151,7 +152,7 @@ class Plane:
         happened to be scrolled like the bar has the two run together into one band from the top. The bar's last
         rows then pass for level. Those captures take the split the others show."""
         splits = [window.first for window in self.windows.values() if window.first > 0]
-        if len(splits) * 3 < len(self.windows):
+        if not splits or len(splits) * 3 < len(self.windows):
             return
         split = max(set(splits), key=splits.count)
         px = self.px
@@ -630,9 +631,16 @@ def stitch(frames: list, system: str) -> list:
                 # Two tables side by side make a map twice the width of one, and the scroll is worked out within one
                 # table: when the screen moved far between two captures, the capture lands exactly one table width
                 # off. That place is tried first, and it is taken on a smaller overlap when nothing there disagrees.
-                for offset in ((wide // px, 0), (-(wide // px), 0), (0, tall // px), (0, -(tall // px))):
+                near_both, near_differ = clash(0, 0)
+                near = near_differ / near_both if near_both else 1.0
+                for offset in ((wide // px, 0), (-(wide // px), 0)):     # sideways only: a level that repeats matches a table height down too
                     both, differ = clash(*offset)
-                    if both >= 12 and differ <= BREAK * both and differ * 20 <= both:
+                    if both < 12:
+                        continue
+                    share = differ / both
+                    # nothing there disagrees, or it agrees far better than the place the scroll pointed to (a column
+                    # the game was still drawing can differ)
+                    if share <= 0.05 or (share <= TABLE_OFF and share * 2 <= near):
                         moved, jumped = offset, True
                         break
             if moved is None:
