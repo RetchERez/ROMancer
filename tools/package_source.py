@@ -161,6 +161,8 @@ APPROVED_FILES = frozenset({
     '.github/screenshots/scenes-png-import.png',
     '.github/screenshots/sprites-as-objects.png',
     '.github/screenshots/mode7-flat-track.png',
+    '.github/screenshots/update-ready.png',
+    '.github/screenshots/level-maps.png',
     '.github/workflows/ci.yml',
     '.gitignore',
     'LICENSE',
