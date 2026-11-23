@@ -24,8 +24,10 @@ class Castlevania:
     sha256 = '55bcab0d9efc33a9d9efc90f2c3c4ab12f3221a44b1f357e6c6202a456399aa8'
     BANK7 = 0x1C000            # ROM offset (no header) of CPU $C000
     ZONE = 64
-    ENEMIES = {0x01: 'Zombie', 0x04: 'Panther'}            # spawner types seen and identified in play
-    UNSURE = {0x04}                                          # named from where it sits, not yet seen in a picture
+    # spawner types identified by spawning each one and looking at what the game drew (trace/v14_objects/enemy_types_sheet.png)
+    ENEMIES = {0x01: 'Zombies', 0x02: 'Zombies', 0x03: 'Zombies', 0x04: 'Zombies', 0x05: 'Zombies', 0x06: 'Zombies',
+               0x51: 'Panther', 0x5E: 'Phantom Bat (boss)'}
+    UNSURE = set()
     DROPS = {0x0: 'Heart or whip upgrade', 0x1: 'Money bag', 0x4: 'Large heart', 0x8: 'Dagger', 0x9: 'Cross',
              0xA: 'Rosary', 0xB: 'Holy water', 0xC: 'Double or triple shot', 0xD: 'Axe', 0xF: 'Stopwatch'}
     SOLID = range(0x60, 0x6C)
