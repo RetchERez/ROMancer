@@ -872,7 +872,8 @@ class LevelTools:
             safe = ''.join(c if c.isalnum() or c in ' -_' else '_' for c in name).strip() or 'level'
             job.update(state='finished', path=path, name=f'{safe} before and after.gif', differs=differs,
                        width=frames[0].width, height=frames[0].height, seconds=round(count * self.COMPARE_EVERY / 60, 1), done=job['total'],
-                       message=(f'The two games first look different {differs} seconds in.' if differs is not None else
+                       message=('The two games look different from the first moment.' if differs == 0 else
+                                f'The two games first look different {differs} seconds in.' if differs is not None else
                                 'The two games look the same the whole way. Your changes may be somewhere this walk does not show.'))
         except Exception as error:      # shown to the user; the editor keeps working
             job.update(state='failed', message=f'The replay could not be made: {error}')
