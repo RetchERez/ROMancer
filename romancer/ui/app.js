@@ -15,6 +15,7 @@ import {ensureRomScan} from './rom_scan.js';
 import {ensureGraphicsObservation} from './graphics_investigation.js';
 import {projectActions} from './project_manager.js';
 import {readPreference,writePreference,removePreference} from './preferences.js';
+import {startUpdates} from './updates.js';
 import * as automation from './views/automation.js';
 import {stopPlayback} from './playback_controls.js';
 import * as tables from './views/tables.js';
@@ -147,5 +148,6 @@ document.addEventListener('dragleave',event=>{if(!event.relatedTarget)document.b
 document.addEventListener('drop',event=>{if(![...event.dataTransfer?.types||[]].includes('Files'))return;event.preventDefault();document.body.classList.remove('file-drag');try{state.droppedImportFile=droppedSource(event.dataTransfer.files);importDialog();}catch(error){notify(error.message,true);}});
 
 const windowOpen=()=>{api.call('system.ui_alive').catch(()=>{});};windowOpen();setInterval(windowOpen,15000);
+startup.then(()=>{state.updates=startUpdates(api,notify);});
 window.addEventListener('pageshow',windowOpen);
 window.addEventListener('pagehide',()=>{api.closing();clearTimeout(state.buildCheckTimer);clearTimeout(locationTimer);rememberLocation();state.visualComparison?.dispose();state.visualComparison=null;state.spritePreviewObserver?.disconnect();state.spritePreviewObserver=null;stopPlayback(state);disposeAudio();state.soundPlayer?.close();state.animationClock?.stop();});

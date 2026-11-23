@@ -429,7 +429,7 @@
   }
 
   // romancer/ui/app_settings.js
-  var DEFAULT_SETTINGS = Object.freeze({ theme: "romancer", scale: 100, autoDeepScan: true, autoGraphics: true, rememberWorkspace: true, volume: 80, startMuted: false, loopPreview: false, reduceMotion: false, advancedTools: false });
+  var DEFAULT_SETTINGS = Object.freeze({ theme: "romancer", scale: 100, autoDeepScan: true, autoGraphics: true, rememberWorkspace: true, volume: 80, startMuted: false, loopPreview: false, reduceMotion: false, advancedTools: false, checkUpdates: true });
   var keys = Object.keys(DEFAULT_SETTINGS);
   var booleanKeys = keys.filter((key2) => typeof DEFAULT_SETTINGS[key2] === "boolean");
   function validateSettings(values) {
@@ -1235,22 +1235,22 @@
     if (!Number.isInteger(rate) || rate < 1 || rate > 192e3) throw new Error("Unsupported sample rate.");
     const raw = Uint8Array.from(atob(encoded), (c) => c.charCodeAt(0));
     if (!raw.length || raw.length > 1048576 || raw.length % 4) throw new Error("Invalid PCM capture.");
-    const buffer = new ArrayBuffer(44 + raw.length), view = new DataView(buffer), bytes = new Uint8Array(buffer);
+    const buffer = new ArrayBuffer(44 + raw.length), view2 = new DataView(buffer), bytes = new Uint8Array(buffer);
     function text(offset, value) {
       for (let i = 0; i < value.length; i++) bytes[offset + i] = value.charCodeAt(i);
     }
     text(0, "RIFF");
-    view.setUint32(4, 36 + raw.length, true);
+    view2.setUint32(4, 36 + raw.length, true);
     text(8, "WAVEfmt ");
-    view.setUint32(16, 16, true);
-    view.setUint16(20, 1, true);
-    view.setUint16(22, 2, true);
-    view.setUint32(24, rate, true);
-    view.setUint32(28, rate * 4, true);
-    view.setUint16(32, 4, true);
-    view.setUint16(34, 16, true);
+    view2.setUint32(16, 16, true);
+    view2.setUint16(20, 1, true);
+    view2.setUint16(22, 2, true);
+    view2.setUint32(24, rate, true);
+    view2.setUint32(28, rate * 4, true);
+    view2.setUint16(32, 4, true);
+    view2.setUint16(34, 16, true);
     text(36, "data");
-    view.setUint32(40, raw.length, true);
+    view2.setUint32(40, raw.length, true);
     bytes.set(raw, 44);
     return bytes;
   }
@@ -1856,6 +1856,149 @@
     };
   }
 
+  // romancer/ui/updates.js
+  var SLOW = 30 * 60 * 1e3;
+  var FAST = 1e3;
+  var RETRY_BUSY = 5e3;
+  var view = { status: null, wanted: false, timer: 0, applying: false };
+  function el() {
+    let node = document.getElementById("update-banner");
+    if (!node) {
+      node = document.createElement("div");
+      node.id = "update-banner";
+      node.setAttribute("role", "status");
+      node.hidden = true;
+      document.body.append(node);
+    }
+    return node;
+  }
+  var percent = (p) => typeof p === "number" ? ` ${Math.floor(p * 100)}%` : "";
+  function bannerHtml(s, wanted) {
+    if (!s || !s.available || !s.latest) return "";
+    const v = esc(s.latest.version), page = esc(s.latest.page || "");
+    const notes = `<button type="button" data-update="notes">What’s new</button>`;
+    if (!s.can_apply) return `<strong>Update ready: v${v}</strong><span>${esc(s.reason || "Download it from the release page.")}</span>${notes}<a href="${page}" target="_blank" rel="noopener">Release page</a><button type="button" data-update="hide" aria-label="Hide until next start">Later</button>`;
+    if (s.task === "downloading") return `<strong>Downloading v${v}${percent(s.progress)}</strong><span>You can keep working. ROMancer restarts when it is done.</span>`;
+    if (s.task === "unpacking") return `<strong>Checking v${v}</strong><span>Every file is checked against the release before anything is changed.</span>`;
+    if (s.task === "restarting") return `<strong>Restarting to update to v${v}</strong>`;
+    if (wanted && s.ready && s.busy) return `<strong>v${v} is ready</strong><span>${esc(s.busy)} ROMancer restarts by itself as soon as it can.</span><button type="button" data-update="cancel">Not now</button>`;
+    if (s.error) return `<strong>Update ready: v${v}</strong><span class="error">${esc(s.error)}</span><button type="button" data-update="go">Try again</button>${notes}`;
+    return `<strong>Update ready: v${v}</strong>${notes}<button type="button" class="primary" data-update="go">Update and restart</button><button type="button" data-update="hide" aria-label="Hide until next start">Later</button>`;
+  }
+  function draw() {
+    const node = el(), html = view.hidden ? "" : bannerHtml(view.status, view.wanted);
+    node.innerHTML = html;
+    node.hidden = !html;
+  }
+  function overlay(version) {
+    const node = document.createElement("div");
+    node.id = "update-overlay";
+    node.setAttribute("role", "alert");
+    node.innerHTML = `<div><img src="/mark.svg" alt=""><h1>Updating ROMancer to v${esc(version)}</h1><p>ROMancer closes, updates and opens again by itself. Your projects are not touched.</p><p class="subtle">If this window stays open, you can close it.</p></div>`;
+    document.body.append(node);
+  }
+  function notesDialog(s) {
+    const dialog = document.createElement("dialog");
+    dialog.className = "update-notes";
+    dialog.innerHTML = `<div class="dialog-heading"><h2>What’s new in v${esc(s.latest.version)}</h2><button type="button" data-close aria-label="Close">×</button></div><pre>${esc(s.latest.notes || "No notes were published with this release.")}</pre><p><a href="${esc(s.latest.page)}" target="_blank" rel="noopener">Open the release page</a></p>`;
+    dialog.addEventListener("click", (event) => {
+      if (event.target === dialog || event.target.closest("[data-close]")) dialog.close();
+    });
+    dialog.addEventListener("close", () => dialog.remove());
+    document.body.append(dialog);
+    dialog.showModal();
+  }
+  function startUpdates(api2, notify2) {
+    const schedule = (ms) => {
+      clearTimeout(view.timer);
+      view.timer = setTimeout(poll, ms);
+    };
+    async function apply() {
+      if (view.applying) return;
+      view.applying = true;
+      try {
+        const result = await api2.call("system.update_apply", {});
+        if (result.restarting) {
+          overlay(result.version);
+          setTimeout(() => {
+            try {
+              window.close();
+            } catch {
+            }
+          }, 4e3);
+          return;
+        }
+        view.status = { ...view.status, busy: result.busy || null, error: result.busy ? "" : result.error || "" };
+        draw();
+        if (result.busy) schedule(RETRY_BUSY);
+      } catch (error) {
+        view.status = { ...view.status, error: error.message };
+        draw();
+      } finally {
+        view.applying = false;
+      }
+    }
+    async function poll() {
+      let s;
+      try {
+        s = await api2.call("system.update_status", {});
+      } catch {
+        schedule(SLOW);
+        return;
+      }
+      view.status = s;
+      if (s.finished) {
+        notify2(s.finished.updated ? `ROMancer was updated to v${s.finished.to}.` : s.finished.message, !s.finished.updated);
+        api2.call("system.update_seen", {}).catch(() => {
+        });
+      }
+      draw();
+      if (view.wanted && s.ready && !s.task) {
+        await apply();
+        return;
+      }
+      schedule(s.task || view.wanted && !s.error ? FAST : SLOW);
+    }
+    el().addEventListener("click", async (event) => {
+      var _a, _b;
+      const action = (_a = event.target.closest("[data-update]")) == null ? void 0 : _a.dataset.update;
+      if (!action) return;
+      if (action === "notes") notesDialog(view.status);
+      else if (action === "hide") {
+        view.hidden = true;
+        draw();
+      } else if (action === "cancel") {
+        view.wanted = false;
+        clearTimeout(view.timer);
+        draw();
+        schedule(SLOW);
+      } else if (action === "go") {
+        view.wanted = true;
+        if ((_b = view.status) == null ? void 0 : _b.ready) {
+          await apply();
+          return;
+        }
+        try {
+          view.status = await api2.call("system.update_start", {});
+          if (view.status.ok === false) throw Error(view.status.error);
+        } catch (error) {
+          view.status = { ...view.status, error: error.message };
+        }
+        draw();
+        schedule(FAST);
+      }
+    });
+    poll();
+    return { checkNow: async () => {
+      const s = await api2.call("system.update_check", {});
+      view.status = s;
+      view.hidden = false;
+      draw();
+      schedule(FAST);
+      return s;
+    }, status: () => view.status };
+  }
+
   // romancer/ui/views/automation.js
   var automation_exports = {};
   __export(automation_exports, {
@@ -2031,9 +2174,9 @@
   }
   function mountBuildChecks(ctx2) {
     clearTimeout(ctx2.state.buildCheckTimer);
-    const view = ctx2.state.buildCheckView;
-    if (!(view == null ? void 0 : view.pending)) return;
-    const current3 = () => ctx2.state.buildCheckView === view && selectionKey(ctx2.state) === view.scope && ctx2.state.page === view.page && !!document.getElementById("build-checks");
+    const view2 = ctx2.state.buildCheckView;
+    if (!(view2 == null ? void 0 : view2.pending)) return;
+    const current3 = () => ctx2.state.buildCheckView === view2 && selectionKey(ctx2.state) === view2.scope && ctx2.state.page === view2.page && !!document.getElementById("build-checks");
     const poll = async () => {
       if (!current3()) return;
       try {
@@ -2419,8 +2562,8 @@
       return `<p class="error" role="status">${esc(error.message)}</p>`;
     }
     if (compact && d.before === d.after) return `<span class="preview-caption">Original ${d.before} · unchanged</span>`;
-    const max = Math.max(1, Math.abs(d.before), Math.abs(d.after)), percent = d.percent === null ? "from zero" : signed(Number(d.percent.toFixed(1))) + "%";
-    return `<div class="number-comparison ${compact ? "compact" : ""}" aria-label="Stored value comparison"><div class="preview-pair">${[["Original", d.before], ["Edited", d.after]].map(([name2, value]) => `<div><span>${name2}</span><strong>${value}</strong><meter class="value-track" min="0" max="${max}" value="${Math.abs(value)}" aria-label="${name2} value magnitude"></meter></div>`).join("")}</div><p class="value-delta" role="status">${d.delta === 0 ? "Unchanged" : "Preview updated"} · ${signed(d.delta)} · ${percent}</p>${d.after < minimum || d.after > maximum ? '<p class="error">Outside the declared numeric range.</p>' : ""}</div>`;
+    const max = Math.max(1, Math.abs(d.before), Math.abs(d.after)), percent2 = d.percent === null ? "from zero" : signed(Number(d.percent.toFixed(1))) + "%";
+    return `<div class="number-comparison ${compact ? "compact" : ""}" aria-label="Stored value comparison"><div class="preview-pair">${[["Original", d.before], ["Edited", d.after]].map(([name2, value]) => `<div><span>${name2}</span><strong>${value}</strong><meter class="value-track" min="0" max="${max}" value="${Math.abs(value)}" aria-label="${name2} value magnitude"></meter></div>`).join("")}</div><p class="value-delta" role="status">${d.delta === 0 ? "Unchanged" : "Preview updated"} · ${signed(d.delta)} · ${percent2}</p>${d.after < minimum || d.after > maximum ? '<p class="error">Outside the declared numeric range.</p>' : ""}</div>`;
   }
   function textComparison(before, after, { columns: columns2 = 32 } = {}) {
     columns2 = Number.isSafeInteger(columns2) ? Math.max(8, Math.min(80, columns2)) : 32;
@@ -2505,12 +2648,12 @@
     (_a = root.querySelectorAll) == null ? void 0 : _a.call(root, "[data-number-input]").forEach((node) => {
       const input = document.getElementById(node.dataset.numberInput);
       if (!input) return;
-      const draw2 = () => {
+      const draw3 = () => {
         node.innerHTML = numberComparison(Number(node.dataset.before), input.value, { minimum: Number(node.dataset.minimum ?? -Infinity), maximum: Number(node.dataset.maximum ?? Infinity), compact: node.dataset.compact === "true" });
       };
-      input.addEventListener("input", draw2);
-      input.addEventListener("change", draw2);
-      draw2();
+      input.addEventListener("input", draw3);
+      input.addEventListener("change", draw3);
+      draw3();
     });
   }
 
@@ -3256,7 +3399,7 @@
       var _a;
       return [f.id, ((_a = document.getElementById("game-" + f.id)) == null ? void 0 : _a.value) ?? f.value];
     }));
-    const draw2 = () => {
+    const draw3 = () => {
       var _a, _b, _c;
       if (current3()) {
         const focus = ((_a = document.activeElement) == null ? void 0 : _a.id) === "room-edit";
@@ -3283,12 +3426,12 @@
           const review = document.getElementById("game-edit-review");
           if (review) review.hidden = true;
         }
-        draw2();
+        draw3();
       };
       input.addEventListener("input", changed2);
       input.addEventListener("change", changed2);
     }
-    draw2();
+    draw3();
   }
 
   // romancer/ui/project_checks.js
@@ -3845,7 +3988,7 @@
     if (!map || !canvas) return;
     const tiles = doc.bitmaps.find((b) => b.id === map.bitmap_id), palette2 = doc.palettes.find((p) => p.id === map.palette_id);
     let current3 = changes, selected = 0, pointer = null;
-    const draw2 = () => {
+    const draw3 = () => {
       canvas.width = map.width * tiles.width;
       canvas.height = map.height * tiles.height;
       canvas.style.imageRendering = "pixelated";
@@ -3880,7 +4023,7 @@
       current3 = paintMapCell(doc, map, current3, index, brush);
       selected = index;
       persist(save);
-      draw2();
+      draw3();
       previewStatus();
       const label = document.getElementById("map-position");
       if (label) label.textContent = "Cell " + selected + " · " + current3.filter((c) => c.kind === "map" && c.tilemap_id === map.id).length + " staged cell" + (current3.filter((c) => c.kind === "map" && c.tilemap_id === map.id).length === 1 ? "" : "s");
@@ -3956,7 +4099,7 @@
           const bitmap = doc.bitmaps.find((b) => b.id === paint3.bitmap_id);
           if (bitmap) current3 = mergeCellChanges(current3, [{ kind: "cell", bitmap_id: bitmap.id, cell_index: paint3.cell_index, before_pixels: bitmap.cells[paint3.cell_index].pixels, after_pixels: paint3.pixels }]);
         }
-        draw2();
+        draw3();
         brushes();
         previewStatus();
       } catch (error) {
@@ -3964,7 +4107,7 @@
         if (label) label.textContent = "Preview unavailable: " + error.message;
       }
     });
-    draw2();
+    draw3();
     brushes();
     previewStatus();
   }
@@ -4386,7 +4529,7 @@ ${font ? `<section class="card"><h3>Font metrics · ${esc(font.id)}</h3><div cla
       c.putImageData(frame, 0, 0);
       rememberPreview(beforeCanvas, image.width, image.height, frame.data);
     }
-    const draw2 = () => {
+    const draw3 = () => {
       const context = canvas.getContext("2d"), frame = context.createImageData(image.width, image.height);
       frame.data.set(rgba(pixels, editorPalette(ctx2, palette2)));
       context.putImageData(frame, 0, 0);
@@ -4400,7 +4543,7 @@ ${font ? `<section class="card"><h3>Font metrics · ${esc(font.id)}</h3><div cla
       const color = Number(read("sprite-color"));
       if (!Number.isInteger(color) || color < 0 || color >= count) throw Error("Choose a palette index inside the declared color count.");
       paintAssemblyPixel(bitmap, layout, pixels, x, y, color);
-      draw2();
+      draw3();
     };
     const at = (event) => {
       const rect = canvas.getBoundingClientRect(), x = Math.floor((event.clientX - rect.left) / rect.width * image.width), y = Math.floor((event.clientY - rect.top) / rect.height * image.height);
@@ -4437,7 +4580,7 @@ ${font ? `<section class="card"><h3>Font metrics · ${esc(font.id)}</h3><div cla
     });
     canvas.style.touchAction = "none";
     resize();
-    draw2();
+    draw3();
     if (typeof ResizeObserver !== "undefined") {
       const observer = new ResizeObserver(resize);
       observer.observe(canvas.parentElement);
@@ -4447,7 +4590,7 @@ ${font ? `<section class="card"><h3>Font metrics · ${esc(font.id)}</h3><div cla
     canvas.addEventListener("sprite-refresh", () => {
       if (current3() && pointer === null) {
         pixels = [...imageFor(ctx2, doc, bitmap, layout).pixels];
-        draw2();
+        draw3();
         updateSwatches();
       }
     });
@@ -4483,7 +4626,7 @@ ${font ? `<section class="card"><h3>Font metrics · ${esc(font.id)}</h3><div cla
     canvas.addEventListener("pointercancel", () => {
       pointer = null;
       pixels = [...undo.current];
-      draw2();
+      draw3();
     });
     canvas.addEventListener("keydown", async (event) => {
       if (!current3() || !["ArrowLeft", "ArrowRight", "ArrowUp", "ArrowDown", " "].includes(event.key)) return;
@@ -4606,7 +4749,7 @@ ${font ? `<section class="card"><h3>Font metrics · ${esc(font.id)}</h3><div cla
     }
     const frames = readAnimation(doc, bitmap, ctx2.draft("animation-frames", "null"));
     const clock = ctx2.state.animationClock = new AnimationClock();
-    const draw2 = (index) => {
+    const draw3 = (index) => {
       if (selectionKey(ctx2.state) !== scope || ctx2.state.page !== "assets") {
         clock.stop();
         return;
@@ -4630,10 +4773,10 @@ ${font ? `<section class="card"><h3>Font metrics · ${esc(font.id)}</h3><div cla
       const label = document.getElementById("animation-position");
       if (label) label.textContent = `Frame ${index + 1} of ${frames.length}`;
     };
-    canvas.addEventListener("animation-refresh", () => draw2(Math.min(frames.length - 1, ctx2.state.animationIndex || 0)));
+    canvas.addEventListener("animation-refresh", () => draw3(Math.min(frames.length - 1, ctx2.state.animationIndex || 0)));
     const first = Math.min(frames.length - 1, ctx2.state.animationIndex || 0);
-    if (ctx2.state.animationPlaying) clock.start(frames, draw2, first);
-    else draw2(first);
+    if (ctx2.state.animationPlaying) clock.start(frames, draw3, first);
+    else draw3(first);
   }
 
   // romancer/ui/saved_animations.js
@@ -4793,12 +4936,12 @@ ${font ? `<section class="card"><h3>Font metrics · ${esc(font.id)}</h3><div cla
         if (!full.isConnected || scope2 !== selectionKey(ctx2.state)) return;
         full.width = img.naturalWidth;
         full.height = img.naturalHeight;
-        const draw2 = full.getContext("2d");
-        draw2.drawImage(img, 0, 0);
+        const draw3 = full.getContext("2d");
+        draw3.drawImage(img, 0, 0);
         const r = model.scene_region;
-        draw2.strokeStyle = "#ffd36a";
-        draw2.lineWidth = 1;
-        draw2.strokeRect(r.x - 0.5, r.y - 0.5, r.width + 1, r.height + 1);
+        draw3.strokeStyle = "#ffd36a";
+        draw3.lineWidth = 1;
+        draw3.strokeRect(r.x - 0.5, r.y - 0.5, r.width + 1, r.height + 1);
       };
       img.src = "data:image/png;base64," + full.dataset.preview;
     }
@@ -4868,15 +5011,15 @@ ${font ? `<section class="card"><h3>Font metrics · ${esc(font.id)}</h3><div cla
         state2.connectedNode = null;
         return ctx2.render();
       },
-      "gameview-page": (el) => {
+      "gameview-page": (el2) => {
         if (!current3()) return;
-        state2.connectedPage = Math.max(0, (state2.connectedPage || 0) + Number(el.dataset.id));
+        state2.connectedPage = Math.max(0, (state2.connectedPage || 0) + Number(el2.dataset.id));
         return ctx2.render();
       },
-      "gameview-select": (el) => {
+      "gameview-select": (el2) => {
         if (!current3()) return;
-        if (!model.nodes.concat((detail == null ? void 0 : detail.neighbors) || []).some((n) => n.id === el.dataset.id)) throw Error("Refresh the current resources.");
-        state2.connectedNode = { scope, id: el.dataset.id };
+        if (!model.nodes.concat((detail == null ? void 0 : detail.neighbors) || []).some((n) => n.id === el2.dataset.id)) throw Error("Refresh the current resources.");
+        state2.connectedNode = { scope, id: el2.dataset.id };
         return ctx2.render();
       },
       "gameview-bytes": () => {
@@ -4889,9 +5032,9 @@ ${font ? `<section class="card"><h3>Font metrics · ${esc(font.id)}</h3><div cla
         await ctx2.run("gameview.link", { ...params, from_id: node.id, to_id: read("gameview-link-target"), relation: read("gameview-link-relation"), note: read("gameview-link-note") }, { render: false });
         if (current3()) return ctx2.render();
       },
-      "gameview-unlink": async (el) => {
-        if (!current3() || !detail.connections.some((e) => e.link_id === el.dataset.id)) throw Error("Refresh this connection first.");
-        await ctx2.run("gameview.unlink", { ...params, link_id: el.dataset.id }, { render: false });
+      "gameview-unlink": async (el2) => {
+        if (!current3() || !detail.connections.some((e) => e.link_id === el2.dataset.id)) throw Error("Refresh this connection first.");
+        await ctx2.run("gameview.unlink", { ...params, link_id: el2.dataset.id }, { render: false });
         if (current3()) return ctx2.render();
       },
       "gameview-editor": async () => {
@@ -6614,7 +6757,7 @@ ${state2.artifact.system_id ? `<details><summary>Advanced byte options</summary>
     var _a;
     const owned = ctx2.state.menuVisual, root = document.getElementById("menu-visual-preview");
     if (!root || !current(ctx2, owned) || owned.status !== "ready") return;
-    const draw2 = () => {
+    const draw3 = () => {
       if (!current(ctx2, owned)) {
         root.innerHTML = '<p class="error" role="status">Menu preview unavailable: source or declarations changed. Preview menu again.</p>';
         return;
@@ -6656,16 +6799,16 @@ ${state2.artifact.system_id ? `<details><summary>Advanced byte options</summary>
     };
     for (const [index, record] of doc.records.entries()) for (const segment of record.segments) {
       const node = document.getElementById(`script-segment-${index}-${segment.index}`);
-      node == null ? void 0 : node.addEventListener("input", draw2);
-      node == null ? void 0 : node.addEventListener("change", draw2);
+      node == null ? void 0 : node.addEventListener("input", draw3);
+      node == null ? void 0 : node.addEventListener("change", draw3);
     }
     for (const id of ["menu-config", "script-schema"]) (_a = document.getElementById(id)) == null ? void 0 : _a.addEventListener("input", () => {
       if (!current(ctx2, owned)) {
-        draw2();
+        draw3();
         if (ctx2.state.menuVisual === owned) ctx2.state.menuVisual = null;
       }
     });
-    draw2();
+    draw3();
   }
 
   // romancer/ui/translation_controls.js
@@ -6926,14 +7069,14 @@ ${state2.artifact.system_id ? `<details><summary>Advanced byte options</summary>
       const target = document.getElementById("script-capacity-" + i);
       if (!target) continue;
       const nodes = row.segments.map((segment) => document.getElementById(`script-segment-${i}-${segment.index}`));
-      const draw2 = () => {
+      const draw3 = () => {
         var _a;
         if (selectionKey(ctx2.state) !== scope || ((_a = ctx2.state.results["script.inspect"]) == null ? void 0 : _a.document_id) !== doc.document_id) return;
         const values = nodes.map((node, j) => (node == null ? void 0 : node.value) ?? row.segments[j].text);
         target.innerHTML = '<p class="preview-caption" role="status">' + (values.some((text, j) => text !== row.segments[j].text) ? "Preview updated · text staged" : "Unchanged text preview") + "</p>" + capacitySummary(textCapacity(row, values, doc.encoding_glyphs));
       };
-      for (const node of nodes) node == null ? void 0 : node.addEventListener("input", draw2);
-      draw2();
+      for (const node of nodes) node == null ? void 0 : node.addEventListener("input", draw3);
+      draw3();
     }
   }
 
@@ -7046,34 +7189,34 @@ ${state2.artifact.system_id ? `<details><summary>Advanced byte options</summary>
     return (b << 16 | a) >>> 0;
   }
   function chunk(type, data) {
-    const out = new Uint8Array(12 + data.length), view = new DataView(out.buffer);
-    view.setUint32(0, data.length);
+    const out = new Uint8Array(12 + data.length), view2 = new DataView(out.buffer);
+    view2.setUint32(0, data.length);
     for (let i = 0; i < 4; i++) out[4 + i] = type.charCodeAt(i);
     out.set(data, 8);
-    view.setUint32(8 + data.length, crc32(out.subarray(4, 8 + data.length)));
+    view2.setUint32(8 + data.length, crc32(out.subarray(4, 8 + data.length)));
     return out;
   }
   function stored2(raw) {
-    const blocks = Math.max(1, Math.ceil(raw.length / 65535)), out = new Uint8Array(2 + raw.length + blocks * 5 + 4), view = new DataView(out.buffer);
+    const blocks = Math.max(1, Math.ceil(raw.length / 65535)), out = new Uint8Array(2 + raw.length + blocks * 5 + 4), view2 = new DataView(out.buffer);
     out[0] = 120;
     out[1] = 1;
     let at = 2;
     for (let block = 0; block < blocks; block++) {
       const part = raw.subarray(block * 65535, (block + 1) * 65535);
       out[at] = block === blocks - 1 ? 1 : 0;
-      view.setUint16(at + 1, part.length, true);
-      view.setUint16(at + 3, ~part.length & 65535, true);
+      view2.setUint16(at + 1, part.length, true);
+      view2.setUint16(at + 3, ~part.length & 65535, true);
       out.set(part, at + 5);
       at += 5 + part.length;
     }
-    view.setUint32(at, adler32(raw));
+    view2.setUint32(at, adler32(raw));
     return out;
   }
   function indexedPng(pixels, width, height, palette2) {
     if (pixels.length !== width * height) throw Error("The picture does not match its size.");
-    const header = new Uint8Array(13), view = new DataView(header.buffer);
-    view.setUint32(0, width);
-    view.setUint32(4, height);
+    const header = new Uint8Array(13), view2 = new DataView(header.buffer);
+    view2.setUint32(0, width);
+    view2.setUint32(4, height);
     header[8] = 8;
     header[9] = 3;
     const colors = Uint8Array.from(palette2.flatMap(([r, g, b]) => [r, g, b]));
@@ -7242,13 +7385,13 @@ ${state2.artifact.system_id ? `<details><summary>Advanced byte options</summary>
     const live = () => root.isConnected && selectionKey(ctx2.state) === model.scope;
     const rgba = palette2.map(([r, g, b]) => [r, g, b, 255]);
     let previous = null, stroke = null, imageRequest = 0, fitTimer;
-    function draw2(canvas, pixels) {
+    function draw3(canvas, pixels) {
       const graphics = canvas.getContext("2d"), image = graphics.createImageData(width, height);
       pixels.forEach((index, position) => image.data.set(rgba[index], position * 4));
       graphics.putImageData(image, 0, 0);
     }
     function refresh2(message = "") {
-      draw2(draft, model.draft);
+      draw3(draft, model.draft);
       const changed2 = model.draft.some((color, i) => color !== model.base[i]);
       undo.disabled = !model.past.length;
       redo.disabled = !model.future.length;
@@ -7341,7 +7484,7 @@ ${state2.artifact.system_id ? `<details><summary>Advanced byte options</summary>
         paint2(Math.round(fromX + (x - fromX) * step / steps3), Math.round(fromY + (y - fromY) * step / steps3));
       }
       previous = [x, y];
-      draw2(draft, model.draft);
+      draw3(draft, model.draft);
     }
     draft.addEventListener("pointerdown", (event) => {
       if (event.button !== 0 || stroke) return;
@@ -7349,7 +7492,7 @@ ${state2.artifact.system_id ? `<details><summary>Advanced byte options</summary>
       previous = point(event);
       stroke = { before: model.draft.slice(), id: event.pointerId };
       paint2(...previous);
-      draw2(draft, model.draft);
+      draw3(draft, model.draft);
     });
     draft.addEventListener("pointermove", (event) => {
       if ((stroke == null ? void 0 : stroke.id) === event.pointerId) extend(event);
@@ -7450,7 +7593,7 @@ ${state2.artifact.system_id ? `<details><summary>Advanced byte options</summary>
         if (live() && request2 === imageRequest) status.textContent = error.message;
       }
     });
-    draw2(root.querySelector("#battle-original"), model.base);
+    draw3(root.querySelector("#battle-original"), model.base);
     refresh2();
     if (!model.fit) queueFit(0);
   }
@@ -7645,7 +7788,7 @@ ${state2.artifact.system_id ? `<details><summary>Advanced byte options</summary>
   function documentNode(id) {
     return document.getElementById(id);
   }
-  function draw(canvas, bitmap, pixels, palette2, bank = 0) {
+  function draw2(canvas, bitmap, pixels, palette2, bank = 0) {
     const context = canvas.getContext("2d"), image = context.createImageData(bitmap.width, bitmap.height);
     pixels.forEach((value, index) => {
       const color = paletteColor(palette2, value, bank) || literalRGB(bitmap, value);
@@ -7659,11 +7802,11 @@ ${state2.artifact.system_id ? `<details><summary>Advanced byte options</summary>
     const bitmap = doc.bitmaps.find((b) => b.id === ctx2.state.assetBitmapId) || doc.bitmaps[0], original2 = doc.palettes.find((p) => p.id === bitmap.palette_id), palette2 = editorPalette(ctx2, original2), canvas = documentNode("paint-canvas"), before = documentNode("paint-original");
     const index = ((_a = ctx2.state.paint) == null ? void 0 : _a.cell_index) ?? 0, pixels = pixelBuffer(ctx2, doc, bitmap, index), status = documentNode("pixel-edit-status");
     if (status) status.innerHTML = JSON.stringify(pixels) !== JSON.stringify(bitmap.cells[index].pixels) ? badge("Staged", "warm") : badge("Unchanged");
-    if (canvas) draw(canvas, bitmap, pixels, palette2, previewPaletteBank(ctx2, original2));
+    if (canvas) draw2(canvas, bitmap, pixels, palette2, previewPaletteBank(ctx2, original2));
     if (before) {
       before.width = bitmap.width;
       before.height = bitmap.height;
-      draw(before, bitmap, bitmap.cells[index].pixels, original2, previewPaletteBank(ctx2, original2));
+      draw2(before, bitmap, bitmap.cells[index].pixels, original2, previewPaletteBank(ctx2, original2));
     }
     const notice = documentNode("pixel-preview-status");
     if (notice) notice.textContent = "Live editing preview · " + pixels.filter((v, i) => v !== bitmap.cells[index].pixels[i]).length + " stored pixels changed · review and build to save.";
@@ -7681,7 +7824,7 @@ ${state2.artifact.system_id ? `<details><summary>Advanced byte options</summary>
       const colors = editorPalette(ctx2, palette2);
       document.querySelectorAll("canvas[data-cell]").forEach((canvas) => {
         const index = Number(canvas.dataset.cell);
-        draw(canvas, bitmap, pixelBuffer(ctx2, doc, bitmap, index), colors, previewPaletteBank(ctx2, palette2));
+        draw2(canvas, bitmap, pixelBuffer(ctx2, doc, bitmap, index), colors, previewPaletteBank(ctx2, palette2));
       });
       document.querySelectorAll("[data-color-index]").forEach((node) => {
         const c = colors.entries[Number(node.dataset.colorIndex)].rgb;
@@ -7816,9 +7959,9 @@ ${state2.artifact.system_id ? `<details><summary>Advanced byte options</summary>
     ctx2.use({
       "source-verify": () => run2(0),
       "source-next": () => run2((packet == null ? void 0 : packet.coverage.next) || 0),
-      "source-proof-load": async (el) => {
+      "source-proof-load": async (el2) => {
         var _a2, _b2, _c2;
-        const id = ((_a2 = el == null ? void 0 : el.dataset) == null ? void 0 : _a2.id) || ((_b2 = trace.verification_summary) == null ? void 0 : _b2.verification_id);
+        const id = ((_a2 = el2 == null ? void 0 : el2.dataset) == null ? void 0 : _a2.id) || ((_b2 = trace.verification_summary) == null ? void 0 : _b2.verification_id);
         if (!history3.some((r) => r.verification_id === id) && id !== ((_c2 = trace.verification_summary) == null ? void 0 : _c2.verification_id)) throw Error("Choose saved verification for this trace.");
         const result = await ctx2.api.call("traces.verification", { ...ctx2.sourceParams(), verification_id: id });
         if (!current3()) return;
@@ -7948,7 +8091,7 @@ ${state2.artifact.system_id ? `<details><summary>Advanced byte options</summary>
     canvas.style.touchAction = "none";
     const raw = Uint8Array.from(atob(frame.rgb24_base64), (c) => c.charCodeAt(0)), context = canvas.getContext("2d"), image = context.createImageData(frame.width, frame.height);
     for (let i = 0; i < frame.width * frame.height; i++) image.data.set([raw[i * 3], raw[i * 3 + 1], raw[i * 3 + 2], 255], i * 4);
-    const draw2 = (region) => {
+    const draw3 = (region) => {
       context.putImageData(image, 0, 0);
       if (region) {
         context.strokeStyle = "#76d9c3";
@@ -7956,7 +8099,7 @@ ${state2.artifact.system_id ? `<details><summary>Advanced byte options</summary>
         context.strokeRect(region.x + 0.5, region.y + 0.5, region.width - 1, region.height - 1);
       }
     };
-    draw2(((_a = ctx2.state.visualRegion) == null ? void 0 : _a.frame_sha256) === frame.sha256 ? ctx2.state.visualRegion.region : null);
+    draw3(((_a = ctx2.state.visualRegion) == null ? void 0 : _a.frame_sha256) === frame.sha256 ? ctx2.state.visualRegion.region : null);
     let start = null, pointer = null, last = null;
     canvas.addEventListener("pointerdown", (event) => {
       if (event.button !== 0) return;
@@ -7970,7 +8113,7 @@ ${state2.artifact.system_id ? `<details><summary>Advanced byte options</summary>
       if (event.pointerId !== pointer) return;
       try {
         last = selectedRegion(canvas.getBoundingClientRect(), start, { x: event.clientX, y: event.clientY }, frame.width, frame.height);
-        draw2(last);
+        draw3(last);
         document.getElementById("visual-region-label").textContent = `Region ${last.x}, ${last.y} · ${last.width} × ${last.height}`;
       } catch (error) {
         last = null;
@@ -7991,7 +8134,7 @@ ${state2.artifact.system_id ? `<details><summary>Advanced byte options</summary>
     canvas.addEventListener("pointerup", finish);
     canvas.addEventListener("pointercancel", () => {
       pointer = null;
-      draw2(null);
+      draw3(null);
     });
   }
   function visualFailures(evidence2) {
@@ -8079,19 +8222,19 @@ ${state2.artifact.system_id ? `<details><summary>Advanced byte options</summary>
     if (typeof encoded !== "string" || encoded.length > 256e3 || !/^(?:[A-Za-z0-9+/]{4})*(?:[A-Za-z0-9+/]{2}==|[A-Za-z0-9+/]{3}=)?$/.test(encoded)) throw new Error("Invalid PCM encoding.");
     const raw = Uint8Array.from(atob(encoded), (c) => c.charCodeAt(0));
     if (raw.length !== packet.captured_frames * 4) throw new Error("Audio sample count differs from the packet.");
-    const view = new DataView(raw.buffer), left = new Float32Array(packet.captured_frames), right = new Float32Array(packet.captured_frames);
+    const view2 = new DataView(raw.buffer), left = new Float32Array(packet.captured_frames), right = new Float32Array(packet.captured_frames);
     for (let i = 0; i < left.length; i++) {
-      left[i] = view.getInt16(i * 4, true) / 32768;
-      right[i] = view.getInt16(i * 4 + 2, true) / 32768;
+      left[i] = view2.getInt16(i * 4, true) / 32768;
+      right[i] = view2.getInt16(i * 4 + 2, true) / 32768;
     }
     return { left, right, rate: packet.sample_rate, duration: left.length / packet.sample_rate };
   }
   function soundCheckPacket() {
-    const count = 1e3, raw = new Uint8Array(count * 4), view = new DataView(raw.buffer);
+    const count = 1e3, raw = new Uint8Array(count * 4), view2 = new DataView(raw.buffer);
     for (let i = 0; i < count; i++) {
       const sample = Math.round(Math.sin(i * 2 * Math.PI * 440 / 8e3) * 6e3);
-      view.setInt16(i * 4, sample, true);
-      view.setInt16(i * 4 + 2, sample, true);
+      view2.setInt16(i * 4, sample, true);
+      view2.setInt16(i * 4 + 2, sample, true);
     }
     return { format: "s16le", channels: 2, sample_rate: 8e3, captured_frames: count, complete: true, dropped_frames: 0, invalid_batches: 0, pcm_s16le_base64: btoa(String.fromCharCode(...raw)) };
   }
@@ -9508,7 +9651,7 @@ ${state2.artifact.system_id ? `<details><summary>Advanced byte options</summary>
     mount: () => mount10,
     render: () => render14
   });
-  var settingIds = { theme: "settings-theme", scale: "settings-scale", autoDeepScan: "settings-auto-deep-scan", autoGraphics: "settings-auto-graphics", rememberWorkspace: "settings-remember-workspace", volume: "settings-volume", startMuted: "settings-start-muted", loopPreview: "settings-loop-preview", reduceMotion: "settings-reduce-motion", advancedTools: "settings-advanced-tools" };
+  var settingIds = { theme: "settings-theme", scale: "settings-scale", autoDeepScan: "settings-auto-deep-scan", autoGraphics: "settings-auto-graphics", rememberWorkspace: "settings-remember-workspace", volume: "settings-volume", startMuted: "settings-start-muted", loopPreview: "settings-loop-preview", reduceMotion: "settings-reduce-motion", advancedTools: "settings-advanced-tools", checkUpdates: "settings-check-updates" };
   async function editorFor(ctx2) {
     if (!ctx2.state.settingsEditor) {
       const editor2 = { values: getSettings(), loaded: false, busy: false, dirty: false, error: "" };
@@ -9560,12 +9703,25 @@ ${state2.artifact.system_id ? `<details><summary>Advanced byte options</summary>
       await ctx2.render();
     }
   }
+  async function checkForUpdates(ctx2) {
+    const updates = ctx2.state.updates;
+    if (!updates) throw Error("ROMancer is still starting. Try again in a moment.");
+    ctx2.notify("Checking for updates…");
+    let s = await updates.checkNow();
+    for (let i = 0; i < 40 && s.task === "checking"; i++) {
+      await new Promise((done) => setTimeout(done, 500));
+      s = await ctx2.api.call("system.update_status", {});
+    }
+    if (s.error) ctx2.notify(s.error, true);
+    else if (s.available) ctx2.notify(`Version ${s.latest.version} is out. The banner at the top shows it.`);
+    else ctx2.notify(`ROMancer is up to date (v${s.current}).`);
+  }
   function checkbox(editor, key2, label, hint = "") {
     return `<label class="settings-check" for="${settingIds[key2]}"><input type="checkbox" id="${settingIds[key2]}" ${editor.values[key2] ? "checked" : ""}><span>${esc(label)}${hint ? `<small>${esc(hint)}</small>` : ""}</span></label>`;
   }
   function settingsForm(editor) {
     const v = editor.values, disabled = editor.busy || !editor.loaded;
-    return `<section class="card settings-card"><form id="settings-form"><h2>Preferences</h2><p>Apply saves these preferences for this workspace. OK saves and closes; Cancel discards unapplied changes.</p>${editor.error ? `<div class="notice"><p class="error" role="alert">${esc(editor.error)}</p>${button("Reload saved settings (discard form)", "settings-reload", { disabled: editor.busy })}</div>` : ""}<div class="grid-even"><fieldset class="settings-group"${editor.busy ? " disabled" : ""}><legend>Appearance</legend>${select("settings-theme", "Theme", [["romancer", "ROMancer (default)"], ["dark", "Dark"], ["light", "Light"]], v.theme)}${select("settings-scale", "Interface size", [[100, "100%"], [125, "125%"], [150, "150%"], [200, "200%"]], v.scale)}<p class="subtle">ROMancer keeps its original teal palette. Dark and Light are also available.</p>${checkbox(editor, "reduceMotion", "Reduce interface motion")}</fieldset><fieldset class="settings-group"${editor.busy ? " disabled" : ""}><legend>Automatic tasks</legend>${checkbox(editor, "autoDeepScan", "Auto deep scan on ROM load", "Find supported resources when a ROM is opened.")}${checkbox(editor, "autoGraphics", "Inspect gameplay graphics automatically", "Analyze available playtest frames for graphics candidates.")}${checkbox(editor, "rememberWorkspace", "Remember my workspace", "Reopen the last project, ROM, page, and editing position.")}</fieldset><fieldset class="settings-group"${editor.busy ? " disabled" : ""}><legend>Audio</legend><label class="field" for="settings-volume"><span>Volume <output id="settings-volume-value" for="settings-volume">${v.volume}%</output></span><input id="settings-volume" type="range" min="0" max="100" step="1" value="${v.volume}"></label>${checkbox(editor, "startMuted", "Start game audio muted")}${checkbox(editor, "loopPreview", "Loop audio previews")}</fieldset><fieldset class="settings-group"${editor.busy ? " disabled" : ""}><legend>Workspace tools</legend>${checkbox(editor, "advancedTools", "Keep Advanced tools expanded", "Basic editors stay visible. Advanced contains Game view, Resources, investigation, automation and regression.")}<p class="subtle">Project recovery, system setup, and AI tools remain available below.</p></fieldset></div><div class="actions settings-actions">${button("OK", "settings-ok", { primary: true, disabled })}${button("Apply", "settings-apply", { disabled })}${button("Cancel", "settings-cancel", { disabled: editor.busy })}${button("Restore defaults", "settings-defaults", { disabled: editor.busy })}<span class="subtle" id="settings-form-status" role="status">${editor.busy ? "Saving settings…" : editor.dirty ? "Unapplied changes" : "Preferences apply to this workspace"}</span></div></form></section>`;
+    return `<section class="card settings-card"><form id="settings-form"><h2>Preferences</h2><p>Apply saves these preferences for this workspace. OK saves and closes; Cancel discards unapplied changes.</p>${editor.error ? `<div class="notice"><p class="error" role="alert">${esc(editor.error)}</p>${button("Reload saved settings (discard form)", "settings-reload", { disabled: editor.busy })}</div>` : ""}<div class="grid-even"><fieldset class="settings-group"${editor.busy ? " disabled" : ""}><legend>Appearance</legend>${select("settings-theme", "Theme", [["romancer", "ROMancer (default)"], ["dark", "Dark"], ["light", "Light"]], v.theme)}${select("settings-scale", "Interface size", [[100, "100%"], [125, "125%"], [150, "150%"], [200, "200%"]], v.scale)}<p class="subtle">ROMancer keeps its original teal palette. Dark and Light are also available.</p>${checkbox(editor, "reduceMotion", "Reduce interface motion")}</fieldset><fieldset class="settings-group"${editor.busy ? " disabled" : ""}><legend>Automatic tasks</legend>${checkbox(editor, "autoDeepScan", "Auto deep scan on ROM load", "Find supported resources when a ROM is opened.")}${checkbox(editor, "autoGraphics", "Inspect gameplay graphics automatically", "Analyze available playtest frames for graphics candidates.")}${checkbox(editor, "rememberWorkspace", "Remember my workspace", "Reopen the last project, ROM, page, and editing position.")}${checkbox(editor, "checkUpdates", "Check for updates", "Once a day ROMancer asks GitHub whether a newer version is out. Nothing is downloaded until you choose Update and restart.")}<div class="actions">${button("Check for updates now", "settings-update-check", { disabled: editor.busy })}</div></fieldset><fieldset class="settings-group"${editor.busy ? " disabled" : ""}><legend>Audio</legend><label class="field" for="settings-volume"><span>Volume <output id="settings-volume-value" for="settings-volume">${v.volume}%</output></span><input id="settings-volume" type="range" min="0" max="100" step="1" value="${v.volume}"></label>${checkbox(editor, "startMuted", "Start game audio muted")}${checkbox(editor, "loopPreview", "Loop audio previews")}</fieldset><fieldset class="settings-group"${editor.busy ? " disabled" : ""}><legend>Workspace tools</legend>${checkbox(editor, "advancedTools", "Keep Advanced tools expanded", "Basic editors stay visible. Advanced contains Game view, Resources, investigation, automation and regression.")}<p class="subtle">Project recovery, system setup, and AI tools remain available below.</p></fieldset></div><div class="actions settings-actions">${button("OK", "settings-ok", { primary: true, disabled })}${button("Apply", "settings-apply", { disabled })}${button("Cancel", "settings-cancel", { disabled: editor.busy })}${button("Restore defaults", "settings-defaults", { disabled: editor.busy })}<span class="subtle" id="settings-form-status" role="status">${editor.busy ? "Saving settings…" : editor.dirty ? "Unapplied changes" : "Preferences apply to this workspace"}</span></div></form></section>`;
   }
   var columns = [["identification", "Identification"], ["raw_inspection", "Inspection"], ["structured_formats", "Declared formats"], ["automatic_resource_discovery", "Resource discovery"], ["runtime_control", "Saved setup"]];
   async function render14(ctx2) {
@@ -9585,7 +9741,7 @@ ${state2.artifact.system_id ? `<details><summary>Advanced byte options</summary>
       editor.dirty = true;
       editor.error = "";
       await ctx2.render();
-    } });
+    }, "settings-update-check": () => checkForUpdates(ctx2) });
     const agent = (_a = ctx2.state.results) == null ? void 0 : _a["system.agent_config"];
     const c = ctx2.state.capabilities || {}, packs = [...((_b = c.systems) == null ? void 0 : _b.systems) || []].sort((a, b) => Number(b.release_focus) - Number(a.release_focus));
     const setups = Object.fromEntries(await Promise.all(packs.map(async (pack) => {
@@ -9701,16 +9857,16 @@ ${state2.artifact.system_id ? `<details><summary>Advanced byte options</summary>
   };
   function decodedWav(encoded) {
     if (typeof encoded !== "string" || encoded.length > 6 * 1024 * 1024) throw Error("Audio preview exceeds its byte budget.");
-    const raw = Uint8Array.from(atob(encoded), (c) => c.charCodeAt(0)), view = new DataView(raw.buffer), tag = (at) => String.fromCharCode(...raw.slice(at, at + 4));
-    if (raw.length < 44 || tag(0) !== "RIFF" || tag(8) !== "WAVE" || view.getUint32(4, true) + 8 !== raw.length) throw Error("Decoded preview is not a complete PCM WAV.");
+    const raw = Uint8Array.from(atob(encoded), (c) => c.charCodeAt(0)), view2 = new DataView(raw.buffer), tag = (at) => String.fromCharCode(...raw.slice(at, at + 4));
+    if (raw.length < 44 || tag(0) !== "RIFF" || tag(8) !== "WAVE" || view2.getUint32(4, true) + 8 !== raw.length) throw Error("Decoded preview is not a complete PCM WAV.");
     let format = null, pcm = null, chunks = 0;
     for (let at = 12; at + 8 <= raw.length; ) {
       if (++chunks > 1024) throw Error("WAV chunk budget exceeded.");
-      const size2 = view.getUint32(at + 4, true), start = at + 8, end = start + size2;
+      const size2 = view2.getUint32(at + 4, true), start = at + 8, end = start + size2;
       if (end > raw.length) throw Error("Decoded WAV contains a truncated chunk.");
       if (tag(at) === "fmt ") {
         if (size2 < 16) throw Error("Decoded WAV format is incomplete.");
-        format = { codec: view.getUint16(start, true), channels: view.getUint16(start + 2, true), sample_rate: view.getUint32(start + 4, true), block: view.getUint16(start + 12, true), bits: view.getUint16(start + 14, true) };
+        format = { codec: view2.getUint16(start, true), channels: view2.getUint16(start + 2, true), sample_rate: view2.getUint32(start + 4, true), block: view2.getUint16(start + 12, true), bits: view2.getUint16(start + 14, true) };
       }
       if (tag(at) === "data") {
         if (pcm) throw Error("Decoded WAV has duplicate audio data.");
@@ -9722,11 +9878,11 @@ ${state2.artifact.system_id ? `<details><summary>Advanced byte options</summary>
     return { pcm, channels: format.channels, sample_rate: format.sample_rate, frames: pcm.length / format.block };
   }
   function waveform(decoded) {
-    const { pcm, channels, sample_rate, frames } = decoded, view = new DataView(pcm.buffer, pcm.byteOffset, pcm.byteLength), step = Math.max(1, Math.ceil(frames / 512)), peaks = [];
+    const { pcm, channels, sample_rate, frames } = decoded, view2 = new DataView(pcm.buffer, pcm.byteOffset, pcm.byteLength), step = Math.max(1, Math.ceil(frames / 512)), peaks = [];
     for (let first = 0; first < frames; first += step) {
       let low = 32767, high = -32768;
       for (let i = first * channels; i < Math.min(frames, first + step) * channels; i++) {
-        const value = view.getInt16(i * 2, true);
+        const value = view2.getInt16(i * 2, true);
         low = Math.min(low, value);
         high = Math.max(high, value);
       }
@@ -10193,12 +10349,12 @@ ${state2.artifact.system_id ? `<details><summary>Advanced byte options</summary>
   var TOOLS = [["pick", "Pick a picture"], ["paint", "Paint"], ["erase", "Unpaint"]];
   var ZOOMS = [1, 2, 3, 4];
   var key = (col, row) => col + "," + row;
-  function placeAt(view, zoom, x, y) {
-    const size2 = view.cell * zoom, col = Math.floor(x / size2), row = Math.floor(y / size2);
-    return col >= 0 && row >= 0 && col < view.width && row < view.height ? [col, row] : null;
+  function placeAt(view2, zoom, x, y) {
+    const size2 = view2.cell * zoom, col = Math.floor(x / size2), row = Math.floor(y / size2);
+    return col >= 0 && row >= 0 && col < view2.width && row < view2.height ? [col, row] : null;
   }
-  function units(view) {
-    const out = [{ id: "cells", label: "Single cells", width: 1, height: 1, left: 0, top: 0 }], blocks = view.blocks;
+  function units(view2) {
+    const out = [{ id: "cells", label: "Single cells", width: 1, height: 1, left: 0, top: 0 }], blocks = view2.blocks;
     if (blocks) {
       out.push({ id: "blocks", label: `Blocks (${blocks.width} by ${blocks.height} cells)`, ...blocks });
       if (blocks.larger) out.push({ id: "larger", label: `Larger blocks (${blocks.larger.width} by ${blocks.larger.height} cells)`, ...blocks.larger });
@@ -10213,23 +10369,23 @@ ${state2.artifact.system_id ? `<details><summary>Advanced byte options</summary>
     const first = snap([Math.min(a[0], b[0]), Math.min(a[1], b[1])], unit), last = snap([Math.max(a[0], b[0]), Math.max(a[1], b[1])], unit);
     return { col: first[0], row: first[1], width: last[0] - first[0] + unit.width, height: last[1] - first[1] + unit.height };
   }
-  function stamp(view, brush, col, row) {
+  function stamp(view2, brush, col, row) {
     const out = [];
     for (let dy = 0; dy < brush.height; dy++) for (let dx = 0; dx < brush.width; dx++) {
       const c = col + dx, r = row + dy, fc = brush.col + dx, fr = brush.row + dy;
-      if (c < 0 || r < 0 || fc < 0 || fr < 0 || c >= view.width || r >= view.height || fc >= view.width || fr >= view.height) continue;
-      if (view.frames[r * view.width + c] < 0 || view.frames[fr * view.width + fc] < 0) continue;
-      if (view.status[r * view.width + c] === "u") continue;
+      if (c < 0 || r < 0 || fc < 0 || fr < 0 || c >= view2.width || r >= view2.height || fc >= view2.width || fr >= view2.height) continue;
+      if (view2.frames[r * view2.width + c] < 0 || view2.frames[fr * view2.width + fc] < 0) continue;
+      if (view2.status[r * view2.width + c] === "u") continue;
       if (c === fc && r === fr) continue;
       out.push([c, r, fc, fr]);
     }
     return out;
   }
-  function paintLayers(view, choice) {
-    if (view.plane !== 0 || view.planes.length < 2) return [view.plane];
-    return choice === "all" ? view.planes.map((plane) => plane.index) : [Number(choice)];
+  function paintLayers(view2, choice) {
+    if (view2.plane !== 0 || view2.planes.length < 2) return [view2.plane];
+    return choice === "all" ? view2.planes.map((plane) => plane.index) : [Number(choice)];
   }
-  var layerChoices = (view) => view.plane === 0 && view.planes.length > 1 ? [["all", "All layers"], ...view.planes.map((plane) => [String(plane.index), plane.name + " only"])] : [];
+  var layerChoices = (view2) => view2.plane === 0 && view2.planes.length > 1 ? [["all", "All layers"], ...view2.planes.map((plane) => [String(plane.index), plane.name + " only"])] : [];
   function steps2(level, change) {
     const at = change ? change.working || change.error ? 2 : 3 : level.painted.size ? 2 : level.brush ? 1 : 0;
     return [["Pick", "Click a place on the map, or drag over several, to take it as your brush."], ["Paint", "Click or drag where the brush should go."], ["Check", "Choose Show what changes. ROMancer replays the game."], ["Keep", "Look at the map, then keep the change or cancel it."]].map(([name2, text], index) => ({ name: name2, text, now: index === at, done: index < at }));
@@ -10264,42 +10420,42 @@ ${state2.artifact.system_id ? `<details><summary>Advanced byte options</summary>
   function levelPart(ed, verdict, keep) {
     const level = ed.level;
     if (!level || !level.view) return "";
-    const view = level.view, change = levelChange(ed), painted = level.painted.size, brush = level.brush;
-    const planes = view.planes.length > 1 ? `<label>Show <select id="level-plane" aria-label="Which layers the map shows">${view.planes.map((p) => `<option value="${p.index}" ${p.index === view.plane ? "selected" : ""}>${p.index === 0 ? "All layers together" : esc(p.name) + " alone"}</option>`).join("")}</select></label>` : "";
-    const choices = layerChoices(view), paintOn = choices.length ? `<label>Paint on <select id="level-layers" aria-label="Which layers a change is made on">${choices.map(([value, label]) => `<option value="${value}" ${value === level.paintOn ? "selected" : ""}>${esc(label)}</option>`).join("")}</select></label>` : "";
+    const view2 = level.view, change = levelChange(ed), painted = level.painted.size, brush = level.brush;
+    const planes = view2.planes.length > 1 ? `<label>Show <select id="level-plane" aria-label="Which layers the map shows">${view2.planes.map((p) => `<option value="${p.index}" ${p.index === view2.plane ? "selected" : ""}>${p.index === 0 ? "All layers together" : esc(p.name) + " alone"}</option>`).join("")}</select></label>` : "";
+    const choices = layerChoices(view2), paintOn = choices.length ? `<label>Paint on <select id="level-layers" aria-label="Which layers a change is made on">${choices.map(([value, label]) => `<option value="${value}" ${value === level.paintOn ? "selected" : ""}>${esc(label)}</option>`).join("")}</select></label>` : "";
     const guide = `<ol class="level-steps" aria-label="How to change the level">${steps2(level, change).map((step) => `<li class="${step.now ? "now" : step.done ? "done" : ""}"${step.now ? ' aria-current="step"' : ""}><strong>${step.name}</strong><span>${step.text}</span></li>`).join("")}</ol>`;
-    const sizes = units(view), unitPart = sizes.length > 1 ? `<label>Brush snaps to <select id="level-unit" aria-label="What the brush snaps to">${sizes.map((u) => `<option value="${u.id}" ${u.id === level.unit ? "selected" : ""}>${esc(u.label)}</option>`).join("")}</select></label>` : "";
+    const sizes = units(view2), unitPart = sizes.length > 1 ? `<label>Brush snaps to <select id="level-unit" aria-label="What the brush snaps to">${sizes.map((u) => `<option value="${u.id}" ${u.id === level.unit ? "selected" : ""}>${esc(u.label)}</option>`).join("")}</select></label>` : "";
     const zoom = `<label>Zoom <select id="level-zoom" aria-label="Zoom">${ZOOMS.map((z) => `<option value="${z}" ${z === level.zoom ? "selected" : ""}>${z}x</option>`).join("")}</select></label>`;
     const tools = TOOLS.map(([id, label]) => `<button type="button" class="scene-mode ${level.tool === id ? "active" : ""}" data-action="level-tool" data-id="${id}" aria-pressed="${level.tool === id}">${label}</button>`).join("");
     const hint = level.tool === "pick" ? "Click a place to take its picture as your brush, or drag to take a block of places (a platform, a tree)." : !brush ? "Pick a picture from the map first." : level.tool === "paint" ? "Click or drag on the map to put your brush there." : "Click or drag over painted places to take the paint off.";
     const brushText = brush ? `Brush: ${brush.width} by ${brush.height} ${brush.width * brush.height === 1 ? "place" : "places"} from column ${brush.col + 1}, row ${brush.row + 1}.` : "No brush yet.";
-    const built = view.blocks ? ` This level is built from blocks of ${view.blocks.width} by ${view.blocks.height} cells${view.blocks.larger ? `, laid out in larger blocks of ${view.blocks.larger.width} by ${view.blocks.larger.height}` : ""}. Paint a whole block onto a whole block and ROMancer looks for the level's own list of blocks, so that only that place changes.` : "";
-    const locked = view.status.includes("u") ? " Places marked with a cross cannot be changed: ROMancer has not seen where the game gets them from." : "";
-    const after = view.after ? `<label class="level-toggle"><input type="checkbox" id="level-after" ${level.showAfter ? "checked" : ""}> Show the map with the changes</label>` : "";
+    const built = view2.blocks ? ` This level is built from blocks of ${view2.blocks.width} by ${view2.blocks.height} cells${view2.blocks.larger ? `, laid out in larger blocks of ${view2.blocks.larger.width} by ${view2.blocks.larger.height}` : ""}. Paint a whole block onto a whole block and ROMancer looks for the level's own list of blocks, so that only that place changes.` : "";
+    const locked = view2.status.includes("u") ? " Places marked with a cross cannot be changed: ROMancer has not seen where the game gets them from." : "";
+    const after = view2.after ? `<label class="level-toggle"><input type="checkbox" id="level-after" ${level.showAfter ? "checked" : ""}> Show the map with the changes</label>` : "";
     const propose2 = button("Show what changes", "level-propose", { primary: true, disabled: !painted, reason: "Paint at least one place first." }) + button("Clear paint", "level-clear", { disabled: !painted && !change });
-    return `<div class="card-heading"><h3>${esc(view.name)}</h3>${badge(`${view.width} by ${view.height} cells · ${plural2(view.scenes.length, "capture")}`, "neutral")}</div>
+    return `<div class="card-heading"><h3>${esc(view2.name)}</h3>${badge(`${view2.width} by ${view2.height} cells · ${plural2(view2.scenes.length, "capture")}`, "neutral")}</div>
  ${guide}
  <div class="actions level-bar">${planes}${paintOn}${zoom}${unitPart}${after}${button("Save map as PNG", "level-export", { icon: "download" })}${button("Remove this level map", "level-forget")}${button("Close", "level-close")}</div>
  <div class="scene-modes" role="group" aria-label="Tool">${tools}</div>
  <p class="subtle" role="status">${hint}${built}${locked}</p>
- <div class="level-scroll" id="level-scroll" tabindex="0" aria-label="The level map. Scroll to move around."><canvas id="level-canvas" class="level-canvas" width="${view.width * view.cell * level.zoom}" height="${view.height * view.cell * level.zoom}" role="img" aria-label="Map of ${esc(view.name)}"></canvas></div>
+ <div class="level-scroll" id="level-scroll" tabindex="0" aria-label="The level map. Scroll to move around."><canvas id="level-canvas" class="level-canvas" width="${view2.width * view2.cell * level.zoom}" height="${view2.height * view2.cell * level.zoom}" role="img" aria-label="Map of ${esc(view2.name)}"></canvas></div>
  <p class="subtle" id="level-where" role="status">${brushText} ${painted ? plural2(painted, "place") + " painted." : ""}</p>
  ${change ? verdict(change) : ""}
- ${change && view.unshown ? `<p class="notice warm" role="status">${view.unshown === view.pending.filter((cell) => cell.change === change.id).length ? "The places you painted" : plural2(view.unshown, "place") + " you painted"} ${view.unshown === 1 ? "does" : "do"} not look different on the map after the replay. The change may show somewhere else in the level. Look at the map before you keep it.</p>` : ""}
+ ${change && view2.unshown ? `<p class="notice warm" role="status">${view2.unshown === view2.pending.filter((cell) => cell.change === change.id).length ? "The places you painted" : plural2(view2.unshown, "place") + " you painted"} ${view2.unshown === 1 ? "does" : "do"} not look different on the map after the replay. The change may show somewhere else in the level. Look at the map before you keep it.</p>` : ""}
  <div class="actions">${change ? keep(change, propose2) : propose2}${button("Open this place in its scene", "level-goto", { disabled: !level.last, reason: "Click a place on the map first." })}</div>
  <p class="subtle">A place on the map is a background cell of the scene that showed it. If the game builds that cell from a block it also uses elsewhere, every place that uses the block changes; the map shows them before you keep the change.</p>`;
   }
   async function drawLevel(ctx2, ed, picture2) {
     const level = ed.level, canvas = document.getElementById("level-canvas");
     if (!level || !level.view || !canvas) return;
-    const view = level.view, zoom = level.zoom, size2 = view.cell * zoom, context = canvas.getContext("2d");
-    const imageKey = level.showAfter && view.after ? view.after : view.image;
+    const view2 = level.view, zoom = level.zoom, size2 = view2.cell * zoom, context = canvas.getContext("2d");
+    const imageKey = level.showAfter && view2.after ? view2.after : view2.image;
     let image = null;
     try {
       image = await picture2(imageKey);
     } catch {
       try {
-        image = await picture2(view.image);
+        image = await picture2(view2.image);
       } catch {
       }
     }
@@ -10312,7 +10468,7 @@ ${state2.artifact.system_id ? `<details><summary>Advanced byte options</summary>
     context.fillStyle = "rgba(255,255,255,.8)";
     context.font = "12px sans-serif";
     context.setLineDash([6, 4]);
-    for (const [first] of view.sections.slice(1)) {
+    for (const [first] of view2.sections.slice(1)) {
       const x = first * size2 - size2 * 2 + 0.5;
       context.beginPath();
       context.moveTo(x, 0);
@@ -10323,8 +10479,8 @@ ${state2.artifact.system_id ? `<details><summary>Advanced byte options</summary>
     context.setLineDash([]);
     context.strokeStyle = "rgba(255,255,255,.35)";
     context.beginPath();
-    for (let row = 0; row < view.height; row++) for (let col = 0; col < view.width; col++) {
-      if (view.status[row * view.width + col] !== "u") continue;
+    for (let row = 0; row < view2.height; row++) for (let col = 0; col < view2.width; col++) {
+      if (view2.status[row * view2.width + col] !== "u") continue;
       const x = col * size2, y = row * size2;
       context.moveTo(x + 2, y + 2);
       context.lineTo(x + size2 - 2, y + size2 - 2);
@@ -10333,13 +10489,13 @@ ${state2.artifact.system_id ? `<details><summary>Advanced byte options</summary>
     }
     context.stroke();
     context.strokeStyle = "#ffd166";
-    for (const cell of view.pending) context.strokeRect(cell.col * size2 + 0.5, cell.row * size2 + 0.5, size2 - 1, size2 - 1);
+    for (const cell of view2.pending) context.strokeRect(cell.col * size2 + 0.5, cell.row * size2 + 0.5, size2 - 1, size2 - 1);
     if (image && level.painted.size) {
-      const source = await picture2(view.image).catch(() => null);
+      const source = await picture2(view2.image).catch(() => null);
       if (ed.level !== level || !canvas.isConnected) return;
       for (const [place, from] of level.painted) {
         const [col, row] = place.split(",").map(Number);
-        if (source) context.drawImage(source, from[0] * view.cell, from[1] * view.cell, view.cell, view.cell, col * size2, row * size2, size2, size2);
+        if (source) context.drawImage(source, from[0] * view2.cell, from[1] * view2.cell, view2.cell, view2.cell, col * size2, row * size2, size2, size2);
       }
       context.strokeStyle = "#4cc9f0";
       for (const place of level.painted.keys()) {
@@ -10354,7 +10510,7 @@ ${state2.artifact.system_id ? `<details><summary>Advanced byte options</summary>
       context.setLineDash([]);
     }
     if (level.drag) {
-      const box = brushFrom(level.drag.from, level.drag.to, units(view).find((u) => u.id === level.unit) || units(view)[0]);
+      const box = brushFrom(level.drag.from, level.drag.to, units(view2).find((u) => u.id === level.unit) || units(view2)[0]);
       context.strokeStyle = "#ffffff";
       context.strokeRect(box.col * size2 + 0.5, box.row * size2 + 0.5, box.width * size2 - 1, box.height * size2 - 1);
     }
@@ -10363,18 +10519,18 @@ ${state2.artifact.system_id ? `<details><summary>Advanced byte options</summary>
     const redraw = () => drawLevel(ctx2, ed, (key2) => host.picture(key2));
     const load = async (id, plane = 0) => {
       var _a;
-      const view = await host.call("level", { level_id: id, plane });
-      const same = ed.level && ed.level.id === id && ((_a = ed.level.view) == null ? void 0 : _a.plane) === view.plane;
-      const unitIds = units(view).map((u) => u.id);
+      const view2 = await host.call("level", { level_id: id, plane });
+      const same = ed.level && ed.level.id === id && ((_a = ed.level.view) == null ? void 0 : _a.plane) === view2.plane;
+      const unitIds = units(view2).map((u) => u.id);
       ed.level = {
         id,
-        view,
+        view: view2,
         paintOn: same && ed.level.paintOn ? ed.level.paintOn : "all",
         unit: same && unitIds.includes(ed.level.unit) ? ed.level.unit : unitIds[unitIds.length - 1],
         tool: same ? ed.level.tool : "pick",
         brush: same ? ed.level.brush : null,
         painted: same ? ed.level.painted : /* @__PURE__ */ new Map(),
-        zoom: same ? ed.level.zoom : view.height * view.cell > 300 ? 1 : 2,
+        zoom: same ? ed.level.zoom : view2.height * view2.cell > 300 ? 1 : 2,
         showAfter: same ? ed.level.showAfter : true,
         last: same ? ed.level.last : null,
         drag: null
@@ -10834,20 +10990,20 @@ ${state2.artifact.system_id ? `<details><summary>Advanced byte options</summary>
     }).join("")}</div>`;
   }
   function stagePart(ed) {
-    const view = ed.view;
-    if (!view) return `<h3>Scene</h3><p class="subtle">Record a scene, then choose it above to see its colors.</p>`;
-    const scale = Math.max(2, Math.floor(1280 / view.scene.width));
-    return `<div class="card-heading"><h3>${esc(view.scene.label)}</h3><span id="scene-look">${ed.showOriginal ? badge("ORIGINAL") : ""}</span></div>${modePart(ed)}
- <div class="scene-stagewrap" id="scene-stagewrap" ${ed.mode === "background" ? 'tabindex="0"' : ""}><canvas id="scene-canvas" class="scene-canvas scene-pickable" width="${view.scene.width}" height="${view.scene.height}" data-action="scene-pick-pixel" role="img" aria-label="${STAGE_LABEL[ed.mode]}"></canvas><canvas id="scene-overlay" class="scene-overlay" width="${view.scene.width * scale}" height="${view.scene.height * scale}" aria-hidden="true"></canvas></div>
+    const view2 = ed.view;
+    if (!view2) return `<h3>Scene</h3><p class="subtle">Record a scene, then choose it above to see its colors.</p>`;
+    const scale = Math.max(2, Math.floor(1280 / view2.scene.width));
+    return `<div class="card-heading"><h3>${esc(view2.scene.label)}</h3><span id="scene-look">${ed.showOriginal ? badge("ORIGINAL") : ""}</span></div>${modePart(ed)}
+ <div class="scene-stagewrap" id="scene-stagewrap" ${ed.mode === "background" ? 'tabindex="0"' : ""}><canvas id="scene-canvas" class="scene-canvas scene-pickable" width="${view2.scene.width}" height="${view2.scene.height}" data-action="scene-pick-pixel" role="img" aria-label="${STAGE_LABEL[ed.mode]}"></canvas><canvas id="scene-overlay" class="scene-overlay" width="${view2.scene.width * scale}" height="${view2.scene.height * scale}" aria-hidden="true"></canvas></div>
  ${hitsPart(ed)}<div class="actions">${button(ed.showOriginal ? "Show with my changes" : "Show original", "scene-toggle-original")}${button("Forget this scene", "scene-forget")}</div>
  <p class="subtle">${STAGE_HINT[ed.mode]}</p><div id="scene-also">${alsoPart(ed)}</div>`;
   }
   function palettePart(ed) {
-    const view = ed.view;
-    if (!view) return "";
-    const matches = new Set(ed.matches), locked = view.swatches.filter((swatch) => !swatch.editable).length;
-    return `<div class="card-heading"><h3>Colors in this scene</h3>${badge(plural2(view.swatches.length - locked, "color") + " you can change", "good")}</div>
- ${groupSwatches(view.swatches).map((group) => `<div class="scene-palette-group"><h4>${esc(group.name)}</h4><div class="scene-swatches">${group.items.map((swatch) => `<button type="button" class="scene-swatch ${swatch.editable ? "" : "locked"} ${swatch.id === ed.selected ? "selected" : ""} ${matches.has(swatch.id) ? "match" : ""}" data-action="scene-select" data-id="${esc(swatch.id)}" aria-pressed="${swatch.id === ed.selected}" aria-label="${esc(swatchLabel(swatch))}" title="${esc(swatchLabel(swatch))}">${chips(swatch.pending || swatch.colors)}${swatch.editable ? "" : icon("lock", "scene-lock")}${swatch.pending ? '<span class="scene-dot" aria-hidden="true"></span>' : ""}</button>`).join("")}</div></div>`).join("")}
+    const view2 = ed.view;
+    if (!view2) return "";
+    const matches = new Set(ed.matches), locked = view2.swatches.filter((swatch) => !swatch.editable).length;
+    return `<div class="card-heading"><h3>Colors in this scene</h3>${badge(plural2(view2.swatches.length - locked, "color") + " you can change", "good")}</div>
+ ${groupSwatches(view2.swatches).map((group) => `<div class="scene-palette-group"><h4>${esc(group.name)}</h4><div class="scene-swatches">${group.items.map((swatch) => `<button type="button" class="scene-swatch ${swatch.editable ? "" : "locked"} ${swatch.id === ed.selected ? "selected" : ""} ${matches.has(swatch.id) ? "match" : ""}" data-action="scene-select" data-id="${esc(swatch.id)}" aria-pressed="${swatch.id === ed.selected}" aria-label="${esc(swatchLabel(swatch))}" title="${esc(swatchLabel(swatch))}">${chips(swatch.pending || swatch.colors)}${swatch.editable ? "" : icon("lock", "scene-lock")}${swatch.pending ? '<span class="scene-dot" aria-hidden="true"></span>' : ""}</button>`).join("")}</div></div>`).join("")}
  ${locked ? `<p class="subtle">${icon("lock", "scene-lock-inline")} ${plural2(locked, "color")} ${locked === 1 ? "is" : "are"} locked. Choose one to see why.</p>` : ""}`;
   }
   function pickerControls(ed, swatch, picker) {
@@ -11095,17 +11251,17 @@ ${state2.artifact.system_id ? `<details><summary>Advanced byte options</summary>
     if (tile) inkTile(context, tilePixels(tile), tilePalette(layer ? { ...tile, pal: layer.pal, zero: layer.zero } : tile, ed.gfx.colors, ed.brush.line < 0 ? tile.line : ed.brush.line), 0, 0, 8, { hflip: ed.brush.hflip, vflip: ed.brush.vflip, clear: tile.zero === "clear" });
   }
   function drawOverlay(ed) {
-    const overlay = document.getElementById("scene-overlay");
-    if (!overlay || !ed.view) return;
-    const context = overlay.getContext("2d"), wide = ed.view.scene.width, tall = ed.view.scene.height, scale = overlay.width / wide;
-    context.clearRect(0, 0, overlay.width, overlay.height);
+    const overlay2 = document.getElementById("scene-overlay");
+    if (!overlay2 || !ed.view) return;
+    const context = overlay2.getContext("2d"), wide = ed.view.scene.width, tall = ed.view.scene.height, scale = overlay2.width / wide;
+    context.clearRect(0, 0, overlay2.width, overlay2.height);
     if (ed.showOriginal || !ed.gfx || ed.mode === "colors") return;
-    const inBand = (rect, draw2) => {
+    const inBand = (rect, draw3) => {
       context.save();
       context.beginPath();
-      context.rect(0, rect.first * scale, overlay.width, (rect.last - rect.first) * scale);
+      context.rect(0, rect.first * scale, overlay2.width, (rect.last - rect.first) * scale);
       context.clip();
-      draw2();
+      draw3();
       context.restore();
     };
     const outline = (rect, color, dash) => {
@@ -11137,7 +11293,7 @@ ${state2.artifact.system_id ? `<details><summary>Advanced byte options</summary>
       const [xs, ys] = bandGrid(layer, band, wide);
       context.save();
       context.beginPath();
-      context.rect(0, band[0] * scale, overlay.width, (band[1] - band[0]) * scale);
+      context.rect(0, band[0] * scale, overlay2.width, (band[1] - band[0]) * scale);
       context.clip();
       for (let top = band[0] - ((band[0] + band[3]) % size2 + size2) % size2; top < band[1]; top += size2) for (let left = xs[0] - size2; left < wide; left += size2) {
         const cell = cellAt(layer, Math.max(0, left), Math.min(tall - 1, Math.max(top, band[0])));
@@ -11155,7 +11311,7 @@ ${state2.artifact.system_id ? `<details><summary>Advanced byte options</summary>
       }
       for (const y of ys) {
         context.moveTo(0, y * scale + 0.5);
-        context.lineTo(overlay.width, y * scale + 0.5);
+        context.lineTo(overlay2.width, y * scale + 0.5);
       }
       context.stroke();
       context.restore();
@@ -11241,9 +11397,9 @@ ${state2.artifact.system_id ? `<details><summary>Advanced byte options</summary>
     ed.lookPoll = setTimeout(async () => {
       if (!current2(ctx2, ed) || ed.proposal || !ed.sceneId) return;
       try {
-        const id = ed.sceneId, view = await call(ctx2, ed, "scene", { scene_id: id });
+        const id = ed.sceneId, view2 = await call(ctx2, ed, "scene", { scene_id: id });
         if (!current2(ctx2, ed) || ed.sceneId !== id || ed.proposal) return;
-        ed.view = view;
+        ed.view = view2;
         void drawStage(ctx2, ed);
         watchLook(ctx2, ed);
       } catch {
@@ -11952,7 +12108,7 @@ ${state2.artifact.system_id ? `<details><summary>Advanced byte options</summary>
     var _a;
     ctx2.modal(row.label, `<p>${esc(row.status)}${row.note ? " " + esc(row.note) : ""}</p><canvas id="scene-compare-canvas" class="scene-canvas" width="${row.width}" height="${row.height}" role="img" aria-label="Before and after, split at the slider"></canvas><label class="scene-slider"><span>Before</span><input type="range" min="0" max="100" value="50" data-compare aria-label="Slide from before to after"><span>After</span></label><div class="actions">${button("Show before", "scene-compare-set", { id: "0" })}${button("Show after", "scene-compare-set", { id: "100" })}${button("Close", "close-modal")}</div><details><summary>Details</summary><p>${row.replayed_from_frame === null || row.replayed_from_frame === void 0 ? "The replay did not reach this scene." : "Replayed in the real engine from a savestate " + plural2(Math.max(0, Math.round((((_a = ed.summary.scenes.find((scene) => scene.id === row.scene_id)) == null ? void 0 : _a.frame) - row.replayed_from_frame) / 60)), "second") + " earlier."} ${plural2(row.pixels, "pixel")} changed.</p></details>`);
     const canvas = document.getElementById("scene-compare-canvas"), slider = document.querySelector("#modal [data-compare]");
-    const draw2 = async () => {
+    const draw3 = async () => {
       try {
         const [before, after] = await Promise.all([picture(ctx2, ed, row.before), picture(ctx2, ed, row.after || row.before)]);
         if (!canvas.isConnected) return;
@@ -11966,12 +12122,12 @@ ${state2.artifact.system_id ? `<details><summary>Advanced byte options</summary>
       } catch {
       }
     };
-    slider.addEventListener("input", draw2);
+    slider.addEventListener("input", draw3);
     ed.compareSet = (value) => {
       slider.value = value;
-      draw2();
+      draw3();
     };
-    void draw2();
+    void draw3();
   }
   function reviewBody(review) {
     return `<p class="notice" role="status">${esc(review.headline)}</p><p>${esc(review.coverage)}</p>${review.unverified.length ? `<p class="notice warm">Not confirmed by replay: ${review.unverified.map(esc).join("; ")}. These may not do what you expect.</p>` : ""}
@@ -12746,7 +12902,7 @@ ${state2.artifact.system_id ? `<details><summary>Advanced byte options</summary>
       var _a2;
       return `<option value="${a.artifact_id}" ${((_a2 = state.artifact) == null ? void 0 : _a2.artifact_id) === a.artifact_id ? "selected" : ""}>${esc(a.name)}</option>`;
     }).join("")}</optgroup>`).join("")}</select></div></div>` : ""}<label class="search">${icon("search")}<input id="global-search" placeholder="Search workspace" aria-label="Search workspace"><kbd>Ctrl K</kbd><button type="button" data-action="workspace-search" aria-label="Go: search workspace" class="search-go">Go</button></label></header><main id="main" tabindex="-1"><div class="loading">Opening ${names6[state.page]}…</div></main>${jobTray()}</div>`;
-    const view = views[state.page];
+    const view2 = views[state.page];
     let html;
     if (project && state.artifact) {
       const scope = project.project_id + ":" + state.artifact.artifact_id;
@@ -12766,7 +12922,7 @@ ${state2.artifact.system_id ? `<details><summary>Advanced byte options</summary>
     }
     try {
       if (revision !== renderRevision) return;
-      html = await view.render({ ...ctx, isCurrentRender: () => revision === renderRevision, use: (handlers) => {
+      html = await view2.render({ ...ctx, isCurrentRender: () => revision === renderRevision, use: (handlers) => {
         if (revision === renderRevision) ctx.use(handlers);
       } });
     } catch (error) {
@@ -12776,7 +12932,7 @@ ${state2.artifact.system_id ? `<details><summary>Advanced byte options</summary>
     if (((_j = document.getElementById("app")) == null ? void 0 : _j.dataset.startupRecovered) === "true") return;
     document.getElementById("main").innerHTML = `<div id="error-panel">${errorNotice()}</div>` + html;
     if (lastRenderedScope === renderScope) restoreDetails(document.getElementById("main"), details);
-    await ((_k = view.mount) == null ? void 0 : _k.call(view, ctx));
+    await ((_k = view2.mount) == null ? void 0 : _k.call(view2, ctx));
     mountBuildDetails(ctx);
     state.visualComparison = mountVisualComparisons(document.getElementById("main"), state, { reduceMotion: getSettings().reduceMotion });
     updateWorkspaceStatus();
@@ -12910,6 +13066,9 @@ ${state2.artifact.system_id ? `<details><summary>Advanced byte options</summary>
   };
   windowOpen();
   setInterval(windowOpen, 15e3);
+  startup.then(() => {
+    state.updates = startUpdates(api, notify);
+  });
   window.addEventListener("pageshow", windowOpen);
   window.addEventListener("pagehide", () => {
     var _a, _b, _c, _d;

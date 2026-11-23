@@ -1,7 +1,7 @@
 import {readPreference,writePreference} from './preferences.js';
 import {applyInterfaceScale} from './interface_scale.js';
 
-export const DEFAULT_SETTINGS=Object.freeze({theme:'romancer',scale:100,autoDeepScan:true,autoGraphics:true,rememberWorkspace:true,volume:80,startMuted:false,loopPreview:false,reduceMotion:false,advancedTools:false});
+export const DEFAULT_SETTINGS=Object.freeze({theme:'romancer',scale:100,autoDeepScan:true,autoGraphics:true,rememberWorkspace:true,volume:80,startMuted:false,loopPreview:false,reduceMotion:false,advancedTools:false,checkUpdates:true});
 const keys=Object.keys(DEFAULT_SETTINGS),booleanKeys=keys.filter(key=>typeof DEFAULT_SETTINGS[key]==='boolean');
 export function validateSettings(values){
  if(!values||typeof values!=='object'||Array.isArray(values)||Object.keys(values).length!==keys.length||Object.keys(values).some(key=>!keys.includes(key)))throw Error('Settings contain missing or unknown fields.');
