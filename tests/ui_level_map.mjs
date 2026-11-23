@@ -1,5 +1,5 @@
 import assert from 'node:assert/strict';
-import {placeAt,units,snap,brushFrom,stamp,paintedCells,paintLayers,layerChoices,steps,levelStatus,levelsPart,levelPart,levelChange} from '../romancer/ui/level_map.js';
+import {placeAt,units,snap,brushFrom,stamp,paintedCells,paintLayers,layerChoices,steps,levelStatus,levelsPart,levelPart,levelChange,objectLabel,objectAt} from '../romancer/ui/level_map.js';
 
 // a map of 12 by 6 cells; (5,2) was never seen, (7,3) cannot be changed
 const width=12,height=6,frames=Array.from({length:width*height},()=>0),status=Array.from({length:width*height},()=>'r');
@@ -117,4 +117,22 @@ assert.deepEqual(steps({...fresh,brush,painted},null).map(step=>step.now),[false
 assert.deepEqual(steps(fresh,{working:1}).map(step=>step.now),[false,false,true,false]);
 assert.deepEqual(steps(fresh,{working:0,error:''}).map(step=>step.now),[false,false,false,true]);
 assert.match(levelPart({level:fresh,proposal:null},verdict,keep),/aria-current="step"><strong>Copy/);
+// what an object on the map is, in words
+assert.equal(objectLabel({kind:'enemy',name:'Panther'}),'Panther');
+assert.equal(objectLabel({kind:'candle',name:'Candle',drop_name:'Dagger'}),'Candle, drops Dagger');
+assert.equal(objectLabel({kind:'treasure',name:'Hidden crown',how:'Crouch there'}),'Hidden crown (crouch there)');
+assert.equal(objectLabel({kind:'block',item:2,drop_name:'Pot roast'}),'Breakable block with pot roast inside');
+assert.equal(objectLabel({kind:'block',item:0,drop_name:'Nothing'}),'Breakable block, empty');
+assert.equal(objectAt([{map_x:40,map_y:100},{map_x:200,map_y:100}],42,90).map_x,40);
+assert.equal(objectAt([{map_x:40,map_y:100}],120,20),null);
+// the tools: a game with a profile offers objects and length; every game offers play from here and before and after
+const known={...fresh,objects:{profile:'Castlevania',objects:[],roles:''},tool:'pick'};
+const toolsHtml=levelPart({level:known,proposal:null},verdict,keep);
+for(const label of ['Enemies, items and secrets','Longer or shorter','Play from here','Before and after'])assert.ok(toolsHtml.includes(label),label);
+const plain=levelPart({level:fresh,proposal:null},verdict,keep);
+assert.ok(!plain.includes('Longer or shorter')&&plain.includes('Play from here'));
+// the length panel says which screen and keeps the first and last screens
+const lengthHtml=levelPart({level:{...known,tool:'length',screen:{stage:0,floor:0,screen:0,screens:3,most:6,map_left:0}},proposal:null},verdict,keep);
+assert.match(lengthHtml,/Screen 1 of 3/);
+assert.match(lengthHtml,/data-action="level-length-apply" data-id="-1"[^>]*disabled/);
 console.log('level map checks passed');

@@ -200,6 +200,8 @@ class Castlevania:
         for st in range(19):
             for fl in (0, 1):
                 start = self.zone_table(st, fl)
+                if not self.ZONES_START <= start < self.ZONES_END:
+                    raise ValueError('This copy of the game keeps its enemy tables somewhere ROMancer does not expect.')
                 need[start] = max(need.get(start, 0), ((self.pages(st, fl) + 1) * 4 + 2) * 2)
         starts = sorted(need)
         ends = starts[1:] + [self.ZONES_END]
