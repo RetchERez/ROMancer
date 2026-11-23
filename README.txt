@@ -1,9 +1,54 @@
-ROMancer v1.3.9
+ROMancer v1.4.0
 By RetchEWretched
 
 ROMancer is a local ROM editing, investigation and playtesting workbench.
 It supports NES, SNES, Genesis / Mega Drive, Master System, Game Boy and
 Game Boy Color cartridge formats. Everyday work runs offline.
+
+NEW IN v1.4.0
+
+Level maps. Choose Levels, play to where a level starts, choose Record a
+level map and play through it (or let ROMancer walk right). ROMancer keeps
+a scene every time the screen moves and puts them together into one map of
+the level with every background layer. Save map as PNG saves it.
+- Paint on the map: copy a place, or drag over a bigger piece, and paint it
+  somewhere else, with the brush snapping to the blocks the level is built
+  from, then Check in the game replays the real game and the map shows every
+  place that changes before you keep anything
+- A block in one place: when ROMancer finds the level's own list of which
+  block goes where, it changes one entry and keeps it only when a replay
+  shows your block where you painted it, otherwise the block itself changes
+  everywhere it is used
+- Measured on 42 well-known games played automatically: a map on 39, a
+  block changed in the level's own list and confirmed by replay on 14, and
+  the block itself changed and confirmed on 6 more (trace/COVERAGE.md)
+
+Castlevania knows its levels. Every enemy, candle, item and secret is read
+from the game's own tables and drawn on the map as the game draws it, and
+every change is checked by playing the game.
+- Enemies, items and secrets: names for enemies and for what each candle
+  holds, swap or remove an enemy, give a candle another item, choose what a
+  breakable block holds, and change which hidden treasure appears and how
+  it is found
+- Show what's solid marks the blocks Simon can stand on
+- Longer or shorter: repeat a screen or remove one, and the enemies,
+  candles, secrets and stairs after it move along (1 to 6 screens a part)
+- Other classics keep the general level map tools for now, and their
+  enemies and items come in later updates
+
+Play from here starts the game at a spot on any level map with the changes
+you kept. Before and after replays your recorded walk on the original and
+the changed game side by side, and Save as GIF keeps it.
+
+Updates. Once a day ROMancer asks GitHub whether a newer version is out
+(Settings, Check for updates). A banner then says Update ready, with What's
+new, Update and restart, and Later.
+- Update and restart downloads the new version, checks it against the
+  release's SHA256SUMS and every file against its manifest, then closes
+  ROMancer, puts the new version in place and opens it again
+- Your projects are not touched, and if anything fails the old files are
+  put back and the old version opens and says why
+- This starts with v1.4.0, so update to v1.4.0 by hand once
 
 NEW IN v1.3.9
 
@@ -240,7 +285,9 @@ copy opens the new build in Playtest. Technical details shows the graphics,
 tile placement and checksum bytes.
 
 Levels opens the level maps in Scenes & colors: record a level while you
-play, then paint whole blocks on its map. Read-only layout research and
+play, then paint whole blocks on its map. On Castlevania the map also shows
+and changes the enemies, candles, secrets and length of each part, and
+Play from here and Before and after work on every map. Read-only layout research and
 measured locations remain available. Generic graphics tilemaps remain
 available as graphics resources.
 
@@ -280,7 +327,7 @@ available. The supplied Pokemon Red and Blue revisions share a
 
 START ON WINDOWS
 
-1. Extract ROMancer-v1.3.9-Windows.zip in Windows File Explorer.
+1. Extract ROMancer-v1.4.0-Windows.zip in Windows File Explorer.
 2. Double-click ROMancer.exe in the extracted folder.
    Keep ROMancer.exe, ROM Catalog.html and the ROMancer Files folder together.
 3. Open an original workshop or choose New project and import your own cartridge image.
@@ -301,8 +348,8 @@ SHA-256 is checked and later captures work offline. No ROM data is uploaded.
 
 START ON LINUX
 
-1. Extract ROMancer-v1.3.9-Linux-x86_64.tar.gz:  tar xf ROMancer-v1.3.9-Linux-x86_64.tar.gz
-2. Run ./ROMancer-v1.3.9-Linux-x86_64/ROMancer.sh
+1. Extract ROMancer-v1.4.0-Linux-x86_64.tar.gz:  tar xf ROMancer-v1.4.0-Linux-x86_64.tar.gz
+2. Run ./ROMancer-v1.4.0-Linux-x86_64/ROMancer.sh
    (./ROMancer.sh --install-desktop adds ROMancer to your application menu).
 
 The Linux x86-64 package includes Python, Pillow and the same six engines built

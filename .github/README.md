@@ -1,6 +1,6 @@
-# ROMancer v1.3.9
+# ROMancer v1.4.0
 
-**[Download for Windows x64](https://github.com/RetchERez/ROMancer/releases/download/v1.3.9/ROMancer-v1.3.9-Windows.zip)** · **[Download for Linux x86-64](https://github.com/RetchERez/ROMancer/releases/download/v1.3.9/ROMancer-v1.3.9-Linux-x86_64.tar.gz)**
+**[Download for Windows x64](https://github.com/RetchERez/ROMancer/releases/download/v1.4.0/ROMancer-v1.4.0-Windows.zip)** · **[Download for Linux x86-64](https://github.com/RetchERez/ROMancer/releases/download/v1.4.0/ROMancer-v1.4.0-Linux-x86_64.tar.gz)**
 
 By **RetchEWretched**. Edit ROMs, preview changes, playtest builds, and export patches offline.
 
@@ -14,6 +14,12 @@ By **RetchEWretched**. Edit ROMs, preview changes, playtest builds, and export p
 - **Scenes & colors editor.** Record moments of the game, change a color, and the **Also changes** strip replays every recorded scene that uses the same data in the real engine, so you see what else changes before you save. Works on all six systems without a game-specific definition.
 - **Tile and background editing.** In the same editor, redraw a picture pixel by pixel or paint pictures into background cells. Packed graphics are re-packed when ROMancer recognises the packing; otherwise the build gets a small run-time patch, shown both in the scene and from power-on.
 - **Accurate catalog.** The catalog now lists 942 cartridge dumps that match the No-Intro reference lists exactly, under their No-Intro names. Fan translations, re-release dumps and entries that did not boot were removed.
+
+New in v1.4.0: level editing and updates. Record a level while you play and get one map of the whole level; paint whole blocks on it and the real game is replayed before anything is kept (a map on 39 of 42 well-known games, a block changed in the level's own list on 14). Castlevania goes further: every enemy, candle, item and secret is on the map with its name, you can swap or remove them, change what a candle or a breakable block holds, change the hidden treasure, and make a part of a level longer or shorter, each change checked by playing the game. **Play from here** and **Before and after** work on every map, and **Update ready** brings new versions from inside ROMancer.
+
+![Castlevania's hall with every enemy and candle on the map](screenshots/level-objects.png)
+
+![Level maps of Castlevania III, DuckTales, Ninja Gaiden, Adventure Island and Contra](screenshots/level-maps.png)
 
 New in v1.3.9: the whole 942-ROM catalog was measured again: an edited pictures PNG had at least one picture confirmed by replay on 897 ROMs (887 in v1.3.0) and every drawn picture on 769 (721), a background layer saves on all 939 ROMs that record a scene (930), and an edited background PNG is confirmed on 800 (785); [per-ROM results](../trace/COVERAGE.md).
 
@@ -33,23 +39,23 @@ New in v1.3.2: closing the window now stops the local service, and **Save all gr
 
 New in v1.3.0: any recorded scene can save its pictures and background layers as PNG and load an edited PNG back as one replay-checked change (saving works on 939 of 942 ROMs; an edited PNG had at least one picture confirmed on 887).
 
-Measured across all 942 catalog entries: a color edit was confirmed by replay on 939 ROMs, a picture edit on 936 and a background edit on 922. Per-ROM results are in [trace/COVERAGE.md](../trace/COVERAGE.md); limits are in the [release notes](https://github.com/RetchERez/ROMancer/releases/tag/v1.3.9).
+Measured across all 942 catalog entries: a color edit was confirmed by replay on 939 ROMs, a picture edit on 936 and a background edit on 922. Per-ROM results are in [trace/COVERAGE.md](../trace/COVERAGE.md); limits are in the [release notes](https://github.com/RetchERez/ROMancer/releases/tag/v1.4.0).
 
 ## Get started on Windows
 
-1. In File Explorer, right-click **ROMancer-v1.3.9-Windows.zip** and choose **Extract All**.
+1. In File Explorer, right-click **ROMancer-v1.4.0-Windows.zip** and choose **Extract All**.
 2. Pick a destination and click **Extract**. Open the extracted folder.
 3. Double-click **ROMancer.exe**. Keep it next to the **ROMancer Files** folder.
 
 The ZIP includes the runtime, emulator engines, tracing engines for Scenes & colors, and offline user guide. Try an included practice ROM or choose **New project** to import your own. Open **Help → User guide** for a walkthrough. The launcher is unsigned, so Windows may show a SmartScreen warning.
 
-[User guide (PDF)](https://github.com/RetchERez/ROMancer/releases/download/v1.3.9/ROMancer-v1.3.9-User-Guide.pdf) · [All 942 ROM revisions](../knowledge/ROM-CATALOG.md) · [Tested games](https://github.com/RetchERez/ROMancer/releases/download/v1.3.9/TESTED-GAMES.txt) · [Release and checksums](https://github.com/RetchERez/ROMancer/releases/tag/v1.3.9)
+[User guide (PDF)](https://github.com/RetchERez/ROMancer/releases/download/v1.4.0/ROMancer-v1.4.0-User-Guide.pdf) · [All 942 ROM revisions](../knowledge/ROM-CATALOG.md) · [Tested games](https://github.com/RetchERez/ROMancer/releases/download/v1.4.0/TESTED-GAMES.txt) · [Release and checksums](https://github.com/RetchERez/ROMancer/releases/tag/v1.4.0)
 
 ## Get started on Linux
 
 ```
-tar xf ROMancer-v1.3.9-Linux-x86_64.tar.gz
-./ROMancer-v1.3.9-Linux-x86_64/ROMancer.sh
+tar xf ROMancer-v1.4.0-Linux-x86_64.tar.gz
+./ROMancer-v1.4.0-Linux-x86_64/ROMancer.sh
 ```
 
 Python, the emulator engines and the tracing engines are included; nothing is installed system-wide. Needs glibc 2.28 or newer (Ubuntu 20.04+, Debian 10+, Fedora 29+, SteamOS 3) and a web browser. Run `./ROMancer.sh --install-desktop` to add a menu entry. Native debugger captures are Windows-only.
@@ -88,6 +94,6 @@ Play your ROM or a saved build, capture scenes, and resume from a save state. He
 
 ## Supported systems
 
-NES, SNES, Genesis / Mega Drive, Master System, Game Boy, and Game Boy Color. The [full ROM catalog](../knowledge/ROM-CATALOG.md) lists every recognized revision with CRC32 and SHA-256. Open **ROM Catalog.html** from the extracted ZIP to search and filter offline. All 942 cataloged revisions passed the byte-edit, undo/redo, build, and BPS workflow. Structured editors use checked definitions for the selected revision. The tested games list shows the game-specific edits and playtest routes verified. Visual level editing is coming soon.
+NES, SNES, Genesis / Mega Drive, Master System, Game Boy, and Game Boy Color. The [full ROM catalog](../knowledge/ROM-CATALOG.md) lists every recognized revision with CRC32 and SHA-256. Open **ROM Catalog.html** from the extracted ZIP to search and filter offline. All 942 cataloged revisions passed the byte-edit, undo/redo, build, and BPS workflow. Structured editors use checked definitions for the selected revision. The tested games list shows the game-specific edits and playtest routes verified. Level maps show and change whole levels, and on Castlevania the enemies, items, secrets and level length too.
 
 [Build and technical documentation](../README.txt) · [MIT license](../LICENSE)
