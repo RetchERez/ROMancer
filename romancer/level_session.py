@@ -386,21 +386,31 @@ class LevelTools:
     # ---- what a game's level profile knows (romancer/level_profiles.py): enemies, items, block roles
 
     def _profile_context(self, level: dict):
-        """(profile, stage, floor, map x of stage x 0, map y of screen y 0) for this level, or None without a profile."""
+        """(profile, [one entry per part of the map]) or None without a profile. Each part of the map (a section: a room
+        the game drew in place of another) is its own stage in the game, so each gets its stage, floor and where its
+        stage x 0 and screen y 0 are on the map, from the earliest capture of that part."""
         from . import level_profiles
         profile = level_profiles.profile_for(self.rom)
         if profile is None:
             return None
         plane = self._level_plane(level, 0)
         ordered = sorted(plane.windows.items(), key=lambda item: self.meta[level['scene_ids'][item[0]]]['frame'])
-        number, window = ordered[0]
-        snapshot = self._scene(level['scene_ids'][number]).snapshot
-        ram = next((snapshot.domains[n].data for n in ('wram', 'ram') if n in snapshot.domains and snapshot.domains[n].data is not None), None)
-        if ram is None:
-            return None
-        camera = ram[0x2E] | ram[0x2F] << 8
-        # a stage x is drawn at screen x stage x - camera - 64 (the game spawns a zone ahead of where it shows it)
-        return profile, ram[0x28], ram[0x46], window.across - camera - profile.ZONE - 1, window.down
+        parts, seen = [], set()
+        for number, window in ordered:
+            if window.section in seen:
+                continue
+            snapshot = self._scene(level['scene_ids'][number]).snapshot
+            ram = next((snapshot.domains[n].data for n in ('wram', 'ram') if n in snapshot.domains and snapshot.domains[n].data is not None), None)
+            if ram is None:
+                continue
+            seen.add(window.section)
+            camera = ram[0x2E] | ram[0x2F] << 8
+            columns = [c for (c, r), spot in plane.cells.items() if plane.windows.get(spot.frame) and plane.windows[spot.frame].section == window.section]
+            # a stage x is drawn at screen x stage x - camera - 64 (the game spawns a zone ahead of where it shows it)
+            parts.append({'section': window.section, 'stage': ram[0x28], 'floor': ram[0x46],
+                          'dx': window.across - camera - profile.ZONE - 1, 'dy': window.down,
+                          'left': min(columns) * plane.px if columns else 0, 'right': (max(columns) + 1) * plane.px if columns else 0})
+        return profile, parts
 
     def level_objects(self, level_id: str) -> dict:
         """Enemies, candles and items of the level on the map, and what each map place is (solid, breakable, open)."""
@@ -409,14 +419,15 @@ class LevelTools:
             context = self._profile_context(level)
             if context is None:
                 return {'profile': None, 'objects': [], 'roles': ''}
-            profile, stage, floor, dx, dy = context
+            profile, parts = context
             stored = level['planes'][0]
             px = stored['px']
             objects = []
-            for item in profile.objects(stage, floor):
-                x, y = item['x'] + dx, item['y'] + dy
-                if -px <= x < stored['width'] * px + px:
-                    objects.append({**item, 'map_x': x, 'map_y': y})
+            for part in parts:
+                for item in profile.objects(part['stage'], part['floor']):
+                    x, y = item['x'] + part['dx'], item['y'] + part['dy']
+                    if part['left'] - px <= x < part['right'] + px:
+                        objects.append({**item, 'map_x': x, 'map_y': y, 'stage': part['stage'], 'floor': part['floor']})
             roles = ['.'] * (stored['width'] * stored['height'])
             plane = self._level_plane(level, 0)
             for (column, row), spot in plane.cells.items():
@@ -426,7 +437,8 @@ class LevelTools:
                 role = profile.tile_role(tile)
                 roles[row * stored['width'] + column] = {'solid': 's', 'breakable': 'b'}.get(role, '.')
             self._object_pictures(level, objects)
-            return {'profile': profile.name, 'stage': stage, 'floor': floor, 'objects': objects, 'roles': ''.join(roles),
+            return {'profile': profile.name, 'parts': [{k: part[k] for k in ('section', 'stage', 'floor')} for part in parts],
+                    'objects': objects, 'roles': ''.join(roles),
                     'enemy_choices': profile.enemy_choices()}
 
     def _object_pictures(self, level: dict, objects: list) -> None:
@@ -473,30 +485,31 @@ class LevelTools:
                 item['picture_box'] = [item['map_x'] - 12, item['map_y'] - 32, 24, 32]
                 item['picture_from_another'] = True
 
-    def level_object_choices(self, level_id: str, zone: int) -> dict:
+    def level_object_choices(self, level_id: str, zone: int, stage: int = 0, floor: int = 0) -> dict:
         with self.lock:
             level = self._level(level_id)
             context = self._profile_context(level)
             if context is None:
                 raise ValueError('ROMancer does not know the objects of this game yet.')
-            profile, stage, floor, _, _ = context
-            return {'drops': profile.drop_choices(stage, floor, int(zone)), 'enemies': profile.enemy_choices()}
+            profile = context[0]
+            return {'drops': profile.drop_choices(int(stage), int(floor), int(zone)), 'enemies': profile.enemy_choices()}
 
-    def propose_level_object(self, level_id: str, zone: int, kind: str, index: int) -> dict:
+    def propose_level_object(self, level_id: str, zone: int, kind: str, index: int, stage: int = 0, floor: int = 0) -> dict:
         """Point one zone's enemy or candle at another of the game's records (index 0 removes it)."""
         with self.lock:
             level = self._level(level_id)
             context = self._profile_context(level)
             if context is None:
                 raise ValueError('ROMancer does not know the objects of this game yet.')
-            profile, stage, floor, _, _ = context
+            profile, parts = context
+            stage, floor = int(stage), int(floor)
             if kind not in ('enemy', 'candle'):
                 raise ValueError('Choose an enemy or a candle.')
             row = profile.zones(stage, floor)[int(zone)]
             offset = row['enemy_byte' if kind == 'enemy' else 'candle_byte']
             index = int(index)
             if not 0 <= index <= 255:
-                raise ValueError('That choice is not one of the game’s own.')
+                raise ValueError('That choice is not one of the game\u2019s own.')
             if kind == 'enemy':
                 record = profile.enemy_record(index)
                 title = 'Remove the enemy' if record is None else f'Enemy here: {profile.enemy_name(record["type"])}'
@@ -505,7 +518,79 @@ class LevelTools:
                 title = 'Remove the candle' if record is None else f'Candle drops: {profile.drop_name(record["drop"])}'
             scene_id = level['scene_ids'][0]
         change = self.propose_writes(scene_id, [(offset, self.rom[offset], index)], f'{title} (zone {int(zone) + 1})', kind='level-object')
-        return change
+        expect = {'kind': kind, 'zone': int(zone), 'record': record, 'stage': stage}
+        stored = self._find(change['id'])
+        stored['object_check'] = {'state': 'working', 'text': 'Playing the game from the start to see the change happen…'}
+        threading.Thread(target=self._check_object, args=(stored, level, expect), name='romancer-object-check', daemon=True).start()
+        return self.change(change['id'])
+
+    def _check_object(self, change: dict, level: dict, expect: dict) -> None:
+        """Replay the recorded walk from power-on with the change, and look at the game's own spawn slots when the zone
+        comes into play: the enemy type (or none) for an enemy, the candle and what it drops (or none) for a candle."""
+        from array import array
+        import zlib
+        from . import edit_session as es
+        try:
+            meta = self.meta[level['scene_ids'][0]]
+            run_dir = self.store / 'runs' / meta['run']
+            inputs = array('H')
+            inputs.frombytes((run_dir / 'inputs.bin').read_bytes())
+            start = min(meta['checkpoints'])
+            state = zlib.decompress((run_dir / f'{start}.st').read_bytes())
+            end = min(len(inputs), max(self.meta[s]['frame'] for s in level['scene_ids']) + 120)
+            rom = bytearray(self.rom)
+            for offset, _, new in change['writes']:
+                rom[offset] = new
+            path = self.store / 'work' / f'object-{change["id"]}.bin'
+            path.parent.mkdir(parents=True, exist_ok=True)
+            path.write_bytes(bytes(rom))
+            fe = es._frontend(self._cfg(), path)
+            seen = None
+            try:
+                if int(fe.lib.retro_serialize_size()) <= 0:
+                    fe.run_frame([])
+                fe.unserialize(state)
+                session = es._Session(fe, checkpoint_every=10 ** 9)
+                session.frame = start
+                slot = expect['zone'] % 6
+                frame = start
+                while frame < end and seen is None:
+                    session.run(4, lambda f: es._names(inputs[f]) if f < len(inputs) else ())
+                    frame += 4
+                    snap = session.snapshot()
+                    ram = next((snap.domains[n].data for n in ('wram', 'ram') if n in snap.domains and snap.domains[n].data is not None), None)
+                    if ram is None or ram[0x28] != expect['stage'] or ram[0x6D] < expect['zone'] or (ram[0x2E] | ram[0x2F] << 8) // 64 + 6 < expect['zone']:
+                        continue
+                    if expect['kind'] == 'enemy':
+                        seen = {'type': ram[0x166 + slot], 'frame': frame}
+                    else:
+                        candle = 0x0E + slot
+                        seen = {'type': ram[0x434 + candle], 'drop': ram[0x584 + candle], 'frame': frame}
+            finally:
+                es._close(fe)
+            record = expect['record']
+            if seen is None:
+                result = {'state': 'warn', 'text': "The recorded walk didn't reach that part of the level, so the change couldn't be watched in the game."}
+            elif expect['kind'] == 'enemy':
+                wanted = record['type'] if record else 0
+                ok = seen['type'] == wanted
+                result = {'state': 'good' if ok else 'bad',
+                          'text': ('Played from the start, the game now spawns ' + ('no enemy' if not wanted else f'type {wanted:#04x}') + ' there.') if ok
+                          else f'Played from the start, the game spawned type {seen["type"]:#04x} there, not what was chosen.'}
+            else:
+                if record is None:
+                    ok = seen['type'] == 0
+                    text = 'Played from the start, there is no candle there any more.' if ok else 'Played from the start, a candle still appears there.'
+                else:
+                    ok = seen['type'] in (0x27, 0x28) and seen['drop'] == record['drop']
+                    text = (f'Played from the start, the candle there now holds drop code {record["drop"]:#04x}.' if ok else
+                            f'Played from the start, the candle there holds drop code {seen["drop"]:#04x}, not the one chosen.')
+                result = {'state': 'good' if ok else 'bad', 'text': text}
+        except Exception as error:      # the check failing must not take the change with it
+            result = {'state': 'bad', 'text': 'The game could not be played to check this: ' + str(error)[:200]}
+        with self.lock:
+            change['object_check'] = result
+            self.revision += 1
 
     def level_place(self, level_id: str, plane: int, col: int, row: int) -> dict:
         """Which scene, layer and cell a place on the map is, for opening it in the scene editors."""

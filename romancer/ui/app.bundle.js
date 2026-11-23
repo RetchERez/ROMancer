@@ -10735,7 +10735,7 @@ ${state2.artifact.system_id ? `<details><summary>Advanced byte options</summary>
         const node = document.getElementById(picked.kind === "candle" ? "level-object-drop" : "level-object-enemy");
         if (!node) return;
         await host.dropPreview();
-        const result = await host.call("level_object", { level_id: level.id, zone: picked.zone, kind: picked.kind, index: Number(node.value) });
+        const result = await host.call("level_object", { level_id: level.id, zone: picked.zone, kind: picked.kind, index: Number(node.value), stage: picked.stage, floor: picked.floor });
         if (!host.current()) return;
         ed.proposal = result.change;
         ed.summary.preview = result.change;
@@ -10746,7 +10746,7 @@ ${state2.artifact.system_id ? `<details><summary>Advanced byte options</summary>
         const level = ed.level, picked = level == null ? void 0 : level.picked;
         if (!picked) return;
         await host.dropPreview();
-        const result = await host.call("level_object", { level_id: level.id, zone: picked.zone, kind: picked.kind, index: 0 });
+        const result = await host.call("level_object", { level_id: level.id, zone: picked.zone, kind: picked.kind, index: 0, stage: picked.stage, floor: picked.floor });
         if (!host.current()) return;
         ed.proposal = result.change;
         ed.summary.preview = result.change;
@@ -10811,7 +10811,7 @@ ${state2.artifact.system_id ? `<details><summary>Advanced byte options</summary>
           level.picked = item;
           level.choices = null;
           host.update(["scene-level"]);
-          if (item) void host.call("level_object_choices", { level_id: level.id, zone: item.zone }).then((choices) => {
+          if (item) void host.call("level_object_choices", { level_id: level.id, zone: item.zone, stage: item.stage, floor: item.floor }).then((choices) => {
             if (ed.level === level && level.picked === item) {
               level.choices = choices;
               host.update(["scene-level"]);
@@ -10835,7 +10835,13 @@ ${state2.artifact.system_id ? `<details><summary>Advanced byte options</summary>
         void redraw();
       });
       main.addEventListener("pointermove", (event) => {
-        const level = ed.level;
+        var _a2;
+        const level = ed.level, canvas = document.getElementById("level-canvas");
+        if (level && canvas && event.target === canvas && level.showObjects && ((_a2 = level.objects) == null ? void 0 : _a2.objects)) {
+          const box = canvas.getBoundingClientRect(), x = (event.clientX - box.left) * canvas.width / box.width / level.zoom, y = (event.clientY - box.top) * canvas.height / box.height / level.zoom;
+          const item = objectAt(level.objects.objects, x, y);
+          canvas.title = item ? item.kind === "enemy" ? item.name : item.name + ", drops " + item.drop_name : "";
+        }
         if (!level || !level.drag && !level.stroke) return;
         const place = at(event);
         if (!place) return;

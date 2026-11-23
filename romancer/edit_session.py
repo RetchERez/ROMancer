@@ -1997,6 +1997,12 @@ class EditSession(LevelTools):
             progress = sg.read_progress(change['progress'])
         if picture and not failed:
             checks, verified = self._checks(change, working)
+        if change.get('object_check') and not failed:
+            # an enemy or candle change is checked by watching the game's own spawn slots, not by redrawing scenes
+            check = change['object_check']
+            checks = [{'name': 'In the game', 'state': check['state'], 'text': check['text']}]
+            verified = check['state'] == 'good'
+            working = working or (1 if check['state'] == 'working' else 0)
         total = len(self.scenes)
         count = len(affected)
         visible = sum(1 for a in affected if a['visible'])
@@ -2080,6 +2086,13 @@ class EditSession(LevelTools):
         """One plain line for the result of a check; the separate checks go under Details."""
         states = {check['name']: check['state'] for check in checks}
         here, start = states.get('In this scene'), states.get('From the start')
+        game = states.get('In the game')
+        if game == 'working':
+            return 'Checking the change in the game…'
+        if game == 'good':
+            return 'This change works. The game was played from the start to check it.'
+        if game in ('bad', 'warn'):
+            return "This change couldn't be confirmed in the game. Look at the details before you keep it."
         if here == 'bad':
             return "This change didn't show up when the game was replayed."
         if start == 'working':
@@ -2338,10 +2351,10 @@ class EditSessionTools:
                 p['level_id'], p['plane'], p['cells'], p['layers'])}),
             'edits.level_export': (base + ' level_id plane edited', self._export_level),
             'edits.level_objects': (base + ' level_id', lambda p, c: {'ok': True, **self.session(p).level_objects(p['level_id'])}),
-            'edits.level_object_choices': (base + ' level_id zone', lambda p, c: {'ok': True, **self.session(p).level_object_choices(
-                p['level_id'], p['zone'])}),
-            'edits.level_object': (base + ' level_id zone kind index', lambda p, c: {'ok': True, 'change': self.session(p).propose_level_object(
-                p['level_id'], p['zone'], p['kind'], p['index'])}),
+            'edits.level_object_choices': (base + ' level_id zone stage floor', lambda p, c: {'ok': True, **self.session(p).level_object_choices(
+                p['level_id'], p['zone'], p['stage'], p['floor'])}),
+            'edits.level_object': (base + ' level_id zone kind index stage floor', lambda p, c: {'ok': True, 'change': self.session(p).propose_level_object(
+                p['level_id'], p['zone'], p['kind'], p['index'], p['stage'], p['floor'])}),
             'edits.change': (base + ' change_id', lambda p, c: {'ok': True, 'change': self.session(p).change(p['change_id'])}),
             'edits.keep': (base + ' change_id', lambda p, c: self._summary(self.session(p), self.session(p).keep(p['change_id']))),
             'edits.remove': (base + ' change_id', lambda p, c: self._summary(self.session(p), self.session(p).remove(p['change_id']))),
