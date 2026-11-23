@@ -401,15 +401,15 @@ def _settle_tables(plane, runs: list) -> None:
     px = plane.px
     for run in runs:
         totals = {}
-        for number, shift, wide, tall, tables, graphics, seen in run:
+        for number, shift, wide, tall, tables, graphics, seen, (ox, oy) in run:
             for (gx, gy, index), score in seen.items():
                 for across in (True, False):
-                    turn = ((gx * px // wide) if across else (gy * px // tall)) & 1
+                    turn = (((gx * px - ox) // wide) if across else ((gy * px - oy) // tall)) & 1
                     start = tables.index(index) ^ turn          # the table at turn 0 if this one is shown here
                     totals[(across, start)] = totals.get((across, start), 0.0) + score
         if not totals:
             continue
-        number, shift, wide, tall, tables, graphics, seen = run[0]
+        number, shift, wide, tall, tables, graphics, seen, (ox, oy) = run[0]
         rom = getattr(graphics, 'rom', b'') or b''
         header = bool(rom[6] & 1) if rom[:4] == b'NES\x1a' and len(rom) > 6 else True      # vertical mirroring: side by side
         control = (getattr(graphics, 'video', None) or {}).get('ppuctrl')
@@ -420,22 +420,22 @@ def _settle_tables(plane, runs: list) -> None:
             across, start = way
             named = 1 if across == header else 0
             if control is not None:
-                turn = ((left * px // wide) if across else (top * px // tall)) & 1
+                turn = (((left * px - ox) // wide) if across else ((top * px - oy) // tall)) & 1
                 named += 1 if ((control & 1) if across else (control >> 1 & 1)) == start ^ turn else 0
             return named
         best = max(totals.values())
         across, start = max((way for way, total in totals.items() if total >= best * 0.995), key=liking)
-        for number, shift, wide, tall, tables, graphics, seen in run:
+        for number, shift, wide, tall, tables, graphics, seen, (ox, oy) in run:
             window = plane.windows.get(number)
             if window is None:
                 continue
             layers = graphics.layers()
             cells, weak = {}, {}
             for gx, gy in {(gx, gy) for gx, gy, _ in seen}:
-                turn = ((gx * px // wide) if across else (gy * px // tall)) & 1
+                turn = (((gx * px - ox) // wide) if across else ((gy * px - oy) // tall)) & 1
                 index = tables[start ^ turn]
                 score = seen[(gx, gy, index)]
-                spot = Spot(number, index, (gx * px % wide) // px, (gy * px % tall) // px)
+                spot = Spot(number, index, ((gx * px - ox) % wide) // px, ((gy * px - oy) % tall) // px)
                 if score >= CELL_MATCH:
                     cells[(gx + shift, gy)] = spot
                 elif score >= WEAK_MATCH:
@@ -467,7 +467,7 @@ def stitch(frames: list, system: str) -> list:
             plane = planes.get((name, px))
             if plane is None:
                 plane = planes[(name, px)] = Plane(name, px)
-                track[(name, px)] = {'at': None, 'shift': 0, 'section': 0, 'looks': {}, 'where': {}, 'right': None, 'still': {}, 'rows': None, 'runs': []}
+                track[(name, px)] = {'at': None, 'off': (0, 0), 'shift': 0, 'section': 0, 'looks': {}, 'where': {}, 'right': None, 'still': {}, 'rows': None, 'runs': []}
             state = track[(name, px)]
             last = state['at']
             if last is None:
@@ -476,6 +476,10 @@ def stitch(frames: list, system: str) -> list:
                 U = last[2] + _wrap(sx - last[0], wide)
                 V = last[3] + _wrap(sy - last[1], tall)
             shared = len(members) > 1
+            # A map place and the layer place it shows have the same number only until a capture is moved to line up
+            # after a jump (a restart puts the game back at a checkpoint): from then on they are offset by the moves
+            # made so far, and the layer must be read where the screen really shows it, not at the map place's number.
+            ox, oy = state['off']
             fresh, hidden = {}, {}
             # Which layer shows where? Layers that share one map (the nametables of the NES) each fill a part of the
             # screen, and the parts meet where the map wraps round. A level that repeats looks the same in two layers
@@ -485,16 +489,16 @@ def stitch(frames: list, system: str) -> list:
             agreement: dict = {}
             for gy in range(-((-(V + y0)) // px), (V + y1) // px):              # cells that are whole on the screen
                 for gx in range(-((-U) // px), (U + graphics.width) // px):
-                    mx, my = (gx * px) % wide, (gy * px) % tall
-                    part = (mx >= U % wide, my >= V % tall)
+                    mx, my = (gx * px - ox) % wide, (gy * px - oy) % tall
+                    part = (mx >= (U - ox) % wide, my >= (V - oy) % tall)
                     for index, view in members:
                         score = _agrees(graphics, view, gx * px - U, gy * px - V, mx, my) if shared else 1.0
                         agreement[(gx, gy, index)] = score
                         scores[(part, index)] = scores.get((part, index), 0.0) + score
             for gy in range(-((-(V + y0)) // px), (V + y1) // px):
                 for gx in range(-((-U) // px), (U + graphics.width) // px):
-                    mx, my = (gx * px) % wide, (gy * px) % tall
-                    part = (mx >= U % wide, my >= V % tall)
+                    mx, my = (gx * px - ox) % wide, (gy * px - oy) % tall
+                    part = (mx >= (U - ox) % wide, my >= (V - oy) % tall)
                     index, view = max(members, key=lambda member: scores[(part, member[0])])
                     score = agreement[(gx, gy, index)]
                     if score >= (CELL_MATCH if shared else 0):
@@ -562,6 +566,7 @@ def stitch(frames: list, system: str) -> list:
                 fresh = {(place[0] + dx, place[1] + dy): value for place, value in fresh.items()}
                 hidden = {(place[0] + dx, place[1] + dy): spot for place, spot in hidden.items()}
                 U, V = U + dx * px, V + dy * px
+                state['off'] = (ox + dx * px, oy + dy * px)
             seen = [state['looks'][at][1] for at in ((place[0] + shift, place[1]) for place in fresh) if at in state['looks']]
             section = max(set(seen), key=seen.count) if seen else state['section']
             cells = {}
@@ -578,7 +583,8 @@ def stitch(frames: list, system: str) -> list:
                 if jumped or not state['runs']:
                     state['runs'].append([])
                 state['runs'][-1].append((number, shift, wide, tall, [index for index, _ in members], graphics,
-                                          {(gx + moved[0], gy + moved[1], index): score for (gx, gy, index), score in agreement.items()}))
+                                          {(gx + moved[0], gy + moved[1], index): score for (gx, gy, index), score in agreement.items()},
+                                          state['off']))
             edge = max(c[0] for c in cells) + 1
             state['right'] = edge if state['right'] is None else max(state['right'], edge)
             plane.layers = tuple(sorted(set(plane.layers) | {spot.layer for spot in cells.values()}))

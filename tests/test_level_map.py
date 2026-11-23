@@ -56,19 +56,19 @@ class TwoTables(FakeGraphics):
     """The NES way: two tables side by side, each a console map wide, repeated. Table p holds the latest stretch of the
     level whose number has that parity; the screen starts in one and runs on into the other."""
 
-    def __init__(self, world, across):
-        self.views = []
+    def __init__(self, world, across, base=0):
+        self.views = []                         # base: the level column at scroll 0 (a restart redraws a checkpoint there)
         for table in (0, 1):
             turn = (across + SCREEN_W - 1) // (LAYER_W * PX)            # the stretch the right edge of the screen is in
             if turn % 2 != table:
                 turn -= 1
-            tiles = {(x, y): world(turn * LAYER_W + x, y) for y in range(LAYER_H) for x in range(LAYER_W)}
+            tiles = {(x, y): world(base + turn * LAYER_W + x, y) for y in range(LAYER_H) for x in range(LAYER_W)}
             layer = FakeLayer(tiles)
             layer.name = f'nametable {table}'
             rows = [bytes(tiles[(x // PX, y // PX)] % 250 for x in range(LAYER_W * PX)) for y in range(LAYER_H * PX)]
             self.views.append(SimpleNamespace(layer=layer, px=PX, rows=rows, lines=[(across % (LAYER_W * PX), 0)] * SCREEN_H,
                                               match=1.0, source='picture'))
-        self.screen = [bytes(world((across + x) // PX, y // PX) % 250 for x in range(SCREEN_W)) for y in range(SCREEN_H)]
+        self.screen = [bytes(world(base + (across + x) // PX, y // PX) % 250 for x in range(SCREEN_W)) for y in range(SCREEN_H)]
 
     def layers(self):
         return self.views
@@ -179,6 +179,21 @@ class StitchTests(unittest.TestCase):
         wrong = [(place, spot.layer) for place, spot in plane.cells.items() if spot.layer != place[0] // LAYER_W % 2]
         self.assertEqual(wrong, [])                                   # every place comes from the table that holds it
         self.assertEqual((plane.cells[(70, 9)].x, plane.cells[(70, 9)].y), (70 % LAYER_W, 9))
+
+    def test_after_a_restart_the_tables_are_read_where_the_screen_shows_them(self):
+        # Scroll on, then the game restarts at a checkpoint 20 columns in and redraws it from scroll 0. The capture is
+        # moved 20 columns to line up; from then on a map place and the table place it shows differ by 20 columns.
+        # Reading the tables at the map place's own number left holes and broke the map in two (Adventure Island).
+        steps = [(across, 0) for across in range(0, 480, 24)] + [(across, 20) for across in range(0, 240, 24)]
+        frames = [lm.Frame(f'scene{number}', TwoTables(level, across, base), number * 12) for number, (across, base) in enumerate(steps)]
+        plane = lm.stitch(frames, 'nes')[0]
+        self.assertEqual(len(plane.sections), 1)
+        after = [plane.windows[number] for number in range(20, len(steps))]
+        self.assertTrue(all(len(window.cells) >= LAYER_W * 27 for window in after), [len(window.cells) for window in after])
+        for window in after:
+            for (column, row), spot in window.cells.items():
+                self.assertEqual(spot.layer, (column - 20) // LAYER_W % 2)       # the table that holds it since the restart
+                self.assertEqual(spot.x, (column - 20) % LAYER_W)
 
     def test_a_status_bar_that_stays_put_is_left_off_the_map(self):
         frames = frames_for([(level, across, 0) for across in range(0, 400, 40)])
