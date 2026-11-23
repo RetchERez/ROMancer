@@ -45,7 +45,7 @@ function galleryPart(ed){
 }
 function playPart(ed){
  if(!ed.playing)return '';
- return `<div class="card-heading"><h3>Play the game</h3>${badge('LIVE','good')}</div><div class="scene-play"><div id="scene-controller" tabindex="0" role="application" aria-label="Game screen. Arrow keys move. Z is the A button, X is B, Enter is Start, Shift is Select."><canvas id="scene-play-canvas" class="scene-canvas" width="160" height="144"></canvas></div><div><p>Click the game, then play with the keyboard: arrow keys, <kbd>Z</kbd> for A, <kbd>X</kbd> for B, <kbd>Enter</kbd> for Start, <kbd>Shift</kbd> for Select. Or tap a button:</p><div class="actions scene-pad">${PAD.map(([id,label])=>button(label,'scene-tap',{id})).join('')}</div><div class="actions">${button('Capture this moment','scene-capture',{primary:true,icon:'plus'})}${button('Stop playing','scene-play-toggle')}</div><p class="subtle" id="scene-play-status" role="status" aria-live="polite">Starting the game…</p></div></div>`;
+ return `<div class="card-heading"><h3>${ed.playtest?'Playtest from the level map':'Play the game'}</h3>${badge(ed.playtest?'CHANGED':'LIVE','good')}</div><div class="scene-play"><div id="scene-controller" tabindex="0" role="application" aria-label="Game screen. Arrow keys move. Z is the A button, X is B, Enter is Start, Shift is Select."><canvas id="scene-play-canvas" class="scene-canvas" width="160" height="144"></canvas></div><div><p>Click the game, then play with the keyboard: arrow keys, <kbd>Z</kbd> for A, <kbd>X</kbd> for B, <kbd>Enter</kbd> for Start, <kbd>Shift</kbd> for Select. Or tap a button:</p><div class="actions scene-pad">${PAD.map(([id,label])=>button(label,'scene-tap',{id})).join('')}</div><div class="actions">${ed.playtest?'':button('Capture this moment','scene-capture',{primary:true,icon:'plus'})}${button('Stop playing','scene-play-toggle',{primary:!!ed.playtest})}</div><p class="subtle" id="scene-play-status" role="status" aria-live="polite">Starting the game…</p></div></div>`;
 }
 const byteText=value=>value===null||value===undefined?'new':value.toString(16).toUpperCase().padStart(2,'0');
 function verdictPart(change){
@@ -444,6 +444,13 @@ function watchRecording(ctx,ed){
  };
  ed.recordPoll=setTimeout(tick,400);
 }
+// Start the live game panel; a label means a playtest of the changed game (started by the level map).
+function startPlaying(ctx,ed,label){
+ ed.playing=true;ed.playtest=label;ed.held.clear();ed.taps=[];update(ctx,ed,['scene-gallery','scene-play-panel']);
+ mountController(ctx,ed);const panel=document.getElementById('scene-play-panel');panel?.scrollIntoView?.({block:'center'});
+ document.getElementById('scene-controller')?.focus();void playLoop(ctx,ed);
+}
+
 async function playLoop(ctx,ed){
  const ticket=++ed.ticket;let due=performance.now();
  while(ed.playing&&ed.ticket===ticket&&current(ctx,ed)){
@@ -455,7 +462,7 @@ async function playLoop(ctx,ed){
    if(packet.busy){if(status)status.textContent=packet.message+(packet.progress?` (${Math.round(100*packet.progress[0]/Math.max(1,packet.progress[1]))}%)`:'');await new Promise(resolve=>setTimeout(resolve,400));due=performance.now();continue;}
    const canvas=document.getElementById('scene-play-canvas');
    if(canvas){if(canvas.width!==packet.width||canvas.height!==packet.height){canvas.width=packet.width;canvas.height=packet.height;}const image=new Image();image.onload=()=>{if(canvas.isConnected)canvas.getContext('2d').drawImage(image,0,0);};image.src='data:image/png;base64,'+packet.png_base64;}
-   if(status)status.textContent=packet.level_captures!==null&&packet.level_captures!==undefined?`Recording the level, ${plural(packet.level_captures,'screen')} so far. Play to the end of it, then finish the map.`:'The game is running. Capture the moment when the screen shows what you want to change.';
+   if(status)status.textContent=packet.playtest?`Playtest of your changed game, ${packet.playtest}. Stop playing to go back to the original game.`:packet.level_captures!==null&&packet.level_captures!==undefined?`Recording the level, ${plural(packet.level_captures,'screen')} so far. Play to the end of it, then finish the map.`:'The game is running. Capture the moment when the screen shows what you want to change.';
    due=Math.max(due+(taps.length?10:4)*1000/60,performance.now()-50);await new Promise(resolve=>setTimeout(resolve,Math.max(0,due-performance.now())));
   }catch(error){ed.playing=false;ctx.notify(error.message,true);update(ctx,ed,['scene-gallery','scene-play-panel']);break;}
  }
@@ -714,7 +721,7 @@ export async function render(ctx){
  const ed=editorFor(ctx);let failure='';
  try{await refresh(ctx,ed);}catch(error){failure=error.message;ed.summary=null;}
  ed.levelTools=levelTools(ctx,ed,{call:(operation,more)=>call(ctx,ed,operation,more),update:ids=>update(ctx,ed,ids),refresh:summary=>refresh(ctx,ed,summary),
-  dropPreview:()=>dropPreview(ctx,ed),watchProposal:()=>watchProposal(ctx,ed),picture:key=>picture(ctx,ed,key),loadScene:id=>loadScene(ctx,ed,id),current:()=>current(ctx,ed)});
+  dropPreview:()=>dropPreview(ctx,ed),watchProposal:()=>watchProposal(ctx,ed),picture:key=>picture(ctx,ed,key),loadScene:id=>loadScene(ctx,ed,id),current:()=>current(ctx,ed),startPlaying:label=>startPlaying(ctx,ed,label)});
  if(ctx.state.openLevels){ctx.state.openLevels=false;ed.scrollToLevels=true;}
  ctx.use({
   ...ed.levelTools.handlers,
@@ -755,7 +762,7 @@ export async function render(ctx){
   'scene-forget':async()=>{const summary=await call(ctx,ed,'forget_scene',{scene_id:ed.sceneId});ed.sceneId=null;ed.selected=null;await refresh(ctx,ed,summary);update(ctx,ed);ctx.notify('Scene removed.');},
   'scene-record':async()=>{ed.summary=await call(ctx,ed,'record',{steps:40,restart:false});update(ctx,ed,['scene-gallery']);watchRecording(ctx,ed);},
   'scene-record-stop':async()=>{ed.summary=await call(ctx,ed,'record_stop');update(ctx,ed,['scene-gallery']);},
-  'scene-play-toggle':()=>{ed.playing=!ed.playing;ed.held.clear();ed.taps=[];update(ctx,ed,['scene-gallery','scene-play-panel']);if(ed.playing){mountController(ctx,ed);document.getElementById('scene-controller')?.focus();void playLoop(ctx,ed);}else ed.ticket++;},
+  'scene-play-toggle':()=>{if(ed.playing){ed.playing=false;ed.ticket++;const was=ed.playtest;ed.playtest=null;update(ctx,ed,['scene-gallery','scene-play-panel']);if(was)void call(ctx,ed,'play_stop',{}).catch(()=>{});}else startPlaying(ctx,ed,null);},
   'scene-tap':node=>{(ed.taps||=[]).push(node.dataset.id);},
   'scene-capture':async()=>{const result=await call(ctx,ed,'capture',{label:''});await refresh(ctx,ed,result);await dropPreview(ctx,ed);ed.selected=null;await loadScene(ctx,ed,result.scene_id);update(ctx,ed,['scene-gallery','scene-stage','scene-palette','scene-picker','scene-changes']);ctx.notify('This moment is now a scene you can edit.');},
   'scene-review':()=>reviewDialog(ctx,ed),

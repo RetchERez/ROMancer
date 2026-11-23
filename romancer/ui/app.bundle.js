@@ -10438,8 +10438,8 @@ ${state2.artifact.system_id ? `<details><summary>Advanced byte options</summary>
     const guide = `<ol class="level-steps" aria-label="How to change the level">${steps2(level, change).map((step) => `<li class="${step.now ? "now" : step.done ? "done" : ""}"${step.now ? ' aria-current="step"' : ""}><strong>${step.name}</strong><span>${step.text}</span></li>`).join("")}</ol>`;
     const sizes = units(view2), unitPart = sizes.length > 1 ? `<label>Brush size <select id="level-unit" aria-label="Brush size">${sizes.map((u) => `<option value="${u.id}" ${u.id === level.unit ? "selected" : ""}>${esc(u.label)}</option>`).join("")}</select></label>` : "";
     const zoom = `<label>Zoom <select id="level-zoom" aria-label="Zoom">${ZOOMS.map((z) => `<option value="${z}" ${z === level.zoom ? "selected" : ""}>${z}x</option>`).join("")}</select></label>`;
-    const tools = [...TOOLS, ...((_a = level.objects) == null ? void 0 : _a.profile) ? [["objects", "Enemies and items"]] : []].map(([id, label]) => `<button type="button" class="scene-mode ${level.tool === id ? "active" : ""}" data-action="level-tool" data-id="${id}" aria-pressed="${level.tool === id}">${label}</button>`).join("");
-    const hint = level.tool === "objects" ? "Click an enemy or a candle to see what it is and change it." : level.tool === "pick" ? "Click a spot on the map to copy it, or drag across a bigger piece like a platform or a tree." : !brush ? "Copy something from the map first." : level.tool === "paint" ? "Click or drag where you want it." : "Click or drag over your paint to remove it.";
+    const tools = [...TOOLS, ...((_a = level.objects) == null ? void 0 : _a.profile) ? [["objects", "Enemies and items"]] : [], ["play", "Play from here"]].map(([id, label]) => `<button type="button" class="scene-mode ${level.tool === id ? "active" : ""}" data-action="level-tool" data-id="${id}" aria-pressed="${level.tool === id}">${label}</button>`).join("");
+    const hint = level.tool === "play" ? "Click a spot on the map. The game starts there with your kept changes, so you can play it." : level.tool === "objects" ? "Click an enemy or a candle to see what it is and change it." : level.tool === "pick" ? "Click a spot on the map to copy it, or drag across a bigger piece like a platform or a tree." : !brush ? "Copy something from the map first." : level.tool === "paint" ? "Click or drag where you want it." : "Click or drag over your paint to remove it.";
     const brushText = brush ? `Copied a ${brush.width}×${brush.height} piece.` : "Nothing copied yet.";
     const built = view2.blocks ? " The brush moves in whole blocks, the way this level is built, so a change can stay in one spot." : "";
     const locked = view2.status.includes("u") ? " Spots with a cross can't be changed yet." : "";
@@ -10803,6 +10803,16 @@ ${state2.artifact.system_id ? `<details><summary>Advanced byte options</summary>
       main.addEventListener("pointerdown", (event) => {
         var _a2, _b2, _c2;
         const level = ed.level;
+        if ((level == null ? void 0 : level.tool) === "play") {
+          const canvas = document.getElementById("level-canvas");
+          if (!canvas || event.target !== canvas) return;
+          const box = canvas.getBoundingClientRect(), x = (event.clientX - box.left) * canvas.width / box.width / level.zoom, y = (event.clientY - box.top) * canvas.height / box.height / level.zoom;
+          ctx2.notify("Starting your changed game at that spot…");
+          void host.call("level_play_from", { level_id: level.id, x, y }).then((result) => {
+            if (host.current()) host.startPlaying(result.playtest);
+          }).catch((error) => ctx2.notify(error.message, true));
+          return;
+        }
         if ((level == null ? void 0 : level.tool) === "objects") {
           const canvas = document.getElementById("level-canvas");
           if (!canvas || event.target !== canvas) return;
@@ -11086,7 +11096,7 @@ ${state2.artifact.system_id ? `<details><summary>Advanced byte options</summary>
   }
   function playPart(ed) {
     if (!ed.playing) return "";
-    return `<div class="card-heading"><h3>Play the game</h3>${badge("LIVE", "good")}</div><div class="scene-play"><div id="scene-controller" tabindex="0" role="application" aria-label="Game screen. Arrow keys move. Z is the A button, X is B, Enter is Start, Shift is Select."><canvas id="scene-play-canvas" class="scene-canvas" width="160" height="144"></canvas></div><div><p>Click the game, then play with the keyboard: arrow keys, <kbd>Z</kbd> for A, <kbd>X</kbd> for B, <kbd>Enter</kbd> for Start, <kbd>Shift</kbd> for Select. Or tap a button:</p><div class="actions scene-pad">${PAD.map(([id, label]) => button(label, "scene-tap", { id })).join("")}</div><div class="actions">${button("Capture this moment", "scene-capture", { primary: true, icon: "plus" })}${button("Stop playing", "scene-play-toggle")}</div><p class="subtle" id="scene-play-status" role="status" aria-live="polite">Starting the game…</p></div></div>`;
+    return `<div class="card-heading"><h3>${ed.playtest ? "Playtest from the level map" : "Play the game"}</h3>${badge(ed.playtest ? "CHANGED" : "LIVE", "good")}</div><div class="scene-play"><div id="scene-controller" tabindex="0" role="application" aria-label="Game screen. Arrow keys move. Z is the A button, X is B, Enter is Start, Shift is Select."><canvas id="scene-play-canvas" class="scene-canvas" width="160" height="144"></canvas></div><div><p>Click the game, then play with the keyboard: arrow keys, <kbd>Z</kbd> for A, <kbd>X</kbd> for B, <kbd>Enter</kbd> for Start, <kbd>Shift</kbd> for Select. Or tap a button:</p><div class="actions scene-pad">${PAD.map(([id, label]) => button(label, "scene-tap", { id })).join("")}</div><div class="actions">${ed.playtest ? "" : button("Capture this moment", "scene-capture", { primary: true, icon: "plus" })}${button("Stop playing", "scene-play-toggle", { primary: !!ed.playtest })}</div><p class="subtle" id="scene-play-status" role="status" aria-live="polite">Starting the game…</p></div></div>`;
   }
   var byteText = (value) => value === null || value === void 0 ? "new" : value.toString(16).toUpperCase().padStart(2, "0");
   function verdictPart(change) {
@@ -11683,6 +11693,19 @@ ${state2.artifact.system_id ? `<details><summary>Advanced byte options</summary>
     };
     ed.recordPoll = setTimeout(tick, 400);
   }
+  function startPlaying(ctx2, ed, label) {
+    var _a, _b;
+    ed.playing = true;
+    ed.playtest = label;
+    ed.held.clear();
+    ed.taps = [];
+    update(ctx2, ed, ["scene-gallery", "scene-play-panel"]);
+    mountController2(ctx2, ed);
+    const panel2 = document.getElementById("scene-play-panel");
+    (_a = panel2 == null ? void 0 : panel2.scrollIntoView) == null ? void 0 : _a.call(panel2, { block: "center" });
+    (_b = document.getElementById("scene-controller")) == null ? void 0 : _b.focus();
+    void playLoop(ctx2, ed);
+  }
   async function playLoop(ctx2, ed) {
     const ticket = ++ed.ticket;
     let due = performance.now();
@@ -11711,7 +11734,7 @@ ${state2.artifact.system_id ? `<details><summary>Advanced byte options</summary>
           };
           image.src = "data:image/png;base64," + packet.png_base64;
         }
-        if (status) status.textContent = packet.level_captures !== null && packet.level_captures !== void 0 ? `Recording the level, ${plural2(packet.level_captures, "screen")} so far. Play to the end of it, then finish the map.` : "The game is running. Capture the moment when the screen shows what you want to change.";
+        if (status) status.textContent = packet.playtest ? `Playtest of your changed game, ${packet.playtest}. Stop playing to go back to the original game.` : packet.level_captures !== null && packet.level_captures !== void 0 ? `Recording the level, ${plural2(packet.level_captures, "screen")} so far. Play to the end of it, then finish the map.` : "The game is running. Capture the moment when the screen shows what you want to change.";
         due = Math.max(due + (taps.length ? 10 : 4) * 1e3 / 60, performance.now() - 50);
         await new Promise((resolve) => setTimeout(resolve, Math.max(0, due - performance.now())));
       } catch (error) {
@@ -12307,7 +12330,8 @@ ${state2.artifact.system_id ? `<details><summary>Advanced byte options</summary>
       watchProposal: () => watchProposal(ctx2, ed),
       picture: (key2) => picture(ctx2, ed, key2),
       loadScene: (id) => loadScene(ctx2, ed, id),
-      current: () => current2(ctx2, ed)
+      current: () => current2(ctx2, ed),
+      startPlaying: (label) => startPlaying(ctx2, ed, label)
     });
     if (ctx2.state.openLevels) {
       ctx2.state.openLevels = false;
@@ -12453,16 +12477,15 @@ ${state2.artifact.system_id ? `<details><summary>Advanced byte options</summary>
         update(ctx2, ed, ["scene-gallery"]);
       },
       "scene-play-toggle": () => {
-        var _a;
-        ed.playing = !ed.playing;
-        ed.held.clear();
-        ed.taps = [];
-        update(ctx2, ed, ["scene-gallery", "scene-play-panel"]);
         if (ed.playing) {
-          mountController2(ctx2, ed);
-          (_a = document.getElementById("scene-controller")) == null ? void 0 : _a.focus();
-          void playLoop(ctx2, ed);
-        } else ed.ticket++;
+          ed.playing = false;
+          ed.ticket++;
+          const was = ed.playtest;
+          ed.playtest = null;
+          update(ctx2, ed, ["scene-gallery", "scene-play-panel"]);
+          if (was) void call(ctx2, ed, "play_stop", {}).catch(() => {
+          });
+        } else startPlaying(ctx2, ed, null);
       },
       "scene-tap": (node) => {
         (ed.taps ||= []).push(node.dataset.id);

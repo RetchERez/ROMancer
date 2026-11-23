@@ -524,6 +524,46 @@ class LevelTools:
         threading.Thread(target=self._check_object, args=(stored, level, expect), name='romancer-object-check', daemon=True).start()
         return self.change(change['id'])
 
+    def level_capture_at(self, level: dict, x: float, y: float) -> str:
+        """The capture that shows this map spot nearest the middle of its screen (the earliest such, on a tie)."""
+        plane = self._level_plane(level, 0)
+        best = None
+        for number, window in plane.windows.items():
+            sid = level['scene_ids'][number]
+            meta = self.meta[sid]
+            width, height = meta['width'], meta['height']
+            if not (window.across <= x < window.across + width and window.down <= y < window.down + height):
+                continue
+            score = (abs(x - (window.across + width / 2)), meta['frame'])
+            if best is None or score < best[0]:
+                best = (score, sid)
+        if best is None:
+            distance = lambda item: abs(x - item[1].across) + abs(y - item[1].down)
+            number = min(plane.windows.items(), key=distance)[0]
+            return level['scene_ids'][number]
+        return best[1]
+
+    def level_play_from(self, level_id: str, x: float, y: float) -> dict:
+        """Start the live game with the kept changes at the recorded moment nearest this map spot."""
+        busy = self._live_busy()
+        if busy:
+            raise ValueError(busy['message'])
+        with self.lock:
+            level = self._level(level_id)
+            sid = self.level_capture_at(level, float(x), float(y))
+            meta = dict(self.meta[sid])
+            if not meta.get('run') or not (self.store / 'runs' / meta['run'] / 'inputs.bin').exists():
+                raise ValueError('The recording for that part of the map is gone, so the game cannot start there.')
+            rom = self._rom_with(self.changes)
+            path = self.store / 'work' / 'playtest.bin'
+            path.parent.mkdir(parents=True, exist_ok=True)
+            path.write_bytes(rom)
+            kept = len(self.changes)
+        label = f'with {kept} change{"s" if kept != 1 else ""}' if kept else 'with no changes yet'
+        with self.host_lock:
+            self._start_playtest(path, meta, label)
+        return {'playtest': self.live.get('playtest'), 'frame': meta['frame'], 'scene_id': sid}
+
     def _check_object(self, change: dict, level: dict, expect: dict) -> None:
         """Replay the recorded walk from power-on with the change, and look at the game's own spawn slots when the zone
         comes into play: the enemy type (or none) for an enemy, the candle and what it drops (or none) for a candle."""

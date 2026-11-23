@@ -357,7 +357,22 @@ class _Host:
             except (ValueError, OSError, KeyError):
                 continue
         saved = self.run_dir / 'inputs.bin'
-        if cfg.get('resume') and saved.exists():
+        if cfg.get('from_run'):
+            source = self.store / 'runs' / cfg['from_run']
+            masks = array('H')
+            masks.frombytes((source / 'inputs.bin').read_bytes())
+            target = min(len(masks), int(cfg['from_frame']))
+            start = max([f for f in cfg.get('from_checkpoints') or [] if f <= target and (source / f'{f}.st').exists()], default=None)
+            if start is not None and start > self.session.frame:
+                self.fe.unserialize(zlib.decompress((source / f'{start}.st').read_bytes()))
+                self.session.frame = start
+                self.session.checkpoints = [(start, self.fe.serialize())]
+                self.inputs = masks[:start]
+            rest = masks[self.session.frame:target]
+            for at in range(0, len(rest), 600):
+                self.advance(rest[at:at + 600])
+                conn.send(('progress', min(at + 600, len(rest)), len(rest)))
+        elif cfg.get('resume') and saved.exists():
             masks = array('H')
             masks.frombytes(saved.read_bytes())
             masks = masks[primed:]
@@ -865,7 +880,9 @@ class EditSession(LevelTools):
     def _start_host(self) -> None:
         """Start the live engine and bring it back to where play left off. Call with host_lock held."""
         if self._host and self._host[0].is_alive():
-            return
+            if not self.live.get('playtest'):
+                return
+            self._drop_host()
         self._require_core()
         run, resume = self._current_run()
         variant = sum(1 for p in (self.store / 'runs').iterdir() if p.is_dir()) - 1
@@ -902,7 +919,7 @@ class EditSession(LevelTools):
 
     def _drop_host(self, message: str = '') -> None:
         host, self._host = self._host, None
-        self.live.update(state='off', message=message, progress=None)
+        self.live.update(state='off', message=message, progress=None, playtest=None)
         if host:
             process, conn, _ = host
             try:
@@ -990,14 +1007,43 @@ class EditSession(LevelTools):
                     threading.Thread(target=self._start_in_background, name='romancer-live', daemon=True).start()
                     return {'busy': True, 'message': 'Catching up to where you left off…', 'progress': None}
                 self._start_host()
-            self._host[1].send(('play', frames, mask, self.level_play_label()))
+            self._host[1].send(('play', frames, mask, None if self.live.get('playtest') else self.level_play_label()))
             _, png, frame, width, height, metas = self._receive()
             self.live['frame'] = frame
             self._level_captured(metas)
             return {'busy': False, 'png_base64': base64.b64encode(png).decode(), 'frame': frame, 'width': width, 'height': height,
-                    'level_captures': len(self.level_rec['scene_ids']) if self.level_rec else None}
+                    'level_captures': len(self.level_rec['scene_ids']) if self.level_rec and not self.live.get('playtest') else None,
+                    'playtest': self.live.get('playtest')}
         finally:
             self.host_lock.release()
+
+    def play_stop(self) -> dict:
+        """End a playtest of the edited build, so the next play is the original game again."""
+        with self.host_lock:
+            if self.live.get('playtest'):
+                self._drop_host()
+        return {'playtest': None}
+
+    def _start_playtest(self, rom_path: Path, meta: dict, label: str) -> None:
+        """Start the live engine on another ROM at a recorded moment. Call with host_lock held."""
+        self._drop_host()
+        self._require_core()
+        context = multiprocessing.get_context('spawn')
+        parent, child = context.Pipe()
+        cfg = dict(self._cfg(), rom=str(rom_path), run='playtest', resume=False,
+                   from_run=meta['run'], from_frame=meta['frame'], from_checkpoints=list(meta.get('checkpoints') or []))
+        process = context.Process(target=_host_main, args=(child, cfg), daemon=True)
+        self.live.update(state='starting', message='Starting your changed game at that spot…', progress=None)
+        process.start()
+        child.close()
+        self._host = (process, parent, 0)
+        while True:
+            event = self._receive()
+            if event[0] == 'progress':
+                self.live['progress'] = [event[1], event[2]]
+            elif event[0] == 'ready':
+                self.live.update(state='ready', message='', frame=event[1], progress=None, playtest=label)
+                return
 
     def _start_in_background(self) -> None:
         with self.host_lock:
@@ -1015,6 +1061,8 @@ class EditSession(LevelTools):
         with self.host_lock:
             if not (self._host and self._host[0].is_alive()):
                 raise ValueError('Play the game first, then capture the moment you want.')
+            if self.live.get('playtest'):
+                raise ValueError('This is a playtest of your changes. Scenes are captured from the original game, so stop the playtest first.')
             if len(self.scenes) - len(self.level_scene_ids()) >= MAX_SCENES:
                 raise ValueError(f'This game already has {MAX_SCENES} recorded scenes. Remove some before capturing more.')
             self._host[1].send(('capture', str(label)[:80]))
@@ -2319,6 +2367,9 @@ class EditSessionTools:
             'edits.open': (base, lambda p, c: self._summary(self.session(p))),
             'edits.record': (base + ' steps restart', lambda p, c: self._summary(self.session(p), self.session(p).record(p['steps'], restart=bool(p['restart'])))),
             'edits.record_stop': (base, lambda p, c: self._summary(self.session(p), self.session(p).stop_recording())),
+            'edits.level_play_from': (base + ' level_id x y', lambda p, c: {'ok': True, **self.session(p).level_play_from(
+                p['level_id'], p['x'], p['y'])}),
+            'edits.play_stop': (base, lambda p, c: {'ok': True, **self.session(p).play_stop()}),
             'edits.play': (base + ' frames buttons', lambda p, c: {'ok': True, **self.session(p).play(p['frames'], p['buttons'])}),
             'edits.capture': (base + ' label', lambda p, c: {'ok': True, **self.session(p).capture(p['label'])}),
             'edits.forget_scene': (base + ' scene_id', lambda p, c: self._summary(self.session(p), self.session(p).forget_scene(p['scene_id']))),

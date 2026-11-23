@@ -97,8 +97,8 @@ export function levelPart(ed,verdict,keep){
  const guide=`<ol class="level-steps" aria-label="How to change the level">${steps(level,change).map(step=>`<li class="${step.now?'now':step.done?'done':''}"${step.now?' aria-current="step"':''}><strong>${step.name}</strong><span>${step.text}</span></li>`).join('')}</ol>`;
  const sizes=units(view),unitPart=sizes.length>1?`<label>Brush size <select id="level-unit" aria-label="Brush size">${sizes.map(u=>`<option value="${u.id}" ${u.id===level.unit?'selected':''}>${esc(u.label)}</option>`).join('')}</select></label>`:'';
  const zoom=`<label>Zoom <select id="level-zoom" aria-label="Zoom">${ZOOMS.map(z=>`<option value="${z}" ${z===level.zoom?'selected':''}>${z}x</option>`).join('')}</select></label>`;
- const tools=[...TOOLS,...(level.objects?.profile?[['objects','Enemies and items']]:[])].map(([id,label])=>`<button type="button" class="scene-mode ${level.tool===id?'active':''}" data-action="level-tool" data-id="${id}" aria-pressed="${level.tool===id}">${label}</button>`).join('');
- const hint=level.tool==='objects'?'Click an enemy or a candle to see what it is and change it.':level.tool==='pick'?'Click a spot on the map to copy it, or drag across a bigger piece like a platform or a tree.':
+ const tools=[...TOOLS,...(level.objects?.profile?[['objects','Enemies and items']]:[]),['play','Play from here']].map(([id,label])=>`<button type="button" class="scene-mode ${level.tool===id?'active':''}" data-action="level-tool" data-id="${id}" aria-pressed="${level.tool===id}">${label}</button>`).join('');
+ const hint=level.tool==='play'?'Click a spot on the map. The game starts there with your kept changes, so you can play it.':level.tool==='objects'?'Click an enemy or a candle to see what it is and change it.':level.tool==='pick'?'Click a spot on the map to copy it, or drag across a bigger piece like a platform or a tree.':
   !brush?'Copy something from the map first.':level.tool==='paint'?'Click or drag where you want it.':'Click or drag over your paint to remove it.';
  const brushText=brush?`Copied a ${brush.width}×${brush.height} piece.`:'Nothing copied yet.';
  const built=view.blocks?' The brush moves in whole blocks, the way this level is built, so a change can stay in one spot.':'';
@@ -289,6 +289,13 @@ export function levelTools(ctx,ed,host){
   const where=()=>{const node=document.getElementById('level-where'),level=ed.level;if(node&&level)node.textContent=`${level.brush?`Brush: ${level.brush.width} by ${level.brush.height} from column ${level.brush.col+1}, row ${level.brush.row+1}.`:'No brush yet.'} ${level.painted.size?plural(level.painted.size,'place')+' painted.':''}`;};
   main.addEventListener('pointerdown',event=>{
    const level=ed.level;
+   if(level?.tool==='play'){
+    const canvas=document.getElementById('level-canvas');if(!canvas||event.target!==canvas)return;
+    const box=canvas.getBoundingClientRect(),x=(event.clientX-box.left)*canvas.width/box.width/level.zoom,y=(event.clientY-box.top)*canvas.height/box.height/level.zoom;
+    ctx.notify('Starting your changed game at that spot…');
+    void host.call('level_play_from',{level_id:level.id,x,y}).then(result=>{if(host.current())host.startPlaying(result.playtest);}).catch(error=>ctx.notify(error.message,true));
+    return;
+   }
    if(level?.tool==='objects'){
     const canvas=document.getElementById('level-canvas');if(!canvas||event.target!==canvas)return;
     const box=canvas.getBoundingClientRect(),x=(event.clientX-box.left)*canvas.width/box.width/level.zoom,y=(event.clientY-box.top)*canvas.height/box.height/level.zoom;
