@@ -10401,7 +10401,18 @@ ${state2.artifact.system_id ? `<details><summary>Advanced byte options</summary>
     if (job == null ? void 0 : job.message) return job.message;
     return playing ? "Play to where the level starts, then record it." : "";
   }
-  var levelChange = (ed) => ed.proposal && ed.proposal.level && ed.level && ed.proposal.level.id === ed.level.id ? ed.proposal : null;
+  function objectAt(objects, x, y, reach = 12) {
+    let best = null, dist = reach * reach;
+    for (const item of objects || []) {
+      const dx = item.map_x - x, dy = item.map_y - 8 - y, d = dx * dx + dy * dy;
+      if (d <= dist) {
+        best = item;
+        dist = d;
+      }
+    }
+    return best;
+  }
+  var levelChange = (ed) => ed.proposal && ed.level && (ed.proposal.level && ed.proposal.level.id === ed.level.id || ed.proposal.kind === "level-object") ? ed.proposal : null;
   function levelsPart(ed) {
     var _a;
     const summary = ed.summary, levels = summary.levels || [], rec = summary.level_recording, job = summary.level_job, walking = ((_a = summary.recording) == null ? void 0 : _a.state) === "running";
@@ -10418,6 +10429,7 @@ ${state2.artifact.system_id ? `<details><summary>Advanced byte options</summary>
     }).join("")}</div>`;
   }
   function levelPart(ed, verdict, keep) {
+    var _a, _b;
     const level = ed.level;
     if (!level || !level.view) return "";
     const view2 = level.view, change = levelChange(ed), painted = level.painted.size, brush = level.brush;
@@ -10426,25 +10438,40 @@ ${state2.artifact.system_id ? `<details><summary>Advanced byte options</summary>
     const guide = `<ol class="level-steps" aria-label="How to change the level">${steps2(level, change).map((step) => `<li class="${step.now ? "now" : step.done ? "done" : ""}"${step.now ? ' aria-current="step"' : ""}><strong>${step.name}</strong><span>${step.text}</span></li>`).join("")}</ol>`;
     const sizes = units(view2), unitPart = sizes.length > 1 ? `<label>Brush size <select id="level-unit" aria-label="Brush size">${sizes.map((u) => `<option value="${u.id}" ${u.id === level.unit ? "selected" : ""}>${esc(u.label)}</option>`).join("")}</select></label>` : "";
     const zoom = `<label>Zoom <select id="level-zoom" aria-label="Zoom">${ZOOMS.map((z) => `<option value="${z}" ${z === level.zoom ? "selected" : ""}>${z}x</option>`).join("")}</select></label>`;
-    const tools = TOOLS.map(([id, label]) => `<button type="button" class="scene-mode ${level.tool === id ? "active" : ""}" data-action="level-tool" data-id="${id}" aria-pressed="${level.tool === id}">${label}</button>`).join("");
-    const hint = level.tool === "pick" ? "Click a spot on the map to copy it, or drag across a bigger piece like a platform or a tree." : !brush ? "Copy something from the map first." : level.tool === "paint" ? "Click or drag where you want it." : "Click or drag over your paint to remove it.";
+    const tools = [...TOOLS, ...((_a = level.objects) == null ? void 0 : _a.profile) ? [["objects", "Enemies and items"]] : []].map(([id, label]) => `<button type="button" class="scene-mode ${level.tool === id ? "active" : ""}" data-action="level-tool" data-id="${id}" aria-pressed="${level.tool === id}">${label}</button>`).join("");
+    const hint = level.tool === "objects" ? "Click an enemy or a candle to see what it is and change it." : level.tool === "pick" ? "Click a spot on the map to copy it, or drag across a bigger piece like a platform or a tree." : !brush ? "Copy something from the map first." : level.tool === "paint" ? "Click or drag where you want it." : "Click or drag over your paint to remove it.";
     const brushText = brush ? `Copied a ${brush.width}×${brush.height} piece.` : "Nothing copied yet.";
     const built = view2.blocks ? " The brush moves in whole blocks, the way this level is built, so a change can stay in one spot." : "";
     const locked = view2.status.includes("u") ? " Spots with a cross can't be changed yet." : "";
+    const known = ((_b = level.objects) == null ? void 0 : _b.profile) ? `<label class="level-toggle"><input type="checkbox" id="level-show-objects" ${level.showObjects ? "checked" : ""}> Show enemies and items (object layer)</label><label class="level-toggle"><input type="checkbox" id="level-show-solid" ${level.showSolid ? "checked" : ""}> Show what's solid</label>` : "";
+    const picked = level.picked, offered = level.choices;
+    const objectPanel = level.tool === "objects" && picked ? `<div class="notice level-object" role="group" aria-label="${esc(picked.name)}"><p><strong>${esc(picked.name)}</strong>${picked.kind === "candle" ? `, drops ${esc(picked.drop_name)}` : ""}</p>${picked.kind === "candle" && picked.shared > 1 ? `<p class="subtle">This candle shares its settings with ${picked.shared - 1} other ${picked.shared === 2 ? "candle" : "candles"} in this stage, so a new drop is given to this one alone by pointing it at another of the game's candles at the same spot.</p>` : ""}${picked.kind === "candle" ? `<label>Drops <select id="level-object-drop">${((offered == null ? void 0 : offered.drops) || []).map((c) => `<option value="${c.index}" ${c.index === picked.index ? "selected" : ""}>${esc(c.name)}${c.drop & 240 && (c.drop & 15) === 1 ? " (colour " + (c.drop >> 4) + ")" : ""}</option>`).join("")}</select></label>` : `<label>Swap for <select id="level-object-enemy">${((offered == null ? void 0 : offered.enemies) || []).map((c) => `<option value="${c.index}" ${c.index === picked.index ? "selected" : ""}>${esc(c.name)} (height ${c.y})</option>`).join("")}</select></label>`}<div class="actions">${button("Check in the game", "level-object-apply", { primary: true })}${button(picked.kind === "candle" ? "Remove this candle" : "Remove this enemy", "level-object-remove")}</div></div>` : "";
     const after = view2.after ? `<label class="level-toggle"><input type="checkbox" id="level-after" ${level.showAfter ? "checked" : ""}> Show my changes</label>` : "";
     const propose2 = button("Check in the game", "level-propose", { primary: true, disabled: !painted, reason: "Paint something first." }) + button("Clear paint", "level-clear", { disabled: !painted && !change });
     return `<div class="card-heading"><h3>${esc(view2.name)}</h3>${badge(`${view2.width}×${view2.height} tiles`, "neutral")}</div>
  ${guide}
- <div class="actions level-bar">${planes}${paintOn}${zoom}${unitPart}${after}${button("Save map as PNG", "level-export", { icon: "download" })}${button("Delete map", "level-forget")}${button("Close", "level-close")}</div>
+ <div class="actions level-bar">${planes}${paintOn}${zoom}${unitPart}${known}${after}${button("Save map as PNG", "level-export", { icon: "download" })}${button("Delete map", "level-forget")}${button("Close", "level-close")}</div>
  <div class="scene-modes" role="group" aria-label="Tool">${tools}</div>
  <p class="subtle" role="status">${hint}${built}${locked}</p>
  <div class="level-scroll" id="level-scroll" tabindex="0" aria-label="The level map. Scroll to move around."><canvas id="level-canvas" class="level-canvas" width="${view2.width * view2.cell * level.zoom}" height="${view2.height * view2.cell * level.zoom}" role="img" aria-label="Map of ${esc(view2.name)}"></canvas></div>
+ ${objectPanel}
  <p class="subtle" id="level-where" role="status">${brushText} ${painted ? plural2(painted, "tile") + " painted." : ""}</p>
  ${change ? verdict(change) : ""}
  ${change && view2.unshown ? `<p class="notice warm" role="status">Some of what you painted doesn't show on the map after the check. It may appear somewhere else in the level, so look over the map before you keep it.</p>` : ""}
  <div class="actions">${change ? keep(change, propose2) : propose2}${button("Open in its scene", "level-goto", { disabled: !level.last, reason: "Click a spot on the map first." })}</div>`;
   }
+  var objectImages = /* @__PURE__ */ new Map();
+  function objectImage(data) {
+    let image = objectImages.get(data);
+    if (!image) {
+      image = new Image();
+      image.src = "data:image/png;base64," + data;
+      objectImages.set(data, image);
+    }
+    return image;
+  }
   async function drawLevel(ctx2, ed, picture2) {
+    var _a, _b;
     const level = ed.level, canvas = document.getElementById("level-canvas");
     if (!level || !level.view || !canvas) return;
     const view2 = level.view, zoom = level.zoom, size2 = view2.cell * zoom, context = canvas.getContext("2d");
@@ -10476,6 +10503,40 @@ ${state2.artifact.system_id ? `<details><summary>Advanced byte options</summary>
       context.fillText("separate area", x + 6, 14);
     }
     context.setLineDash([]);
+    if (level.showSolid && ((_a = level.objects) == null ? void 0 : _a.roles)) {
+      for (let row = 0; row < view2.height; row++) for (let col = 0; col < view2.width; col++) {
+        const role = level.objects.roles[row * view2.width + col];
+        if (role === ".") continue;
+        context.fillStyle = role === "b" ? "rgba(255,160,40,.45)" : "rgba(70,140,255,.35)";
+        context.fillRect(col * size2, row * size2, size2, size2);
+      }
+    }
+    if (level.showObjects && ((_b = level.objects) == null ? void 0 : _b.objects)) {
+      context.font = `${Math.max(10, 5 * zoom)}px sans-serif`;
+      for (const item of level.objects.objects) {
+        const x = item.map_x * zoom, y = item.map_y * zoom, w = 16 * zoom, h = 16 * zoom;
+        if (item.picture) {
+          const image2 = objectImage(item.picture);
+          if (image2.complete) {
+            const [l, t, pw, ph] = item.picture_box;
+            context.globalAlpha = item.picture_from_another ? 0.7 : 1;
+            context.drawImage(image2, l * zoom, t * zoom, pw * zoom, ph * zoom);
+            context.globalAlpha = 1;
+          } else image2.onload = () => void drawLevel(ctx2, ed, picture2);
+        }
+        context.strokeStyle = item.kind === "enemy" ? "#ff5a5a" : "#ffd166";
+        context.lineWidth = item === level.picked ? 3 : 1.5;
+        context.strokeRect(x - w / 2, y - h, w, h);
+        context.lineWidth = 1;
+        if (item === level.picked) {
+          context.fillStyle = "rgba(0,0,0,.7)";
+          const label = item.kind === "enemy" ? item.name : item.name + ", drops " + item.drop_name, width = context.measureText(label).width + 6;
+          context.fillRect(x - w / 2, y - h - 14 * zoom / 2 - 4, width, 12 + zoom);
+          context.fillStyle = "#fff";
+          context.fillText(label, x - w / 2 + 3, y - h - 6);
+        }
+      }
+    }
     context.strokeStyle = "rgba(255,255,255,.35)";
     context.beginPath();
     for (let row = 0; row < view2.height; row++) for (let col = 0; col < view2.width; col++) {
@@ -10519,6 +10580,12 @@ ${state2.artifact.system_id ? `<details><summary>Advanced byte options</summary>
     const load = async (id, plane = 0) => {
       var _a;
       const view2 = await host.call("level", { level_id: id, plane });
+      let objects = null;
+      try {
+        objects = await host.call("level_objects", { level_id: id });
+      } catch {
+        objects = null;
+      }
       const same = ed.level && ed.level.id === id && ((_a = ed.level.view) == null ? void 0 : _a.plane) === view2.plane;
       const unitIds = units(view2).map((u) => u.id);
       ed.level = {
@@ -10532,7 +10599,12 @@ ${state2.artifact.system_id ? `<details><summary>Advanced byte options</summary>
         zoom: same ? ed.level.zoom : view2.height * view2.cell > 300 ? 1 : 2,
         showAfter: same ? ed.level.showAfter : true,
         last: same ? ed.level.last : null,
-        drag: null
+        drag: null,
+        objects,
+        showObjects: same ? ed.level.showObjects : !!(objects == null ? void 0 : objects.profile),
+        showSolid: same ? ed.level.showSolid : false,
+        picked: same ? ed.level.picked : null,
+        choices: same ? ed.level.choices : null
       };
     };
     const reload = async () => {
@@ -10657,6 +10729,30 @@ ${state2.artifact.system_id ? `<details><summary>Advanced byte options</summary>
         host.update(["scene-changes"]);
         host.watchProposal();
       },
+      "level-object-apply": async () => {
+        const level = ed.level, picked = level == null ? void 0 : level.picked;
+        if (!picked) return;
+        const node = document.getElementById(picked.kind === "candle" ? "level-object-drop" : "level-object-enemy");
+        if (!node) return;
+        await host.dropPreview();
+        const result = await host.call("level_object", { level_id: level.id, zone: picked.zone, kind: picked.kind, index: Number(node.value) });
+        if (!host.current()) return;
+        ed.proposal = result.change;
+        ed.summary.preview = result.change;
+        host.update(["scene-level", "scene-changes"]);
+        host.watchProposal();
+      },
+      "level-object-remove": async () => {
+        const level = ed.level, picked = level == null ? void 0 : level.picked;
+        if (!picked) return;
+        await host.dropPreview();
+        const result = await host.call("level_object", { level_id: level.id, zone: picked.zone, kind: picked.kind, index: 0 });
+        if (!host.current()) return;
+        ed.proposal = result.change;
+        ed.summary.preview = result.change;
+        host.update(["scene-level", "scene-changes"]);
+        host.watchProposal();
+      },
       "level-goto": async () => {
         var _a;
         const level = ed.level;
@@ -10705,11 +10801,28 @@ ${state2.artifact.system_id ? `<details><summary>Advanced byte options</summary>
         if (node && level) node.textContent = `${level.brush ? `Brush: ${level.brush.width} by ${level.brush.height} from column ${level.brush.col + 1}, row ${level.brush.row + 1}.` : "No brush yet."} ${level.painted.size ? plural2(level.painted.size, "place") + " painted." : ""}`;
       };
       main.addEventListener("pointerdown", (event) => {
-        var _a2, _b2;
-        const place = at(event), level = ed.level;
+        var _a2, _b2, _c2;
+        const level = ed.level;
+        if ((level == null ? void 0 : level.tool) === "objects") {
+          const canvas = document.getElementById("level-canvas");
+          if (!canvas || event.target !== canvas) return;
+          const box = canvas.getBoundingClientRect(), x = (event.clientX - box.left) * canvas.width / box.width / level.zoom, y = (event.clientY - box.top) * canvas.height / box.height / level.zoom;
+          const item = objectAt((_a2 = level.objects) == null ? void 0 : _a2.objects, x, y);
+          level.picked = item;
+          level.choices = null;
+          host.update(["scene-level"]);
+          if (item) void host.call("level_object_choices", { level_id: level.id, zone: item.zone }).then((choices) => {
+            if (ed.level === level && level.picked === item) {
+              level.choices = choices;
+              host.update(["scene-level"]);
+            }
+          }).catch((error) => ctx2.notify(error.message, true));
+          return;
+        }
+        const place = at(event);
         if (!place || !level) return;
         event.preventDefault();
-        (_b2 = (_a2 = event.target).setPointerCapture) == null ? void 0 : _b2.call(_a2, event.pointerId);
+        (_c2 = (_b2 = event.target).setPointerCapture) == null ? void 0 : _c2.call(_b2, event.pointerId);
         level.last = place;
         if (level.tool === "pick") {
           level.drag = { from: place, to: place };
@@ -10768,6 +10881,14 @@ ${state2.artifact.system_id ? `<details><summary>Advanced byte options</summary>
         }
         if (event.target.id === "level-after") {
           level.showAfter = event.target.checked;
+          void redraw();
+        }
+        if (event.target.id === "level-show-objects") {
+          level.showObjects = event.target.checked;
+          void redraw();
+        }
+        if (event.target.id === "level-show-solid") {
+          level.showSolid = event.target.checked;
           void redraw();
         }
         if (event.target.id === "level-plane") {

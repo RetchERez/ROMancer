@@ -57,6 +57,8 @@ class LevelTools:
                 level = json.loads(path.read_text())
             except (ValueError, OSError):
                 continue
+            if not isinstance(level, dict):
+                continue                    # the list of places that changed, kept beside a map after a check
             if level.get('rom_sha') == self.rom_sha and all(sid in self.scenes for sid in level.get('scene_ids', ())):
                 self.levels.append(level)
         self.levels.sort(key=lambda level: level.get('created', 0))
@@ -380,6 +382,130 @@ class LevelTools:
                     'image': f'level:{level_id}:{number}', 'after': after, 'frames': frames, 'status': ''.join(status),
                     'scenes': [{'id': sid, 'label': self._label(sid)} for sid in level['scene_ids']],
                     'pending': pending, 'working': working}
+
+    # ---- what a game's level profile knows (romancer/level_profiles.py): enemies, items, block roles
+
+    def _profile_context(self, level: dict):
+        """(profile, stage, floor, map x of stage x 0, map y of screen y 0) for this level, or None without a profile."""
+        from . import level_profiles
+        profile = level_profiles.profile_for(self.rom)
+        if profile is None:
+            return None
+        plane = self._level_plane(level, 0)
+        ordered = sorted(plane.windows.items(), key=lambda item: self.meta[level['scene_ids'][item[0]]]['frame'])
+        number, window = ordered[0]
+        snapshot = self._scene(level['scene_ids'][number]).snapshot
+        ram = next((snapshot.domains[n].data for n in ('wram', 'ram') if n in snapshot.domains and snapshot.domains[n].data is not None), None)
+        if ram is None:
+            return None
+        camera = ram[0x2E] | ram[0x2F] << 8
+        # a stage x is drawn at screen x stage x - camera - 64 (the game spawns a zone ahead of where it shows it)
+        return profile, ram[0x28], ram[0x46], window.across - camera - profile.ZONE - 1, window.down
+
+    def level_objects(self, level_id: str) -> dict:
+        """Enemies, candles and items of the level on the map, and what each map place is (solid, breakable, open)."""
+        with self.lock:
+            level = self._level(level_id)
+            context = self._profile_context(level)
+            if context is None:
+                return {'profile': None, 'objects': [], 'roles': ''}
+            profile, stage, floor, dx, dy = context
+            stored = level['planes'][0]
+            px = stored['px']
+            objects = []
+            for item in profile.objects(stage, floor):
+                x, y = item['x'] + dx, item['y'] + dy
+                if -px <= x < stored['width'] * px + px:
+                    objects.append({**item, 'map_x': x, 'map_y': y})
+            roles = ['.'] * (stored['width'] * stored['height'])
+            plane = self._level_plane(level, 0)
+            for (column, row), spot in plane.cells.items():
+                graphics = self._graphics(level['scene_ids'][spot.frame])
+                cell = graphics.layers()[spot.layer].layer.cell(spot.x, spot.y)
+                tile = (cell.tile_address % 0x1000) // 16
+                role = profile.tile_role(tile)
+                roles[row * stored['width'] + column] = {'solid': 's', 'breakable': 'b'}.get(role, '.')
+            self._object_pictures(level, objects)
+            return {'profile': profile.name, 'stage': stage, 'floor': floor, 'objects': objects, 'roles': ''.join(roles),
+                    'enemy_choices': profile.enemy_choices()}
+
+    def _object_pictures(self, level: dict, objects: list) -> None:
+        """Give each object the picture the game draws for it: from a capture that shows that spot, the pixels where the
+        real screen differs from the same screen drawn without sprites. Objects of a type never seen take the picture of
+        one that was. Adds 'picture' (PNG as base64) and 'picture_box' ([left, top, width, height] on the map)."""
+        import base64
+        from PIL import Image, ImageChops
+        plane = self._level_plane(level, 0)
+        shots = {}
+
+        def shot(number):
+            if number not in shots:
+                graphics = self._graphics(level['scene_ids'][number])
+                real = Image.new('RGB', (graphics.width, graphics.height))
+                palette = [tuple(c) for c in graphics.reps] + [lm.EMPTY] * (256 - len(graphics.reps))
+                real.putdata([palette[v] if v < len(palette) else lm.EMPTY for line in graphics.screen for v in line])
+                shots[number] = (real, lm.screen_picture(graphics, self.system))
+            return shots[number]
+        by_type = {}
+        for item in objects:
+            left, top, width, height = item['map_x'] - 12, item['map_y'] - 32, 24, 32
+            for number, window in sorted(plane.windows.items()):
+                x0, y0 = left - window.across, top - window.down
+                if x0 < 0 or y0 < window.first or x0 + width > 256 or y0 + height > window.last:
+                    continue
+                real, plain = shot(number)
+                box = (x0, y0, x0 + width, y0 + height)
+                piece, ground = real.crop(box), plain.crop(box)
+                mask = ImageChops.difference(piece, ground).convert('L').point(lambda v: 255 if v else 0)
+                if mask.getbbox() is None:
+                    continue
+                picture = piece.convert('RGBA')
+                picture.putalpha(mask)
+                out = io.BytesIO()
+                picture.save(out, format='PNG')
+                item['picture'] = base64.b64encode(out.getvalue()).decode()
+                item['picture_box'] = [left, top, width, height]
+                by_type.setdefault((item['kind'], item['type']), item['picture'])
+                break
+        for item in objects:
+            if 'picture' not in item and (item['kind'], item['type']) in by_type:
+                item['picture'] = by_type[(item['kind'], item['type'])]
+                item['picture_box'] = [item['map_x'] - 12, item['map_y'] - 32, 24, 32]
+                item['picture_from_another'] = True
+
+    def level_object_choices(self, level_id: str, zone: int) -> dict:
+        with self.lock:
+            level = self._level(level_id)
+            context = self._profile_context(level)
+            if context is None:
+                raise ValueError('ROMancer does not know the objects of this game yet.')
+            profile, stage, floor, _, _ = context
+            return {'drops': profile.drop_choices(stage, floor, int(zone)), 'enemies': profile.enemy_choices()}
+
+    def propose_level_object(self, level_id: str, zone: int, kind: str, index: int) -> dict:
+        """Point one zone's enemy or candle at another of the game's records (index 0 removes it)."""
+        with self.lock:
+            level = self._level(level_id)
+            context = self._profile_context(level)
+            if context is None:
+                raise ValueError('ROMancer does not know the objects of this game yet.')
+            profile, stage, floor, _, _ = context
+            if kind not in ('enemy', 'candle'):
+                raise ValueError('Choose an enemy or a candle.')
+            row = profile.zones(stage, floor)[int(zone)]
+            offset = row['enemy_byte' if kind == 'enemy' else 'candle_byte']
+            index = int(index)
+            if not 0 <= index <= 255:
+                raise ValueError('That choice is not one of the game’s own.')
+            if kind == 'enemy':
+                record = profile.enemy_record(index)
+                title = 'Remove the enemy' if record is None else f'Enemy here: {profile.enemy_name(record["type"])}'
+            else:
+                record = profile.candle_record(index)
+                title = 'Remove the candle' if record is None else f'Candle drops: {profile.drop_name(record["drop"])}'
+            scene_id = level['scene_ids'][0]
+        change = self.propose_writes(scene_id, [(offset, self.rom[offset], index)], f'{title} (zone {int(zone) + 1})', kind='level-object')
+        return change
 
     def level_place(self, level_id: str, plane: int, col: int, row: int) -> dict:
         """Which scene, layer and cell a place on the map is, for opening it in the scene editors."""
