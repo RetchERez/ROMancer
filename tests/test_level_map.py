@@ -195,6 +195,55 @@ class StitchTests(unittest.TestCase):
                 self.assertEqual(spot.layer, (column - 20) // LAYER_W % 2)       # the table that holds it since the restart
                 self.assertEqual(spot.x, (column - 20) % LAYER_W)
 
+    def test_captures_taken_during_a_fade_are_left_out(self):
+        frames = frames_for([(level, across, 0) for across in range(0, 400, 40)])
+        dim = frames[5].graphics                                   # the screen fades: same pictures, darker colors
+        dim.reps = [(v * 6 // 10,) * 3 for v in range(250)]
+        dark = frames[7].graphics                                  # nearly black: the fade into a stage
+        dark.reps = [(v // 5,) * 3 for v in range(250)]
+        plane = lm.stitch(frames, 'gb')[0]
+        self.assertNotIn(5, plane.windows)
+        self.assertNotIn(7, plane.windows)
+        self.assertEqual(len(plane.sections), 1)
+        self.assertTrue(all(spot.frame not in (5, 7) for spot in plane.cells.values()))
+
+    def test_a_level_that_is_dark_all_through_is_kept(self):
+        frames = frames_for([(level, across, 0) for across in range(0, 400, 40)])
+        for frame in frames:
+            frame.graphics.reps = [(v // 5,) * 3 for v in range(250)]
+        plane = lm.stitch(frames, 'gb')[0]
+        self.assertEqual(len(plane.windows), len(frames))
+
+    def test_a_capture_scrolled_like_the_status_bar_takes_the_usual_split(self):
+        # Most captures show the level from line 38 (a bar above it); one was scrolled like the bar, so its band
+        # starts at line 0 and the bar's last row (screen row 4) would pass for level.
+        plane = lm.Plane('Background', PX)
+        def cells(rows):
+            return {(column, row): lm.Spot(0, 0, column, row) for column in range(32) for row in rows}
+        plane.windows = {0: lm.Window(0, 0, 0, 38, 224, cells(range(5, 28))),
+                         1: lm.Window(0, 0, 0, 38, 224, cells(range(5, 28))),
+                         2: lm.Window(0, 0, 0, 0, 224, cells(range(4, 28)))}
+        plane.same_split()
+        self.assertEqual(min(row for _, row in plane.windows[2].cells), 5)
+        self.assertEqual(plane.windows[2].first, 38)
+        plain = lm.Plane('Background', PX)                       # no bar: nothing changes
+        plain.windows = {0: lm.Window(0, 0, 0, 0, 224, cells(range(0, 28)))}
+        plain.same_split()
+        self.assertEqual(min(row for _, row in plain.windows[0].cells), 0)
+
+    def test_a_small_hole_closed_in_by_the_map_is_filled_from_the_layer(self):
+        seen = {(column, row): lm.Spot(0, 0, column, row) for column in range(10) for row in range(6)}
+        hole = {(4, 2), (5, 2), (5, 3)}                            # a sprite stood there in every capture
+        edge = {(9, 5)}                                            # on the edge of what was seen: not a hole
+        for place in hole | edge:
+            del seen[place]
+        plane = lm.Plane('Background', PX)
+        plane.windows = {0: lm.Window(0, 0, 0, 0, 224, seen, {}, {place: lm.Spot(0, 0, *place) for place in hole | edge | {(10, 5)}})}
+        plane.assign()
+        self.assertTrue(hole <= set(plane.cells))
+        self.assertNotIn((9, 5), plane.cells)
+        self.assertNotIn((10, 5), plane.cells)
+
     def test_a_status_bar_that_stays_put_is_left_off_the_map(self):
         frames = frames_for([(level, across, 0) for across in range(0, 400, 40)])
         for frame in frames:                      # the top two rows of the screen always show the same words

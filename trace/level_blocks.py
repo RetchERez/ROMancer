@@ -26,12 +26,24 @@ sys.path.insert(0, str(ROOT))
 sys.path.insert(0, str(ROOT / 'trace'))
 
 
-def record_level(session, steps: int, intro: int) -> dict | None:
+# Games whose title, story or name entry the automatic play does not get through: how many times to press Start
+# (4 frames held, then 150 frames) before the level is recorded. A player starts recording in the stage; the
+# automatic play needs to be told how to get there. Each was found by looking at the screen after every press.
+START_PRESSES = {
+    '085ec6395681': 5,          # Castlevania III: title, story, name entry, then Block 1-01
+}
+
+
+def record_level(session, steps: int, intro: int, presses: int = 0) -> dict | None:
     session.record(intro, wait=True)
     for scene_id in list(session.scenes):
         session.forget_scene(scene_id)
     while session.play(1, []).get('busy'):
         time.sleep(0.2)
+    for _ in range(presses):
+        for buttons, frames in ((['start'], 4), ([], 150)):
+            while session.play(frames, buttons).get('busy'):
+                time.sleep(0.2)
     session.level_start('Measured level')
     for attempt in range(3):
         session.level_auto(2, wait=True)
@@ -59,7 +71,7 @@ def measure(index: Path, key: str, steps: int, png, tries: int, intro: int = 8) 
     rom.write_bytes(data)
     session = EditSession(temp / 'store', rom, system)
     try:
-        level = record_level(session, steps, intro)
+        level = record_level(session, steps, intro, START_PRESSES.get(sha[:12], 0))
         if level is None:
             out['error'] = session.level_job['message']
             return out

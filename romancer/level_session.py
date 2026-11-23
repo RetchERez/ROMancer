@@ -210,7 +210,7 @@ class LevelTools:
             for plane in planes:
                 plane.windows = {index[n]: w for n, w in plane.windows.items() if n in index}
                 for window in plane.windows.values():
-                    for spot in list(window.cells.values()) + list(window.weak.values()):
+                    for spot in list(window.cells.values()) + list(window.weak.values()) + list(window.faint.values()):
                         spot.frame = index[spot.frame]
                 plane.assign()
             kept = [frames[n] for n in keep]

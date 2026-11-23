@@ -36,6 +36,9 @@ CELL_MATCH = 0.85
 WEAK_MATCH = 0.3        # below CELL_MATCH something covers the cell; above this the layer is still the likeliest one there       # share of a cell's pixels that must agree with the screen, where two layers share one map
 BREAK = 0.25            # share of overlapping cells that may disagree before a new section starts
 GAP = 4                 # empty columns between sections
+HOLE_CELLS = 24         # the largest closed-in group of covered places that is filled from the layer
+FADED = 0.35            # a capture darker than this share of the recording's middle brightness is a fade
+DIMMER = 0.8            # a capture that shows known places darker than this share of before is a fade
 EMPTY = (24, 24, 32)    # the color of places no capture showed
 HATCH = (58, 58, 76)    # and of the fine lines drawn across them
 
@@ -66,6 +69,7 @@ class Window:
     last: int                   # line after its last
     cells: dict                 # (column, row) -> Spot
     weak: dict = field(default_factory=dict)    # places where something (a sprite) hid the background: the likeliest Spot
+    faint: dict = field(default_factory=dict)   # places the screen hardly showed at all (covered every time): only for holes
 
 
 @dataclass
@@ -97,6 +101,36 @@ class Plane:
         self.sections = [spans[k] for k in sorted(spans)]
         for place, spot in weak.items():            # a place only ever seen behind a sprite still belongs on the map
             self.cells.setdefault(place, spot)
+        # A few places that something (a sprite standing still) covered in every capture would be a hole in the middle
+        # of the map, and holes read as faults. A small group of them that the map closes in on every side is drawn
+        # from the layer, which holds the background without the sprites.
+        faint: dict = {}
+        for number in sorted(self.windows):
+            if chosen is None or number in chosen:
+                for place, spot in self.windows[number].faint.items():
+                    if place not in self.cells:
+                        faint.setdefault(place, spot)
+        done: set = set()
+        for start in faint:
+            if start in done:
+                continue
+            group, todo, closed = [], [start], True
+            done.add(start)
+            while todo:
+                column, row = todo.pop()
+                group.append((column, row))
+                for near in ((column - 1, row), (column + 1, row), (column, row - 1), (column, row + 1)):
+                    if near in self.cells:
+                        continue
+                    if near in faint:
+                        if near not in done:
+                            done.add(near)
+                            todo.append(near)
+                    else:
+                        closed = False          # open to a place no capture showed: not a hole, the edge of what was seen
+            if closed and len(group) <= HOLE_CELLS:
+                for place in group:
+                    self.cells[place] = faint[place]
         return self
 
     def trim(self, fixed: set) -> None:
@@ -109,6 +143,27 @@ class Plane:
                 return (place[1] * px - window.down) // px not in fixed
             window.cells = {place: spot for place, spot in window.cells.items() if moving(place)}
             window.weak = {place: spot for place, spot in window.weak.items() if moving(place)}
+            window.faint = {place: spot for place, spot in window.faint.items() if moving(place)}
+        self.windows = {number: window for number, window in self.windows.items() if window.cells}
+
+    def same_split(self) -> None:
+        """When most captures show the level starting below a split (a status bar that stays put), a capture whose screen
+        happened to be scrolled like the bar has the two run together into one band from the top. The bar's last
+        rows then pass for level. Those captures take the split the others show."""
+        splits = [window.first for window in self.windows.values() if window.first > 0]
+        if len(splits) * 3 < len(self.windows):
+            return
+        split = max(set(splits), key=splits.count)
+        px = self.px
+        for window in self.windows.values():
+            if window.first >= split:
+                continue
+            def below(place):
+                return place[1] * px - window.down >= split
+            window.cells = {place: spot for place, spot in window.cells.items() if below(place)}
+            window.weak = {place: spot for place, spot in window.weak.items() if below(place)}
+            window.faint = {place: spot for place, spot in window.faint.items() if below(place)}
+            window.first = split
         self.windows = {number: window for number, window in self.windows.items() if window.cells}
 
     def keep_levels(self, screen_columns: int, screen_rows: int) -> None:
@@ -444,11 +499,34 @@ def _settle_tables(plane, runs: list) -> None:
                 window.cells, window.weak = cells, weak
 
 
+def _light(graphics, x0: int, y0: int, wide: int, tall: int, step: int = 2) -> float:
+    """How bright this part of the recorded screen is: the mean of its pixels' red, green and blue."""
+    reps = graphics.reps
+    total = count = 0
+    for y in range(max(0, y0), min(graphics.height, y0 + tall), step):
+        line = graphics.screen[y]
+        for x in range(max(0, x0), min(graphics.width, x0 + wide), step):
+            value = line[x]
+            if value < len(reps):
+                color = reps[value]
+                total += color[0] + color[1] + color[2]
+                count += 1
+    return total / (3 * count) if count else 0.0
+
+
 def stitch(frames: list, system: str) -> list:
     """Planes of the level with every frame assigned, the largest first."""
     planes: dict = {}
+    # A capture taken while the screen fades (into a stage, after a death, through a door) is not a place in the
+    # level: its dim colors would land on the map as a dark stretch. One much darker than most of the recording is
+    # left out here; one that shows places already on the map clearly darker is left out below.
+    lights = [_light(frame.graphics, 0, 0, frame.graphics.width, frame.graphics.height, 4) for frame in frames]
+    middle = sorted(lights)[len(lights) // 2] if lights else 0.0
+    faded = {number for number, light in enumerate(lights) if light < FADED * middle}
     track: dict = {}            # key -> {'at': (sx, sy, U, V), 'shift', 'section', 'looks', 'where', 'right'}
     for number, frame in enumerate(frames):
+        if number in faded:
+            continue
         graphics = frame.graphics
         layers = graphics.layers()
         groups: dict = {}
@@ -467,7 +545,7 @@ def stitch(frames: list, system: str) -> list:
             plane = planes.get((name, px))
             if plane is None:
                 plane = planes[(name, px)] = Plane(name, px)
-                track[(name, px)] = {'at': None, 'off': (0, 0), 'shift': 0, 'section': 0, 'looks': {}, 'where': {}, 'right': None, 'still': {}, 'rows': None, 'runs': []}
+                track[(name, px)] = {'at': None, 'off': (0, 0), 'light': {}, 'shift': 0, 'section': 0, 'looks': {}, 'where': {}, 'right': None, 'still': {}, 'rows': None, 'runs': []}
             state = track[(name, px)]
             last = state['at']
             if last is None:
@@ -480,7 +558,7 @@ def stitch(frames: list, system: str) -> list:
             # after a jump (a restart puts the game back at a checkpoint): from then on they are offset by the moves
             # made so far, and the layer must be read where the screen really shows it, not at the map place's number.
             ox, oy = state['off']
-            fresh, hidden = {}, {}
+            fresh, hidden, faint = {}, {}, {}
             # Which layer shows where? Layers that share one map (the nametables of the NES) each fill a part of the
             # screen, and the parts meet where the map wraps round. A level that repeats looks the same in two layers
             # at once, so the choice is made for each part as a whole, by how well each layer agrees with the screen
@@ -505,6 +583,8 @@ def stitch(frames: list, system: str) -> list:
                         fresh[(gx, gy)] = (Spot(number, index, mx // px, my // px), _look(graphics, view, mx // px, my // px))
                     elif score >= WEAK_MATCH:
                         hidden[(gx, gy)] = Spot(number, index, mx // px, my // px)
+                    else:
+                        faint[(gx, gy)] = Spot(number, index, mx // px, my // px)
             tally: dict = {}
             for value in fresh.values():
                 tally[value[1]] = tally.get(value[1], 0) + 1
@@ -546,6 +626,15 @@ def stitch(frames: list, system: str) -> list:
             both, differ = clash(0, 0)
             if both < 24 or differ <= BREAK * both:
                 moved = (0, 0)
+            if moved is None and shared:
+                # Two tables side by side make a map twice the width of one, and the scroll is worked out within one
+                # table: when the screen moved far between two captures, the capture lands exactly one table width
+                # off. That place is tried first, and it is taken on a smaller overlap when nothing there disagrees.
+                for offset in ((wide // px, 0), (-(wide // px), 0), (0, tall // px), (0, -(tall // px))):
+                    both, differ = clash(*offset)
+                    if both >= 12 and differ <= BREAK * both and differ * 20 <= both:
+                        moved, jumped = offset, True
+                        break
             if moved is None:
                 votes: dict = {}
                 rare = sorted(fresh.items(), key=lambda item: len(state['where'].get(item[1][1], ())) or 10 ** 6)[:40]
@@ -558,6 +647,10 @@ def stitch(frames: list, system: str) -> list:
                         moved, jumped = offset, True
                         break
             if moved is None:
+                if __import__('os').environ.get('LEVEL_DEBUG'):
+                    print('capture', number, 'starts a new section: at the nearest place', clash(0, 0), 'U', U, 'sx', sx,
+                          'votes', sorted(votes.items(), key=lambda item: -item[1])[:4],
+                          [(offset, clash(*offset)) for offset, _ in sorted(votes.items(), key=lambda item: -item[1])[:4]], flush=True)
                 shift = state['shift'] = state['right'] + GAP - min(place[0] for place in fresh)
                 state['section'] += 1
                 moved, jumped = (0, 0), True
@@ -565,19 +658,33 @@ def stitch(frames: list, system: str) -> list:
                 dx, dy = moved
                 fresh = {(place[0] + dx, place[1] + dy): value for place, value in fresh.items()}
                 hidden = {(place[0] + dx, place[1] + dy): spot for place, spot in hidden.items()}
+                faint = {(place[0] + dx, place[1] + dy): spot for place, spot in faint.items()}
                 U, V = U + dx * px, V + dy * px
                 state['off'] = (ox + dx * px, oy + dy * px)
+            # Places already on the map that this capture shows with the same picture, but much darker: a fade.
+            here = {place: _light(graphics, place[0] * px - U, place[1] * px - V, px, px) for place in fresh}
+            pairs = [(here[place], state['light'][(place[0] + shift, place[1])]) for place, value in fresh.items()
+                     if (place[0] + shift, place[1]) in state['looks'] and state['looks'][(place[0] + shift, place[1])][0] == value[1]
+                     and (place[0] + shift, place[1]) in state['light']]
+            if len(pairs) >= 24:
+                now, before = sum(a for a, _ in pairs), sum(b for _, b in pairs)
+                if before and now < DIMMER * before:
+                    if __import__('os').environ.get('LEVEL_DEBUG'):
+                        print('capture', number, 'left out: a fade', round(now / before, 2), flush=True)
+                    continue
             seen = [state['looks'][at][1] for at in ((place[0] + shift, place[1]) for place in fresh) if at in state['looks']]
             section = max(set(seen), key=seen.count) if seen else state['section']
             cells = {}
             for place, (spot, look) in fresh.items():
                 at = (place[0] + shift, place[1])
                 cells[at] = spot
+                state['light'][at] = here[place]
                 if at not in state['looks']:
                     state['where'].setdefault(look, []).append(at)
                 state['looks'][at] = (look, section)
             plane.windows[number] = Window(section, U + shift * px, V, y0, y1, cells,
-                                           {(place[0] + shift, place[1]): spot for place, spot in hidden.items()})
+                                           {(place[0] + shift, place[1]): spot for place, spot in hidden.items()},
+                                           {(place[0] + shift, place[1]): spot for place, spot in faint.items()})
             if shared and len(members) == 2:
                 # remembered for _settle_tables: how well each of the two tables agreed with the screen at every cell
                 if jumped or not state['runs']:
@@ -628,6 +735,7 @@ def stitch(frames: list, system: str) -> list:
         if below:
             fixed.update(range(min(below), count + 1))
         plane.trim(fixed)
+        plane.same_split()
         plane.keep_levels(frames[0].graphics.width // plane.px, count)
     found = [plane.assign() for plane in planes.values() if plane.windows]
     found.sort(key=lambda plane: -len(plane.cells))
