@@ -319,3 +319,5 @@ html[data-theme="light"] .scene-thumb.flagged,html[data-theme="light"] .scene-re
 #update-overlay{position:fixed;inset:0;z-index:60;display:grid;place-items:center;background:var(--bg);text-align:center;padding:24px}#update-overlay img{width:70px}#update-overlay p{color:var(--muted)}
 dialog.update-notes pre{max-height:55vh;white-space:pre-wrap}
 @media(max-width:1100px){#update-banner{left:205px;max-width:calc(100vw - 225px)}}@media(max-width:820px){#update-banner{left:80px;max-width:calc(100vw - 96px)}}.scaled-compact #update-banner{left:205px}.scaled-narrow #update-banner{left:80px}
+
+.level-compare-picture{display:block;max-width:100%;height:auto;image-rendering:pixelated;margin:8px 0;border-radius:4px}

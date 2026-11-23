@@ -564,6 +564,116 @@ class LevelTools:
             self._start_playtest(path, meta, label)
         return {'playtest': self.live.get('playtest'), 'frame': meta['frame'], 'scene_id': sid}
 
+    COMPARE_FRAMES = 1200       # 20 seconds of play
+    COMPARE_EVERY = 3           # every third frame goes in the picture (20 pictures a second)
+
+    def level_compare(self, level_id: str, x: float = None, y: float = None) -> dict:
+        """Start (with a map spot) or look at a before-and-after replay: the recorded walk played on the original game and
+        on the game with the kept changes, from that spot for 20 seconds, side by side in one animated picture."""
+        with self.lock:
+            level = self._level(level_id)
+            job = self._compares.get(level_id) if hasattr(self, '_compares') else None
+            if x is None:
+                return {'compare': self._compare_view(job)}
+            if job and job['state'] == 'running':
+                return {'compare': self._compare_view(job)}
+            if not self.changes:
+                raise ValueError('Keep a change first; then the replay shows the game before and after it.')
+            sid = self.level_capture_at(level, float(x), float(y))
+            first = self.meta[level['scene_ids'][0]]
+            meta = self.meta[sid]
+            if meta.get('run') != first.get('run') or not (self.store / 'runs' / meta['run'] / 'inputs.bin').exists():
+                raise ValueError('The recording for that part of the map is gone, so it cannot be replayed.')
+            job = {'id': uuid.uuid4().hex[:12], 'state': 'running', 'done': 0, 'total': self.COMPARE_FRAMES * 2,
+                   'kept': len(self.changes), 'message': 'Replaying the original game…'}
+            if not hasattr(self, '_compares'):
+                self._compares = {}
+            self._compares[level_id] = job
+            rom = self._rom_with(self.changes)
+            target = max(first['frame'], meta['frame'] - 60)
+        threading.Thread(target=self._compare_worker, args=(job, first, target, rom, level['name']), name='romancer-compare', daemon=True).start()
+        return {'compare': self._compare_view(job)}
+
+    def level_compare_file(self, level_id: str) -> dict:
+        job = getattr(self, '_compares', {}).get(level_id)
+        if not job or job['state'] != 'finished':
+            raise ValueError('The before-and-after replay is not ready yet.')
+        return {'gif': job['path'].read_bytes(), 'name': job['name']}
+
+    @staticmethod
+    def _compare_view(job):
+        if not job:
+            return None
+        return {k: job[k] for k in ('id', 'state', 'done', 'total', 'message', 'kept', 'differs', 'width', 'height', 'seconds') if k in job}
+
+    def _compare_worker(self, job: dict, first: dict, target: int, rom: bytes, name: str) -> None:
+        from array import array
+        import io
+        import zlib
+        from PIL import Image, ImageDraw
+        from . import edit_session as es
+        try:
+            run_dir = self.store / 'runs' / first['run']
+            inputs = array('H')
+            inputs.frombytes((run_dir / 'inputs.bin').read_bytes())
+            start = min(first['checkpoints'])
+            state = zlib.decompress((run_dir / f'{start}.st').read_bytes())
+            end = min(len(inputs), target + self.COMPARE_FRAMES)
+            work = self.store / 'work'
+            work.mkdir(parents=True, exist_ok=True)
+            changed = work / f'compare-{job["id"]}.bin'
+            changed.write_bytes(rom)
+            runs = []
+            for number, path in enumerate((self.rom_path, changed)):
+                job['message'] = 'Replaying the original game…' if number == 0 else 'Replaying the game with your changes…'
+                fe = es._frontend(self._cfg(), path)
+                pictures = []
+                try:
+                    if int(fe.lib.retro_serialize_size()) <= 0:
+                        fe.run_frame([])
+                    fe.unserialize(state)
+                    session = es._Session(fe, checkpoint_every=10 ** 9)
+                    session.frame = start
+                    if target > start:
+                        session.run(target - start, lambda f: es._names(inputs[f]) if f < len(inputs) else ())
+                    for at in range(target, end, self.COMPARE_EVERY):
+                        session.run(self.COMPARE_EVERY, lambda f: es._names(inputs[f]) if f < len(inputs) else ())
+                        frame = fe.last_frame
+                        pictures.append((frame.width, frame.height, bytes(frame.rgb)))
+                        job['done'] = number * self.COMPARE_FRAMES + (at - target)
+                finally:
+                    es._close(fe)
+                runs.append(pictures)
+            changed.unlink(missing_ok=True)
+            job['message'] = 'Making the picture…'
+            differs = None
+            frames = []
+            count = min(len(runs[0]), len(runs[1]))
+            for n in range(count):
+                (w, h, before), (_, _, after) = runs[0][n], runs[1][n]
+                if differs is None and before != after:
+                    differs = round(n * self.COMPARE_EVERY / 60, 1)
+                sheet = Image.new('RGB', (w * 2 + 4, h + 14), (16, 20, 24))
+                sheet.paste(Image.frombytes('RGB', (w, h), before), (0, 14))
+                sheet.paste(Image.frombytes('RGB', (w, h), after), (w + 4, 14))
+                draw = ImageDraw.Draw(sheet)
+                draw.text((4, 2), 'Before', fill=(230, 230, 230))
+                draw.text((w + 8, 2), 'After', fill=(120, 230, 180))
+                frames.append(sheet.convert('P', palette=Image.Palette.ADAPTIVE, colors=128))
+            if not frames:
+                raise ValueError('The recording ends before that spot, so there was nothing to replay.')
+            out = io.BytesIO()
+            frames[0].save(out, 'GIF', save_all=True, append_images=frames[1:], duration=int(1000 * self.COMPARE_EVERY / 60), loop=0, optimize=False)
+            path = work / f'compare-{job["id"]}.gif'
+            path.write_bytes(out.getvalue())
+            safe = ''.join(c if c.isalnum() or c in ' -_' else '_' for c in name).strip() or 'level'
+            job.update(state='finished', path=path, name=f'{safe} before and after.gif', differs=differs,
+                       width=frames[0].width, height=frames[0].height, seconds=round(count * self.COMPARE_EVERY / 60, 1), done=job['total'],
+                       message=(f'The two games first look different {differs} seconds in.' if differs is not None else
+                                'The two games look the same the whole way. Your changes may be somewhere this walk does not show.'))
+        except Exception as error:      # shown to the user; the editor keeps working
+            job.update(state='failed', message=f'The replay could not be made: {error}')
+
     def _check_object(self, change: dict, level: dict, expect: dict) -> None:
         """Replay the recorded walk from power-on with the change, and look at the game's own spawn slots when the zone
         comes into play: the enemy type (or none) for an enemy, the candle and what it drops (or none) for a candle."""
@@ -594,18 +704,30 @@ class LevelTools:
                 session.frame = start
                 slot = expect['zone'] % 6
                 frame = start
-                while frame < end and seen is None:
+                record = expect['record']
+                wanted = (record['type'] if record else 0) if expect['kind'] == 'enemy' else record
+                removing = wanted in (0, None)
+                # the game fills a zone's slot when the zone loads (the first six zones all at once when a stage starts) and
+                # gives the slot to zone + 6 later; watch the whole time in between. A new enemy or drop counts once it
+                # shows; a removal counts only if nothing shows the whole time.
+                while frame < end:
                     session.run(4, lambda f: es._names(inputs[f]) if f < len(inputs) else ())
                     frame += 4
                     snap = session.snapshot()
                     ram = next((snap.domains[n].data for n in ('wram', 'ram') if n in snap.domains and snap.domains[n].data is not None), None)
-                    if ram is None or ram[0x28] != expect['stage'] or ram[0x6D] < expect['zone'] or (ram[0x2E] | ram[0x2F] << 8) // 64 + 6 < expect['zone']:
+                    if ram is None or ram[0x28] != expect['stage'] or not expect['zone'] <= ram[0x6D] < expect['zone'] + 6:
                         continue
                     if expect['kind'] == 'enemy':
-                        seen = {'type': ram[0x166 + slot], 'frame': frame}
+                        sample = {'type': ram[0x166 + slot], 'frame': frame}
+                        hit = sample['type'] == wanted if not removing else sample['type'] != 0
                     else:
                         candle = 0x0E + slot
-                        seen = {'type': ram[0x434 + candle], 'drop': ram[0x584 + candle], 'frame': frame}
+                        sample = {'type': ram[0x434 + candle], 'drop': ram[0x584 + candle], 'frame': frame}
+                        hit = (sample['type'] in (0x27, 0x28) and sample['drop'] == record['drop']) if not removing else sample['type'] in (0x27, 0x28)
+                    if seen is None or hit or (not removing and sample['type']):
+                        seen = sample
+                    if hit:
+                        break
             finally:
                 es._close(fe)
             record = expect['record']

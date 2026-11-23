@@ -2370,6 +2370,9 @@ class EditSessionTools:
             'edits.level_play_from': (base + ' level_id x y', lambda p, c: {'ok': True, **self.session(p).level_play_from(
                 p['level_id'], p['x'], p['y'])}),
             'edits.play_stop': (base, lambda p, c: {'ok': True, **self.session(p).play_stop()}),
+            'edits.level_compare': (base + ' level_id', lambda p, c: {'ok': True, **self.session(p).level_compare(
+                p['level_id'], p.get('x'), p.get('y'))}),
+            'edits.level_compare_file': (base + ' level_id', self._compare_file),
             'edits.play': (base + ' frames buttons', lambda p, c: {'ok': True, **self.session(p).play(p['frames'], p['buttons'])}),
             'edits.capture': (base + ' label', lambda p, c: {'ok': True, **self.session(p).capture(p['label'])}),
             'edits.forget_scene': (base + ' scene_id', lambda p, c: self._summary(self.session(p), self.session(p).forget_scene(p['scene_id']))),
@@ -2421,6 +2424,10 @@ class EditSessionTools:
     def _export_everything(self, p, c):
         out = self.session(p).export_everything()
         return {'ok': True, **{k: v for k, v in out.items() if k != 'zip'}, 'zip_base64': base64.b64encode(out['zip']).decode()}
+
+    def _compare_file(self, p, c):
+        out = self.session(p).level_compare_file(p['level_id'])
+        return {'ok': True, 'name': out['name'], 'gif_base64': base64.b64encode(out['gif']).decode()}
 
     def _export_level(self, p, c):
         out = self.session(p).export_level(p['level_id'], p['plane'], bool(p['edited']))
