@@ -221,6 +221,7 @@ def serve(workspace:Path,port:int=0,open_browser:bool=True,stop_when_closed:bool
     print(url,flush=True)
     if open_browser:webbrowser.open(url)
     if stop_when_closed:_stop_when_closed(server)
+    server.api.updater.shutdown=server.shutdown      # Update and restart stops the service once its reply is out
     try:server.serve_forever(poll_interval=.25)
     except KeyboardInterrupt:pass
     finally:server.server_close();server.api.close()

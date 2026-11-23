@@ -271,6 +271,34 @@ class WorkbenchAPI:
         self.jobs=JobManager(self.workspace,self.dispatch,set(self.routes)-{'system.capabilities','systems.list','projects.list','project.open','reports.list','reports.get','exports.list','drafts.list','drafts.get','drafts.save','drafts.move'})
         try:self.runtime=RuntimePool()
         except BaseException:self.jobs.close();raise
+        from .updater import Updater
+        self.updater=Updater(self.workspace,enabled=self._updates_enabled,busy=self._update_busy)
+        self.routes.update({
+            'system.update_status':('',lambda p,c:self.updater.check()),
+            'system.update_check':('',lambda p,c:self.updater.check(force=True)),
+            'system.update_start':('',lambda p,c:self.updater.start()),
+            'system.update_apply':('',lambda p,c:self.updater.apply()),
+            'system.update_seen':('',lambda p,c:self.updater.seen_finished()),
+        })
+
+    def _updates_enabled(self):
+        from .app_settings import get_settings
+        try:return bool(get_settings(self.workspace)['values'].get('checkUpdates',True))
+        except (ValueError,OSError):return True
+
+    def _update_busy(self):
+        """Why ROMancer should not close now (None when it can): work that a restart would cut off."""
+        for job in self.jobs.list():
+            if job.get('status') in ('QUEUED','RUNNING'):
+                return 'A task is still running. Wait for it to finish, then choose Update and restart again.'
+        for session in list(self.edit_sessions.sessions.values()):
+            if session.recording and session.recording.get('state')=='running':
+                return 'ROMancer is recording scenes. Wait for it to finish or stop it, then choose Update and restart again.'
+            if getattr(session,'level_rec',None):
+                return 'A level map is being recorded. Finish the level map, then choose Update and restart again.'
+            if session.pending:
+                return 'A change is still being checked by replay. Wait for it to finish, then choose Update and restart again.'
+        return None
 
     def project(self,parameters):
         project_id=projects.identifier(parameters['project_id']);project=checked_path(self.projects/project_id)

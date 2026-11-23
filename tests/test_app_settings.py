@@ -10,7 +10,7 @@ from romancer.workbench_api import WorkbenchAPI
 
 DEFAULTS = {'theme':'romancer','scale':100,'autoDeepScan':True,'autoGraphics':True,
             'rememberWorkspace':True,'volume':80,'startMuted':False,'loopPreview':False,
-            'reduceMotion':False,'advancedTools':False}
+            'reduceMotion':False,'advancedTools':False,'checkUpdates':True}
 LOCATION = {'version':1,'project_id':'a'*32,'artifact_id':'b'*32,'sha256':'c'*64,
             'page':'resources','offset':16,'selected':18,'scroll':20.5,
             'assetPage':0,'scriptPage':1,'catalogPage':0,'catalogQuery':'font'}

@@ -4,7 +4,7 @@ const storage=new Map([['romancer-scale','125']]);globalThis.localStorage={getIt
 const classes=new Map(),root={dataset:{},style:{setProperty(){}},classList:{toggle:(name,value)=>classes.set(name,value)}};globalThis.window={innerWidth:1600,innerHeight:1000};
 const nodes=new Map();globalThis.document={documentElement:root,getElementById:id=>nodes.get(id)||null};
 const view=await import('../romancer/ui/views/settings.js');
-const defaults={theme:'romancer',scale:100,autoDeepScan:true,autoGraphics:true,rememberWorkspace:true,volume:80,startMuted:false,loopPreview:false,reduceMotion:false,advancedTools:false};
+const defaults={theme:'romancer',scale:100,autoDeepScan:true,autoGraphics:true,rememberWorkspace:true,volume:80,startMuted:false,loopPreview:false,reduceMotion:false,advancedTools:false,checkUpdates:true};
 let persisted={revision:0,values:{...defaults}},writes=0,closed=[],failSave=false;
 const handlers={},state={page:'settings',settingsReturnPage:'resources',drafts:{'existing-rom-draft':'keep'},results:{},capabilities:{systems:{systems:[]},version:'1.0'}};
 const api={call:async(op,p)=>{if(op==='settings.get')return {ok:true,...structuredClone(persisted)};if(op==='settings.save'){writes++;if(failSave)throw Error('Settings changed in another window');assert.equal(p.revision,persisted.revision);persisted={revision:p.revision+1,values:structuredClone(p.values)};return {ok:true,...persisted};}throw Error('Unexpected operation '+op);}};
@@ -12,7 +12,7 @@ let html='';const ctx={state,api,use:next=>Object.assign(handlers,next),draft:(_
 await ctx.render();assert.match(html,/data-action="settings-defaults"/,'Settings needs Restore defaults as a staged form action');assert.match(html,/id="settings-auto-deep-scan"[^>]*checked/);assert.match(html,/id="settings-theme"/);
 const settings=await import('../romancer/ui/app_settings.js');assert.deepEqual(settings.DEFAULT_SETTINGS,defaults);
 assert.deepEqual(settings.getSettings(),defaults,'server values override an origin-specific legacy scale');
-const ids={theme:'settings-theme',scale:'settings-scale',autoDeepScan:'settings-auto-deep-scan',autoGraphics:'settings-auto-graphics',rememberWorkspace:'settings-remember-workspace',volume:'settings-volume',startMuted:'settings-start-muted',loopPreview:'settings-loop-preview',reduceMotion:'settings-reduce-motion',advancedTools:'settings-advanced-tools'};
+const ids={theme:'settings-theme',scale:'settings-scale',autoDeepScan:'settings-auto-deep-scan',autoGraphics:'settings-auto-graphics',rememberWorkspace:'settings-remember-workspace',volume:'settings-volume',startMuted:'settings-start-muted',loopPreview:'settings-loop-preview',reduceMotion:'settings-reduce-motion',advancedTools:'settings-advanced-tools',checkUpdates:'settings-check-updates'};
 const install=values=>{for(const [key,id] of Object.entries(ids))nodes.set(id,{id,value:String(values[key]),checked:values[key],addEventListener(){}});};
 install({...defaults,theme:'light',scale:150,autoDeepScan:false,reduceMotion:true,volume:21});
 await handlers['settings-apply']();assert.equal(writes,1);assert.equal(root.dataset.theme,'light');assert.equal(root.style.zoom,'1.125');assert.equal(classes.get('reduce-motion'),true);assert.equal(settings.getSettings().volume,21);assert.deepEqual(closed,[]);assert.equal(state.drafts['existing-rom-draft'],'keep');

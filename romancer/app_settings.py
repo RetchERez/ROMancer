@@ -11,7 +11,7 @@ from .workbench_projects import write_json
 
 DEFAULT_SETTINGS={'theme':'romancer','scale':100,'autoDeepScan':True,'autoGraphics':True,
                   'rememberWorkspace':True,'volume':80,'startMuted':False,'loopPreview':False,
-                  'reduceMotion':False,'advancedTools':False}
+                  'reduceMotion':False,'advancedTools':False,'checkUpdates':True}
 _PAGES={'overview','gameview','resources','scripts','assets','tables','levels','sound','playtest','release',
         'automation','help','settings','debug','routes','regression'}
 _LOCATION_FIELDS={'version','project_id','artifact_id','sha256','page','offset','selected','scroll',
@@ -62,7 +62,9 @@ def _read_settings(workspace):
     if not path.exists():return {'revision':0,'values':dict(DEFAULT_SETTINGS)}
     stored=load_script_json(path,max_bytes=4096)
     if set(stored)!={'schema_version','revision','values'} or type(stored['schema_version']) is not int or stored['schema_version']!=1:raise ValueError('Stored settings format is invalid')
-    return {'revision':_revision(stored['revision']),'values':validate_settings(stored['values'])}
+    values=stored['values']
+    if type(values) is dict and set(values)<set(DEFAULT_SETTINGS):values={**DEFAULT_SETTINGS,**values}      # saved by an older version
+    return {'revision':_revision(stored['revision']),'values':validate_settings(values)}
 
 
 def get_settings(workspace):
