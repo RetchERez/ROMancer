@@ -5,7 +5,7 @@ from .script_schema import load_script_json
 SYSTEMS=('nes', 'snes', 'genesis', 'gb', 'gbc', 'sms')
 LEVEL_EDITOR_ENABLED = False
 LEVEL_WRITE_OPERATIONS = frozenset(('levels.plan', 'games.maps.plan'))
-LEVEL_EDITOR_MESSAGE = 'Edit levels on a level map: choose Levels, record the level, then paint on its map.'
+LEVEL_EDITOR_MESSAGE = 'Edit levels on a level map: choose Level Editor, record the level, then paint on its map.'
 
 
 def require_supported(row):

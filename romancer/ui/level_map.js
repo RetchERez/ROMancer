@@ -89,7 +89,7 @@ export function levelsPart(ed){
  const building=job?.state==='running';
  const actions=rec?button('Finish the map','level-stop',{primary:true,icon:'check',disabled:walking,reason:'Wait for the walk to finish.'})+button(walking?'Walking…':'Walk right for me','level-auto',{disabled:walking,reason:'Already walking.'}):
   button('Record a level map','level-start',{icon:'plus',disabled:!ed.playing||building,reason:building?'The last map is still being put together.':'Start playing above and get to where the level starts first.'});
- return `<div class="card-heading"><h3>Level maps</h3>${badge(plural(levels.length,'level map'),levels.length?'good':'neutral')}</div>
+ return `<div class="card-heading"><h3>Level maps <small class="beta-tag">BETA</small></h3>${badge(plural(levels.length,'level map'),levels.length?'good':'neutral')}</div><p class="subtle">The level editor is in beta. Every change is checked in the game before you keep it, but expect rough edges.</p>
  <p class="subtle">Record a level while you play and you get a map of the whole level that you can paint on.</p>
  <div class="actions">${actions}</div>
  <p class="subtle" id="level-status" role="status" aria-live="polite">${esc(levelStatus(summary,ed.playing))}</p>

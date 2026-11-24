@@ -105,7 +105,7 @@
         },
         {
           "title": "Basic and Advanced navigation",
-          "text": "Basic keeps Overview, Text & layout, Graphics & fonts, Scenes & colors, Stats & data, Music & sound, Playtest and Export visible. Levels opens the level maps in Scenes &amp; colors. Expand Advanced for Game view, Resources/hex, Investigation, Recipes & definitions, Routes and Regression. A direct task opens the matching group automatically."
+          "text": "Basic keeps Overview, Text & layout, Graphics & fonts, Scenes & colors, Stats & data, Music & sound, Playtest and Export visible. Level Editor (beta) opens the level maps in Scenes &amp; colors. Expand Advanced for Game view, Resources/hex, Investigation, Recipes & definitions, Routes and Regression. A direct task opens the matching group automatically."
         },
         {
           "title": "Updating ROMancer",
@@ -1006,7 +1006,7 @@
       "kicker": "SCENES AND COLORS / NEW IN v1.4",
       "intro": "A <b>level map</b> is a picture of a whole level that you can paint on. It is put together while you play, so it works without anything prepared for the game. You can save it as a PNG, and when you paint on it the real game is replayed so you can see every spot that changes before anything is saved.",
       "steps": [
-        "Choose <b>Levels</b> in the sidebar. Start playing and get to where the level begins.",
+        "Choose <b>Level Editor</b> (marked BETA) in the sidebar. Start playing and get to where the level begins.",
         "Choose <b>Record a level map</b> and play through the level. <b>Walk right for me</b> plays for you if you like.",
         "Choose <b>Finish the map</b>. It opens when it is ready, and <b>Save map as PNG</b> saves the picture.",
         "Choose <b>Copy</b> and click a spot on the map, or drag across a bigger piece such as a platform. In most games the brush moves in whole blocks, because that is how the level is built.",

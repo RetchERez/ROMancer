@@ -239,7 +239,7 @@ that was. The draft shows whether the image fits. Save playable
 copy opens the new build in Playtest. Technical details shows the graphics,
 tile placement and checksum bytes.
 
-Levels opens the level maps in Scenes & colors: record a level while you
+Level Editor (beta) opens the level maps in Scenes & colors: record a level while you
 play, then paint whole blocks on its map. Read-only layout research and
 measured locations remain available. Generic graphics tilemaps remain
 available as graphics resources.
