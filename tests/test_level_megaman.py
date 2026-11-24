@@ -137,5 +137,170 @@ class MegaMan2Test(unittest.TestCase):
         self.assertEqual([(s, l, n, k) for s, l, n, k, x in self.p.slots(ram)], [(3, 'item', 1, 0x7A), (4, 'enemy', 2, 0x21)])
 
 
+def put8(rom, bank, address, data):
+    """Write into an 8 KB bank (Mega Man 3 to 5 map stage banks at $A000 and code banks at $8000)."""
+    at = mm.HEADER + bank * 0x2000 + (address & 0x1FFF)
+    rom[at:at + len(data)] = bytes(data)
+    return at
+
+
+def cart3():
+    """Mega Man 3: stage 1 (bank 1) with four sections, four records (the last in the boss room) and one restart point."""
+    rom = bytearray(mm.HEADER + 16 * 0x4000)
+    rom[4] = 0x10
+    put8(rom, 1, 0xAA40, [0x22, 0x40, 0x61, 0x20, 0x00])   # 3 screens; down 1; down then 2 sideways; right 1 (boss); end
+    for address, values in ((0xAB00, [1, 2, 3, 6, 0xFF]), (0xAC00, [0x10, 0x20, 0x30, 0x40]), (0xAD00, [0x80, 0x90, 0x90, 0x90]),
+                            (0xAE00, [0x1B, 0x50, 0x3B, 0x47])):
+        put8(rom, 1, address, values)
+    put8(rom, 1, 0xAAF8, [3, 0xFF])                         # restart point at screen 3
+    put8(rom, 1, 0xABC0, [2])                               # with records 0 and 1 behind it
+    put8(rom, 0, 0xA100 + 0x1B, [0x2A])
+    put8(rom, 0, 0xA100 + 0x3B, [0x4C])
+    put8(rom, 0, 0xA100 + 0x50, [0x64])
+    put8(rom, 0, 0xA400 + 0x47, [0x1C])                     # a boss's full energy bar
+    return rom
+
+
+class MegaMan3Test(unittest.TestCase):
+    def setUp(self):
+        self.rom = cart3()
+        self.p = mm.MegaMan3(bytes(self.rom))
+
+    def test_sections(self):
+        self.assertEqual([(s['first'], s['last'], s['link']) for s in self.p.sections(1)],
+                         [(0, 2, 0x40), (3, 3, 0x40), (4, 5, 0x20), (6, 6, 0)])
+
+    def test_objects_and_boss(self):
+        first = self.p.objects({'stage': 1, 'section': 0})
+        self.assertEqual([(o['id'], o['name']) for o in first], [('record:0', 'Hari Harry'), ('record:1', 'Large life energy'),
+                                                                 ('link:0', 'Way down to the next section')])
+        self.assertEqual(first[1]['style'], 'item')
+        self.assertEqual([o['id'] for o in self.p.objects({'stage': 1, 'section': 3})], [])     # the boss is left as it is
+        self.assertNotIn(0x47, [c['value'] for c in self.p.choices()['enemies']])
+
+    def test_where(self):
+        ram = bytearray(0x800)
+        ram[0x22], ram[0x2B], ram[0x2C], ram[0x2D], ram[0xF9], ram[0xFC], ram[0x300] = 1, 2, 1, 1, 5, 0x40, 0x80
+        self.assertEqual(self.p.where(ram), {'part': {'stage': 1, 'section': 2}, 'x': 256 + 0x40, 'y': 0})
+        ram[0x300] = 0                                                          # Mega Man is not in the stage
+        self.assertIsNone(self.p.where(ram))
+
+    def test_swap_and_remove(self):
+        plan = self.p.edit({'stage': 1, 'section': 0}, 'record:0', {'type': 0x3B})
+        self.assertEqual(plan['writes'], [(put8(bytearray(len(self.rom)), 1, 0xAE00, []), 0x1B, 0x3B)])
+        plan = self.p.edit({'stage': 1, 'section': 0}, 'record:0', {}, remove=True)
+        rom = bytearray(self.rom)
+        for at, old, new in plan['writes']:
+            self.assertEqual(rom[at], old)
+            rom[at] = new
+        p = mm.MegaMan3(bytes(rom))
+        self.assertEqual([(r['screen'], r['type']) for r in p.records(1)], [(2, 0x50), (3, 0x3B), (6, 0x47)])
+        self.assertEqual(rom[put8(bytearray(len(rom)), 1, 0xABC0, [])], 1)    # one record fewer behind the restart point
+
+    def test_watcher_uses_routine(self):
+        plan = self.p.edit({'stage': 1, 'section': 0}, 'record:0', {'type': 0x3B})
+        ram = bytearray(0x800)
+        ram[0x22], ram[0x2C], ram[0x300] = 1, 2, 0x80
+        ram[0x312], ram[0x4D2], ram[0x332], ram[0x392], ram[0x372] = 0x80, 0, 0x4C, 1, 0x10
+        watcher = self.p.watcher(plan['watch'])
+        self.assertTrue(watcher.see(ram, 0, 'changed'))
+        self.assertEqual(watcher.result()['state'], 'good')
+        ram[0x332] = 0x2A                                                       # the unchanged game: Hari Harry's routine
+        control = self.p.watcher(plan['watch'])
+        control.see(ram, 0, 'original')
+        self.assertEqual(control.result()['state'], 'bad')
+
+
+def cart4():
+    """Mega Man 4: stage 2 (bank $22) with a warp into a side section, records and the first-record-of-screen table."""
+    rom = bytearray(mm.HEADER + 32 * 0x4000)
+    rom[4] = 0x20
+    bank = 0x22
+    put8(rom, bank, 0xB530, [0x21, 0x40, 0x30, 0x00, 0x20] + [0] * 11)   # 2 screens; down; boss room; unreachable; side room
+    put8(rom, bank, 0xB540, [1, 0x40, 4, 9, 0xFF])                        # warp: screen 1 going down -> section 4 at screen 9
+    for address, values in ((0xB100, [0, 1, 2, 3, 9, 0xFF]), (0xB180, [0x40, 0x50, 0x20, 0x30, 0x60]),
+                            (0xB200, [0x90] * 5), (0xB280, [0x03, 0xC1, 0x5A, 0x79, 0x7C])):
+        put8(rom, bank, address, values)
+    put8(rom, bank, 0xB300, [0, 1, 2, 3] + [4] * 6 + [5] * 22)
+    for kind, number, picture in ((0x03, 0x15, 0), (0x13, 0x33, 0x56), (0x5A, 0xC1, 0x1A), (0x7C, 0xC1, 0x1E), (0x79, 0xB8, 0)):
+        put8(rom, 0x38, 0x820F + kind, [number])
+        put8(rom, 0x38, 0x832F + kind, [picture])
+    return rom
+
+
+class MegaMan4Test(unittest.TestCase):
+    def setUp(self):
+        self.rom = cart4()
+        self.p = mm.MegaMan4(bytes(self.rom))
+
+    def test_sections_and_warp(self):
+        self.assertEqual([(s['segment'], s['first'], s['last']) for s in self.p.sections(2)], [(0, 0, 1), (1, 2, 2), (2, 3, 3), (4, 9, 9)])
+        self.assertEqual(self.p.boss_room(2)['segment'], 2)
+        side = self.p.objects({'stage': 2, 'section': 4})
+        self.assertEqual([(o['id'], o['x']) for o in side], [('record:4', 0x60)])
+
+    def test_objects(self):
+        first = {o['id']: o for o in self.p.objects({'stage': 2, 'section': 0})}
+        self.assertEqual(sorted(first), ['link:0', 'record:0'])               # record 1 changes palettes
+        self.assertEqual(self.p.objects({'stage': 2, 'section': 1})[0]['name'], 'Large life energy')
+        self.assertEqual(self.p.objects({'stage': 2, 'section': 2}), [])       # the boss room
+
+    def test_remove_updates_screen_table(self):
+        plan = self.p.edit({'stage': 2, 'section': 0}, 'record:0', {}, remove=True)
+        rom = bytearray(self.rom)
+        for at, old, new in plan['writes']:
+            rom[at] = new
+        table = put8(bytearray(len(rom)), 0x22, 0xB300, [])
+        self.assertEqual(list(rom[table:table + 32]), [0, 0, 1, 2] + [3] * 6 + [4] * 22)
+        self.assertEqual([r['type'] for r in mm.MegaMan4(bytes(rom)).records(2)], [0xC1, 0x5A, 0x79, 0x7C])
+
+    def test_pickup_signature(self):
+        plan = self.p.edit({'stage': 2, 'section': 1}, 'record:2', {'type': 0x7C})
+        ram = bytearray(0x800)
+        ram[0x22], ram[0x300] = 2, 1
+        ram[0x309], ram[0x441], ram[0x561], ram[0x351] = 0xC1, 2, 0x1E, 2
+        watcher = self.p.watcher(plan['watch'])
+        self.assertTrue(watcher.see(ram, 0, 'changed'))
+        self.assertEqual(watcher.result()['state'], 'good')
+        ram[0x561] = 0x1A                                                       # same object number, large life energy's picture
+        control = self.p.watcher(plan['watch'])
+        control.see(ram, 0, 'original')
+        self.assertEqual(control.result()['state'], 'bad')
+
+
+def cart5():
+    """Mega Man 5: stage 3 (bank 3) with a ladder warp."""
+    rom = bytearray(mm.HEADER + 16 * 0x4000)
+    rom[4] = 0x10
+    put8(rom, 3, 0xA950, [0x23, 0x20, 0x00, 0x20, 0x20, 0x00])           # 4 screens; right 1; stops; (warp) 1; right 1
+    put8(rom, 3, 0xA9E0, [4, 0x80, 7, 3, 0xFF])                           # screen 4 going up -> screen 7, section 3
+    for address, values in ((0xAA00, [1, 4, 8, 0xFF]), (0xAA80, [0x10, 0x20, 0x30]), (0xAB00, [0x90] * 3), (0xAB80, [0x07, 0x01, 0x6A])):
+        put8(rom, 3, address, values)
+    put8(rom, 3, 0xAC00, [0, 0, 1, 1, 1, 2, 2, 2, 2, 3])
+    return rom
+
+
+class MegaMan5Test(unittest.TestCase):
+    def setUp(self):
+        self.rom = cart5()
+        self.p = mm.MegaMan5(bytes(self.rom))
+
+    def test_sections(self):
+        self.assertEqual([(s['segment'], s['first'], s['last']) for s in self.p.sections(3)], [(0, 0, 3), (1, 4, 4), (3, 7, 7), (4, 8, 8)])
+        self.assertEqual(self.p.boss_room(3)['segment'], 4)
+        self.assertEqual([o['id'] for o in self.p.objects({'stage': 3, 'section': 0})], ['record:0', 'link:0'])
+
+    def test_remove_and_slots(self):
+        plan = self.p.edit({'stage': 3, 'section': 0}, 'record:0', {}, remove=True)
+        rom = bytearray(self.rom)
+        for at, old, new in plan['writes']:
+            rom[at] = new
+        table = put8(bytearray(len(rom)), 3, 0xAC00, [])
+        self.assertEqual(list(rom[table:table + 10]), [0, 0, 0, 0, 0, 1, 1, 1, 1, 2])
+        ram = bytearray(0x800)
+        ram[0x30A], ram[0x442], ram[0x51A], ram[0x352], ram[0x33A] = 0x12, 1, 0x01, 4, 0x20
+        self.assertEqual(self.p.slots(ram), [(10, 'record', 1, 0x01, 4 * 256 + 0x20)])
+
+
 if __name__ == '__main__':
     unittest.main()
