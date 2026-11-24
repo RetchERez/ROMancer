@@ -84,6 +84,7 @@ APPROVED_FILES = frozenset({
     'trace/level_blocks.py',
     'trace/level_collision.py',
     'trace/level_objects_dump.py',
+    'trace/profile_check.py',
     'trace/level_block_roles.py',
     'trace/level_objects.py',
     'trace/level_rom_experiment.py',

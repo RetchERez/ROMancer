@@ -99,8 +99,10 @@ GAMES = ['castlevania']
 
 def _registry():
     import importlib
+    import os
     games = []
-    for module in GAMES:
+    extra = [m for m in os.environ.get('ROMANCER_EXTRA_PROFILES', '').split(',') if m]    # profiles being written
+    for module in GAMES + [m for m in extra if m not in GAMES]:
         games += importlib.import_module(f'.{module}', __name__).PROFILES
     return games
 
