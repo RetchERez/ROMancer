@@ -13,6 +13,7 @@ DuckTales (USA), research/capcom_disney-level-profile.md:
 * Type $08 with graphic $1B or $3F is a treasure chest: contents n give item $8FB8[n] (graphic $3F: $9016[land * 3 + n]
   first, when it is not 0). Type $08 with graphic bit 7 set is a block or rock holding item $F67B[n]. Type $14 is a
   hidden item: its graphic is the item that appears.
+Chip 'n Dale - Rescue Rangers (USA): see the ChipDale class below and the same research notes.
 """
 from __future__ import annotations
 
@@ -335,4 +336,377 @@ class DuckTalesProfile(DuckTales, Profile):
         return _SpawnWatcher(watch)
 
 
-PROFILES = [DuckTalesProfile]
+
+# ---------------------------------------------------------------------------------------------------------------------
+# Shared pieces for the games below: each keeps its object records in parallel arrays and remembers in every object
+# slot which record spawned it.
+
+def _shift_out(values: list, index: int, end: int) -> list:
+    """A record array with entry `index` taken out: later entries move down one place and the last place gets `end`."""
+    return values[:index] + values[index + 1:] + [end]
+
+
+class _SlotWatcher(Watcher):
+    """Watches object slots in the replay. A new spawn is a slot whose record number changes while it is in use.
+    Swaps: the edited record's spawn (same record number, same place) must have the chosen object type and graphic.
+    Removals: the place was on screen and nothing of the old type spawned there. Subclasses say where things are."""
+    every = 1
+    SLOTS = range(0)
+    TOLERANCE = 8
+
+    def __init__(self, watch):
+        self.w = watch
+        self.slots = None
+        self.spawned = None
+        self.in_view = False
+
+    def part(self, ram):
+        raise NotImplementedError
+
+    def used(self, ram, s) -> bool:
+        raise NotImplementedError
+
+    def number(self, ram, s) -> int:
+        raise NotImplementedError
+
+    def place(self, ram, s):
+        raise NotImplementedError
+
+    def camera(self, ram):
+        raise NotImplementedError
+
+    def looks(self, ram, s) -> dict:
+        raise NotImplementedError
+
+    def see(self, ram, frame, run):
+        w = self.w
+        if self.part(ram) != w['part']:
+            self.slots = None
+            return False
+        slots = [(self.used(ram, s), self.number(ram, s)) for s in self.SLOTS]
+        old, self.slots = self.slots, slots
+        cam = self.camera(ram)
+        if cam[0] - 16 <= w['x'] <= cam[0] + 272 and cam[1] - 16 <= w['y'] <= cam[1] + 256:
+            self.in_view = True
+        if old is None:
+            return False
+        for n, s in enumerate(self.SLOTS):
+            if not slots[n][0] or slots[n] == old[n]:
+                continue
+            x, y = self.place(ram, s)
+            if abs(x - w['x']) > self.TOLERANCE or abs(y - w['y']) > self.TOLERANCE:
+                continue
+            if not w['removing'] and slots[n][1] != w['index']:
+                continue
+            self.spawned = self.looks(ram, s)
+            if not w['removing']:
+                return True
+        return False
+
+    def result(self):
+        w, got = self.w, self.spawned
+        if w['removing']:
+            if got is not None and got['type'] in w['old_types']:
+                return {'state': 'bad', 'text': 'Played from the start, the object still appears there.'}
+            if self.in_view:
+                return {'state': 'good', 'text': 'Played from the start, nothing appears there any more.'}
+            return super().result()
+        if got is None:
+            return super().result()
+        want = w['want']
+        if got['type'] in want['types'] and got['gfx'] in want['gfx']:
+            return {'state': 'good', 'text': f'Played from the start, the game now puts {w["name"]} there.'}
+        return {'state': 'bad', 'text': f'Played from the start, the game put something else there (object type {got["type"]:#04x}, '
+                                        f'graphic {got["gfx"]:#04x}), not what was chosen.'}
+
+
+class _RecordProfile(Profile):
+    """Common adapter for the decoders below. The decoder gives records(level) (each with 'index', 'kind', 'role' and
+    'item'), place(record) -> (x, y), role(kind), kind_name(kind), item_name(item), content_choices(kind, index),
+    enemy_choices(level), swap_writes, remove_writes and wanted(kind) -> {'types', 'gfx'} (how a spawn of that kind
+    looks in the slots). Roles: 'enemy' (swap and remove), 'covered' (an item under a box), 'container' (an object
+    holding an item), 'hidden' (a hidden item) and 'fixed' (left as it is)."""
+    KEY = 'level'
+    LEVELS = 0
+    HIDDEN_NOTE = ''
+    COVERED_NOTE = ''
+
+    def part_name(self, part):
+        return f'Level {int(part[self.KEY])}'
+
+    def objects(self, part):
+        level = int(part[self.KEY])
+        out = []
+        for r in self.records(level):
+            x, y = self.place(r)
+            row = {'id': f'object:{r["index"]}', 'type': r['kind'], 'x': x, 'y': y, 'name': self.kind_name(r['kind']),
+                   'remove': 'Remove this object'}
+            if r['role'] in ('covered', 'hidden', 'container'):
+                choices = self.content_choices(r['kind'], r['index'])
+                label = {'hidden': 'Gives', 'container': 'Holds'}.get(r['role'], 'Item')
+                row.update(style='secret' if r['role'] == 'hidden' else 'item',
+                           fields=[{'key': 'kind', 'label': label, 'value': r['kind'], 'choices': choices}] if len(choices) > 1 else [])
+                note = {'hidden': self.HIDDEN_NOTE, 'covered': self.COVERED_NOTE}.get(r['role'])
+                if note:
+                    row['note'] = note
+                if r['role'] == 'container':
+                    row['detail'] = 'holds ' + self.item_name(r['item']).lower()
+            elif r['role'] == 'enemy':
+                row.update(style='enemy', fields=[{'key': 'kind', 'label': 'Swap for', 'value': r['kind'], 'choices': f'{self.KEY}{level}'}])
+            else:
+                row.update(style='enemy', fields=[], remove=None,
+                           note='ROMancer does not know what this object does yet, so it stays as it is.')
+            out.append(row)
+        return out
+
+    def choices(self):
+        return {f'{self.KEY}{level}': self.enemy_choices(level) for level in range(self.LEVELS)}
+
+    def find_record(self, part, object_id):
+        level = int(part[self.KEY])
+        kind_of, _, number = object_id.partition(':')
+        if kind_of != 'object' or not number.isdigit():
+            raise ValueError('ROMancer cannot change that yet.')
+        rec = next((r for r in self.records(level) if r['index'] == int(number)), None)
+        if rec is None:
+            raise ValueError('That is not part of this level any more. Reopen the map.')
+        if rec['role'] == 'fixed':
+            raise ValueError('ROMancer cannot change that object yet.')
+        return level, rec
+
+    def edit(self, part, object_id, values, remove=False):
+        level, rec = self.find_record(part, object_id)
+        x, y = self.place(rec)
+        watch = {'part': {self.KEY: level}, 'index': rec['index'], 'x': x, 'y': y,
+                 'old_types': self.wanted(rec['kind'])['types']}
+        if remove:
+            return {'writes': self.remove_writes(level, rec['index']), 'title': f'Remove {self.kind_name(rec["kind"]).lower()}',
+                    'watch': {**watch, 'removing': True}}
+        kind = int(values.get('kind'))
+        if rec['role'] == 'enemy':
+            allowed = [c['value'] for c in self.enemy_choices(level)]
+        else:
+            allowed = [c['value'] for c in self.content_choices(rec['kind'], rec['index'])]
+        if kind not in allowed:
+            raise ValueError('That choice is not one of the game’s own.')
+        if rec['role'] == 'enemy':
+            name = self.kind_name(kind)
+            title, said = f'Object here: {name}', name
+        else:
+            name = self.item_name(self.role(kind)['item']).lower()
+            if rec['role'] == 'hidden':
+                title, said = f'Hidden item gives: {name}', f'a hidden {name}'
+            elif rec['role'] == 'container':
+                title, said = f'{self.kind_name(rec["kind"])} holds: {name}', f'{self.kind_name(rec["kind"]).lower()} holding {name}'
+            else:
+                title, said = f'Item here: {name}', name
+        return {'writes': self.swap_writes(level, rec['index'], kind), 'title': title,
+                'watch': {**watch, 'removing': False, 'want': self.wanted(kind), 'name': said}}
+
+
+# ---------------------------------------------------------------------------------------------------------------------
+# Chip 'n Dale - Rescue Rangers (USA)
+
+class ChipDale:
+    """Chip 'n Dale - Rescue Rangers (USA) decoder (MMC1, 8 banks of 16 KB, bank 7 fixed at $C000).
+
+    * Level $31 (0-10). A level is made of sections ($FB, 240 pixels high, 0 at the top) that scroll sideways: camera
+      x $FD:$FC, camera y $FA inside section $FB. $97 is $28 while a level is played.
+    * Objects: bank 4 $8000 copies six pointers per level from $8193 (tables of 15 lows then 15 highs): x high, x low,
+      section, y, kind and a per-section table. The five record arrays are equally long and end with a $FF record.
+    * Spawn (bank 4 $80FA): a free slot ($0F down to $06) gets $0590 record number, $04F0/$0500 x, $0510 y, $0520
+      section, then the kind's 4 bytes at bank 4 $9028 + kind * 4: $0400 flags, $04E0 object type, $0420 graphic,
+      $0570 parameter. Kind $53 (the red ball in a boss room) always goes to slot 2.
+    * Object type $3B: an item waiting under a box (bank 6 $8BC8); it turns into item type $3C when nothing covers it,
+      and its graphic is the item. Types $55-$5E with graphic $83: a hidden item that appears when Chip or Dale touches
+      it (bank 6 $880F) and turns into graphic $8B55[type].
+    """
+    name = "Chip 'n Dale Rescue Rangers"
+    sha256 = '8d5e3d9ce20fa0a61b23e93dbc975606803f2d5e7a264514b02b96f832a63181'
+    BANK4, BANK6 = 0x10000, 0x18000
+    LEVELS = 11
+    POINTERS = 0x8193
+    KINDS = 0x9028
+    KIND_COUNT = 0x54
+    REVEALS = 0x8B55
+    SCREEN_H = 240
+    PLAYING = 0x28
+    # items by graphic, from what picking one up changed: the F, S and P counters of the status screen ($05AE, $05B2,
+    # $05B6) and the hearts (sprites $0208, $020C, $0210)
+    ITEMS = {0x2D: 'Flower', 0x2E: 'Star', 0x2F: 'Extra life', 0x30: 'Acorn (one heart)', 0x31: 'Acorn (all hearts)'}
+    COVERED_TYPE = 0x3B
+    HIDDEN_TYPES = range(0x55, 0x5F)
+    HIDDEN_CHOICES = (0x0A, 0x12, 0x13)          # hidden star, extra life, acorn (all hearts)
+    # named from what the game draws when one is spawned in its own level (trace/v15_profiles/capcom_disney/shots/cd1)
+    NAMES = {0x00: 'Robot bulldog', 0x01: 'Robot mouse', 0x03: 'Caterpillar', 0x1D: 'Ape', 0x1F: 'Kangaroo',
+             0x26: 'Lizard', 0x29: 'Crab', 0x2A: 'Pelican', 0x2C: 'Spark', 0x2D: 'Spark', 0x2E: 'Spark',
+             0x30: 'Rolling ball', 0x33: 'Rolling ball', 0x34: 'Rolling ball', 0x3C: 'Rolling ball',
+             0x09: 'Apple', 0x53: 'Red ball', 0x14: 'Hidden Zipper', 0x15: 'Hidden Zipper'}
+    FIRST_BOSS_KIND = 0x40        # kinds $40-$53: each level's boss, its parts and the boss room's red ball
+
+    def __init__(self, rom: bytes):
+        self.rom = rom
+
+    def o4(self, address: int) -> int:
+        return HEADER_NES + self.BANK4 + (address - 0x8000)
+
+    def b4(self, address: int) -> int:
+        return self.rom[self.o4(address)]
+
+    def b6(self, address: int) -> int:
+        return self.rom[HEADER_NES + self.BANK6 + (address - 0x8000)]
+
+    def tables(self, level: int) -> dict:
+        names = ('xhi', 'xlo', 'section', 'y', 'kind', 'scroll')
+        return {n: self.b4(self.POINTERS + 30 * k + level) | self.b4(self.POINTERS + 30 * k + 15 + level) << 8
+                for k, n in enumerate(names)}
+
+    def count(self, level: int) -> int:
+        t = self.tables(level)
+        return t['xlo'] - t['xhi']
+
+    def kind(self, kind: int) -> dict:
+        a = self.KINDS + kind * 4
+        flags, otype, gfx, param = (self.b4(a + i) for i in range(4))
+        return {'kind': kind, 'flags': flags, 'type': otype, 'gfx': gfx, 'param': param}
+
+    def records(self, level: int) -> list:
+        if not 0 <= level < self.LEVELS:
+            return []
+        t, out = self.tables(level), []
+        for i in range(self.count(level)):
+            section = self.b4(t['section'] + i)
+            if section == 0xFF:
+                continue
+            k = self.b4(t['kind'] + i)
+            out.append({'index': i, 'section': section, 'x': self.b4(t['xhi'] + i) << 8 | self.b4(t['xlo'] + i),
+                        'y': self.b4(t['y'] + i), 'kind': k, **self.role(k)})
+        return out
+
+    def place(self, rec):
+        return rec['x'], rec['section'] * self.SCREEN_H + rec['y']
+
+    def role(self, kind: int) -> dict:
+        if kind >= self.KIND_COUNT:
+            return {'role': 'fixed', 'item': None}
+        k = self.kind(kind)
+        if k['type'] == self.COVERED_TYPE:
+            return {'role': 'covered', 'item': k['gfx']}
+        if k['type'] in self.HIDDEN_TYPES and k['gfx'] == 0x83:
+            return {'role': 'hidden', 'item': self.b6(self.REVEALS + k['type'])}
+        if k['flags'] & 0x40 and kind < self.FIRST_BOSS_KIND:
+            return {'role': 'enemy', 'item': None}
+        return {'role': 'fixed', 'item': None}
+
+    def item_name(self, item) -> str:
+        return self.ITEMS.get(item, f'Item {item:#04x}')
+
+    def kind_name(self, kind: int) -> str:
+        if kind in self.NAMES:
+            return self.NAMES[kind]
+        role = self.role(kind)
+        if role['role'] == 'covered':
+            return self.item_name(role['item'])
+        if role['role'] == 'hidden':
+            return 'Hidden ' + self.item_name(role['item']).lower() if role['item'] in self.ITEMS else f'Hidden object {kind:#04x}'
+        if role['role'] == 'enemy':
+            return f'Enemy {kind:#04x}'
+        return f'Object {kind:#04x}'
+
+    def content_choices(self, kind: int, index: int) -> list:
+        """Kinds of the same sort (an item under a box, or a hidden item) with another known item. The extra life is
+        not offered for record 0: the game remembers taken extra lives by record number in $E8-$EB, where 0 is an
+        empty place, so record 0 would never give it."""
+        role = self.role(kind)
+        if role['role'] == 'covered':
+            pool = [k for k in range(self.KIND_COUNT) if self.role(k)['role'] == 'covered']
+        elif role['role'] == 'hidden':
+            pool = list(self.HIDDEN_CHOICES)
+        else:
+            return []
+        out, seen = [], set()
+        for other in [kind] + pool:
+            item = self.role(other)['item']
+            if item in seen or (other != kind and (item not in self.ITEMS or (item == 0x2F and index == 0))):
+                continue
+            seen.add(item)
+            out.append({'value': other, 'name': self.item_name(item) if item in self.ITEMS else self.kind_name(other)})
+        return sorted(out, key=lambda c: c['value'])
+
+    def enemy_choices(self, level: int) -> list:
+        """Enemies this level uses (their pictures are loaded there), one kind per object type. Enemies that start
+        hidden (flag $08) are not offered: they wait for something particular to their place."""
+        out, seen = [], set()
+        for kind in sorted({r['kind'] for r in self.records(level)}):
+            k = self.kind(kind)
+            if self.role(kind)['role'] != 'enemy' or k['type'] in seen or k['flags'] & 0x08:
+                continue
+            seen.add(k['type'])
+            out.append({'value': kind, 'name': self.kind_name(kind)})
+        return out
+
+    def wanted(self, kind):
+        k = self.kind(kind)
+        if k['type'] == self.COVERED_TYPE:          # becomes item type $3C at once when nothing covers it
+            return {'types': [k['type'], k['type'] + 1], 'gfx': [k['gfx']]}
+        return {'types': [k['type']], 'gfx': [k['gfx']]}
+
+    def swap_writes(self, level: int, index: int, kind: int) -> list:
+        offset = self.o4(self.tables(level)['kind'] + index)
+        return [(offset, self.rom[offset], kind)] if self.rom[offset] != kind else []
+
+    def remove_writes(self, level: int, index: int) -> list:
+        """Take record `index` out of the level: later records move down one place in all five arrays and the last
+        place becomes another $FF record."""
+        t, n = self.tables(level), self.count(level)
+        if not 0 <= index < n - 1 or self.b4(t['section'] + index) == 0xFF:
+            raise ValueError('That is not one of this level’s objects.')
+        writes = {}
+        for name in ('xhi', 'xlo', 'section', 'y', 'kind'):
+            values = [self.b4(t[name] + i) for i in range(n)]
+            for i, v in enumerate(_shift_out(values, index, 0xFF)):
+                writes[self.o4(t[name] + i)] = v
+        return [(o, self.rom[o], v) for o, v in sorted(writes.items()) if self.rom[o] != v]
+
+
+class _ChipDaleWatcher(_SlotWatcher):
+    SLOTS = range(2, 16)
+
+    def part(self, ram):
+        return {'level': ram[0x31]} if ram[0x97] == ChipDale.PLAYING else None
+
+    def used(self, ram, s):
+        return bool(ram[0x4D0 + s] & 0x80)
+
+    def number(self, ram, s):
+        return ram[0x590 + s]
+
+    def place(self, ram, s):
+        return ram[0x500 + s] << 8 | ram[0x4F0 + s], ram[0x520 + s] * ChipDale.SCREEN_H + ram[0x510 + s]
+
+    def camera(self, ram):
+        return ram[0xFD] << 8 | ram[0xFC], ram[0xFB] * ChipDale.SCREEN_H + ram[0xFA]
+
+    def looks(self, ram, s):
+        return {'type': ram[0x4E0 + s], 'gfx': ram[0x420 + s]}
+
+
+class ChipDaleProfile(ChipDale, _RecordProfile):
+    """Chip 'n Dale - Rescue Rangers on the common interface. A part is a level ($31); x is the level's x and y is
+    section * 240 + y."""
+    sha256s = (ChipDale.sha256,)
+    HIDDEN_NOTE = 'Hidden until Chip or Dale touches the spot.'
+    COVERED_NOTE = 'Waits under a box until the box is lifted (it shows at once when nothing covers it).'
+
+    def where(self, ram):
+        """None outside play: $97 is $28 while a level is played and the object pointer $74/$75 is the level's own."""
+        level = ram[0x31]
+        if level >= self.LEVELS or ram[0x97] != self.PLAYING or ram[0x74] | ram[0x75] << 8 != self.tables(level)['xhi']:
+            return None
+        return {'part': {'level': level}, 'x': ram[0xFD] << 8 | ram[0xFC], 'y': ram[0xFB] * self.SCREEN_H + ram[0xFA]}
+
+    def watcher(self, watch):
+        return _ChipDaleWatcher(watch)
+
+
+PROFILES = [DuckTalesProfile, ChipDaleProfile]

@@ -1,4 +1,4 @@
-"""Capcom Disney level profiles (DuckTales): decoders and edits on a made-up cartridge laid out like the real one.
+"""Capcom Disney level profiles (DuckTales, Chip 'n Dale - Rescue Rangers): decoders and edits on made-up cartridges laid out like the real ones.
 
 The real game is not part of the tests; these build the same tables at the same addresses (bank 6 object tables and
 kinds, bank 7 land sizes and item tables), so a change in how a table is read or written shows here. What the tables
@@ -198,6 +198,148 @@ class DuckTalesWatcher(unittest.TestCase):
             r1[a + 3] = v
         w.see(r1, 1, 'changed')
         self.assertEqual(w.result()['state'], 'bad')
+
+
+
+# ---- Chip 'n Dale - Rescue Rangers: MMC1, 8 banks of 16 KB; object tables in bank 4, reveal table in bank 6
+
+class BankCart:
+    """A blank cartridge of 16 KB banks; put(bank, cpu address, bytes) for a bank mapped at $8000."""
+
+    def __init__(self, banks=8):
+        self.rom = bytearray(H + banks * 0x4000)
+
+    def put(self, bank, address, data):
+        o = H + bank * 0x4000 + (address & 0x3FFF)
+        self.rom[o:o + len(data)] = bytes(data)
+
+    def get(self, bank, address):
+        return self.rom[H + bank * 0x4000 + (address & 0x3FFF)]
+
+
+CD_KINDS = {
+    0x00: [0xD0, 0x02, 0x1D, 0x44],      # robot bulldog
+    0x01: [0xD0, 0x03, 0x20, 0x43],      # robot mouse
+    0x02: [0xD8, 0x04, 0x1E, 0x42],      # an enemy that starts hidden (not offered)
+    0x09: [0x90, 0x10, 0x26, 0x81],      # apple (left alone)
+    0x0A: [0x98, 0x5D, 0x83, 0x00],      # hidden star
+    0x0B: [0x98, 0x3B, 0x2D, 0x00],      # flower under a box
+    0x0C: [0x98, 0x3B, 0x2E, 0x00],      # star under a box
+    0x0F: [0x98, 0x3B, 0x2F, 0x00],      # extra life under a box
+    0x12: [0x90, 0x57, 0x83, 0x00],      # hidden extra life
+    0x13: [0x90, 0x58, 0x83, 0x00],      # hidden acorn
+    0x40: [0xD0, 0x4C, 0x72, 0x00],      # a boss part (left alone)
+}
+# level 0 arrays at $8300 (x high), $8310 (x low), $8320 (section), $8330 (y), $8340 (kind), $8350 (scroll table)
+CD_RECORDS = [(5, 0x0018, 0xB4, 0x09), (5, 0x00E8, 0xA8, 0x0B), (5, 0x0148, 0x70, 0x00), (5, 0x0178, 0x38, 0x0C),
+              (3, 0x04A8, 0x50, 0x0A), (3, 0x0448, 0xB4, 0x01), (2, 0x0480, 0x44, 0x40), (0xFF, 0xFFFF, 0xFF, 0xFF)]
+
+
+def cd_build():
+    c = BankCart()
+    for level in range(15):
+        for k in range(6):
+            pointer = 0x8300 + 16 * k if level == 0 else 0x8400 + k
+            c.put(4, 0x8193 + 30 * k + level, [pointer & 0xFF])
+            c.put(4, 0x8193 + 30 * k + 15 + level, [pointer >> 8])
+    for i, (section, x, y, kind) in enumerate(CD_RECORDS):
+        c.put(4, 0x8300 + i, [x >> 8])
+        c.put(4, 0x8310 + i, [x & 0xFF])
+        c.put(4, 0x8320 + i, [section])
+        c.put(4, 0x8330 + i, [y])
+        c.put(4, 0x8340 + i, [kind])
+    c.put(4, 0x8320 + len(CD_RECORDS), [0xFF] * (16 - len(CD_RECORDS)))
+    for kind, data in CD_KINDS.items():
+        c.put(4, 0x9028 + kind * 4, data)
+    for otype, gfx in {0x57: 0x2F, 0x58: 0x31, 0x5D: 0x2E}.items():
+        c.put(6, 0x8B55 + otype, [gfx])
+    return c
+
+
+class ChipDaleDecode(unittest.TestCase):
+    def setUp(self):
+        self.c = cd_build()
+        self.p = cd.ChipDaleProfile(bytes(self.c.rom))
+
+    def test_records_and_roles(self):
+        rows = self.p.records(0)
+        self.assertEqual(self.p.count(0), 0x10)
+        self.assertEqual([(r['index'], r['section'], r['x'], r['y'], r['kind']) for r in rows][:3],
+                         [(0, 5, 0x18, 0xB4, 0x09), (1, 5, 0xE8, 0xA8, 0x0B), (2, 5, 0x148, 0x70, 0x00)])
+        self.assertEqual([r['role'] for r in rows], ['fixed', 'covered', 'enemy', 'covered', 'hidden', 'enemy', 'fixed'])
+        self.assertEqual(rows[4]['item'], 0x2E)                                # the hidden star turns into graphic $2E
+        self.assertEqual(self.p.place(rows[1]), (0xE8, 5 * 240 + 0xA8))
+
+    def test_choices(self):
+        self.assertEqual([c['value'] for c in self.p.enemy_choices(0)], [0x00, 0x01])     # $02 starts hidden, $40 is a boss
+        covered = self.p.content_choices(0x0B, 1)
+        self.assertEqual([(c['value'], c['name']) for c in covered], [(0x0B, 'Flower'), (0x0C, 'Star'), (0x0F, 'Extra life')])
+        self.assertNotIn(0x0F, [c['value'] for c in self.p.content_choices(0x0B, 0)])       # record 0 never gives it
+        self.assertEqual([c['value'] for c in self.p.content_choices(0x0A, 4)], [0x0A, 0x12, 0x13])
+        objs = {o['id']: o for o in self.p.objects({'level': 0})}
+        self.assertEqual(objs['object:0']['fields'], [])
+        self.assertIsNone(objs['object:0']['remove'])
+        self.assertEqual(objs['object:4']['style'], 'secret')
+        self.assertEqual(objs['object:2']['fields'][0]['choices'], 'level0')
+
+    def test_where(self):
+        self.assertIsNone(self.p.where(ram(x31=0, x97=0x04, x74=0x00, x75=0x83)))      # not in play
+        self.assertIsNone(self.p.where(ram(x31=0, x97=0x28, x74=0x00, x75=0x84)))      # another level's pointers
+        playing = ram(x31=0, x97=0x28, x74=0x00, x75=0x83, xFD=1, xFC=0x20, xFB=3, xFA=0x10)
+        self.assertEqual(self.p.where(playing), {'part': {'level': 0}, 'x': 0x120, 'y': 3 * 240 + 0x10})
+
+    def test_swap(self):
+        plan = self.p.edit({'level': 0}, 'object:1', {'kind': 0x0C})
+        self.assertEqual(plan['writes'], [(H + 0x10000 + 0x0341, 0x0B, 0x0C)])
+        self.assertEqual(plan['watch']['want'], {'types': [0x3B, 0x3C], 'gfx': [0x2E]})
+        plan = self.p.edit({'level': 0}, 'object:2', {'kind': 0x01})
+        self.assertEqual(plan['writes'], [(H + 0x10000 + 0x0342, 0x00, 0x01)])
+        plan = self.p.edit({'level': 0}, 'object:4', {'kind': 0x12})
+        self.assertEqual(plan['watch']['want'], {'types': [0x57], 'gfx': [0x83]})
+        with self.assertRaises(ValueError):
+            self.p.edit({'level': 0}, 'object:2', {'kind': 0x02})
+        with self.assertRaises(ValueError):
+            self.p.edit({'level': 0}, 'object:0', {'kind': 0x09})          # left as it is
+
+    def test_remove(self):
+        writes = self.p.remove_writes(0, 2)
+        rom = bytearray(self.c.rom)
+        for offset, old, new in writes:
+            self.assertEqual(rom[offset], old)
+            rom[offset] = new
+        after = cd.ChipDaleProfile(bytes(rom))
+        self.assertEqual([r['kind'] for r in after.records(0)], [0x09, 0x0B, 0x0C, 0x0A, 0x01, 0x40])
+        self.assertEqual(rom[H + 0x10000 + 0x0326], 0xFF)                   # the end record moved down one place
+        with self.assertRaises(ValueError):
+            self.p.remove_writes(0, 7)
+
+
+class ChipDaleWatcher(unittest.TestCase):
+    def setUp(self):
+        self.p = cd.ChipDaleProfile(bytes(cd_build().rom))
+
+    def run_frames(self, watcher, slot, camera=0):
+        base = dict(x31=0, x97=0x28, xFB=5, xFA=0, xFD=camera >> 8, xFC=camera & 0xFF)
+        watcher.see(ram(**base), 0, 'changed')
+        r = ram(**base)
+        for a, v in slot.items():
+            r[a + 9] = v
+        watcher.see(r, 1, 'changed')
+        return watcher.result()['state']
+
+    def test_swap(self):
+        plan = self.p.edit({'level': 0}, 'object:1', {'kind': 0x0C})
+        spot = {0x4D0: 0x80, 0x590: 1, 0x4F0: 0xE8, 0x500: 0, 0x510: 0xA8, 0x520: 5, 0x4E0: 0x3C}
+        self.assertEqual(self.run_frames(self.p.watcher(plan['watch']), {**spot, 0x420: 0x2E}), 'good')
+        self.assertEqual(self.run_frames(self.p.watcher(plan['watch']), {**spot, 0x420: 0x2D}), 'bad')
+        self.assertEqual(self.p.watcher(plan['watch']).result()['state'], 'warn')
+
+    def test_remove(self):
+        plan = self.p.edit({'level': 0}, 'object:2', {}, remove=True)
+        self.assertEqual(self.run_frames(self.p.watcher(plan['watch']), {}), 'warn')           # never on screen
+        self.assertEqual(self.run_frames(self.p.watcher(plan['watch']), {}, 0x100), 'good')
+        spot = {0x4D0: 0x80, 0x590: 2, 0x4F0: 0x48, 0x500: 1, 0x510: 0x70, 0x520: 5, 0x4E0: 0x02, 0x420: 0x1D}
+        self.assertEqual(self.run_frames(self.p.watcher(plan['watch']), spot, 0x100), 'bad')
 
 
 if __name__ == '__main__':
