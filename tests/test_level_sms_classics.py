@@ -257,12 +257,12 @@ class WonderBoy(unittest.TestCase):
         objects = {o['id']: o for o in self.p.objects({'round': 0})}
         snail = objects[f'object:{0xA000}']
         self.assertEqual((snail['name'], snail['style']), ('Snail', 'enemy'))
-        self.assertEqual(snail['x'], max(0x20 * 8, 256) + 0xD0 - 4)
+        self.assertEqual(snail['x'], max(0x20 * 8, 256) + 2 * 0xD0 - 135 + 8)
         self.assertEqual(snail['y'], 145 + 16)
         self.assertEqual([c['name'] for c in snail['fields'][0]['choices']], ['Snail', 'Cobra', 'Rock'])
         egg = objects[f'object:{0xA003}']
         self.assertEqual([c['value'] for c in egg['fields'][0]['choices']], [3, 4, 7])
-        self.assertEqual(objects[f'object:{0xA006}']['x'], max(0x28 * 8, 256) + 0x98 - 4)
+        self.assertEqual(objects[f'object:{0xA006}']['x'], max(0x28 * 8, 256) + 2 * 0x98 - 135 + 8)
         self.assertIn('shared', snail['note'])
 
     def test_edits_and_watcher(self):
@@ -274,6 +274,9 @@ class WonderBoy(unittest.TestCase):
         ram = bytearray(0x2000)
         ram[0xC18D - RAM:0xC18F - RAM] = (0xA000).to_bytes(2, 'little')
         self.assertEqual(self.p.where(ram), {'part': {'round': 0}, 'x': 0, 'y': 0})
+        ram[0xC12B - RAM:0xC12D - RAM] = (256).to_bytes(2, 'little')
+        self.assertIsNone(self.p.where(ram))                       # the round's first screen before it scrolls
+        ram[0xC12B - RAM:0xC12D - RAM] = bytes(2)
         w = self.p.watcher(plan['watch'])
         w.see(bytes(ram), 1, 'changed')
         ram[0xC18D - RAM:0xC18F - RAM] = (0xA003).to_bytes(2, 'little')

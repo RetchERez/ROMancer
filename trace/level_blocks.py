@@ -47,9 +47,10 @@ START_PRESSES = {
 
 # Games whose first level is reached from a map: the inputs (buttons, frames) played after the Start presses.
 # Games where the automatic play before recording (intro steps) already starts a level the walk cannot use.
-INTROS = {'6f74e8a7575a': 1, '9f5fa2106293': 1, '0838e531fe22': 5}
+INTROS = {'6f74e8a7575a': 1, '9f5fa2106293': 1, '0838e531fe22': 5, 'a13fa8164a0a': 1}
 
 ROUTES = {
+    'a13fa8164a0a': [([], 120)] * 2 + [(['b'], 4)] + [([], 120)] * 3 + [(['b'], 4)] + [([], 120)] * 4,                      # Wonder Boy: button 1 starts
     '6f74e8a7575a': [([], 120)] + [(['right'], 4), ([], 30)] * 3 + [(['start'], 4)] + [([], 100)] * 4,          # Mega Man: Bomb Man
     '9f5fa2106293': [([], 120), (['down'], 4), ([], 30), (['start'], 4)] + [([], 100)] * 6,                      # Mega Man 2: Flash Man
     '1ddc4b429490': [(['right'], 20), ([], 40), (['up'], 20), ([], 40), (['a'], 4), ([], 200)],   # Super Mario Bros. 3: World 1 map into 1-1

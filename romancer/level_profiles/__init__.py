@@ -114,7 +114,11 @@ def _registry():
     games = []
     extra = [m for m in os.environ.get('ROMANCER_EXTRA_PROFILES', '').split(',') if m]    # profiles being written
     for module in GAMES + [m for m in extra if m not in GAMES]:
-        games += importlib.import_module(f'.{module}', __name__).PROFILES
+        try:
+            games += importlib.import_module(f'.{module}', __name__).PROFILES
+        except Exception:           # one game's module must never stop the others from being found
+            import traceback
+            traceback.print_exc()
     return games
 
 

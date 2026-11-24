@@ -529,7 +529,8 @@ class WonderBoyProfile(_Sms):
     (low 5 bits)]. A record is read when $C12A reaches position * 2; the index picks the type from the part's type list
     (word at $9D6E + the same * 2). Levels: a normal record appears when its level is at most the round's value at
     $11E7 + round ($C136); a record with bit 7 set appears only when its level is that value. The object is put at screen
-    x $D0 and the record's y ($06E2); fruit types place themselves at x $98 (measured).
+    x $D0 and the record's y ($06E2); fruit types place themselves at x $98 (measured). Object x is in 2-pixel steps:
+    the sprite's left edge is at screen 2 * x - 135, so an object made at $D0 is 281 pixels right of the camera.
     """
     name = 'Wonder Boy'
     sha256s = ('a13fa8164a0ab2d549d9a9bb3f998907c3f64b42eab9f4fae3d666abab510fdd',)
@@ -542,9 +543,10 @@ class WonderBoyProfile(_Sms):
              0x1F: 'Sign 3', 0x20: 'Sign 4', 0x21: 'Goal sign', 0x33: 'King'}
     FRUIT_X = {0x07, 0x0D, 0x0E, 0x0F}      # measured: these appear at screen x $98, the rest at $D0
     START = 256                             # the camera when a round starts at its first part (measured)
-    # a record's y counts up from the ground in 2-pixel steps: a snail with y $2C has its sprite bottom on screen line 145;
-    # its sprite's middle is 4 pixels left of the object's x (sprite table, sms_classics/wb/w14.py)
-    GROUND, DX = 145 + 2 * 0x2C, -4
+    # a record's y counts up from the ground in 2-pixel steps: a snail with y $2C has its sprite bottom on screen line 145.
+    # An object's x (+7) is in 2-pixel steps too: its sprite's left edge is on screen at 2 * x - 135 (rocks, snail and
+    # fruit, sprite table against the object, sms_classics/wb/w14.py, w16.py)
+    GROUND = 145 + 2 * 0x2C
 
     def level_value(self, rnd):
         return self.rom[0x11E7 + rnd]
@@ -585,7 +587,11 @@ class WonderBoyProfile(_Sms):
         lists = self.part_lists(rnd)
         if not any(at <= pointer <= at + 3 * 256 for _, at, _ in lists):
             return None                 # not playing this round (title, area screen)
-        return {'part': {'round': rnd}, 'x': _w(ram, 0xC12B), 'y': 0}
+        camera = _w(ram, 0xC12B)
+        if camera == _b(ram, 0xC129) * 2048 + self.START:
+            return None                 # the round's first screen before it scrolls: the forest repeats, so the level map
+                                        # can place this screen a few trees off (measured); later screens place right
+        return {'part': {'round': rnd}, 'x': camera, 'y': 0}
 
     def part_name(self, part):
         rnd = int(part['round'])
@@ -598,7 +604,7 @@ class WonderBoyProfile(_Sms):
             types = self.part_lists(rnd)[seg][2]
             table = [self.rom[types + k] for k in range(32)]
             camera = max((seg * 256 + pos * 2) * 8, seg * 2048 + self.START)
-            row = {'id': f'object:{offset}', 'type': kind, 'x': camera + (0x98 if kind in self.FRUIT_X else 0xD0) + self.DX,
+            row = {'id': f'object:{offset}', 'type': kind, 'x': camera + 2 * (0x98 if kind in self.FRUIT_X else 0xD0) - 135 + 8,
                    'y': self.GROUND - 2 * (y & 0x7F) + AlexKiddProfile.SHOWN, 'name': self.type_name(kind), 'remove': None, 'fields': []}
             group = self.ENEMIES if kind in self.ENEMIES else self.EGGS if kind in self.EGGS else None
             if group is not None:
