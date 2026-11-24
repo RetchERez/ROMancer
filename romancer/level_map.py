@@ -747,4 +747,15 @@ def stitch(frames: list, system: str) -> list:
         plane.keep_levels(frames[0].graphics.width // plane.px, count)
     found = [plane.assign() for plane in planes.values() if plane.windows]
     found.sort(key=lambda plane: -len(plane.cells))
+    if len(found) > 1:
+        # The level scrolls with the camera; a background behind it (a far hill, a sky) scrolls slower. Of the planes
+        # that are at least half the size of the largest, the one that scrolled furthest is the level.
+        def travel(plane):
+            xs = [w.across for w in plane.windows.values()]
+            ys = [w.down for w in plane.windows.values()]
+            return (max(xs) - min(xs)) + (max(ys) - min(ys))
+        big = [plane for plane in found if len(plane.cells) * 2 >= len(found[0].cells)]
+        lead = max(big, key=lambda plane: (travel(plane), len(plane.cells)))
+        found.remove(lead)
+        found.insert(0, lead)
     return found
