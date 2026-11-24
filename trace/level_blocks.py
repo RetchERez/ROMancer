@@ -41,6 +41,9 @@ START_PRESSES = {
     '7aaaf89257b1': 1,          # Super Mario Bros. 2: title, then character select (see ROUTES)
     '46160baa0636': 1,          # Sonic The Hedgehog (Mega Drive): Start at the title
     '568e5e9557c4': 1,          # Sonic The Hedgehog 2 (Mega Drive): the same
+    'd50c957bd76c': 2,          # Mega Man 3: title, stage select (see ROUTES: Top Man)
+    '1e06f2224792': 7,          # Mega Man 4: the title arrives at different times (see ROUTES: Pharaoh Man)
+    '010673ff28a6': 5,          # Mega Man 5: (see ROUTES: Charge Man)
     '23f395b26644': 3,          # DuckTales: title, then the land select (Amazon)
     '6f74e8a7575a': 1,          # Mega Man: title, then the stage select (see ROUTES: Bomb Man)
     '9f5fa2106293': 3,          # Mega Man 2: title, story, stage select (see ROUTES: Flash Man)
@@ -51,9 +54,12 @@ START_PRESSES = {
 
 # Games whose first level is reached from a map: the inputs (buttons, frames) played after the Start presses.
 # Games where the automatic play before recording (intro steps) already starts a level the walk cannot use.
-INTROS = {'6f74e8a7575a': 1, '9f5fa2106293': 1, '0838e531fe22': 5, 'a13fa8164a0a': 1, '7aaaf89257b1': 1}
+INTROS = {'6f74e8a7575a': 1, '9f5fa2106293': 1, '0838e531fe22': 5, 'a13fa8164a0a': 1, '7aaaf89257b1': 1, 'd50c957bd76c': 1, '1e06f2224792': 1, '010673ff28a6': 1}
 
 ROUTES = {
+    'd50c957bd76c': [([], 120), (['right'], 4), ([], 30), (['start'], 4)] + [([], 100)] * 5,                    # Mega Man 3: Top Man
+    '1e06f2224792': [([], 120), (['left'], 4), ([], 30), (['start'], 4)] + [([], 120)] * 5,                     # Mega Man 4: Pharaoh Man
+    '010673ff28a6': [([], 120), (['left'], 4), ([], 30), (['start'], 4)] + [([], 120)] * 5,                     # Mega Man 5: Charge Man
     '7aaaf89257b1': [(['a'], 4)] + [([], 100)] * 4 + [([], 120), ([], 60), (['right'], 70), ([], 10), (['up'], 10), ([], 120), ([], 60),
                                                         (['right'], 110), ([], 20), (['up'], 10), ([], 120), ([], 120)],       # SMB2: Mario, then the door into 1-1's main area
     'a13fa8164a0a': [([], 120)] * 2 + [(['b'], 4)] + [([], 120)] * 3 + [(['b'], 4)] + [([], 120)] * 4,                      # Wonder Boy: button 1 starts

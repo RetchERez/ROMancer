@@ -257,7 +257,7 @@ class MegaMan4Test(unittest.TestCase):
     def test_pickup_signature(self):
         plan = self.p.edit({'stage': 2, 'section': 1}, 'record:2', {'type': 0x7C})
         ram = bytearray(0x800)
-        ram[0x22], ram[0x300] = 2, 1
+        ram[0x22], ram[0x300], ram[0x2D] = 2, 1, 1                             # in section 1 (2 screens)
         ram[0x309], ram[0x441], ram[0x561], ram[0x351] = 0xC1, 2, 0x1E, 2
         watcher = self.p.watcher(plan['watch'])
         self.assertTrue(watcher.see(ram, 0, 'changed'))
