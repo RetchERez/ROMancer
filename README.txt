@@ -1,9 +1,35 @@
-ROMancer v1.4.0
+ROMancer v1.4.1
 By RetchEWretched
 
 ROMancer is a local ROM editing, investigation and playtesting workbench.
 It supports NES, SNES, Genesis / Mega Drive, Master System, Game Boy and
 Game Boy Color cartridge formats. Everyday work runs offline.
+
+NEW IN v1.4.1
+
+Level Editor (BETA) for 31 games. The level editor that v1.4.0 brought to
+Castlevania now knows the enemies, items and secrets of 31 games, each read
+from the game's own tables, and every change is checked by playing the game
+before you keep it. The Level Editor page lists them too.
+- NES: Castlevania, Castlevania II, Castlevania III, Chip 'n Dale Rescue
+  Rangers, DuckTales, Kid Icarus (world 1), Mega Man 1 to 5, Metroid, Ninja
+  Gaiden I to III, Super Mario Bros., Super Mario Bros. 2, Super Mario
+  Bros. 3, The Legend of Zelda and Zelda II
+- Game Boy: Metroid II, Super Mario Land, Super Mario Land 2 and Link's
+  Awakening
+- Master System: Alex Kidd in Miracle World, Sonic The Hedgehog and
+  Wonder Boy
+- Mega Drive: Sonic The Hedgehog and Sonic The Hedgehog 2 (enemies,
+  monitors and rings)
+- Super NES: Super Mario World and Super Metroid (enemies and items, the
+  packed level layouts stay as they are)
+- What you can change depends on the game: swap or remove enemies, change
+  what a block, chest, candle or container holds, change where a door or
+  pipe leads, hidden items and secrets, and Show what's solid where the
+  game has a clear rule
+- Every other game keeps the general level tools: the map, painting
+  blocks, Play from here, and Before and after
+- The sidebar entry is now Level Editor, marked BETA
 
 NEW IN v1.4.0
 
@@ -48,7 +74,7 @@ new, Update and restart, and Later.
   ROMancer, puts the new version in place and opens it again
 - Your projects are not touched, and if anything fails the old files are
   put back and the old version opens and says why
-- This starts with v1.4.0, so update to v1.4.0 by hand once
+- This starts with v1.4.1, so update to v1.4.1 by hand once
 
 NEW IN v1.3.9
 
@@ -328,7 +354,7 @@ available. The supplied Pokemon Red and Blue revisions share a
 
 START ON WINDOWS
 
-1. Extract ROMancer-v1.4.0-Windows.zip in Windows File Explorer.
+1. Extract ROMancer-v1.4.1-Windows.zip in Windows File Explorer.
 2. Double-click ROMancer.exe in the extracted folder.
    Keep ROMancer.exe, ROM Catalog.html and the ROMancer Files folder together.
 3. Open an original workshop or choose New project and import your own cartridge image.
@@ -349,8 +375,8 @@ SHA-256 is checked and later captures work offline. No ROM data is uploaded.
 
 START ON LINUX
 
-1. Extract ROMancer-v1.4.0-Linux-x86_64.tar.gz:  tar xf ROMancer-v1.4.0-Linux-x86_64.tar.gz
-2. Run ./ROMancer-v1.4.0-Linux-x86_64/ROMancer.sh
+1. Extract ROMancer-v1.4.1-Linux-x86_64.tar.gz:  tar xf ROMancer-v1.4.1-Linux-x86_64.tar.gz
+2. Run ./ROMancer-v1.4.1-Linux-x86_64/ROMancer.sh
    (./ROMancer.sh --install-desktop adds ROMancer to your application menu).
 
 The Linux x86-64 package includes Python, Pillow and the same six engines built
