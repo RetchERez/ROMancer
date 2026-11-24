@@ -39,6 +39,17 @@ class Castlevania3:
     CANDLES = {0x90: 'Candle', 0x91: 'Fire bowl', 0x92: 'Candle (0x92)'}
     # spawner types named by spawning each one and looking at what the game drew (trace/v15_profiles/castlevania23)
     ENEMIES = {0x01: 'Zombies', 0x02: 'Zombies', 0x05: 'Skeleton (rises from the ground)', 0x32: 'Bone-throwing skeleton'}
+    # Stage objects (breakable blocks, moving platforms and the like): placed by $9D17 / $9EA5, code and tables in the
+    # 16 KB bank at ROM 0x8000 run at CPU $8000. Room list: byte at word(word($A073 + block * 2) + sub * 2) + room, 0
+    # none, else the list at word($A199 + index * 2): 8-byte records ended by $FF.
+    OBJECT_BANK = 0x8000
+    BLOCK_SIDEWAYS, BLOCK_UPDOWN = 0x10, 0x11       # record kinds of breakable blocks (jump table $A04F: $9CC0, $9CA4)
+    # what a block holds ($078B; sprite table $B077, picked up at $B2EE). Measured by breaking the block of 1-03 with
+    # each code (bitems.py): 0 health +32, 1 hearts +5, 2 nothing drops, 3 double shot ($87 = 1; triple shot when it is
+    # already double), 4 lives +1, 5 triple shot ($87 = 2). 3 and 5 give a large heart instead with no subweapon or the
+    # stopwatch ($B083, $B348).
+    BLOCK_ITEMS = {0: 'Pot roast', 1: 'Large heart', 2: 'Nothing', 3: 'Double shot', 4: 'Extra life', 5: 'Triple shot'}
+    BLOCK_SLOTS = (0x1A, 0x1B)
 
     def __init__(self, rom: bytes):
         self.rom = rom
@@ -196,6 +207,72 @@ class Castlevania3:
             address += 7
         return out
 
+    # ---- stage objects: breakable blocks
+    def _obj_offset(self, address: int) -> int:
+        """ROM file offset of a CPU address as the stage object code sees it (bank 0x8000 at $8000)."""
+        if not 0x8000 <= address < 0xC000:
+            return self.offset(address)
+        return HEADER_NES + self.OBJECT_BANK + address - 0x8000
+
+    def _obj_at(self, address: int) -> int:
+        return self.rom[self._obj_offset(address)]
+
+    def _obj_word(self, address: int) -> int:
+        return self._obj_at(address) | self._obj_at(address + 1) << 8
+
+    def object_list(self, block: int, sub: int, room: int):
+        """(list number, CPU address) of a room's stage objects, or None."""
+        subs = self._obj_word(0xA073 + 2 * block)
+        if not 0x8000 <= subs < 0xC000:
+            return None
+        rooms = self._obj_word(subs + 2 * sub)
+        if not 0x8000 <= rooms < 0xC000:
+            return None
+        index = self._obj_at(rooms + room)
+        if not index:
+            return None
+        address = self._obj_word(0xA199 + 2 * index)
+        return (index, address) if 0x8000 <= address < 0xC000 else None
+
+    def blocks(self, block: int, sub: int, room: int) -> list:
+        """Breakable blocks of a room. Record: position (page, then x in a sideways room or y in an up-and-down one),
+        a size byte, kind ($10 sideways, $11 up and down), the other coordinate, the item ($078B), two blocks high
+        ($0797, nonzero: one above the other, both must break) and the broken flag (`$F4` + this, set to $FF).
+        Positions are in room pixels as the game keeps them; the object's middle. Checked by eye: the boxes drawn from
+        them sit on the blocks of 1-03 (shots/brk3b_120_boxes.png)."""
+        found = self.object_list(block, sub, room)
+        if found is None:
+            return []
+        index, address = found
+        out = []
+        for number in range(40):
+            if self._obj_at(address) == 0xFF:
+                break
+            raw = [self._obj_at(address + i) for i in range(8)]
+            if raw[3] in (self.BLOCK_SIDEWAYS, self.BLOCK_UPDOWN):
+                if raw[3] == self.BLOCK_SIDEWAYS:
+                    x, y = raw[0] * 256 + raw[1], raw[4]
+                else:
+                    x, y = raw[4], raw[0] * 240 + raw[1] + 0x37
+                out.append({'number': number, 'kind': raw[3], 'x': x, 'y': y, 'item': raw[5], 'double': bool(raw[6]),
+                            'flag': raw[7], 'byte': self._obj_offset(address), 'list': index})
+            address += 8
+        return out
+
+    def list_users(self, index: int) -> list:
+        """Every (block, sub, room) whose stage object list is this one."""
+        if not hasattr(self, '_list_users'):
+            users = {}
+            for place in self.all_rooms():
+                found = self.object_list(*place)
+                if found:
+                    users.setdefault(found[0], []).append(place)
+            self._list_users = users
+        return self._list_users.get(index, [])
+
+    def block_item_name(self, code: int) -> str:
+        return self.BLOCK_ITEMS.get(code, f'Item {code}')
+
     # ---- names
     def item_name(self, code: int) -> str:
         return self.ITEMS.get(code, f'Item {code:#04x}')
@@ -229,7 +306,7 @@ class Castlevania3:
                 elif rec['type']:
                     out.append({'kind': 'venemy', 'number': rec['number'], 'type': rec['type'], 'x': rec['x'], 'y': y,
                                 'p1': rec['p1'], 'p2': rec['p2'], 'byte': rec['byte'], 'name': self.enemy_name(rec['type'])})
-            return out
+            return out + self._block_rows(block, sub, room)
         for row in self.zones(block, sub, room):
             base = row['zone'] * self.ZONE - self.ZONE
             enemy = row['enemy'] or row['hard_enemy']
@@ -242,7 +319,12 @@ class Castlevania3:
                 out.append({'kind': 'candle', 'zone': row['zone'], 'type': c['type'], 'name': self.CANDLES.get(c['type'], 'Candle'),
                             'drop': c['drop'], 'x': base + c['dx'], 'y': c['y'], 'index': row['candle_index'],
                             'byte': row['candle_byte'], 'record': c['record'], 'shared': self.candle_users(c['record'])})
-        return out
+        return out + self._block_rows(block, sub, room)
+
+    def _block_rows(self, block: int, sub: int, room: int) -> list:
+        # the map wants the bottom middle: a block is 16 pixels square around its point, a double one 32 pixels high
+        return [dict(b, kind='block', type=b['kind'], name='Breakable block', y=b['y'] + (8 if b['double'] else 0), middle=b['y'],
+                     shared=len(self.list_users(b['list']))) for b in self.blocks(block, sub, room)]
 
     def enemy_choices(self) -> list:
         """One enemy record per type and place, from the pool the zone bytes point into (normal mode)."""
@@ -381,6 +463,42 @@ class _Cv3VerticalWatcher(Watcher):
         return {'state': 'good' if ok else 'bad', 'text': text}
 
 
+class _Cv3BlockWatcher(Watcher):
+    """A breakable block: when the game places it (object slots $1A-$1B, $9CC0 / $9CA4) it copies the record's item
+    into $078B and its broken flag number into $079D, so look for the slot with this block's flag and place (y in
+    $041C in sideways rooms, x in $0438 in up-and-down ones) before it is broken ($078D = 0)."""
+    every = 2
+
+    def __init__(self, watch):
+        self.w = watch
+        self.seen = None
+
+    def see(self, ram, frame, run):
+        w = self.w
+        if (ram[0x32], ram[0x33], ram[0x34]) != tuple(w['part']):
+            return False
+        for slot in Castlevania3.BLOCK_SLOTS:
+            if not ram[0x470 + slot] or ram[0x79D + slot] != w['flag'] or ram[0x78D + slot] != 0:
+                continue
+            if (ram[0x41C + slot] if w['sideways'] else ram[0x438 + slot]) != (w['y'] if w['sideways'] else w['x']):
+                continue
+            self.seen = ram[0x78B + slot]
+            return True
+        return False
+
+    def result(self):
+        w = self.w
+        if self.seen is None:
+            return super().result()
+        ok = self.seen == w['item']
+        if w['item'] == 2:
+            text = 'Played from the start, the block is placed empty.' if ok else 'Played from the start, the block still holds an item.'
+        else:
+            text = (f'Played from the start, the block now holds {w["name"].lower()}.' if ok else
+                    f'Played from the start, the block holds {Castlevania3.BLOCK_ITEMS.get(self.seen, str(self.seen)).lower()}, not the one chosen.')
+        return {'state': 'good' if ok else 'bad', 'text': text}
+
+
 class Castlevania3Profile(Castlevania3, Profile):
     """Castlevania III on the common profile interface. Parts are {'block', 'sub', 'room'} (RAM $32, $33, $34)."""
     sha256s = (Castlevania3.sha256,)
@@ -394,9 +512,29 @@ class Castlevania3Profile(Castlevania3, Profile):
             vertical = self.vertical(block, sub, room)
         except (IndexError, ValueError):
             return None
+        # the block's solidity rule as the game loaded it for its graphics (see tile_role)
+        self.__dict__.setdefault('_rules', set()).add(bytes(ram[0x770:0x780]))
         if vertical:
             return {'part': part, 'x': 0, 'y': ram[0x57] * 240 + ram[0x56]}
         return {'part': part, 'x': ram[0x56] | ram[0x57] << 8, 'y': 0}
+
+    def tile_role(self, tile):
+        """What the game makes of a tile ($D3B9). Its collision map ($06E0: a nibble per 16x16 spot, from the tile at the
+        spot's bottom left) gives tiles below $80 the class 'how many of $0770-$0777 the tile is not below', tiles $80-$BF
+        the same with $0778-$077F, $DC/$DD 5 and $DE/$DF 7 (both kill), $E4/$E5 0. The eight bytes come from tables per
+        background graphics set ($83F0 in ROM bank 0, by the banks in $4B/$4C), so the rule is read from the game's RAM
+        in where(); when the parts of the map use different sets the roles are not given. The game's floor tests treat
+        every class but 0 as ground. Breakable blocks use the same tiles as walls; they are objects (see blocks())."""
+        rules = self.__dict__.get('_rules', set())
+        if len(rules) != 1:
+            return None
+        rule = next(iter(rules))
+        if tile >= 0xC0:
+            if tile in (0xE4, 0xE5):
+                return 'open'
+            return 'solid' if tile in (0xDC, 0xDD, 0xDE, 0xDF) else None
+        limits = rule[:8] if tile < 0x80 else rule[8:]
+        return 'solid' if tile >= limits[0] else 'open'
 
     def part_name(self, part):
         block, sub, room = int(part['block']), int(part['sub']), int(part['room'])
@@ -409,7 +547,8 @@ class Castlevania3Profile(Castlevania3, Profile):
 
     def choices(self):
         return {'enemies': [{'value': c['index'], 'name': f'{c["name"]} (height {c["y"]})'} for c in self.enemy_choices()],
-                'items': [{'value': code, 'name': self.item_name(code)} for code in self.drop_codes()]}
+                'items': [{'value': code, 'name': self.item_name(code)} for code in self.drop_codes()],
+                'block_items': [{'value': code, 'name': name} for code, name in self.BLOCK_ITEMS.items()]}
 
     def _vertical_enemy_choices(self):
         found, seen = [], set()
@@ -452,10 +591,27 @@ class Castlevania3Profile(Castlevania3, Profile):
                 row.update(id=f'venemy:{item["number"]}', style='enemy', remove='Remove this enemy',
                            fields=[{'key': 'kind', 'label': 'Swap for', 'value': f'{item["type"]}:{item["p1"]}:{item["p2"]}',
                                     'choices': self._vertical_enemy_choices()}])
+            elif item['kind'] == 'block':
+                inside = self.block_item_name(item['item'])
+                row.update(id=f'block:{item["number"]}', style='block', remove=None,
+                           detail='empty' if item['item'] == 2 else f'{inside.lower()} inside',
+                           fields=[{'key': 'item', 'label': 'Inside', 'value': item['item'], 'choices': 'block_items'}])
+                notes = []
+                if item['double']:
+                    notes.append('Two blocks high: both have to be broken before the item falls out.')
+                if item['item'] in (3, 5):
+                    notes.append('With no subweapon or the stopwatch the game gives a large heart instead.')
+                if item['shared'] > 1:
+                    others = [self.part_name({'block': b, 'sub': s, 'room': r}) for b, s, r in self.list_users(item['list'])
+                              if (b, s, r) != (block, sub, room)]
+                    notes.append('The game uses this room’s list of blocks in other places too (' + ', '.join(others) +
+                                 '), so the change shows there as well.')
+                if notes:
+                    row['note'] = ' '.join(notes)
             else:
                 row.update(id=f'vcandle:{item["number"]}', style='item', detail=f'drops {self.item_name(item["drop"])}',
                            remove='Remove this candle', fields=[{'key': 'drop', 'label': 'Drops', 'value': item['drop'], 'choices': 'items'}])
-            if item['type'] in self.CANDLES and item.get('drop') in self.SUBWEAPONS:
+            if item['kind'] != 'block' and item['type'] in self.CANDLES and item.get('drop') in self.SUBWEAPONS:
                 row['note'] = ' '.join(([row['note']] if row.get('note') else []) +
                                        ['With a partner the game gives the partner’s own item in place of this one.'])
             out.append(row)
@@ -534,9 +690,24 @@ class Castlevania3Profile(Castlevania3, Profile):
             o = rec['byte'] + 4
             return {'writes': [(o, self.rom[o], drop)] if self.rom[o] != drop else [], 'title': f'Candle drops: {self.item_name(drop)}',
                     'watch': {'kind': 'vcandle', 'part': where, 'x': rec['x'], 'y': y, 'drop': drop, 'name': self.item_name(drop)}}
+        if kind == 'block':
+            rec = next((b for b in self.blocks(block, sub, room) if b['number'] == number), None)
+            if rec is None:
+                raise ValueError('That is not part of this room.')
+            item = int(values.get('item'))
+            if item not in self.BLOCK_ITEMS:
+                raise ValueError('That choice is not one of the game’s own.')
+            o = rec['byte'] + 5
+            name = self.block_item_name(item)
+            return {'writes': [(o, self.rom[o], item)] if self.rom[o] != item else [],
+                    'title': 'Empty block' if item == 2 else f'Block holds: {name}',
+                    'watch': {'kind': 'block', 'part': where, 'flag': rec['flag'], 'sideways': rec['kind'] == self.BLOCK_SIDEWAYS,
+                              'x': rec['x'], 'y': rec['y'], 'item': item, 'name': name}}
         raise ValueError('ROMancer cannot change that yet.')
 
     def watcher(self, watch):
+        if watch['kind'] == 'block':
+            return _Cv3BlockWatcher(watch)
         if watch['kind'] in ('enemy', 'candle'):
             return _Cv3SlotWatcher(watch)
         if watch['kind'] in ('venemy', 'vcandle'):

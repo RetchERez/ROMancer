@@ -30,6 +30,9 @@ class Cart3:
     def bank0(self, address, data):
         self.rom[H + address - 0x8000:H + address - 0x8000 + len(data)] = bytes(data)
 
+    def obj(self, address, data):           # stage object bank 0x8000 at $8000
+        self.rom[H + 0x8000 + address - 0x8000:H + 0x8000 + address - 0x8000 + len(data)] = bytes(data)
+
     @staticmethod
     def w(value):
         return [value & 0xFF, value >> 8]
@@ -70,6 +73,15 @@ def build3():
     c.put(0x9500, [b for z in zones for b in z])
     c.put(0x9600, [1, 0x20, 0x90, 0x40, 0xA2, 0, 0, 1, 0x50, 0x32, 0x80, 0, 1, 2, 0xFF])
     c.put(0x9700, [0] * 6)
+    # stage objects: room 1 of sub-block 0 and the room of sub-block 1 share list 1, the up-and-down room has list 2
+    for block in range(15):
+        c.obj(0xA073 + 2 * block, Cart3.w(0xA100))
+    c.obj(0xA100, Cart3.w(0xA110) + Cart3.w(0xA112))
+    c.obj(0xA110, [1, 2]); c.obj(0xA112, [1])
+    c.obj(0xA199 + 2, Cart3.w(0xA200)); c.obj(0xA199 + 4, Cart3.w(0xA240))
+    c.obj(0xA200, [0x00, 0x50, 0x00, 0x02, 0x64, 1, 0, 0,        # a platform (not a block)
+                   0x01, 0x18, 0x00, 0x10, 0xB0, 0, 1, 0, 0xFF])  # block at 256 + 24, y $B0, two high, pot roast
+    c.obj(0xA240, [0x01, 0x20, 0x00, 0x11, 0x40, 4, 0, 1, 0xFF])  # up and down: x $40, page 1 y $20, extra life
     return c
 
 
@@ -101,7 +113,7 @@ class Castlevania3Tests(unittest.TestCase):
 
     def test_objects(self):
         objs = {o['id']: o for o in self.p.objects(ROOM)}
-        self.assertEqual(set(objs), {'enemy:1', 'candle:2', 'candle:4', 'enemy:5', 'candle:9'})
+        self.assertEqual(set(objs), {'enemy:1', 'candle:2', 'candle:4', 'enemy:5', 'candle:9', 'block:1'})
         self.assertEqual((objs['enemy:1']['x'], objs['enemy:1']['y'], objs['enemy:1']['name']), (64 - 64 + 0x10, 0xB0, 'Bone-throwing skeleton'))
         self.assertEqual((objs['candle:2']['x'], objs['candle:2']['y']), (2 * 64 - 64 + 0x20, 0x98))
         self.assertEqual(objs['candle:2']['fields'][0]['key'], 'drop')            # used once: its own item byte
@@ -145,6 +157,52 @@ class Castlevania3Tests(unittest.TestCase):
         self.assertTrue(watcher.see(bytes(ram), 4, 'changed'))
         self.assertEqual(watcher.result()['state'], 'bad')
         self.assertEqual(p.watcher({'kind': 'candle', 'zone': 9, 'record': None, 'part': [0, 0, 0], 'name': ''}).result()['state'], 'warn')
+
+
+class Castlevania3BlockTests(unittest.TestCase):
+    def setUp(self):
+        self.p = cv.Castlevania3Profile(bytes(build3().rom))
+
+    def test_blocks(self):
+        block = {o['id']: o for o in self.p.objects(ROOM)}['block:1']
+        self.assertEqual((block['style'], block['x'], block['y']), ('block', 256 + 0x18, 0xB0 + 8))
+        self.assertEqual(block['detail'], 'pot roast inside')
+        self.assertIn('Two blocks high', block['note'])
+        self.assertIn('Block 1-02', block['note'])                      # the other room that uses list 1
+        up = {o['id']: o for o in self.p.objects(UP)}['block:0']
+        self.assertEqual((up['x'], up['y'], up['detail']), (0x40, 240 + 0x20 + 0x37, 'extra life inside'))
+        self.assertEqual([c['value'] for c in self.p.choices()['block_items']], [0, 1, 2, 3, 4, 5])
+
+    def test_block_edit_and_watcher(self):
+        p = self.p
+        plan = p.edit(ROOM, 'block:1', {'item': 4})
+        self.assertEqual(plan['writes'], [(H + 0x8000 + 0xA200 - 0x8000 + 8 + 5, 0, 4)])
+        self.assertEqual(p.edit(UP, 'block:0', {'item': 0})['writes'], [(H + 0x8000 + 0xA240 - 0x8000 + 5, 4, 0)])
+        with self.assertRaises(ValueError):
+            p.edit(ROOM, 'block:1', {'item': 6})
+        ram = bytearray(0x800)
+        watcher = p.watcher(plan['watch'])
+        self.assertFalse(watcher.see(bytes(ram), 0, 'changed'))
+        self.assertEqual(watcher.result()['state'], 'warn')
+        ram[0x470 + 0x1A], ram[0x41C + 0x1A], ram[0x78B + 0x1A] = 2, 0xB0, 4
+        self.assertTrue(watcher.see(bytes(ram), 2, 'changed'))
+        self.assertEqual(watcher.result()['state'], 'good')
+        control = p.watcher(plan['watch'])
+        ram[0x78B + 0x1A] = 0
+        control.see(bytes(ram), 2, 'original')
+        self.assertEqual(control.result()['state'], 'bad')
+
+    def test_tile_roles(self):
+        p = self.p
+        self.assertIsNone(p.tile_role(0))                               # no rule seen yet
+        ram = bytearray(0x800)
+        ram[0x770:0x780] = bytes([0x7E] * 6 + [0x80] * 2 + [0xB7] * 6 + [0xC0] * 2)
+        p.where(bytes(ram))
+        self.assertEqual([p.tile_role(t) for t in (0x10, 0x7E, 0xB0, 0xB8, 0xDC, 0xE4, 0xC5)],
+                         ['open', 'solid', 'open', 'solid', 'solid', 'open', None])
+        ram[0x770] = 0x70                                               # another part with another rule
+        p.where(bytes(ram))
+        self.assertIsNone(p.tile_role(0))
 
 
 class Cart2:
