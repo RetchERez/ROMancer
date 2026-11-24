@@ -130,6 +130,17 @@ def profile_for(rom: bytes):
     return None
 
 
+SYSTEM_NAMES = {'nes': 'NES', 'snes': 'Super NES', 'genesis': 'Mega Drive / Genesis', 'sms': 'Master System', 'gb': 'Game Boy', 'gbc': 'Game Boy Color'}
+
+
+def game_list() -> list:
+    """[{'name', 'system'}] of every game with a level profile, sorted by system then name."""
+    order = list(SYSTEM_NAMES)
+    rows = [{'name': kind.name, 'system': SYSTEM_NAMES.get(kind.system, kind.system)} for kind in _registry()]
+    key = lambda row: (order.index(next((k for k, v in SYSTEM_NAMES.items() if v == row['system']), 'nes')), row['name'].lower())
+    return sorted(rows, key=key)
+
+
 def known_games() -> list:
     return [kind.name for kind in _registry()]
 

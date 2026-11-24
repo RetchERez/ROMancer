@@ -1,5 +1,5 @@
 import assert from 'node:assert/strict';
-import {placeAt,units,snap,brushFrom,stamp,paintedCells,paintLayers,layerChoices,steps,levelStatus,levelsPart,levelPart,levelChange,objectLabel,objectAt,fieldChoices} from '../romancer/ui/level_map.js';
+import {placeAt,units,snap,brushFrom,stamp,paintedCells,paintLayers,layerChoices,steps,levelStatus,levelsPart,levelPart,levelChange,objectLabel,objectAt,fieldChoices,gamesPart} from '../romancer/ui/level_map.js';
 
 // a map of 12 by 6 cells; (5,2) was never seen, (7,3) cannot be changed
 const width=12,height=6,frames=Array.from({length:width*height},()=>0),status=Array.from({length:width*height},()=>'r');
@@ -141,4 +141,11 @@ assert.match(editHtml,/value="84" selected>Dagger/);
 assert.match(editHtml,/Remove this candle/);
 assert.match(lengthHtml,/Screen 1 of 3/);
 assert.match(lengthHtml,/data-action="level-length-apply" data-id="-1"[^>]*disabled/);
+// the list of games with full level editing
+const gamesHtml=gamesPart({games:[{name:'Castlevania',system:'NES'},{name:'Super Mario Land',system:'Game Boy'}],this:'Castlevania'});
+assert.match(gamesHtml,/Games with full level editing \(2\)/);
+assert.match(gamesHtml,/<strong>Castlevania<\/strong> has full level editing/);
+assert.match(gamesHtml,/<strong>Game Boy<\/strong>/);
+assert.match(gamesPart({games:[{name:'A',system:'NES'}],this:null}),/general level tools/);
+assert.equal(gamesPart(null),'');
 console.log('level map checks passed');

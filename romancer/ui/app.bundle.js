@@ -10419,6 +10419,14 @@ ${state2.artifact.system_id ? `<details><summary>Advanced byte options</summary>
     return best;
   }
   var levelChange = (ed) => ed.proposal && ed.level && (ed.proposal.level && ed.proposal.level.id === ed.level.id || ed.proposal.kind === "level-object") ? ed.proposal : null;
+  function gamesPart(info) {
+    var _a;
+    if (!((_a = info == null ? void 0 : info.games) == null ? void 0 : _a.length)) return "";
+    const groups = {};
+    for (const g of info.games) (groups[g.system] = groups[g.system] || []).push(g.name);
+    const here = info.this ? `<p><strong>${esc(info.this)}</strong> has full level editing: its enemies, items and secrets are on the map and can be changed.</p>` : "<p>This game has the general level tools: the map, painting blocks, Play from here, and Before and after.</p>";
+    return `<div class="level-games">${here}<details><summary>Games with full level editing (${info.games.length})</summary>${Object.entries(groups).map(([system2, names7]) => `<p class="subtle"><strong>${esc(system2)}</strong></p><ul>${names7.map((n) => `<li>${esc(n)}</li>`).join("")}</ul>`).join("")}</details></div>`;
+  }
   function levelsPart(ed) {
     var _a;
     const summary = ed.summary, levels = summary.levels || [], rec = summary.level_recording, job = summary.level_job, walking = ((_a = summary.recording) == null ? void 0 : _a.state) === "running";
@@ -10426,6 +10434,7 @@ ${state2.artifact.system_id ? `<details><summary>Advanced byte options</summary>
     const actions3 = rec ? button("Finish the map", "level-stop", { primary: true, icon: "check", disabled: walking, reason: "Wait for the walk to finish." }) + button(walking ? "Walking…" : "Walk right for me", "level-auto", { disabled: walking, reason: "Already walking." }) : button("Record a level map", "level-start", { icon: "plus", disabled: !ed.playing || building, reason: building ? "The last map is still being put together." : "Start playing above and get to where the level starts first." });
     return `<div class="card-heading"><h3>Level maps <small class="beta-tag">BETA</small></h3>${badge(plural2(levels.length, "level map"), levels.length ? "good" : "neutral")}</div><p class="subtle">The level editor is in beta. Every change is checked in the game before you keep it, but expect rough edges.</p>
  <p class="subtle">Record a level while you play and you get a map of the whole level that you can paint on.</p>
+ ${gamesPart(summary.level_games)}
  <div class="actions">${actions3}</div>
  <p class="subtle" id="level-status" role="status" aria-live="polite">${esc(levelStatus(summary, ed.playing))}</p>
  ${building ? `<progress max="${job.total}" value="${job.done}" aria-label="Putting the map together"></progress>` : ""}

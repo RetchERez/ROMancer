@@ -84,6 +84,13 @@ export function objectAt(objects,x,y,reach=12){
 
 export const levelChange=ed=>ed.proposal&&ed.level&&((ed.proposal.level&&ed.proposal.level.id===ed.level.id)||ed.proposal.kind==='level-object')?ed.proposal:null;
 
+// Which games the level editor knows in full (enemies, items, secrets), and whether this is one of them.
+export function gamesPart(info){
+ if(!info?.games?.length)return '';
+ const groups={};for(const g of info.games)(groups[g.system]=groups[g.system]||[]).push(g.name);
+ const here=info.this?`<p><strong>${esc(info.this)}</strong> has full level editing: its enemies, items and secrets are on the map and can be changed.</p>`:'<p>This game has the general level tools: the map, painting blocks, Play from here, and Before and after.</p>';
+ return `<div class="level-games">${here}<details><summary>Games with full level editing (${info.games.length})</summary>${Object.entries(groups).map(([system,names])=>`<p class="subtle"><strong>${esc(system)}</strong></p><ul>${names.map(n=>`<li>${esc(n)}</li>`).join('')}</ul>`).join('')}</details></div>`;
+}
 export function levelsPart(ed){
  const summary=ed.summary,levels=summary.levels||[],rec=summary.level_recording,job=summary.level_job,walking=summary.recording?.state==='running';
  const building=job?.state==='running';
@@ -91,6 +98,7 @@ export function levelsPart(ed){
   button('Record a level map','level-start',{icon:'plus',disabled:!ed.playing||building,reason:building?'The last map is still being put together.':'Start playing above and get to where the level starts first.'});
  return `<div class="card-heading"><h3>Level maps <small class="beta-tag">BETA</small></h3>${badge(plural(levels.length,'level map'),levels.length?'good':'neutral')}</div><p class="subtle">The level editor is in beta. Every change is checked in the game before you keep it, but expect rough edges.</p>
  <p class="subtle">Record a level while you play and you get a map of the whole level that you can paint on.</p>
+ ${gamesPart(summary.level_games)}
  <div class="actions">${actions}</div>
  <p class="subtle" id="level-status" role="status" aria-live="polite">${esc(levelStatus(summary,ed.playing))}</p>
  ${building?`<progress max="${job.total}" value="${job.done}" aria-label="Putting the map together"></progress>`:''}

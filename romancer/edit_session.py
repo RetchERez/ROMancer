@@ -1124,7 +1124,16 @@ class EditSession(LevelTools):
                     'engine': {'installed': bool(self.core), 'reason': self.core_error},
                     'scenes': scenes, 'scene_limit': MAX_SCENES, 'recording': recording, 'live': dict(self.live),
                     'changes': self.change_list(), 'preview': self._change_view(self.preview) if self.preview else None,
-                    'private_copy': _private_copy_support(), **levels}
+                    'private_copy': _private_copy_support(), 'level_games': self._level_games(), **levels}
+
+    def _level_games(self) -> dict:
+        """The games the level editor knows in full, and whether this is one of them."""
+        cached = getattr(self, '_level_games_cache', None)
+        if cached is None:
+            from . import level_profiles
+            profile = level_profiles.profile_for(self.rom)
+            cached = self._level_games_cache = {'games': level_profiles.game_list(), 'this': profile.name if profile else None}
+        return cached
 
     def _swatch_key(self, swatch: pt.Swatch) -> str:
         return 'color:' + ','.join(str(s['offset'] + self.skip) for s in swatch.sources if s)
