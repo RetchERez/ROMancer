@@ -35,6 +35,8 @@ START_PRESSES = {
     '49fbd2f61f95': 1,          # Super Mario Land: title, then 1-1
     '42045a1642f7': 2,          # Super Mario Land 2: title, file select (the recorder's own extra press enters the level)
     '0838e531fe22': 2,          # Super Mario World: with 5 intro steps this reaches Yoshi's Island 2
+    'ce3245591dd6': 1,          # Ninja Gaiden: the automatic play reaches 1-1 paused
+    '9b7ebd1d6fd2': 1,          # Ninja Gaiden II: the same
     '23f395b26644': 3,          # DuckTales: title, then the land select (Amazon)
     '6f74e8a7575a': 1,          # Mega Man: title, then the stage select (see ROUTES: Bomb Man)
     '9f5fa2106293': 3,          # Mega Man 2: title, story, stage select (see ROUTES: Flash Man)
