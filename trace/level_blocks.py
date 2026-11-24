@@ -32,6 +32,9 @@ sys.path.insert(0, str(ROOT / 'trace'))
 START_PRESSES = {
     '085ec6395681': 5,          # Castlevania III: title, story, name entry, then Block 1-01
     '22ac359d66da': 2,          # Castlevania II: title, then GAME START (a third press opens the status screen)
+    '49fbd2f61f95': 1,          # Super Mario Land: title, then 1-1
+    '42045a1642f7': 2,          # Super Mario Land 2: title, file select (the recorder's own extra press enters the level)
+    '0838e531fe22': 2,          # Super Mario World: with 5 intro steps this reaches Yoshi's Island 2
     '23f395b26644': 3,          # DuckTales: title, then the land select (Amazon)
     '6f74e8a7575a': 1,          # Mega Man: title, then the stage select (see ROUTES: Bomb Man)
     '9f5fa2106293': 3,          # Mega Man 2: title, story, stage select (see ROUTES: Flash Man)
@@ -42,7 +45,7 @@ START_PRESSES = {
 
 # Games whose first level is reached from a map: the inputs (buttons, frames) played after the Start presses.
 # Games where the automatic play before recording (intro steps) already starts a level the walk cannot use.
-INTROS = {'6f74e8a7575a': 1, '9f5fa2106293': 1}
+INTROS = {'6f74e8a7575a': 1, '9f5fa2106293': 1, '0838e531fe22': 5}
 
 ROUTES = {
     '6f74e8a7575a': [([], 120)] + [(['right'], 4), ([], 30)] * 3 + [(['start'], 4)] + [([], 100)] * 4,          # Mega Man: Bomb Man
