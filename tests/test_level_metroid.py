@@ -152,6 +152,19 @@ def kid_icarus_cart():
         put(start, [0xFF] * 32)
     put(k.LISTS[0], [0x01, 0x09, 0xC7, 0x00, 0x01, 0x0A, 0x97, 0x00, 0xFF])
     put(k.LISTS[3], [0x00, 0x02, 0x37, 0x00, 0xFF])
+    # stage 0: group A Monoeye on screen 1, group B Shemum on screen 1, a Reaper (group B) at YX $38 on screen 1
+    put(0x7CD0, Cart.word(0x7D00) + Cart.word(0x7D08))
+    put(0x7D00, [0x00, 0x08])
+    put(0x7D3A, Cart.word(0x7D40) + Cart.word(0x7D48))
+    put(0x7D40, [0x00, 0x02])
+    put(0x7D05, Cart.word(0x7D50) + Cart.word(0x7D58))
+    put(0x7D6F, Cart.word(0x7D60) + Cart.word(0x7D68))
+    put(0x7D60, [0x00, 0x38])
+    # items: a harp on stage 0 screen 1 at YX $5C, a chalice on stage 1 screen 0
+    put(0x7E07, [0x02, 0x00, 0x01, 0x5C, 0x00, 0x01, 0x00, 0xA8, 0x01])
+    # doors (bank 7, list found through the word at bank 2 $8056): stage 0 screen 1 YX $AE -> god's chamber, stage 1
+    c.put(2, 0x8056, Cart.word(0xF001))
+    c.put(7, 0xF001, [0x00, 0x01, 0xAE, 0x24, 0x01, 0x00, 0x71, 0x22, 0xFF])
     return c
 
 
@@ -166,7 +179,7 @@ class KidIcarusTest(unittest.TestCase):
         rows = [(r['list'], r['number'], r['stage'], r['screen'], r['scroll']) for r in self.p.spawns(1)]
         self.assertEqual(rows, [(0, 0, 1, 9, 0xC7), (0, 1, 1, 10, 0x97), (3, 0, 0, 2, 0x37)])
         objects = self.p.objects({'world': 1, 'stage': 1})
-        self.assertEqual([o['id'] for o in objects], ['spawn:0:0', 'spawn:0:1'])
+        self.assertEqual([o['id'] for o in objects], ['spawn:0:0', 'spawn:0:1', 'item:1', 'door:1'])
         self.assertEqual(objects[0]['y'], -8 * 240 + 0xC7 - 0xEE + 16)
 
     def test_remove(self):
@@ -195,6 +208,77 @@ class KidIcarusTest(unittest.TestCase):
         w = self.p.watcher(plan['watch'])
         self.assertTrue(w.see(ram, 0, 'changed'))
         self.assertEqual(w.result()['state'], 'bad')
+
+    def test_groups_reapers_items_doors(self):
+        part = {'world': 1, 'stage': 0}
+        objects = {o['id']: o for o in self.p.objects(part)}
+        self.assertEqual(sorted(objects), ['door:0', 'groupA:1', 'groupB:1', 'item:0', 'reaperB:1', 'spawn:3:0'])
+        self.assertEqual(objects['groupA:1']['name'], 'Monoeye')
+        self.assertEqual(objects['groupB:1']['name'], 'Shemum')
+        self.assertEqual((objects['reaperB:1']['x'], objects['reaperB:1']['y']), (8 * 16 + 8, 2 - 240 + 0x30 + 16))
+        self.assertEqual((objects['item:0']['name'], objects['item:0']['x']), ('Harp', 0xC * 16 + 8))
+        self.assertEqual((objects['door:0']['name'], objects['door:0']['y']), ('God’s chamber', 2 - 240 + 0xA0 + 32))
+        self.assertEqual([d['block'] for d in self.p.doors()], [0x24, 0x22])
+
+    def apply(self, plan):
+        rom = bytearray(self.c.rom)
+        for offset, old, new in plan['writes']:
+            self.assertEqual(rom[offset], old)
+            rom[offset] = new
+        return m.KidIcarusProfile(bytes(rom))
+
+    def test_group_edits(self):
+        part = {'world': 1, 'stage': 0}
+        plan = self.p.edit(part, 'groupA:1', {'kind': 10})
+        self.assertEqual(plan['writes'], [(m._Cart.offset(6, 0x9940 + 0x0D01), 8, 10)])
+        self.assertEqual(plan['watch'], {'kind': 'wave', 'mode': 2, 'stage': 0, 'group': 'A', 'screen': 1, 'want': 10})
+        self.assertEqual(self.apply(plan).find(part, 'groupA:1')['name'], 'Red floater')
+        plan = self.p.edit(part, 'groupB:1', {}, remove=True)
+        self.assertEqual(plan['writes'][0][2], 0)
+        self.assertNotIn('groupB:1', [o['id'] for o in self.apply(plan).objects(part)])
+        with self.assertRaises(ValueError):
+            self.p.edit(part, 'groupB:1', {'kind': 8})            # a group A kind in group B
+        plan = self.p.edit(part, 'reaperB:1', {}, remove=True)
+        self.assertEqual(plan['writes'], [(m._Cart.offset(6, 0x9940 + 0x0D61), 0x38, 0)])
+        self.assertEqual(plan['watch']['row'], 0x30)
+
+    def test_item_and_door_edits(self):
+        part = {'world': 1, 'stage': 0}
+        plan = self.p.edit(part, 'item:0', {'item': 1})
+        self.assertEqual(plan['writes'], [(m._Cart.offset(6, 0x9940 + 0x0E0B), 0, 1)])
+        self.assertEqual((plan['watch']['x'], plan['watch']['row']), (0xC0, 0x50))
+        p = self.apply(self.p.edit(part, 'item:0', {}, remove=True))
+        self.assertEqual([(r['stage'], r['item']) for r in p.items(1)], [(1, 1)])
+        plan = self.p.edit(part, 'door:0', {'chamber': 0x25})
+        self.assertEqual(plan['writes'], [(m._Cart.offset(7, 0xF004), 0x24, 0x25)])
+        self.assertEqual(plan['watch']['at'], 0x5F0 + 0xAE + 16)
+        with self.assertRaises(ValueError):
+            self.p.edit(part, 'door:0', {'chamber': 0x27})        # not used in world 1
+        p = self.apply(self.p.edit(part, 'door:0', {}, remove=True))
+        self.assertEqual([(d['stage'], d['block']) for d in p.doors()], [(1, 0x22)])
+
+    def test_new_watchers(self):
+        part = {'world': 1, 'stage': 0}
+        ram = bytearray(0x2800)
+        ram[0xA0], ram[0x130], ram[0x4D1], ram[0xFD] = 2, 0, 1, 0xEE
+        w = self.p.watcher(self.p.edit(part, 'groupB:1', {'kind': 3})['watch'])
+        self.assertFalse(w.see(ram, 0, 'changed'))                # all four slots empty
+        ram[0x7C1] = ram[0x7D1] = 0x18
+        self.assertTrue(w.see(ram, 1, 'changed'))
+        self.assertEqual(w.result()['state'], 'good')
+        ram[0x7C1] = ram[0x7D1] = 0
+        w = self.p.watcher(self.p.edit(part, 'door:0', {'chamber': 0x25})['watch'])
+        ram[0x5F0 + 0xAE], ram[0x5F0 + 0xAE + 16] = 0x50, 0x24
+        for f in range(4):
+            done = w.see(ram, f, 'changed')
+        self.assertTrue(done)
+        self.assertEqual(w.result()['state'], 'bad')
+        w = self.p.watcher(self.p.edit(part, 'item:0', {'item': 1})['watch'])
+        ram[0x4D1], ram[0xFD] = 1, 0x50
+        self.assertFalse(w.see(ram, 0, 'changed'))
+        ram[0x751], ram[0x752], ram[0x753] = 0x81, 1, 0xC0
+        self.assertTrue(w.see(ram, 1, 'changed'))
+        self.assertEqual(w.result()['state'], 'good')
 
 
 if __name__ == '__main__':
