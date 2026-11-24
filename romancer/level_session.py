@@ -456,7 +456,7 @@ class LevelTools:
         real screen differs from the same screen drawn without sprites. Objects of a type never seen take the picture of
         one that was. Adds 'picture' (PNG as base64) and 'picture_box' ([left, top, width, height] on the map)."""
         import base64
-        from PIL import Image, ImageChops
+        from PIL import Image, ImageChops, ImageFilter
         plane = self._level_plane(level, 0)
         shots = {}
 
@@ -468,6 +468,18 @@ class LevelTools:
                 real.putdata([palette[v] if v < len(palette) else lm.EMPTY for line in graphics.screen for v in line])
                 shots[number] = (real, lm.screen_picture(graphics, self.system))
             return shots[number]
+        # the player is on screen in nearly every capture at much the same spot; sprite pixels that show at the same
+        # screen place in most captures are the player, not the object there
+        numbers = sorted(plane.windows)
+        common = None
+        if len(numbers) >= 4:
+            counts = None
+            for number in numbers:
+                real, plain = shot(number)
+                diff = ImageChops.difference(real, plain).convert('L').point(lambda v: 1 if v else 0)
+                counts = diff if counts is None else ImageChops.add(counts, diff)
+            limit = max(2, len(numbers) // 2)
+            common = counts.point(lambda v: 255 if v >= limit else 0).filter(ImageFilter.MaxFilter(5))
         by_type = {}
         for item in objects:
             left, top, width, height = item['map_x'] - 12, item['map_y'] - 32, 24, 32
@@ -479,6 +491,8 @@ class LevelTools:
                 box = (x0, y0, x0 + width, y0 + height)
                 piece, ground = real.crop(box), plain.crop(box)
                 mask = ImageChops.difference(piece, ground).convert('L').point(lambda v: 255 if v else 0)
+                if common is not None:
+                    mask = ImageChops.subtract(mask, common.crop(box))
                 if mask.getbbox() is None:
                     continue
                 picture = piece.convert('RGBA')

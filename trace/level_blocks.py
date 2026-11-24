@@ -31,6 +31,7 @@ sys.path.insert(0, str(ROOT / 'trace'))
 # automatic play needs to be told how to get there. Each was found by looking at the screen after every press.
 START_PRESSES = {
     '085ec6395681': 5,          # Castlevania III: title, story, name entry, then Block 1-01
+    '0b3d9e1f01ed': 1,          # Super Mario Bros.: title, then World 1-1
 }
 
 
