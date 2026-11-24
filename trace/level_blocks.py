@@ -32,10 +32,17 @@ sys.path.insert(0, str(ROOT / 'trace'))
 START_PRESSES = {
     '085ec6395681': 5,          # Castlevania III: title, story, name entry, then Block 1-01
     '0b3d9e1f01ed': 1,          # Super Mario Bros.: title, then World 1-1
+    '1ddc4b429490': 3,          # Super Mario Bros. 3: title, then the World 1 map (see ROUTES)
 }
 
 
-def record_level(session, steps: int, intro: int, presses: int = 0) -> dict | None:
+# Games whose first level is reached from a map: the inputs (buttons, frames) played after the Start presses.
+ROUTES = {
+    '1ddc4b429490': [(['right'], 20), ([], 40), (['up'], 20), ([], 40), (['a'], 4), ([], 200)],   # Super Mario Bros. 3: World 1 map into 1-1
+}
+
+
+def record_level(session, steps: int, intro: int, presses: int = 0, route=None) -> dict | None:
     session.record(intro, wait=True)
     for scene_id in list(session.scenes):
         session.forget_scene(scene_id)
@@ -45,6 +52,15 @@ def record_level(session, steps: int, intro: int, presses: int = 0) -> dict | No
         for buttons, frames in ((['start'], 4), ([], 150)):
             while session.play(frames, buttons).get('busy'):
                 time.sleep(0.2)
+    if route:
+        for buttons, frames in route:
+            while session.play(frames, buttons).get('busy'):
+                time.sleep(0.2)
+        session.level_start('Measured level')
+        session.level_auto(steps, wait=True)
+        session.level_stop(wait=True)
+        job = session.level_job
+        return session._level(job['level_id']) if job['state'] == 'finished' else None
     session.level_start('Measured level')
     for attempt in range(3):
         session.level_auto(2, wait=True)
@@ -72,7 +88,7 @@ def measure(index: Path, key: str, steps: int, png, tries: int, intro: int = 8) 
     rom.write_bytes(data)
     session = EditSession(temp / 'store', rom, system)
     try:
-        level = record_level(session, steps, intro, START_PRESSES.get(sha[:12], 0))
+        level = record_level(session, steps, intro, START_PRESSES.get(sha[:12], 0), ROUTES.get(sha[:12]))
         if level is None:
             out['error'] = session.level_job['message']
             return out
