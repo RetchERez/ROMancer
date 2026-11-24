@@ -89,8 +89,19 @@ class Profile:
         raise ValueError('That choice is not one of the game’s own.')
 
 
+class Ram(bytes):
+    """The game's work RAM (index 0 is the start of work RAM), with every other memory area of the moment in .domains
+    (for example 'hram' and 'sram', cartridge RAM, on the Game Boy)."""
+    domains: dict = {}
+
+
 def ram_of(snapshot):
-    return next((snapshot.domains[n].data for n in ('wram', 'ram') if n in snapshot.domains and snapshot.domains[n].data is not None), None)
+    data = next((snapshot.domains[n].data for n in ('wram', 'ram') if n in snapshot.domains and snapshot.domains[n].data is not None), None)
+    if data is None:
+        return None
+    ram = Ram(data)
+    ram.domains = {name: d.data for name, d in snapshot.domains.items() if d.data is not None}
+    return ram
 
 
 # one module per game (or family of games that share an engine); each has PROFILES = [classes]

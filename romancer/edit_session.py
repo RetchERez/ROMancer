@@ -157,9 +157,28 @@ class _Session(pv.TraceSession):
 
     def snapshot(self):
         try:
-            return super().snapshot()
+            snap = super().snapshot()
         except OSError:
-            return self._guarded_snapshot()
+            snap = self._guarded_snapshot()
+        self._add_cart_ram(snap)
+        return snap
+
+    def _add_cart_ram(self, snap) -> None:
+        """Cartridge RAM (battery or work RAM on the cartridge), when the engine has some and the trace does not already
+        list it: some games keep their whole state there (Super Mario Land 2). Untraced, so its sources are unknown."""
+        import ctypes
+        if 'sram' in snap.domains:
+            return
+        try:
+            lib = self.fe.lib
+            size = int(lib.retro_get_memory_size(0))
+            pointer = lib.retro_get_memory_data(0)
+        except (AttributeError, OSError):
+            return
+        if not pointer or not 0 < size <= 1 << 17:
+            return
+        zeros = bytes(4 * size)
+        snap.domains['sram'] = pv.DomainSnapshot('sram', ctypes.string_at(pointer, size), array('I', zeros), array('I', zeros))
 
     def _guarded_snapshot(self):
         import ctypes
