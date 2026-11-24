@@ -38,6 +38,7 @@ START_PRESSES = {
     'ce3245591dd6': 1,          # Ninja Gaiden: the automatic play reaches 1-1 paused
     '9b7ebd1d6fd2': 1,          # Ninja Gaiden II: the same
     '8d5e3d9ce20f': 3,          # Chip 'n Dale: title, character select, then Start skips the story
+    '7aaaf89257b1': 1,          # Super Mario Bros. 2: title, then character select (see ROUTES)
     '23f395b26644': 3,          # DuckTales: title, then the land select (Amazon)
     '6f74e8a7575a': 1,          # Mega Man: title, then the stage select (see ROUTES: Bomb Man)
     '9f5fa2106293': 3,          # Mega Man 2: title, story, stage select (see ROUTES: Flash Man)
@@ -48,9 +49,11 @@ START_PRESSES = {
 
 # Games whose first level is reached from a map: the inputs (buttons, frames) played after the Start presses.
 # Games where the automatic play before recording (intro steps) already starts a level the walk cannot use.
-INTROS = {'6f74e8a7575a': 1, '9f5fa2106293': 1, '0838e531fe22': 5, 'a13fa8164a0a': 1}
+INTROS = {'6f74e8a7575a': 1, '9f5fa2106293': 1, '0838e531fe22': 5, 'a13fa8164a0a': 1, '7aaaf89257b1': 1}
 
 ROUTES = {
+    '7aaaf89257b1': [(['a'], 4)] + [([], 100)] * 4 + [([], 120), ([], 60), (['right'], 70), ([], 10), (['up'], 10), ([], 120), ([], 60),
+                                                        (['right'], 110), ([], 20), (['up'], 10), ([], 120), ([], 120)],       # SMB2: Mario, then the door into 1-1's main area
     'a13fa8164a0a': [([], 120)] * 2 + [(['b'], 4)] + [([], 120)] * 3 + [(['b'], 4)] + [([], 120)] * 4,                      # Wonder Boy: button 1 starts
     '6f74e8a7575a': [([], 120)] + [(['right'], 4), ([], 30)] * 3 + [(['start'], 4)] + [([], 100)] * 4,          # Mega Man: Bomb Man
     '9f5fa2106293': [([], 120), (['down'], 4), ([], 30), (['start'], 4)] + [([], 100)] * 6,                      # Mega Man 2: Flash Man
