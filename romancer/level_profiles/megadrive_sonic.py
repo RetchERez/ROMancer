@@ -9,7 +9,7 @@ Sonic 1 marks an object the game remembers (a broken monitor stays broken) with 
 with bit 15 of the y word. Edits change the id and subtype bytes of one record in place, so nothing moves: a swap writes
 another enemy's id and subtype as the game uses them in the same zone (so its graphics are loaded there), and a removal
 writes object id 0, which the object loader places as an empty slot. Worked out from the games' own loaders (Sonic 1
-$D8F0 and $DA56, Sonic 2 $17AA4 and $17F84) and proven by replaying the game; see research/megadrive_sonic-level-profile.md.
+$D8F0 and $DA56, Sonic 2 $17A2A and $17EBE) and proven by replaying the game; see research/megadrive_sonic-level-profile.md.
 
 RAM: snapshots give work RAM as 'wram', index 0 = $FF0000, words big-endian (68000 order).
 """

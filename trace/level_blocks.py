@@ -39,6 +39,8 @@ START_PRESSES = {
     '9b7ebd1d6fd2': 1,          # Ninja Gaiden II: the same
     '8d5e3d9ce20f': 3,          # Chip 'n Dale: title, character select, then Start skips the story
     '7aaaf89257b1': 1,          # Super Mario Bros. 2: title, then character select (see ROUTES)
+    '46160baa0636': 1,          # Sonic The Hedgehog (Mega Drive): Start at the title
+    '568e5e9557c4': 1,          # Sonic The Hedgehog 2 (Mega Drive): the same
     '23f395b26644': 3,          # DuckTales: title, then the land select (Amazon)
     '6f74e8a7575a': 1,          # Mega Man: title, then the stage select (see ROUTES: Bomb Man)
     '9f5fa2106293': 3,          # Mega Man 2: title, story, stage select (see ROUTES: Flash Man)
