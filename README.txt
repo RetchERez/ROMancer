@@ -284,10 +284,11 @@ that was. The draft shows whether the image fits. Save playable
 copy opens the new build in Playtest. Technical details shows the graphics,
 tile placement and checksum bytes.
 
-Levels opens the level maps in Scenes & colors: record a level while you
-play, then paint whole blocks on its map. On Castlevania the map also shows
-and changes the enemies, candles, secrets and length of each part, and
-Play from here and Before and after work on every map. Read-only layout research and
+Level Editor (beta) opens the level maps in Scenes & colors: record a level
+while you play, then paint whole blocks on its map. For the 31 games the
+Level Editor page lists, the map also shows and changes the enemies, items
+and secrets, and on Castlevania the length of each part. Play from here and
+Before and after work on every map. Read-only layout research and
 measured locations remain available. Generic graphics tilemaps remain
 available as graphics resources.
 

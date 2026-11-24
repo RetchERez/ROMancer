@@ -383,37 +383,48 @@ class LevelTools:
                     'scenes': [{'id': sid, 'label': self._label(sid)} for sid in level['scene_ids']],
                     'pending': pending, 'working': working}
 
-    # ---- what a game's level profile knows (romancer/level_profiles.py): enemies, items, block roles
+    # ---- what a game's level profile knows (romancer/level_profiles): enemies, items, secrets, block roles, length
 
     def _profile_context(self, level: dict):
         """(profile, [one entry per part of the map]) or None without a profile. Each part of the map (a section: a room
-        the game drew in place of another) is its own stage in the game, so each gets its stage, floor and where its
-        stage x 0 and screen y 0 are on the map, from the earliest capture of that part."""
+        the game drew in place of another) is its own part of the game, so each gets the profile's name for it and where
+        that part's pixel 0, 0 is on the map, from the earliest capture of that part."""
         from . import level_profiles
         profile = level_profiles.profile_for(self.rom)
         if profile is None:
             return None
         plane = self._level_plane(level, 0)
         ordered = sorted(plane.windows.items(), key=lambda item: self.meta[level['scene_ids'][item[0]]]['frame'])
-        parts, seen = [], set()
+        found = {}          # section -> [(part, dx, dy)] for every capture the profile can place
         for number, window in ordered:
-            if window.section in seen:
-                continue
-            snapshot = self._scene(level['scene_ids'][number]).snapshot
-            ram = next((snapshot.domains[n].data for n in ('wram', 'ram') if n in snapshot.domains and snapshot.domains[n].data is not None), None)
-            if ram is None:
-                continue
-            seen.add(window.section)
-            camera = ram[0x2E] | ram[0x2F] << 8
-            columns = [c for (c, r), spot in plane.cells.items() if plane.windows.get(spot.frame) and plane.windows[spot.frame].section == window.section]
-            # a stage x is drawn at screen x stage x - camera - 64 (the game spawns a zone ahead of where it shows it)
-            parts.append({'section': window.section, 'stage': ram[0x28], 'floor': ram[0x46],
-                          'dx': window.across - camera - profile.ZONE - 1, 'dy': window.down,
+            ram = level_profiles.ram_of(self._scene(level['scene_ids'][number]).snapshot)
+            where = profile.where(ram) if ram is not None else None
+            if where is not None:
+                found.setdefault(window.section, []).append((where['part'], window.across - where['x'], window.down - where['y']))
+        parts = []
+        for section, rows in found.items():
+            # the part of the earliest capture, and the offset most of that part's captures agree on: one capture the
+            # map placed off (a repeating forest, a restart) must not move every box in the section
+            part = rows[0][0]
+            offsets = [(dx, dy) for p, dx, dy in rows if p == part]
+            dx, dy = max(set(offsets), key=offsets.count)
+            columns = [c for (c, r), spot in plane.cells.items() if plane.windows.get(spot.frame) and plane.windows[spot.frame].section == section]
+            parts.append({'section': section, 'part': part, 'name': profile.part_name(part), 'dx': dx, 'dy': dy,
                           'left': min(columns) * plane.px if columns else 0, 'right': (max(columns) + 1) * plane.px if columns else 0})
         return profile, parts
 
+    def _profile_part(self, level: dict, part: dict):
+        context = self._profile_context(level)
+        if context is None:
+            raise ValueError('ROMancer does not know the objects of this game yet.')
+        profile, parts = context
+        if not isinstance(part, dict) or not any(p['part'] == part for p in parts):
+            raise ValueError('That part of the level is not on this map.')
+        return profile, next(p for p in parts if p['part'] == part)
+
     def level_objects(self, level_id: str) -> dict:
-        """Enemies, candles and items of the level on the map, and what each map place is (solid, breakable, open)."""
+        """Everything the game's profile knows in the level, placed on the map, and what each map place is (solid,
+        breakable, open) when the profile knows block roles."""
         with self.lock:
             level = self._level(level_id)
             context = self._profile_context(level)
@@ -424,32 +435,31 @@ class LevelTools:
             px = stored['px']
             objects = []
             for part in parts:
-                for item in profile.objects(part['stage'], part['floor']):
+                for item in profile.objects(part['part']):
                     x, y = item['x'] + part['dx'], item['y'] + part['dy']
                     if part['left'] - px <= x < part['right'] + px:
-                        objects.append({**item, 'map_x': x, 'map_y': y, 'stage': part['stage'], 'floor': part['floor']})
-            roles = ['.'] * (stored['width'] * stored['height'])
-            plane = self._level_plane(level, 0)
-            for (column, row), spot in plane.cells.items():
-                graphics = self._graphics(level['scene_ids'][spot.frame])
-                cell = graphics.layers()[spot.layer].layer.cell(spot.x, spot.y)
-                tile = (cell.tile_address % 0x1000) // 16
-                role = profile.tile_role(tile)
-                roles[row * stored['width'] + column] = {'solid': 's', 'breakable': 'b'}.get(role, '.')
-            self._object_pictures(level, [o for o in objects if o['kind'] in ('enemy', 'candle')])
-            return {'profile': profile.name, 'parts': [{k: part[k] for k in ('section', 'stage', 'floor')} for part in parts],
-                    'objects': objects, 'roles': ''.join(roles),
-                    'enemy_choices': profile.enemy_choices(),
-                    'block_items': [{'item': n, 'name': profile.block_item_name(n)} for n in range(8)],
-                    'treasures': [{'treasure': k, 'name': v} for k, v in profile.TREASURES.items()],
-                    'triggers': [{'trigger': k, 'name': v} for k, v in profile.TRIGGERS.items()]}
+                        objects.append({**item, 'map_x': x, 'map_y': y, 'part': part['part']})
+            roles = ''
+            if profile.tile_role(0) is not None:
+                cells = ['.'] * (stored['width'] * stored['height'])
+                plane = self._level_plane(level, 0)
+                for (column, row), spot in plane.cells.items():
+                    graphics = self._graphics(level['scene_ids'][spot.frame])
+                    cell = graphics.layers()[spot.layer].layer.cell(spot.x, spot.y)
+                    role = profile.tile_role((cell.tile_address % 0x1000) // 16)
+                    cells[row * stored['width'] + column] = {'solid': 's', 'breakable': 'b'}.get(role, '.')
+                roles = ''.join(cells)
+            self._object_pictures(level, [o for o in objects if o['style'] in ('enemy', 'item')])
+            return {'profile': profile.name, 'parts': [{k: part[k] for k in ('section', 'part', 'name')} for part in parts],
+                    'objects': objects, 'roles': roles, 'choices': profile.choices(),
+                    'resizable': any(profile.screens(part['part']) for part in parts)}
 
     def _object_pictures(self, level: dict, objects: list) -> None:
         """Give each object the picture the game draws for it: from a capture that shows that spot, the pixels where the
         real screen differs from the same screen drawn without sprites. Objects of a type never seen take the picture of
         one that was. Adds 'picture' (PNG as base64) and 'picture_box' ([left, top, width, height] on the map)."""
         import base64
-        from PIL import Image, ImageChops
+        from PIL import Image, ImageChops, ImageFilter
         plane = self._level_plane(level, 0)
         shots = {}
 
@@ -461,17 +471,31 @@ class LevelTools:
                 real.putdata([palette[v] if v < len(palette) else lm.EMPTY for line in graphics.screen for v in line])
                 shots[number] = (real, lm.screen_picture(graphics, self.system))
             return shots[number]
+        # the player is on screen in nearly every capture at much the same spot; sprite pixels that show at the same
+        # screen place in most captures are the player, not the object there
+        numbers = sorted(plane.windows)
+        common = None
+        if len(numbers) >= 4:
+            counts = None
+            for number in numbers:
+                real, plain = shot(number)
+                diff = ImageChops.difference(real, plain).convert('L').point(lambda v: 1 if v else 0)
+                counts = diff if counts is None else ImageChops.add(counts, diff)
+            limit = max(2, len(numbers) // 2)
+            common = counts.point(lambda v: 255 if v >= limit else 0).filter(ImageFilter.MaxFilter(5))
         by_type = {}
         for item in objects:
             left, top, width, height = item['map_x'] - 12, item['map_y'] - 32, 24, 32
             for number, window in sorted(plane.windows.items()):
                 x0, y0 = left - window.across, top - window.down
-                if x0 < 0 or y0 < window.first or x0 + width > 256 or y0 + height > window.last:
-                    continue
                 real, plain = shot(number)
+                if x0 < 0 or y0 < window.first or x0 + width > real.width or y0 + height > window.last:
+                    continue
                 box = (x0, y0, x0 + width, y0 + height)
                 piece, ground = real.crop(box), plain.crop(box)
                 mask = ImageChops.difference(piece, ground).convert('L').point(lambda v: 255 if v else 0)
+                if common is not None:
+                    mask = ImageChops.subtract(mask, common.crop(box))
                 if mask.getbbox() is None:
                     continue
                 picture = piece.convert('RGBA')
@@ -480,90 +504,43 @@ class LevelTools:
                 picture.save(out, format='PNG')
                 item['picture'] = base64.b64encode(out.getvalue()).decode()
                 item['picture_box'] = [left, top, width, height]
-                by_type.setdefault((item['kind'], item['type']), item['picture'])
+                by_type.setdefault((item['style'], item.get('type')), item['picture'])
                 break
         for item in objects:
-            if 'picture' not in item and (item['kind'], item['type']) in by_type:
-                item['picture'] = by_type[(item['kind'], item['type'])]
+            if 'picture' not in item and (item['style'], item.get('type')) in by_type:
+                item['picture'] = by_type[(item['style'], item.get('type'))]
                 item['picture_box'] = [item['map_x'] - 12, item['map_y'] - 32, 24, 32]
                 item['picture_from_another'] = True
 
-    def level_object_choices(self, level_id: str, zone: int, stage: int = 0, floor: int = 0) -> dict:
+    def propose_level_edit(self, level_id: str, part: dict, object_id: str, values: dict = None, remove: bool = False) -> dict:
+        """Change one thing the profile knows (an enemy, an item, a secret), checked by replaying the recorded walk."""
         with self.lock:
             level = self._level(level_id)
-            context = self._profile_context(level)
-            if context is None:
-                raise ValueError('ROMancer does not know the objects of this game yet.')
-            profile = context[0]
-            return {'drops': profile.drop_choices(int(stage), int(floor), int(zone)), 'enemies': profile.enemy_choices()}
-
-    def propose_level_object(self, level_id: str, zone: int, kind: str, index: int, stage: int = 0, floor: int = 0) -> dict:
-        """Point one zone's enemy or candle at another of the game's records (index 0 removes it)."""
-        with self.lock:
-            level = self._level(level_id)
-            context = self._profile_context(level)
-            if context is None:
-                raise ValueError('ROMancer does not know the objects of this game yet.')
-            profile, parts = context
-            stage, floor = int(stage), int(floor)
-            if kind not in ('enemy', 'candle'):
-                raise ValueError('Choose an enemy or a candle.')
-            row = profile.zones(stage, floor)[int(zone)]
-            offset = row['enemy_byte' if kind == 'enemy' else 'candle_byte']
-            index = int(index)
-            if not 0 <= index <= 255:
-                raise ValueError('That choice is not one of the game\u2019s own.')
-            if kind == 'enemy':
-                record = profile.enemy_record(index)
-                title = 'Remove the enemy' if record is None else f'Enemy here: {profile.enemy_name(record["type"])}'
-            else:
-                record = profile.candle_record(index)
-                title = 'Remove the candle' if record is None else f'Candle drops: {profile.drop_name(record["drop"])}'
-            scene_id = level['scene_ids'][0]
-        change = self.propose_writes(scene_id, [(offset, self.rom[offset], index)], f'{title} (zone {int(zone) + 1})', kind='level-object')
-        expect = {'kind': kind, 'zone': int(zone), 'record': record, 'stage': stage}
-        stored = self._find(change['id'])
-        stored['object_check'] = {'state': 'working', 'text': 'Playing the game from the start to see the change happen…'}
-        threading.Thread(target=self._check_object, args=(stored, level, expect), name='romancer-object-check', daemon=True).start()
-        return self.change(change['id'])
-
-    def propose_level_secret(self, level_id: str, kind: str, number: int, stage: int, floor: int,
-                             item=None, treasure=None, trigger=None) -> dict:
-        """Change what a breakable block holds, or what hidden treasure appears and how it is found."""
-        with self.lock:
-            level = self._level(level_id)
-            context = self._profile_context(level)
-            if context is None:
-                raise ValueError('ROMancer does not know the secrets of this game yet.')
-            profile = context[0]
-            if kind not in ('block', 'treasure'):
-                raise ValueError('Choose a breakable block or a hidden treasure.')
-            stage, floor, number = int(stage), int(floor), int(number)
-            writes = profile.secret_writes(kind, stage, floor, number, item, treasure, trigger)
-            if not writes:
+            profile, _ = self._profile_part(level, part)
+            item = profile.find(part, str(object_id))
+            values = dict(values or {})
+            if remove and not item.get('remove'):
+                raise ValueError('That cannot be removed.')
+            for field in item.get('fields', []):
+                if field['key'] in values:
+                    values[field['key']] = profile.pick(field, profile.choices(), values[field['key']])['value']
+            plan = profile.edit(part, str(object_id), values, bool(remove))
+            if not plan['writes']:
                 raise ValueError('That is how the game already has it.')
-            if kind == 'block':
-                title = f'Breakable block holds: {profile.block_item_name(int(item))}'
-                expect = {'kind': 'block', 'number': number, 'stage': stage,
-                          'drop': None if int(item) == 0 else profile.block_items()[int(item)]}
-            else:
-                row = next(r for r in profile.treasures(stage, floor) if r['number'] == number)
-                shown = row['treasure'] if treasure is None else int(treasure)
-                how = row['trigger'] if trigger is None else int(trigger)
-                title = f'Hidden treasure: {profile.TREASURES[shown]}, {profile.TRIGGERS[how].lower()}'
-                expect = {'kind': 'treasure', 'number': number, 'stage': stage, 'treasure': shown}
-            change = self.propose_writes(level['scene_ids'][0], writes, title, kind='level-object')
+            change = self.propose_writes(level['scene_ids'][0], plan['writes'], plan['title'], kind='level-object')
             stored = self._find(change['id'])
             stored['object_check'] = {'state': 'working', 'text': 'Playing the game from the start to see the change happen…'}
-        threading.Thread(target=self._check_secret, args=(stored, level, expect), name='romancer-secret-check', daemon=True).start()
+            watcher = profile.watcher(plan['watch'])
+        threading.Thread(target=self._watch_change, args=(stored, level, watcher), name='romancer-object-check', daemon=True).start()
         return self.change(change['id'])
 
-    def _check_secret(self, change: dict, level: dict, expect: dict) -> None:
-        """Replay the recorded walk with the change and watch for the secret being found: the game's own found-flags
-        ($0144 treasure, $0146 blocks, one bit per secret) and then what appeared."""
+    def _watch_change(self, change: dict, level: dict, watcher) -> None:
+        """Replay the recorded walk from the level's first checkpoint with the change (and first without it, when the
+        watcher compares) and let the watcher look at the game every few frames."""
         from array import array
         import zlib
         from . import edit_session as es
+        from .level_profiles import ram_of
         try:
             meta = self.meta[level['scene_ids'][0]]
             run_dir = self.store / 'runs' / meta['run']
@@ -571,55 +548,31 @@ class LevelTools:
             inputs.frombytes((run_dir / 'inputs.bin').read_bytes())
             start = min(meta['checkpoints'])
             state = zlib.decompress((run_dir / f'{start}.st').read_bytes())
-            end = min(len(inputs), max(self.meta[s]['frame'] for s in level['scene_ids']) + 120)
-            path = self.store / 'work' / f'secret-{change["id"]}.bin'
+            end = len(inputs) if watcher.compare else min(len(inputs), max(self.meta[s]['frame'] for s in level['scene_ids']) + 120)
+            path = self.store / 'work' / f'watch-{change["id"]}.bin'
             path.parent.mkdir(parents=True, exist_ok=True)
             path.write_bytes(self._rom_with([change]))
-            fe = es._frontend(self._cfg(), path)
-            seen, found_at = None, None
-            bit = 1 << expect['number']
-            try:
-                if int(fe.lib.retro_serialize_size()) <= 0:
-                    fe.run_frame([])
-                fe.unserialize(state)
-                session = es._Session(fe, checkpoint_every=10 ** 9)
-                session.frame = start
-                frame = start
-                while frame < end:
-                    session.run(2, lambda f: es._names(inputs[f]) if f < len(inputs) else ())
-                    frame += 2
-                    snap = session.snapshot()
-                    ram = next((snap.domains[n].data for n in ('wram', 'ram') if n in snap.domains and snap.domains[n].data is not None), None)
-                    if ram is None or ram[0x28] != expect['stage']:
-                        continue
-                    flags = ram[0x144] if expect['kind'] == 'treasure' else ram[0x146]
-                    if not flags & bit:
-                        continue
-                    found_at = found_at or frame
-                    if expect['kind'] == 'treasure':
-                        hits = [ram[0x568 + x] for x in range(0x17, 0x1C) if ram[0x434 + x] == 2]
-                    else:
-                        hits = [ram[0x584 + x] for x in range(0x03, 0x1C) if ram[0x434 + x] == 0x2F]
-                    if hits:
-                        seen = hits[0]
-                        break
-                    if frame - found_at > 60:
-                        break
-            finally:
-                es._close(fe)
-            if found_at is None:
-                result = {'state': 'warn', 'text': "The recorded walk doesn't find this secret, so the change couldn't be watched in the game. Use Play from here to try it yourself."}
-            elif expect['kind'] == 'treasure':
-                ok = seen == expect['treasure']
-                result = {'state': 'good' if ok else 'bad', 'text': 'Played from the start, the secret is found and the chosen treasure appears.' if ok
-                          else 'Played from the start, the secret is found but a different treasure appears.'}
-            else:
-                wanted = expect['drop']
-                ok = (seen is None) if wanted is None else seen == wanted
-                result = {'state': 'good' if ok else 'bad', 'text': 'Played from the start, the block breaks and gives the chosen item.' if ok
-                          else 'Played from the start, the block breaks but gives something else.'}
+            runs = ([('original', self.rom_path)] if watcher.compare else []) + [('changed', path)]
+            for run, rom_path in runs:
+                fe = es._frontend(self._cfg(), rom_path)
+                try:
+                    if int(fe.lib.retro_serialize_size()) <= 0:
+                        fe.run_frame([])
+                    fe.unserialize(state)
+                    session = es._Session(fe, checkpoint_every=10 ** 9)
+                    session.frame = start
+                    frame = start
+                    while frame < end:
+                        session.run(watcher.every, lambda f: es._names(inputs[f]) if f < len(inputs) else ())
+                        frame += watcher.every
+                        ram = ram_of(session.snapshot())
+                        if ram is not None and watcher.see(ram, frame, run):
+                            break
+                finally:
+                    es._close(fe)
             path.unlink(missing_ok=True)
-        except Exception as error:
+            result = watcher.result()
+        except Exception as error:      # shown to the user; the editor keeps working
             result = {'state': 'warn', 'text': f'The change could not be watched in the game: {error}'}
         change['object_check'] = result
 
@@ -633,99 +586,33 @@ class LevelTools:
             profile, parts = context
             x = float(x)
             part = min(parts, key=lambda p: 0 if p['left'] <= x < p['right'] else min(abs(x - p['left']), abs(x - p['right'])))
-            origin = part['dx'] + profile.ZONE + 1                  # map x of the part's stage x 0
-            pages = profile.pages(part['stage'], part['floor'])
-            screen = max(0, min(pages, int((x - origin) // 256)))
-            return {'stage': part['stage'], 'floor': part['floor'], 'section': part['section'], 'screen': screen,
-                    'screens': pages + 1, 'map_left': origin + screen * 256, 'most': profile.MAX_PAGES + 1}
+            screens = profile.screens(part['part'])
+            if not screens:
+                raise ValueError('ROMancer cannot change the length of this part yet.')
+            screen = max(0, min(screens['count'] - 1, int((x - part['dx']) // 256)))
+            return {'part': part['part'], 'name': part['name'], 'screen': screen, 'screens': screens['count'],
+                    'map_left': part['dx'] + screen * 256, 'most': screens['most']}
 
-    def propose_level_length(self, level_id: str, stage: int, floor: int, screen: int, delta: int) -> dict:
+    def propose_level_length(self, level_id: str, part: dict, screen: int, delta: int) -> dict:
         """Remove screens from a part of the level, or repeat one; everything after moves along with it."""
         with self.lock:
             level = self._level(level_id)
-            context = self._profile_context(level)
-            if context is None:
-                raise ValueError('ROMancer does not know how long the parts of this game are yet.')
-            profile = context[0]
+            profile, _ = self._profile_part(level, part)
             if any(c.get('length') for c in self._active()):
                 raise ValueError('ROMancer changes the length of one part of the level at a time. Keep or cancel the other length change, save, and then make the next one.')
-            stage, floor, screen, delta = int(stage), int(floor), int(screen), int(delta)
-            before = profile.pages(stage, floor) + 1
-            result = profile.resize_writes(stage, floor, screen, delta)
+            screen, delta = int(screen), int(delta)
+            before = profile.screens(part)['count']
+            plan = profile.resize(part, screen, delta)
             count = abs(delta)
             title = (f'Screen {screen + 1} repeated {count} more time{"s" if count > 1 else ""} ({before} to {before + delta} screens)' if delta > 0 else
                      f'{count} screen{"s" if count > 1 else ""} removed from screen {screen + 1} ({before} to {before + delta} screens)')
-            change = self.propose_writes(level['scene_ids'][0], result['writes'], title, kind='level-object')
+            change = self.propose_writes(level['scene_ids'][0], plan['writes'], title, kind='level-object')
             stored = self._find(change['id'])
             stored['length'] = True
             stored['object_check'] = {'state': 'working', 'text': 'Playing the game from the start on the old and the new length…'}
-            expect = {'stage': stage, 'floor': floor, 'old': before - 1, 'new': before - 1 + delta, 'notes': result['notes']}
-        threading.Thread(target=self._check_length, args=(stored, level, expect), name='romancer-length-check', daemon=True).start()
+            watcher = profile.watcher(plan['watch'])
+        threading.Thread(target=self._watch_change, args=(stored, level, watcher), name='romancer-length-check', daemon=True).start()
         return self.change(change['id'])
-
-    def _check_length(self, change: dict, level: dict, expect: dict) -> None:
-        """Play the recorded walk on the old and the new game: how far this part scrolls, and when the next part starts."""
-        from array import array
-        import zlib
-        from . import edit_session as es
-        try:
-            meta = self.meta[level['scene_ids'][0]]
-            run_dir = self.store / 'runs' / meta['run']
-            inputs = array('H')
-            inputs.frombytes((run_dir / 'inputs.bin').read_bytes())
-            start = min(meta['checkpoints'])
-            state = zlib.decompress((run_dir / f'{start}.st').read_bytes())
-            end = len(inputs)
-            path = self.store / 'work' / f'length-{change["id"]}.bin'
-            path.parent.mkdir(parents=True, exist_ok=True)
-            path.write_bytes(self._rom_with([change]))
-            runs = []
-            for rom_path in (self.rom_path, path):
-                fe = es._frontend(self._cfg(), rom_path)
-                furthest, left_at, been = 0, None, False
-                try:
-                    if int(fe.lib.retro_serialize_size()) <= 0:
-                        fe.run_frame([])
-                    fe.unserialize(state)
-                    session = es._Session(fe, checkpoint_every=10 ** 9)
-                    session.frame = start
-                    frame = start
-                    while frame < end:
-                        session.run(4, lambda f: es._names(inputs[f]) if f < len(inputs) else ())
-                        frame += 4
-                        snap = session.snapshot()
-                        ram = next((snap.domains[n].data for n in ('wram', 'ram') if n in snap.domains and snap.domains[n].data is not None), None)
-                        if ram is None:
-                            continue
-                        camera = ram[0x2E] | ram[0x2F] << 8
-                        if ram[0x28] == expect['stage'] and ram[0x46] == expect['floor'] and camera < 0x8000:
-                            been = been or camera > 0           # really played (the attract mode shows stages too)
-                            furthest = max(furthest, camera) if been else furthest
-                        elif been and ram[0x28] == expect['stage'] + 1:
-                            left_at = frame
-                            break
-                finally:
-                    es._close(fe)
-                runs.append((furthest, left_at))
-            path.unlink(missing_ok=True)
-            (old_far, old_left), (new_far, new_left) = runs
-            wanted = expect['new'] * 256
-            screens = lambda far: far // 256 + 1
-            if new_far == wanted or (expect['new'] < expect['old'] and new_far == wanted):
-                text = f'Played from the start, this part now scrolls through {screens(new_far)} screens (it was {screens(old_far)}).'
-                if old_left and new_left:
-                    seconds = round(abs(new_left - old_left) / 60, 1)
-                    text += f' The next part starts {seconds} seconds {"later" if new_left > old_left else "earlier"}.'
-                result = {'state': 'good', 'text': text}
-            elif new_far < wanted and expect['new'] > expect['old'] and new_far >= old_far:
-                result = {'state': 'warn', 'text': f"The recorded walk doesn't reach the end of this part, so the new length couldn't be watched to the end (it got {screens(new_far)} screens in). Use Play from here to walk it."}
-            else:
-                result = {'state': 'bad', 'text': f'Played from the start, this part scrolls through {screens(new_far)} screens, not the {expect["new"] + 1} chosen.'}
-            if expect['notes']:
-                result['text'] += ' ' + ' '.join(sorted(set(expect['notes'])))
-        except Exception as error:
-            result = {'state': 'warn', 'text': f'The change could not be watched in the game: {error}'}
-        change['object_check'] = result
 
     def level_capture_at(self, level: dict, x: float, y: float) -> str:
         """The capture that shows this map spot nearest the middle of its screen (the earliest such, on a tie)."""
@@ -877,86 +764,6 @@ class LevelTools:
                                 'The two games look the same the whole way. Your changes may be somewhere this walk does not show.'))
         except Exception as error:      # shown to the user; the editor keeps working
             job.update(state='failed', message=f'The replay could not be made: {error}')
-
-    def _check_object(self, change: dict, level: dict, expect: dict) -> None:
-        """Replay the recorded walk from power-on with the change, and look at the game's own spawn slots when the zone
-        comes into play: the enemy type (or none) for an enemy, the candle and what it drops (or none) for a candle."""
-        from array import array
-        import zlib
-        from . import edit_session as es
-        try:
-            meta = self.meta[level['scene_ids'][0]]
-            run_dir = self.store / 'runs' / meta['run']
-            inputs = array('H')
-            inputs.frombytes((run_dir / 'inputs.bin').read_bytes())
-            start = min(meta['checkpoints'])
-            state = zlib.decompress((run_dir / f'{start}.st').read_bytes())
-            end = min(len(inputs), max(self.meta[s]['frame'] for s in level['scene_ids']) + 120)
-            rom = bytearray(self.rom)
-            for offset, _, new in change['writes']:
-                rom[offset] = new
-            path = self.store / 'work' / f'object-{change["id"]}.bin'
-            path.parent.mkdir(parents=True, exist_ok=True)
-            path.write_bytes(bytes(rom))
-            fe = es._frontend(self._cfg(), path)
-            seen = None
-            try:
-                if int(fe.lib.retro_serialize_size()) <= 0:
-                    fe.run_frame([])
-                fe.unserialize(state)
-                session = es._Session(fe, checkpoint_every=10 ** 9)
-                session.frame = start
-                slot = expect['zone'] % 6
-                frame = start
-                record = expect['record']
-                wanted = (record['type'] if record else 0) if expect['kind'] == 'enemy' else record
-                removing = wanted in (0, None)
-                # the game fills a zone's slot when the zone loads (the first six zones all at once when a stage starts) and
-                # gives the slot to zone + 6 later; watch the whole time in between. A new enemy or drop counts once it
-                # shows; a removal counts only if nothing shows the whole time.
-                while frame < end:
-                    session.run(4, lambda f: es._names(inputs[f]) if f < len(inputs) else ())
-                    frame += 4
-                    snap = session.snapshot()
-                    ram = next((snap.domains[n].data for n in ('wram', 'ram') if n in snap.domains and snap.domains[n].data is not None), None)
-                    if ram is None or ram[0x28] != expect['stage'] or not expect['zone'] <= ram[0x6D] < expect['zone'] + 6:
-                        continue
-                    if expect['kind'] == 'enemy':
-                        sample = {'type': ram[0x166 + slot], 'frame': frame}
-                        hit = sample['type'] == wanted if not removing else sample['type'] != 0
-                    else:
-                        candle = 0x0E + slot
-                        sample = {'type': ram[0x434 + candle], 'drop': ram[0x584 + candle], 'frame': frame}
-                        hit = (sample['type'] in (0x27, 0x28) and sample['drop'] == record['drop']) if not removing else sample['type'] in (0x27, 0x28)
-                    if seen is None or hit or (not removing and sample['type']):
-                        seen = sample
-                    if hit:
-                        break
-            finally:
-                es._close(fe)
-            record = expect['record']
-            if seen is None:
-                result = {'state': 'warn', 'text': "The recorded walk didn't reach that part of the level, so the change couldn't be watched in the game."}
-            elif expect['kind'] == 'enemy':
-                wanted = record['type'] if record else 0
-                ok = seen['type'] == wanted
-                result = {'state': 'good' if ok else 'bad',
-                          'text': ('Played from the start, the game now spawns ' + ('no enemy' if not wanted else f'type {wanted:#04x}') + ' there.') if ok
-                          else f'Played from the start, the game spawned type {seen["type"]:#04x} there, not what was chosen.'}
-            else:
-                if record is None:
-                    ok = seen['type'] == 0
-                    text = 'Played from the start, there is no candle there any more.' if ok else 'Played from the start, a candle still appears there.'
-                else:
-                    ok = seen['type'] in (0x27, 0x28) and seen['drop'] == record['drop']
-                    text = (f'Played from the start, the candle there now holds drop code {record["drop"]:#04x}.' if ok else
-                            f'Played from the start, the candle there holds drop code {seen["drop"]:#04x}, not the one chosen.')
-                result = {'state': 'good' if ok else 'bad', 'text': text}
-        except Exception as error:      # the check failing must not take the change with it
-            result = {'state': 'bad', 'text': 'The game could not be played to check this: ' + str(error)[:200]}
-        with self.lock:
-            change['object_check'] = result
-            self.revision += 1
 
     def level_place(self, level_id: str, plane: int, col: int, row: int) -> dict:
         """Which scene, layer and cell a place on the map is, for opening it in the scene editors."""

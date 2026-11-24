@@ -157,9 +157,28 @@ class _Session(pv.TraceSession):
 
     def snapshot(self):
         try:
-            return super().snapshot()
+            snap = super().snapshot()
         except OSError:
-            return self._guarded_snapshot()
+            snap = self._guarded_snapshot()
+        self._add_cart_ram(snap)
+        return snap
+
+    def _add_cart_ram(self, snap) -> None:
+        """Cartridge RAM (battery or work RAM on the cartridge), when the engine has some and the trace does not already
+        list it: some games keep their whole state there (Super Mario Land 2). Untraced, so its sources are unknown."""
+        import ctypes
+        if 'sram' in snap.domains:
+            return
+        try:
+            lib = self.fe.lib
+            size = int(lib.retro_get_memory_size(0))
+            pointer = lib.retro_get_memory_data(0)
+        except (AttributeError, OSError):
+            return
+        if not pointer or not 0 < size <= 1 << 17:
+            return
+        zeros = bytes(4 * size)
+        snap.domains['sram'] = pv.DomainSnapshot('sram', ctypes.string_at(pointer, size), array('I', zeros), array('I', zeros))
 
     def _guarded_snapshot(self):
         import ctypes
@@ -1105,7 +1124,16 @@ class EditSession(LevelTools):
                     'engine': {'installed': bool(self.core), 'reason': self.core_error},
                     'scenes': scenes, 'scene_limit': MAX_SCENES, 'recording': recording, 'live': dict(self.live),
                     'changes': self.change_list(), 'preview': self._change_view(self.preview) if self.preview else None,
-                    'private_copy': _private_copy_support(), **levels}
+                    'private_copy': _private_copy_support(), 'level_games': self._level_games(), **levels}
+
+    def _level_games(self) -> dict:
+        """The games the level editor knows in full, and whether this is one of them."""
+        cached = getattr(self, '_level_games_cache', None)
+        if cached is None:
+            from . import level_profiles
+            profile = level_profiles.profile_for(self.rom)
+            cached = self._level_games_cache = {'games': level_profiles.game_list(), 'this': profile.name if profile else None}
+        return cached
 
     def _swatch_key(self, swatch: pt.Swatch) -> str:
         return 'color:' + ','.join(str(s['offset'] + self.skip) for s in swatch.sources if s)
@@ -2374,10 +2402,10 @@ class EditSessionTools:
                 p['level_id'], p.get('x'), p.get('y'))}),
             'edits.level_compare_file': (base + ' level_id', self._compare_file),
             'edits.level_screen_at': (base + ' level_id x', lambda p, c: {'ok': True, **self.session(p).level_screen_at(p['level_id'], p['x'])}),
-            'edits.level_length': (base + ' level_id stage floor screen delta', lambda p, c: {'ok': True, 'change': self.session(p).propose_level_length(
-                p['level_id'], p['stage'], p['floor'], p['screen'], p['delta'])}),
-            'edits.level_secret': (base + ' level_id kind number stage floor', lambda p, c: {'ok': True, 'change': self.session(p).propose_level_secret(
-                p['level_id'], p['kind'], p['number'], p['stage'], p['floor'], p.get('item'), p.get('treasure'), p.get('trigger'))}),
+            'edits.level_length': (base + ' level_id part screen delta', lambda p, c: {'ok': True, 'change': self.session(p).propose_level_length(
+                p['level_id'], p['part'], p['screen'], p['delta'])}),
+            'edits.level_edit': (base + ' level_id part object_id values remove', lambda p, c: {'ok': True, 'change': self.session(p).propose_level_edit(
+                p['level_id'], p['part'], p['object_id'], p['values'], bool(p['remove']))}),
             'edits.play': (base + ' frames buttons', lambda p, c: {'ok': True, **self.session(p).play(p['frames'], p['buttons'])}),
             'edits.capture': (base + ' label', lambda p, c: {'ok': True, **self.session(p).capture(p['label'])}),
             'edits.forget_scene': (base + ' scene_id', lambda p, c: self._summary(self.session(p), self.session(p).forget_scene(p['scene_id']))),
@@ -2410,10 +2438,6 @@ class EditSessionTools:
                 p['level_id'], p['plane'], p['cells'], p['layers'])}),
             'edits.level_export': (base + ' level_id plane edited', self._export_level),
             'edits.level_objects': (base + ' level_id', lambda p, c: {'ok': True, **self.session(p).level_objects(p['level_id'])}),
-            'edits.level_object_choices': (base + ' level_id zone stage floor', lambda p, c: {'ok': True, **self.session(p).level_object_choices(
-                p['level_id'], p['zone'], p['stage'], p['floor'])}),
-            'edits.level_object': (base + ' level_id zone kind index stage floor', lambda p, c: {'ok': True, 'change': self.session(p).propose_level_object(
-                p['level_id'], p['zone'], p['kind'], p['index'], p['stage'], p['floor'])}),
             'edits.change': (base + ' change_id', lambda p, c: {'ok': True, 'change': self.session(p).change(p['change_id'])}),
             'edits.keep': (base + ' change_id', lambda p, c: self._summary(self.session(p), self.session(p).keep(p['change_id']))),
             'edits.remove': (base + ' change_id', lambda p, c: self._summary(self.session(p), self.session(p).remove(p['change_id']))),

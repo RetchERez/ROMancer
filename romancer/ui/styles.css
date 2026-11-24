@@ -321,3 +321,7 @@ dialog.update-notes pre{max-height:55vh;white-space:pre-wrap}
 @media(max-width:1100px){#update-banner{left:205px;max-width:calc(100vw - 225px)}}@media(max-width:820px){#update-banner{left:80px;max-width:calc(100vw - 96px)}}.scaled-compact #update-banner{left:205px}.scaled-narrow #update-banner{left:80px}
 
 .level-compare-picture{display:block;max-width:100%;height:auto;image-rendering:pixelated;margin:8px 0;border-radius:4px}
+
+.nav-stack{display:flex;flex-direction:column;line-height:1.1}
+.nav-beta{font-size:.62rem;letter-spacing:.08em;font-weight:700;color:var(--accent);opacity:.9}
+.beta-tag{font-size:.6em;letter-spacing:.08em;font-weight:700;color:var(--accent);vertical-align:middle;margin-left:.35em}

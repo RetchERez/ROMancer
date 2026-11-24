@@ -105,7 +105,7 @@
         },
         {
           "title": "Basic and Advanced navigation",
-          "text": "Basic keeps Overview, Text & layout, Graphics & fonts, Scenes & colors, Stats & data, Music & sound, Playtest and Export visible. Levels opens the level maps in Scenes &amp; colors. Expand Advanced for Game view, Resources/hex, Investigation, Recipes & definitions, Routes and Regression. A direct task opens the matching group automatically."
+          "text": "Basic keeps Overview, Text & layout, Graphics & fonts, Scenes & colors, Stats & data, Music & sound, Playtest and Export visible. Level Editor (beta) opens the level maps in Scenes &amp; colors. Expand Advanced for Game view, Resources/hex, Investigation, Recipes & definitions, Routes and Regression. A direct task opens the matching group automatically."
         },
         {
           "title": "Updating ROMancer",
@@ -1006,7 +1006,7 @@
       "kicker": "SCENES AND COLORS / NEW IN v1.4",
       "intro": "A <b>level map</b> is a picture of a whole level that you can paint on. It is put together while you play, so it works without anything prepared for the game. You can save it as a PNG, and when you paint on it the real game is replayed so you can see every spot that changes before anything is saved.",
       "steps": [
-        "Choose <b>Levels</b> in the sidebar. Start playing and get to where the level begins.",
+        "Choose <b>Level Editor</b> (marked BETA) in the sidebar. Start playing and get to where the level begins.",
         "Choose <b>Record a level map</b> and play through the level. <b>Walk right for me</b> plays for you if you like.",
         "Choose <b>Finish the map</b>. It opens when it is ready, and <b>Save map as PNG</b> saves the picture.",
         "Choose <b>Copy</b> and click a spot on the map, or drag across a bigger piece such as a platform. In most games the brush moves in whole blocks, because that is how the level is built.",
@@ -1022,7 +1022,7 @@
         },
         {
           "title": "What to expect",
-          "text": "On 42 well-known games played automatically, a level map was put together for 39. On 14 of them a block was changed in the level’s own list and confirmed by replay, including Castlevania, Castlevania III, Metroid, Contra, Ninja Gaiden, DuckTales and Adventure Island, and on 6 more the block itself was changed. Most Super NES and Mega Drive games show their map but can’t yet take a block in one spot only."
+          "text": "On 42 well-known games played automatically, a level map was put together for 40. On 16 of them a block was changed in the level’s own list and confirmed by replay, including Castlevania, Castlevania III, Metroid, Metroid II, Contra, Ninja Gaiden, DuckTales, Adventure Island and Link’s Awakening, and on 4 more the block itself was changed. Super Mario Bros. stores its levels as a stream of objects, so a block can’t be placed in one spot there, but its profile changes what each block holds. Most Super NES and Mega Drive games show their map but can’t yet take a block in one spot only."
         },
         {
           "title": "Play from here, and Before and after",
@@ -1047,17 +1047,21 @@
       "title": "Enemies, items, secrets and level length",
       "part": "Basic",
       "kicker": "SCENES AND COLORS / NEW IN v1.4",
-      "intro": "For <b>Castlevania</b>, ROMancer knows what is in each level: every enemy, every candle and the item inside it, the hidden treasure, the breakable blocks and how long each part of the level is. All of it is read from the game’s own tables, and every change is checked by playing the game.",
+      "intro": "For <b>31 games</b>, ROMancer knows what is in each level: the enemies, the items and what each block, chest or candle holds, and secrets such as hidden items, all read from the game’s own tables. Every change is checked by playing the game. Castlevania also knows how long each part of a level is. The <b>Level Editor</b> page lists the games and says whether the open game is one of them.",
       "steps": [
-        "Open a Castlevania level map. The object layer shows each enemy and candle as the game draws it, with a box around it. Breakable blocks have purple boxes and hidden treasure green ones. <b>Show what’s solid</b> marks the blocks Simon can stand on.",
+        "Open a level map of one of the games listed below. The object layer shows each enemy and item as the game draws it, with a box around it. Breakable blocks have purple boxes and secrets green ones. Where the game has a clear rule, <b>Show what’s solid</b> marks the blocks you can stand on.",
         "Choose <b>Enemies, items and secrets</b> and click something to see what it is. Point at anything on the map to see its name.",
         "Change it: pick another item for a candle or a block, swap an enemy for another of the game’s enemies or remove it, or change which treasure appears and how it is found. Then choose <b>Check in the game</b>.",
-        "Choose <b>Longer or shorter</b> and click a screen of the level. <b>Repeat this screen</b> adds copies of it and <b>Remove this screen</b> takes it out. Enemies, candles, secrets and stairs on later screens move along.",
+        "For Castlevania, choose <b>Longer or shorter</b> and click a screen of the level. <b>Repeat this screen</b> adds copies of it and <b>Remove this screen</b> takes it out. Enemies, candles, secrets and stairs on later screens move along.",
         "Use <b>Play from here</b> to play the changed level yourself, or <b>Before and after</b> to watch the old and the new game side by side."
       ],
       "result": "The check says what the game really did, for example that the candle now holds a dagger, or that the next part of the level starts 4.7 seconds later.",
-      "note": "Other games keep the general level map tools for now: the layout and blocks, Play from here, and Before and after. Their enemies, items and secrets come in later updates.",
+      "note": "Every other game keeps the general level map tools: the layout and blocks, Play from here, and Before and after. What can be changed differs from game to game, and some games know more of their levels than others.",
       "details": [
+        {
+          "title": "The games",
+          "text": "NES: Castlevania, Castlevania II, Castlevania III, Chip ’n Dale Rescue Rangers, DuckTales, Kid Icarus (world 1), Mega Man 1 to 5, Metroid, Ninja Gaiden I to III, Super Mario Bros., Super Mario Bros. 2, Super Mario Bros. 3, The Legend of Zelda and Zelda II. Game Boy: Metroid II, Super Mario Land, Super Mario Land 2 and Link’s Awakening. Master System: Alex Kidd in Miracle World, Sonic The Hedgehog and Wonder Boy. Mega Drive: Sonic The Hedgehog and Sonic The Hedgehog 2. Super NES: Super Mario World and Super Metroid (enemies and items only; their packed level layouts stay as they are)."
+        },
         {
           "title": "How a change is checked",
           "text": "A change to an enemy or a candle is checked by playing your recorded walk from the start and reading the game’s memory when that part of the level loads. A secret is checked when the walk finds it; when it doesn’t, ROMancer says so, and Play from here lets you try it yourself. A length change is checked by playing the walk on the old and the new game and comparing how far that part scrolls and when the next part starts."
@@ -1068,7 +1072,7 @@
         },
         {
           "title": "Limits",
-          "text": "A part of the level can be 1 to 6 screens long, the longest the game has. The first and the last screen stay, because they hold the way in and the way out, and a screen with stairs can’t be removed. Make one length change at a time: keep it and save, then make the next."
+          "text": "Length changes are for Castlevania only: a part of the level can be 1 to 6 screens long, the first and the last screen stay, and a screen with stairs can’t be removed. Make one length change at a time: keep it and save, then make the next."
         }
       ],
       "related": [

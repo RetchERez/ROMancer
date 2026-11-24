@@ -31,10 +31,49 @@ sys.path.insert(0, str(ROOT / 'trace'))
 # automatic play needs to be told how to get there. Each was found by looking at the screen after every press.
 START_PRESSES = {
     '085ec6395681': 5,          # Castlevania III: title, story, name entry, then Block 1-01
+    '22ac359d66da': 2,          # Castlevania II: title, then GAME START (a third press opens the status screen)
+    '49fbd2f61f95': 1,          # Super Mario Land: title, then 1-1
+    '42045a1642f7': 2,          # Super Mario Land 2: title, file select (the recorder's own extra press enters the level)
+    '0838e531fe22': 2,          # Super Mario World: with 5 intro steps this reaches Yoshi's Island 2
+    'ce3245591dd6': 1,          # Ninja Gaiden: the automatic play reaches 1-1 paused
+    '9b7ebd1d6fd2': 1,          # Ninja Gaiden II: the same
+    '8d5e3d9ce20f': 3,          # Chip 'n Dale: title, character select, then Start skips the story
+    '7aaaf89257b1': 1,          # Super Mario Bros. 2: title, then character select (see ROUTES)
+    '46160baa0636': 1,          # Sonic The Hedgehog (Mega Drive): Start at the title
+    '568e5e9557c4': 1,          # Sonic The Hedgehog 2 (Mega Drive): the same
+    'd50c957bd76c': 2,          # Mega Man 3: title, stage select (see ROUTES: Top Man)
+    '1e06f2224792': 7,          # Mega Man 4: the title arrives at different times (see ROUTES: Pharaoh Man)
+    '010673ff28a6': 5,          # Mega Man 5: (see ROUTES: Charge Man)
+    '23f395b26644': 3,          # DuckTales: title, then the land select (Amazon)
+    '6f74e8a7575a': 1,          # Mega Man: title, then the stage select (see ROUTES: Bomb Man)
+    '9f5fa2106293': 3,          # Mega Man 2: title, story, stage select (see ROUTES: Flash Man)
+    '0b3d9e1f01ed': 1,          # Super Mario Bros.: title, then World 1-1
+    '1ddc4b429490': 3,          # Super Mario Bros. 3: title, then the World 1 map (see ROUTES)
 }
 
 
-def record_level(session, steps: int, intro: int, presses: int = 0) -> dict | None:
+# Games whose first level is reached from a map: the inputs (buttons, frames) played after the Start presses.
+# Games where the automatic play before recording (intro steps) already starts a level the walk cannot use.
+INTROS = {'6f74e8a7575a': 1, '9f5fa2106293': 1, '0838e531fe22': 5, 'a13fa8164a0a': 1, '7aaaf89257b1': 1, 'd50c957bd76c': 1, '1e06f2224792': 1, '010673ff28a6': 1}
+
+ROUTES = {
+    'd50c957bd76c': [([], 120), (['right'], 4), ([], 30), (['start'], 4)] + [([], 100)] * 5,                    # Mega Man 3: Top Man
+    '1e06f2224792': [([], 120), (['left'], 4), ([], 30), (['start'], 4)] + [([], 120)] * 5,                     # Mega Man 4: Pharaoh Man
+    '010673ff28a6': [([], 120), (['left'], 4), ([], 30), (['start'], 4)] + [([], 120)] * 5,                     # Mega Man 5: Charge Man
+    '7aaaf89257b1': [(['a'], 4)] + [([], 100)] * 4 + [([], 120), ([], 60), (['right'], 70), ([], 10), (['up'], 10), ([], 120), ([], 60),
+                                                        (['right'], 110), ([], 20), (['up'], 10), ([], 120), ([], 120)],       # SMB2: Mario, then the door into 1-1's main area
+    'a13fa8164a0a': [([], 120)] * 2 + [(['b'], 4)] + [([], 120)] * 3 + [(['b'], 4)] + [([], 120)] * 4,                      # Wonder Boy: button 1 starts
+    '6f74e8a7575a': [([], 120)] + [(['right'], 4), ([], 30)] * 3 + [(['start'], 4)] + [([], 100)] * 4,          # Mega Man: Bomb Man
+    '9f5fa2106293': [([], 120), (['down'], 4), ([], 30), (['start'], 4)] + [([], 100)] * 6,                      # Mega Man 2: Flash Man
+    '1ddc4b429490': [(['right'], 20), ([], 40), (['up'], 20), ([], 40), (['a'], 4), ([], 200)],   # Super Mario Bros. 3: World 1 map into 1-1
+}
+
+# Longer routes are kept as JSON files in trace/routes/<key>.json: [[buttons, frames], ...]
+for _file in (Path(__file__).resolve().parent / 'routes').glob('*.json'):
+    ROUTES.setdefault(_file.stem, [tuple(step) for step in json.loads(_file.read_text())])
+
+
+def record_level(session, steps: int, intro: int, presses: int = 0, route=None) -> dict | None:
     session.record(intro, wait=True)
     for scene_id in list(session.scenes):
         session.forget_scene(scene_id)
@@ -44,6 +83,15 @@ def record_level(session, steps: int, intro: int, presses: int = 0) -> dict | No
         for buttons, frames in ((['start'], 4), ([], 150)):
             while session.play(frames, buttons).get('busy'):
                 time.sleep(0.2)
+    if route:
+        for buttons, frames in route:
+            while session.play(frames, buttons).get('busy'):
+                time.sleep(0.2)
+        session.level_start('Measured level')
+        session.level_auto(steps, wait=True)
+        session.level_stop(wait=True)
+        job = session.level_job
+        return session._level(job['level_id']) if job['state'] == 'finished' else None
     session.level_start('Measured level')
     for attempt in range(3):
         session.level_auto(2, wait=True)
@@ -71,7 +119,7 @@ def measure(index: Path, key: str, steps: int, png, tries: int, intro: int = 8) 
     rom.write_bytes(data)
     session = EditSession(temp / 'store', rom, system)
     try:
-        level = record_level(session, steps, intro, START_PRESSES.get(sha[:12], 0))
+        level = record_level(session, steps, INTROS.get(sha[:12], intro), START_PRESSES.get(sha[:12], 0), ROUTES.get(sha[:12]))
         if level is None:
             out['error'] = session.level_job['message']
             return out

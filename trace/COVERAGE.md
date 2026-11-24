@@ -255,54 +255,54 @@ Measured with `trace/level_blocks.py` on 42 well-known games. For each one the g
 
 | What | Games |
 |---|---|
-| A level map was put together | 39 of 42 |
-| The level is built from blocks that are copied from a table in the ROM | 21 |
+| A level map was put together | 40 of 42 |
+| The level is built from blocks that are copied from a table in the ROM | 22 |
 | A block was changed in the level's own list of blocks, confirmed by replay | 16 |
-| Otherwise the block itself was changed (every place that uses it), confirmed by replay | 3 |
+| Otherwise the block itself was changed (every place that uses it), confirmed by replay | 4 |
 
 Places that looked different afterwards are counted over the whole map. A count equal to the size of the block means only that place changed. A larger count means the game uses the changed entry in more places, or that the change sent the automatic play another way (it walks into the new block), so later captures show other things.
 
 | Game | System | Map (cells) | Blocks | Result | Places that looked different |
 |---|---|---|---|---|---|
-| Adventure Island (USA) | NES | 196 by 25 | 4 by 4 | In the level's own list of blocks | 151 |
+| Adventure Island (USA) | NES | 83 by 25 | 4 by 4 | In the level's own list of blocks | 80 |
 | Alex Kidd in Miracle World (World) (Sega Ages) | Master System | 32 by 40 |  | Map only |  |
-| Batman - The Video Game (USA) | NES | 125 by 29 | 4 by 2 | In the level's own list of blocks | 298 |
-| Bionic Commando (USA) | NES | 116 by 28 |  | Map only |  |
-| Blaster Master (USA) | NES | 180 by 29 | 2 by 2, in larger blocks of 4 by 4 | In the level's own list of blocks | 168 |
-| Castlevania (USA) | NES | 204 by 23 | 4 by 4 | In the level's own list of blocks | 16 |
-| Castlevania - The Adventure (USA | Game Boy | 92 by 18 |  | Map only |  |
+| Batman - The Video Game (USA) | NES | 106 by 32 | 4 by 2 | In the level's own list of blocks | 8 |
+| Bionic Commando (USA) | NES | 68 by 28 |  | Map only |  |
+| Blaster Master (USA) | NES | 108 by 29 | 2 by 2, in larger blocks of 4 by 4 | In the level's own list of blocks | 464 |
+| Castlevania (USA) | NES | 160 by 23 | 4 by 4 | In the level's own list of blocks | 11 |
+| Castlevania - The Adventure (USA | Game Boy | 44 by 18 |  | Map only |  |
 | Castlevania II - Belmont's Revenge (USA, Europe | Game Boy |  |  | No map |  |
-| Castlevania II - Simon's Quest (USA) | NES | 203 by 28 |  | Map only |  |
-| Castlevania III - Dracula's Curse (USA) | NES | 104 by 90 | 4 by 4, in larger blocks of 8 by 8 | In the level's own list of blocks | 16 |
-| Contra (USA) | NES | 270 by 27 | 4 by 4 | In the level's own list of blocks | 160 |
+| Castlevania II - Simon's Quest (USA) | NES | 127 by 35 | 4 by 4 | The block itself, everywhere it is used | 141 |
+| Castlevania III - Dracula's Curse (USA) | NES | 128 by 23 | 4 by 4 | In the level's own list of blocks | 16 |
+| Contra (USA) | NES | 231 by 28 | 4 by 4 | In the level's own list of blocks | 848 |
 | Double Dragon (USA) | NES | 32 by 28 |  | Map only |  |
 | DuckTales (USA | Game Boy | 84 by 14 | 2 by 2 | The block itself, everywhere it is used | 112 |
-| DuckTales (USA) | NES | 196 by 24 | 2 by 2, in larger blocks of 4 by 4 | In the level's own list of blocks | 186 |
-| Faxanadu (USA) (Rev 1) | NES | 112 by 10 | 2 by 2 | The block itself, everywhere it is used | 8 |
-| Ghosts'n Goblins (USA) | NES | 246 by 23 | 2 by 2 | In the level's own list of blocks | 780 |
+| DuckTales (USA) | NES | 95 by 23 | 2 by 2, in larger blocks of 4 by 4 | In the level's own list of blocks | 80 |
+| Faxanadu (USA) (Rev 1) | NES | 68 by 28 | 2 by 2 | The block itself, everywhere it is used | 104 |
+| Ghosts'n Goblins (USA) | NES | 117 by 24 | 2 by 2 | In the level's own list of blocks | 423 |
 | Kid Icarus (USA, Europe) (Rev 1) | NES | 32 by 27 | 2 by 2 | In the level's own list of blocks | 24 |
 | Kirby's Adventure (USA) (Rev 1) | NES | 31 by 28 | 2 by 2 | Blocks found, no change confirmed |  |
 | Kirby's Dream Land (USA, Europe | Game Boy | 79 by 16 |  | Map only |  |
 | Legend of Zelda, The (USA) (Rev 1) | NES | 32 by 28 |  | Map only |  |
-| Legend of Zelda, The - Link's Awakening (USA, Europe) (Rev 2 | Game Boy | 20 by 18 | 2 by 2 | In the level's own list of blocks | 4 |
-| Mega Man (USA) | NES | 35 by 17 |  | Map only |  |
+| Legend of Zelda, The - Link's Awakening (USA, Europe) (Rev 2 | Game Boy | 40 by 16 | 2 by 2 | In the level's own list of blocks | 446 |
+| Mega Man (USA) | NES | 158 by 28 |  | Map only |  |
 | Mega Man - Dr. Wily's Revenge (USA | Game Boy | 20 by 18 |  | Map only |  |
-| Mega Man 2 (USA) | NES | 104 by 28 |  | Map only |  |
-| Mega Man 3 (USA) | NES | 81 by 28 | 2 by 2, in larger blocks of 4 by 4 | In the level's own list of blocks | 4 |
-| Mega Man X (USA) (Rev 1) | Super NES | 348 by 28 |  | Map only |  |
-| Metroid (USA) | NES | 145 by 20 | 2 by 2 | In the level's own list of blocks | 24 |
-| Metroid II - Return of Samus (World | Game Boy | 88 by 19 | 2 by 2 | In the level's own list of blocks | 4 |
-| Ninja Gaiden (USA) | NES | 139 by 23 | 2 by 2, in larger blocks of 4 by 4 | In the level's own list of blocks | 128 |
-| Sonic The Hedgehog (USA, Europe | Mega Drive | 750 by 92 |  | Map only |  |
+| Mega Man 2 (USA) | NES | 175 by 28 |  | Map only |  |
+| Mega Man 3 (USA) | NES | 85 by 28 | 2 by 2, in larger blocks of 4 by 4 | In the level's own list of blocks | 16 |
+| Mega Man X (USA) (Rev 1) | Super NES | 186 by 28 |  | Map only |  |
+| Metroid (USA) | NES | 94 by 28 | 2 by 2 | In the level's own list of blocks | 15 |
+| Metroid II - Return of Samus (World | Game Boy | 88 by 20 | 2 by 2 | In the level's own list of blocks | 4 |
+| Ninja Gaiden (USA) | NES | 139 by 23 | 2 by 2, in larger blocks of 4 by 4 | In the level's own list of blocks | 240 |
+| Sonic The Hedgehog (USA, Europe | Mega Drive | 647 by 107 |  | Map only |  |
 | Sonic The Hedgehog (USA, Europe, Brazil) | Master System | 32 by 28 | 4 by 4 | In the level's own list of blocks | 12 |
-| Sonic The Hedgehog 2 (World) (Rev B | Mega Drive | 494 by 63 |  | Map only |  |
+| Sonic The Hedgehog 2 (World) (Rev B | Mega Drive | 672 by 69 |  | Map only |  |
 | Super Castlevania IV (USA) | Super NES | 101 by 24 |  | Map only |  |
-| Super Mario Bros. (World) | NES | 126 by 12 | 2 by 2 | Blocks found, no change confirmed |  |
-| Super Mario Bros. 2 (USA) (Rev 1) | NES | 74 by 64 | 2 by 2, in larger blocks of 4 by 4 | The block itself, everywhere it is used | 34 |
-| Super Mario Bros. 3 (USA) (Rev 1) | NES | 788 by 27 | 2 by 2 | In the level's own list of blocks | 57 |
-| Super Mario Land (World) (Rev 1 | Game Boy | 88 by 16 |  | Map only |  |
-| Super Mario World (USA) | Super NES | 172 by 54 |  | Map only |  |
+| Super Mario Bros. (World) | NES | 150 by 24 | 2 by 2 | Blocks found, no change confirmed |  |
+| Super Mario Bros. 2 (USA) (Rev 1) | NES | 143 by 28 | 2 by 2 | The block itself, everywhere it is used | 276 |
+| Super Mario Bros. 3 (USA) (Rev 1) | NES | 68 by 27 | 2 by 2 | In the level's own list of blocks | 4 |
+| Super Mario Land (World) (Rev 1 | Game Boy | 180 by 14 |  | Map only |  |
+| Super Mario World (USA) | Super NES | 133 by 29 |  | Map only |  |
 | Super Metroid (Japan, USA) (En,Ja) | Super NES | 140 by 28 |  | Map only |  |
-| Wonder Boy (USA, Europe, Brazil) (Rev 1) | Master System |  |  | No map |  |
-| Wonder Boy III - The Dragon's Trap (USA, Europe) | Master System | 112 by 28 |  | Map only |  |
+| Wonder Boy (USA, Europe, Brazil) (Rev 1) | Master System | 219 by 24 |  | Map only |  |
+| Wonder Boy III - The Dragon's Trap (USA, Europe) | Master System | 56 by 28 |  | Map only |  |
 | Zelda II - The Adventure of Link (USA) | NES |  |  | No map |  |

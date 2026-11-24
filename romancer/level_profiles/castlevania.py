@@ -7,7 +7,6 @@ Only games with a profile get these; every other game keeps the general level ma
 """
 from __future__ import annotations
 
-import hashlib
 
 HEADER_NES = 16
 
@@ -26,8 +25,9 @@ class Castlevania:
     ZONE = 64
     # spawner types identified by spawning each one and looking at what the game drew (trace/v14_objects/enemy_types_sheet.png)
     ENEMIES = {0x01: 'Zombies', 0x02: 'Zombies', 0x03: 'Zombies', 0x04: 'Zombies', 0x05: 'Zombies', 0x06: 'Zombies',
-               0x51: 'Panther', 0x5E: 'Phantom Bat (boss)'}
-    UNSURE = set()
+               0x51: 'Panther', 0x5E: 'Phantom Bat (boss)', 0x53: 'Fleaman', 0x54: 'Bat', 0x5D: 'Moving platform',
+               0x4A: 'Axe Knight', 0x12: 'Eagle'}
+    UNSURE = {0x4A, 0x12}       # named from one spawned picture each (trace/v14_objects/enemy_types_sheet.png)
     # item codes, from the pickup code at $E73E (bank 7): 0 small heart (a weak whip gets the whip upgrade instead), 1 money
     # bag, 3 whip upgrade, 4 large heart, 5 pot roast, 6 magic crystal, A rosary, C double or triple shot, E invisibility
     # potion, and the rest set the subweapon (2 and 7 are numbers no subweapon uses)
@@ -427,12 +427,252 @@ class Castlevania:
         return found
 
 
-PROFILES = [Castlevania]
+from . import Profile, Watcher  # noqa: E402  (the package imports this module lazily)
+
+
+class _SlotWatcher(Watcher):
+    """An enemy or candle edit: watch the zone's spawn slot from when the zone loads until the slot goes to zone + 6
+    (the first six zones load at once when a stage starts). A new enemy or item counts once it shows; a removal counts
+    only if nothing shows the whole time."""
+
+    def __init__(self, watch):
+        self.w = watch
+        self.seen = None
+        record = watch['record']
+        self.removing = record is None
+        self.wanted = (record['type'] if record else 0) if watch['kind'] == 'enemy' else record
+
+    def see(self, ram, frame, run):
+        w = self.w
+        if ram[0x28] != w['stage'] or not w['zone'] <= ram[0x6D] < w['zone'] + 6:
+            return False
+        slot = w['zone'] % 6
+        if w['kind'] == 'enemy':
+            sample = {'type': ram[0x166 + slot]}
+            hit = sample['type'] == self.wanted if not self.removing else sample['type'] != 0
+        else:
+            candle = 0x0E + slot
+            sample = {'type': ram[0x434 + candle], 'drop': ram[0x584 + candle]}
+            hit = (sample['type'] in (0x27, 0x28) and sample['drop'] == self.wanted['drop']) if not self.removing else sample['type'] in (0x27, 0x28)
+        if self.seen is None or hit or (not self.removing and sample['type']):
+            self.seen = sample
+        return hit
+
+    def result(self):
+        seen, w = self.seen, self.w
+        if seen is None:
+            return super().result()
+        if w['kind'] == 'enemy':
+            wanted = self.wanted
+            ok = seen['type'] == wanted
+            return {'state': 'good' if ok else 'bad',
+                    'text': ('Played from the start, the game now spawns ' + ('no enemy' if not wanted else w['name']) + ' there.') if ok
+                    else f'Played from the start, the game spawned type {seen["type"]:#04x} there, not what was chosen.'}
+        if self.removing:
+            ok = seen['type'] == 0
+            return {'state': 'good' if ok else 'bad', 'text': 'Played from the start, there is no candle there any more.' if ok
+                    else 'Played from the start, a candle still appears there.'}
+        ok = seen['type'] in (0x27, 0x28) and seen['drop'] == self.wanted['drop']
+        return {'state': 'good' if ok else 'bad', 'text': f'Played from the start, the candle there now holds the item chosen ({w["name"]}).' if ok
+                else f'Played from the start, the candle there holds item code {seen["drop"]:#04x}, not the one chosen.'}
+
+
+class _SecretWatcher(Watcher):
+    """A secret edit: watch the game's found-flags ($0144 treasure, $0146 blocks, one bit per secret), then what appeared."""
+    every = 2
+
+    def __init__(self, watch):
+        self.w, self.seen, self.found_at = watch, None, None
+
+    def see(self, ram, frame, run):
+        w = self.w
+        if ram[0x28] != w['stage']:
+            return False
+        flags = ram[0x144] if w['kind'] == 'treasure' else ram[0x146]
+        if not flags & (1 << w['number']):
+            return False
+        self.found_at = self.found_at or frame
+        if w['kind'] == 'treasure':
+            hits = [ram[0x568 + x] for x in range(0x17, 0x1C) if ram[0x434 + x] == 2]
+        else:
+            hits = [ram[0x584 + x] for x in range(0x03, 0x1C) if ram[0x434 + x] == 0x2F]
+        if hits:
+            self.seen = hits[0]
+            return True
+        return frame - self.found_at > 60
+
+    def result(self):
+        w = self.w
+        if self.found_at is None:
+            return {'state': 'warn', 'text': "The recorded walk doesn't find this secret, so the change couldn't be watched in the game. Use Play from here to try it yourself."}
+        if w['kind'] == 'treasure':
+            ok = self.seen == w['treasure']
+            return {'state': 'good' if ok else 'bad', 'text': 'Played from the start, the secret is found and the chosen treasure appears.' if ok
+                    else 'Played from the start, the secret is found but a different treasure appears.'}
+        ok = (self.seen is None) if w['drop'] is None else self.seen == w['drop']
+        return {'state': 'good' if ok else 'bad', 'text': 'Played from the start, the block breaks and gives the chosen item.' if ok
+                else 'Played from the start, the block breaks but gives something else.'}
+
+
+class _LengthWatcher(Watcher):
+    """A length change: how far the part scrolls on the old and the new game, and when the next part starts."""
+    compare = True
+
+    def __init__(self, watch):
+        self.w = watch
+        self.runs = {}
+
+    def see(self, ram, frame, run):
+        w = self.w
+        state = self.runs.setdefault(run, {'far': 0, 'left': None, 'been': False})
+        camera = ram[0x2E] | ram[0x2F] << 8
+        if ram[0x28] == w['stage'] and ram[0x46] == w['floor'] and camera < 0x8000:
+            state['been'] = state['been'] or camera > 0       # really played (the attract mode shows stages too)
+            if state['been']:
+                state['far'] = max(state['far'], camera)
+        elif state['been'] and ram[0x28] == w['stage'] + 1:
+            state['left'] = frame
+            return True
+        return False
+
+    def result(self):
+        w = self.w
+        old = self.runs.get('original', {'far': 0, 'left': None})
+        new = self.runs.get('changed', {'far': 0, 'left': None})
+        wanted = w['new'] * 256
+
+        def screens(far):
+            return far // 256 + 1
+        if new['far'] == wanted:
+            text = f'Played from the start, this part now scrolls through {screens(new["far"])} screens (it was {screens(old["far"])}).'
+            if old['left'] and new['left']:
+                seconds = round(abs(new['left'] - old['left']) / 60, 1)
+                text += f' The next part starts {seconds} seconds {"later" if new["left"] > old["left"] else "earlier"}.'
+            out = {'state': 'good', 'text': text}
+        elif new['far'] < wanted and w['new'] > w['old'] and new['far'] >= old['far']:
+            out = {'state': 'warn', 'text': "The recorded walk doesn't reach the end of this part, so the new length couldn't be watched to the end "
+                                            f"(it got {screens(new['far'])} screens in). Use Play from here to walk it."}
+        else:
+            out = {'state': 'bad', 'text': f'Played from the start, this part scrolls through {screens(new["far"])} screens, not the {w["new"] + 1} chosen.'}
+        if w['notes']:
+            out['text'] += ' ' + ' '.join(sorted(set(w['notes'])))
+        return out
+
+
+class CastlevaniaProfile(Castlevania, Profile):
+    """Castlevania on the common profile interface. Parts are {'stage', 'floor'}; x is the camera's world pixels."""
+    sha256s = (Castlevania.sha256,)
+    SPAWN = Castlevania.ZONE + 1        # a zone record's x is drawn this far right of the same world x
+
+    def where(self, ram):
+        camera = ram[0x2E] | ram[0x2F] << 8
+        return {'part': {'stage': ram[0x28], 'floor': ram[0x46]}, 'x': camera, 'y': 0}
+
+    def part_name(self, part):
+        return f'Stage part {part["stage"] + 1}' + (', lower floor' if part['floor'] else '')
+
+    def choices(self):
+        return {'enemies': [{'value': c['index'], 'name': f'{c["name"]} (height {c["y"]})'} for c in self.enemy_choices()],
+                'block_items': [{'value': n, 'name': self.block_item_name(n)} for n in range(8)],
+                'treasures': [{'value': k, 'name': v} for k, v in self.TREASURES.items()],
+                'triggers': [{'value': k, 'name': v} for k, v in self.TRIGGERS.items()]}
+
+    def objects(self, part, floor=None, count=64):
+        if not isinstance(part, dict):                      # the old call: objects(stage, floor, count)
+            return Castlevania.objects(self, part, floor, count)
+        stage, floor = int(part['stage']), int(part['floor'])
+        count = (self.pages(stage, floor) + 1) * 4 + 2
+        out = []
+        for item in Castlevania.objects(self, stage, floor, count):
+            row = dict(item)
+            if item['kind'] == 'enemy':
+                row.update(id=f'enemy:{item["zone"]}', style='enemy', x=item['x'] - self.SPAWN, remove='Remove this enemy',
+                           fields=[{'key': 'record', 'label': 'Swap for', 'value': item['index'], 'choices': 'enemies'}])
+            elif item['kind'] == 'candle':
+                choices = [{'value': c['index'], 'name': c['name'] + (f' (colour {c["drop"] >> 4})' if c['drop'] & 0xF0 and (c['drop'] & 15) == 1 else '')}
+                           for c in self.drop_choices(stage, floor, item['zone'], count)]
+                row.update(id=f'candle:{item["zone"]}', style='item', x=item['x'] - self.SPAWN, detail=f'drops {item["drop_name"]}',
+                           remove='Remove this candle', fields=[{'key': 'record', 'label': 'Drops', 'value': item['index'], 'choices': choices}])
+                if item['shared'] > 1:
+                    others = item['shared'] - 1
+                    row['note'] = (f'This candle shares its settings with {others} other {"candle" if others == 1 else "candles"} in this stage, '
+                                   'so a new item is given to this one alone by pointing it at another of the game’s candles at the same spot.')
+            elif item['kind'] == 'treasure':
+                row.update(id=f'treasure:{item["number"]}', style='secret', x=item['x'] - self.SPAWN, detail=item['how'].lower(), remove=None,
+                           fields=[{'key': 'treasure', 'label': 'Treasure', 'value': item['treasure'], 'choices': 'treasures'},
+                                   {'key': 'trigger', 'label': 'Found by', 'value': item['trigger'], 'choices': 'triggers'}])
+            else:
+                row.update(id=f'block:{item["number"]}', style='block', x=item['x'] - self.SPAWN, name='Breakable block',
+                           detail=f'{item["drop_name"].lower()} inside' if item['item'] else 'empty', remove=None,
+                           fields=[{'key': 'item', 'label': 'Inside', 'value': item['item'], 'choices': 'block_items'}])
+            notes = []
+            if item.get('second_quest'):
+                notes.append('Only in the second quest (the harder game after the ending).')
+            if item['kind'] in ('treasure', 'block') and item['shared'] > 1:
+                notes.append(f'This list is shared with {item["shared"] - 1} other stages, so the change shows there too.')
+            if notes:
+                row['note'] = ' '.join(([row['note']] if row.get('note') else []) + notes)
+            out.append(row)
+        return out
+
+    def edit(self, part, object_id, values, remove=False):
+        stage, floor = int(part['stage']), int(part['floor'])
+        kind, _, number = object_id.partition(':')
+        number = int(number)
+        if kind in ('enemy', 'candle'):
+            row = self.zones(stage, floor)[number]
+            offset = row['enemy_byte' if kind == 'enemy' else 'candle_byte']
+            index = 0 if remove else int(values.get('record'))
+            if not 0 <= index <= 255:
+                raise ValueError('That choice is not one of the game’s own.')
+            if kind == 'enemy':
+                record = self.enemy_record(index)
+                name = 'no enemy' if record is None else self.enemy_name(record['type'])
+                title = 'Remove the enemy' if record is None else f'Enemy here: {name}'
+            else:
+                record = self.candle_record(index)
+                name = '' if record is None else self.drop_name(record['drop'])
+                title = 'Remove the candle' if record is None else f'Candle drops: {name}'
+            writes = [(offset, self.rom[offset], index)] if self.rom[offset] != index else []
+            return {'writes': writes, 'title': f'{title} (zone {number + 1})',
+                    'watch': {'kind': kind, 'zone': number, 'record': record, 'stage': stage, 'name': name}}
+        if kind == 'block':
+            item = int(values.get('item'))
+            return {'writes': Castlevania.secret_writes(self, 'block', stage, floor, number, item=item),
+                    'title': f'Breakable block holds: {self.block_item_name(item)}',
+                    'watch': {'kind': 'block', 'number': number, 'stage': stage, 'drop': None if item == 0 else self.block_items()[item]}}
+        if kind == 'treasure':
+            row = next(r for r in self.treasures(stage, floor) if r['number'] == number)
+            treasure = int(values['treasure']) if values.get('treasure') is not None else None
+            trigger = int(values['trigger']) if values.get('trigger') is not None else None
+            shown = row['treasure'] if treasure is None else treasure
+            how = row['trigger'] if trigger is None else trigger
+            return {'writes': Castlevania.secret_writes(self, 'treasure', stage, floor, number, treasure=treasure, trigger=trigger),
+                    'title': f'Hidden treasure: {self.TREASURES[shown]}, {self.TRIGGERS[how].lower()}',
+                    'watch': {'kind': 'treasure', 'number': number, 'stage': stage, 'treasure': shown}}
+        raise ValueError('ROMancer cannot change that yet.')
+
+    def watcher(self, watch):
+        if watch['kind'] in ('enemy', 'candle'):
+            return _SlotWatcher(watch)
+        if watch['kind'] in ('block', 'treasure'):
+            return _SecretWatcher(watch)
+        return _LengthWatcher(watch)
+
+    def screens(self, part):
+        return {'count': self.pages(int(part['stage']), int(part['floor'])) + 1, 'most': self.MAX_PAGES + 1}
+
+    def resize(self, part, at, delta):
+        stage, floor = int(part['stage']), int(part['floor'])
+        old = self.pages(stage, floor)
+        result = self.resize_writes(stage, floor, at, delta)
+        return {'writes': result['writes'], 'notes': result['notes'],
+                'watch': {'kind': 'length', 'stage': stage, 'floor': floor, 'old': old, 'new': result['pages'], 'notes': result['notes']}}
+
+
+PROFILES = [CastlevaniaProfile]
 
 
 def profile_for(rom: bytes):
-    digest = hashlib.sha256(rom).hexdigest()
-    for kind in PROFILES:
-        if kind.sha256 == digest:
-            return kind(rom)
-    return None
+    from . import profile_for as find
+    return find(rom)
