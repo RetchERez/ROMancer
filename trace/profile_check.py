@@ -80,7 +80,7 @@ def main() -> None:
     os.environ.setdefault('ROMANCER_TRACE_CORES', str(ROOT.parent / 'release-v1.3.9' / 'work' / 'trace-pack-windows'))
     os.environ.setdefault('ROMANCER_TRACE_WORKERS', '2')
     from png_roundtrip import load_rom
-    from level_blocks import record_level, START_PRESSES, ROUTES
+    from level_blocks import record_level, START_PRESSES, ROUTES, INTROS
     from romancer.edit_session import EditSession
     sha, name, system, data, suffix = load_rom(args.index, args.key)
     args.out.mkdir(parents=True, exist_ok=True)
@@ -90,7 +90,7 @@ def main() -> None:
     session = EditSession(temp / 'store', rom, system)
     out = {'name': name, 'sha256': sha}
     try:
-        level = record_level(session, args.steps, args.intro, args.presses or START_PRESSES.get(sha[:12], 0), ROUTES.get(sha[:12]))
+        level = record_level(session, args.steps, INTROS.get(sha[:12], args.intro), args.presses or START_PRESSES.get(sha[:12], 0), ROUTES.get(sha[:12]))
         if level is None:
             out['error'] = session.level_job['message']
             print(json.dumps(out, indent=1))

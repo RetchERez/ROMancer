@@ -479,6 +479,32 @@ class SMB3Profile(SMB3, Profile):
     def choices(self):
         return {'enemies': [{'value': i, 'name': self.enemy_name(i)} for i in self._enemy_ids()]}
 
+    # Sprite graphics: every frame each active enemy writes the 1 KB sprite bank it needs into $071D or $071E (object
+    # code bank 0 $CA4F): group by id ($CA41: $00, $24, $48, $6C, $90 -> code bank 1-5 at $A000), then byte $A144 +
+    # (id - group start) of that bank: 0 needs nothing, bit 7 picks $071E over $071D, the rest is the bank. Two enemies
+    # that need different banks in the same slot draw each other's pictures, so a swap only offers enemies that need
+    # nothing, or a bank no other enemy of the part needs differently.
+    GROUPS = (0x00, 0x24, 0x48, 0x6C, 0x90)
+
+    def sprite_need(self, kind: int):
+        group = max(g for g in range(5) if kind >= self.GROUPS[g])
+        value = self._at(group + 1, 0xA144 + kind - self.GROUPS[group])
+        return None if value == 0 else (0x71E if value & 0x80 else 0x71D, value & 0x7F)
+
+    def enemy_choices(self, objects: int, number: int) -> list:
+        """Enemy ids this record can become without fighting another enemy of the part over sprite graphics."""
+        taken = {}
+        for e in self.enemy_list(objects):
+            need = self.sprite_need(e['id']) if e['id'] < self.CONTROL else None
+            if e['number'] != number and need:
+                taken.setdefault(need[0], set()).add(need[1])
+        out = []
+        for kind in self._enemy_ids():
+            need = self.sprite_need(kind)
+            if need is None or taken.get(need[0], {need[1]}) == {need[1]}:
+                out.append(kind)
+        return out
+
     def _blocks_list(self, tileset):
         return [{'value': v, 'name': self.block_name(t)} for v, t in self.block_choices(tileset) if t in self.BLOCK_NAMES]
 
@@ -501,9 +527,11 @@ class SMB3Profile(SMB3, Profile):
             if e['id'] >= self.CONTROL:
                 continue
             editable = e['id'] != 0x41
+            choices = [{'value': i, 'name': self.enemy_name(i)} for i in self.enemy_choices(objects, e['number'])] if editable else []
             out.append({'id': f'enemy:{e["number"]}', 'style': 'enemy', 'type': e['id'], 'name': self.enemy_name(e['id']),
                         'x': e['column'] * 16 + 8, 'y': e['row'] * 16 + 16,
-                        'fields': [{'key': 'id', 'label': 'Swap for', 'value': e['id'], 'choices': 'enemies'}] if editable else [],
+                        'fields': [{'key': 'id', 'label': 'Swap for', 'value': e['id'], 'choices': choices}] if editable else [],
+                        'note': 'Only enemies whose pictures this part can show next to its other enemies are offered.' if editable else None,
                         'remove': 'Remove this enemy' if editable else None})
         blocks, rows = None, None
         for number, r in enumerate(self.records(tileset, layout)):
@@ -574,7 +602,7 @@ class SMB3Profile(SMB3, Profile):
                 watch.update(kind='enemy', remove=True, number=number, record=[e['id'], e['column'], e['row']], name='')
                 return {'writes': writes, 'title': f'Remove {self.enemy_name(e["id"])} (screen {e["column"] // 16 + 1})', 'watch': watch}
             new_id = int(values.get('id', e['id']))
-            if new_id not in self._enemy_ids():
+            if new_id != e['id'] and new_id not in self.enemy_choices(objects, number):
                 raise ValueError('That choice is not one of the game’s own.')
             writes = [(e['offset'], e['id'], new_id)] if new_id != e['id'] else []
             watch.update(kind='enemy', remove=False, number=number, id=new_id, name=self.enemy_name(new_id))

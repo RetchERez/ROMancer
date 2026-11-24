@@ -32,15 +32,27 @@ sys.path.insert(0, str(ROOT / 'trace'))
 START_PRESSES = {
     '085ec6395681': 5,          # Castlevania III: title, story, name entry, then Block 1-01
     '22ac359d66da': 2,          # Castlevania II: title, then GAME START (a third press opens the status screen)
+    '23f395b26644': 3,          # DuckTales: title, then the land select (Amazon)
+    '6f74e8a7575a': 1,          # Mega Man: title, then the stage select (see ROUTES: Bomb Man)
+    '9f5fa2106293': 3,          # Mega Man 2: title, story, stage select (see ROUTES: Flash Man)
     '0b3d9e1f01ed': 1,          # Super Mario Bros.: title, then World 1-1
     '1ddc4b429490': 3,          # Super Mario Bros. 3: title, then the World 1 map (see ROUTES)
 }
 
 
 # Games whose first level is reached from a map: the inputs (buttons, frames) played after the Start presses.
+# Games where the automatic play before recording (intro steps) already starts a level the walk cannot use.
+INTROS = {'6f74e8a7575a': 1, '9f5fa2106293': 1}
+
 ROUTES = {
+    '6f74e8a7575a': [([], 120)] + [(['right'], 4), ([], 30)] * 3 + [(['start'], 4)] + [([], 100)] * 4,          # Mega Man: Bomb Man
+    '9f5fa2106293': [([], 120), (['down'], 4), ([], 30), (['start'], 4)] + [([], 100)] * 6,                      # Mega Man 2: Flash Man
     '1ddc4b429490': [(['right'], 20), ([], 40), (['up'], 20), ([], 40), (['a'], 4), ([], 200)],   # Super Mario Bros. 3: World 1 map into 1-1
 }
+
+# Longer routes are kept as JSON files in trace/routes/<key>.json: [[buttons, frames], ...]
+for _file in (Path(__file__).resolve().parent / 'routes').glob('*.json'):
+    ROUTES.setdefault(_file.stem, [tuple(step) for step in json.loads(_file.read_text())])
 
 
 def record_level(session, steps: int, intro: int, presses: int = 0, route=None) -> dict | None:
@@ -89,7 +101,7 @@ def measure(index: Path, key: str, steps: int, png, tries: int, intro: int = 8) 
     rom.write_bytes(data)
     session = EditSession(temp / 'store', rom, system)
     try:
-        level = record_level(session, steps, intro, START_PRESSES.get(sha[:12], 0), ROUTES.get(sha[:12]))
+        level = record_level(session, steps, INTROS.get(sha[:12], intro), START_PRESSES.get(sha[:12], 0), ROUTES.get(sha[:12]))
         if level is None:
             out['error'] = session.level_job['message']
             return out

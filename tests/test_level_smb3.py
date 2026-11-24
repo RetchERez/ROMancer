@@ -186,6 +186,20 @@ class Edits(unittest.TestCase):
         with self.assertRaises(ValueError):
             self.p.edit(PART, 'enemy:0', {'id': 0x99})                    # not used anywhere in the game
 
+    def test_enemy_choices_follow_sprite_banks(self):
+        c = build()
+        c.put(4, 0xA144 + 0x72 - 0x6C, [0xCF])          # Goomba: sprite bank $4F in $071E
+        c.put(5, 0xA144 + 0xA6 - 0x90, [0xCF])          # Venus Fire Trap: the same
+        c.put(4, 0xA144 + 0x6C - 0x6C, [0xB3])          # Koopa Troopa: bank $33 in $071E
+        p = smb3.SMB3Profile(bytes(c.rom))
+        self.assertEqual(p.sprite_need(0x72), (0x71E, 0x4F))
+        self.assertEqual(p.enemy_choices(MAIN_OBJ, 2), [0x72, 0xA6])        # the Koopa may become what the others need
+        self.assertEqual(p.enemy_choices(MAIN_OBJ, 0), [])                  # the others need two banks in $071E already
+        with self.assertRaises(ValueError):
+            p.edit(PART, 'enemy:0', {'id': 0xA6})
+        objects = {o['id']: o for o in p.objects(PART)}
+        self.assertEqual([c['value'] for c in objects['enemy:2']['fields'][0]['choices']], [0x72, 0xA6])
+
     def test_enemy_remove(self):
         plan = self.p.edit(PART, 'enemy:0', {}, remove=True)
         rom = bytearray(self.c.rom)
