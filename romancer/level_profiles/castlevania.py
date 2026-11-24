@@ -25,8 +25,9 @@ class Castlevania:
     ZONE = 64
     # spawner types identified by spawning each one and looking at what the game drew (trace/v14_objects/enemy_types_sheet.png)
     ENEMIES = {0x01: 'Zombies', 0x02: 'Zombies', 0x03: 'Zombies', 0x04: 'Zombies', 0x05: 'Zombies', 0x06: 'Zombies',
-               0x51: 'Panther', 0x5E: 'Phantom Bat (boss)'}
-    UNSURE = set()
+               0x51: 'Panther', 0x5E: 'Phantom Bat (boss)', 0x53: 'Fleaman', 0x54: 'Bat', 0x5D: 'Moving platform',
+               0x4A: 'Axe Knight', 0x12: 'Eagle'}
+    UNSURE = {0x4A, 0x12}       # named from one spawned picture each (trace/v14_objects/enemy_types_sheet.png)
     # item codes, from the pickup code at $E73E (bank 7): 0 small heart (a weak whip gets the whip upgrade instead), 1 money
     # bag, 3 whip upgrade, 4 large heart, 5 pot roast, 6 magic crystal, A rosary, C double or triple shot, E invisibility
     # potion, and the rest set the subweapon (2 and 7 are numbers no subweapon uses)
