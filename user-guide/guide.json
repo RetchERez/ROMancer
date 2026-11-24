@@ -1022,7 +1022,7 @@
         },
         {
           "title": "What to expect",
-          "text": "On 42 well-known games played automatically, a level map was put together for 39. On 14 of them a block was changed in the level’s own list and confirmed by replay, including Castlevania, Castlevania III, Metroid, Contra, Ninja Gaiden, DuckTales and Adventure Island, and on 6 more the block itself was changed. Most Super NES and Mega Drive games show their map but can’t yet take a block in one spot only."
+          "text": "On 42 well-known games played automatically, a level map was put together for 40. On 16 of them a block was changed in the level’s own list and confirmed by replay, including Castlevania, Castlevania III, Metroid, Metroid II, Contra, Ninja Gaiden, DuckTales, Adventure Island and Link’s Awakening, and on 4 more the block itself was changed. Super Mario Bros. stores its levels as a stream of objects, so a block can’t be placed in one spot there, but its profile changes what each block holds. Most Super NES and Mega Drive games show their map but can’t yet take a block in one spot only."
         },
         {
           "title": "Play from here, and Before and after",
