@@ -395,18 +395,21 @@ class LevelTools:
             return None
         plane = self._level_plane(level, 0)
         ordered = sorted(plane.windows.items(), key=lambda item: self.meta[level['scene_ids'][item[0]]]['frame'])
-        parts, seen = [], set()
+        found = {}          # section -> [(part, dx, dy)] for every capture the profile can place
         for number, window in ordered:
-            if window.section in seen:
-                continue
             ram = level_profiles.ram_of(self._scene(level['scene_ids'][number]).snapshot)
             where = profile.where(ram) if ram is not None else None
-            if where is None:
-                continue
-            seen.add(window.section)
-            columns = [c for (c, r), spot in plane.cells.items() if plane.windows.get(spot.frame) and plane.windows[spot.frame].section == window.section]
-            parts.append({'section': window.section, 'part': where['part'], 'name': profile.part_name(where['part']),
-                          'dx': window.across - where['x'], 'dy': window.down - where['y'],
+            if where is not None:
+                found.setdefault(window.section, []).append((where['part'], window.across - where['x'], window.down - where['y']))
+        parts = []
+        for section, rows in found.items():
+            # the part of the earliest capture, and the offset most of that part's captures agree on: one capture the
+            # map placed off (a repeating forest, a restart) must not move every box in the section
+            part = rows[0][0]
+            offsets = [(dx, dy) for p, dx, dy in rows if p == part]
+            dx, dy = max(set(offsets), key=offsets.count)
+            columns = [c for (c, r), spot in plane.cells.items() if plane.windows.get(spot.frame) and plane.windows[spot.frame].section == section]
+            parts.append({'section': section, 'part': part, 'name': profile.part_name(part), 'dx': dx, 'dy': dy,
                           'left': min(columns) * plane.px if columns else 0, 'right': (max(columns) + 1) * plane.px if columns else 0})
         return profile, parts
 
