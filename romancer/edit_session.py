@@ -2374,10 +2374,10 @@ class EditSessionTools:
                 p['level_id'], p.get('x'), p.get('y'))}),
             'edits.level_compare_file': (base + ' level_id', self._compare_file),
             'edits.level_screen_at': (base + ' level_id x', lambda p, c: {'ok': True, **self.session(p).level_screen_at(p['level_id'], p['x'])}),
-            'edits.level_length': (base + ' level_id stage floor screen delta', lambda p, c: {'ok': True, 'change': self.session(p).propose_level_length(
-                p['level_id'], p['stage'], p['floor'], p['screen'], p['delta'])}),
-            'edits.level_secret': (base + ' level_id kind number stage floor', lambda p, c: {'ok': True, 'change': self.session(p).propose_level_secret(
-                p['level_id'], p['kind'], p['number'], p['stage'], p['floor'], p.get('item'), p.get('treasure'), p.get('trigger'))}),
+            'edits.level_length': (base + ' level_id part screen delta', lambda p, c: {'ok': True, 'change': self.session(p).propose_level_length(
+                p['level_id'], p['part'], p['screen'], p['delta'])}),
+            'edits.level_edit': (base + ' level_id part object_id values remove', lambda p, c: {'ok': True, 'change': self.session(p).propose_level_edit(
+                p['level_id'], p['part'], p['object_id'], p['values'], bool(p['remove']))}),
             'edits.play': (base + ' frames buttons', lambda p, c: {'ok': True, **self.session(p).play(p['frames'], p['buttons'])}),
             'edits.capture': (base + ' label', lambda p, c: {'ok': True, **self.session(p).capture(p['label'])}),
             'edits.forget_scene': (base + ' scene_id', lambda p, c: self._summary(self.session(p), self.session(p).forget_scene(p['scene_id']))),
@@ -2410,10 +2410,6 @@ class EditSessionTools:
                 p['level_id'], p['plane'], p['cells'], p['layers'])}),
             'edits.level_export': (base + ' level_id plane edited', self._export_level),
             'edits.level_objects': (base + ' level_id', lambda p, c: {'ok': True, **self.session(p).level_objects(p['level_id'])}),
-            'edits.level_object_choices': (base + ' level_id zone stage floor', lambda p, c: {'ok': True, **self.session(p).level_object_choices(
-                p['level_id'], p['zone'], p['stage'], p['floor'])}),
-            'edits.level_object': (base + ' level_id zone kind index stage floor', lambda p, c: {'ok': True, 'change': self.session(p).propose_level_object(
-                p['level_id'], p['zone'], p['kind'], p['index'], p['stage'], p['floor'])}),
             'edits.change': (base + ' change_id', lambda p, c: {'ok': True, 'change': self.session(p).change(p['change_id'])}),
             'edits.keep': (base + ' change_id', lambda p, c: self._summary(self.session(p), self.session(p).keep(p['change_id']))),
             'edits.remove': (base + ' change_id', lambda p, c: self._summary(self.session(p), self.session(p).remove(p['change_id']))),
