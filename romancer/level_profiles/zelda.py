@@ -1,9 +1,10 @@
-"""The Legend of Zelda (USA) (Rev 1): level profile (Zelda II - The Adventure of Link is not covered yet; see the notes).
+"""The Legend of Zelda (USA) (Rev 1) and Zelda II - The Adventure of Link (USA): level profiles.
 
 Everything here was read from the games' own code and tables and checked by replaying the games (research notes in
 research/zelda-level-profile.md). Zelda shows its world one screen at a time; a part of the game is the overworld or one
 dungeon (with its quest), and its pixels are the screens laid out on the game's own 16 x 8 room grid, so the screens the
-map recorder stitches together line up with the rooms they show.
+map recorder stitches together line up with the rooms they show. Zelda II's parts are its side-view scenes (towns,
+palaces, caves, encounter scenes), each one area of up to four screens across.
 """
 from __future__ import annotations
 
@@ -693,4 +694,415 @@ class Zelda1Profile(Zelda1, Profile):
                 'dest': _CaveWatcher, 'cave': _CaveWatcher}[watch['kind']](watch)
 
 
-PROFILES = [Zelda1Profile]
+# ================================================================ Zelda II - The Adventure of Link (USA)
+
+class Zelda2:
+    """Zelda II - The Adventure of Link (USA). MMC1, 8 banks of 16 KB (bank 7 fixed at $C000).
+
+    Side-view scenes ("areas") come in sets, one per bank of scene data (bank 7 $C4B7 picks the bank by world $0707;
+    world 0 picks bank 1 or 2 by region $0706, and region 1 by the region Link came from, $070A). Each set has 63 areas:
+    layout pointers at $8523 + 2 * area and enemy list pointers at $85A1 + 2 * area in the set's bank ($A000/$A07E
+    for world 0 region 1, bank 7 $C4FE). Enemy list pointers are cartridge RAM addresses: bank 7 $CD9A copies the
+    bank's $88A0-$8C9F to $7000-$73FF when a world is loaded.
+
+    Enemy list: a length byte, then two bytes per enemy (bank 7 $D625): first byte bit 7 = already placed (the game
+    sets it when it places the enemy and skips entries that have it), bits 4-6 = height (row of the table at bank 7
+    $D5FB), bits 0-3 = column; second byte bits 6-7 = screen, bits 0-5 = type. The game places an entry when its
+    screen comes into view; the slot remembers the entry's offset in $BC. In random encounters ($075A = 1 small, 2
+    big monster touched on the map) bit 7 is cleared on entry (bank 7 $C554), and a big monster's encounter uses the
+    list that follows the area's own list ($C53E).
+
+    Layout: a length byte, three header bytes, then objects of two bytes (position, kind); kind $0F carries a third
+    byte, an item ($C8F6 -> $C9A5: the item is placed at column x * 16 + 3 of its screen, line (y * 16) + $20, unless
+    the per-area collected flags in RAM $0600+ (bank 7 $C2A6) say it was taken). Position $Dx changes the floor,
+    $Ex jumps to screen x & 3.
+    """
+    name = 'Zelda II - The Adventure of Link'
+    sha256 = '9fca03064a5113e6a92f550d9f42bac9ac1ae248a84df1f653d7cd7f76a1803d'
+    BANKS = 8
+    AREAS = 63
+    # set: (name, bank, alternate tables)
+    SETS = {0: ('West Hyrule', 1, False), 1: ('Death Mountain', 1, True), 2: ('East Hyrule', 2, False),
+            3: ('Maze Island', 2, True), 4: ('Towns', 3, False), 5: ('Palaces', 4, False), 6: ('Great Palace', 5, False)}
+    ENCOUNTER_SETS = {0, 1, 2, 3}       # world 0: the only sets with random encounters
+    HEIGHTS_AT = 0xD5FB                 # bank 7: enemy line by the entry's height
+    # items, named by placing each one and looking at it (trace/v15_profiles/zelda/z2/z2_items_crop.png) and by the
+    # pickup code (bank 7 $E771): 0-7 set inventory flags $0785 + n, 8 adds a key ($0793), $0A-$0D give experience
+    # through the table at $E7E6 + n (classes 7, 9, $0B, $0D of the experience table $DDC0/$DDDC: 50, 100, 200, 500),
+    # $0E/$0F raise the magic and heart containers ($0783/$0784), $10/$11 refill magic ($05E2: a little / all),
+    # $12 adds a life ($0700); $13-$15 set quest flags and keep their number
+    ITEMS = {0x00: 'Candle', 0x01: 'Glove', 0x02: 'Raft', 0x03: 'Boots', 0x04: 'Flute', 0x05: 'Cross', 0x06: 'Hammer',
+             0x07: 'Magic key', 0x08: 'Key', 0x0A: 'P-bag (50 points)', 0x0B: 'P-bag (100 points)',
+             0x0C: 'P-bag (200 points)', 0x0D: 'P-bag (500 points)', 0x0E: 'Magic container', 0x0F: 'Heart container',
+             0x10: 'Blue magic jar', 0x11: 'Red magic jar', 0x12: 'Doll (extra life)', 0x13: 'Item 0x13',
+             0x14: 'Item 0x14', 0x15: 'Item 0x15'}
+    # enemy types per bank of scene data, named by placing each type in a scene the walk reaches and looking at what
+    # the game drew (trace/v15_profiles/zelda/z2/names_*.png); types never seen keep their number
+    # (descriptive names: what the picture shows)
+    ENEMIES = {
+        1: {0x03: 'Black beetle', 0x04: 'Blue slime', 0x05: 'Red slime', 0x06: 'Red flying eye',
+            0x07: 'Blue spiked crawler', 0x0A: 'Red spiked crawler', 0x0C: 'Red ball', 0x0D: 'Red spider',
+            0x0E: 'Blue spider', 0x11: 'Red octopus', 0x12: 'Red octopus (second kind)', 0x14: 'Orange spear soldier',
+            0x15: 'Red pig-faced soldier', 0x16: 'Blue pig-faced soldier', 0x17: 'Orange club thrower',
+            0x18: 'Dark pig-faced soldier', 0x19: 'Orange lizard soldier', 0x1A: 'Red lizard soldier',
+            0x1B: 'Blue lizard soldier', 0x1C: 'Blue grass creatures', 0x1D: 'Blue grass creature',
+            0x1F: 'Blue grass creature (second kind)', 0x20: 'White column creature'},
+        3: {0x06: 'Purple flying eye', 0x0B: 'Purple slime', 0x0D: 'Old woman (purple)', 0x0E: 'Man (purple)',
+            0x10: 'Child', 0x11: 'Woman (purple dress)', 0x12: 'Man (red)', 0x14: 'Door (kind 0x14)',
+            0x15: 'Door (kind 0x15)', 0x16: 'Door (kind 0x16)', 0x17: 'Woman (red dress)', 0x18: 'Old woman (orange)'},
+        4: {0x03: 'Dark blue beetle', 0x04: 'Blue slime', 0x07: 'Orange flying head', 0x1D: 'Flame'}}
+
+    def __init__(self, rom: bytes):
+        self.rom = rom
+
+    # ---- reading
+    def at(self, bank, address):
+        return _bank(self.BANKS, bank, address)
+
+    def byte(self, bank, address):
+        return self.rom[self.at(bank, address)]
+
+    def word(self, bank, address):
+        return self.byte(bank, address) | self.byte(bank, address + 1) << 8
+
+    def tables(self, kind):
+        name, bank, alt = self.SETS[kind]
+        return bank, (0xA000, 0xA07E) if alt else (0x8523, 0x85A1)
+
+    def list_offset(self, kind, address):
+        """File offset of a cartridge RAM enemy list address ($7000-$73FF is the bank's $88A0-$8C9F)."""
+        bank = self.SETS[kind][1]
+        return self.at(bank, address - 0x7000 + 0x88A0)
+
+    def layout_at(self, kind, area):
+        bank, (layouts, lists) = self.tables(kind)
+        return self.word(bank, layouts + 2 * area)
+
+    def list_at(self, kind, area, strong=False):
+        bank, (layouts, lists) = self.tables(kind)
+        address = self.word(bank, lists + 2 * area)
+        if strong:
+            address += self.rom[self.list_offset(kind, address)]
+        return address
+
+    def enemies(self, kind, area, strong=False):
+        """[{'k', 'at' (file offset of the entry's first byte), 'placed', 'height', 'column', 'screen', 'type'}]"""
+        address = self.list_at(kind, area, strong)
+        if not 0x7000 <= address < 0x7400:
+            return []
+        start = self.list_offset(kind, address)
+        out = []
+        for k, i in enumerate(range(1, self.rom[start] - 1, 2)):
+            first, second = self.rom[start + i], self.rom[start + i + 1]
+            out.append({'k': k, 'offset': i, 'at': start + i, 'placed': bool(first & 0x80), 'height': (first >> 4) & 7,
+                        'column': first & 15, 'screen': second >> 6, 'type': second & 0x3F})
+        return out
+
+    def line(self, height):
+        return self.byte(7, self.HEIGHTS_AT + height)
+
+    def items(self, kind, area):
+        """Item objects of the area's layout: [{'n', 'at' (file offset of the item byte), 'item', 'screen', 'column', 'row'}]"""
+        bank = self.SETS[kind][1]
+        start = self.at(bank, self.layout_at(kind, area))
+        length = self.rom[start]
+        out, i, x = [], 4, 0
+        while i < length:
+            pos, what = self.rom[start + i], self.rom[start + i + 1]
+            if pos >> 4 == 0xE:
+                x = (pos & 3) * 16
+            elif pos >> 4 != 0xD:
+                x += pos & 15
+            if what == 0x0F and pos >> 4 != 0xD:
+                out.append({'n': len(out), 'at': start + i + 2, 'item': self.rom[start + i + 2], 'screen': x >> 4,
+                            'column': x & 15, 'row': pos >> 4})
+                i += 3
+            else:
+                i += 2
+        return out
+
+    LOCATIONS = 62                      # map entrances of a region: bank $861F y, $865E x, $869D area, $86DC world
+    LOCATION_AREAS, LOCATION_WORLDS = 0x869D, 0x86DC
+
+    def entrance_areas(self, kind):
+        """World-0 areas a map entrance of the set's own region leads to (West and East Hyrule only)."""
+        bank = self.SETS[kind][1]
+        return {self.byte(bank, self.LOCATION_AREAS + k) & 0x3F for k in range(self.LOCATIONS)
+                if not (self.byte(bank, self.LOCATION_WORLDS + k) >> 2) & 7}
+
+    def encounter_list(self, kind, area):
+        """True when the area's big-monster list is shown: West or East Hyrule areas no map entrance leads to
+        (random encounter scenes have no entrance of their own)."""
+        return kind in (0, 2) and area not in self.entrance_areas(kind)
+
+    def list_users(self, kind, address):
+        """Areas of the set that use this enemy list: [(area, strong)]."""
+        out = []
+        for area in range(self.AREAS):
+            if self.list_at(kind, area) == address:
+                out.append((area, False))
+            if self.encounter_list(kind, area) and self.list_at(kind, area, True) == address:
+                out.append((area, True))
+        return out
+
+    def layout_users(self, kind, area):
+        pointer = self.layout_at(kind, area)
+        bank = self.SETS[kind][1]
+        return [(k, a) for k in self.SETS if self.SETS[k][1] == bank for a in range(self.AREAS)
+                if self.layout_at(k, a) == pointer]
+
+    def enemy_name(self, kind, kind_type):
+        names = self.ENEMIES.get(self.SETS[kind][1], {})
+        return names.get(kind_type, f'Enemy {kind_type:#04x}')
+
+    def item_name(self, item):
+        return self.ITEMS.get(item & 0x7F, f'Item {item & 0x7F:#04x}')
+
+    def set_types(self, kind):
+        found = set()
+        for area in range(self.AREAS):
+            for strong in ((False, True) if self.encounter_list(kind, area) else (False,)):
+                for e in self.enemies(kind, area, strong):
+                    found.add(e['type'])
+        return sorted(found)
+
+
+class _Z2Watcher(Watcher):
+    """Watches one area of one set; `scene` gives (set, area) from the RAM like Zelda2Profile.where."""
+    every = 2
+
+    def __init__(self, watch):
+        self.w = watch
+
+    def here(self, ram):
+        part = Zelda2Profile.part_of(ram)
+        return part is not None and part == {'set': self.w['set'], 'area': self.w['area']} and \
+            (not self.w.get('strong') or ram[0x75A] == 2) and (self.w.get('strong') or ram[0x75A] < 2)
+
+    @staticmethod
+    def camera(ram):
+        return ram[0x72A] * 256 + ram[0x72C]
+
+
+class _Z2EnemyWatcher(_Z2Watcher):
+    """The slot the game fills from the entry ($BC = the entry's offset in its list) shows the chosen type; for a
+    removed entry, the entry is in view or its screen and column reach an edge of the view ($0732/$0734 left,
+    $0733/$0735 right, where the game places enemies) and no slot is filled from it in the next looks."""
+    VIEW = 20                           # looks after the entry's column reached an edge of the screen
+
+    def __init__(self, watch):
+        super().__init__(watch)
+        self.seen, self.viewed = None, 0
+
+    def see(self, ram, frame, run):
+        if not self.here(ram) or ram[0x736] != 0x0B:
+            return False
+        w = self.w
+        for slot in range(6):
+            if ram[0xB6 + slot] and ram[0xBC + slot] == w['offset'] and ram[0xA1 + slot] != 1:
+                self.seen = ram[0xA1 + slot]
+                return True
+        edge = (ram[0x732], ram[0x734]), (ram[0x733], ram[0x735])    # screen and column at each edge ($D625)
+        cam = self.camera(ram)
+        if self.viewed or (w['screen'], w['column']) in edge or cam - 16 <= w['x'] < cam + 272:   # in view (or the next column): placed on entry
+            self.viewed += 1
+            if w['remove'] and self.viewed >= self.VIEW:
+                return True
+        return False
+
+    def result(self):
+        w = self.w
+        if w['remove']:
+            if self.seen is not None:
+                return {'state': 'bad', 'text': f'Played from the start, the game still placed enemy type {self.seen:#04x} there.'}
+            if self.viewed >= self.VIEW:
+                return {'state': 'good', 'text': 'Played from the start, the game reached that spot and put no enemy there.'}
+            return super().result()
+        if self.seen is None:
+            return super().result()
+        ok = self.seen == w['type']
+        return {'state': 'good' if ok else 'bad', 'text': f'Played from the start, the game placed {w["name"]} there.' if ok
+                else f'Played from the start, the game placed enemy type {self.seen:#04x} there, not the one chosen.'}
+
+
+class _Z2ItemWatcher(_Z2Watcher):
+    """An item slot ($A1 = 1) at the item's screen and column holds the chosen item ($AF)."""
+
+    def __init__(self, watch):
+        super().__init__(watch)
+        self.seen = None
+
+    def see(self, ram, frame, run):
+        if not self.here(ram) or ram[0x736] != 0x0B:
+            return False
+        w = self.w
+        for slot in range(6):
+            if ram[0xB6 + slot] and ram[0xA1 + slot] == 1 and ram[0x3C + slot] == w['screen'] and \
+                    ram[0x4E + slot] == w['column'] * 16 + 3:
+                self.seen = ram[0xAF + slot] & 0x7F
+                return True
+        return False
+
+    def result(self):
+        if self.seen is None:
+            return super().result()
+        ok = self.seen == self.w['item']
+        return {'state': 'good' if ok else 'bad', 'text': f'Played from the start, the scene now holds {self.w["name"]}.' if ok
+                else f'Played from the start, the scene holds item {self.seen:#04x}, not the one chosen.'}
+
+
+class Zelda2Profile(Zelda2, Profile):
+    """Zelda II on the common profile interface. Parts are {'set', 'area'}: one side-view area of a set (see
+    Zelda2.SETS); x is the camera ($072A screen, $072C pixel) and y the screen line."""
+    sha256s = (Zelda2.sha256,)
+    SCREEN_W = 256
+    FEET = 24                           # lines from a figure's line ($2A) to its feet, measured on recorded maps
+
+    @staticmethod
+    def part_of(ram):
+        """Side-view play ($0736 = $0B): the set from world $0707, region $0706 and the region Link came from
+        $070A; the area is $0561."""
+        if ram[0x736] != 0x0B:
+            return None
+        world, region = ram[0x707], ram[0x706]
+        if world == 0:
+            kind = {0: 0, 2: 2}.get(region, 3 if ram[0x70A] else 1)
+        elif world in (1, 2):
+            kind = 4
+        elif world in (3, 4):
+            kind = 5
+        elif world == 5:
+            kind = 6
+        else:
+            return None
+        if ram[0x561] >= Zelda2.AREAS:
+            return None
+        return {'set': kind, 'area': ram[0x561]}
+
+    def where(self, ram):
+        part = self.part_of(ram)
+        if part is None:
+            return None
+        return {'part': part, 'x': ram[0x72A] * 256 + ram[0x72C], 'y': 0}
+
+    def part_name(self, part):
+        return f'{self.SETS[int(part["set"])][0]}, area {int(part["area"]):#04x}'
+
+    def choices(self):
+        out = {'items': [{'value': k, 'name': v} for k, v in self.ITEMS.items()]}
+        for kind in self.SETS:
+            out[f'enemies_{kind}'] = [{'value': t, 'name': self.enemy_name(kind, t)} for t in self.set_types(kind)]
+        return out
+
+    def _list_note(self, kind, area, strong):
+        """(editable, note) for the area's enemy list."""
+        address = self.list_at(kind, area, strong)
+        users = self.list_users(kind, address)
+        layout = self.layout_at(kind, area)
+        others = [(a, s) for a, s in users if (a, s) != (area, strong)]
+        if not others:
+            return True, ''
+        if all(not s and self.layout_at(kind, a) == layout for a, s in others):
+            return True, (f'Areas {", ".join(f"{a:#04x}" for a, s in others)} are this same scene and share this list, '
+                          'so the change shows there too.')
+        return False, (f'{len(others)} other place{"s" if len(others) > 1 else ""} use this enemy list, so it is shown '
+                       'but not changed here.')
+
+    def objects(self, part):
+        kind, area = int(part['set']), int(part['area'])
+        out = []
+        for strong in ((False, True) if self.encounter_list(kind, area) else (False,)):
+            editable, note = self._list_note(kind, area, strong)
+            for e in self.enemies(kind, area, strong):
+                x = e['screen'] * 256 + e['column'] * 16 + 8
+                row = {'id': f'{"strong" if strong else "enemy"}:{e["k"]}', 'style': 'enemy', 'type': e['type'],
+                       'x': x, 'y': self.line(e['height']) + self.FEET, 'name': self.enemy_name(kind, e['type']),
+                       'detail': f'screen {e["screen"] + 1}, column {e["column"]}',
+                       'remove': 'Remove the enemy' if editable and not strong else None,
+                       'fields': [{'key': 'enemy', 'label': 'Enemy', 'value': e['type'], 'choices': f'enemies_{kind}'}] if editable else []}
+                notes = []
+                if strong:
+                    notes.append('No map entrance leads to this scene; when it is a random encounter, this enemy is '
+                                 'there when Link touches a big monster on the map.')
+                elif self.encounter_list(kind, area):
+                    notes.append('In a random encounter scene the game brings back every enemy each time, so a removed '
+                                 'enemy stays away only when this scene is not a random encounter.')
+                if e['placed']:
+                    notes.append('The game treats this one as already placed, so it never appears.')
+                if note:
+                    notes.append(note)
+                if notes:
+                    row['note'] = ' '.join(notes)
+                out.append(row)
+        shared = len(self.layout_users(kind, area)) > 1
+        for it in self.items(kind, area):
+            x = it['screen'] * 256 + it['column'] * 16 + 8
+            row = {'id': f'item:{it["n"]}', 'style': 'item', 'type': 0x100 + (it['item'] & 0x7F), 'x': x,
+                   'y': it['row'] * 16 + 0x20 + self.FEET, 'name': self.item_name(it['item']),
+                   'detail': f'screen {it["screen"] + 1}, column {it["column"]}', 'remove': None,
+                   'note': 'It falls to the floor below this spot.',
+                   'fields': [{'key': 'item', 'label': 'Item', 'value': it['item'] & 0x7F, 'choices': 'items'}]}
+            if shared:
+                row['fields'] = []
+                row['note'] += (f' {len(self.layout_users(kind, area)) - 1} other areas are drawn from the same layout, '
+                                'so the item is shown but not changed here.')
+            out.append(row)
+        return out
+
+    def edit(self, part, object_id, values, remove=False):
+        kind, area = int(part['set']), int(part['area'])
+        if kind not in self.SETS or not 0 <= area < self.AREAS:
+            raise ValueError('That is not one of the game’s scenes.')
+        what, _, n = object_id.partition(':')
+        n = int(n)
+        where = self.part_name(part)
+        if what in ('enemy', 'strong'):
+            strong = what == 'strong'
+            if strong and not self.encounter_list(kind, area):
+                raise ValueError('That is not part of this level any more. Reopen the map.')
+            entries = self.enemies(kind, area, strong)
+            if not 0 <= n < len(entries):
+                raise ValueError('That is not part of this level any more. Reopen the map.')
+            e = entries[n]
+            editable, _ = self._list_note(kind, area, strong)
+            if not editable:
+                raise ValueError('Other places use this enemy list, so ROMancer leaves it alone.')
+            first, second = self.rom[e['at']], self.rom[e['at'] + 1]
+            x = e['screen'] * 256 + e['column'] * 16 + 8
+            watch = {'kind': 'enemy', 'set': kind, 'area': area, 'strong': strong, 'offset': e['offset'], 'x': x,
+                     'screen': e['screen'], 'column': e['column']}
+            if remove:
+                if strong:
+                    raise ValueError('The game brings back every enemy of an encounter, so this one cannot be removed.')
+                writes = [(e['at'], first, first | 0x80)] if not first & 0x80 else []
+                watch.update(remove=True, type=None, name='no enemy')
+                return {'writes': writes, 'title': f'{where}: enemy {n + 1} removed', 'watch': watch}
+            new = int(values.get('enemy', e['type']))
+            if new not in self.set_types(kind):
+                raise ValueError('That choice is not one of the game’s own.')
+            writes = [(e['at'] + 1, second, (second & 0xC0) | new)] if new != e['type'] else []
+            name = self.enemy_name(kind, new)
+            watch.update(remove=False, type=new, name=name)
+            return {'writes': writes, 'title': f'{where}: enemy {n + 1} is now {name}', 'watch': watch}
+        if what == 'item':
+            items = self.items(kind, area)
+            if not 0 <= n < len(items):
+                raise ValueError('That is not part of this level any more. Reopen the map.')
+            it = items[n]
+            if len(self.layout_users(kind, area)) > 1:
+                raise ValueError('Other areas are drawn from the same layout, so ROMancer leaves this item alone.')
+            new = int(values.get('item', it['item'] & 0x7F))
+            if new not in self.ITEMS:
+                raise ValueError('That choice is not one of the game’s own.')
+            value = (it['item'] & 0x80) | new
+            writes = [(it['at'], it['item'], value)] if value != it['item'] else []
+            name = self.item_name(new)
+            return {'writes': writes, 'title': f'{where}: item is now {name}',
+                    'watch': {'kind': 'item', 'set': kind, 'area': area, 'screen': it['screen'], 'column': it['column'],
+                              'item': new, 'name': name}}
+        raise ValueError('ROMancer cannot change that yet.')
+
+    def watcher(self, watch):
+        return {'enemy': _Z2EnemyWatcher, 'item': _Z2ItemWatcher}[watch['kind']](watch)
+
+PROFILES = [Zelda1Profile, Zelda2Profile]

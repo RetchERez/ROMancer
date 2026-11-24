@@ -174,5 +174,143 @@ class Zelda1Test(unittest.TestCase):
         self.assertIn('enemies_1', z.choices())
 
 
+# ---------------------------------------------------------------- Zelda II
+
+def build2():
+    """Zelda II tables at their real places: scene tables ($8523/$85A1, $A000/$A07E) of every scene bank, enemy lists
+    in the bank's $88A0 block (cartridge RAM $7000), the line table at bank 7 $D5FB and map entrances at $869D/$86DC."""
+    c = Cart()
+    c.put(7, 0xD5FB, [0x30, 0x50, 0x60, 0x70, 0x80, 0x90, 0xA0, 0xB0])
+    for bank in (1, 2, 3, 4, 5):
+        for area in range(63):
+            c.word(bank, 0x8523 + 2 * area, 0x9000)            # every area: an empty layout
+            c.word(bank, 0x85A1 + 2 * area, 0x7000)            # and the empty list at $7000
+            c.word(bank, 0xA000 + 2 * area, 0x9000)
+            c.word(bank, 0xA07E + 2 * area, 0x7000)
+        c.put(bank, 0x9000, [4, 0, 0, 0])
+        c.put(bank, 0x88A0, [1])
+        for k in range(62):                                    # map entrances: all lead to area $3E of world 0
+            c.put(bank, 0x869D + k, [0x3E])
+            c.put(bank, 0x86DC + k, [0])
+    # towns: area 2 list at $7010 (two enemies), layout $9100 with an item
+    c.word(3, 0x85A1 + 2 * 2, 0x7010)
+    c.put(3, 0x88A0 + 0x10, [5, 0x7D, 0x17, 0xF5, 0xE2])      # (height 7, col D, screen 0, $17), (placed, col 5, screen 3, $22)
+    c.word(3, 0x8523 + 2 * 2, 0x9100)
+    c.put(3, 0x9100, [11, 0x60, 0xA0, 0x01, 0x32, 0x10, 0xE2, 0x00, 0x84, 0x0F, 0x0A])   # object; to screen 2; item at x 4
+    c.word(3, 0x85A1 + 2 * 3, 0x7020)                          # areas 3 and 4 (different layouts) share a list
+    c.word(3, 0x85A1 + 2 * 4, 0x7020)
+    c.word(3, 0x8523 + 2 * 4, 0x9200)
+    c.put(3, 0x9200, [4, 0, 0, 0])
+    c.put(3, 0x88A0 + 0x20, [3, 0x10, 0x05])
+    c.word(3, 0x8523 + 2 * 6, 0x9300)                          # area 6: its own layout with a key
+    c.put(3, 0x9300, [7, 0, 0, 0, 0x93, 0x0F, 0x08])
+    # West Hyrule: area $22 (no entrance) list at $7040, followed by its big-monster list
+    c.word(1, 0x85A1 + 2 * 0x22, 0x7040)
+    c.put(1, 0x88A0 + 0x40, [3, 0x7C, 0x04, 5, 0x0F, 0x21, 0x70, 0x45])
+    return c
+
+
+class Zelda2Test(unittest.TestCase):
+    def setUp(self):
+        self.c = build2()
+        self.z = zl.Zelda2Profile(bytes(self.c.rom))
+
+    def test_where(self):
+        ram = bytearray(0x800)
+        ram[0x736], ram[0x707], ram[0x706], ram[0x561], ram[0x72A], ram[0x72C] = 0x0B, 1, 0, 2, 3, 0x10
+        self.assertEqual(self.z.where(bytes(ram)), {'part': {'set': 4, 'area': 2}, 'x': 0x310, 'y': 0})
+        ram[0x707], ram[0x706], ram[0x70A] = 0, 1, 2
+        self.assertEqual(self.z.where(bytes(ram))['part']['set'], 3)    # Maze Island: region 1, came from the east
+        ram[0x70A] = 0
+        self.assertEqual(self.z.where(bytes(ram))['part']['set'], 1)
+        ram[0x707] = 4
+        self.assertEqual(self.z.where(bytes(ram))['part']['set'], 5)
+        ram[0x736] = 5
+        self.assertIsNone(self.z.where(bytes(ram)))
+
+    def test_enemies(self):
+        e = self.z.enemies(4, 2)
+        self.assertEqual([(x['height'], x['column'], x['screen'], x['type'], x['placed']) for x in e],
+                         [(7, 0xD, 0, 0x17, False), (7, 5, 3, 0x22, True)])
+        self.assertEqual(e[0]['at'], self.c.at(3, 0x88B1))
+        objs = {o['id']: o for o in self.z.objects({'set': 4, 'area': 2})}
+        self.assertEqual((objs['enemy:0']['x'], objs['enemy:0']['y']), (0xD8, 0xB0 + zl.Zelda2Profile.FEET))
+        self.assertEqual(objs['enemy:0']['name'], 'Woman (red dress)')
+        self.assertIn('already placed', objs['enemy:1']['note'])
+        plan = self.z.edit({'set': 4, 'area': 2}, 'enemy:0', {'enemy': 0x22})
+        self.assertEqual(plan['writes'], [(self.c.at(3, 0x88B2), 0x17, 0x22)])
+        plan = self.z.edit({'set': 4, 'area': 2}, 'enemy:0', {}, True)
+        self.assertEqual(plan['writes'], [(self.c.at(3, 0x88B1), 0x7D, 0xFD)])
+        self.assertEqual(plan['watch']['offset'], 1)
+        with self.assertRaises(ValueError):
+            self.z.edit({'set': 4, 'area': 2}, 'enemy:0', {'enemy': 0x3F})     # not a type the set uses
+        row = self.z.objects({'set': 4, 'area': 3})[0]                          # list shared by two scenes
+        self.assertEqual(row['fields'], [])
+        with self.assertRaises(ValueError):
+            self.z.edit({'set': 4, 'area': 3}, 'enemy:0', {'enemy': 0x17})
+
+    def test_big_monster_list(self):
+        ids = [o['id'] for o in self.z.objects({'set': 0, 'area': 0x22})]
+        self.assertEqual(ids, ['enemy:0', 'strong:0', 'strong:1'])
+        self.assertEqual(self.z.list_at(0, 0x22, True), 0x7043)
+        plan = self.z.edit({'set': 0, 'area': 0x22}, 'strong:1', {'enemy': 0x04})
+        self.assertEqual(plan['writes'], [(self.c.at(1, 0x88A0 + 0x47), 0x45, 0x44)])
+        self.assertTrue(plan['watch']['strong'])
+        with self.assertRaises(ValueError):
+            self.z.edit({'set': 0, 'area': 0x22}, 'strong:1', {}, True)
+        self.assertEqual(self.z.objects({'set': 0, 'area': 0x3E}), [])       # an entrance's scene: no big-monster list
+
+    def test_items(self):
+        its = self.z.items(4, 2)
+        self.assertEqual([(i['item'], i['screen'], i['column'], i['row']) for i in its], [(0x0A, 2, 4, 8)])
+        self.assertEqual(its[0]['at'], self.c.at(3, 0x910A))
+        plan = self.z.edit({'set': 4, 'area': 2}, 'item:0', {'item': 0x0D})
+        self.assertEqual(plan['writes'], [(self.c.at(3, 0x910A), 0x0A, 0x0D)])
+        self.assertEqual(plan['watch'], {'kind': 'item', 'set': 4, 'area': 2, 'screen': 2, 'column': 4, 'item': 0x0D,
+                                         'name': 'P-bag (500 points)'})
+        self.assertEqual(self.z.items(4, 6)[0]['item'], 0x08)
+        self.c.word(3, 0x8523 + 2 * 7, 0x9300)                  # area 7 now shares area 6's layout
+        z = zl.Zelda2Profile(bytes(self.c.rom))
+        self.assertEqual(z.objects({'set': 4, 'area': 6})[0]['fields'], [])
+        with self.assertRaises(ValueError):
+            z.edit({'set': 4, 'area': 6}, 'item:0', {'item': 0x0D})
+
+    @staticmethod
+    def ram():
+        ram = bytearray(0x800)
+        ram[0x736], ram[0x707], ram[0x561], ram[0x72A] = 0x0B, 1, 2, 2
+        return ram
+
+    def test_watchers(self):
+        plan = self.z.edit({'set': 4, 'area': 2}, 'enemy:0', {'enemy': 0x22})
+        w = self.z.watcher(plan['watch'])
+        ram = self.ram()
+        ram[0xB6], ram[0xBC], ram[0xA1] = 1, 1, 0x22
+        self.assertTrue(w.see(bytes(ram), 0, 'changed'))
+        self.assertEqual(w.result()['state'], 'good')
+        w = self.z.watcher(plan['watch'])
+        ram[0xA1] = 0x17
+        w.see(bytes(ram), 0, 'original')
+        self.assertEqual(w.result()['state'], 'bad')
+        removed = self.z.watcher(self.z.edit({'set': 4, 'area': 2}, 'enemy:0', {}, True)['watch'])
+        ram = self.ram()
+        ram[0x732], ram[0x734] = 0, 0xD
+        for f in range(60):
+            if removed.see(bytes(ram), f, 'changed'):
+                break
+        self.assertEqual(removed.result()['state'], 'good')
+        item = self.z.watcher(self.z.edit({'set': 4, 'area': 2}, 'item:0', {'item': 0x0D})['watch'])
+        ram = self.ram()
+        ram[0xB6], ram[0xA1], ram[0x3C], ram[0x4E], ram[0xAF] = 1, 1, 2, 0x43, 0x0D
+        self.assertTrue(item.see(bytes(ram), 0, 'changed'))
+        self.assertEqual(item.result()['state'], 'good')
+        self.assertEqual(self.z.watcher({'kind': 'item', 'set': 4, 'area': 2, 'screen': 2, 'column': 4, 'item': 0x0D,
+                                         'name': ''}).result()['state'], 'warn')
+
+    def test_registered(self):
+        self.assertIn(zl.Zelda2Profile, zl.PROFILES)
+        self.assertIn(zl.Zelda1Profile, zl.PROFILES)
+
+
 if __name__ == '__main__':
     unittest.main()
