@@ -1,5 +1,5 @@
 import assert from 'node:assert/strict';
-import {placeAt,units,snap,brushFrom,stamp,paintedCells,paintLayers,layerChoices,steps,levelStatus,levelsPart,levelPart,levelChange,objectLabel,objectAt,fieldChoices,gamesPart,addOption} from '../romancer/ui/level_map.js';
+import {placeAt,units,snap,brushFrom,stamp,paintedCells,paintLayers,layerChoices,steps,levelStatus,levelsPart,levelPart,levelChange,objectLabel,objectAt,fieldChoices,gamesPart,addOption,mapLabel} from '../romancer/ui/level_map.js';
 
 // a map of 12 by 6 cells; (5,2) was never seen, (7,3) cannot be changed
 const width=12,height=6,frames=Array.from({length:width*height},()=>0),status=Array.from({length:width*height},()=>'r');
@@ -178,4 +178,11 @@ assert.match(undoHtml,/Bat swapped for Ghost <button type="button" data-action="
 assert.match(toolsHtml,/data-action="level-export-named"/);
 assert.ok(!plain.includes('level-export-named'));
 assert.match(toolsHtml,/id="level-show-names"/);
+// the map shows short names: what it holds or where it leads, in brackets
+assert.equal(mapLabel({name:'Candle',detail:'drops Large heart'}),'Candle [Large heart]');
+assert.equal(mapLabel({name:'? block',detail:'holds a coin'}),'? block [Coin]');
+assert.equal(mapLabel({name:'Pipe',detail:'leads to World 1-2'}),'Pipe [→ World 1-2]');
+assert.equal(mapLabel({name:'Hidden money bag',detail:'crouch there'}),'Hidden money bag');
+assert.equal(mapLabel({name:'Zombie',detail:'screen 3 of this section'}),'Zombie');
+assert.equal(mapLabel({name:'Bat'}),'Bat');
 console.log('level map checks passed');

@@ -39,6 +39,18 @@ MIN_PLANE_CELLS = 200
 MAX_LEVEL_CELLS = 256       # places painted in one change
 
 
+def map_label(item: dict) -> str:
+    """The short name drawn on a map: what it is, and what it holds or where it leads in brackets (the same rule as
+    mapLabel in ui/level_map.js). Notes about where or how stay out."""
+    import re
+    found = re.match(r'^(holds|drops|gives|sells|contains|opens the|leads to)\s+(?:an?\s+)?(.+)$', item.get('detail') or '', re.I)
+    if not found:
+        return item['name']
+    verb, what = found.group(1).lower(), found.group(2)
+    shown = '→ ' + what[:1].upper() + what[1:] if verb == 'leads to' else 'opens ' + what if verb == 'opens the' else what[:1].upper() + what[1:]
+    return f"{item['name']} [{shown}]"
+
+
 class _Same(Exception):
     """A place that already shows what was painted."""
 
@@ -1118,7 +1130,7 @@ class LevelTools:
         for item in sorted(objects, key=lambda o: (o['map_x'], o['map_y'])):
             x, y = item['map_x'] * zoom, item['map_y'] * zoom
             colour = colours.get(item['style'], (255, 255, 255))
-            label = item['name'] + (f", {item['detail']}" if item.get('detail') else '')
+            label = map_label(item)
             width = int(draw.textlength(label, font=font))
             left = max(4, min(int(x) - width // 2, sheet.width - width - 6))
             top = int(y) + 4

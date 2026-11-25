@@ -71,6 +71,14 @@ export function levelStatus(summary,playing){
 export function objectLabel(item){
  return item.detail?`${item.name}, ${item.detail}`:item.name;
 }
+// The short name drawn on the map: what it is, and what it holds or where it leads in brackets. Notes about where
+// or how (a screen number, "crouch there") stay in the panel and the pointer text.
+export function mapLabel(item){
+ const m=/^(holds|drops|gives|sells|contains|opens the|leads to)\s+(?:an?\s+)?(.+)$/i.exec(item.detail||'');
+ if(!m)return item.name;
+ const what=m[2].charAt(0).toUpperCase()+m[2].slice(1);
+ return `${item.name} [${/^leads/i.test(m[1])?'→ '+what:/^opens/i.test(m[1])?'opens '+m[2]:what}]`;
+}
 // The choices of one field of an object: its own list, or a list the game shares between objects.
 export function fieldChoices(field,shared){
  return Array.isArray(field.choices)?field.choices:(shared?.[field.choices]||[]);
@@ -195,7 +203,7 @@ export async function drawLevel(ctx,ed,picture){
   const placed=[];
   // a name on a solid dark plate, kept inside the map, moved down a line when it would cover another name
   const nameAt=(item,x,top)=>{
-   const label=objectLabel(item),width=Math.ceil(context.measureText(label).width)+10,height=fontSize+8;
+   const label=mapLabel(item),width=Math.ceil(context.measureText(label).width)+10,height=fontSize+8;
    let left=Math.max(2,Math.min(x-width/2,canvas.width-width-2)),y=Math.max(2,top-height-4);
    for(let n=0;n<8&&placed.some(b=>left<b[2]&&b[0]<left+width&&y<b[3]&&b[1]<y+height);n++)y+=height+2;
    placed.push([left,y,left+width,y+height]);
