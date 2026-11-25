@@ -53,6 +53,7 @@ START_PRESSES = {
     '1271dce8678f': 8,          # Darkwing Duck: through the intro into the first level
     'dff668a78853': 6,          # Chip 'n Dale 2: into level 0
     '1f4a9b3f04e2': 3,          # Contra: skip the title scroll, 1 PLAYER, then Stage 1
+    'f4083971fb73': 2,          # Adventure Island: title, then 1-1
 }
 
 
@@ -73,6 +74,7 @@ ROUTES = {
     '6791433fd1c6': [([], 120), (['left'], 4), ([], 30), (['start'], 4)] + [([], 120)] * 5,   # Mega Man 6: Plant Man
     'f2db2cbdaaed': [([], 120)] * 3 + [(['b'], 4), ([], 150), (['down'], 4), ([], 30), (['b'], 4)] + [([], 120)] * 10,   # Wonder Boy III: button 1 starts, then the first room
     '1271dce8678f': [(['a'], 4), ([], 150)] * 6 + [([], 120)],   # Darkwing Duck: through the intro into the first level
+    '1b6b2323ac4c': [([], 120)] + [(['start'], 4), ([], 150)] * 2 + [(['start'], 4), ([], 400), (['start'], 4), ([], 300)] + [(['a'], 4), ([], 200)] * 9,   # DuckTales 2: past the map into Niagara
 }
 
 # Longer routes are kept as JSON files in trace/routes/<key>.json: [[buttons, frames], ...]

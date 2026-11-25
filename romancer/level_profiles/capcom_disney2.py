@@ -35,6 +35,7 @@ class DuckTales2:
     ROWS = 6
     LISTS = 0x9424
     SCREEN_H = 240
+    HIDDEN_LINES = 8
     FIRST_CONTROL = 0x99
     CHEST_ITEMS, BIG_CHEST_ITEMS = 0x8ACA, 0x8B2D
     HIDDEN_ITEMS, HIDDEN_CHESTS = 0x89AC, 0x89B0
@@ -49,11 +50,44 @@ class DuckTales2:
     OFFERED_ITEMS = (0x2A, 0x2B, 0x2C, 0x2D, 0x2E)
     # enemies: kinds $42-$5C (the pictures of every kind each stage uses, shots/dt2/zoom*.png, show its enemies there)
     FIRST_ENEMY, LAST_ENEMY = 0x42, 0x5C
-    # named from what the game draws when the kind is spawned in its own stage (shots/dt2/psheet*.png, zoom*.png);
-    # a kind can look different in another stage, so names are per stage
-    NAMES = {(0, 0x4C): 'Plant', (0, 0x4D): 'Bird', (0, 0x4E): 'Frog', (2, 0x55): 'Mummy',
-             (0, 0x76): 'Log'}
-    HELPERS = {0x3C: 'Huey', 0x3D: 'Dewey', 0x3E: 'Louie', 0x3F: 'Webby'}
+    # names and what each does, from what the game draws when the record is spawned at its own place (the stage started
+    # there: trace/v15_profiles/capcom_disney2/name2_dt2.py, pictures shots/dt2/m<stage>_<kind>.png) or in front of
+    # Scrooge at the stage's start (name_dt2.py, shots/dt2/n<stage>_<kind>.png), and its place every frame for 160
+    # frames. A kind can look different in another stage, so most names are per stage. Kinds drawn with the wrong
+    # pictures in both ways (letters and numbers instead of a sprite) keep their number.
+    NAMES = {
+        (0, 0x4C): ('Plant', 'Stays rooted in one spot.'),
+        (0, 0x4D): ('Bird', 'Flies slowly back and forth near the ground.'),
+        (0, 0x4E): ('Frog', 'Hops toward Scrooge.'),
+        (0, 0x76): ('Log', 'Floats down the waterfall and comes back at the top.'),
+        (1, 0x51): ('Crab', 'Walks back and forth.'),
+        (1, 0x53): ('Pink bird', 'Flies across the screen and away.'),
+        (1, 0x52): ('Small duck in a hat', 'Jumps toward Scrooge.'),
+        (1, 0x73): ('Striped pole', None), (1, 0x74): ('Striped pole', None),
+        (1, 0x8D): ('Cannon', None), (1, 0x8E): ('Lever', None), (1, 0x96): ('Hanging ring', None),
+        (2, 0x21): ('Hook', None), (2, 0x91): ('Hook', None),
+        (2, 0x55): ('Mummy', None),
+        (2, 0x7C): ('Arrow block', None), (2, 0x7D): ('Arrow block', None), (2, 0x7E): ('Arrow block', None),
+        (2, 0x7F): ('Arrow block', None),
+        (2, 0x94): ('Striped pillar', None),
+        (2, 0x95): ('Creature in the sand', 'Rises out of the sand and sinks back.'),
+        (3, 0x51): ('Crab', 'Walks back and forth.'),
+        (3, 0x57): ('Mermaid', 'Hops along the ground toward Scrooge.'),
+        (3, 0x72): ('Drum', None), (3, 0x92): ('Striped block', None), (3, 0x94): ('Striped pillar', None),
+        (4, 0x4E): ('Frog', 'Hops toward Scrooge.'),
+        (4, 0x5B): ('Ghost', 'Swoops down and across toward Scrooge.'),
+        (4, 0x82): ('Arrow block', None), (4, 0x84): ('Cart', None),
+        (5, 0x51): ('Crab', 'Walks back and forth.'),
+        (5, 0x5B): ('Ghost', 'Swoops down and across toward Scrooge.'),
+        (5, 0x72): ('Drum', None),
+    }
+    # the same picture in every stage it was seen in
+    HELPERS = {0x3C: ('Huey', 'Stands in one place.'), 0x3D: ('Dewey', 'Stands in one place.'),
+               0x3E: ('Louie', 'Stands in one place.'), 0x3F: ('Webby', 'Stands in one place.'),
+               0x40: ('Launchpad', 'Stands in one place.'),
+               0x41: ('Duck in a red cap', 'Stands in one place.'),
+               0x23: ('Invisible object', 'Draws nothing and stays where it is.'),
+               0x5E: ('Invisible marker', 'Draws nothing and is gone a few frames after it appears.')}
 
     def __init__(self, rom: bytes):
         self.rom = rom
@@ -129,10 +163,23 @@ class DuckTales2:
         if r['role'] == 'hidden chest':
             return 'Hidden treasure chest'
         if (stage, kind) in self.NAMES:
-            return self.NAMES[(stage, kind)]
+            return self.NAMES[(stage, kind)][0]
         if kind in self.HELPERS:
-            return self.HELPERS[kind]
+            return self.HELPERS[kind][0]
+        if kind in self.HIDDEN:
+            return 'Hidden enemy' if self.FIRST_ENEMY <= self.b6(self.HIDDEN_CHESTS + kind - 0x36) <= self.LAST_ENEMY \
+                else f'Hidden object {kind:#04x}'
         return f'Enemy {kind:#04x}' if r['role'] == 'enemy' else f'Object {kind:#04x}'
+
+    def kind_does(self, kind: int, stage: int):
+        """One short sentence on what the kind does, from watching it in the game, or None."""
+        if (stage, kind) in self.NAMES:
+            return self.NAMES[(stage, kind)][1]
+        if kind in self.HELPERS:
+            return self.HELPERS[kind][1]
+        if kind in self.HIDDEN and self.kind_name(kind, stage) == 'Hidden enemy':
+            return 'Turns into an enemy when Scrooge walks over the spot.'
+        return None
 
     # ---- choices: always kinds from the game's own tables
     def content_choices(self, kind: int, stage: int) -> list:
@@ -219,7 +266,9 @@ class _DuckTales2Watcher(Watcher):
         slots = [(ram[0x3FE + s], ram[0x41E + s]) for s in range(16)]
         old, self.slots = self.slots, slots
         if old is None:
-            return False
+            # the stage spawns the objects of its first screen before $8A turns 1, so on the first frame of play
+            # every object already in a slot counts as just spawned
+            old = [(0, 0)] * 16
         for s in range(16):
             if not slots[s][0] or slots[s] == old[s] or slots[s][1] != w['index']:
                 continue
@@ -256,7 +305,10 @@ class DuckTales2Profile(DuckTales2, Profile):
         stage, row = ram[0xC8], ram[0x1B]
         if ram[0x8A] != 1 or stage >= len(self.STAGES) or row >= self.ROWS:
             return None
-        return {'part': {'stage': stage}, 'x': ram[0x18] << 8 | ram[0x17], 'y': row * self.SCREEN_H + ram[0x1A]}
+        # the recorded pictures leave out the NES's top 8 lines, so the top of a picture is 8 below the camera
+        # (an object's y is the screen line of its bottom: trace/v15_profiles/capcom_disney2/dt2_y2.py)
+        return {'part': {'stage': stage}, 'x': ram[0x18] << 8 | ram[0x17],
+                'y': row * self.SCREEN_H + ram[0x1A] + self.HIDDEN_LINES}
 
     def part_name(self, part):
         return self.STAGES[int(part['stage'])]
@@ -268,6 +320,9 @@ class DuckTales2Profile(DuckTales2, Profile):
             row = {'id': f'object:{r["row"]}:{r["index"]}', 'type': r['kind'], 'x': r['x'],
                    'y': r['row'] * self.SCREEN_H + r['y'], 'name': self.kind_name(r['kind'], stage),
                    'remove': 'Remove this object'}
+            does = self.kind_does(r['kind'], stage)
+            if does:
+                row['does'] = does
             if r['role'] in ('chest', 'big chest', 'hidden', 'hidden chest'):
                 choices = self.content_choices(r['kind'], stage)
                 hidden = r['role'].startswith('hidden')
@@ -285,7 +340,7 @@ class DuckTales2Profile(DuckTales2, Profile):
                                                    'choices': f'stage{stage}'}])
             else:
                 row.update(style='enemy', fields=[], remove=None,
-                           note='ROMancer does not know what this object does yet, so it stays as it is.')
+                           note='ROMancer cannot change this object yet, so it stays as it is.')
             out.append(row)
         return out
 
@@ -790,4 +845,4 @@ class ChipDale2Profile(ChipDale2, Profile):
 # =====================================================================================================================
 
 # DuckTales2Profile is decoded but its edits are not proven yet (research notes), so it is not registered
-PROFILES = [DarkwingDuckProfile, ChipDale2Profile]
+PROFILES = [DuckTales2Profile, DarkwingDuckProfile, ChipDale2Profile]
