@@ -45,13 +45,87 @@ class MegaManX:
     ENTRY_RAM = 0xFA02
     LEVEL_NAMES = ['Highway', 'Stage 1 (sea)', 'Stage 2 (forest)', 'Stage 3 (factory)', 'Stage 4', 'Stage 5',
                    'Stage 6', 'Stage 7', 'Stage 8 (snow)', 'Fortress 1', 'Fortress 2', 'Fortress 3', 'Fortress 4']
-    # Enemies named from what the game drew when they spawned (trace/v15_profiles/snes_more/survey2, sheet_survey.png)
-    ENEMY_NAMES = {0x15: 'Spiky', 0x22: 'Bee Blader', 0x29: 'Gun Volt', 0x0B: 'Axe Max', 0x0F: 'Flying spiked pod',
-                   0x2D: 'Batton Bone', 0x04: 'Tall walker', 0x51: 'Snowmobile rider', 0x49: 'Crane claw',
-                   0x33: 'Zero'}
+    # Enemies: each was spawned in its own level and watched for 240 frames (trace/v15_profiles/snes_more/mmxlook.py,
+    # look/*.png, look1.txt, look2.txt; earlier crops in survey2/). Names come from the picture; "does" from the slot's
+    # positions while it was watched. "(likely)" marks a picture that was hard to read.
+    ENEMIES = {
+        0x04: ('Tall walker', 'Stands on two long legs with a spinning head.'),
+        0x06: ('Grass crawler', 'Hides in the grass and stays in place until Mega Man comes near.'),
+        0x0B: ('Axe Max', 'Stands by a stack of logs and swings an axe to send them along the ground.'),
+        0x0F: ('Flying drone (likely)', 'Hovers and drifts toward Mega Man.'),
+        0x11: ('Road car (likely)', 'Drives left along the road and drops off its edge.'),
+        0x13: ('Cannon soldier', 'Stands behind a cannon and fires large shots.'),
+        0x15: ('Spiky', 'Rolls along the road toward Mega Man.'),
+        0x17: ('Parachute mine', 'Hangs in the air under a parachute.'),
+        0x18: ('Cave rock (likely)', 'Stays in place in the cave ceiling.'),
+        0x19: ('Hornet robot', 'Flies toward Mega Man.'),
+        0x1D: ('Underwater bubble maker (likely)', 'Sends up bubbles and moves only a little.'),
+        0x1E: ('Mad Pecker', 'Clings to a tree trunk.'),
+        0x20: ('Grasshopper robot', 'Hops along the ground toward Mega Man.'),
+        0x22: ('Bee Blader', 'Flies down from above and hovers over the road.'),
+        0x27: ('Road car, second kind (likely)', 'Moves left along the road.'),
+        0x29: ('Gun Volt', 'Stands on the road on two big legs.'),
+        0x2B: ('Wall cannon', 'Fixed to the wall.'),
+        0x2D: ('Batton Bone', 'A bat that flies at Mega Man.'),
+        0x2E: ('Ceiling press', 'Hangs from the ceiling and stays in place.'),
+        0x33: ('Zero', 'Stands still and talks to Mega Man.'),
+        0x34: ('Rock golem', 'Stands in the cave.'),
+        0x36: ('Pink flying robot', 'Flies in a wave toward Mega Man.'),
+        0x37: ('Dragonfly robot', 'Flies straight across the screen fast.'),
+        0x46: ('Fuel tanks (likely)', 'Stand in place.'),
+        0x49: ('Crane claw', 'Moves sideways looking for something to grab.'),
+        0x4C: ('Storage tank (likely)', 'Stands in place.'),
+        0x4F: ('Patrolling robot (likely)', 'Moves back and forth along the floor.'),
+        0x51: ('Snowmobile rider', 'Rides a snowmobile toward Mega Man.'),
+        0x5B: ('Dome turret', 'Sits in place and sends out fireballs.'),
+        0x65: ('Final room machine (likely)', 'Stays in place in the dark.'),
+        0x68: ('Green wall head', 'Fixed to the wall.'),
+        # second session: spawned with the camera borders opened ($1E56-$1E61) and Mega Man held near the entry
+        # (look5.txt, look5_*.png). "Boss" names are the ones that bring up the boss energy bar.
+        0x02: ('Dropping block (likely)', 'Waits a second, then drops straight down.'),
+        0x03: ('Electric ball (likely)', 'Moves toward Mega Man and stops.'),
+        0x05: ('Hidden roamer', 'Draws nothing and moves around in steps.'),
+        0x07: ('Boss room trigger', 'Draws nothing and goes away after a second, near a boss door.'),
+        0x0A: ('Falling rocks', 'Drops from the cave ceiling and breaks apart.'),
+        0x0C: ('Stage 4 boss', 'Brings up the boss energy bar and fights Mega Man.'),
+        0x0D: ('Electric spark', 'Runs back and forth along the floor.'),
+        0x14: ('Falling platform (likely)', 'Waits, then falls.'),
+        0x16: ('Short flash', 'Appears for a moment and goes away.'),
+        0x21: ('Whale ship', 'Floats in place under the water.'),
+        0x2C: ('Mine cart riders (likely)', 'Rush along the floor fast.'),
+        0x2F: ('Grasshopper robot, large (likely)', 'Hops toward Mega Man.'),
+        0x30: ('Hidden helper, factory', 'Draws nothing and goes away after a second.'),
+        0x31: ('Hidden helper, power plant', 'Draws nothing and stays in place.'),
+        0x35: ('Hidden helper, factory, second kind', 'Draws nothing and goes away at once.'),
+        0x39: ('Crushing pillar', 'A metal pillar that stays in place for a while.'),
+        0x3A: ('Hidden helper, snow', 'Draws nothing and goes away after a moment.'),
+        0x3B: ('Falling wall section (likely)', 'Slides, then falls a long way.'),
+        0x3D: ('Hidden helper, stage 7', 'Draws nothing and stays in place.'),
+        0x40: ('Message window (likely)', 'Shows a few letters for a second.'),
+        0x42: ('Laser emitter', 'Sits on the wall and fires a thin beam.'),
+        0x44: ('Hovering eye drone', 'Floats in place with a red eye.'),
+        0x47: ('Rising part (likely)', 'Draws nothing, rises a little and goes away.'),
+        0x53: ('Hidden helper, snow, second kind', 'Draws nothing and goes away after a second.'),
+        0x54: ('Hidden drift, snow', 'Draws nothing and drifts down and to the left.'),
+        0x57: ('Snow hut', 'A hut that stands in place.'),
+        0x5D: ('Fortress 2 boss', 'Brings up the boss energy bar and fights Mega Man.'),
+        0x63: ('Fortress 1 boss', 'Brings up the boss energy bar and fights Mega Man.'),
+        0x64: ('Fortress 1 boss helper (likely)', 'Stands by the boss.'),
+        0x66: ('Hidden runner, fortress', 'Draws nothing and moves far to the right fast.'),
+        0x67: ('Hidden helper, fortress', 'Draws nothing and stays in place.'),
+        0x4D: ('Dr. Light capsule', 'Draws nothing until Mega Man has what it asks for: its code checks which Heart Tanks and Sub Tanks he has.'),
+        0x01: ('Hidden helper, forest', 'Draws nothing and stays in place.'),
+        0x41: ('Hidden helper, stage 5', 'Draws nothing and goes away after half a second.'),
+        0x48: ('Hidden helper, stage 5, second kind', 'Draws nothing and stays in place.'),
+        0x50: ('Hidden helper, stage 5, third kind', 'Draws nothing and stays in place.'),
+        0x59: ('Hidden helper, stage 5, fourth kind', 'Draws nothing and goes away after half a second.'),
+    }
+    ENEMY_NAMES = {k: v[0] for k, v in ENEMIES.items()}
     # Items: each was put in the highway's list and picked up (mmxitem.py): what changed in RAM is in the notes
     ITEMS = {(0x02, 0x80): 'Large life energy', (0x02, 0x82): 'Small life energy', (0x04, 0x80): '1-Up',
              (0x0B, None): 'Heart Tank', (0x05, None): 'Sub Tank'}
+    ITEM_DOES = {0x02: None, 0x04: 'Gives one more life.', 0x0B: 'Raises the most life energy by 2 and fills it.',
+                 0x05: 'Stores spare life energy for later.'}
     COMMON_ITEMS = [(0x02, 0x80), (0x02, 0x82), (0x04, 0x80)]
     SLOTS = {0: (0x1628, 0x30, 16), 1: (0x1928, 0x20, 31), 2: (0x1D08, 0x10, 16), 3: (0x0E68, 0x40, 15)}
 
@@ -157,8 +231,24 @@ class MegaManX:
         return sorted(seen)
 
     def enemy_name(self, number: int, sub: int | None = None) -> str:
-        name = self.ENEMY_NAMES.get(number, f'Enemy {number:#04x}')
-        return name if sub in (None, 0) else f'{name} (setting {sub:#04x})'
+        name = self.ENEMY_NAMES.get(number)
+        if name is None:
+            levels = sorted({lv for lv in range(self.LEVELS) for e in self.entries(lv) if e['type'] == 3 and e['id'] == number})
+            name = f'{self.LEVEL_NAMES[levels[0]] if levels else "Unplaced"} enemy, not seen yet'
+        if not sub:
+            return name
+        subs = sorted({e['sub'] for lv in range(self.LEVELS) for e in self.entries(lv) if e['type'] == 3 and e['id'] == number} - {0})
+        order = ['second', 'third', 'fourth', 'fifth', 'sixth', 'seventh', 'eighth']
+        n = subs.index(sub) if sub in subs else len(subs)
+        return f'{name}, {order[n] if n < len(order) else "another"} kind'
+
+    def enemy_does(self, number: int):
+        return self.ENEMIES.get(number, (None, None))[1]
+
+    def item_does(self, number: int, sub: int):
+        if number == 0x02:
+            return 'Restores 2 life energy.' if sub & 0x02 else 'Restores 8 life energy.'
+        return self.ITEM_DOES.get(number)
 
     def item_name(self, number: int, sub: int) -> str:
         return self.ITEMS.get((number, sub)) or self.ITEMS.get((number, None)) or f'Object {number:#04x}'
@@ -219,7 +309,7 @@ class _MmxWatcher(Watcher):
             ok = self.seen == 'gone'
             return {'state': 'good' if ok else 'bad',
                     'text': f'Played from the start, the screen reached that spot and no {w["name"]} appeared there.' if ok
-                    else f'Played from the start, a {w["name"]} still appears there.'}
+                    else f'Played from the start, the {w["name"]} still appears there.'}
         ok = self.seen == (w['id'], w['sub'])
         return {'state': 'good' if ok else 'bad',
                 'text': f'Played from the start, the game now puts {w["name"]} there.' if ok
@@ -251,9 +341,9 @@ class MegaManXProfile(MegaManX, Profile):
         for e in self.entries(level):
             if e['type'] == 3:
                 row = {'id': f'obj:{e["index"]}', 'style': 'enemy', 'type': e['id'], 'x': e['x'], 'y': e['y'],
-                       'name': self.enemy_name(e['id']), 'remove': None, 'fields': []}
-                if e['sub']:
-                    row['detail'] = f'setting {e["sub"]:#04x}'
+                       'name': self.enemy_name(e['id'], e['sub']), 'remove': None, 'fields': []}
+                if self.enemy_does(e['id']):
+                    row['does'] = self.enemy_does(e['id'])
                 if self.editable_enemy(e):
                     row['remove'] = 'Remove this enemy'
                     choices = self.enemy_choices(level, e)
@@ -275,6 +365,8 @@ class MegaManXProfile(MegaManX, Profile):
                        'fields': [{'key': 'item', 'label': 'Item', 'value': e['id'] << 8 | e['sub'], 'choices': fields}]}
                 if special:
                     row['note'] = 'Changing it to another item gives up this one for good: the game counts each of these once.'
+                if self.item_does(e['id'], e['sub']):
+                    row['does'] = self.item_does(e['id'], e['sub'])
                 out.append(row)
         return out
 
@@ -288,7 +380,7 @@ class MegaManXProfile(MegaManX, Profile):
         enemy = self.editable_enemy(e)
         if not enemy and not self.is_item(e):
             raise ValueError('ROMancer cannot change that yet.')
-        name = self.enemy_name(e['id']) if enemy else self.item_name(e['id'], e['sub'])
+        name = self.enemy_name(e['id'], e['sub']) if enemy else self.item_name(e['id'], e['sub'])
         watch = {'level': level, 'type': e['type'], 'entry': self.ENTRY_RAM + 5 * e['index'], 'x': e['x'], 'y': e['y']}
         if remove:
             return {'writes': self.remove_writes(level, e['index']), 'title': f'Remove the {name}',
@@ -456,7 +548,7 @@ class _Sc4Watcher(Watcher):
             ok = self.seen == 'gone'
             return {'state': 'good' if ok else 'bad',
                     'text': f'Played from the start, the screen reached that spot and no {w["name"]} appeared there.' if ok
-                    else f'Played from the start, a {w["name"]} still appears there.'}
+                    else f'Played from the start, the {w["name"]} still appears there.'}
         ok = self.seen == w['want']
         if w['candle']:
             return {'state': 'good' if ok else 'bad',
@@ -552,4 +644,4 @@ class SuperCastlevania4Profile(SuperCastlevania4, Profile):
         return _Sc4Watcher(watch)
 
 
-PROFILES = [MegaManXProfile, SuperCastlevania4Profile]
+PROFILES = [MegaManXProfile]      # Super Castlevania IV is added once its edits are proven in the game

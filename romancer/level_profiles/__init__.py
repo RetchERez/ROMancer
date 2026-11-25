@@ -127,7 +127,7 @@ def ram_of(snapshot):
 
 
 # one module per game (or family of games that share an engine); each has PROFILES = [classes]
-GAMES = ['capcom_disney', 'capcom_disney2', 'castlevania', 'castlevania23', 'gb_adventure', 'gbc_more', 'mario_land', 'megadrive_sonic', 'megaman', 'megaman6', 'metroid', 'ninjagaiden', 'smb1', 'smb2', 'smb3', 'sms_classics', 'snes_classics', 'wonderboy3', 'zelda']
+GAMES = ['capcom_disney', 'capcom_disney2', 'castlevania', 'castlevania23', 'gb_adventure', 'gbc_more', 'mario_land', 'megadrive_sonic', 'megaman', 'megaman6', 'metroid', 'ninjagaiden', 'smb1', 'smb2', 'smb3', 'sms_classics', 'snes_classics', 'snes_more', 'wonderboy3', 'zelda']
 
 
 def _registry():

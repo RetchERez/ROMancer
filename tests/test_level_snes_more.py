@@ -97,6 +97,27 @@ class MegaManXTest(unittest.TestCase):
         w.see(bytes(ram), 0, 'original')
         self.assertEqual(w.result()['state'], 'bad')
 
+    def test_names(self):
+        objs = {o['id']: o for o in self.p.objects({'level': 0})}
+        self.assertEqual(objs['obj:2']['name'], 'Gun Volt')
+        self.assertEqual(objs['obj:1']['does'], 'Rolls along the road toward Mega Man.')
+        self.assertEqual(objs['obj:3']['does'], 'Restores 8 life energy.')
+        names = [c['name'] for c in objs['obj:1']['fields'][0]['choices']]
+        self.assertEqual(names, ['Flying drone (likely)', 'Spiky', 'Gun Volt'])
+        self.assertEqual([c['name'] for c in self.p.choices()['items']], ['Large life energy', 'Small life energy', '1-Up'])
+        self.assertEqual(self.p.item_does(0x02, 0x82), 'Restores 2 life energy.')
+        self.assertEqual(self.p.item_name(0x0B, 0x04), 'Heart Tank')
+        self.assertEqual(self.p.enemy_name(0x2D, 0x01), 'Batton Bone, second kind')
+        self.assertEqual(self.p.enemy_name(0x0C), 'Stage 4 boss')
+        self.assertEqual(self.p.enemy_name(0x4D), 'Dr. Light capsule')
+        # a type never seen says where it is and that it was not seen, without its number
+        self.assertEqual(self.p.enemy_name(0x62), 'Unplaced enemy, not seen yet')
+        for number in range(0x100):
+            self.assertNotIn('0x', self.p.enemy_name(number))
+            self.assertNotIn('0x', self.p.enemy_name(number, 0x10))
+        for o in objs.values():
+            self.assertNotIn('0x', o['name'])
+
 
 def sc4_rom():
     rom = bytearray(0x100000)
