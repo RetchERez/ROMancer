@@ -1038,6 +1038,7 @@ APPROVED_FILES = frozenset({
     'user-guide/screenshots/271-scenes-graphics.png',
     'user-guide/screenshots/272-level-map.png',
     'user-guide/screenshots/273-level-objects.png',
+    'user-guide/screenshots/274-level-tools.png',
     'user-guide/screenshots/45-changes-only.png',
     'user-guide/screenshots/46-brush-build-review.png',
     'user-guide/screenshots/47-search-files.png',
