@@ -1,9 +1,30 @@
-ROMancer v1.4.1
+ROMancer v1.4.9
 By RetchEWretched
 
 ROMancer is a local ROM editing, investigation and playtesting workbench.
 It supports NES, SNES, Genesis / Mega Drive, Master System, Game Boy and
 Game Boy Color cartridge formats. Everyday work runs offline.
+
+NEW IN v1.4.9
+
+Level Editor (BETA) for 42 games. Eleven more games now have full level
+editing, with real names for what is in each level and a line on what each
+enemy does, and the editor can do more in the games it knows.
+- New games: Adventure Island, Contra, Darkwing Duck, Chip 'n Dale Rescue
+  Rangers 2, DuckTales 2, Mega Man 6, Mega Man X, Super Castlevania IV,
+  Wonder Boy III, Link's Awakening DX and Wario Land II, plus Kid Icarus
+  worlds 2 and 3
+- Level pieces: move, resize, change or remove the pieces Super Mario
+  Bros. 1 and 3 build their levels from
+- Packed levels: copy and paint whole blocks in Sonic 1 and 2, Super Mario
+  World and Super Metroid, and ROMancer packs the level again
+- Level length for Ninja Gaiden I to III
+- Add new: put a new object on an empty spot where a game has room
+- Add to this map: play through what a map is missing and it is put
+  together again from both walks
+- Save the walk: a small file that rebuilds the same map on the same ROM
+- Save map with names, Show names, short names on the map, thicker boxes,
+  and Undo for one object's own change
 
 NEW IN v1.4.1
 
@@ -74,7 +95,7 @@ new, Update and restart, and Later.
   ROMancer, puts the new version in place and opens it again
 - Your projects are not touched, and if anything fails the old files are
   put back and the old version opens and says why
-- This starts with v1.4.1, so update to v1.4.1 by hand once
+- This starts with v1.4.9, so update to v1.4.9 by hand once
 
 NEW IN v1.3.9
 
@@ -354,7 +375,7 @@ available. The supplied Pokemon Red and Blue revisions share a
 
 START ON WINDOWS
 
-1. Extract ROMancer-v1.4.1-Windows.zip in Windows File Explorer.
+1. Extract ROMancer-v1.4.9-Windows.zip in Windows File Explorer.
 2. Double-click ROMancer.exe in the extracted folder.
    Keep ROMancer.exe, ROM Catalog.html and the ROMancer Files folder together.
 3. Open an original workshop or choose New project and import your own cartridge image.
@@ -375,8 +396,8 @@ SHA-256 is checked and later captures work offline. No ROM data is uploaded.
 
 START ON LINUX
 
-1. Extract ROMancer-v1.4.1-Linux-x86_64.tar.gz:  tar xf ROMancer-v1.4.1-Linux-x86_64.tar.gz
-2. Run ./ROMancer-v1.4.1-Linux-x86_64/ROMancer.sh
+1. Extract ROMancer-v1.4.9-Linux-x86_64.tar.gz:  tar xf ROMancer-v1.4.9-Linux-x86_64.tar.gz
+2. Run ./ROMancer-v1.4.9-Linux-x86_64/ROMancer.sh
    (./ROMancer.sh --install-desktop adds ROMancer to your application menu).
 
 The Linux x86-64 package includes Python, Pillow and the same six engines built
