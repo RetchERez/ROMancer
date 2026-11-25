@@ -1088,11 +1088,11 @@
     {
       "id": "level-tools",
       "image": "274-level-tools",
-      "image_alt": "A level map with Add new chosen: a new enemy being placed on an empty spot, and the panel that picks which enemy",
-      "caption": "Adding a new enemy on a level map. The check plays the game to see it appear.",
+      "image_alt": "Castlevania's first stage saved with Save map with names: each candle and hidden money bag boxed, with short names such as Candle [Large heart]",
+      "caption": "A map saved with names. Each box says what is there and what it holds.",
       "title": "Add new things, add to a map, and share a walk",
       "part": "Basic",
-      "kicker": "SCENES AND COLORS / NEW IN v1.5",
+      "kicker": "SCENES AND COLORS / NEW IN v1.4.9",
       "intro": "These tools build on the level maps. Where a game's profile allows it you can add new enemies, items and secrets, not only change the ones that are there. You can also fill in what a map is missing, save a map with every object named, and save the walk behind a map so someone else with the same ROM can make the same map.",
       "steps": [
         "Open a level map. If the game can take new things, the tools include <b>Add new</b>. Choose it and click an empty spot. Pick what to add and choose <b>Check in the game</b>. Only things that part of the level can draw are offered.",
