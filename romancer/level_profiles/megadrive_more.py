@@ -50,6 +50,7 @@ class Sonic3K(Profile):
     GAME_MODE, LEVEL_MODE = 0xF600, 0x0C
     ZONE = 0xFE10                # zone, then act
     CAMERA = 0xEE78              # camera x, then y 4 bytes on
+    HSCROLL = 0xF000             # the scroll table in video memory: line 0, plane A (minus the camera x the picture used)
     SLOTS = (0xB0DE, 0xB0DE + 0x4A * 90)     # dynamic object slots, $4A bytes each ($1BAF2)
     RESPAWN = 0xEB00
     RING_START = 0xEE42          # ROM address of the first ring in the loaded window, then the end ($EB86)
@@ -132,7 +133,17 @@ class Sonic3K(Profile):
         zone, act = ram[self.ZONE], ram[self.ZONE + 1]
         if (zone, act) not in self.PLAYED:
             return None
-        return {'part': {'zone': zone, 'act': act}, 'x': _w(ram, self.CAMERA), 'y': _w(ram, self.CAMERA + 4)}
+        x, y = _w(ram, self.CAMERA), _w(ram, self.CAMERA + 4)
+        # The picture of a frame is drawn with the scroll the game set one frame earlier, while the camera in RAM has
+        # already moved on (by up to 16 pixels at full speed). The scroll the picture used is in video memory: the
+        # first line of the scroll table at $F000 holds minus the camera x, and the first scroll word the camera y.
+        domains = getattr(ram, 'domains', None) or {}
+        vram, vsram = domains.get('vram'), domains.get('vsram')
+        if vram is not None and len(vram) >= self.HSCROLL + 2 and vsram is not None and len(vsram) >= 2:
+            shown_x, shown_y = -_w(vram, self.HSCROLL) & 0xFFFF, _w(vsram, 0)
+            if abs(shown_x - x) <= 32 and abs(shown_y - y) <= 32:
+                x, y = shown_x, shown_y
+        return {'part': {'zone': zone, 'act': act}, 'x': x, 'y': y}
 
     def part_name(self, part):
         zone, act = int(part['zone']), int(part['act'])
@@ -158,25 +169,31 @@ class Sonic3K(Profile):
             row = {'id': f'object:{r["n"]}', 'type': kind, 'x': r['x'], 'y': r['y'] + 16, 'style': 'block',
                    'name': f'Object {kind:#04x}', 'remove': None, 'fields': []}
             if kind in names:
-                row.update(style='enemy', name=names[kind], remove='Remove this enemy',
+                row.update(style='enemy', name=names[kind], remove='Remove this enemy' if self.REMOVAL else None,
                            fields=[{'key': 'enemy', 'label': 'Swap for', 'value': kind << 8 | r['sub'], 'choices': f'enemies_{zone}_{act}'}])
             elif kind == self.MONITOR:
-                row.update(style='item', name='Monitor', detail=f'holds {self.contents_name(r["sub"]).lower()}', remove='Remove this monitor',
+                row.update(style='item', name='Monitor', detail=f'holds {self.contents_name(r["sub"]).lower()}', remove='Remove this monitor' if self.REMOVAL else None,
                            fields=[{'key': 'contents', 'label': 'Holds', 'value': r['sub'], 'choices': 'contents'}] if r['sub'] in self.CONTENTS else [])
             if shared and (row['fields'] or row['remove']):
                 row['note'] = ' and '.join(self.part_name({'zone': z, 'act': a}) for z, a in shared) + ' uses the same list of objects, so a change here shows there too.'
             out.append(row)
         for g in self.rings(zone, act):
             out.append({'id': f'ring:{g["n"]}', 'type': 'ring', 'style': 'item', 'name': 'Ring', 'x': g['x'], 'y': g['y'] + 8,
-                        'remove': 'Remove this ring', 'fields': []})
+                        'remove': 'Remove this ring' if self.REMOVAL else None, 'fields': []})
         return out
 
     def _game(self):
         return {'zone': self.ZONE, 'mode': self.GAME_MODE, 'level': self.LEVEL_MODE, 'camera': self.CAMERA, 'slots': self.SLOTS,
                 'respawn': self.RESPAWN, 'rings': self.RING_START}
 
+    # Removal (closing the list up over a record, and the ring list likewise) is written and has a compare watcher, but
+    # it has not passed profile_check --control yet, so it is not offered (REMOVAL = True turns it back on).
+    REMOVAL = False
+
     def edit(self, part, object_id, values, remove=False):
         zone, act = int(part['zone']), int(part['act'])
+        if remove and not self.REMOVAL:
+            raise ValueError('ROMancer cannot remove that yet.')
         text, _, number = str(object_id).partition(':')
         if text == 'ring':
             return self._edit_ring(part, zone, act, number, remove)
@@ -239,13 +256,17 @@ class _S3KObjectWatcher(Watcher):
     """Looks through the object slots of the replayed game.
 
     A record placed by the loader is found by the respawn address its slot keeps (+$48 = $FFEB00 + record number); what
-    the slot is comes from its code address (+0), which stays inside the object's own code. A removal counts once the
-    place has been inside the loader's window (camera x - $80 to camera x + $280) for 60 frames with no object of the old
-    kind at the place."""
+    the slot is comes from its code address (+0), which stays inside the object's own code.
+
+    A removal compares two replays: the unchanged game is played first, and at every look where the removed record's
+    object is loaded (its slot keeps the record's respawn address) the number of objects of that kind is noted. The
+    changed game must have one fewer of that kind at the same frames."""
     every = 2
 
     def __init__(self, watch):
-        self.w, self.seen, self.over = watch, None, 0
+        self.w, self.seen = watch, None
+        self.compare = watch.get('kind') == 'gone'
+        self.before, self.fewer, self.same = {}, 0, 0
 
     def _slots(self, ram):
         start, end = self.w['game']['slots']
@@ -260,14 +281,18 @@ class _S3KObjectWatcher(Watcher):
             return False
         old = w['old_range']
         if w['kind'] == 'gone':
-            for slot, ptr in self._slots(ram):
-                if old[0] <= ptr < old[1] and abs(_w(ram, slot + 0x10) - w['x']) <= 48 and abs(_w(ram, slot + 0x14) - w['y']) <= 64:
-                    self.seen = ptr
-                    return True
-            cx = _w(ram, g['camera'])
-            if cx - 0x80 <= w['x'] < cx + 0x280:
-                self.over += 1
-            return self.over >= 30
+            mine = (g['respawn'] + w['n']) & 0xFFFF
+            kinds = [slot for slot, ptr in self._slots(ram) if old[0] <= ptr < old[1]]
+            if run == 'original':
+                if any(_w(ram, slot + 0x48) == mine for slot in kinds):
+                    self.before[frame] = len(kinds)
+                return False
+            if frame in self.before:
+                if len(kinds) < self.before[frame]:
+                    self.fewer += 1
+                else:
+                    self.same += 1
+            return self.fewer + self.same >= 30
         mine = (g['respawn'] + w['n']) & 0xFFFF
         for slot, ptr in self._slots(ram):
             if _w(ram, slot + 0x48) != mine:
@@ -293,11 +318,11 @@ class _S3KObjectWatcher(Watcher):
     def result(self):
         w, seen = self.w, self.seen
         if w['kind'] == 'gone':
-            if seen is not None:
-                return {'state': 'bad', 'text': 'Played from the start, the object still appears there.'}
-            if self.over >= 30:
-                return {'state': 'good', 'text': 'Played from the start, nothing appears there any more.'}
-            return super().result()
+            if self.fewer + self.same == 0:
+                return super().result()
+            if self.fewer > self.same:
+                return {'state': 'good', 'text': 'Played from the start, the object is gone: the game places one fewer of that kind there.'}
+            return {'state': 'bad', 'text': 'Played from the start, the object still appears there.'}
         if seen is None:
             return super().result()
         if w['kind'] == 'monitor':
@@ -373,7 +398,7 @@ class Bloodlines(Profile):
     # breaking a candle with each setting (shots/cv_candle_sheet3.png); only settings the game's own candles use
     CONTENTS = {0x10: 'Small red gem', 0x20: 'Blue gem', 0x30: 'Money bag (setting 0x30)', 0x31: 'Money bag (setting 0x31)',
                 0x32: 'Money bag (setting 0x32)', 0x33: 'Money bag (setting 0x33)', 0x34: 'Money bag (setting 0x34)',
-                0x35: 'Money bag (setting 0x35)', 0x70: 'Item 0x70', 0x80: 'Extra life', 0x90: 'Item 0x90',
+                0x35: 'Money bag (setting 0x35)', 0x70: 'Silver disc', 0x80: 'Extra life', 0x90: 'Dark orb',
                 0xA0: 'Holy water', 0xB1: 'Axe', 0xC2: 'Boomerang'}
 
     # ---- reading
@@ -428,7 +453,7 @@ class Bloodlines(Profile):
                    'name': f'Object {r["kind"]:#04x}', 'remove': None, 'fields': []}
             if r['kind'] == self.CANDLE:
                 known = r['setting'] in self.CONTENTS
-                row.update(style='item', name='Candle', remove='Remove this candle',
+                row.update(style='item', name='Candle', remove='Remove this candle' if self.REMOVAL else None,
                            detail=f'drops {self.CONTENTS[r["setting"]].lower()}' if known else f'drops item {r["setting"]:#04x}',
                            fields=[{'key': 'contents', 'label': 'Drops', 'value': r['setting'], 'choices': 'candle_contents'}] if known else [])
                 if r['extra'] & 0x7F != 1:
@@ -441,8 +466,14 @@ class Bloodlines(Profile):
             out.append(row)
         return out
 
+    # Removal (kind 3 in place) is written and has a compare watcher, but the compare watcher has not passed
+    # profile_check --control yet, so it is not offered (REMOVAL = True turns it back on).
+    REMOVAL = False
+
     def edit(self, part, object_id, values, remove=False):
         room = int(part['room'])
+        if remove and not self.REMOVAL:
+            raise ValueError('ROMancer cannot remove that yet.')
         text, _, number = str(object_id).partition(':')
         rows = self.records(room)
         if text != 'object' or not number.isdigit() or int(number) >= len(rows):
@@ -476,43 +507,54 @@ class Bloodlines(Profile):
 
 class _CandleWatcher(Watcher):
     """Finds the candle the changed record places: a slot in use (+0 = 1) of kind $77 whose remember number (+$4C, the
-    record's place in the list counted from the $8000 record) is the record's. Its setting is kept at +$53. A removal
-    counts once the record's place has been inside the spawner's reach (camera + $160 across, or the camera height + $100
-    in a room that scrolls up and down) for 60 frames with no candle of that number."""
+    record's place in the list counted from the $8000 record) is the record's. Its setting is kept at +$53.
+
+    A removal compares two replays: the unchanged game is played first and every look where it has that candle is
+    noted; the changed game must have no such candle at those same frames."""
     every = 2
 
     def __init__(self, watch):
-        self.w, self.seen, self.over = watch, None, 0
+        self.w, self.seen = watch, None
+        self.compare = watch.get('kind') == 'gone'
+        self.before, self.present, self.absent = set(), 0, 0
 
-    def see(self, ram, frame, run):
+    def _candle(self, ram):
         w, g = self.w, self.w['game']
         if _w(ram, g['mode']) != g['playing'] or _w(ram, g['in_room']) != 1 or _w(ram, g['room']) != w['room']:
-            return False
+            return None
         number = (w['n'] + 2) & 0xFF
         start, end = g['slots']
         for slot in range(start, end, 0x80):
             if _w(ram, slot) == 1 and _w(ram, slot + 0x16) == g['candle'] and ram[slot + 0x4C] == number:
-                self.seen = ram[slot + 0x53]
-                return True
-        if w['kind'] == 'gone':
-            cx, cy = _w(ram, g['camera']), (0x10000 - _w(ram, g['camera_y'])) & 0xFFFF
-            if w['vertical']:
-                inside = cy - 0x20 <= w['y'] <= cy + 0x100
-            else:
-                inside = cx - 0x20 <= w['x'] <= cx + 0x160
-            if inside:
-                self.over += 1
-            return self.over >= 30
+                return ram[slot + 0x53]
         return False
+
+    def see(self, ram, frame, run):
+        found = self._candle(ram)
+        if self.w['kind'] != 'gone':
+            if found is not None and found is not False:
+                self.seen = found
+                return True
+            return False
+        if run == 'original':
+            if found is not None and found is not False:
+                self.before.add(frame)
+            return False
+        if frame in self.before:
+            if found is not None and found is not False:
+                self.present += 1
+            else:
+                self.absent += 1
+        return self.present + self.absent >= 30
 
     def result(self):
         w, seen = self.w, self.seen
         if w['kind'] == 'gone':
-            if seen is not None:
-                return {'state': 'bad', 'text': 'Played from the start, the candle still appears there.'}
-            if self.over >= 30:
+            if self.present + self.absent == 0:
+                return super().result()
+            if self.absent > self.present:
                 return {'state': 'good', 'text': 'Played from the start, the candle is gone.'}
-            return super().result()
+            return {'state': 'bad', 'text': 'Played from the start, the candle still appears there.'}
         if seen is None:
             return super().result()
         ok = seen == w['setting']
