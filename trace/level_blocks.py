@@ -50,6 +50,8 @@ START_PRESSES = {
     '0b3d9e1f01ed': 1,          # Super Mario Bros.: title, then World 1-1
     '1ddc4b429490': 3,          # Super Mario Bros. 3: title, then the World 1 map (see ROUTES)
     '6791433fd1c6': 5,          # Mega Man 6: Plant Man
+    '1271dce8678f': 8,          # Darkwing Duck: through the intro into the first level
+    'dff668a78853': 6,          # Chip 'n Dale 2: into level 0
 }
 
 
@@ -69,6 +71,7 @@ ROUTES = {
     '1ddc4b429490': [(['right'], 20), ([], 40), (['up'], 20), ([], 40), (['a'], 4), ([], 200)],   # Super Mario Bros. 3: World 1 map into 1-1
     '6791433fd1c6': [([], 120), (['left'], 4), ([], 30), (['start'], 4)] + [([], 120)] * 5,   # Mega Man 6: Plant Man
     'f2db2cbdaaed': [([], 120)] * 3 + [(['b'], 4), ([], 150), (['down'], 4), ([], 30), (['b'], 4)] + [([], 120)] * 10,   # Wonder Boy III: button 1 starts, then the first room
+    '1271dce8678f': [(['a'], 4), ([], 150)] * 6 + [([], 120)],   # Darkwing Duck: through the intro into the first level
 }
 
 # Longer routes are kept as JSON files in trace/routes/<key>.json: [[buttons, frames], ...]
