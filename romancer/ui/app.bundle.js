@@ -10464,7 +10464,7 @@ ${state2.artifact.system_id ? `<details><summary>Advanced byte options</summary>
     const brushText = brush ? `Copied a ${brush.width}×${brush.height} piece.` : "Nothing copied yet.";
     const built = view2.layout ? " This level is stored packed, so the brush copies whole blocks of it, and ROMancer packs the level again." : view2.blocks ? " The brush moves in whole blocks, the way this level is built, so a change can stay in one spot." : "";
     const locked = view2.status.includes("u") ? " Spots with a cross can't be changed yet." : "";
-    const known = ((_b = level.objects) == null ? void 0 : _b.profile) ? `<label class="level-toggle"><input type="checkbox" id="level-show-objects" ${level.showObjects ? "checked" : ""}> Show enemies, items and secrets (object layer)</label>${level.objects.roles ? `<label class="level-toggle"><input type="checkbox" id="level-show-solid" ${level.showSolid ? "checked" : ""}> Show what's solid</label>` : ""}` : "";
+    const known = ((_b = level.objects) == null ? void 0 : _b.profile) ? `<label class="level-toggle"><input type="checkbox" id="level-show-objects" ${level.showObjects ? "checked" : ""}> Show enemies, items and secrets (object layer)</label><label class="level-toggle"><input type="checkbox" id="level-show-names" ${level.showNames ? "checked" : ""}> Show names</label>${level.objects.roles ? `<label class="level-toggle"><input type="checkbox" id="level-show-solid" ${level.showSolid ? "checked" : ""}> Show what's solid</label>` : ""}` : "";
     const picked = level.picked;
     const job = level.compare, comparePanel = job ? `<div class="notice level-compare" role="group" aria-label="Before and after"><p><strong>Before and after</strong></p><p role="status">${esc(job.message)}${job.state === "running" ? ` (${Math.round(100 * job.done / Math.max(1, job.total))}%)` : ""}</p>${job.state === "finished" && level.compareGif ? `<img class="level-compare-picture" src="data:image/gif;base64,${level.compareGif}" width="${job.width}" height="${job.height}" alt="The recorded walk, the original game on the left and the changed game on the right">` : ""}<div class="actions">${job.state === "finished" && level.compareGif ? button("Save as GIF", "level-compare-save", { icon: "download", primary: true }) : ""}${job.state !== "running" ? button("Close", "level-compare-close") : ""}</div></div>` : "";
     const objectEditor = level.tool === "objects" && picked ? `<div class="notice level-object" role="group" aria-label="${esc(objectLabel(picked))}"><p><strong>${esc(picked.name)}</strong>${picked.detail ? ", " + esc(picked.detail) : ""}</p>${picked.note ? `<p class="subtle">${esc(picked.note)}</p>` : ""}${(picked.fields || []).map((field2) => {
@@ -10490,6 +10490,7 @@ ${state2.artifact.system_id ? `<details><summary>Advanced byte options</summary>
  ${change && view2.unshown ? `<p class="notice warm" role="status">Some of what you painted doesn't show on the map after the check. It may appear somewhere else in the level, so look over the map before you keep it.</p>` : ""}
  <div class="actions">${change ? keep(change, propose2) : propose2}${button("Open in its scene", "level-goto", { disabled: !level.last, reason: "Click a spot on the map first." })}</div>`;
   }
+  var boxColour = (item) => ({ enemy: "#ff5a5a", item: "#ffd166", secret: "#5ee6b0", block: "#c792ff" })[item.style] || "#ffd166";
   var objectImages = /* @__PURE__ */ new Map();
   function objectImage(data) {
     let image = objectImages.get(data);
@@ -10558,7 +10559,23 @@ ${state2.artifact.system_id ? `<details><summary>Advanced byte options</summary>
       context.lineWidth = 1;
     }
     if (level.showObjects && ((_b = level.objects) == null ? void 0 : _b.objects)) {
-      context.font = `${Math.max(10, 5 * zoom)}px sans-serif`;
+      const fontSize = Math.max(14, 6 * zoom);
+      context.font = `600 ${fontSize}px sans-serif`;
+      context.textBaseline = "top";
+      const placed = [];
+      const nameAt = (item, x, top) => {
+        const label = objectLabel(item), width = Math.ceil(context.measureText(label).width) + 10, height = fontSize + 8;
+        let left = Math.max(2, Math.min(x - width / 2, canvas.width - width - 2)), y = Math.max(2, top - height - 4);
+        for (let n = 0; n < 8 && placed.some((b) => left < b[2] && b[0] < left + width && y < b[3] && b[1] < y + height); n++) y += height + 2;
+        placed.push([left, y, left + width, y + height]);
+        context.fillStyle = "rgba(0,0,0,.85)";
+        context.fillRect(left, y, width, height);
+        context.strokeStyle = boxColour(item);
+        context.lineWidth = 2;
+        context.strokeRect(left + 1, y + 1, width - 2, height - 2);
+        context.fillStyle = "#fff";
+        context.fillText(label, left + 5, y + 4);
+      };
       for (const item of level.objects.objects) {
         const x = item.map_x * zoom, y = item.map_y * zoom, w = 16 * zoom, h = 16 * zoom;
         if (item.picture) {
@@ -10570,20 +10587,19 @@ ${state2.artifact.system_id ? `<details><summary>Advanced byte options</summary>
             context.globalAlpha = 1;
           } else image2.onload = () => void drawLevel(ctx2, ed, picture2);
         }
-        context.strokeStyle = { enemy: "#ff5a5a", item: "#ffd166", secret: "#5ee6b0", block: "#c792ff" }[item.style] || "#ffd166";
-        context.lineWidth = item === level.picked ? 3 : 1.5;
-        if (item.style === "secret" || item.style === "block") context.setLineDash([3 * zoom, 2 * zoom]);
+        const thick = item === level.picked ? 5 : 3;
+        if (item.style === "secret" || item.style === "block") context.setLineDash([4 * zoom, 2 * zoom]);
+        context.strokeStyle = "rgba(0,0,0,.8)";
+        context.lineWidth = thick + 2;
+        context.strokeRect(x - w / 2, y - h, w, h);
+        context.strokeStyle = boxColour(item);
+        context.lineWidth = thick;
         context.strokeRect(x - w / 2, y - h, w, h);
         context.setLineDash([]);
         context.lineWidth = 1;
-        if (item === level.picked) {
-          context.fillStyle = "rgba(0,0,0,.7)";
-          const label = objectLabel(item), width = context.measureText(label).width + 6;
-          context.fillRect(x - w / 2, y - h - 14 * zoom / 2 - 4, width, 12 + zoom);
-          context.fillStyle = "#fff";
-          context.fillText(label, x - w / 2 + 3, y - h - 6);
-        }
       }
+      for (const item of level.objects.objects) if (level.showNames || item === level.picked) nameAt(item, item.map_x * zoom, item.map_y * zoom - 16 * zoom);
+      context.textBaseline = "alphabetic";
     }
     context.strokeStyle = "rgba(255,255,255,.35)";
     context.beginPath();
@@ -10671,6 +10687,7 @@ ${state2.artifact.system_id ? `<details><summary>Advanced byte options</summary>
         objects,
         showObjects: same ? ed.level.showObjects : !!(objects == null ? void 0 : objects.profile),
         showSolid: same ? ed.level.showSolid : false,
+        showNames: same ? ed.level.showNames : false,
         picked: same ? ed.level.picked : null,
         spot: same ? ed.level.spot : null,
         addKind: same ? ed.level.addKind : null,
@@ -11116,6 +11133,10 @@ ${state2.artifact.system_id ? `<details><summary>Advanced byte options</summary>
         }
         if (event.target.id === "level-show-objects") {
           level.showObjects = event.target.checked;
+          void redraw();
+        }
+        if (event.target.id === "level-show-names") {
+          level.showNames = event.target.checked;
           void redraw();
         }
         if (event.target.id === "level-show-solid") {

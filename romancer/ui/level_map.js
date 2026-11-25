@@ -126,7 +126,7 @@ export function levelPart(ed,verdict,keep){
  const brushText=brush?`Copied a ${brush.width}×${brush.height} piece.`:'Nothing copied yet.';
  const built=view.layout?' This level is stored packed, so the brush copies whole blocks of it, and ROMancer packs the level again.':view.blocks?' The brush moves in whole blocks, the way this level is built, so a change can stay in one spot.':'';
  const locked=view.status.includes('u')?" Spots with a cross can't be changed yet.":'';
- const known=level.objects?.profile?`<label class="level-toggle"><input type="checkbox" id="level-show-objects" ${level.showObjects?'checked':''}> Show enemies, items and secrets (object layer)</label>${level.objects.roles?`<label class="level-toggle"><input type="checkbox" id="level-show-solid" ${level.showSolid?'checked':''}> Show what's solid</label>`:''}`:'';
+ const known=level.objects?.profile?`<label class="level-toggle"><input type="checkbox" id="level-show-objects" ${level.showObjects?'checked':''}> Show enemies, items and secrets (object layer)</label><label class="level-toggle"><input type="checkbox" id="level-show-names" ${level.showNames?'checked':''}> Show names</label>${level.objects.roles?`<label class="level-toggle"><input type="checkbox" id="level-show-solid" ${level.showSolid?'checked':''}> Show what's solid</label>`:''}`:'';
  const picked=level.picked;
  const job=level.compare,comparePanel=job?`<div class="notice level-compare" role="group" aria-label="Before and after"><p><strong>Before and after</strong></p><p role="status">${esc(job.message)}${job.state==='running'?` (${Math.round(100*job.done/Math.max(1,job.total))}%)`:''}</p>${job.state==='finished'&&level.compareGif?`<img class="level-compare-picture" src="data:image/gif;base64,${level.compareGif}" width="${job.width}" height="${job.height}" alt="The recorded walk, the original game on the left and the changed game on the right">`:''}<div class="actions">${job.state==='finished'&&level.compareGif?button('Save as GIF','level-compare-save',{icon:'download',primary:true}):''}${job.state!=='running'?button('Close','level-compare-close'):''}</div></div>`:'';
  const objectEditor=level.tool==='objects'&&picked?`<div class="notice level-object" role="group" aria-label="${esc(objectLabel(picked))}"><p><strong>${esc(picked.name)}</strong>${picked.detail?', '+esc(picked.detail):''}</p>${picked.note?`<p class="subtle">${esc(picked.note)}</p>`:''}${(picked.fields||[]).map(field=>`<label>${esc(field.label)} <select id="level-field-${esc(field.key)}" data-key="${esc(field.key)}">${fieldChoices(field,level.objects?.choices).map(c=>`<option value="${esc(JSON.stringify(c.value))}" ${JSON.stringify(c.value)===JSON.stringify(field.value)?'selected':''}>${esc(c.name)}</option>`).join('')}</select></label>`).join('')}<div class="actions">${(picked.fields||[]).length?button('Check in the game','level-edit-apply',{primary:true}):''}${picked.remove?button(picked.remove,'level-edit-remove'):''}</div>${(picked.changes||[]).length?`<p class="subtle">Your changes to this:</p><ul class="level-object-changes">${picked.changes.map(c=>`<li>${esc(c.title)} ${button('Undo','level-edit-undo',{id:c.id})}</li>`).join('')}</ul>`:''}</div>`:'';
@@ -152,6 +152,7 @@ export function levelPart(ed,verdict,keep){
 
 // ---- drawing
 
+export const boxColour=item=>({enemy:'#ff5a5a',item:'#ffd166',secret:'#5ee6b0',block:'#c792ff'}[item.style]||'#ffd166');
 const objectImages=new Map();
 function objectImage(data){
  let image=objectImages.get(data);
@@ -190,7 +191,18 @@ export async function drawLevel(ctx,ed,picture){
   context.strokeRect(level.screen.map_left*zoom+1,1,256*zoom-2,view.height*view.cell*zoom-2);context.setLineDash([]);context.lineWidth=1;
  }
  if(level.showObjects&&level.objects?.objects){
-  context.font=`${Math.max(10,5*zoom)}px sans-serif`;
+  const fontSize=Math.max(14,6*zoom);context.font=`600 ${fontSize}px sans-serif`;context.textBaseline='top';
+  const placed=[];
+  // a name on a solid dark plate, kept inside the map, moved down a line when it would cover another name
+  const nameAt=(item,x,top)=>{
+   const label=objectLabel(item),width=Math.ceil(context.measureText(label).width)+10,height=fontSize+8;
+   let left=Math.max(2,Math.min(x-width/2,canvas.width-width-2)),y=Math.max(2,top-height-4);
+   for(let n=0;n<8&&placed.some(b=>left<b[2]&&b[0]<left+width&&y<b[3]&&b[1]<y+height);n++)y+=height+2;
+   placed.push([left,y,left+width,y+height]);
+   context.fillStyle='rgba(0,0,0,.85)';context.fillRect(left,y,width,height);
+   context.strokeStyle=boxColour(item);context.lineWidth=2;context.strokeRect(left+1,y+1,width-2,height-2);
+   context.fillStyle='#fff';context.fillText(label,left+5,y+4);
+  };
   for(const item of level.objects.objects){
    const x=item.map_x*zoom,y=item.map_y*zoom,w=16*zoom,h=16*zoom;
    if(item.picture){                                            // the object layer: what the game draws there
@@ -198,14 +210,15 @@ export async function drawLevel(ctx,ed,picture){
     if(image.complete){const [l,t,pw,ph]=item.picture_box;context.globalAlpha=item.picture_from_another?.7:1;context.drawImage(image,l*zoom,t*zoom,pw*zoom,ph*zoom);context.globalAlpha=1;}
     else image.onload=()=>void drawLevel(ctx,ed,picture);
    }
-   context.strokeStyle={enemy:'#ff5a5a',item:'#ffd166',secret:'#5ee6b0',block:'#c792ff'}[item.style]||'#ffd166';context.lineWidth=item===level.picked?3:1.5;
-   if(item.style==='secret'||item.style==='block')context.setLineDash([3*zoom,2*zoom]);
-   context.strokeRect(x-w/2,y-h,w,h);context.setLineDash([]);context.lineWidth=1;
-   if(item===level.picked){                                    // the name of the one you clicked; the rest keep the map readable
-    context.fillStyle='rgba(0,0,0,.7)';const label=objectLabel(item),width=context.measureText(label).width+6;
-    context.fillRect(x-w/2,y-h-14*zoom/2-4,width,12+zoom);context.fillStyle='#fff';context.fillText(label,x-w/2+3,y-h-6);
-   }
+   const thick=item===level.picked?5:3;                         // a dark edge under the colour so a box shows on any background
+   if(item.style==='secret'||item.style==='block')context.setLineDash([4*zoom,2*zoom]);
+   context.strokeStyle='rgba(0,0,0,.8)';context.lineWidth=thick+2;context.strokeRect(x-w/2,y-h,w,h);
+   context.strokeStyle=boxColour(item);context.lineWidth=thick;context.strokeRect(x-w/2,y-h,w,h);
+   context.setLineDash([]);context.lineWidth=1;
   }
+  // names: every one when asked for, otherwise the one you clicked
+  for(const item of level.objects.objects)if(level.showNames||item===level.picked)nameAt(item,item.map_x*zoom,item.map_y*zoom-16*zoom);
+  context.textBaseline='alphabetic';
  }
  // places that cannot be changed
  context.strokeStyle='rgba(255,255,255,.35)';context.beginPath();
@@ -258,7 +271,7 @@ export function levelTools(ctx,ed,host){
   const same=ed.level&&ed.level.id===id&&ed.level.view?.plane===view.plane;
   const unitIds=units(view).map(u=>u.id);
   ed.level={id,view,paintOn:same&&ed.level.paintOn?ed.level.paintOn:'all',unit:same&&unitIds.includes(ed.level.unit)?ed.level.unit:unitIds[unitIds.length-1],tool:same?ed.level.tool:'pick',brush:same?ed.level.brush:null,painted:same?ed.level.painted:new Map(),zoom:same?ed.level.zoom:view.height*view.cell>300?1:2,
-   showAfter:same?ed.level.showAfter:true,last:same?ed.level.last:null,drag:null,objects,showObjects:same?ed.level.showObjects:!!objects?.profile,showSolid:same?ed.level.showSolid:false,picked:same?ed.level.picked:null,spot:same?ed.level.spot:null,addKind:same?ed.level.addKind:null,choices:same?ed.level.choices:null};
+   showAfter:same?ed.level.showAfter:true,last:same?ed.level.last:null,drag:null,objects,showObjects:same?ed.level.showObjects:!!objects?.profile,showSolid:same?ed.level.showSolid:false,showNames:same?ed.level.showNames:false,picked:same?ed.level.picked:null,spot:same?ed.level.spot:null,addKind:same?ed.level.addKind:null,choices:same?ed.level.choices:null};
  };
  const reload=async()=>{if(!ed.level)return;try{await load(ed.level.id,ed.level.view.plane);}catch{ed.level=null;}host.update(['scene-level']);};
  const watch=()=>{
@@ -450,6 +463,7 @@ export function levelTools(ctx,ed,host){
    if(event.target.id==='level-unit'){level.unit=event.target.value;level.brush=null;level.tool='pick';host.update(['scene-level']);}
    if(event.target.id==='level-after'){level.showAfter=event.target.checked;void redraw();}
    if(event.target.id==='level-show-objects'){level.showObjects=event.target.checked;void redraw();}
+   if(event.target.id==='level-show-names'){level.showNames=event.target.checked;void redraw();}
    if(event.target.id==='level-show-solid'){level.showSolid=event.target.checked;void redraw();}
    if(event.target.id==='level-plane'){await host.dropPreview();const id=level.id;ed.level=null;await load(id,Number(event.target.value));host.update(['scene-level','scene-changes']);}
   });

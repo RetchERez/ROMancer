@@ -1096,44 +1096,50 @@ class LevelTools:
 
     def _labeled(self, level_id: str, png: bytes):
         """The map twice as big with every object the profile knows boxed in its colour and named, and a key below."""
-        from PIL import Image, ImageDraw
+        from PIL import Image, ImageDraw, ImageFont
         objects = self.level_objects(level_id).get('objects') or []
         base = Image.open(io.BytesIO(png)).convert('RGB')
         zoom = 2
-        key_height = 24
+        try:
+            font = ImageFont.load_default(size=16)
+        except (TypeError, OSError):
+            font = ImageFont.load_default()
+        line = 24
+        key_height = 34
         sheet = Image.new('RGB', (base.width * zoom, base.height * zoom + key_height), (20, 20, 24))
         sheet.paste(base.resize((base.width * zoom, base.height * zoom), Image.NEAREST), (0, 0))
         draw = ImageDraw.Draw(sheet)
         colours = {'enemy': (255, 90, 90), 'item': (255, 209, 102), 'secret': (94, 230, 176), 'block': (199, 146, 255)}
-        for item in objects:
+        for item in objects:           # a dark edge under the colour so each box shows on any background
             x, y = item['map_x'] * zoom, item['map_y'] * zoom
-            draw.rectangle([x - 16, y - 32, x + 16, y], outline=colours.get(item['style'], (255, 255, 255)), width=2)
+            draw.rectangle([x - 17, y - 33, x + 17, y + 1], outline=(0, 0, 0), width=6)
+            draw.rectangle([x - 16, y - 32, x + 16, y], outline=colours.get(item['style'], (255, 255, 255)), width=4)
         placed = []             # label boxes already drawn: a label that would cover one moves a line down
         for item in sorted(objects, key=lambda o: (o['map_x'], o['map_y'])):
             x, y = item['map_x'] * zoom, item['map_y'] * zoom
             colour = colours.get(item['style'], (255, 255, 255))
             label = item['name'] + (f", {item['detail']}" if item.get('detail') else '')
-            width = int(draw.textlength(label))
-            left = max(2, min(int(x) - 16, sheet.width - width - 4))
-            top = int(y) + 2
+            width = int(draw.textlength(label, font=font))
+            left = max(4, min(int(x) - width // 2, sheet.width - width - 6))
+            top = int(y) + 4
             for _ in range(8):
-                box = (left - 2, top - 1, left + width + 2, top + 12)
+                box = (left - 4, top - 2, left + width + 4, top + line - 2)
                 if not any(box[0] < b[2] and b[0] < box[2] and box[1] < b[3] and b[1] < box[3] for b in placed):
                     break
-                top += 13
-            top = min(top, base.height * zoom - 13)
-            box = (left - 2, top - 1, left + width + 2, top + 12)
+                top += line
+            top = min(top, base.height * zoom - line)
+            box = (left - 4, top - 2, left + width + 4, top + line - 2)
             placed.append(box)
-            if top > y + 4:     # moved down: a thin line back to its box
-                draw.line([x, y, x, top - 1], fill=colour)
-            draw.rectangle(box, fill=(0, 0, 0))
-            draw.text((left, top), label, fill=colour)
+            if top > y + 6:     # moved down: a line back to its box
+                draw.line([x, y, x, top - 2], fill=colour, width=2)
+            draw.rectangle(box, fill=(0, 0, 0), outline=colour, width=2)
+            draw.text((left, top), label, fill=(255, 255, 255), font=font)
         at = 6
         for style, text in (('enemy', 'Enemies'), ('item', 'Items'), ('secret', 'Secrets'), ('block', 'Blocks')):
             if any(o['style'] == style for o in objects):
-                draw.rectangle([at, base.height * zoom + 7, at + 10, base.height * zoom + 17], outline=colours[style], width=2)
-                draw.text((at + 14, base.height * zoom + 6), text, fill=(230, 230, 230))
-                at += 24 + int(draw.textlength(text))
+                draw.rectangle([at, base.height * zoom + 9, at + 16, base.height * zoom + 25], outline=colours[style], width=4)
+                draw.text((at + 22, base.height * zoom + 8), text, fill=(240, 240, 240), font=font)
+                at += 40 + int(draw.textlength(text, font=font))
         out = io.BytesIO()
         sheet.save(out, format='PNG')
         return out.getvalue(), sheet.width, sheet.height

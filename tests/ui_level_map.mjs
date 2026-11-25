@@ -177,4 +177,5 @@ const undoHtml=levelPart({level:{...known,tool:'objects',picked:{id:'enemy:1',st
 assert.match(undoHtml,/Bat swapped for Ghost <button type="button" data-action="level-edit-undo" data-id="c9"/);
 assert.match(toolsHtml,/data-action="level-export-named"/);
 assert.ok(!plain.includes('level-export-named'));
+assert.match(toolsHtml,/id="level-show-names"/);
 console.log('level map checks passed');
