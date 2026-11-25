@@ -1047,12 +1047,12 @@
       "title": "Enemies, items, secrets and level length",
       "part": "Basic",
       "kicker": "SCENES AND COLORS / NEW IN v1.4",
-      "intro": "For <b>31 games</b>, ROMancer knows what is in each level: the enemies, the items and what each block, chest or candle holds, and secrets such as hidden items, all read from the game’s own tables. Every change is checked by playing the game. Castlevania also knows how long each part of a level is. The <b>Level Editor</b> page lists the games and says whether the open game is one of them.",
+      "intro": "For <b>41 games</b>, ROMancer knows what is in each level: the enemies, the items and what each block, chest or candle holds, and secrets such as hidden items, all read from the game’s own tables. Every change is checked by playing the game. Castlevania also knows how long each part of a level is. The <b>Level Editor</b> page lists the games and says whether the open game is one of them.",
       "steps": [
         "Open a level map of one of the games listed below. The object layer shows each enemy and item as the game draws it, with a box around it. Breakable blocks have purple boxes and secrets green ones. Where the game has a clear rule, <b>Show what’s solid</b> marks the blocks you can stand on.",
         "Choose <b>Enemies, items and secrets</b> and click something to see what it is. Point at anything on the map to see its name.",
         "Change it: pick another item for a candle or a block, swap an enemy for another of the game’s enemies or remove it, or change which treasure appears and how it is found. Then choose <b>Check in the game</b>.",
-        "For Castlevania, choose <b>Longer or shorter</b> and click a screen of the level. <b>Repeat this screen</b> adds copies of it and <b>Remove this screen</b> takes it out. Enemies, candles, secrets and stairs on later screens move along.",
+        "For Castlevania and Ninja Gaiden, choose <b>Longer or shorter</b> and click a screen of the level. <b>Repeat this screen</b> adds copies of it and <b>Remove this screen</b> takes it out. Enemies, candles, secrets and stairs on later screens move along.",
         "Use <b>Play from here</b> to play the changed level yourself, or <b>Before and after</b> to watch the old and the new game side by side."
       ],
       "result": "The check says what the game really did, for example that the candle now holds a dagger, or that the next part of the level starts 4.7 seconds later.",
@@ -1060,7 +1060,7 @@
       "details": [
         {
           "title": "The games",
-          "text": "NES: Castlevania, Castlevania II, Castlevania III, Chip ’n Dale Rescue Rangers, DuckTales, Kid Icarus (world 1), Mega Man 1 to 5, Metroid, Ninja Gaiden I to III, Super Mario Bros., Super Mario Bros. 2, Super Mario Bros. 3, The Legend of Zelda and Zelda II. Game Boy: Metroid II, Super Mario Land, Super Mario Land 2 and Link’s Awakening. Master System: Alex Kidd in Miracle World, Sonic The Hedgehog and Wonder Boy. Mega Drive: Sonic The Hedgehog and Sonic The Hedgehog 2. Super NES: Super Mario World and Super Metroid (enemies and items only; their packed level layouts stay as they are)."
+          "text": "NES: Adventure Island, Castlevania, Castlevania II, Castlevania III, Chip ’n Dale Rescue Rangers 1 and 2, Contra, Darkwing Duck, DuckTales 1 and 2, Kid Icarus (worlds 1 to 3), Mega Man 1 to 6, Metroid, Ninja Gaiden I to III, Super Mario Bros. 1 to 3, The Legend of Zelda and Zelda II. Super NES: Mega Man X, Super Mario World and Super Metroid. Mega Drive: Sonic The Hedgehog 1 and 2. Master System: Alex Kidd in Miracle World, Sonic The Hedgehog, Wonder Boy and Wonder Boy III. Game Boy: Metroid II, Super Mario Land 1 and 2 and Link’s Awakening. Game Boy Color: Link’s Awakening DX and Wario Land II."
         },
         {
           "title": "How a change is checked",
@@ -1072,7 +1072,11 @@
         },
         {
           "title": "Limits",
-          "text": "Length changes are for Castlevania only: a part of the level can be 1 to 6 screens long, the first and the last screen stay, and a screen with stairs can’t be removed. Make one length change at a time: keep it and save, then make the next."
+          "text": "Length changes are for Castlevania and Ninja Gaiden I to III. In Castlevania a part of the level can be 1 to 6 screens long, the first and the last screen stay, and a screen with stairs can’t be removed. Ninja Gaiden III parts can only be made shorter, because the cartridge has no room for a longer one. Make one length change at a time: keep it and save, then make the next."
+        },
+        {
+          "title": "Level pieces and packed levels",
+          "text": "In Super Mario Bros. 1 and 3 the level is built from pieces such as pipes and rows of bricks: click a piece to move it, change its size or kind, or remove it. In Sonic 1 and 2, Super Mario World and Super Metroid, Copy and Paint move whole blocks of the packed level, and ROMancer packs it again before the check."
         }
       ],
       "related": [
