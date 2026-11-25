@@ -12,7 +12,8 @@ The interface every profile gives (see Profile):
   part), 'style' ('enemy', 'item', 'secret' or 'block': how the map draws it), 'type' (for pictures), 'x', 'y' (the
   part's pixels, the object's bottom middle), 'name', optional 'detail' ("drops a dagger"), 'note', 'fields'
   ([{'key', 'label', 'value', 'choices'}], choices being a list of {'value', 'name'} or the name of a shared list in
-  choices()) and 'remove' (the label of a remove button, or None)
+  choices()), 'remove' (the label of a remove button, or None) and optional 'does': one short plain sentence on what
+  it does in the game, from watching it ("Walks toward you and jumps over gaps.")
 * choices() -> {name: [{'value', 'name'}]}: lists that many objects share
 * edit(part, object id, values, remove) -> {'writes': [(offset, old, new)], 'title', 'watch'}
 * watcher(watch) -> Watcher: looks at the replayed game and says whether the change happened
