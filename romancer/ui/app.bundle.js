@@ -10396,6 +10396,7 @@ ${state2.artifact.system_id ? `<details><summary>Advanced byte options</summary>
   });
   function levelStatus(summary, playing) {
     const rec = summary.level_recording, job = summary.level_job;
+    if (rec == null ? void 0 : rec.extends) return rec.captures >= rec.limit ? `That's as much as one map can hold, so finish it now (${plural2(rec.added, "new screen")}).` : `Adding to ${rec.name}, ${plural2(rec.added, "new screen")} so far. Play through the parts the map is missing, then finish the map.`;
     if (rec) return rec.captures >= rec.limit ? `That's as much as one map can hold, so finish it now (${plural2(rec.captures, "screen")}).` : `Recording the level, ${plural2(rec.captures, "screen")} so far. Play to the end of it, then finish the map.`;
     if ((job == null ? void 0 : job.state) === "running") return `${job.message} ${job.done} of ${job.total}.`;
     if (job == null ? void 0 : job.message) return job.message;
@@ -10406,6 +10407,10 @@ ${state2.artifact.system_id ? `<details><summary>Advanced byte options</summary>
   }
   function fieldChoices(field2, shared) {
     return Array.isArray(field2.choices) ? field2.choices : (shared == null ? void 0 : shared[field2.choices]) || [];
+  }
+  function addOption(spot, kind) {
+    const options = (spot == null ? void 0 : spot.options) || [];
+    return options.find((o) => o.kind === kind) || options[0] || null;
   }
   function objectAt(objects, x, y, reach = 12) {
     let best = null, dist = reach * reach;
@@ -10444,7 +10449,7 @@ ${state2.artifact.system_id ? `<details><summary>Advanced byte options</summary>
     }).join("")}</div>`;
   }
   function levelPart(ed, verdict, keep) {
-    var _a, _b;
+    var _a, _b, _c, _d;
     const level = ed.level;
     if (!level || !level.view) return "";
     const view2 = level.view, change = levelChange(ed), painted = level.painted.size, brush = level.brush;
@@ -10453,8 +10458,8 @@ ${state2.artifact.system_id ? `<details><summary>Advanced byte options</summary>
     const guide = `<ol class="level-steps" aria-label="How to change the level">${steps2(level, change).map((step) => `<li class="${step.now ? "now" : step.done ? "done" : ""}"${step.now ? ' aria-current="step"' : ""}><strong>${step.name}</strong><span>${step.text}</span></li>`).join("")}</ol>`;
     const sizes = units(view2), unitPart = sizes.length > 1 ? `<label>Brush size <select id="level-unit" aria-label="Brush size">${sizes.map((u) => `<option value="${u.id}" ${u.id === level.unit ? "selected" : ""}>${esc(u.label)}</option>`).join("")}</select></label>` : "";
     const zoom = `<label>Zoom <select id="level-zoom" aria-label="Zoom">${ZOOMS.map((z) => `<option value="${z}" ${z === level.zoom ? "selected" : ""}>${z}x</option>`).join("")}</select></label>`;
-    const tools = [...TOOLS, ...((_a = level.objects) == null ? void 0 : _a.profile) ? [["objects", "Enemies, items and secrets"], ...level.objects.resizable ? [["length", "Longer or shorter"]] : []] : [], ["play", "Play from here"], ["compare", "Before and after"]].map(([id, label]) => `<button type="button" class="scene-mode ${level.tool === id ? "active" : ""}" data-action="level-tool" data-id="${id}" aria-pressed="${level.tool === id}">${label}</button>`).join("");
-    const hint = level.tool === "length" ? "Click a screen of the level to repeat it or remove it. Enemies, candles and secrets on later screens move along with them." : level.tool === "objects" ? "Click an enemy, a candle, a breakable block (purple) or a hidden treasure (green) to see what it is and change it." : level.tool === "compare" ? "Click a spot on the map. ROMancer replays your recorded walk from there on the original game and on the game with your kept changes, side by side." : level.tool === "play" ? "Click a spot on the map. The game starts there with your kept changes, so you can play it." : level.tool === "objects" ? "Click an enemy or a candle to see what it is and change it." : level.tool === "pick" ? "Click a spot on the map to copy it, or drag across a bigger piece like a platform or a tree." : !brush ? "Copy something from the map first." : level.tool === "paint" ? "Click or drag where you want it." : "Click or drag over your paint to remove it.";
+    const tools = [...TOOLS, ...((_a = level.objects) == null ? void 0 : _a.profile) ? [["objects", "Enemies, items and secrets"], ...level.objects.addable ? [["add", "Add new"]] : [], ...level.objects.resizable ? [["length", "Longer or shorter"]] : []] : [], ["play", "Play from here"], ["compare", "Before and after"]].map(([id, label]) => `<button type="button" class="scene-mode ${level.tool === id ? "active" : ""}" data-action="level-tool" data-id="${id}" aria-pressed="${level.tool === id}">${label}</button>`).join("");
+    const hint = level.tool === "add" ? "Click an empty spot on the map to add a new enemy, item or secret there. Only things this part of the level can draw are offered." : level.tool === "length" ? "Click a screen of the level to repeat it or remove it. Enemies, candles and secrets on later screens move along with them." : level.tool === "objects" ? "Click an enemy, a candle, a breakable block (purple) or a hidden treasure (green) to see what it is and change it." : level.tool === "compare" ? "Click a spot on the map. ROMancer replays your recorded walk from there on the original game and on the game with your kept changes, side by side." : level.tool === "play" ? "Click a spot on the map. The game starts there with your kept changes, so you can play it." : level.tool === "objects" ? "Click an enemy or a candle to see what it is and change it." : level.tool === "pick" ? "Click a spot on the map to copy it, or drag across a bigger piece like a platform or a tree." : !brush ? "Copy something from the map first." : level.tool === "paint" ? "Click or drag where you want it." : "Click or drag over your paint to remove it.";
     const brushText = brush ? `Copied a ${brush.width}×${brush.height} piece.` : "Nothing copied yet.";
     const built = view2.blocks ? " The brush moves in whole blocks, the way this level is built, so a change can stay in one spot." : "";
     const locked = view2.status.includes("u") ? " Spots with a cross can't be changed yet." : "";
@@ -10467,12 +10472,14 @@ ${state2.artifact.system_id ? `<details><summary>Advanced byte options</summary>
     }).join("")}<div class="actions">${(picked.fields || []).length ? button("Check in the game", "level-edit-apply", { primary: true }) : ""}${picked.remove ? button(picked.remove, "level-edit-remove") : ""}</div></div>` : "";
     const screen = level.tool === "length" ? level.screen : null;
     const lengthPanel = screen ? `<div class="notice level-object" role="group" aria-label="Screen ${screen.screen + 1}"><p><strong>Screen ${screen.screen + 1} of ${screen.screens}</strong> in this part of the level</p><label>How many <select id="level-length-count">${[1, 2, 3].map((n) => `<option value="${n}">${n}</option>`).join("")}</select></label><div class="actions">${button("Repeat this screen", "level-length-apply", { id: "1", primary: true, disabled: screen.screens >= screen.most, reason: `This part is already ${screen.most} screens long, the longest the game has.` })}${button("Remove this screen", "level-length-apply", { id: "-1", disabled: screen.screen === 0 || screen.screen === screen.screens - 1, reason: "The first and the last screen hold the way in and the way out, so they stay." })}</div><p class="subtle">The map keeps showing the level as it was recorded. Play from here and Before and after show the new length.</p></div>` : "";
-    const objectPanel = lengthPanel || objectEditor;
+    const spot = level.tool === "add" ? level.spot : null, option = addOption(spot, level.addKind);
+    const addPanel = spot && option ? `<div class="notice level-object" role="group" aria-label="Add something new"><p><strong>Add at this spot</strong> in ${esc(spot.name)}</p><label>What to add <select id="level-add-kind">${spot.options.map((o) => `<option value="${esc(o.kind)}" ${o.kind === option.kind ? "selected" : ""}>${esc(o.name)}</option>`).join("")}</select></label>${(option.fields || []).map((field2) => `<label>${esc(field2.label)} <select id="level-add-field-${esc(field2.key)}" data-key="${esc(field2.key)}">${fieldChoices(field2, spot.choices).map((c) => `<option value="${esc(JSON.stringify(c.value))}" ${JSON.stringify(c.value) === JSON.stringify(field2.value) ? "selected" : ""}>${esc(c.name)}</option>`).join("")}</select></label>`).join("")}<div class="actions">${button("Check in the game", "level-add-apply", { primary: true })}${button("Cancel", "level-add-cancel")}</div></div>` : "";
+    const objectPanel = lengthPanel || addPanel || objectEditor;
     const after = view2.after ? `<label class="level-toggle"><input type="checkbox" id="level-after" ${level.showAfter ? "checked" : ""}> Show my changes</label>` : "";
     const propose2 = button("Check in the game", "level-propose", { primary: true, disabled: !painted, reason: "Paint something first." }) + button("Clear paint", "level-clear", { disabled: !painted && !change });
     return `<div class="card-heading"><h3>${esc(view2.name)}</h3>${badge(`${view2.width}×${view2.height} tiles`, "neutral")}</div>
  ${guide}
- <div class="actions level-bar">${planes}${paintOn}${zoom}${unitPart}${known}${after}${button("Save map as PNG", "level-export", { icon: "download" })}${button("Delete map", "level-forget")}${button("Close", "level-close")}</div>
+ <div class="actions level-bar">${planes}${paintOn}${zoom}${unitPart}${known}${after}${button("Save map as PNG", "level-export", { icon: "download" })}${button("Add to this map", "level-extend", { disabled: !ed.playing || !!((_c = ed.summary) == null ? void 0 : _c.level_recording), reason: ((_d = ed.summary) == null ? void 0 : _d.level_recording) ? "A map is being recorded now." : "Start playing above first, then play through what the map is missing." })}${button("Delete map", "level-forget")}${button("Close", "level-close")}</div>
  <div class="scene-modes" role="group" aria-label="Tool">${tools}</div>
  <p class="subtle" role="status">${hint}${built}${locked}</p>
  <div class="level-scroll" id="level-scroll" tabindex="0" aria-label="The level map. Scroll to move around."><canvas id="level-canvas" class="level-canvas" width="${view2.width * view2.cell * level.zoom}" height="${view2.height * view2.cell * level.zoom}" role="img" aria-label="Map of ${esc(view2.name)}"></canvas></div>
@@ -10532,6 +10539,14 @@ ${state2.artifact.system_id ? `<details><summary>Advanced byte options</summary>
         context.fillStyle = role === "b" ? "rgba(255,160,40,.45)" : "rgba(70,140,255,.35)";
         context.fillRect(col * size2, row * size2, size2, size2);
       }
+    }
+    if (level.tool === "add" && level.spot) {
+      context.strokeStyle = "#ffffff";
+      context.lineWidth = 2;
+      context.setLineDash([3 * zoom, 2 * zoom]);
+      context.strokeRect(level.spot.map_x * zoom - 8 * zoom, level.spot.map_y * zoom - 16 * zoom, 16 * zoom, 16 * zoom);
+      context.setLineDash([]);
+      context.lineWidth = 1;
     }
     if (level.tool === "length" && level.screen) {
       context.strokeStyle = "#7fb2ff";
@@ -10656,6 +10671,8 @@ ${state2.artifact.system_id ? `<details><summary>Advanced byte options</summary>
         showObjects: same ? ed.level.showObjects : !!(objects == null ? void 0 : objects.profile),
         showSolid: same ? ed.level.showSolid : false,
         picked: same ? ed.level.picked : null,
+        spot: same ? ed.level.spot : null,
+        addKind: same ? ed.level.addKind : null,
         choices: same ? ed.level.choices : null
       };
     };
@@ -10708,6 +10725,15 @@ ${state2.artifact.system_id ? `<details><summary>Advanced byte options</summary>
         ed.summary = await host.call("level_start", { name: "" });
         host.update(["scene-levels"]);
         watch();
+      },
+      "level-extend": async () => {
+        var _a, _b;
+        const id = (_a = ed.level) == null ? void 0 : _a.id;
+        if (!id) return;
+        ed.summary = await host.call("level_start", { name: "", extend: id });
+        host.update(["scene-levels", "scene-level"]);
+        watch();
+        (_b = document.getElementById("scene-levels")) == null ? void 0 : _b.scrollIntoView({ block: "nearest" });
       },
       "level-auto": async () => {
         ed.summary = await host.call("level_auto", { steps: 6, direction: "right" });
@@ -10822,6 +10848,24 @@ ${state2.artifact.system_id ? `<details><summary>Advanced byte options</summary>
         host.update(["scene-level", "scene-changes"]);
         host.watchProposal();
       },
+      "level-add-apply": async () => {
+        const level = ed.level, spot = level == null ? void 0 : level.spot, option = addOption(spot, level == null ? void 0 : level.addKind);
+        if (!option) return;
+        const values = {};
+        for (const node of document.querySelectorAll('[id^="level-add-field-"]')) values[node.dataset.key] = JSON.parse(node.value);
+        await host.dropPreview();
+        const result = await host.call("level_add", { level_id: level.id, part: spot.part, kind: option.kind, x: spot.x, y: spot.y, values });
+        if (!host.current()) return;
+        ed.proposal = result.change;
+        ed.summary.preview = result.change;
+        host.update(["scene-level", "scene-changes"]);
+        host.watchProposal();
+      },
+      "level-add-cancel": () => {
+        if (!ed.level) return;
+        ed.level.spot = null;
+        host.update(["scene-level"]);
+      },
       "level-length-apply": async (node) => {
         var _a;
         const level = ed.level, screen = level == null ? void 0 : level.screen;
@@ -10892,6 +10936,19 @@ ${state2.artifact.system_id ? `<details><summary>Advanced byte options</summary>
           void host.call("level_screen_at", { level_id: level.id, x }).then((result) => {
             level.screen = result;
             host.update(["scene-level"]);
+          }).catch((error) => ctx2.notify(error.message, true));
+          return;
+        }
+        if ((level == null ? void 0 : level.tool) === "add") {
+          const canvas = document.getElementById("level-canvas");
+          if (!canvas || event.target !== canvas) return;
+          const box = canvas.getBoundingClientRect(), x = (event.clientX - box.left) * canvas.width / box.width / level.zoom, y = (event.clientY - box.top) * canvas.height / box.height / level.zoom;
+          void host.call("level_add_at", { level_id: level.id, x, y }).then((result) => {
+            var _a3;
+            level.spot = result;
+            level.addKind = (_a3 = result.options[0]) == null ? void 0 : _a3.kind;
+            host.update(["scene-level"]);
+            void redraw();
           }).catch((error) => ctx2.notify(error.message, true));
           return;
         }
@@ -10980,6 +11037,10 @@ ${state2.artifact.system_id ? `<details><summary>Advanced byte options</summary>
       main.addEventListener("change", async (event) => {
         const level = ed.level;
         if (!level) return;
+        if (event.target.id === "level-add-kind") {
+          level.addKind = event.target.value;
+          host.update(["scene-level"]);
+        }
         if (event.target.id === "level-zoom") {
           level.zoom = Number(event.target.value);
           host.update(["scene-level"]);
