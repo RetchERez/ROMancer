@@ -130,7 +130,9 @@ class Decode(unittest.TestCase):
         self.assertNotIn('way:15', objects)                    # for world 6
         goomba = objects['enemy:3']
         self.assertEqual((goomba['name'], goomba['x'], goomba['y'], goomba['remove']), ('Goomba', 1 * 256 + 6 * 16 + 8, 208, 'Remove this enemy'))
+        self.assertEqual(goomba['does'], 'Walks along, walks off ledges and turns back when it bumps into something.')
         self.assertEqual(objects['enemy:7']['y'], 32 + 11 * 16)   # a group stands on the ground whatever its row
+        self.assertEqual(objects['enemy:7']['does'], 'Walk along together toward Mario.')
         self.assertIsNone(objects['enemy:11']['remove'])
         block = objects['block:2']
         self.assertEqual((block['style'], block['name'], block['detail'], block['x'], block['y']), ('item', 'Question block', 'holds a coin', 264, 160))

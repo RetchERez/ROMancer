@@ -57,6 +57,46 @@ ENEMIES = {
     0x38: 'Three Goombas', 0x39: 'Two Goombas, higher up', 0x3A: 'Three Goombas, higher up',
     0x3B: 'Two Green Koopa Troopas', 0x3C: 'Three Green Koopa Troopas',
 }
+# What each one does, from watching it in World 1-1 for four seconds with Mario standing still (positions every 4 frames:
+# trace/v15_profiles/naming_smb/track1.py and track1.json; ledge edges: koopa1.py; a pair of pulley lifts with Mario on
+# one: pulley1.py; the lifts that wait for Mario: smb1/lifts.py). The warp zone draws nothing and has no line.
+DOES = {
+    0x00: 'Walks along and walks off the edge of a ledge.',
+    0x02: 'Walks along and walks off the edge of a ledge.',
+    0x03: 'Walks along and turns back at the edge of a ledge.',
+    0x05: 'Steps back and forth, jumps now and then and throws hammers at Mario.',
+    0x06: 'Walks along, walks off ledges and turns back when it bumps into something.',
+    0x07: 'Sinks slowly, then swims up toward Mario in quick spurts.',
+    0x0A: 'Swims slowly to the left.',
+    0x0C: 'Jumps high out of the lava and falls back, over and over.',
+    0x0E: 'Hops along toward Mario.',
+    0x0F: 'Flies slowly up and down in one place.',
+    0x10: 'Flies left and right in one place.',
+    0x11: 'Floats above Mario on a cloud and throws Spinies down at him.',
+    0x15: 'Flies straight across the screen to the left.',
+    0x17: 'Bullet Bills keep flying in from the right at different heights.',
+    0x1B: 'A chain of fireballs that turns clockwise around a block.',
+    0x1C: 'A chain of fireballs that turns clockwise around a block, twice as fast.',
+    0x1D: 'A chain of fireballs that turns anticlockwise around a block.',
+    0x1F: 'A long chain of fireballs that turns around a block.',
+    0x24: 'Sinks while Mario stands on it and pulls its partner on the other side of the rope up.',
+    0x25: 'Moves up and down, slowing down at each end.',
+    0x26: 'Rises and comes back in at the bottom of the screen.',
+    0x27: 'Sinks and comes back in at the top of the screen.',
+    0x28: 'Moves left and right, slowing down at each end.',
+    0x29: 'Stays still until Mario stands on it, then falls.',
+    0x2A: 'Stays still until Mario stands on it, then carries him to the right.',
+    0x2B: 'Rises and comes back in at the bottom of the screen.',
+    0x2C: 'Sinks and comes back in at the top of the screen.',
+    0x2D: 'Walks back and forth, jumps and breathes fire at Mario.',
+    0x35: 'Stands still.',
+    0x37: 'Walk along together toward Mario.',
+    0x38: 'Walk along together toward Mario.',
+    0x39: 'Walk along together toward Mario.',
+    0x3A: 'Walk along together toward Mario.',
+    0x3B: 'Walk along together toward Mario.',
+    0x3C: 'Walk along together toward Mario.',
+}
 GROUPS = {0x37: 0x06, 0x38: 0x06, 0x39: 0x06, 0x3A: 0x06, 0x3B: 0x00, 0x3C: 0x00}     # $C71B: what a group spawns
 GROUP_ROW = {0x37: 11, 0x38: 11, 0x39: 7, 0x3A: 7, 0x3B: 11, 0x3C: 11}                  # $C732: y $B0 or $70 (row 11 or 7)
 FRENZIES = {0x15, 0x16, 0x17}                                                           # $C7A0: kept in $06CB
@@ -770,6 +810,8 @@ class SMB1Profile(SMB1Data, Profile):
                         'remove': 'Remove this enemy' if removable else None}
                 if notes:
                     item['note'] = ' '.join(notes)
+                if row['id'] in DOES:
+                    item['does'] = DOES[row['id']]
                 out.append(item)
             elif row['kind'] == 'way' and row['world'] == world - 1:
                 start = row['page'] * 256 + row['col'] * 16
