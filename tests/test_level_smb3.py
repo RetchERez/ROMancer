@@ -71,7 +71,9 @@ def build(extra_world_objects=None):
            0xE1, 0x42, 0x80,                # the way out of screen 1: screen 0 of the other area, column 8
            0xFF])
     c.put(15, ALT, Cart.word(MAIN) + Cart.word(MAIN_OBJ) + [0x01, 0x00, 0x01, 0x00, 0x00] +
-          [0x20 | 20, 0x00, 0x0E, 0xE0, 0x71, 0x19, 0xFF])
+          [0x20 | 20, 0x00, 0x0E, 0xE0, 0x71, 0x19,
+           0x20 | 22, 0x13, 0x92,           # a pipe (class 1 kind 9, 3 tall), screen 1 column 3
+           0xFF])
     # enemy lists (bank 6)
     c.put(6, MAIN_OBJ, [0x01, 0x72, 0x0E, 0x19, 0xA6, 0x16, 0x17, 0x6C, 0x20, 0x19, 0xFF])
     c.put(6, ALT_OBJ, [0x01, 0xFF])
@@ -224,6 +226,71 @@ class Edits(unittest.TestCase):
             self.p.edit(PART, 'way:4', {'to_screen': 2})                   # the other area has 2 screens
 
 
+ALT_PART = {'world': 1, 'tileset': 1, 'layout': ALT, 'objects': ALT_OBJ}
+
+
+def apply(rom, writes):
+    data = bytearray(rom)
+    for offset, old, new in writes:
+        assert data[offset] == old
+        data[offset] = new
+    return bytes(data)
+
+
+class Pieces(unittest.TestCase):
+    def setUp(self):
+        self.c = build()
+        self.rom = bytes(self.c.rom)
+        self.p = smb3.SMB3Profile(self.rom)
+
+    def test_listing(self):
+        objects = {o['id']: o for o in self.p.objects(ALT_PART)}
+        pipe = objects['piece:2']
+        self.assertEqual((pipe['style'], pipe['name'], pipe['detail'], pipe['x'], pipe['y']),
+                         ('block', 'Pipe (kind 9)', '3 tall', 256 + 3 * 16 + 8, 22 * 16 + 16))
+        fields = {f['key']: f for f in pipe['fields']}
+        self.assertEqual(fields['x']['value'], 19)
+        self.assertEqual([c['value'] for c in fields['x']['choices']], list(range(32)))     # the area's two screens
+        self.assertEqual(len(fields['y']['choices']), 27)
+        self.assertEqual(fields['size']['value'], 2)
+        self.assertEqual([c['value'] for c in fields['piece']['choices']], [k << 4 for k in range(9, 16)])
+        main = {o['id']: o for o in self.p.objects(PART)}
+        self.assertEqual(main['row:1']['remove'], 'Remove this row')
+        self.assertIn('size', {f['key'] for f in main['row:1']['fields']})
+        self.assertIn('x', {f['key'] for f in main['block:2']['fields']})
+        self.assertEqual(main['piece:0']['name'], 'Ground')
+
+    def test_move_size_kind(self):
+        at = self.c.at(15, ALT + 9 + 6)
+        plan = self.p.edit(ALT_PART, 'piece:2', {'x': 5, 'y': 10})
+        self.assertEqual(plan['writes'], [(at, 0x20 | 22, 0x20 | 10), (at + 1, 0x13, 0x05)])
+        self.assertEqual((plan['watch']['shift'], plan['watch']['screens']), ([-14, -12], 2))
+        plan = self.p.edit(ALT_PART, 'piece:2', {'size': 5})
+        self.assertEqual(plan['writes'], [(at + 2, 0x92, 0x95)])
+        self.assertIsNone(plan['watch']['shift'])
+        plan = self.p.edit(ALT_PART, 'piece:2', {'piece': 0xA0})
+        self.assertEqual(plan['writes'], [(at + 2, 0x92, 0xA2)])
+        with self.assertRaises(ValueError):
+            self.p.edit(ALT_PART, 'piece:2', {'x': 32})                        # past the last screen
+        plan = self.p.edit(PART, 'block:2', {'x': 3})
+        self.assertEqual(plan['writes'], [(self.c.at(15, MAIN + 9 + 4 + 3) + 1, 0x0F, 0x03)])
+        plan = self.p.edit(PART, 'row:1', {'size': 4})
+        self.assertEqual(plan['writes'], [(self.c.at(15, MAIN + 9 + 4) + 2, 0x21, 0x24)])
+
+    def test_remove(self):
+        plan = self.p.edit(PART, 'row:1', {}, remove=True)
+        changed = smb3.SMB3Profile(apply(self.rom, plan['writes']))
+        rows = changed.records(1, MAIN)
+        self.assertEqual([(r['b0'], r['b1'], r['b2']) for r in rows],
+                         [(0x00, 0x00, 0xC0), (0x20 | 19, 0x0F, 0x01), (0x40 | 22, 0x13, 0x01), (0xE1, 0x42, 0x80)])
+        plan = self.p.edit(ALT_PART, 'piece:2', {}, remove=True)
+        self.assertEqual(plan['writes'], [(self.c.at(15, ALT + 9 + 6), 0x20 | 22, 0xFF)])
+        c = build(extra_world_objects=MAIN_OBJ)
+        c.put(12, 0xB5A0, Cart.word(MAIN + 9 + 4 + 3))                  # another area's layout starts inside this one
+        with self.assertRaises(ValueError):
+            smb3.SMB3Profile(bytes(c.rom)).edit(PART, 'row:1', {}, remove=True)
+
+
 class Watchers(unittest.TestCase):
     def setUp(self):
         self.p = smb3.SMB3Profile(bytes(build().rom))
@@ -259,6 +326,38 @@ class Watchers(unittest.TestCase):
         self.assertEqual(self.play(self.p.watcher(plan['watch']), ram)['state'], 'good')
         ram[0x800 + 0x1B40:0x800 + 0x1B45] = bytes([0x01, 0x72, 0x0E, 0x19, 0xFF])
         self.assertEqual(self.play(self.p.watcher(plan['watch']), ram)['state'], 'bad')
+
+    def test_piece(self):
+        plan = self.p.edit(ALT_PART, 'piece:2', {'x': 5, 'y': 10})
+        old, new = 0x1B0 + 22 * 16 + 3, 10 * 16 + 5
+
+        def tiles(**at):
+            ram = ram_for(1, ALT, ALT_OBJ)
+            for index, tile in at.items():
+                ram[0x800 + int(index[1:])] = tile
+            return ram
+
+        def run(original, changed):
+            w = self.p.watcher(plan['watch'])
+            self.assertTrue(w.compare)
+            for frame in range(0, 80, 4):
+                if w.see(original, frame, 'original'):
+                    break
+            for frame in range(0, 80, 4):
+                if w.see(changed, frame, 'changed'):
+                    break
+            return w.result()['state']
+        before = tiles(**{f'_{old}': 0xAD})
+        self.assertEqual(run(before, tiles(**{f'_{new}': 0xAD})), 'good')
+        self.assertEqual(run(before, before), 'bad')                                    # the control
+        self.assertEqual(run(before, tiles(**{f'_{new}': 0xAD, f'_{old}': 0xAD, '_7': 0x12})), 'bad')   # something else
+        removing = self.p.edit(ALT_PART, 'piece:2', {}, remove=True)
+        w = self.p.watcher(removing['watch'])
+        for frame in range(0, 80, 4):
+            w.see(before, frame, 'original')
+        for frame in range(0, 80, 4):
+            w.see(tiles(), frame, 'changed')
+        self.assertEqual(w.result()['state'], 'good')
 
     def test_way(self):
         plan = self.p.edit(PART, 'way:4', {'to_screen': 1})

@@ -49,24 +49,78 @@ TILES = 0x6000                      # the area's tiles: page * $F0 + row * 16 + 
 ENEMY_COPY = 0x7B00
 
 # Enemy ids, spawned in place of an enemy entry and looked at (trace/v15_profiles/smb2/enemy_sheet_a.png, _b.png,
-# snifit_sheet.png, look3_sheet.png). Colours are as the game draws them in World 1. Two of a kind keep their number;
-# ids never seen in the pictures (they hide or fly in later) show only their number.
+# snifit_sheet.png, look3_sheet.png; trace/v15_profiles/naming_zelda_smb2/smb2/names.png). Colours are as the game draws
+# them in World 1. Two of a kind are told apart by what they were seen doing (paths recorded by
+# trace/v15_profiles/naming_zelda_smb2/smb2_track2.py, smb2_ledge.py, smb2_spark.py; research/smb2-level-profile.md).
 ENEMIES = {
     0x01: 'Shy Guy (red)', 0x02: 'Tweeter', 0x03: 'Shy Guy (pink)', 0x04: 'Porcupo', 0x05: 'Snifit (red)',
-    0x06: 'Snifit (gray)', 0x07: 'Snifit (pink)', 0x08: 'Ostro', 0x09: 'Bob-omb', 0x0A: 'Albatoss (0x0a)',
-    0x0B: 'Albatoss (0x0b)', 0x0C: 'Albatoss (0x0c)', 0x0D: 'Ninji (0x0d)', 0x0E: 'Ninji (0x0e)',
-    0x0F: 'Beezo (0x0f)', 0x10: 'Beezo (0x10)', 0x12: 'Enemy 0x12', 0x13: 'Trouter', 0x14: 'Hoopster',
-    0x17: 'Phanto', 0x18: 'Enemy 0x18', 0x19: 'Enemy 0x19', 0x1A: 'Pokey',
-    0x23: 'Panser (0x23)', 0x24: 'Panser (0x24)', 0x25: 'Panser (0x25)',
-    0x26: 'Autobomb', 0x29: 'Flurry', 0x2E: 'Spark (0x2e)', 0x2F: 'Spark (0x2f)', 0x30: 'Spark (0x30)', 0x31: 'Spark (0x31)',
+    0x06: 'Snifit (gray)', 0x07: 'Snifit (pink)', 0x08: 'Ostro', 0x09: 'Bob-omb', 0x0A: 'Albatoss carrying a Bob-omb',
+    0x0B: 'Albatoss, flies right', 0x0C: 'Albatoss, flies left', 0x0D: 'Ninji, runs and jumps',
+    0x0E: 'Ninji, jumps in place', 0x0F: 'Beezo, swoops down', 0x10: 'Beezo, flies straight', 0x12: 'Pidgit',
+    0x13: 'Trouter', 0x14: 'Hoopster', 0x17: 'Phanto', 0x18: 'Cobrat in a jar', 0x19: 'Cobrat in the sand',
+    0x1A: 'Pokey', 0x23: 'Panser, fires toward you', 0x24: 'Panser, walks', 0x25: 'Panser, fires straight up',
+    0x26: 'Autobomb', 0x29: 'Flurry', 0x2E: 'Spark, slow, clockwise', 0x2F: 'Spark, fast, clockwise',
+    0x30: 'Spark, slow, counterclockwise', 0x31: 'Spark, fast, counterclockwise',
 }
 # Shown but not changed: the level needs them to be finished, or they are not plain enemies
 FIXED = {
-    0x15: 'Enemy 0x15 (jar)', 0x16: 'Enemy 0x16 (jar)', 0x1C: 'Birdo',
-    0x2D: 'Hawkmouth (boss)', 0x3B: 'Falling log', 0x3D: 'Key', 0x42: 'Hawkmouth (exit, facing right)',
-    0x43: 'Hawkmouth (exit, facing left)', 0x44: 'Crystal ball', 0x47: 'Bob-omb generator',
-    0x48: 'Beezo generator', 0x5C: 'Birdo (boss)', 0x5D: 'Mouser', 0x5F: 'Tryclyde', 0x61: 'Clawgrip',
-    0x6A: 'Boss 0x6a', 0x6C: 'Wart',
+    0x15: 'Jar that sends out Shy Guys', 0x16: 'Jar that sends out Bob-ombs', 0x1C: 'Birdo',
+    0x28: 'Whale spout', 0x2D: 'Hawkmouth (boss)', 0x3B: 'Falling log', 0x3D: 'Key',
+    0x42: 'Hawkmouth (exit, facing right)', 0x43: 'Hawkmouth (exit, facing left)', 0x44: 'Crystal ball',
+    0x47: 'Albatoss generator', 0x48: 'Beezo generator', 0x49: 'Generator stop',
+    0x4A: 'Vegetable thrower in Wart’s room', 0x5C: 'Birdo (boss)', 0x5D: 'Mouser', 0x5F: 'Tryclyde',
+    0x61: 'Clawgrip', 0x6A: 'Fryguy', 0x6C: 'Wart',
+}
+# What each one does, from watching it in the game for a few seconds (positions every frame, and the objects it made)
+DOES = {
+    0x01: 'Walks along the ground and walks off ledges.',
+    0x02: 'Hops along toward you.',
+    0x03: 'Walks along the ground and turns back at ledges.',
+    0x04: 'Walks along the ground.',
+    0x05: 'Walks, stops now and then, shoots bullets and walks off ledges.',
+    0x06: 'Stays in one place, hops now and then and shoots bullets.',
+    0x07: 'Walks, stops now and then, shoots bullets and turns back at ledges.',
+    0x08: 'Runs back and forth quickly.',
+    0x09: 'Walks about and blows up after a few seconds.',
+    0x0A: 'Flies across the screen carrying a Bob-omb.',
+    0x0B: 'Flies straight across the screen to the right.',
+    0x0C: 'Flies straight across the screen to the left.',
+    0x0D: 'Runs toward you and jumps.',
+    0x0E: 'Jumps up and down in one place.',
+    0x0F: 'Swoops down to your height and flies straight at you.',
+    0x10: 'Flies straight across the screen at the height it starts.',
+    0x12: 'Flies back and forth on a carpet and swoops down at you.',
+    0x13: 'Leaps high out of the water and falls back.',
+    0x14: 'Climbs up and down a vine or log.',
+    0x15: 'Sends red Shy Guys out of the jar one after another.',
+    0x16: 'Sends Bob-ombs out of the jar one after another.',
+    0x17: 'Hangs still on the wall while the key is left alone.',
+    0x18: 'Hides in a jar and spits bullets at you.',
+    0x19: 'Bobs up and down half buried in the sand.',
+    0x1A: 'Walks slowly back and forth.',
+    0x1C: 'Walks back and forth and spits shots at you.',
+    0x23: 'Stays in one place and throws fireballs in an arc toward you.',
+    0x24: 'Walks back and forth and throws fireballs in an arc.',
+    0x25: 'Stays in one place and throws fireballs straight up.',
+    0x26: 'Drives back and forth and shoots fire along the ground.',
+    0x28: 'Shoots up out of the water and falls back.',
+    0x29: 'Slides after you across the ground.',
+    0x2D: 'Guards the exit of the last level.',
+    0x2E: 'Creeps slowly clockwise around the edges of blocks.',
+    0x2F: 'Runs quickly clockwise around the edges of blocks.',
+    0x30: 'Creeps slowly counterclockwise around the edges of blocks.',
+    0x31: 'Runs quickly counterclockwise around the edges of blocks.',
+    0x3B: 'Falls down the waterfall again and again.',
+    0x47: 'Albatosses carrying Bob-ombs keep flying in from here on.',
+    0x48: 'Beezos keep swooping in from here on.',
+    0x49: 'Albatosses or Beezos stop coming from here on.',
+    0x4A: 'Throws vegetables up into the room again and again.',
+    0x5C: 'Walks back and forth and spits shots at you.',
+    0x5D: 'Throws bombs at you.',
+    0x5F: 'Spits fireballs at you.',
+    0x61: 'Throws rocks at you.',
+    0x6A: 'Floats in loops and drops fireballs.',
+    0x6C: 'Spits bubbles at you.',
 }
 ITEMS = {0x3B, 0x3D, 0x42, 0x43, 0x44}
 # Grass that can be pulled: object type -> (tile, what comes out), each pulled in 1-1 (pull.py, pull2.py)
@@ -423,6 +477,8 @@ class SMB2Profile(SMB2Data, Profile):
                             note='The level needs this to be finished, or it is not a plain enemy, so ROMancer leaves it as it is.')
             else:
                 item.update(style='enemy', name=f'Enemy {kind:#04x}', fields=[])
+            if kind in DOES:
+                item['does'] = DOES[kind]
             if shared:
                 item['note'] = (item.get('note', '') + ' ' if item.get('note') else '') + \
                     f'These enemies are shared with area {shared[0] + 1}, so a change shows there too.'

@@ -23,16 +23,46 @@ class Castlevania:
     sha256 = '55bcab0d9efc33a9d9efc90f2c3c4ab12f3221a44b1f357e6c6202a456399aa8'
     BANK7 = 0x1C000            # ROM offset (no header) of CPU $C000
     ZONE = 64
-    # spawner types identified by spawning each one and looking at what the game drew (trace/v14_objects/enemy_types_sheet.png)
-    ENEMIES = {0x01: 'Zombies', 0x02: 'Zombies', 0x03: 'Zombies', 0x04: 'Zombies', 0x05: 'Zombies', 0x06: 'Zombies',
-               0x51: 'Panther', 0x5E: 'Phantom Bat (boss)', 0x53: 'Fleaman', 0x54: 'Bat', 0x5D: 'Moving platform',
-               0x4A: 'Axe Knight', 0x12: 'Eagle'}
-    UNSURE = {0x4A, 0x12}       # named from one spawned picture each (trace/v14_objects/enemy_types_sheet.png)
+    # spawner types, named by placing each record alone in a zone of a stage that uses it (the stage's own graphics,
+    # reached by finishing the stage before it) and watching (trace/v15_profiles/naming_castlevania/names.png). Some
+    # spawner handlers ($F3B9 jump table) depend on the stage; every name holds for the stages the game uses it in.
+    # Bosses: the handlers that clear the screen and take the boss slot ($F469), each used once, in the last stage of a level.
+    ENEMIES = {
+        0x01: ('Zombies', 'Zombies come in from the side of the screen and walk along the floor.'),
+        0x02: ('Bats', 'Bats fly in from the side of the screen in a wavy line.'),
+        0x03: ('Fishmen', 'Fishmen leap out of the water and walk toward you.'),
+        0x04: ('Bats (second quest only)', 'Only in the second quest: bats fly in from the side of the screen.'),
+        0x05: ('Medusa heads (second quest only)', 'Only in the second quest: Medusa heads fly across the screen in a wavy line.'),
+        0x06: ('Medusa heads', 'Medusa heads fly across the screen in a wavy line.'),
+        0x0D: ('Ghost, from the left', 'A ghost comes in from the left side of the screen and floats toward you.'),
+        0x8D: ('Ghost, from the right', 'A ghost comes in from the right side of the screen and floats toward you.'),
+        0x12: ('Eagle', 'Flies across the top of the screen and drops fleamen.'),
+        0x47: ('Bat, hanging', 'Hangs on the wall until you come near, then swoops at you.'),
+        0x48: ('Zombie', 'Walks slowly along the floor.'),
+        0x4A: ('Axe Knight', 'Stands guard and throws axes at you.'),
+        0x4C: ('Fleaman', 'Hops about and leaps at you.'),
+        0x4E: ('Bone pillar', 'A stack of dragon skulls that stays in place and spits fireballs.'),
+        0x4F: ('Raven', 'Perches until you come near, then dives at you.'),
+        0x50: ('Skeleton', 'Walks back and forth and throws bones in an arc.'),
+        0x51: ('Panther', 'Crouches on a ledge and pounces when you come near.'),
+        0x53: ('Red skeleton', 'Walks toward you along the floor.'),
+        0x54: ('Bone dragon', 'A neck of bones that sways out from the wall; its head spits fireballs.'),
+        0x58: ('Death (boss)', 'The boss at the end of stage 15.'),
+        0x59: ('Phantom Bat (boss)', 'The boss at the end of stage 3; it hangs on the wall until the fight starts.'),
+        0x5A: ('Mummies (boss)', 'The boss at the end of stage 9.'),
+        0x5B: ('Medusa (boss)', 'The boss at the end of stage 6.'),
+        0x5C: ("Frankenstein's monster and Igor (boss)", 'The boss at the end of stage 12.'),
+        0x5D: ('Dracula (boss)', 'The last boss, at the end of stage 18.'),
+        0x5E: ('Giant bat', 'A big red bat that flies about in wide swoops.'),
+    }
+    # enemy indexes from 69 on read candle records (both share the pool at $D6A1); no zone uses them as enemies, so
+    # they are not offered
+    NOT_ENEMIES = {0x20, 0xFE, 0xFF}
     # item codes, from the pickup code at $E73E (bank 7): 0 small heart (a weak whip gets the whip upgrade instead), 1 money
     # bag, 3 whip upgrade, 4 large heart, 5 pot roast, 6 magic crystal, A rosary, C double or triple shot, E invisibility
     # potion, and the rest set the subweapon (2 and 7 are numbers no subweapon uses)
-    DROPS = {0x0: 'Heart or whip upgrade', 0x1: 'Money bag', 0x2: 'Empty subweapon (0x02)', 0x3: 'Whip upgrade',
-             0x4: 'Large heart', 0x5: 'Pot roast', 0x6: 'Magic crystal (ends the stage)', 0x7: 'Empty subweapon (0x07)',
+    DROPS = {0x0: 'Heart or whip upgrade', 0x1: 'Money bag', 0x2: 'Blank subweapon (an unused code)', 0x3: 'Whip upgrade',
+             0x4: 'Large heart', 0x5: 'Pot roast', 0x6: 'Magic crystal (ends the stage)', 0x7: 'Blank subweapon (a second unused code)',
              0x8: 'Dagger', 0x9: 'Cross', 0xA: 'Rosary', 0xB: 'Holy water', 0xC: 'Double or triple shot', 0xD: 'Axe',
              0xE: 'Invisibility potion', 0xF: 'Stopwatch'}
     # hidden treasure ($A63A, bank 6): 4 bytes each, table $FC14 by stage. What appears is byte 3; how it is found is
@@ -362,10 +392,14 @@ class Castlevania:
         return self.DROPS.get(low, f'Item {low:#04x}')
 
     def enemy_name(self, kind: int) -> str:
-        name = self.ENEMIES.get(kind)
-        if name is None:
-            return f'Enemy {kind:#04x}'
-        return name + (' (likely)' if kind in self.UNSURE else '')
+        if kind in self.ENEMIES:
+            return self.ENEMIES[kind][0]
+        if kind in self.NOT_ENEMIES:
+            return 'Not an enemy (candle data)'
+        return f'Enemy {kind:#04x}'
+
+    def enemy_does(self, kind: int):
+        return self.ENEMIES[kind][1] if kind in self.ENEMIES else None
 
     def objects(self, stage: int, floor: int, count: int = 64) -> list:
         """Every enemy and candle of a stage, in stage pixels (x from the stage start, y on the screen)."""
@@ -375,6 +409,7 @@ class Castlevania:
             if row['enemy']:
                 e = row['enemy']
                 out.append({'kind': 'enemy', 'zone': row['zone'], 'type': e['type'], 'name': self.enemy_name(e['type']),
+                            'does': self.enemy_does(e['type']),
                             'x': base + e['dx'], 'y': e['y'], 'index': row['enemy_index'], 'byte': row['enemy_byte']})
             if row['candle']:
                 c = row['candle']
@@ -421,13 +456,67 @@ class Castlevania:
                 record = self.enemy_record(index)
             except IndexError:
                 break
-            if record and (record['type'], record['dx'], record['y']) not in seen:
+            if record and record['type'] not in self.NOT_ENEMIES and (record['type'], record['dx'], record['y']) not in seen:
                 seen.add((record['type'], record['dx'], record['y']))
                 found.append({'index': index, **record, 'name': self.enemy_name(record['type'])})
         return found
 
 
 from . import Profile, Watcher  # noqa: E402  (the package imports this module lazily)
+
+
+def _band(y: int) -> str:
+    if y < 80:
+        return 'near the top'
+    if y < 112:
+        return 'high'
+    if y < 144:
+        return 'halfway up'
+    if y < 176:
+        return 'low'
+    return 'near the floor'
+
+
+def _side(dx: int) -> str:
+    return 'to the left' if dx < 22 else ('in the middle' if dx < 43 else 'to the right')
+
+
+def variant_names(choices: list) -> list:
+    """[{'value', 'name'}] for enemy records [{'index', 'name', 'dx', 'y', ...}]: records that share a name get where
+    they stand (height on the screen, then their place in their 64-pixel stretch), and a count when that is still the same."""
+    groups = {}
+    for c in choices:
+        groups.setdefault(c['name'], []).append(c)
+    names = {}
+    for name, group in groups.items():
+        if len(group) == 1:
+            names[group[0]['index']] = name
+            continue
+        labels = {c['index']: _band(c['y']) for c in group}
+        for c in group:
+            if sum(1 for o in group if _band(o['y']) == _band(c['y'])) > 1:
+                labels[c['index']] = f'{_band(c["y"])}, {_side(c["dx"])}'
+        if name.startswith('Not an enemy'):
+            for n, c in enumerate(group, 1):
+                names[c['index']] = f'{name} {n}'
+            continue
+        clash = {}
+        for c in group:
+            clash.setdefault(labels[c['index']], []).append(c)
+        for label, same in clash.items():
+            same.sort(key=lambda c: (c['y'], c['dx'], c['index']))
+            if len(same) == 1:
+                names[same[0]['index']] = f'{name}, {label}'
+            elif len(same) == 2 and same[0]['y'] != same[1]['y']:
+                names[same[0]['index']] = f'{name}, {label}, a little higher'
+                names[same[1]['index']] = f'{name}, {label}, a little lower'
+            elif len(same) == 2 and same[0]['dx'] != same[1]['dx']:
+                names[same[0]['index']] = f'{name}, {label}, a little to the left'
+                names[same[1]['index']] = f'{name}, {label}, a little to the right'
+            else:
+                for n, c in enumerate(same, 1):
+                    names[c['index']] = f'{name}, {label}' + (f' ({n})' if n > 1 else '')
+    return [{'value': c['index'], 'name': names[c['index']]} for c in choices]
 
 
 class _SlotWatcher(Watcher):
@@ -572,7 +661,7 @@ class CastlevaniaProfile(Castlevania, Profile):
         return f'Stage part {part["stage"] + 1}' + (', lower floor' if part['floor'] else '')
 
     def choices(self):
-        return {'enemies': [{'value': c['index'], 'name': f'{c["name"]} (height {c["y"]})'} for c in self.enemy_choices()],
+        return {'enemies': variant_names(self.enemy_choices()),
                 'block_items': [{'value': n, 'name': self.block_item_name(n)} for n in range(8)],
                 'treasures': [{'value': k, 'name': v} for k, v in self.TREASURES.items()],
                 'triggers': [{'value': k, 'name': v} for k, v in self.TRIGGERS.items()]}

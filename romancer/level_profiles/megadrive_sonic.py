@@ -1,7 +1,6 @@
-"""Sonic The Hedgehog and Sonic The Hedgehog 2 (Mega Drive): the object layout of every act.
+"""Sonic The Hedgehog and Sonic The Hedgehog 2 (Mega Drive): the object layout and the chunk layout of every act.
 
-The level layouts are compressed, so blocks stay with the general level map tools. Each act has a plain list of the
-objects placed in it, 6 bytes each, sorted by x and ended by x = $FFFF:
+Each act has a plain list of the objects placed in it, 6 bytes each, sorted by x and ended by x = $FFFF:
 
     x (word), y (word: low 12 bits y, two flip bits above), object id (byte), subtype (byte)
 
@@ -10,6 +9,19 @@ with bit 15 of the y word. Edits change the id and subtype bytes of one record i
 another enemy's id and subtype as the game uses them in the same zone (so its graphics are loaded there), and a removal
 writes object id 0, which the object loader places as an empty slot. Worked out from the games' own loaders (Sonic 1
 $D8F0 and $DA56, Sonic 2 $17A2A and $17EBE) and proven by replaying the game; see research/megadrive_sonic-level-profile.md.
+
+The level layouts are made of chunks (256 by 256 pixels in Sonic 1, 128 by 128 in Sonic 2), so the general painter
+cannot change them; packed_layout and set_packed_layout copy whole chunks:
+
+* Sonic 1 (loader $6D12): index $68BD6, three words an act (foreground, background, unused), 6 bytes an act and 4 acts
+  a zone; each layout is its width less one, its height less one, then the chunk numbers row by row, plain. The game
+  copies it to $FFA400, $80 bytes a row (the background sits $40 on). Bit 7 of a chunk number is the loop flag and
+  stays with the chunk. Writes go in place.
+* Sonic 2 (loader $E42C): index $45A80, one word an act (unsigned, forward from the index), Kosinski compressed (KosDec
+  $18F8) into $FFFF8000: 16 rows of $100 bytes, the foreground in the first $80 of each row. A change is decompressed,
+  changed and compressed again by kos_encode, and must fit the layout's old room (up to the next layout; the layouts
+  are padded to 16 bytes). No free space lies within reach of the index's 16-bit offsets, so a layout that does not
+  fit is refused.
 
 RAM: snapshots give work RAM as 'wram', index 0 = $FF0000, words big-endian (68000 order).
 """
@@ -20,6 +32,126 @@ from . import Profile, Watcher
 
 def _w(data, at: int) -> int:
     return data[at] << 8 | data[at + 1]
+
+
+def kos_decode(data, at: int = 0):
+    """Kosinski as KosDec ($18F8) reads it: (bytes out, bytes of input read). The next descriptor word is read as soon as
+    the 16th bit of the old one is used, before that command's bytes."""
+    src, out = at, bytearray()
+    desc, left = data[src] | data[src + 1] << 8, 16
+    src += 2
+
+    def bit():
+        nonlocal desc, left, src
+        b = desc & 1
+        desc >>= 1
+        left -= 1
+        if left == 0:
+            desc, left = data[src] | data[src + 1] << 8, 16
+            src += 2
+        return b
+    while True:
+        if bit():
+            out.append(data[src])
+            src += 1
+            continue
+        if bit() == 0:
+            count = (bit() << 1 | bit()) + 2
+            back = 0x100 - data[src]
+            src += 1
+        else:
+            lo, hi = data[src], data[src + 1]
+            src += 2
+            back = 0x2000 - (((hi & 0xF8) << 5) | lo)
+            if hi & 7:
+                count = (hi & 7) + 2
+            else:
+                count = data[src]
+                src += 1
+                if count == 0:
+                    return bytes(out), src - at
+                if count == 1:
+                    continue
+                count += 1
+        if back > len(out):
+            raise ValueError('That compressed layout reaches back before its start.')
+        for _ in range(count):
+            out.append(out[-back])
+
+
+def kos_encode(data: bytes, chain: int = 48) -> bytes:
+    """A Kosinski stream that kos_decode (and the game) reads back as data: the cheapest path over the commands (a
+    literal costs 9 bits; a copy of 2-5 bytes within 256 costs 12; 3-9 bytes within 8192 costs 18; 10-256 bytes within
+    8192 costs 26), with matches found through up to `chain` earlier places that start with the same two bytes."""
+    n = len(data)
+    heads: dict = {}
+    found = [(0, 0, 0, 0)] * n
+    for i in range(n - 1):
+        key = data[i] << 8 | data[i + 1]
+        short_len = short_back = long_len = long_back = 0
+        cap = min(256, n - i)
+        for j in reversed(heads.get(key, ())[-chain:]):
+            back = i - j
+            if back > 0x2000:
+                break
+            if not (back <= 256 and short_len < min(5, cap)):
+                if long_len == cap:
+                    break
+                if data[j + long_len] != data[i + long_len]:
+                    continue        # cannot beat the longest found so far
+            length = 2
+            while length < cap and data[j + length] == data[i + length]:
+                length += 1
+            if back <= 256 and min(length, 5) > short_len:
+                short_len, short_back = min(length, 5), back
+            if length > long_len:
+                long_len, long_back = length, back
+            if long_len == cap and (short_len == min(5, cap) or back > 256):
+                break
+        heads.setdefault(key, []).append(i)
+        found[i] = (short_len, short_back, long_len, long_back)
+    best = [0] * (n + 1)
+    step = [None] * (n + 1)
+    for i in range(n - 1, -1, -1):
+        cost, how = 9 + best[i + 1], None
+        short_len, short_back, long_len, long_back = found[i]
+        for length in range(2, short_len + 1):
+            if 12 + best[i + length] < cost:
+                cost, how = 12 + best[i + length], (short_back, length, True)
+        for length in range(3, long_len + 1):
+            c = (18 if length <= 9 else 26) + best[i + length]
+            if c < cost:
+                cost, how = c, (long_back, length, False)
+        best[i], step[i] = cost, how
+    commands, i = [], 0
+    while i < n:
+        how = step[i]
+        if how is None:
+            commands.append(((1,), bytes([data[i]])))
+            i += 1
+            continue
+        back, length, short = how
+        if short:
+            k = length - 2
+            commands.append(((0, 0, k >> 1, k & 1), bytes([0x100 - back])))
+        else:
+            off = 0x2000 - back
+            lo, hi = off & 0xFF, (off >> 5) & 0xF8
+            commands.append(((0, 1), bytes([lo, hi | (length - 2)]) if length <= 9 else bytes([lo, hi, length - 1])))
+        i += length
+    commands.append(((0, 1), b'\x00\xf0\x00'))       # the end: a long copy whose count byte is 0
+    out = bytearray(2)
+    desc_at, desc, used = 0, 0, 0
+    for bits, body in commands:
+        for b in bits:
+            desc |= b << used
+            used += 1
+            out[desc_at], out[desc_at + 1] = desc & 0xFF, desc >> 8
+            if used == 16:          # the game reads the next descriptor right away
+                desc_at, desc, used = len(out), 0, 0
+                out += b'\0\0'
+        out += body
+    return bytes(out)
 
 
 class _SonicLayouts(Profile):
@@ -196,7 +328,76 @@ class _SonicLayouts(Profile):
         return {'writes': [w for w in writes if w[1] != w[2]], 'title': f'{title} ({self.part_name(part)}, x {r["x"]})', 'watch': watch}
 
     def watcher(self, watch):
+        if watch.get('kind') == 'layout':
+            return _LayoutWatcher(watch)
         return _ObjectWatcher(watch)
+
+    # ---- chunk layouts (a game class gives layout_start, layout_of and layout_writes)
+    CHUNK = 256                 # pixels a chunk
+    LAYOUT_RAM = 0xA400         # where the foreground layout sits in RAM
+    LAYOUT_ROW = 0x80           # RAM bytes a row
+
+    def layout_start(self, zone: int, act: int) -> int:
+        raise NotImplementedError
+
+    def layout_of(self, zone: int, act: int) -> dict:
+        """{'width', 'height', 'blocks', ...}: the foreground as the game has it in RAM after loading the act."""
+        raise NotImplementedError
+
+    def layout_writes(self, zone: int, act: int, grid: dict, blocks: list) -> list:
+        raise NotImplementedError
+
+    def same_layout(self, zone: int, act: int) -> list:
+        start = self.layout_start(zone, act)
+        return [(z, a) for z, a in self.acts() if (z, a) != (zone, act) and self.layout_start(z, a) == start]
+
+    def zone_chunks(self, zone: int) -> set:
+        """Every chunk number the zone's own acts place (a zone's chunks are loaded in each of its acts)."""
+        out = set()
+        for z, a in self.acts():
+            if z == zone:
+                out.update(self.layout_of(z, a)['blocks'])
+        return out
+
+    def packed_layout(self, part):
+        zone, act = int(part['zone']), int(part['act'])
+        if (zone, act) not in self.acts():
+            return None
+        grid = self.layout_of(zone, act)
+        return {'size': self.CHUNK, 'width': grid['width'], 'height': grid['height'], 'blocks': list(grid['blocks']),
+                'left': 0, 'top': 0}
+
+    def set_packed_layout(self, part, changes):
+        zone, act = int(part['zone']), int(part['act'])
+        if (zone, act) not in self.acts():
+            raise ValueError('That part of the game has no layout ROMancer can change.')
+        grid = self.layout_of(zone, act)
+        allowed = self.zone_chunks(zone)
+        blocks = list(grid['blocks'])
+        places = []
+        for column, row, block in changes:
+            column, row, block = int(column), int(row), int(block)
+            if not (0 <= column < grid['width'] and 0 <= row < grid['height']):
+                raise ValueError('That place is outside the act’s layout.')
+            if block not in allowed:
+                raise ValueError('That chunk is not one this zone uses.')
+            at = row * grid['width'] + column
+            if blocks[at] != block:
+                if any(p[:2] == [column, row] for p in places):
+                    raise ValueError('Each place can take one chunk at a time.')
+                places.append([column, row, block, blocks[at]])
+                blocks[at] = block
+        if not places:
+            raise ValueError('Those places already look like that. Paint a different picture first.')
+        writes = self.layout_writes(zone, act, grid, blocks)
+        shared = self.same_layout(zone, act)
+        title = f'Layout: {len(places)} {"chunk" if len(places) == 1 else "chunks"} changed ({self.part_name(part)})'
+        if shared:
+            names = ' and '.join(self.part_name({'zone': z, 'act': a}) for z, a in shared)
+            title += f'; {names} {"uses" if len(shared) == 1 else "use"} the same layout'
+        watch = {'kind': 'layout', 'zone': zone, 'act': act, 'places': places, 'ram': self.LAYOUT_RAM, 'row': self.LAYOUT_ROW,
+                 'mode': self.GAME_MODE, 'level': self.LEVEL_MODE, 'zone_at': self.ZONE}
+        return {'writes': writes, 'title': title, 'watch': watch}
 
 
 class _ObjectWatcher(Watcher):
@@ -294,6 +495,40 @@ class _ObjectWatcher(Watcher):
                 else f'Played from the start, the game placed object {seen:#04x} there, not what was chosen.'}
 
 
+class _LayoutWatcher(Watcher):
+    """Reads the chunk numbers at the changed places in the layout the replayed game built in RAM once the act is
+    playing (the act loads its layout before play starts); two looks in a row must agree."""
+
+    def __init__(self, watch):
+        self.w, self.seen, self.last = watch, None, None
+
+    def see(self, ram, frame, run):
+        w = self.w
+        if ram[w['mode']] != w['level'] or (ram[w['zone_at']], ram[w['zone_at'] + 1]) != (w['zone'], w['act']):
+            self.last = None
+            return False
+        now = [ram[w['ram'] + row * w['row'] + column] for column, row, _, _ in w['places']]
+        if now == self.last:
+            self.seen = now
+            return True
+        self.last = now
+        return False
+
+    def result(self):
+        if self.seen is None:
+            return super().result()
+        places = self.w['places']
+        right = sum(1 for got, place in zip(self.seen, places) if got == place[2])
+        if right == len(places):
+            return {'state': 'good', 'text': 'Played from the start, the game builds the act with the new '
+                                             f'{"chunk" if right == 1 else "chunks"} there.'}
+        got, new = next((got, place[2]) for got, place in zip(self.seen, places) if got != place[2])
+        if len(places) == 1:
+            return {'state': 'bad', 'text': f'Played from the start, that place holds chunk {got:#04x}, not the chosen {new:#04x}.'}
+        return {'state': 'bad', 'text': f'Played from the start, {len(places) - right} of {len(places)} places hold another '
+                                        f'chunk (chunk {got:#04x} where {new:#04x} was chosen).'}
+
+
 class Sonic1(_SonicLayouts):
     """Sonic The Hedgehog (USA, Europe). Object loader $D8F0; index $6B000, two words per act (the second list is empty)."""
     name = 'Sonic The Hedgehog'
@@ -326,6 +561,28 @@ class Sonic1(_SonicLayouts):
     def ring_count(self, sub):
         n = sub & 7                     # $9B6E: low 3 bits are the extra rings, 7 is read as 6
         return (6 if n == 7 else n) + 1
+
+    LAYOUT_INDEX = 0x68BD6      # $6D32: (zone * 4 + act) * 6, then the foreground's signed word offset from the index
+
+    def layout_start(self, zone, act):
+        offset = _w(self.rom, self.LAYOUT_INDEX + (zone * 4 + act) * 6)
+        return self.LAYOUT_INDEX + (offset - 0x10000 if offset & 0x8000 else offset)
+
+    def layout_of(self, zone, act):
+        at = self.layout_start(zone, act)
+        stride = self.rom[at] + 1
+        # the game copies each row into $80 bytes of RAM, the background $40 on, after clearing $800 bytes ($6D12)
+        width, height = min(stride, 0x40), min(self.rom[at + 1] + 1, 16)
+        return {'width': width, 'height': height, 'stride': stride, 'at': at + 2,
+                'blocks': [self.rom[at + 2 + r * stride + c] for r in range(height) for c in range(width)]}
+
+    def layout_writes(self, zone, act, grid, blocks):
+        out = []
+        for n, block in enumerate(blocks):
+            at = grid['at'] + (n // grid['width']) * grid['stride'] + n % grid['width']
+            if self.rom[at] != block:
+                out.append((at, self.rom[at], block))
+        return out
 
 
 class _RingWatcher(Watcher):
@@ -454,6 +711,49 @@ class Sonic2(_SonicLayouts):
             watch['count'] = count + 1
             title = f'Rings in the row: {count + 1}'
         return {'writes': [w for w in writes if w[1] != w[2]], 'title': f'{title} ({self.part_name(part)}, x {g["x"]})', 'watch': watch}
+
+    CHUNK = 128
+    LAYOUT_RAM, LAYOUT_ROW = 0x8000, 0x100
+    LAYOUT_INDEX = 0x45A80      # $E42C: (zone * 2 + act) * 2, an unsigned word offset forward from the index
+
+    def layout_start(self, zone, act):
+        return self.LAYOUT_INDEX + _w(self.rom, self.LAYOUT_INDEX + (zone * 2 + act) * 2)
+
+    def layout_room(self, start: int) -> int:
+        """Bytes the layout at start may use: up to the next layout the index points at; the last one up to its end
+        rounded up to 16 bytes (the layouts are padded to 16)."""
+        starts = sorted({self.layout_start(z, a) for z in range(17) for a in range(2)})
+        later = [s for s in starts if s > start]
+        if later:
+            return later[0] - start
+        used = kos_decode(self.rom, start)[1]
+        return (start + used + 15) // 16 * 16 - start
+
+    def layout_of(self, zone, act):
+        data = kos_decode(self.rom, self.layout_start(zone, act))[0]
+        rows = min(16, len(data) // 0x100)
+        return {'width': 0x80, 'height': rows, 'data': data,
+                'blocks': [data[r * 0x100 + c] for r in range(rows) for c in range(0x80)]}
+
+    def layout_writes(self, zone, act, grid, blocks):
+        data = bytearray(grid['data'])
+        for n, block in enumerate(blocks):
+            data[(n // 0x80) * 0x100 + n % 0x80] = block
+        data = bytes(data)
+        start = self.layout_start(zone, act)
+        room = self.layout_room(start)
+        packed = b''
+        for chain in (48, 320, 2048):       # quick first, harder only when it does not fit
+            packed = kos_encode(data, chain)
+            if len(packed) <= room:
+                break
+        if len(packed) > room:
+            raise ValueError(f'The new layout packs to {len(packed)} bytes and only {room} fit where it was. The game '
+                             'cannot reach any free space, so try fewer or plainer chunks.')
+        if kos_decode(packed) != (data, len(packed)):
+            raise ValueError('ROMancer could not pack that layout correctly.')
+        new = packed + bytes(room - len(packed))
+        return [(start + i, self.rom[start + i], b) for i, b in enumerate(new) if self.rom[start + i] != b]
 
     def watcher(self, watch):
         if 'table' in watch:

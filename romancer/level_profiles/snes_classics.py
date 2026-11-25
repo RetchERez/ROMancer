@@ -3,17 +3,609 @@
 Both cartridges are LoROM without a copier header: CPU address $BB:8000-$BB:FFFF is ROM offset BB * $8000 + (address
 & $7FFF). The snapshots give the system RAM as 'wram' (128 KB): index 0 is $7E:0000 and index $10000 is $7F:0000.
 
-The level layouts are left alone here, except for single bytes that name what one block or one exit holds (see the
-notes on each). Research notes: research/snes_classics-level-profile.md.
+Layouts (packed_layout / set_packed_layout): Super Mario World's levels are built from objects by the game's code, so
+the profile runs that code (_Cpu, a small 65816 interpreter) to know the blocks and to check each change; Super Metroid's
+rooms are compressed, so the profile decompresses, changes and compresses them in the game's own format. Research
+notes: research/snes_classics-level-profile.md.
 """
 from __future__ import annotations
 
+import hashlib
+
 from . import Profile, Watcher
+
+_SINGLE_BLOCKS: dict = {}        # Super Mario World: objects found to put one block, per cartridge, level mode and tileset
 
 
 def lorom(address: int) -> int:
     """ROM offset of a LoROM CPU address."""
     return ((address >> 16) & 0x7F) * 0x8000 + (address & 0x7FFF)
+
+
+# --------------------------------------------------------------------------------------------- the 65816 CPU
+
+# A small 65816 interpreter (native mode, LoROM) that runs the game's own code from the ROM on a copy of its RAM, to know
+# what the game builds. Hardware registers read as 0 except the multiply / divide unit and the WRAM port; DMA is done
+# only to and from the WRAM port (video memory is not kept).
+
+class _CpuStop(Exception):
+    pass
+
+
+_SPEC = """
+00 BRK imm8,01 ORA dpxi,02 COP imm8,03 ORA sr,04 TSB dp,05 ORA dp,06 ASL dp,07 ORA dpil,08 PHP imp,09 ORA immm,0A ASL acc,0B PHD imp,0C TSB abs,0D ORA abs,0E ASL abs,0F ORA long
+10 BPL rel,11 ORA dpiy,12 ORA dpi,13 ORA sriy,14 TRB dp,15 ORA dpx,16 ASL dpx,17 ORA dpily,18 CLC imp,19 ORA absy,1A INC acc,1B TCS imp,1C TRB abs,1D ORA absx,1E ASL absx,1F ORA longx
+20 JSR abs,21 AND dpxi,22 JSL long,23 AND sr,24 BIT dp,25 AND dp,26 ROL dp,27 AND dpil,28 PLP imp,29 AND immm,2A ROL acc,2B PLD imp,2C BIT abs,2D AND abs,2E ROL abs,2F AND long
+30 BMI rel,31 AND dpiy,32 AND dpi,33 AND sriy,34 BIT dpx,35 AND dpx,36 ROL dpx,37 AND dpily,38 SEC imp,39 AND absy,3A DEC acc,3B TSC imp,3C BIT absx,3D AND absx,3E ROL absx,3F AND longx
+40 RTI imp,41 EOR dpxi,42 WDM imm8,43 EOR sr,44 MVP mv,45 EOR dp,46 LSR dp,47 EOR dpil,48 PHA imp,49 EOR immm,4A LSR acc,4B PHK imp,4C JMP abs,4D EOR abs,4E LSR abs,4F EOR long
+50 BVC rel,51 EOR dpiy,52 EOR dpi,53 EOR sriy,54 MVN mv,55 EOR dpx,56 LSR dpx,57 EOR dpily,58 CLI imp,59 EOR absy,5A PHY imp,5B TCD imp,5C JML long,5D EOR absx,5E LSR absx,5F EOR longx
+60 RTS imp,61 ADC dpxi,62 PER rell,63 ADC sr,64 STZ dp,65 ADC dp,66 ROR dp,67 ADC dpil,68 PLA imp,69 ADC immm,6A ROR acc,6B RTL imp,6C JMP absi,6D ADC abs,6E ROR abs,6F ADC long
+70 BVS rel,71 ADC dpiy,72 ADC dpi,73 ADC sriy,74 STZ dpx,75 ADC dpx,76 ROR dpx,77 ADC dpily,78 SEI imp,79 ADC absy,7A PLY imp,7B TDC imp,7C JMP absxi,7D ADC absx,7E ROR absx,7F ADC longx
+80 BRA rel,81 STA dpxi,82 BRL rell,83 STA sr,84 STY dp,85 STA dp,86 STX dp,87 STA dpil,88 DEY imp,89 BIT immm,8A TXA imp,8B PHB imp,8C STY abs,8D STA abs,8E STX abs,8F STA long
+90 BCC rel,91 STA dpiy,92 STA dpi,93 STA sriy,94 STY dpx,95 STA dpx,96 STX dpy,97 STA dpily,98 TYA imp,99 STA absy,9A TXS imp,9B TXY imp,9C STZ abs,9D STA absx,9E STZ absx,9F STA longx
+A0 LDY immx,A1 LDA dpxi,A2 LDX immx,A3 LDA sr,A4 LDY dp,A5 LDA dp,A6 LDX dp,A7 LDA dpil,A8 TAY imp,A9 LDA immm,AA TAX imp,AB PLB imp,AC LDY abs,AD LDA abs,AE LDX abs,AF LDA long
+B0 BCS rel,B1 LDA dpiy,B2 LDA dpi,B3 LDA sriy,B4 LDY dpx,B5 LDA dpx,B6 LDX dpy,B7 LDA dpily,B8 CLV imp,B9 LDA absy,BA TSX imp,BB TYX imp,BC LDY absx,BD LDA absx,BE LDX absy,BF LDA longx
+C0 CPY immx,C1 CMP dpxi,C2 REP imm8,C3 CMP sr,C4 CPY dp,C5 CMP dp,C6 DEC dp,C7 CMP dpil,C8 INY imp,C9 CMP immm,CA DEX imp,CB WAI imp,CC CPY abs,CD CMP abs,CE DEC abs,CF CMP long
+D0 BNE rel,D1 CMP dpiy,D2 CMP dpi,D3 CMP sriy,D4 PEI dp,D5 CMP dpx,D6 DEC dpx,D7 CMP dpily,D8 CLD imp,D9 CMP absy,DA PHX imp,DB STP imp,DC JML absil,DD CMP absx,DE DEC absx,DF CMP longx
+E0 CPX immx,E1 SBC dpxi,E2 SEP imm8,E3 SBC sr,E4 CPX dp,E5 SBC dp,E6 INC dp,E7 SBC dpil,E8 INX imp,E9 SBC immm,EA NOP imp,EB XBA imp,EC CPX abs,ED SBC abs,EE INC abs,EF SBC long
+F0 BEQ rel,F1 SBC dpiy,F2 SBC dpi,F3 SBC sriy,F4 PEA abs,F5 SBC dpx,F6 INC dpx,F7 SBC dpily,F8 SED imp,F9 SBC absy,FA PLX imp,FB XCE imp,FC JSR absxi,FD SBC absx,FE INC absx,FF SBC longx
+"""
+_OPS = {}
+for _line in _SPEC.strip().split('\n'):
+    for _item in _line.split(','):
+        _op, _name, _mode = _item.split()
+        _OPS[int(_op, 16)] = (_name, _mode)
+
+_N, _V, _M, _XF, _D, _I, _Z, _C = 0x80, 0x40, 0x20, 0x10, 0x08, 0x04, 0x02, 0x01
+
+
+class _Cpu:
+    def __init__(self, rom: bytes, ram: bytearray):
+        self.rom = rom
+        self.ram = ram
+        self.a = self.x = self.y = 0
+        self.s = 0x1FF
+        self.d = 0
+        self.db = 0
+        self.pb = 0
+        self.pc = 0
+        self.p = _M | _XF | _I
+        self.io = {}
+        self.wport = 0
+        self.writes = None          # set to a dict to record WRAM writes {index: value}
+        self.patch = None           # {ROM offset: byte}: ROM bytes read as if they had been changed
+
+    # ---- bus
+    def read(self, a):
+        bank, addr = a >> 16 & 0xFF, a & 0xFFFF
+        if bank in (0x7E, 0x7F):
+            return self.ram[(bank - 0x7E) << 16 | addr]
+        low = bank & 0x7F
+        if low < 0x40:
+            if addr < 0x2000:
+                return self.ram[addr]
+            if addr < 0x8000:
+                return self.ioread(addr)
+        if addr >= 0x8000:
+            o = (low * 0x8000 + (addr & 0x7FFF)) % len(self.rom)
+            if self.patch is not None and o in self.patch:
+                return self.patch[o]
+            return self.rom[o]
+        return 0
+
+    def write(self, a, v):
+        bank, addr = a >> 16 & 0xFF, a & 0xFFFF
+        if bank in (0x7E, 0x7F):
+            i = (bank - 0x7E) << 16 | addr
+        elif (bank & 0x7F) < 0x40 and addr < 0x2000:
+            i = addr
+        else:
+            if (bank & 0x7F) < 0x40 and 0x2000 <= addr < 0x8000:
+                self.iowrite(addr, v)
+            return
+        self.ram[i] = v
+        if self.writes is not None:
+            self.writes[i] = v
+
+    def ioread(self, addr):
+        if addr == 0x2180:
+            v = self.ram[self.wport]
+            self.wport = (self.wport + 1) & 0x1FFFF
+            return v
+        return self.io.get(addr, 0)
+
+    def iowrite(self, addr, v):
+        io = self.io
+        io[addr] = v
+        if addr == 0x2180:
+            self.ram[self.wport] = v
+            if self.writes is not None:
+                self.writes[self.wport] = v
+            self.wport = (self.wport + 1) & 0x1FFFF
+        elif 0x2181 <= addr <= 0x2183:
+            shift = (addr - 0x2181) * 8
+            self.wport = (self.wport & ~(0xFF << shift) | v << shift) & 0x1FFFF
+        elif addr == 0x4203:
+            product = io.get(0x4202, 0) * v
+            io[0x4216], io[0x4217] = product & 0xFF, product >> 8
+        elif addr == 0x4206:
+            dividend = io.get(0x4204, 0) | io.get(0x4205, 0) << 8
+            q, r = (dividend // v, dividend % v) if v else (0xFFFF, dividend)
+            io[0x4214], io[0x4215], io[0x4216], io[0x4217] = q & 0xFF, q >> 8, r & 0xFF, r >> 8
+        elif addr == 0x420B:
+            for ch in range(8):
+                if v >> ch & 1:
+                    self.dma(ch)
+
+    def dma(self, ch):
+        io = self.io
+        base = 0x4300 + ch * 16
+        mode, baddr = io.get(base, 0), io.get(base + 1, 0)
+        a = io.get(base + 2, 0) | io.get(base + 3, 0) << 8 | io.get(base + 4, 0) << 16
+        size = io.get(base + 5, 0) | io.get(base + 6, 0) << 8 or 0x10000
+        if baddr != 0x80:
+            return                  # only the WRAM port matters here (video memory is not kept)
+        step = 0 if mode & 0x08 else (-1 if mode & 0x10 else 1)
+        for _ in range(size):
+            if mode & 0x80:
+                self.write(a, self.ioread(0x2180))
+            else:
+                self.iowrite(0x2180, self.read(a))
+            a = (a & 0xFF0000) | ((a + step) & 0xFFFF)
+        io[base + 5] = io[base + 6] = 0
+
+    def r16(self, a):
+        return self.read(a) | self.read(a + 1) << 8
+
+    def r24(self, a):
+        return self.read(a) | self.read(a + 1) << 8 | self.read(a + 2) << 16
+
+    # ---- helpers
+    def fetch(self):
+        v = self.read(self.pb << 16 | self.pc)
+        self.pc = (self.pc + 1) & 0xFFFF
+        return v
+
+    def fetch16(self):
+        return self.fetch() | self.fetch() << 8
+
+    def push(self, v):
+        self.write(self.s, v)
+        self.s = (self.s - 1) & 0xFFFF
+
+    def pull(self):
+        self.s = (self.s + 1) & 0xFFFF
+        return self.read(self.s)
+
+    def push16(self, v):
+        self.push(v >> 8 & 0xFF)
+        self.push(v & 0xFF)
+
+    def pull16(self):
+        return self.pull() | self.pull() << 8
+
+    def nz(self, v, wide):
+        self.p &= ~(_N | _Z)
+        if wide:
+            v &= 0xFFFF
+            self.p |= (_N if v & 0x8000 else 0) | (0 if v else _Z)
+        else:
+            v &= 0xFF
+            self.p |= (_N if v & 0x80 else 0) | (0 if v else _Z)
+
+    def setp(self, v):
+        self.p = v
+        if v & _XF:
+            self.x &= 0xFF
+            self.y &= 0xFF
+
+    def address(self, mode):
+        """Effective 24-bit address of an operand."""
+        if mode == 'dp':
+            return (self.d + self.fetch()) & 0xFFFF
+        if mode == 'dpx':
+            return (self.d + self.fetch() + self.x) & 0xFFFF
+        if mode == 'dpy':
+            return (self.d + self.fetch() + self.y) & 0xFFFF
+        if mode == 'dpi':
+            p = (self.d + self.fetch()) & 0xFFFF
+            return self.db << 16 | self.r16(p)
+        if mode == 'dpxi':
+            p = (self.d + self.fetch() + self.x) & 0xFFFF
+            return self.db << 16 | self.r16(p)
+        if mode == 'dpiy':
+            p = (self.d + self.fetch()) & 0xFFFF
+            return ((self.db << 16 | self.r16(p)) + self.y) & 0xFFFFFF
+        if mode == 'dpil':
+            return self.r24((self.d + self.fetch()) & 0xFFFF)
+        if mode == 'dpily':
+            return (self.r24((self.d + self.fetch()) & 0xFFFF) + self.y) & 0xFFFFFF
+        if mode == 'abs':
+            return self.db << 16 | self.fetch16()
+        if mode == 'absx':
+            return ((self.db << 16 | self.fetch16()) + self.x) & 0xFFFFFF
+        if mode == 'absy':
+            return ((self.db << 16 | self.fetch16()) + self.y) & 0xFFFFFF
+        if mode == 'long':
+            return self.fetch16() | self.fetch() << 16
+        if mode == 'longx':
+            return ((self.fetch16() | self.fetch() << 16) + self.x) & 0xFFFFFF
+        if mode == 'sr':
+            return (self.s + self.fetch()) & 0xFFFF
+        if mode == 'sriy':
+            p = (self.s + self.fetch()) & 0xFFFF
+            return ((self.db << 16 | self.r16(p)) + self.y) & 0xFFFFFF
+        raise _CpuStop(f'mode {mode}')
+
+    def operand(self, mode, wide):
+        if mode in ('immm', 'immx'):
+            return self.fetch16() if wide else self.fetch()
+        a = self.address(mode)
+        return self.r16(a) if wide else self.read(a)
+
+    def store(self, a, v, wide):
+        self.write(a, v & 0xFF)
+        if wide:
+            self.write(a + 1, v >> 8 & 0xFF)
+
+    # ---- running
+    def run(self, pc, stop=None, limit=5_000_000):
+        """Run from pb:pc (24-bit) as a JSL; returns when the routine returns or reaches a stop address."""
+        self.pb, self.pc = pc >> 16, pc & 0xFFFF
+        floor = self.s
+        self.push(0xFF)
+        self.push16(0xFFFF)          # a return address no code uses
+        self.floor = floor
+        self.go(stop, limit)
+
+    def go(self, stop=None, limit=5_000_000):
+        """Carry on from where the last run stopped."""
+        stops = set(stop or ())
+        floor = self.floor
+        for _ in range(limit):
+            if (self.pb << 16 | self.pc) in stops or self.s > floor or (self.pb == 0xFF and self.pc == 0):
+                return
+            self.step()
+        raise _CpuStop('too many steps')
+
+    def state(self):
+        return {k: v for k, v in self.__dict__.items() if k not in ('rom', 'ram', 'io', 'writes')} | {'io': dict(self.io)}
+
+    def restore(self, state):
+        self.__dict__.update({k: (dict(v) if k == 'io' else v) for k, v in state.items()})
+
+    def step(self):
+        op = self.fetch()
+        name, mode = _OPS[op]
+        p = self.p
+        m16, x16 = not p & _M, not p & _XF
+        if name in ('LDA', 'ORA', 'AND', 'EOR', 'ADC', 'SBC', 'CMP', 'BIT') and mode not in ('acc', 'imp'):
+            v = self.operand(mode, m16)
+            mask = 0xFFFF if m16 else 0xFF
+            if name == 'LDA':
+                self.a = (self.a & 0xFF00 | v) if not m16 else v
+                self.nz(v, m16)
+            elif name in ('ORA', 'AND', 'EOR'):
+                cur = self.a & mask
+                r = cur | v if name == 'ORA' else cur & v if name == 'AND' else cur ^ v
+                self.a = (self.a & ~mask | r) & 0xFFFF
+                self.nz(r, m16)
+            elif name == 'CMP':
+                self.compare(self.a & mask, v, m16)
+            elif name == 'BIT':
+                r = self.a & mask & v
+                self.p = self.p & ~_Z | (0 if r else _Z)
+                if mode != 'immm':
+                    top = 0x8000 if m16 else 0x80
+                    self.p = self.p & ~(_N | _V) | (_N if v & top else 0) | (_V if v & (top >> 1) else 0)
+            elif name == 'ADC':
+                self.adc(v, m16)
+            else:
+                self.sbc(v, m16)
+            return
+        if name in ('LDX', 'LDY'):
+            v = self.operand(mode, x16)
+            if name == 'LDX':
+                self.x = v
+            else:
+                self.y = v
+            self.nz(v, x16)
+            return
+        if name in ('CPX', 'CPY'):
+            v = self.operand(mode, x16)
+            self.compare(self.x if name == 'CPX' else self.y, v, x16)
+            return
+        if name in ('STA', 'STX', 'STY', 'STZ'):
+            a = self.address(mode)
+            if name == 'STA':
+                self.store(a, self.a, m16)
+            elif name == 'STZ':
+                self.store(a, 0, m16)
+            else:
+                self.store(a, self.x if name == 'STX' else self.y, x16)
+            return
+        if name in ('ASL', 'LSR', 'ROL', 'ROR', 'INC', 'DEC', 'TSB', 'TRB'):
+            if mode == 'acc':
+                mask = 0xFFFF if m16 else 0xFF
+                r = self.shift(name, self.a & mask, m16)
+                self.a = (self.a & ~mask | r) & 0xFFFF
+            else:
+                a = self.address(mode)
+                v = self.r16(a) if m16 else self.read(a)
+                if name in ('TSB', 'TRB'):
+                    acc = self.a & (0xFFFF if m16 else 0xFF)
+                    self.p = self.p & ~_Z | (0 if v & acc else _Z)
+                    r = v | acc if name == 'TSB' else v & ~acc & 0xFFFF
+                else:
+                    r = self.shift(name, v, m16)
+                self.store(a, r, m16)
+            return
+        getattr(self, 'op_' + name)(mode, m16, x16)
+
+    def compare(self, reg, v, wide):
+        r = reg - v
+        self.p = self.p & ~_C | (_C if r >= 0 else 0)
+        self.nz(r, wide)
+
+    def adc(self, v, wide):
+        mask, top = (0xFFFF, 0x8000) if wide else (0xFF, 0x80)
+        a = self.a & mask
+        c = self.p & _C
+        if self.p & _D:
+            r, carry, shift = 0, c, 0
+            for _ in range(4 if wide else 2):
+                digit = (a >> shift & 15) + (v >> shift & 15) + carry
+                carry = 1 if digit > 9 else 0
+                if carry:
+                    digit -= 10
+                r |= (digit & 15) << shift
+                shift += 4
+            overflow = 0
+        else:
+            r = a + v + c
+            carry = 1 if r > mask else 0
+            r &= mask
+            overflow = _V if (~(a ^ v) & (a ^ r) & top) else 0
+        self.p = self.p & ~(_C | _V) | carry | overflow
+        self.a = (self.a & ~mask | r) & 0xFFFF
+        self.nz(r, wide)
+
+    def sbc(self, v, wide):
+        mask, top = (0xFFFF, 0x8000) if wide else (0xFF, 0x80)
+        if self.p & _D:
+            a = self.a & mask
+            borrow = 1 - (self.p & _C)
+            r, shift = 0, 0
+            for _ in range(4 if wide else 2):
+                digit = (a >> shift & 15) - (v >> shift & 15) - borrow
+                borrow = 1 if digit < 0 else 0
+                if borrow:
+                    digit += 10
+                r |= (digit & 15) << shift
+                shift += 4
+            self.p = self.p & ~(_C | _V) | (0 if borrow else _C)
+            self.a = (self.a & ~mask | r) & 0xFFFF
+            self.nz(r, wide)
+        else:
+            self.adc(v ^ mask, wide)
+
+    def shift(self, name, v, wide):
+        mask, top = (0xFFFF, 0x8000) if wide else (0xFF, 0x80)
+        c = self.p & _C
+        if name == 'ASL':
+            r, nc = (v << 1) & mask, 1 if v & top else 0
+        elif name == 'LSR':
+            r, nc = v >> 1, v & 1
+        elif name == 'ROL':
+            r, nc = ((v << 1) | c) & mask, 1 if v & top else 0
+        elif name == 'ROR':
+            r, nc = (v >> 1) | (top if c else 0), v & 1
+        elif name == 'INC':
+            r = (v + 1) & mask
+            self.nz(r, wide)
+            return r
+        else:
+            r = (v - 1) & mask
+            self.nz(r, wide)
+            return r
+        self.p = self.p & ~_C | nc
+        self.nz(r, wide)
+        return r
+
+    # ---- the other instructions
+    def branch(self, take):
+        off = self.fetch()
+        if take:
+            self.pc = (self.pc + (off - 256 if off > 127 else off)) & 0xFFFF
+
+    def op_BPL(self, *a): self.branch(not self.p & _N)
+    def op_BMI(self, *a): self.branch(self.p & _N)
+    def op_BVC(self, *a): self.branch(not self.p & _V)
+    def op_BVS(self, *a): self.branch(self.p & _V)
+    def op_BCC(self, *a): self.branch(not self.p & _C)
+    def op_BCS(self, *a): self.branch(self.p & _C)
+    def op_BNE(self, *a): self.branch(not self.p & _Z)
+    def op_BEQ(self, *a): self.branch(self.p & _Z)
+    def op_BRA(self, *a): self.branch(True)
+
+    def op_BRL(self, *a):
+        off = self.fetch16()
+        self.pc = (self.pc + (off - 0x10000 if off > 0x7FFF else off)) & 0xFFFF
+
+    def op_JMP(self, mode, *a):
+        if mode == 'abs':
+            self.pc = self.fetch16()
+        elif mode == 'absi':
+            self.pc = self.r16(self.fetch16())
+        else:  # absxi
+            self.pc = self.r16(self.pb << 16 | ((self.fetch16() + self.x) & 0xFFFF))
+
+    def op_JML(self, mode, *a):
+        if mode == 'long':
+            t = self.fetch16() | self.fetch() << 16
+        else:
+            t = self.r24(self.fetch16())
+        self.pb, self.pc = t >> 16, t & 0xFFFF
+
+    def op_JSR(self, mode, *a):
+        t = self.fetch16()
+        if mode == 'absxi':
+            t = self.r16(self.pb << 16 | ((t + self.x) & 0xFFFF))
+        self.push16((self.pc - 1) & 0xFFFF)
+        self.pc = t
+
+    def op_JSL(self, *a):
+        t = self.fetch16()
+        bank = self.fetch()
+        self.push(self.pb)
+        self.push16((self.pc - 1) & 0xFFFF)
+        self.pb, self.pc = bank, t
+
+    def op_RTS(self, *a):
+        self.pc = (self.pull16() + 1) & 0xFFFF
+
+    def op_RTL(self, *a):
+        self.pc = (self.pull16() + 1) & 0xFFFF
+        self.pb = self.pull()
+
+    def op_RTI(self, *a):
+        self.setp(self.pull())
+        self.pc = self.pull16()
+        self.pb = self.pull()
+
+    def op_PHA(self, mode, m16, x16):
+        self.push16(self.a) if m16 else self.push(self.a & 0xFF)
+
+    def op_PHX(self, mode, m16, x16):
+        self.push16(self.x) if x16 else self.push(self.x & 0xFF)
+
+    def op_PHY(self, mode, m16, x16):
+        self.push16(self.y) if x16 else self.push(self.y & 0xFF)
+
+    def op_PLA(self, mode, m16, x16):
+        v = self.pull16() if m16 else self.pull()
+        self.a = v if m16 else (self.a & 0xFF00 | v)
+        self.nz(v, m16)
+
+    def op_PLX(self, mode, m16, x16):
+        self.x = self.pull16() if x16 else self.pull()
+        self.nz(self.x, x16)
+
+    def op_PLY(self, mode, m16, x16):
+        self.y = self.pull16() if x16 else self.pull()
+        self.nz(self.y, x16)
+
+    def op_PHP(self, *a): self.push(self.p)
+    def op_PLP(self, *a): self.setp(self.pull())
+    def op_PHB(self, *a): self.push(self.db)
+    def op_PHK(self, *a): self.push(self.pb)
+    def op_PHD(self, *a): self.push16(self.d)
+
+    def op_PLB(self, *a):
+        self.db = self.pull()
+        self.nz(self.db, False)
+
+    def op_PLD(self, *a):
+        self.d = self.pull16()
+        self.nz(self.d, True)
+
+    def op_PEA(self, *a): self.push16(self.fetch16())
+    def op_PEI(self, *a): self.push16(self.r16((self.d + self.fetch()) & 0xFFFF))
+
+    def op_PER(self, *a):
+        off = self.fetch16()
+        self.push16((self.pc + off) & 0xFFFF)
+
+    def op_REP(self, *a): self.setp(self.p & ~self.fetch())
+    def op_SEP(self, *a): self.setp(self.p | self.fetch())
+
+    def _tr(self, value, wide, target):
+        if target == 'a':
+            if wide:
+                self.a = value & 0xFFFF
+            else:
+                self.a = self.a & 0xFF00 | value & 0xFF
+        else:
+            setattr(self, target, value & (0xFFFF if wide else 0xFF))
+        self.nz(value, wide)
+
+    def op_TAX(self, mode, m16, x16): self._tr(self.a, x16, 'x')
+    def op_TAY(self, mode, m16, x16): self._tr(self.a, x16, 'y')
+    def op_TXA(self, mode, m16, x16): self._tr(self.x, m16, 'a')
+    def op_TYA(self, mode, m16, x16): self._tr(self.y, m16, 'a')
+    def op_TXY(self, mode, m16, x16): self._tr(self.x, x16, 'y')
+    def op_TYX(self, mode, m16, x16): self._tr(self.y, x16, 'x')
+    def op_TSX(self, mode, m16, x16): self._tr(self.s, x16, 'x')
+    def op_TXS(self, *a): self.s = self.x
+    def op_TCS(self, *a): self.s = self.a
+
+    def op_TSC(self, *a):
+        self.a = self.s
+        self.nz(self.a, True)
+
+    def op_TCD(self, *a):
+        self.d = self.a
+        self.nz(self.d, True)
+
+    def op_TDC(self, *a):
+        self.a = self.d
+        self.nz(self.a, True)
+
+    def op_XBA(self, *a):
+        self.a = (self.a >> 8 | self.a << 8) & 0xFFFF
+        self.nz(self.a & 0xFF, False)
+
+    def op_XCE(self, *a):
+        if self.p & _C:
+            raise _CpuStop('emulation mode')
+
+    def op_INX(self, mode, m16, x16):
+        self.x = (self.x + 1) & (0xFFFF if x16 else 0xFF)
+        self.nz(self.x, x16)
+
+    def op_INY(self, mode, m16, x16):
+        self.y = (self.y + 1) & (0xFFFF if x16 else 0xFF)
+        self.nz(self.y, x16)
+
+    def op_DEX(self, mode, m16, x16):
+        self.x = (self.x - 1) & (0xFFFF if x16 else 0xFF)
+        self.nz(self.x, x16)
+
+    def op_DEY(self, mode, m16, x16):
+        self.y = (self.y - 1) & (0xFFFF if x16 else 0xFF)
+        self.nz(self.y, x16)
+
+    def op_CLC(self, *a): self.p &= ~_C
+    def op_SEC(self, *a): self.p |= _C
+    def op_CLI(self, *a): self.p &= ~_I
+    def op_SEI(self, *a): self.p |= _I
+    def op_CLD(self, *a): self.p &= ~_D
+    def op_SED(self, *a): self.p |= _D
+    def op_CLV(self, *a): self.p &= ~_V
+    def op_NOP(self, *a): pass
+    def op_WDM(self, *a): self.fetch()
+
+    def _move(self, step, x16):
+        dst, src = self.fetch(), self.fetch()
+        self.db = dst
+        while True:
+            self.write(dst << 16 | self.y, self.read(src << 16 | self.x))
+            self.x = (self.x + step) & 0xFFFF
+            self.y = (self.y + step) & 0xFFFF
+            self.a = (self.a - 1) & 0xFFFF
+            if self.a == 0xFFFF:
+                break
+        if not x16:
+            self.x &= 0xFF
+            self.y &= 0xFF
+
+    def op_MVN(self, mode, m16, x16): self._move(1, x16)
+    def op_MVP(self, mode, m16, x16): self._move(-1, x16)
+
+    def op_BRK(self, *a): raise _CpuStop(f'BRK at {self.pb:02X}:{self.pc - 1:04X}')
+    def op_COP(self, *a): raise _CpuStop('COP')
+    def op_STP(self, *a): raise _CpuStop('STP')
+    def op_WAI(self, *a): raise _CpuStop('WAI')
 
 
 # --------------------------------------------------------------------------------------------- Super Mario World
@@ -264,6 +856,158 @@ class SuperMarioWorld:
         new = self.rom[start + 3:end] + b'\xff' * 4
         return [(start + i, o, n) for i, (o, n) in enumerate(zip(old, new)) if o != n]
 
+    # ---- the layout: layer 1 blocks as the game builds them in RAM
+    # The game builds a level at $05801E: it fills the level with the empty block, then runs every layer 1 object
+    # ($0583AC, the object list after the 5-byte header) and puts the blocks in RAM ($7EC800 low bytes, $7FC800 high
+    # bytes, screen by screen from the $00BEA8 tables). ROMancer runs that same code from the ROM (_Cpu) to know the
+    # blocks exactly, and to check every change it makes before it offers it.
+    LAYER2 = 0x05E600
+    BUILD, BUILD_OBJECTS, BUILD_DONE = 0x05801E, 0x0583AC, 0x05808F
+    NO_OBJECTS = (0x09, 0x0B, 0x10)     # boss rooms: the builder skips the objects ($0583BB)
+    ROWS = 27                           # rows of a screen in a level that scrolls sideways ($1B0 bytes a screen)
+    EMPTY = 0x25                        # the block the builder fills the level with first ($05807F)
+
+    def _cpu(self, level, patch=None):
+        ram = bytearray(0x20000)
+        for i, table in enumerate((self.LAYER1, self.LAYER2)):
+            o = lorom(table + level * 3)
+            ram[0x65 + 3 * i:0x68 + 3 * i] = bytes(self.rom[o:o + 3])
+        for offset, value in (patch or {}).items():         # a changed pointer must be seen before the build starts
+            for i, table in enumerate((self.LAYER1, self.LAYER2)):
+                o = lorom(table + level * 3)
+                if o <= offset < o + 3:
+                    ram[0x65 + 3 * i + offset - o] = value
+        cpu = _Cpu(self.rom, ram)
+        cpu.patch = patch
+        cpu.p = 0x34
+        return cpu, ram
+
+    def build(self, level: int, patch=None) -> bytearray:
+        """The game's RAM after it has built the level (patch: {ROM offset: byte} read instead of the ROM's)."""
+        key = ('build', level)
+        if patch is None and key in self._cache:
+            return self._cache[key]
+        cpu, ram = self._cpu(level, patch)
+        cpu.run(self.BUILD, stop=[self.BUILD_DONE])
+        if patch is None:
+            self._cache[key] = ram
+        return ram
+
+    def layout_screens(self, level: int):
+        """How many screens the level's layout has, or None when ROMancer cannot change its layout (levels that scroll
+        up and down, and boss rooms)."""
+        mode = self.header(level)[1] & 0x1F
+        if self.vertical(level) or mode in self.NO_OBJECTS:
+            return None
+        return (self.header(level)[0] & 0x1F) + 1
+
+    def spot(self, level: int, column: int, row: int) -> tuple:
+        return self.block_ram(level, column // 16, row, column % 16)
+
+    def decoded(self, level: int, ram=None) -> list:
+        ram = self.build(level) if ram is None else ram
+        width = self.layout_screens(level) * 16
+        out = []
+        for row in range(self.ROWS):
+            for column in range(width):
+                low, high = self.spot(level, column, row)
+                out.append(ram[low] | ram[high] << 8)
+        return out
+
+    def objects_data(self, level: int) -> bytes:
+        """The level's layer 1 data: the 5-byte header and the objects, without the $FF that ends them."""
+        start = lorom(self.l(self.LAYER1 + level * 3))
+        objects = self.layer1_objects(level)
+        end = objects[-1]['offset'] + objects[-1]['size'] if objects else start + 5
+        return bytes(self.rom[start:end])
+
+    # objects that may put one block by themselves: extended objects 2-$FF, then standard objects 1-$3F of the smallest
+    # size, then with the other sizes whose high or low half is 0 (in a scan of every size of every standard object in
+    # level $106 those were the only ones that put a single block)
+    def _candidates(self):
+        for ext in range(2, 0x100):
+            yield (0, ext)
+        for number in range(1, 0x40):
+            yield (number, 0)
+        for size in list(range(1, 0x10)) + list(range(0x10, 0x100, 0x10)):
+            for number in range(1, 0x40):
+                yield (number, size)
+
+    @staticmethod
+    def object_bytes(number: int, size: int, row: int, column: int) -> bytes:
+        """A 3-byte layer 1 object on the current screen ($0585FF): number = BB << 4 | bbbb in b0 bits 5-6 and b1."""
+        return bytes([(number & 0x30) << 1 | row, (number & 0x0F) << 4 | column, size])
+
+    def single_blocks(self, level: int, wanted=None) -> dict:
+        """{block: (number, size)}: objects that put exactly that one block in this level and nothing else, found by
+        running each on its own in the level's own builder (stops early once every wanted block is found)."""
+        header = self.objects_data(level)[:5]
+        if 'digest' not in self._cache:
+            self._cache['digest'] = hashlib.sha1(bytes(self.rom)).hexdigest()
+        key = ('single', self._cache['digest'], header[1] & 0x1F, header[4] & 0x0F)
+        cache = _SINGLE_BLOCKS          # kept for every profile of the same cartridge: a full search takes a while
+        found, done = cache.setdefault(key, [{}, None])
+        if done is not None or (wanted is not None and set(wanted) <= set(found)):
+            return found
+        cpu, ram = self._cpu(level)
+        cpu.run(self.BUILD, stop=[self.BUILD_OBJECTS])
+        start_ram, start = bytes(ram), cpu.state()
+        screen, row, column = 1, 10, 5
+        place = set(self.spot(level, 16 + column, row))
+        tried = cache.setdefault(key + ('tried',), set())
+        start_offset = lorom(self.l(self.LAYER1 + level * 3))
+
+        def objects_alone(data):
+            run_ram = bytearray(start_ram)
+            run = _Cpu(self.rom, run_ram)
+            run.restore(start)
+            run.patch = {start_offset + i: v for i, v in enumerate(data)}
+            run.writes = {}
+            run.go([self.BUILD_DONE], 200_000)
+            return run_ram, {i: v for i, v in run.writes.items() if 0xC800 <= i & 0xFFFF and (i < 0x10000 or i >= 0x1C800)}
+
+        _, plain = objects_alone(header + bytes([0xFF]))        # what the header alone writes (a layer 2 pass, for example)
+        for candidate in self._candidates():
+            if candidate in tried:
+                continue
+            tried.add(candidate)
+            data = header + bytes([screen, 0, 1]) + self.object_bytes(*candidate, row, column) + b'\xff'
+            run_ram = bytearray(start_ram)
+            run = _Cpu(self.rom, run_ram)
+            run.restore(start)
+            run.patch = {start_offset + i: v for i, v in enumerate(data)}
+            run.writes = {}
+            try:
+                run.go([self.BUILD_DONE], 200_000)
+            except _CpuStop:
+                continue
+            places = {i for i in run.writes if 0xC800 <= i & 0xFFFF and (i < 0x10000 or i >= 0x1C800)}
+            if places and places <= place and min(place) in places:
+                low, high = sorted(place)
+                block = run_ram[low] | run_ram[high] << 8
+                found.setdefault(block, candidate)
+            if wanted is not None and set(wanted) <= set(found):
+                return found
+        cache[key][1] = True
+        return found
+
+    def free_space(self, size: int, avoid=()):
+        """A ROM offset with room for size bytes: inside a run of $FF that fills the end of a bank (padding nothing
+        reads), 16 bytes after the run starts, never across a bank (the builder's pointer only carries into its middle
+        byte). Banks are tried from the last one down."""
+        for bank in range(len(self.rom) // 0x8000 - 1, 0, -1):
+            end = (bank + 1) * 0x8000
+            start = end
+            while start > bank * 0x8000 and self.rom[start - 1] == 0xFF:
+                start -= 1
+            at = start + 16
+            for lo_, hi_ in sorted(avoid):
+                if lo_ < at + size and at < hi_:
+                    at = hi_ + 16
+            if at + size <= end:
+                return at
+        return None
+
 
 class _SmwSpriteWatcher(Watcher):
     """A sprite edit. A swap is seen when a sprite slot filled from that list entry ($161A = index, $14C8 not 0) holds
@@ -356,6 +1100,31 @@ class _SmwRamWatcher(Watcher):
         return {'state': 'good' if ok else 'bad',
                 'text': f'Played from the start, the level loads with a {w["name"][0].lower() + w["name"][1:]} here.' if ok
                 else f'Played from the start, the level loads with block tile {self.seen:#05x} there, not the one chosen.'}
+
+
+class _SmwLayoutWatcher(Watcher):
+    """A layout change: once the level has loaded, the game's decoded blocks in RAM ($7EC800 low bytes, $7FC800 high
+    bytes) must be the chosen blocks at every changed place."""
+
+    def __init__(self, watch):
+        self.w = watch
+        self.seen = None
+
+    def see(self, ram, frame, run):
+        w = self.w
+        if ram[0x100] != 0x14 or ram[0xD0] != 0x07 or (ram[0xCE] | ram[0xCF] << 8) != w['list'] & 0xFFFF:
+            return False
+        self.seen = [ram[low] | ram[high] << 8 for low, high, _ in w['spots']]
+        return True
+
+    def result(self):
+        if self.seen is None:
+            return super().result()
+        wrong = [(got, spot[2]) for got, spot in zip(self.seen, self.w['spots']) if got != spot[2]]
+        if not wrong:
+            return {'state': 'good', 'text': 'Played from the start, the level loads with the new blocks in place.'}
+        got, want = wrong[0]
+        return {'state': 'bad', 'text': f'Played from the start, the level loads with block {got:03X} where {want:03X} should be.'}
 
 
 class SuperMarioWorldProfile(SuperMarioWorld, Profile):
@@ -495,6 +1264,69 @@ class SuperMarioWorldProfile(SuperMarioWorld, Profile):
                     'watch': {**base, 'kind': 'exit', 'screen': screen, 'value': new, 'name': name}}
         raise ValueError('ROMancer cannot change that yet.')
 
+    def packed_layout(self, part):
+        level = int(part['level'])
+        screens = self.layout_screens(level)
+        if screens is None:
+            return None
+        return {'size': 16, 'width': screens * 16, 'height': self.ROWS, 'blocks': self.decoded(level), 'left': 0, 'top': 0}
+
+    def set_packed_layout(self, part, changes):
+        """Put blocks in a level: for each one, a screen jump and an object that puts exactly that block (found by
+        running the game's builder) go after the level's own objects, so they are built last. The longer object list
+        moves to free space and the level's pointer ($05E000 + level * 3) points at it; levels that shared the old list
+        keep it. The whole level is built again with the new bytes and must come out exactly as asked."""
+        level = int(part['level'])
+        screens = self.layout_screens(level)
+        if screens is None:
+            raise ValueError('ROMancer cannot change the layout of this level: it scrolls up and down, or it is a boss room.')
+        width = screens * 16
+        wanted = {}
+        for column, row, block in changes:
+            column, row, block = int(column), int(row), int(block)
+            if not (0 <= column < width and 0 <= row < self.ROWS):
+                raise ValueError('That place is outside the level.')
+            wanted[(column, row)] = block
+        if not wanted:
+            raise ValueError('Paint something first.')
+        found = self.single_blocks(level, set(wanted.values()))
+        missing = sorted({b for b in wanted.values() if b not in found})
+        if missing:
+            raise ValueError('The game has no object that puts block ' + ', '.join(f'{b:03X}' for b in missing) +
+                             ' by itself in this level, so ROMancer cannot place it exactly.')
+        data = bytearray(self.objects_data(level))
+        for (column, row), block in sorted(wanted.items(), key=lambda item: (item[0][0] // 16, item[0])):
+            data += bytes([column // 16, 0x00, 0x01])                  # screen jump ($0DA100 extended object 1)
+            data += self.object_bytes(*found[block], row, column % 16)
+        before = self.build(level)
+        # two more screen jumps leave the builder's screen ($1928) and its copy ($1BA1) as the level's own list left them
+        data += bytes([before[0x1BA1] & 0x1F, 0x00, 0x01, before[0x1928] & 0x1F, 0x00, 0x01, 0xFF])
+        at = self.free_space(len(data))
+        if at is None:
+            raise ValueError('There is no free space left in the cartridge for this level’s longer object list.')
+        pointer = lorom(self.LAYER1 + level * 3)
+        address = (at // 0x8000) << 16 | 0x8000 | at % 0x8000
+        writes = [(at + i, self.rom[at + i], v) for i, v in enumerate(data)]
+        writes += [(pointer + i, self.rom[pointer + i], v) for i, v in enumerate(address.to_bytes(3, 'little'))]
+        writes = [w for w in writes if w[1] != w[2]]
+        # check: the game's own builder must give exactly the asked blocks, and the rest of its RAM as it was (apart from
+        # its scratch bytes, its pointers into the object list and the stack)
+        after = self.build(level, {off: new for off, _, new in writes})
+        old_blocks, new_blocks = self.decoded(level, before), self.decoded(level, after)
+        expect = list(old_blocks)
+        for (column, row), block in wanted.items():
+            expect[row * width + column] = block
+        spots = [[*self.spot(level, column, row), block] for (column, row), block in sorted(wanted.items())]
+        places = {i for spot in spots for i in spot[:2]}
+        scratch = set(range(0x10)) | set(range(0x57, 0x5B)) | set(range(0x65, 0x70)) | set(range(0x100, 0x200))
+        others = [i for i in range(len(after)) if after[i] != before[i] and i not in places and i not in scratch]
+        if new_blocks != expect or others:
+            raise ValueError('The game would not build that exactly, so ROMancer did not change it.')
+        count = len(wanted)
+        title = f'Layout: {count} block{"s" if count > 1 else ""} in level {level:03X}'
+        return {'writes': writes, 'title': title,
+                'watch': {'kind': 'layout', 'list': self.list_address(level), 'level': level, 'spots': spots}}
+
     def shown(self, number: int) -> int:
         """The number the sprite slot gets ($02A97A): shells become the matching Koopa number."""
         return number - 0xDA + 4 if number in self.SHELLS else number
@@ -502,11 +1334,218 @@ class SuperMarioWorldProfile(SuperMarioWorld, Profile):
     def watcher(self, watch):
         if watch['kind'] == 'sprite':
             return _SmwSpriteWatcher(watch)
+        if watch['kind'] == 'layout':
+            return _SmwLayoutWatcher(watch)
         return _SmwRamWatcher(watch)
 
 
 
 # --------------------------------------------------------------------------------------------- Super Metroid
+
+# Super Metroid level data: the game's own decompressor ($80B0FF / $80B119) in Python, and a compressor that writes
+# only the command formats that decompressor reads.
+#
+# Command byte c ($FF ends the data):
+# * c >> 5 != 7: command = c & $E0, length = (c & $1F) + 1
+# * c >> 5 == 7 (long form): command = (c << 3) & $E0, length = ((c & 3) << 8 | next byte) + 1
+# Commands: $00 copy the next length bytes; $20 one byte, repeated; $40 two bytes a, b, written a b a b ... (length
+# bytes in all); $60 one byte, written counting up by one; $80 copy from an earlier place in the output (2-byte offset
+# from the start of the output, low byte first); $A0 the same with every byte inverted (EOR #$FF); $C0 copy from one
+# byte back distance before the current place (1 byte); $E0 the same inverted (only in the long form, c = $FC-$FE).
+# Copies go one byte at a time, so they may overlap what they are writing. Reading crosses into the next bank at
+# $8000 ($80B266), which is the next byte of a LoROM file.
+
+
+def _sm_decompress(rom: bytes, offset: int):
+    """(data, compressed length) of the compressed data at a ROM file offset."""
+    out = bytearray()
+    i = offset
+    while True:
+        c = rom[i]
+        i += 1
+        if c == 0xFF:
+            return bytes(out), i - offset
+        if c >> 5 == 7:
+            cmd = (c << 3) & 0xE0
+            length = ((c & 3) << 8 | rom[i]) + 1
+            i += 1
+        else:
+            cmd, length = c & 0xE0, (c & 0x1F) + 1
+        if cmd == 0x00:
+            out += rom[i:i + length]
+            i += length
+        elif cmd == 0x20:
+            out += bytes([rom[i]]) * length
+            i += 1
+        elif cmd == 0x40:
+            a, b = rom[i], rom[i + 1]
+            i += 2
+            out += (bytes([a, b]) * (length // 2 + 1))[:length]
+        elif cmd == 0x60:
+            v = rom[i]
+            i += 1
+            out += bytes((v + k) & 0xFF for k in range(length))
+        else:
+            if cmd < 0xC0:
+                src = rom[i] | rom[i + 1] << 8
+                i += 2
+            else:
+                src = len(out) - rom[i]
+                i += 1
+            invert = 0xFF if cmd & 0x20 else 0
+            for k in range(length):
+                out.append(out[src + k] ^ invert)
+
+
+def _sm_header(cmd: int, length: int) -> bytes:
+    """Command byte(s) for a command of length bytes (1..1024)."""
+    n = length - 1
+    if n < 32 and cmd != 0xE0:
+        return bytes([cmd | n])
+    return bytes([0xE0 | (cmd >> 3) | n >> 8, n & 0xFF])
+
+
+def _sm_hsize(cmd: int, length: int) -> int:
+    return 1 if length <= 32 and cmd != 0xE0 else 2
+
+
+_SM_MAX = 1024
+
+
+def _sm_lengths(k: int):
+    """Lengths worth trying for a fill or copy that could go k bytes: the short ones, the longest one header byte
+    can say, and the longest."""
+    return sorted({x for x in (2, 3, 4, min(k, 32), k) if 2 <= x <= k})
+
+
+def _sm_compress(data: bytes) -> bytes:
+    """Compressed bytes (ending in $FF) that decompress to exactly data. An optimal parse over the game's commands
+    (fills and copies of lengths 2-4, 32 and their longest, literals of any length)."""
+    data = bytes(data)
+    n = len(data)
+    inv = bytes(b ^ 0xFF for b in data)
+    INF = 1 << 60
+    cost = [INF] * (n + 1)
+    how = [None] * (n + 1)              # (start, cmd, length, argument bytes)
+    cost[0] = 0
+    chains: dict = {}                   # 3-byte key -> positions (latest last)
+
+    def extend(p, i, src, limit):
+        k = 0
+        while k + 16 <= limit and src[p + k:p + k + 16] == data[i + k:i + k + 16]:
+            k += 16
+        while k < limit and src[p + k] == data[i + k]:
+            k += 1
+        return k
+
+    def offer(i, j, c, step):
+        if c < cost[j]:
+            cost[j], how[j] = c, step
+
+    # literal runs: cost[j] = min over i in [j-1024, j-1] of cost[i] + header + (j - i); done lazily per position
+    from collections import deque
+    # how far each kind of fill could go from each place (counted from the end)
+    run1, run2, run3 = [1] * (n + 1), [1] * (n + 1), [1] * (n + 1)
+    for i in range(n - 2, -1, -1):
+        if data[i + 1] == data[i]:
+            run1[i] = run1[i + 1] + 1
+        if data[i + 1] == (data[i] + 1) & 0xFF:
+            run3[i] = run3[i + 1] + 1
+    tail = 0                            # places from i on where data[k + 2] == data[k]
+    for i in range(n - 1, -1, -1):
+        tail = tail + 1 if i + 2 < n and data[i + 2] == data[i] else 0
+        run2[i] = min(n - i, 2 + tail) if n - i >= 2 else 1
+    last: dict = {}
+    short, long_ = deque(), deque()     # (value cost[i]-i, i), increasing values
+    for i in range(n + 1):
+        # literals ending at i (from earlier starts)
+        if i > 0:
+            k = i - 1
+            v = cost[k] - k
+            while short and short[-1][0] >= v:
+                short.pop()
+            short.append((v, k))
+            while short and short[0][1] < i - 32:
+                moved = short.popleft()
+                while long_ and long_[-1][0] >= moved[0]:
+                    long_.pop()
+                long_.append(moved)
+            while long_ and long_[0][1] < i - _SM_MAX:
+                long_.popleft()
+            if short:
+                v, k = short[0]
+                offer(k, i, v + i + 1, (k, 0x00, i - k, None))
+            if long_:
+                v, k = long_[0]
+                offer(k, i, v + i + 2, (k, 0x00, i - k, None))
+        if i == n:
+            break
+        base = cost[i]
+        left = min(_SM_MAX, n - i)
+        b = data[i]
+        r, r2, r3 = min(run1[i], left), min(run2[i], left), min(run3[i], left)
+        for cmd, run, extra in ((0x20, r, 1), (0x40, r2, 2), (0x60, r3, 1)):
+            if run < 2:
+                continue
+            arg = bytes([b]) if extra == 1 else data[i:i + 2]
+            for length in _sm_lengths(run):
+                offer(i, i + length, base + _sm_hsize(cmd, length) + extra, (i, cmd, length, arg))
+        # copies
+        if left >= 3:
+            key = data[i:i + 3]
+            best = {}
+            for src, cmd_abs, cmd_rel in ((data, 0x80, 0xC0), (inv, 0xA0, 0xE0)):
+                carried = last.get(cmd_abs)
+                if carried and carried[0] > 64:         # still inside a long copy: the same source one byte on
+                    far = near = (min(carried[0] - 1, left), carried[1] + 1)
+                    if i - near[1] > 255:
+                        near = last.get(cmd_rel, (0, 0))
+                        near = (min(near[0] - 1, left), near[1] + 1) if near[0] > 2 else (0, 0)
+                    best[cmd_abs] = far
+                    if near[0] >= 2:
+                        best[cmd_rel] = near
+                    continue
+                positions = chains.get(('i' if src is inv else 'd', key))
+                if not positions:
+                    continue
+                far = near = (0, 0)
+                for count, p in enumerate(reversed(positions)):
+                    if count >= 24:
+                        break
+                    k = extend(p, i, src, left)
+                    if k > far[0]:
+                        far = (k, p)
+                    if i - p <= 255 and k > near[0]:
+                        near = (k, p)
+                if far[0] >= 3:
+                    best[cmd_abs] = far
+                if near[0] >= 2:
+                    best[cmd_rel] = near
+            last = dict(best)
+            for cmd, (k, p) in best.items():
+                if cmd == 0xE0:
+                    k = min(k, 768)         # a long-form $E0 of 769 or more would be the end byte $FF
+                arg = bytes([p & 0xFF, p >> 8]) if cmd < 0xC0 else bytes([i - p])
+                for length in _sm_lengths(k):
+                    offer(i, i + length, base + _sm_hsize(cmd, length) + len(arg), (i, cmd, length, arg))
+        # index this position: by its own bytes (for plain copies) and by its inverted bytes (for inverted copies)
+        if i + 3 <= n:
+            chains.setdefault(('d', data[i:i + 3]), []).append(i)
+            chains.setdefault(('i', inv[i:i + 3]), []).append(i)
+    # walk back
+    steps = []
+    j = n
+    while j > 0:
+        step = how[j]
+        steps.append(step)
+        j = step[0]
+    out = bytearray()
+    for start, cmd, length, arg in reversed(steps):
+        out += _sm_header(cmd, length)
+        out += data[start:start + length] if cmd == 0x00 else arg
+    out.append(0xFF)
+    return bytes(out)
+
 
 class SuperMetroid:
     """Super Metroid (Japan, USA). Room header (bank $8F): +1 area, +4 width, +5 height (screens), +9 door list,
@@ -651,6 +1690,39 @@ class SuperMetroid:
                 raise ValueError('This enemy list runs into another room’s list, so ROMancer cannot shorten it safely.')
         return writes
 
+    # ---- the layout: the room's level data, compressed ($80B119)
+    def level_pointer(self, state: int) -> int:
+        """CPU address of a room state's compressed level data (state +0, 3 bytes)."""
+        return self.w(0x8F0000 | state) | self.b(0x8F0000 | state + 2) << 16
+
+    def level_data(self, state: int):
+        """(decompressed level data, compressed length) of a room state."""
+        key = ('level', self.level_pointer(state))
+        if key not in self._cache:
+            self._cache[key] = _sm_decompress(self.rom, lorom(self.level_pointer(state)))
+        return self._cache[key]
+
+    def level_users(self, state: int) -> list:
+        """Every (room, state) whose level data is the same as this state's."""
+        pointer = self.level_pointer(state)
+        return sorted({(r, s) for r in self.rooms() for s in self.states(r) if self.level_pointer(s) == pointer})
+
+    def room_blocks(self, room: int) -> tuple:
+        return self.b(0x8F0000 | room + 4) * 16, self.b(0x8F0000 | room + 5) * 16
+
+    def free_space(self, size: int, first_bank: int):
+        """A ROM offset with room for size bytes in a run of $FF that fills the end of a bank (padding nothing reads),
+        16 bytes after the run starts; the level data's own bank is tried first, then the others from the last one down."""
+        banks = len(self.rom) // 0x8000
+        for bank in [first_bank] + list(range(banks - 1, -1, -1)):
+            end = (bank + 1) * 0x8000
+            start = end
+            while start > bank * 0x8000 and self.rom[start - 1] == 0xFF:
+                start -= 1
+            if start + 16 + size <= end:
+                return start + 16
+        return None
+
 
 def _word(ram, address):
     return ram[address] | ram[address + 1] << 8
@@ -712,6 +1784,31 @@ class _SmItemWatcher(Watcher):
         ok = self.seen == w['id']
         return {'state': 'good' if ok else 'bad', 'text': f'Played from the start, the room loads with {w["name"]} at that spot.' if ok
                 else f'Played from the start, the room loads with object {self.seen:#06x} at that spot, not the one chosen.'}
+
+
+class _SmLayoutWatcher(Watcher):
+    """A layout change: when the room has loaded, the game's decompressed level data in RAM must hold the chosen blocks:
+    the layer 1 word at $7F0002 + block * 2 and the BTS byte at $7F6402 + block."""
+
+    def __init__(self, watch):
+        self.w = watch
+        self.seen = None
+
+    def see(self, ram, frame, run):
+        w = self.w
+        if _word(ram, 0x998) != 8 or _word(ram, 0x79B) != w['room'] or _word(ram, 0x7BB) != w['state']:
+            return False
+        self.seen = [_word(ram, 0x10002 + i * 2) | ram[0x16402 + i] << 16 for i, _ in w['spots']]
+        return True
+
+    def result(self):
+        if self.seen is None:
+            return super().result()
+        wrong = [(got, spot[1]) for got, spot in zip(self.seen, self.w['spots']) if got != spot[1]]
+        if not wrong:
+            return {'state': 'good', 'text': 'Played from the start, the room loads with the new blocks in place.'}
+        got, want = wrong[0]
+        return {'state': 'bad', 'text': f'Played from the start, the room loads with block {got:06X} where {want:06X} should be.'}
 
 
 class SuperMetroidProfile(SuperMetroid, Profile):
@@ -807,7 +1904,71 @@ class SuperMetroidProfile(SuperMetroid, Profile):
                     'watch': {**base, 'kind': 'item', 'id': new, 'x': o['x'], 'y': o['y'], 'name': self.item_name(new)}}
         raise ValueError('ROMancer cannot change that yet.')
 
+    def packed_layout(self, part):
+        room, state = int(part['room']), int(part['state'])
+        width, height = self.room_blocks(room)
+        data, _ = self.level_data(state)
+        size = data[0] | data[1] << 8
+        if not width or size != width * height * 2 or len(data) < 2 + size + size // 2:
+            return None
+        bts = data[2 + size:]
+        blocks = [data[2 + i * 2] | data[3 + i * 2] << 8 | bts[i] << 16 for i in range(width * height)]
+        return {'size': 16, 'width': width, 'height': height, 'blocks': blocks, 'left': 0, 'top': 0}
+
+    def set_packed_layout(self, part, changes):
+        """Blocks are the layer 1 word (block number, flips and block type) with the BTS byte in bits 16-23. The level
+        data is changed, compressed again in the game's own format, and written where it was when it fits and no other
+        room uses it; otherwise it goes to free space and this room's states that used it point at the new copy."""
+        room, state = int(part['room']), int(part['state'])
+        grid = self.packed_layout(part)
+        if grid is None:
+            raise ValueError('ROMancer cannot read the layout of this room.')
+        width, height = grid['width'], grid['height']
+        data, old_length = self.level_data(state)
+        new = bytearray(data)
+        size = data[0] | data[1] << 8
+        wanted = {}
+        for column, row, block in changes:
+            column, row, block = int(column), int(row), int(block)
+            if not (0 <= column < width and 0 <= row < height):
+                raise ValueError('That place is outside the room.')
+            if not 0 <= block <= 0xFFFFFF:
+                raise ValueError('That is not one of the game’s blocks.')
+            i = row * width + column
+            wanted[i] = block
+            new[2 + i * 2], new[3 + i * 2], new[2 + size + i] = block & 0xFF, block >> 8 & 0xFF, block >> 16
+        if not wanted:
+            raise ValueError('Paint something first.')
+        packed = _sm_compress(bytes(new))
+        if _sm_decompress(packed, 0) != (bytes(new), len(packed)):
+            raise ValueError('ROMancer could not pack this room again exactly, so it did not change it.')
+        pointer = self.level_pointer(state)
+        users = self.level_users(state)
+        here = [s for r, s in users if r == room]
+        start = lorom(pointer)
+        if all(r == room for r, _ in users) and len(packed) <= old_length:
+            writes = [(start + i, self.rom[start + i], v) for i, v in enumerate(packed) if self.rom[start + i] != v]
+            moved = False
+        else:
+            at = self.free_space(len(packed), start // 0x8000)
+            if at is None:
+                raise ValueError('There is no free space left in the cartridge for this room’s level data.')
+            address = 0x800000 | (at // 0x8000) << 16 | 0x8000 | at % 0x8000
+            writes = [(at + i, self.rom[at + i], v) for i, v in enumerate(packed)]
+            for s in sorted(set(here)):
+                o = lorom(0x8F0000 | s)
+                writes += [(o + i, self.rom[o + i], v) for i, v in enumerate(address.to_bytes(3, 'little'))]
+            writes = [w for w in writes if w[1] != w[2]]
+            moved = True
+        count = len(wanted)
+        title = f'Layout: {count} block{"s" if count > 1 else ""} in room {room:04X}'
+        return {'writes': writes, 'title': title,
+                'watch': {'kind': 'layout', 'room': room, 'state': state, 'moved': moved,
+                          'spots': [[i, block] for i, block in sorted(wanted.items())]}}
+
     def watcher(self, watch):
+        if watch['kind'] == 'layout':
+            return _SmLayoutWatcher(watch)
         return _SmEnemyWatcher(watch) if watch['kind'] == 'enemy' else _SmItemWatcher(watch)
 
 

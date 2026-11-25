@@ -12,12 +12,22 @@ The interface every profile gives (see Profile):
   part), 'style' ('enemy', 'item', 'secret' or 'block': how the map draws it), 'type' (for pictures), 'x', 'y' (the
   part's pixels, the object's bottom middle), 'name', optional 'detail' ("drops a dagger"), 'note', 'fields'
   ([{'key', 'label', 'value', 'choices'}], choices being a list of {'value', 'name'} or the name of a shared list in
-  choices()) and 'remove' (the label of a remove button, or None)
+  choices()), 'remove' (the label of a remove button, or None) and optional 'does': one short plain sentence on what
+  it does in the game, from watching it ("Walks toward you and jumps over gaps.")
 * choices() -> {name: [{'value', 'name'}]}: lists that many objects share
 * edit(part, object id, values, remove) -> {'writes': [(offset, old, new)], 'title', 'watch'}
 * watcher(watch) -> Watcher: looks at the replayed game and says whether the change happened
 * tile_role(tile) -> 'solid', 'breakable', 'open', or None when the profile has no block roles
 * screens(part) -> {'count', 'most'} or None, and resize(part, at, delta) -> {'writes', 'notes', 'watch'}
+* addable(part) -> [{'kind', 'name', 'fields'}]: what can be added to that part ([] when nothing can), and
+  add(part, kind, x, y, values) -> {'writes', 'title', 'watch'}: put a new one at the part's pixel x, y (its bottom
+  middle, rounded the way the game stores places). Only kinds the part can draw are offered; the game's own tables
+  must have room, or add() says why not
+* packed_layout(part) -> {'size', 'width', 'height', 'blocks', 'left', 'top'} or None: the part's layout as the game stores
+  it when it is packed (compressed or built from chunks), so the general painter cannot change it: blocks of 'size'
+  pixels, 'width' by 'height' of them row by row, block 0, 0 at the part's pixel 'left', 'top'; and
+  set_packed_layout(part, changes [(column, row, block)]) -> {'writes', 'title', 'watch'}: put those blocks there and pack
+  the layout again (it must fit where it was, or be moved to free space with its pointer fixed; otherwise say why not)
 """
 from __future__ import annotations
 
@@ -72,6 +82,18 @@ class Profile:
     def resize(self, part: dict, at: int, delta: int) -> dict:
         raise ValueError('ROMancer cannot change the length of this game’s levels yet.')
 
+    def addable(self, part: dict) -> list:
+        return []
+
+    def add(self, part: dict, kind: str, x: int, y: int, values: dict) -> dict:
+        raise ValueError('ROMancer cannot add new things to this game’s levels yet.')
+
+    def packed_layout(self, part: dict):
+        return None
+
+    def set_packed_layout(self, part: dict, changes: list) -> dict:
+        raise ValueError('ROMancer cannot change the layout of this game’s levels yet.')
+
     # helpers
     def find(self, part: dict, object_id: str) -> dict:
         found = next((o for o in self.objects(part) if o['id'] == object_id), None)
@@ -105,7 +127,7 @@ def ram_of(snapshot):
 
 
 # one module per game (or family of games that share an engine); each has PROFILES = [classes]
-GAMES = ['capcom_disney', 'castlevania', 'castlevania23', 'gb_adventure', 'mario_land', 'megadrive_sonic', 'megaman', 'metroid', 'ninjagaiden', 'smb1', 'smb2', 'smb3', 'sms_classics', 'snes_classics', 'zelda']
+GAMES = ['adventure_island', 'capcom_disney', 'capcom_disney2', 'castlevania', 'castlevania23', 'contra', 'gb_adventure', 'gbc_more', 'mario_land', 'megadrive_sonic', 'megaman', 'megaman6', 'metroid', 'ninjagaiden', 'smb1', 'smb2', 'smb3', 'sms_classics', 'snes_classics', 'snes_more', 'wonderboy3', 'zelda']
 
 
 def _registry():

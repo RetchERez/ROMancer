@@ -17,6 +17,8 @@ from __future__ import annotations
 import hashlib
 import io
 import json
+import zlib
+import base64
 import os
 import threading
 import time
@@ -35,6 +37,18 @@ MAX_LEVELS = 24
 MAX_PLANES = 3
 MIN_PLANE_CELLS = 200
 MAX_LEVEL_CELLS = 256       # places painted in one change
+
+
+def map_label(item: dict) -> str:
+    """The short name drawn on a map: what it is, and what it holds or where it leads in brackets (the same rule as
+    mapLabel in ui/level_map.js). Notes about where or how stay out."""
+    import re
+    found = re.match(r'^(holds|drops|gives|sells|contains|opens the|leads to)\s+(?:an?\s+)?(.+)$', item.get('detail') or '', re.I)
+    if not found:
+        return item['name']
+    verb, what = found.group(1).lower(), found.group(2)
+    shown = '→ ' + what[:1].upper() + what[1:] if verb == 'leads to' else 'opens ' + what if verb == 'opens the' else what[:1].upper() + what[1:]
+    return f"{item['name']} [{shown}]"
 
 
 class _Same(Exception):
@@ -88,23 +102,34 @@ class LevelTools:
                             'pixel_height': level['planes'][0]['height'] * level['planes'][0]['px']} for level in self.levels],
                 'level_limit': MAX_LEVELS,
                 'level_recording': {'name': self.level_rec['name'], 'captures': len(self.level_rec['scene_ids']),
-                                    'limit': MAX_LEVEL_CAPTURES} if self.level_rec else None,
+                                    'limit': MAX_LEVEL_CAPTURES, 'extends': self.level_rec.get('extends'),
+                                    'added': len(self.level_rec['scene_ids']) - self.level_rec.get('had', 0)} if self.level_rec else None,
                 'level_job': dict(self.level_job) if self.level_job else None}
 
     # ---- recording
 
-    def level_start(self, name: str = '') -> dict:
-        """Begin keeping captures of the live game as it is played; level_stop puts the map together."""
+    def level_start(self, name: str = '', extend: str = None) -> dict:
+        """Begin keeping captures of the live game as it is played; level_stop puts the map together. With extend (a
+        level id), the new captures are added to that map: play through the parts it is missing, and the map is put
+        together again from everything."""
         self._require_core()
         with self.lock:
             if self.level_job and self.level_job['state'] == 'running':
                 raise ValueError('ROMancer is still putting the last level map together. Wait for it to finish.')
             if self.level_rec:
                 return self.summary()
-            if len(self.levels) >= MAX_LEVELS:
-                raise ValueError(f'This game already has {MAX_LEVELS} level maps. Remove one before recording another.')
             if not (self._host and self._host[0].is_alive()):
                 raise ValueError('Play the game to the start of the level first, then start recording the level.')
+            if extend:
+                level = self._level(extend)
+                if any(c.get('level', {}).get('id') == extend for c in self._active()):
+                    raise ValueError('A pending change was made on this level map. Keep or undo it before adding to the map.')
+                self.level_rec = {'id': uuid.uuid4().hex[:16], 'name': level['name'], 'scene_ids': list(level['scene_ids']),
+                                  'extends': extend, 'had': len(level['scene_ids'])}
+                self.level_job = None
+                return self.summary()
+            if len(self.levels) >= MAX_LEVELS:
+                raise ValueError(f'This game already has {MAX_LEVELS} level maps. Remove one before recording another.')
             number = len(self.levels) + 1
             self.level_rec = {'id': uuid.uuid4().hex[:16], 'name': str(name).strip()[:60] or f'Level map {number}', 'scene_ids': []}
             self.level_job = None
@@ -182,6 +207,105 @@ class LevelTools:
             thread.join()
         return self.summary()
 
+    # ---- a map's walk as a file: the inputs exactly as they were played, so the map and its checks can be made again
+
+    WALK_FORMAT = 'romancer-walk/1'
+
+    def level_walk_file(self, level_id: str) -> dict:
+        """The recorded walks of a map as a small file: for each walk, the inputs from power on to the end of the map and
+        where the map starts. Anyone with the same ROM can open it and get the same map."""
+        from array import array
+        with self.lock:
+            level = self._level(level_id)
+            walks = {}
+            for sid in level['scene_ids']:
+                meta = self.meta[sid]
+                walks.setdefault(meta['run'], []).append(meta['frame'])
+            out = []
+            for run, frames in walks.items():
+                inputs = array('H')
+                inputs.frombytes((self.store / 'runs' / run / 'inputs.bin').read_bytes())
+                end = min(len(inputs), max(frames) + 60)
+                out.append({'start': max(0, min(frames) - 30), 'end': end,
+                            'inputs': base64.b64encode(zlib.compress(inputs[:end].tobytes(), 9)).decode()})
+            name = ''.join(ch if ch.isalnum() else '-' for ch in level['name']).strip('-').lower() or 'level'
+            text = json.dumps({'format': self.WALK_FORMAT, 'rom_sha256': self.rom_sha, 'name': level['name'], 'walks': out})
+            return {'name': f'{name}.romancer-walk', 'text': text}
+
+    def level_walk_open(self, text: str) -> dict:
+        """Play a saved walk back from power on and put its map together, as if it had been played here."""
+        from array import array
+        try:
+            data = json.loads(text)
+        except ValueError:
+            raise ValueError('That is not a ROMancer walk file.')
+        if not isinstance(data, dict) or data.get('format') != self.WALK_FORMAT or not data.get('walks'):
+            raise ValueError('That is not a ROMancer walk file.')
+        if data.get('rom_sha256') != self.rom_sha:
+            raise ValueError('That walk was recorded on a different ROM. Open it with the same exact ROM it was recorded on.')
+        walks = []
+        for walk in data['walks'][:4]:
+            inputs = array('H')
+            try:
+                inputs.frombytes(zlib.decompress(base64.b64decode(walk['inputs'])))
+                start, end = int(walk['start']), int(walk['end'])
+            except (ValueError, KeyError, TypeError, zlib.error):
+                raise ValueError('That walk file is damaged.')
+            if not 0 <= start < end <= len(inputs) or end > 600_000:
+                raise ValueError('That walk file is damaged.')
+            walks.append((inputs, start, end))
+        self._require_core()
+        name = str(data.get('name') or 'Opened walk')[:60]
+        with self.lock:
+            if self.level_rec or (self.level_job and self.level_job['state'] == 'running'):
+                raise ValueError('A level map is being recorded or put together. Wait for it to finish.')
+            if len(self.levels) >= MAX_LEVELS:
+                raise ValueError(f'This game already has {MAX_LEVELS} level maps. Remove one before opening a walk.')
+            total = sum(end - start for _, start, end in walks)
+            self.level_job = {'state': 'running', 'done': 0, 'total': total, 'message': 'Playing the saved walk…', 'level_id': None}
+        threading.Thread(target=self._walk_worker, args=(walks, name), name='romancer-walk', daemon=True).start()
+        return self.summary()
+
+    def _walk_worker(self, walks, name: str) -> None:
+        job = self.level_job
+        level_id = None
+        try:
+            for inputs, start, end in walks:
+                with self.host_lock:
+                    self._drop_host()
+                    (self.store / 'current_run').write_text(uuid.uuid4().hex)      # a fresh run from power on
+                    self._start_host()
+                    conn = self._host[1]
+                    frame = self.live.get('frame') or 0
+                    for at in range(frame, start, 600):
+                        conn.send(('advance', inputs[at:min(start, at + 600)].tobytes(), ''))
+                        frame = self._receive()[1]
+                    with self.lock:
+                        if level_id is None:
+                            self.level_rec = {'id': uuid.uuid4().hex[:16], 'name': name, 'scene_ids': []}
+                        else:
+                            level = self._level(level_id)
+                            self.level_rec = {'id': uuid.uuid4().hex[:16], 'name': level['name'], 'scene_ids': list(level['scene_ids']),
+                                              'extends': level_id, 'had': len(level['scene_ids'])}
+                    for at in range(start, end, 600):
+                        conn.send(('walk', inputs[at:min(end, at + 600)].tobytes(), name))
+                        _, frame, metas = self._receive()
+                        self.live['frame'] = frame
+                        self._level_captured(metas)
+                        job['done'] += min(end, at + 600) - at
+                with self.lock:
+                    rec, self.level_rec = self.level_rec, None
+                self._level_build(rec)
+                if job['state'] != 'finished':
+                    return
+                level_id = job['level_id']
+                job['state'] = 'running'
+            job.update(state='finished', message=f'{name} is ready, made from the saved walk.')
+        except (RuntimeError, ValueError, OSError) as error:
+            with self.lock:
+                self.level_rec = None
+            job.update(state='failed', message=f'The walk could not be played: {error}')
+
     def _level_frames(self, scene_ids, job=None) -> list:
         frames = []
         for number, scene_id in enumerate(scene_ids):
@@ -236,14 +360,21 @@ class LevelTools:
                     'windows': {str(n): [w.section, w.across, w.down, w.first, w.last] for n, w in plane.windows.items()},
                     'cells': [[c - left, r - top, s.frame, s.layer, s.x, s.y, status[(c, r)]] for (c, r), s in sorted(plane.cells.items())]})
             with self.lock:
+                old = next((other for other in self.levels if other['id'] == rec.get('extends')), None)
+                if old is not None:         # the map it adds to is replaced by the one put together from everything
+                    level['created'] = old.get('created', level['created'])
+                    self._drop_level(old)
                 self._level_save(level)
                 self.levels.append(level)
-                drop = [sid for sid in ids if sid not in level['scene_ids']]
+                self.levels.sort(key=lambda other: other.get('created', 0))
+                others = {sid for other in self.levels for sid in other['scene_ids']}
+                drop = [sid for sid in ids if sid not in others]
             self._forget_many(drop)
             job.update(state='finished', level_id=level['id'], message=f"{level['name']} is ready: "
                        f"{level['planes'][0]['width']} by {level['planes'][0]['height']} cells from {len(kept)} captures.")
         except (ValueError, OSError, KeyError) as error:
-            self._forget_many([sid for sid in rec['scene_ids'] if sid in self.scenes])
+            others = {sid for other in self.levels for sid in other['scene_ids']}     # a map being added to keeps its own
+            self._forget_many([sid for sid in rec['scene_ids'] if sid in self.scenes and sid not in others])
             job.update(state='failed', message=str(error))
 
     def _level_blocks(self, plane, kept, left: int, top: int):
@@ -312,13 +443,18 @@ class LevelTools:
             level = self._level(level_id)
             if any(c.get('level', {}).get('id') == level_id for c in self._active()):
                 raise ValueError('A pending change was made on this level map. Undo that change first.')
-            self.levels.remove(level)
-            self._level_cache.pop(level_id, None)
-            for path in (self.store / 'levels').glob(level_id + '*'):
-                path.unlink(missing_ok=True)
+            self._drop_level(level)
             others = {sid for other in self.levels for sid in other['scene_ids']}
         self._forget_many([sid for sid in level['scene_ids'] if sid not in others])
         return self.summary()
+
+    def _drop_level(self, level: dict) -> None:
+        """Take a map out of the store (its captures stay; the lock is held)."""
+        self.levels.remove(level)
+        for key in [k for k in self._level_cache if k == level['id'] or (isinstance(k, tuple) and k[0] == level['id'])]:
+            self._level_cache.pop(key, None)
+        for path in (self.store / 'levels').glob(level['id'] + '*'):
+            path.unlink(missing_ok=True)
 
     # ---- the map
 
@@ -375,7 +511,14 @@ class LevelTools:
                 # memory but that shows somewhere else is said plainly.
                 differ = self._level_changed(level_id, number, after.rsplit(':', 1)[1])
                 unshown = sum(1 for place in shown['level']['places'] if tuple(place) not in differ)
+            layout = self._layout_grid(level) if number == 0 else None
+            if layout:                      # a packed layout the profile can change: its places are not locked
+                for place in layout['cells']:
+                    at = place[1] * width + place[0]
+                    if 0 <= at < len(status) and status[at] == 'u':
+                        status[at] = 'p'
             return {'id': level_id, 'name': level['name'], 'plane': number, 'unshown': unshown,
+                    'layout': {k: layout[k] for k in ('width', 'height', 'left', 'top')} if layout else None,
                     'planes': [{'index': k, 'name': p['name'], 'width': p['width'], 'height': p['height'], 'cell': p['px']}
                                for k, p in enumerate(level['planes'])],
                     'width': width, 'height': height, 'cell': stored['px'], 'sections': stored['sections'], 'blocks': stored.get('blocks'),
@@ -422,6 +565,77 @@ class LevelTools:
             raise ValueError('That part of the level is not on this map.')
         return profile, next(p for p in parts if p['part'] == part)
 
+    def _layout_grid(self, level: dict):
+        """Where the blocks of every packed layout the profile knows sit on the first map: {'width', 'height', 'left',
+        'top'} (one block in map cells, and where the grid starts) and 'cells': {(column, row): (part, block column,
+        block row)}; None when the game has no such layout."""
+        try:
+            context = self._profile_context(level)
+        except Exception:
+            return None
+        if context is None:
+            return None
+        profile, parts = context
+        px = level['planes'][0]['px']
+        plane = self._level_plane(level, 0)
+        out = None
+        for part in parts:
+            grid = profile.packed_layout(part['part'])
+            if not grid or grid['size'] % px:
+                continue
+            cells = grid['size'] // px
+            left, top = part['dx'] + grid.get('left', 0), part['dy'] + grid.get('top', 0)
+            if out is None:
+                out = {'width': cells, 'height': cells, 'left': (left // px) % cells, 'top': (top // px) % cells, 'cells': {}}
+            for (column, row), spot in plane.cells.items():
+                window = plane.windows.get(spot.frame)
+                if window is None or window.section != part['section']:
+                    continue
+                bx, by = (column * px - left) // grid['size'], (row * px - top) // grid['size']
+                if 0 <= bx < grid['width'] and 0 <= by < grid['height']:
+                    out['cells'][(column, row)] = (part['part'], bx, by)
+        return out
+
+    def propose_level_layout(self, level_id: str, cells) -> dict:
+        """Copy whole blocks of a packed layout from one place on the first map to others ([{'col', 'row', 'from'}]);
+        the profile packs the layout again, and the change is checked by replaying the recorded walk."""
+        with self.lock:
+            level = self._level(level_id)
+            grid = self._layout_grid(level)
+            if not grid:
+                raise ValueError('ROMancer cannot change the layout of this level yet.')
+            profile, _ = self._profile_context(level)
+            wanted: dict = {}
+            places = []
+            part = None
+            for item in cells:
+                here, there = (int(item['col']), int(item['row'])), (int(item['from'][0]), int(item['from'][1]))
+                target, source = grid['cells'].get(here), grid['cells'].get(there)
+                if target is None or source is None:
+                    raise ValueError('No capture showed that part of the level, so it cannot be painted.')
+                if target[0] != source[0] or (part is not None and target[0] != part):
+                    raise ValueError('Copy blocks within one part of the level at a time.')
+                part = target[0]
+                layout = profile.packed_layout(part)
+                wanted.setdefault((target[1], target[2]), layout['blocks'][source[2] * layout['width'] + source[1]])
+                places.append(list(here))
+            if part is None:
+                raise ValueError('Paint something first.')
+            layout = profile.packed_layout(part)
+            changes = [(bx, by, block) for (bx, by), block in sorted(wanted.items())
+                       if layout['blocks'][by * layout['width'] + bx] != block]
+            if not changes:
+                raise ValueError('Those places already look like that. Paint a different picture first.')
+            plan = profile.set_packed_layout(part, changes)
+            change = self.propose_writes(level['scene_ids'][0], plan['writes'], plan['title'], kind='level-object')
+            stored = self._find(change['id'])
+            stored['level'] = {'id': level_id, 'plane': 0, 'places': places, 'name': level['name']}
+            stored['object_check'] = {'state': 'working', 'text': 'Playing the game from the start to see the new blocks…'}
+            watch = plan['watch']
+            watcher = lambda: profile.watcher(watch)
+        threading.Thread(target=self._watch_change, args=(stored, level, watcher), name='romancer-layout-check', daemon=True).start()
+        return self.change(change['id'])
+
     def level_objects(self, level_id: str) -> dict:
         """Everything the game's profile knows in the level, placed on the map, and what each map place is (solid,
         breakable, open) when the profile knows block roles."""
@@ -438,7 +652,9 @@ class LevelTools:
                 for item in profile.objects(part['part']):
                     x, y = item['x'] + part['dx'], item['y'] + part['dy']
                     if part['left'] - px <= x < part['right'] + px:
-                        objects.append({**item, 'map_x': x, 'map_y': y, 'part': part['part']})
+                        mine = [{'id': c['id'], 'title': c['title']} for c in self._active()
+                                if c.get('object') and c['object']['part'] == part['part'] and c['object']['id'] == item['id']]
+                        objects.append({**item, 'map_x': x, 'map_y': y, 'part': part['part'], 'changes': mine})
             roles = ''
             if profile.tile_role(0) is not None:
                 cells = ['.'] * (stored['width'] * stored['height'])
@@ -452,7 +668,8 @@ class LevelTools:
             self._object_pictures(level, [o for o in objects if o['style'] in ('enemy', 'item')])
             return {'profile': profile.name, 'parts': [{k: part[k] for k in ('section', 'part', 'name')} for part in parts],
                     'objects': objects, 'roles': roles, 'choices': profile.choices(),
-                    'resizable': any(profile.screens(part['part']) for part in parts)}
+                    'resizable': any(profile.screens(part['part']) for part in parts),
+                    'addable': any(profile.addable(part['part']) for part in parts)}
 
     def _object_pictures(self, level: dict, objects: list) -> None:
         """Give each object the picture the game draws for it: from a capture that shows that spot, the pixels where the
@@ -529,8 +746,53 @@ class LevelTools:
                 raise ValueError('That is how the game already has it.')
             change = self.propose_writes(level['scene_ids'][0], plan['writes'], plan['title'], kind='level-object')
             stored = self._find(change['id'])
+            stored['object'] = {'level': level_id, 'part': part, 'id': str(object_id)}
             stored['object_check'] = {'state': 'working', 'text': 'Playing the game from the start to see the change happen…'}
-            watcher = profile.watcher(plan['watch'])
+            watch = plan['watch']
+            watcher = lambda: profile.watcher(watch)
+        threading.Thread(target=self._watch_change, args=(stored, level, watcher), name='romancer-object-check', daemon=True).start()
+        return self.change(change['id'])
+
+    def _part_at(self, parts: list, x: float) -> dict:
+        return min(parts, key=lambda p: 0 if p['left'] <= x < p['right'] else min(abs(x - p['left']), abs(x - p['right'])))
+
+    def level_add_at(self, level_id: str, x: float, y: float) -> dict:
+        """What can be added at a map spot: the part of the game it is in, the spot in that part's pixels, and the
+        kinds the profile offers there."""
+        with self.lock:
+            level = self._level(level_id)
+            context = self._profile_context(level)
+            if context is None:
+                raise ValueError('ROMancer does not know the objects of this game yet.')
+            profile, parts = context
+            part = self._part_at(parts, float(x))
+            options = profile.addable(part['part'])
+            if not options:
+                raise ValueError('ROMancer cannot add new things to this part of the level yet.')
+            return {'part': part['part'], 'name': part['name'], 'x': int(round(float(x) - part['dx'])),
+                    'y': int(round(float(y) - part['dy'])), 'map_x': float(x), 'map_y': float(y),
+                    'options': options, 'choices': profile.choices()}
+
+    def propose_level_add(self, level_id: str, part: dict, kind: str, x: int, y: int, values: dict = None) -> dict:
+        """Add a new enemy, item or secret at a spot in a part of the level, checked by replaying the recorded walk."""
+        with self.lock:
+            level = self._level(level_id)
+            profile, _ = self._profile_part(level, part)
+            option = next((o for o in profile.addable(part) if o['kind'] == kind), None)
+            if option is None:
+                raise ValueError('That cannot be added here.')
+            values = dict(values or {})
+            for field in option.get('fields', []):
+                if field['key'] in values:
+                    values[field['key']] = profile.pick(field, profile.choices(), values[field['key']])['value']
+            plan = profile.add(part, kind, int(x), int(y), values)
+            if not plan['writes']:
+                raise ValueError('That is how the game already has it.')
+            change = self.propose_writes(level['scene_ids'][0], plan['writes'], plan['title'], kind='level-object')
+            stored = self._find(change['id'])
+            stored['object_check'] = {'state': 'working', 'text': 'Playing the game from the start to see the new one appear…'}
+            watch = plan['watch']
+            watcher = lambda: profile.watcher(watch)
         threading.Thread(target=self._watch_change, args=(stored, level, watcher), name='romancer-object-check', daemon=True).start()
         return self.change(change['id'])
 
@@ -541,39 +803,50 @@ class LevelTools:
         import zlib
         from . import edit_session as es
         from .level_profiles import ram_of
+        make = watcher if callable(watcher) and not hasattr(watcher, 'see') else (lambda: watcher)
+        firsts = {}             # one walk per recording that went into the map (a map can be added to)
+        for sid in level['scene_ids']:
+            firsts.setdefault(self.meta[sid]['run'], sid)
+        result = None
+        path = self.store / 'work' / f'watch-{change["id"]}.bin'
         try:
-            meta = self.meta[level['scene_ids'][0]]
-            run_dir = self.store / 'runs' / meta['run']
-            inputs = array('H')
-            inputs.frombytes((run_dir / 'inputs.bin').read_bytes())
-            start = min(meta['checkpoints'])
-            state = zlib.decompress((run_dir / f'{start}.st').read_bytes())
-            end = len(inputs) if watcher.compare else min(len(inputs), max(self.meta[s]['frame'] for s in level['scene_ids']) + 120)
-            path = self.store / 'work' / f'watch-{change["id"]}.bin'
             path.parent.mkdir(parents=True, exist_ok=True)
             path.write_bytes(self._rom_with([change]))
-            runs = ([('original', self.rom_path)] if watcher.compare else []) + [('changed', path)]
-            for run, rom_path in runs:
-                fe = es._frontend(self._cfg(), rom_path)
-                try:
-                    if int(fe.lib.retro_serialize_size()) <= 0:
-                        fe.run_frame([])
-                    fe.unserialize(state)
-                    session = es._Session(fe, checkpoint_every=10 ** 9)
-                    session.frame = start
-                    frame = start
-                    while frame < end:
-                        session.run(watcher.every, lambda f: es._names(inputs[f]) if f < len(inputs) else ())
-                        frame += watcher.every
-                        ram = ram_of(session.snapshot())
-                        if ram is not None and watcher.see(ram, frame, run):
-                            break
-                finally:
-                    es._close(fe)
-            path.unlink(missing_ok=True)
-            result = watcher.result()
+            for walk, first in firsts.items():
+                watcher_now = make()
+                meta = self.meta[first]
+                run_dir = self.store / 'runs' / walk
+                inputs = array('H')
+                inputs.frombytes((run_dir / 'inputs.bin').read_bytes())
+                start = min(meta['checkpoints'])
+                state = zlib.decompress((run_dir / f'{start}.st').read_bytes())
+                same_run = [self.meta[s]['frame'] for s in level['scene_ids'] if self.meta[s]['run'] == walk]
+                end = len(inputs) if watcher_now.compare else min(len(inputs), max(same_run) + 120)
+                runs = ([('original', self.rom_path)] if watcher_now.compare else []) + [('changed', path)]
+                for run, rom_path in runs:
+                    fe = es._frontend(self._cfg(), rom_path)
+                    try:
+                        if int(fe.lib.retro_serialize_size()) <= 0:
+                            fe.run_frame([])
+                        fe.unserialize(state)
+                        session = es._Session(fe, checkpoint_every=10 ** 9)
+                        session.frame = start
+                        frame = start
+                        while frame < end:
+                            session.run(watcher_now.every, lambda f: es._names(inputs[f]) if f < len(inputs) else ())
+                            frame += watcher_now.every
+                            ram = ram_of(session.snapshot())
+                            if ram is not None and watcher_now.see(ram, frame, run):
+                                break
+                    finally:
+                        es._close(fe)
+                result = watcher_now.result()
+                if result.get('state') != 'warn' or len(firsts) == 1:
+                    break
         except Exception as error:      # shown to the user; the editor keeps working
             result = {'state': 'warn', 'text': f'The change could not be watched in the game: {error}'}
+        finally:
+            path.unlink(missing_ok=True)
         change['object_check'] = result
 
     def level_screen_at(self, level_id: str, x: float) -> dict:
@@ -585,7 +858,7 @@ class LevelTools:
                 raise ValueError('ROMancer does not know how long the parts of this game are yet.')
             profile, parts = context
             x = float(x)
-            part = min(parts, key=lambda p: 0 if p['left'] <= x < p['right'] else min(abs(x - p['left']), abs(x - p['right'])))
+            part = self._part_at(parts, x)
             screens = profile.screens(part['part'])
             if not screens:
                 raise ValueError('ROMancer cannot change the length of this part yet.')
@@ -610,7 +883,8 @@ class LevelTools:
             stored = self._find(change['id'])
             stored['length'] = True
             stored['object_check'] = {'state': 'working', 'text': 'Playing the game from the start on the old and the new length…'}
-            watcher = profile.watcher(plan['watch'])
+            watch = plan['watch']
+            watcher = lambda: profile.watcher(watch)
         threading.Thread(target=self._watch_change, args=(stored, level, watcher), name='romancer-length-check', daemon=True).start()
         return self.change(change['id'])
 
@@ -820,14 +1094,67 @@ class LevelTools:
         except (OSError, ValueError):
             return set()
 
-    def export_level(self, level_id: str, plane: int = 0, edited: bool = False) -> dict:
+    def export_level(self, level_id: str, plane: int = 0, edited: bool = False, labels: bool = False) -> dict:
         with self.lock:
             level = self._level(level_id)
             view = self.level_view(level_id, plane)
             stamp = view['after'].rsplit(':', 1)[1] if edited and view['after'] else ''
             name = ''.join(ch if ch.isalnum() else '-' for ch in level['name']).strip('-').lower() or 'level'
-            return {'png': self.level_image(level_id, plane, stamp), 'name': f"{name}{'-edited' if stamp else ''}.png",
-                    'width': view['width'] * view['cell'], 'height': view['height'] * view['cell']}
+            png = self.level_image(level_id, plane, stamp)
+            width, height = view['width'] * view['cell'], view['height'] * view['cell']
+        if labels:
+            png, width, height = self._labeled(level_id, png)
+        return {'png': png, 'name': f"{name}{'-edited' if stamp else ''}{'-named' if labels else ''}.png", 'width': width, 'height': height}
+
+    def _labeled(self, level_id: str, png: bytes):
+        """The map twice as big with every object the profile knows boxed in its colour and named, and a key below."""
+        from PIL import Image, ImageDraw, ImageFont
+        objects = self.level_objects(level_id).get('objects') or []
+        base = Image.open(io.BytesIO(png)).convert('RGB')
+        zoom = 2
+        try:
+            font = ImageFont.load_default(size=16)
+        except (TypeError, OSError):
+            font = ImageFont.load_default()
+        line = 24
+        key_height = 34
+        sheet = Image.new('RGB', (base.width * zoom, base.height * zoom + key_height), (20, 20, 24))
+        sheet.paste(base.resize((base.width * zoom, base.height * zoom), Image.NEAREST), (0, 0))
+        draw = ImageDraw.Draw(sheet)
+        colours = {'enemy': (255, 90, 90), 'item': (255, 209, 102), 'secret': (94, 230, 176), 'block': (199, 146, 255)}
+        for item in objects:           # a dark edge under the colour so each box shows on any background
+            x, y = item['map_x'] * zoom, item['map_y'] * zoom
+            draw.rectangle([x - 17, y - 33, x + 17, y + 1], outline=(0, 0, 0), width=6)
+            draw.rectangle([x - 16, y - 32, x + 16, y], outline=colours.get(item['style'], (255, 255, 255)), width=4)
+        placed = []             # label boxes already drawn: a label that would cover one moves a line down
+        for item in sorted(objects, key=lambda o: (o['map_x'], o['map_y'])):
+            x, y = item['map_x'] * zoom, item['map_y'] * zoom
+            colour = colours.get(item['style'], (255, 255, 255))
+            label = map_label(item)
+            width = int(draw.textlength(label, font=font))
+            left = max(4, min(int(x) - width // 2, sheet.width - width - 6))
+            top = int(y) + 4
+            for _ in range(8):
+                box = (left - 4, top - 2, left + width + 4, top + line - 2)
+                if not any(box[0] < b[2] and b[0] < box[2] and box[1] < b[3] and b[1] < box[3] for b in placed):
+                    break
+                top += line
+            top = min(top, base.height * zoom - line)
+            box = (left - 4, top - 2, left + width + 4, top + line - 2)
+            placed.append(box)
+            if top > y + 6:     # moved down: a line back to its box
+                draw.line([x, y, x, top - 2], fill=colour, width=2)
+            draw.rectangle(box, fill=(0, 0, 0), outline=colour, width=2)
+            draw.text((left, top), label, fill=(255, 255, 255), font=font)
+        at = 6
+        for style, text in (('enemy', 'Enemies'), ('item', 'Items'), ('secret', 'Secrets'), ('block', 'Blocks')):
+            if any(o['style'] == style for o in objects):
+                draw.rectangle([at, base.height * zoom + 9, at + 16, base.height * zoom + 25], outline=colours[style], width=4)
+                draw.text((at + 22, base.height * zoom + 8), text, fill=(240, 240, 240), font=font)
+                at += 40 + int(draw.textlength(text, font=font))
+        out = io.BytesIO()
+        sheet.save(out, format='PNG')
+        return out.getvalue(), sheet.width, sheet.height
 
     # ---- changes
 

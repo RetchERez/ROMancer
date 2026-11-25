@@ -158,6 +158,23 @@ class Zelda1Test(unittest.TestCase):
         self.assertIsNone(z.room(0, 2, 0x0E)['b_at'])
         self.assertEqual(z.room(0, 2, 0x74)['d'], 0x5A)
 
+    def test_names_and_does(self):
+        import re
+        Z = zl.Zelda1
+        for kind, name in Z.ENEMIES.items():
+            self.assertFalse(re.search(r'0x|second kind|type ', name), name)    # a name, never a number
+            self.assertTrue(Z.DOES[kind].endswith('.'), kind)                   # every enemy says what it does
+        self.assertEqual((Z.ENEMIES[0x08], Z.ENEMIES[0x44], Z.ENEMIES[0x48]),
+                         ('Red Octorok, fast', 'Gleeok with three heads', 'Patra, eyes swing wide'))
+        self.assertEqual(self.z.item_name(0x0E), 'Triforce of Power')
+        self.assertNotIn(0x0E, [c['value'] for c in self.z.choices()['items']])     # named, not offered
+        row = {o['id']: o for o in self.z.objects({'level': 1, 'quest': 1})}['enemy:73']
+        self.assertEqual(row['does'], Z.DOES[0x2A])                            # one kind: its does-line
+        ow = {o['id']: o for o in self.z.objects({'level': 0, 'quest': 1})}['enemy:77']
+        self.assertNotIn('does', ow)                                           # a mixed group: no single line
+        names = [c['name'] for k, v in self.z.choices().items() if k.startswith('enemies') for c in v]
+        self.assertFalse([n for n in names if re.search(r'0x', n)])
+
     def test_objects_and_where(self):
         z = self.z
         ids = {o['id'] for o in z.objects({'level': 1, 'quest': 1})}
@@ -259,6 +276,23 @@ class Zelda2Test(unittest.TestCase):
         with self.assertRaises(ValueError):
             self.z.edit({'set': 0, 'area': 0x22}, 'strong:1', {}, True)
         self.assertEqual(self.z.objects({'set': 0, 'area': 0x3E}), [])       # an entrance's scene: no big-monster list
+
+    def test_names_and_does(self):
+        import re
+        Z = zl.Zelda2
+        for bank, names in Z.ENEMIES.items():
+            for kind, name in names.items():
+                if not name.startswith('Door'):
+                    self.assertFalse(re.search(r'0x|second kind', name), name)
+                    self.assertTrue(Z.DOES[bank][kind].endswith('.'), (bank, kind))
+        self.assertIs(Z.ENEMIES[1], Z.ENEMIES[2])                              # banks 1 and 2 run the same code
+        self.assertEqual((Z.ENEMIES[5][0x22], Z.ENEMIES[4][0x0E]), ('Thunderbird', 'Floating skull, fast'))
+        self.assertEqual([Z.ITEMS[k] for k in (0x13, 0x14, 0x15)], ['Kidnapped child', 'Trophy', 'Water of Life'])
+        self.assertEqual(self.z.item_name(0x09), 'Unused glove picture')
+        self.assertNotIn(0x09, [c['value'] for c in self.z.choices()['items']])
+        objs = {o['id']: o for o in self.z.objects({'set': 4, 'area': 2})}
+        self.assertEqual(objs['enemy:0']['does'], 'Walks about the town.')
+        self.assertEqual(objs['item:0']['does'], 'Gives 50 experience points.')
 
     def test_items(self):
         its = self.z.items(4, 2)

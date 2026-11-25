@@ -505,6 +505,11 @@ class _Host:
                 conn.send(('frame', png_bytes(frame.width, frame.height, frame.rgb), self.session.frame, frame.width, frame.height, metas))
             elif kind == 'capture':
                 conn.send(('scene', self.record(command[1], 'play', only_new=False), self.session.frame))
+            elif kind in ('advance', 'walk'):          # a saved walk being played back: inputs exactly as recorded
+                masks = array('H')
+                masks.frombytes(command[1])
+                metas = self.play_level(masks, command[2]) if kind == 'walk' else (self.advance(masks) or [])
+                conn.send(('walked', self.session.frame, metas))
 
 
 def _host_main(conn, cfg: dict) -> None:
@@ -2404,6 +2409,9 @@ class EditSessionTools:
             'edits.level_screen_at': (base + ' level_id x', lambda p, c: {'ok': True, **self.session(p).level_screen_at(p['level_id'], p['x'])}),
             'edits.level_length': (base + ' level_id part screen delta', lambda p, c: {'ok': True, 'change': self.session(p).propose_level_length(
                 p['level_id'], p['part'], p['screen'], p['delta'])}),
+            'edits.level_add_at': (base + ' level_id x y', lambda p, c: {'ok': True, **self.session(p).level_add_at(p['level_id'], p['x'], p['y'])}),
+            'edits.level_add': (base + ' level_id part kind x y values', lambda p, c: {'ok': True, 'change': self.session(p).propose_level_add(
+                p['level_id'], p['part'], p['kind'], p['x'], p['y'], p['values'])}),
             'edits.level_edit': (base + ' level_id part object_id values remove', lambda p, c: {'ok': True, 'change': self.session(p).propose_level_edit(
                 p['level_id'], p['part'], p['object_id'], p['values'], bool(p['remove']))}),
             'edits.play': (base + ' frames buttons', lambda p, c: {'ok': True, **self.session(p).play(p['frames'], p['buttons'])}),
@@ -2427,7 +2435,7 @@ class EditSessionTools:
                 p['scene_id'], p['cells'])}),
             'edits.find_color': (base + ' scene_id domain entry colors', lambda p, c: {'ok': True, 'change': self.session(p).find_color(
                 p['scene_id'], p['domain'], p['entry'], p['colors'])}),
-            'edits.level_start': (base + ' name', lambda p, c: self._summary(self.session(p), self.session(p).level_start(p['name']))),
+            'edits.level_start': (base + ' name', lambda p, c: self._summary(self.session(p), self.session(p).level_start(p['name'], p['extend']))),
             'edits.level_auto': (base + ' steps direction', lambda p, c: self._summary(self.session(p), self.session(p).level_auto(p['steps'], p['direction']))),
             'edits.level_stop': (base, lambda p, c: self._summary(self.session(p), self.session(p).level_stop())),
             'edits.level_forget': (base + ' level_id', lambda p, c: self._summary(self.session(p), self.session(p).level_forget(p['level_id']))),
@@ -2437,6 +2445,10 @@ class EditSessionTools:
             'edits.level_paint': (base + ' level_id plane cells layers', lambda p, c: {'ok': True, 'change': self.session(p).propose_level(
                 p['level_id'], p['plane'], p['cells'], p['layers'])}),
             'edits.level_export': (base + ' level_id plane edited', self._export_level),
+            'edits.level_layout': (base + ' level_id cells', lambda p, c: {'ok': True, 'change': self.session(p).propose_level_layout(
+                p['level_id'], p['cells'])}),
+            'edits.level_walk_file': (base + ' level_id', lambda p, c: {'ok': True, **self.session(p).level_walk_file(p['level_id'])}),
+            'edits.level_walk_open': (base + ' text', lambda p, c: self._summary(self.session(p), self.session(p).level_walk_open(p['text']))),
             'edits.level_objects': (base + ' level_id', lambda p, c: {'ok': True, **self.session(p).level_objects(p['level_id'])}),
             'edits.change': (base + ' change_id', lambda p, c: {'ok': True, 'change': self.session(p).change(p['change_id'])}),
             'edits.keep': (base + ' change_id', lambda p, c: self._summary(self.session(p), self.session(p).keep(p['change_id']))),
@@ -2459,7 +2471,7 @@ class EditSessionTools:
         return {'ok': True, 'name': out['name'], 'gif_base64': base64.b64encode(out['gif']).decode()}
 
     def _export_level(self, p, c):
-        out = self.session(p).export_level(p['level_id'], p['plane'], bool(p['edited']))
+        out = self.session(p).export_level(p['level_id'], p['plane'], bool(p['edited']), bool(p['labels']))
         return {'ok': True, **{k: v for k, v in out.items() if k != 'png'}, 'png_base64': base64.b64encode(out['png']).decode()}
 
     def _import_picture(self, p, c):

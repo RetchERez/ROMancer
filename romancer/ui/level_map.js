@@ -19,6 +19,7 @@ export function placeAt(view,zoom,x,y){
 // The units the brush can snap to: single cells, the level's blocks, and its larger blocks when it has them.
 export function units(view){
  const out=[{id:'cells',label:'Single tiles',width:1,height:1,left:0,top:0}],blocks=view.blocks;
+ if(view.layout)return [{id:'layout',label:`Whole blocks (${view.layout.width}×${view.layout.height})`,...view.layout}];
  if(blocks){out.push({id:'blocks',label:`Whole blocks (${blocks.width}×${blocks.height})`,...blocks});
   if(blocks.larger)out.push({id:'larger',label:`Big blocks (${blocks.larger.width}×${blocks.larger.height})`,...blocks.larger});}
  return out;
@@ -59,6 +60,7 @@ export function steps(level,change){
 export const paintedCells=painted=>[...painted.entries()].map(([place,from])=>{const [col,row]=place.split(',').map(Number);return {col,row,from};});
 export function levelStatus(summary,playing){
  const rec=summary.level_recording,job=summary.level_job;
+ if(rec?.extends)return rec.captures>=rec.limit?`That's as much as one map can hold, so finish it now (${plural(rec.added,'new screen')}).`:`Adding to ${rec.name}, ${plural(rec.added,'new screen')} so far. Play through the parts the map is missing, then finish the map.`;
  if(rec)return rec.captures>=rec.limit?`That's as much as one map can hold, so finish it now (${plural(rec.captures,'screen')}).`:`Recording the level, ${plural(rec.captures,'screen')} so far. Play to the end of it, then finish the map.`;
  if(job?.state==='running')return `${job.message} ${job.done} of ${job.total}.`;
  if(job?.message)return job.message;
@@ -69,9 +71,22 @@ export function levelStatus(summary,playing){
 export function objectLabel(item){
  return item.detail?`${item.name}, ${item.detail}`:item.name;
 }
+// The short name drawn on the map: what it is, and what it holds or where it leads in brackets. Notes about where
+// or how (a screen number, "crouch there") stay in the panel and the pointer text.
+export function mapLabel(item){
+ const m=/^(holds|drops|gives|sells|contains|opens the|leads to)\s+(?:an?\s+)?(.+)$/i.exec(item.detail||'');
+ if(!m)return item.name;
+ const what=m[2].charAt(0).toUpperCase()+m[2].slice(1);
+ return `${item.name} [${/^leads/i.test(m[1])?'→ '+what:/^opens/i.test(m[1])?'opens '+m[2]:what}]`;
+}
 // The choices of one field of an object: its own list, or a list the game shares between objects.
 export function fieldChoices(field,shared){
  return Array.isArray(field.choices)?field.choices:(shared?.[field.choices]||[]);
+}
+// The fields of the kind chosen to add, or of the first kind offered.
+export function addOption(spot,kind){
+ const options=spot?.options||[];
+ return options.find(o=>o.kind===kind)||options[0]||null;
 }
 // The enemy or candle under a map pixel (objects sit on their bottom middle), or null.
 export function objectAt(objects,x,y,reach=12){
@@ -99,7 +114,7 @@ export function levelsPart(ed){
  return `<div class="card-heading"><h3>Level maps <small class="beta-tag">BETA</small></h3>${badge(plural(levels.length,'level map'),levels.length?'good':'neutral')}</div><p class="subtle">The level editor is in beta. Every change is checked in the game before you keep it, but expect rough edges.</p>
  <p class="subtle">Record a level while you play and you get a map of the whole level that you can paint on.</p>
  ${gamesPart(summary.level_games)}
- <div class="actions">${actions}</div>
+ <div class="actions">${actions}<label class="button level-walk-open">Open a saved walk<input id="level-walk-file" type="file" accept=".romancer-walk,application/json" aria-label="Open a saved walk" ${rec||building?'disabled':''}></label></div>
  <p class="subtle" id="level-status" role="status" aria-live="polite">${esc(levelStatus(summary,ed.playing))}</p>
  ${building?`<progress max="${job.total}" value="${job.done}" aria-label="Putting the map together"></progress>`:''}
  <div class="scene-strip" role="group" aria-label="Level maps">${levels.map(row=>`<button type="button" class="scene-thumb level-thumb ${ed.level?.id===row.id?'selected':''}" data-action="level-open" data-id="${row.id}" aria-pressed="${ed.level?.id===row.id}"><img alt="" data-picture="${esc(row.image)}" width="${row.pixel_width}" height="${row.pixel_height}"><span>${esc(row.name)}</span></button>`).join('')}</div>`;
@@ -113,24 +128,26 @@ export function levelPart(ed,verdict,keep){
  const guide=`<ol class="level-steps" aria-label="How to change the level">${steps(level,change).map(step=>`<li class="${step.now?'now':step.done?'done':''}"${step.now?' aria-current="step"':''}><strong>${step.name}</strong><span>${step.text}</span></li>`).join('')}</ol>`;
  const sizes=units(view),unitPart=sizes.length>1?`<label>Brush size <select id="level-unit" aria-label="Brush size">${sizes.map(u=>`<option value="${u.id}" ${u.id===level.unit?'selected':''}>${esc(u.label)}</option>`).join('')}</select></label>`:'';
  const zoom=`<label>Zoom <select id="level-zoom" aria-label="Zoom">${ZOOMS.map(z=>`<option value="${z}" ${z===level.zoom?'selected':''}>${z}x</option>`).join('')}</select></label>`;
- const tools=[...TOOLS,...(level.objects?.profile?[['objects','Enemies, items and secrets'],...(level.objects.resizable?[['length','Longer or shorter']]:[])]:[]),['play','Play from here'],['compare','Before and after']].map(([id,label])=>`<button type="button" class="scene-mode ${level.tool===id?'active':''}" data-action="level-tool" data-id="${id}" aria-pressed="${level.tool===id}">${label}</button>`).join('');
- const hint=level.tool==='length'?'Click a screen of the level to repeat it or remove it. Enemies, candles and secrets on later screens move along with them.':level.tool==='objects'?'Click an enemy, a candle, a breakable block (purple) or a hidden treasure (green) to see what it is and change it.':level.tool==='compare'?'Click a spot on the map. ROMancer replays your recorded walk from there on the original game and on the game with your kept changes, side by side.':level.tool==='play'?'Click a spot on the map. The game starts there with your kept changes, so you can play it.':level.tool==='objects'?'Click an enemy or a candle to see what it is and change it.':level.tool==='pick'?'Click a spot on the map to copy it, or drag across a bigger piece like a platform or a tree.':
+ const tools=[...TOOLS,...(level.objects?.profile?[['objects','Enemies, items and secrets'],...(level.objects.addable?[['add','Add new']]:[]),...(level.objects.resizable?[['length','Longer or shorter']]:[])]:[]),['play','Play from here'],['compare','Before and after']].map(([id,label])=>`<button type="button" class="scene-mode ${level.tool===id?'active':''}" data-action="level-tool" data-id="${id}" aria-pressed="${level.tool===id}">${label}</button>`).join('');
+ const hint=level.tool==='add'?'Click an empty spot on the map to add a new enemy, item or secret there. Only things this part of the level can draw are offered.':level.tool==='length'?'Click a screen of the level to repeat it or remove it. Enemies, candles and secrets on later screens move along with them.':level.tool==='objects'?'Click an enemy, a candle, a breakable block (purple) or a hidden treasure (green) to see what it is and change it.':level.tool==='compare'?'Click a spot on the map. ROMancer replays your recorded walk from there on the original game and on the game with your kept changes, side by side.':level.tool==='play'?'Click a spot on the map. The game starts there with your kept changes, so you can play it.':level.tool==='objects'?'Click an enemy or a candle to see what it is and change it.':level.tool==='pick'?'Click a spot on the map to copy it, or drag across a bigger piece like a platform or a tree.':
   !brush?'Copy something from the map first.':level.tool==='paint'?'Click or drag where you want it.':'Click or drag over your paint to remove it.';
  const brushText=brush?`Copied a ${brush.width}×${brush.height} piece.`:'Nothing copied yet.';
- const built=view.blocks?' The brush moves in whole blocks, the way this level is built, so a change can stay in one spot.':'';
+ const built=view.layout?' This level is stored packed, so the brush copies whole blocks of it, and ROMancer packs the level again.':view.blocks?' The brush moves in whole blocks, the way this level is built, so a change can stay in one spot.':'';
  const locked=view.status.includes('u')?" Spots with a cross can't be changed yet.":'';
- const known=level.objects?.profile?`<label class="level-toggle"><input type="checkbox" id="level-show-objects" ${level.showObjects?'checked':''}> Show enemies, items and secrets (object layer)</label>${level.objects.roles?`<label class="level-toggle"><input type="checkbox" id="level-show-solid" ${level.showSolid?'checked':''}> Show what's solid</label>`:''}`:'';
+ const known=level.objects?.profile?`<label class="level-toggle"><input type="checkbox" id="level-show-objects" ${level.showObjects?'checked':''}> Show enemies, items and secrets (object layer)</label><label class="level-toggle"><input type="checkbox" id="level-show-names" ${level.showNames?'checked':''}> Show names</label>${level.objects.roles?`<label class="level-toggle"><input type="checkbox" id="level-show-solid" ${level.showSolid?'checked':''}> Show what's solid</label>`:''}`:'';
  const picked=level.picked;
  const job=level.compare,comparePanel=job?`<div class="notice level-compare" role="group" aria-label="Before and after"><p><strong>Before and after</strong></p><p role="status">${esc(job.message)}${job.state==='running'?` (${Math.round(100*job.done/Math.max(1,job.total))}%)`:''}</p>${job.state==='finished'&&level.compareGif?`<img class="level-compare-picture" src="data:image/gif;base64,${level.compareGif}" width="${job.width}" height="${job.height}" alt="The recorded walk, the original game on the left and the changed game on the right">`:''}<div class="actions">${job.state==='finished'&&level.compareGif?button('Save as GIF','level-compare-save',{icon:'download',primary:true}):''}${job.state!=='running'?button('Close','level-compare-close'):''}</div></div>`:'';
- const objectEditor=level.tool==='objects'&&picked?`<div class="notice level-object" role="group" aria-label="${esc(objectLabel(picked))}"><p><strong>${esc(picked.name)}</strong>${picked.detail?', '+esc(picked.detail):''}</p>${picked.note?`<p class="subtle">${esc(picked.note)}</p>`:''}${(picked.fields||[]).map(field=>`<label>${esc(field.label)} <select id="level-field-${esc(field.key)}" data-key="${esc(field.key)}">${fieldChoices(field,level.objects?.choices).map(c=>`<option value="${esc(JSON.stringify(c.value))}" ${JSON.stringify(c.value)===JSON.stringify(field.value)?'selected':''}>${esc(c.name)}</option>`).join('')}</select></label>`).join('')}<div class="actions">${(picked.fields||[]).length?button('Check in the game','level-edit-apply',{primary:true}):''}${picked.remove?button(picked.remove,'level-edit-remove'):''}</div></div>`:'';
+ const objectEditor=level.tool==='objects'&&picked?`<div class="notice level-object" role="group" aria-label="${esc(objectLabel(picked))}"><p><strong>${esc(picked.name)}</strong>${picked.detail?', '+esc(picked.detail):''}</p>${picked.does?`<p>${esc(picked.does)}</p>`:''}${picked.note?`<p class="subtle">${esc(picked.note)}</p>`:''}${(picked.fields||[]).map(field=>`<label>${esc(field.label)} <select id="level-field-${esc(field.key)}" data-key="${esc(field.key)}">${fieldChoices(field,level.objects?.choices).map(c=>`<option value="${esc(JSON.stringify(c.value))}" ${JSON.stringify(c.value)===JSON.stringify(field.value)?'selected':''}>${esc(c.name)}</option>`).join('')}</select></label>`).join('')}<div class="actions">${(picked.fields||[]).length?button('Check in the game','level-edit-apply',{primary:true}):''}${picked.remove?button(picked.remove,'level-edit-remove'):''}</div>${(picked.changes||[]).length?`<p class="subtle">Your changes to this:</p><ul class="level-object-changes">${picked.changes.map(c=>`<li>${esc(c.title)} ${button('Undo','level-edit-undo',{id:c.id})}</li>`).join('')}</ul>`:''}</div>`:'';
  const screen=level.tool==='length'?level.screen:null;
  const lengthPanel=screen?`<div class="notice level-object" role="group" aria-label="Screen ${screen.screen+1}"><p><strong>Screen ${screen.screen+1} of ${screen.screens}</strong> in this part of the level</p><label>How many <select id="level-length-count">${[1,2,3].map(n=>`<option value="${n}">${n}</option>`).join('')}</select></label><div class="actions">${button('Repeat this screen','level-length-apply',{id:'1',primary:true,disabled:screen.screens>=screen.most,reason:`This part is already ${screen.most} screens long, the longest the game has.`})}${button('Remove this screen','level-length-apply',{id:'-1',disabled:screen.screen===0||screen.screen===screen.screens-1,reason:'The first and the last screen hold the way in and the way out, so they stay.'})}</div><p class="subtle">The map keeps showing the level as it was recorded. Play from here and Before and after show the new length.</p></div>`:'';
- const objectPanel=lengthPanel||objectEditor;
+ const spot=level.tool==='add'?level.spot:null,option=addOption(spot,level.addKind);
+ const addPanel=spot&&option?`<div class="notice level-object" role="group" aria-label="Add something new"><p><strong>Add at this spot</strong> in ${esc(spot.name)}</p><label>What to add <select id="level-add-kind">${spot.options.map(o=>`<option value="${esc(o.kind)}" ${o.kind===option.kind?'selected':''}>${esc(o.name)}</option>`).join('')}</select></label>${(option.fields||[]).map(field=>`<label>${esc(field.label)} <select id="level-add-field-${esc(field.key)}" data-key="${esc(field.key)}">${fieldChoices(field,spot.choices).map(c=>`<option value="${esc(JSON.stringify(c.value))}" ${JSON.stringify(c.value)===JSON.stringify(field.value)?'selected':''}>${esc(c.name)}</option>`).join('')}</select></label>`).join('')}<div class="actions">${button('Check in the game','level-add-apply',{primary:true})}${button('Cancel','level-add-cancel')}</div></div>`:'';
+ const objectPanel=lengthPanel||addPanel||objectEditor;
  const after=view.after?`<label class="level-toggle"><input type="checkbox" id="level-after" ${level.showAfter?'checked':''}> Show my changes</label>`:'';
  const propose=button('Check in the game','level-propose',{primary:true,disabled:!painted,reason:'Paint something first.'})+button('Clear paint','level-clear',{disabled:!painted&&!change});
  return `<div class="card-heading"><h3>${esc(view.name)}</h3>${badge(`${view.width}×${view.height} tiles`,'neutral')}</div>
  ${guide}
- <div class="actions level-bar">${planes}${paintOn}${zoom}${unitPart}${known}${after}${button('Save map as PNG','level-export',{icon:'download'})}${button('Delete map','level-forget')}${button('Close','level-close')}</div>
+ <div class="actions level-bar">${planes}${paintOn}${zoom}${unitPart}${known}${after}${button('Save map as PNG','level-export',{icon:'download'})}${level.objects?.profile?button('Save map with names','level-export-named',{icon:'download'}):''}${button('Save the walk','level-walk-save',{icon:'download'})}${button('Add to this map','level-extend',{disabled:!ed.playing||!!ed.summary?.level_recording,reason:ed.summary?.level_recording?'A map is being recorded now.':'Start playing above first, then play through what the map is missing.'})}${button('Delete map','level-forget')}${button('Close','level-close')}</div>
  <div class="scene-modes" role="group" aria-label="Tool">${tools}</div>
  <p class="subtle" role="status">${hint}${built}${locked}</p>
  <div class="level-scroll" id="level-scroll" tabindex="0" aria-label="The level map. Scroll to move around."><canvas id="level-canvas" class="level-canvas" width="${view.width*view.cell*level.zoom}" height="${view.height*view.cell*level.zoom}" role="img" aria-label="Map of ${esc(view.name)}"></canvas></div>
@@ -143,6 +160,7 @@ export function levelPart(ed,verdict,keep){
 
 // ---- drawing
 
+export const boxColour=item=>({enemy:'#ff5a5a',item:'#ffd166',secret:'#5ee6b0',block:'#c792ff'}[item.style]||'#ffd166');
 const objectImages=new Map();
 function objectImage(data){
  let image=objectImages.get(data);
@@ -172,12 +190,27 @@ export async function drawLevel(ctx,ed,picture){
    context.fillStyle=role==='b'?'rgba(255,160,40,.45)':'rgba(70,140,255,.35)';context.fillRect(col*size,row*size,size,size);
   }
  }
+ if(level.tool==='add'&&level.spot){
+  context.strokeStyle='#ffffff';context.lineWidth=2;context.setLineDash([3*zoom,2*zoom]);
+  context.strokeRect(level.spot.map_x*zoom-8*zoom,level.spot.map_y*zoom-16*zoom,16*zoom,16*zoom);context.setLineDash([]);context.lineWidth=1;
+ }
  if(level.tool==='length'&&level.screen){
   context.strokeStyle='#7fb2ff';context.lineWidth=2;context.setLineDash([6,4]);
   context.strokeRect(level.screen.map_left*zoom+1,1,256*zoom-2,view.height*view.cell*zoom-2);context.setLineDash([]);context.lineWidth=1;
  }
  if(level.showObjects&&level.objects?.objects){
-  context.font=`${Math.max(10,5*zoom)}px sans-serif`;
+  const fontSize=Math.max(14,6*zoom);context.font=`600 ${fontSize}px sans-serif`;context.textBaseline='top';
+  const placed=[];
+  // a name on a solid dark plate, kept inside the map, moved down a line when it would cover another name
+  const nameAt=(item,x,top)=>{
+   const label=mapLabel(item),width=Math.ceil(context.measureText(label).width)+10,height=fontSize+8;
+   let left=Math.max(2,Math.min(x-width/2,canvas.width-width-2)),y=Math.max(2,top-height-4);
+   for(let n=0;n<8&&placed.some(b=>left<b[2]&&b[0]<left+width&&y<b[3]&&b[1]<y+height);n++)y+=height+2;
+   placed.push([left,y,left+width,y+height]);
+   context.fillStyle='rgba(0,0,0,.85)';context.fillRect(left,y,width,height);
+   context.strokeStyle=boxColour(item);context.lineWidth=2;context.strokeRect(left+1,y+1,width-2,height-2);
+   context.fillStyle='#fff';context.fillText(label,left+5,y+4);
+  };
   for(const item of level.objects.objects){
    const x=item.map_x*zoom,y=item.map_y*zoom,w=16*zoom,h=16*zoom;
    if(item.picture){                                            // the object layer: what the game draws there
@@ -185,14 +218,15 @@ export async function drawLevel(ctx,ed,picture){
     if(image.complete){const [l,t,pw,ph]=item.picture_box;context.globalAlpha=item.picture_from_another?.7:1;context.drawImage(image,l*zoom,t*zoom,pw*zoom,ph*zoom);context.globalAlpha=1;}
     else image.onload=()=>void drawLevel(ctx,ed,picture);
    }
-   context.strokeStyle={enemy:'#ff5a5a',item:'#ffd166',secret:'#5ee6b0',block:'#c792ff'}[item.style]||'#ffd166';context.lineWidth=item===level.picked?3:1.5;
-   if(item.style==='secret'||item.style==='block')context.setLineDash([3*zoom,2*zoom]);
-   context.strokeRect(x-w/2,y-h,w,h);context.setLineDash([]);context.lineWidth=1;
-   if(item===level.picked){                                    // the name of the one you clicked; the rest keep the map readable
-    context.fillStyle='rgba(0,0,0,.7)';const label=objectLabel(item),width=context.measureText(label).width+6;
-    context.fillRect(x-w/2,y-h-14*zoom/2-4,width,12+zoom);context.fillStyle='#fff';context.fillText(label,x-w/2+3,y-h-6);
-   }
+   const thick=item===level.picked?5:3;                         // a dark edge under the colour so a box shows on any background
+   if(item.style==='secret'||item.style==='block')context.setLineDash([4*zoom,2*zoom]);
+   context.strokeStyle='rgba(0,0,0,.8)';context.lineWidth=thick+2;context.strokeRect(x-w/2,y-h,w,h);
+   context.strokeStyle=boxColour(item);context.lineWidth=thick;context.strokeRect(x-w/2,y-h,w,h);
+   context.setLineDash([]);context.lineWidth=1;
   }
+  // names: every one when asked for, otherwise the one you clicked
+  for(const item of level.objects.objects)if(level.showNames||item===level.picked)nameAt(item,item.map_x*zoom,item.map_y*zoom-16*zoom);
+  context.textBaseline='alphabetic';
  }
  // places that cannot be changed
  context.strokeStyle='rgba(255,255,255,.35)';context.beginPath();
@@ -245,7 +279,7 @@ export function levelTools(ctx,ed,host){
   const same=ed.level&&ed.level.id===id&&ed.level.view?.plane===view.plane;
   const unitIds=units(view).map(u=>u.id);
   ed.level={id,view,paintOn:same&&ed.level.paintOn?ed.level.paintOn:'all',unit:same&&unitIds.includes(ed.level.unit)?ed.level.unit:unitIds[unitIds.length-1],tool:same?ed.level.tool:'pick',brush:same?ed.level.brush:null,painted:same?ed.level.painted:new Map(),zoom:same?ed.level.zoom:view.height*view.cell>300?1:2,
-   showAfter:same?ed.level.showAfter:true,last:same?ed.level.last:null,drag:null,objects,showObjects:same?ed.level.showObjects:!!objects?.profile,showSolid:same?ed.level.showSolid:false,picked:same?ed.level.picked:null,choices:same?ed.level.choices:null};
+   showAfter:same?ed.level.showAfter:true,last:same?ed.level.last:null,drag:null,objects,showObjects:same?ed.level.showObjects:!!objects?.profile,showSolid:same?ed.level.showSolid:false,showNames:same?ed.level.showNames:false,picked:same?ed.level.picked:null,spot:same?ed.level.spot:null,addKind:same?ed.level.addKind:null,choices:same?ed.level.choices:null};
  };
  const reload=async()=>{if(!ed.level)return;try{await load(ed.level.id,ed.level.view.plane);}catch{ed.level=null;}host.update(['scene-level']);};
  const watch=()=>{
@@ -269,6 +303,7 @@ export function levelTools(ctx,ed,host){
  };
  const handlers={
   'level-start':async()=>{ed.summary=await host.call('level_start',{name:''});host.update(['scene-levels']);watch();},
+  'level-extend':async()=>{const id=ed.level?.id;if(!id)return;ed.summary=await host.call('level_start',{name:'',extend:id});host.update(['scene-levels','scene-level']);watch();document.getElementById('scene-levels')?.scrollIntoView({block:'nearest'});},
   'level-auto':async()=>{ed.summary=await host.call('level_auto',{steps:6,direction:'right'});host.update(['scene-levels']);watch();},
   'level-stop':async()=>{ed.summary=await host.call('level_stop');host.update(['scene-levels']);watch();},
   'level-open':async node=>{if(ed.level?.id===node.dataset.id)return;await host.dropPreview();await load(node.dataset.id);host.update(['scene-levels','scene-level','scene-changes']);document.getElementById('scene-level')?.scrollIntoView({block:'nearest'});},
@@ -279,6 +314,27 @@ export function levelTools(ctx,ed,host){
    const result=await host.call('level_export',{level_id:level.id,plane:level.view.plane,edited:!!(level.showAfter&&level.view.after)});
    const link=document.createElement('a');link.href='data:image/png;base64,'+result.png_base64;link.download=result.name;document.body.append(link);link.click();link.remove();
    ctx.notify(`Saved ${result.name} (${result.width} by ${result.height} pixels).`);
+  },
+  'level-walk-save':async()=>{
+   const level=ed.level;if(!level)return;
+   const result=await host.call('level_walk_file',{level_id:level.id});
+   const link=document.createElement('a');link.href=URL.createObjectURL(new Blob([result.text],{type:'application/json'}));link.download=result.name;document.body.append(link);link.click();link.remove();
+   ctx.notify(`Saved ${result.name}. Anyone with the same ROM can open it to get this map and replay its checks.`);
+  },
+  'level-export-named':async()=>{
+   const level=ed.level;if(!level)return;
+   const result=await host.call('level_export',{level_id:level.id,plane:0,edited:!!(level.showAfter&&level.view.after),labels:true});
+   const link=document.createElement('a');link.href='data:image/png;base64,'+result.png_base64;link.download=result.name;document.body.append(link);link.click();link.remove();
+   ctx.notify(`Saved ${result.name} (${result.width} by ${result.height} pixels), with every enemy, item and secret named.`);
+  },
+  'level-edit-undo':async node=>{
+   const level=ed.level;if(!level)return;
+   await host.dropPreview();
+   const summary=await host.call('remove',{change_id:node.dataset.id});
+   await host.refresh(summary);await reload();
+   if(level.picked)level.picked=(ed.level?.objects?.objects||[]).find(o=>o.id===level.picked.id&&JSON.stringify(o.part)===JSON.stringify(level.picked.part))||null;
+   if(ed.level)ed.level.picked=level.picked;
+   host.update(['scene-level','scene-changes']);ctx.notify('That change is undone.');
   },
   'level-compare-save':()=>{
    const level=ed.level;if(!level?.compareGif)return;
@@ -291,7 +347,8 @@ export function levelTools(ctx,ed,host){
   'level-propose':async()=>{
    const level=ed.level;if(!level||!level.painted.size)return;
    await host.dropPreview();
-   const result=await host.call('level_paint',{level_id:level.id,plane:level.view.plane,cells:paintedCells(level.painted),layers:paintLayers(level.view,level.paintOn)});
+   const result=level.view.layout?await host.call('level_layout',{level_id:level.id,cells:paintedCells(level.painted)}):
+    await host.call('level_paint',{level_id:level.id,plane:level.view.plane,cells:paintedCells(level.painted),layers:paintLayers(level.view,level.paintOn)});
    if(!host.current())return;
    ed.proposal=result.change;ed.inspect=null;ed.summary.preview=result.change;level.painted=new Map();level.showAfter=true;
    await reload();host.update(['scene-changes']);host.watchProposal();
@@ -309,6 +366,14 @@ export function levelTools(ctx,ed,host){
    const result=await host.call('level_edit',{level_id:level.id,part:picked.part,object_id:picked.id,values:{},remove:true});
    if(!host.current())return;ed.proposal=result.change;ed.summary.preview=result.change;host.update(['scene-level','scene-changes']);host.watchProposal();
   },
+  'level-add-apply':async()=>{
+   const level=ed.level,spot=level?.spot,option=addOption(spot,level?.addKind);if(!option)return;
+   const values={};for(const node of document.querySelectorAll('[id^="level-add-field-"]'))values[node.dataset.key]=JSON.parse(node.value);
+   await host.dropPreview();
+   const result=await host.call('level_add',{level_id:level.id,part:spot.part,kind:option.kind,x:spot.x,y:spot.y,values});
+   if(!host.current())return;ed.proposal=result.change;ed.summary.preview=result.change;host.update(['scene-level','scene-changes']);host.watchProposal();
+  },
+  'level-add-cancel':()=>{if(!ed.level)return;ed.level.spot=null;host.update(['scene-level']);},
   'level-length-apply':async node=>{
    const level=ed.level,screen=level?.screen;if(!screen)return;
    const count=Number(document.getElementById('level-length-count')?.value||1),delta=Number(node.dataset.id)*count;
@@ -340,6 +405,12 @@ export function levelTools(ctx,ed,host){
     const canvas=document.getElementById('level-canvas');if(!canvas||event.target!==canvas)return;
     const box=canvas.getBoundingClientRect(),x=(event.clientX-box.left)*canvas.width/box.width/level.zoom;
     void host.call('level_screen_at',{level_id:level.id,x}).then(result=>{level.screen=result;host.update(['scene-level']);}).catch(error=>ctx.notify(error.message,true));
+    return;
+   }
+   if(level?.tool==='add'){
+    const canvas=document.getElementById('level-canvas');if(!canvas||event.target!==canvas)return;
+    const box=canvas.getBoundingClientRect(),x=(event.clientX-box.left)*canvas.width/box.width/level.zoom,y=(event.clientY-box.top)*canvas.height/box.height/level.zoom;
+    void host.call('level_add_at',{level_id:level.id,x,y}).then(result=>{level.spot=result;level.addKind=result.options[0]?.kind;host.update(['scene-level']);void redraw();}).catch(error=>ctx.notify(error.message,true));
     return;
    }
    if(level?.tool==='compare'){
@@ -375,7 +446,7 @@ export function levelTools(ctx,ed,host){
    if(level&&canvas&&event.target===canvas&&level.showObjects&&level.objects?.objects){
     const box=canvas.getBoundingClientRect(),x=(event.clientX-box.left)*canvas.width/box.width/level.zoom,y=(event.clientY-box.top)*canvas.height/box.height/level.zoom;
     const item=objectAt(level.objects.objects,x,y);
-    canvas.title=item?objectLabel(item):'';
+    canvas.title=item?objectLabel(item)+(item.does?'. '+item.does:''):'';
    }if(!level||(!level.drag&&!level.stroke))return;const place=at(event);if(!place)return;
    if(level.drag){if(String(level.drag.to)===String(place))return;level.drag.to=place;void redraw();}
    else if(apply(place)){where();void redraw();}
@@ -387,12 +458,20 @@ export function levelTools(ctx,ed,host){
   };
   main.addEventListener('pointerup',finish);main.addEventListener('pointercancel',finish);
   main.addEventListener('change',async event=>{
+   if(event.target.id==='level-walk-file'){
+    const file=event.target.files?.[0];if(!file)return;
+    if(file.size>8*1024*1024){ctx.notify('That file is too big to be a saved walk.',true);return;}
+    try{ed.summary=await host.call('level_walk_open',{text:await file.text()});host.update(['scene-levels']);watch();}catch(error){ctx.notify(error.message,true);}
+    event.target.value='';return;
+   }
    const level=ed.level;if(!level)return;
+   if(event.target.id==='level-add-kind'){level.addKind=event.target.value;host.update(['scene-level']);}
    if(event.target.id==='level-zoom'){level.zoom=Number(event.target.value);host.update(['scene-level']);}
    if(event.target.id==='level-layers'){level.paintOn=event.target.value;}
    if(event.target.id==='level-unit'){level.unit=event.target.value;level.brush=null;level.tool='pick';host.update(['scene-level']);}
    if(event.target.id==='level-after'){level.showAfter=event.target.checked;void redraw();}
    if(event.target.id==='level-show-objects'){level.showObjects=event.target.checked;void redraw();}
+   if(event.target.id==='level-show-names'){level.showNames=event.target.checked;void redraw();}
    if(event.target.id==='level-show-solid'){level.showSolid=event.target.checked;void redraw();}
    if(event.target.id==='level-plane'){await host.dropPreview();const id=level.id;ed.level=null;await load(id,Number(event.target.value));host.update(['scene-level','scene-changes']);}
   });

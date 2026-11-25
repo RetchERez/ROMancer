@@ -7,6 +7,7 @@ and a candle byte each, but its own tables, banks, record layouts and RAM; nothi
 from __future__ import annotations
 
 from . import Profile, Watcher
+from .castlevania import variant_names
 
 HEADER_NES = 16
 
@@ -37,8 +38,62 @@ class Castlevania3:
              0xAD: 'Large heart', 0xAE: 'Small heart or whip upgrade', 0xAF: 'Double shot', 0xB0: 'Triple shot'}
     SUBWEAPONS = range(0x93, 0x98)  # the game swaps these for the partner's own item when a partner is chosen ($A30B)
     CANDLES = {0x90: 'Candle', 0x91: 'Fire bowl', 0x92: 'Candle (0x92)'}
-    # spawner types named by spawning each one and looking at what the game drew (trace/v15_profiles/castlevania23)
-    ENEMIES = {0x01: 'Zombies', 0x02: 'Zombies', 0x05: 'Skeleton (rises from the ground)', 0x32: 'Bone-throwing skeleton'}
+    # spawner types: (name, what it does), named by putting each record alone in a zone of a room that uses it (ROM
+    # copy), sending the game there and watching (trace/v15_profiles/naming_castlevania/names.png). Types that showed
+    # nothing there (bosses, or ones that wait for something the scripted visit never did) keep their numbers.
+    ENEMIES = {
+        0x01: ('Zombies', 'Zombies rise and walk toward you along the floor.'),
+        0x02: ('Zombie', 'Walks toward you along the floor.'),
+        0x03: ('Medusa heads', 'Medusa heads fly across the screen in a wavy line.'),
+        0x04: ('Winged demon', 'A winged demon with a shield that flies down from above.'),
+        0x05: ('Sword skeleton', 'Rises out of the ground and comes at you with a sword and shield.'),
+        0x07: ('Hunchbacked ape', 'Crouches on top of a pillar.'),
+        0x08: ('Red skeleton', 'Walks toward you along the floor.'),
+        0x0B: ('Fleaman', 'Hops about and leaps at you.'),
+        0x0C: ('Bat', 'Flies low toward you.'),
+        0x0D: ('Bat, hanging', 'Hangs still until you come near.'),
+        0x0E: ('Bone pillar', 'A stack of skulls that stays in place and spits fireballs.'),
+        0x0F: ('Axe Knight', 'Walks toward you and throws axes.'),
+        0x11: ('Fishman', 'Stands at the water and waits.'),
+        0x12: ('Fishman', 'Stands on a ledge by the water.'),
+        0x13: ('Chain skeleton', 'Swings a long chain whip at you.'),
+        0x14: ('Floating eye', 'A red eye that hovers in the air.'),
+        0x15: ('Green slime', 'Hops along the floor.'),
+        0x16: ('Bone-throwing skeleton', 'Throws bones at you in an arc.'),
+        0x17: ('Bone whip skeleton', 'Walks toward you swinging a curved bone.'),
+        0x18: ('Ghost', 'Floats toward you.'),
+        0x19: ('Red skeleton', 'Walks toward you along the floor.'),
+        0x1B: ('Spider, hanging', 'Hangs still under a ledge.'),
+        0x1D: ('Bat, hanging', 'Hangs still until you come near.'),
+        0x20: ("Will-o'-the-wisp", 'A blue flame with a face that floats in place and flickers.'),
+        0x23: ('Death', 'The Grim Reaper; he floats about swinging his scythe.'),
+        0x24: ('Purple ghoul', 'Walks slowly along the floor.'),
+        0x25: ("Will-o'-the-wisp", 'A blue flame with a face that grows and shrinks in place.'),
+        0x26: ('Swinging pendulum', 'A clock pendulum that swings back and forth.'),
+        0x27: ('Raven', 'Perches, then flies down at you.'),
+        0x28: ('Hooded spearman', 'A hooded figure that stands guard with a spear.'),
+        0x29: ('Spider', 'Lowers itself on a thread and climbs back up.'),
+        0x2D: ('Red mushroom creature', 'Stands rooted to the floor.'),
+        0x2E: ('Red hopping blob', 'Hops toward you.'),
+        0x32: ('Bone-throwing skeleton', 'Throws bones at you in an arc.'),
+        0x3A: ('Zombies', 'A crowd of zombies that walks toward you along the floor.'),
+        0x3B: ('Mud men', 'Mud men rise out of the floor and shamble toward you.'),
+        0x3C: ('Red crawler', 'Crouches on the floor.'),
+        0x3D: ('Fishman, leaps from the water', 'Leaps out of the water and lands near you.'),
+        0x3F: ('Flame man', 'A man made of fire that stands burning.'),
+        0x40: ('Armored knight', 'Walks slowly toward you.'),
+        0x41: ('Bone pillar', 'A stack of skulls on the wall that spits fireballs.'),
+        0x43: ('Flock of bats', 'A flock of bats that takes off and flies at you.'),
+        0x44: ('Owl', 'Swoops down from the trees and perches.'),
+        0x45: ('Spiked ball', 'Rolls and bounces along.'),
+        0x46: ('Harpy', 'Flies overhead and drops a fleaman.'),
+        0x47: ('Bat', 'Flies toward you in a wavy line.'),
+        0x4A: ('Medusa head', 'Flies at you in a wavy line.'),
+        0x4B: ('Ghost', 'Drips from the ceiling, then floats toward you as a ghost.'),
+        0x4F: ('Zombies', 'A crowd of zombies that walks toward you along the floor.'),
+        0x51: ('Fishman', 'Stands on a ledge by the water.'),
+        0x52: ('Winged demon', 'A winged demon with a shield that flies down from above.'),
+    }
     # Stage objects (breakable blocks, moving platforms and the like): placed by $9D17 / $9EA5, code and tables in the
     # 16 KB bank at ROM 0x8000 run at CPU $8000. Room list: byte at word(word($A073 + block * 2) + sub * 2) + room, 0
     # none, else the list at word($A199 + index * 2): 8-byte records ended by $FF.
@@ -278,7 +333,10 @@ class Castlevania3:
         return self.ITEMS.get(code, f'Item {code:#04x}')
 
     def enemy_name(self, kind: int) -> str:
-        return self.ENEMIES.get(kind, f'Enemy {kind:#04x}')
+        return self.ENEMIES[kind][0] if kind in self.ENEMIES else f'Enemy {kind:#04x}'
+
+    def enemy_does(self, kind: int):
+        return self.ENEMIES[kind][1] if kind in self.ENEMIES else None
 
     def block_label(self, block: int, sub: int) -> str:
         """The label the status bar shows ($8D96 in ROM bank 0: one string per block at $8DCF, the block's character
@@ -305,13 +363,15 @@ class Castlevania3:
                                 'drop': rec['drop'], 'byte': rec['byte'], 'name': self.CANDLES.get(rec['type'], 'Candle')})
                 elif rec['type']:
                     out.append({'kind': 'venemy', 'number': rec['number'], 'type': rec['type'], 'x': rec['x'], 'y': y,
-                                'p1': rec['p1'], 'p2': rec['p2'], 'byte': rec['byte'], 'name': self.enemy_name(rec['type'])})
+                                'p1': rec['p1'], 'p2': rec['p2'], 'byte': rec['byte'], 'name': self.enemy_name(rec['type']),
+                                'does': self.enemy_does(rec['type'])})
             return out + self._block_rows(block, sub, room)
         for row in self.zones(block, sub, room):
             base = row['zone'] * self.ZONE - self.ZONE
             enemy = row['enemy'] or row['hard_enemy']
             if enemy:
                 out.append({'kind': 'enemy', 'zone': row['zone'], 'type': enemy['type'], 'name': self.enemy_name(enemy['type']),
+                            'does': self.enemy_does(enemy['type']),
                             'x': base + enemy['dx'], 'y': enemy['y'], 'index': row['enemy_index'], 'byte': row['enemy_byte'],
                             'hard': row['enemy'] is None})
             if row['candle']:
@@ -546,7 +606,7 @@ class Castlevania3Profile(Castlevania3, Profile):
         return f'Block {label}' + (f', room {room + 1}' if many else '')
 
     def choices(self):
-        return {'enemies': [{'value': c['index'], 'name': f'{c["name"]} (height {c["y"]})'} for c in self.enemy_choices()],
+        return {'enemies': variant_names(self.enemy_choices()),
                 'items': [{'value': code, 'name': self.item_name(code)} for code in self.drop_codes()],
                 'block_items': [{'value': code, 'name': name} for code, name in self.BLOCK_ITEMS.items()]}
 
@@ -559,9 +619,15 @@ class Castlevania3Profile(Castlevania3, Profile):
                 key = (rec['type'], rec['p1'], rec['p2'])
                 if not rec['candle'] and rec['type'] and key not in seen:
                     seen.add(key)
-                    found.append({'value': f'{rec["type"]}:{rec["p1"]}:{rec["p2"]}', 'name': self.enemy_name(rec['type']) +
-                                  (f' (settings {rec["p1"]}, {rec["p2"]})' if rec['p1'] or rec['p2'] else '')})
-        return sorted(found, key=lambda c: c['value'])
+                    found.append({'value': f'{rec["type"]}:{rec["p1"]}:{rec["p2"]}', 'name': self.enemy_name(rec['type']),
+                                  'key': (rec['type'], rec['p1'], rec['p2'])})
+        found.sort(key=lambda c: c['value'])
+        # the same enemy with other settings: number them in the order of their settings
+        out = []
+        for c in found:
+            same = sorted(o['key'] for o in found if o['name'] == c['name'])
+            out.append({'value': c['value'], 'name': c['name'] + (f', kind {same.index(c["key"]) + 1}' if len(same) > 1 else '')})
+        return out
 
     def objects(self, part, sub=None, room=None):
         if not isinstance(part, dict):
@@ -873,9 +939,35 @@ class Castlevania2Profile(Castlevania2, Profile):
     """Castlevania II on the common profile interface. Parts are {'kind', 'area', 'room'} (RAM $30, $50, $51); the
     camera is $53/$54 across and $8C/$8D down, in the room's pixels."""
     sha256s = (Castlevania2.sha256,)
-    # named by spawning each type in Jova at night and looking (trace/v15_profiles/castlevania23/shots/cv2_enemies_*.png);
-    # types from other places draw with the town's graphics there, so only the town's own enemy is named
-    ENEMIES = {0x17: 'Zombie'}
+    # (name, what it does), named by keeping one record of the type in a room that uses it (the room's other enemies
+    # removed in a ROM copy), sending the game there and watching (trace/v15_profiles/naming_castlevania/names.png).
+    # Types the scripted visit never brought on screen keep their numbers.
+    ENEMIES = {
+        0x03: ('Skeleton', 'Walks back and forth on the stairs and floors of the mansions.'),
+        0x04: ('Werewolf', 'Prowls back and forth near you.'),
+        0x06: ('Red beast', 'Crouches low and spits fireballs.'),
+        0x13: ('Blue ghoul', 'Lurches toward you through the woods.'),
+        0x15: ('Wall creature', 'Clings to a wall and spits fire.'),
+        0x17: ('Zombie', 'Walks toward you through town at night.'),
+        0x1D: ('Fire man', 'A man made of fire that walks about and throws fireballs.'),
+        0x02: ('Red snake', 'Wriggles in place on the wall.'),
+        0x05: ('Spear skeleton', 'Stands guard and thrusts a spear.'),
+        0x0D: ('Bone-throwing skeleton', 'Throws bones at you.'),
+        0x0F: ('Gargoyle', 'A winged demon that flies about and spits fireballs.'),
+        0x11: ('Bat', 'Flies about the room.'),
+        0x12: ('Wolf', 'Leaps at you.'),
+        0x16: ('Ghoul', 'Walks along the graveyard.'),
+        0x18: ('Fishman', 'Leaps out of the swamp and spits fireballs.'),
+        0x38: ('Grave hand', 'Pokes up out of the ground.'),
+        0x39: ('Ghost', 'Floats toward you.'),
+        0x3A: ('Mummy', 'Walks slowly toward you.'),
+        0x3B: ('Eagle', 'Swoops across the sky.'),
+        0x3F: ('Man-eating plant', 'Stays rooted and spits at you.'),
+        0x41: ('Floating eyeball', 'Drifts up and down above the ground.'),
+        0x42: ('Giant floating mask (boss)', 'A huge stone face that drifts about the room.'),
+        0x44: ('Death (boss)', 'The Grim Reaper; he swings his scythe at you.'),
+        0x4A: ('Bone serpent', 'A neck of bones that rises from the ground and spits fireballs.'),
+    }
 
     def where(self, ram):
         kind = ram[0x30]
@@ -890,7 +982,10 @@ class Castlevania2Profile(Castlevania2, Profile):
         return f'{place} {area + 1}, room {room + 1}'
 
     def enemy_name(self, kind: int) -> str:
-        return self.ENEMIES.get(kind, f'Enemy {kind:#04x}')
+        return self.ENEMIES[kind][0] if kind in self.ENEMIES else f'Enemy {kind:#04x}'
+
+    def enemy_does(self, kind: int):
+        return self.ENEMIES[kind][1] if kind in self.ENEMIES else None
 
     def _choices(self):
         if hasattr(self, '_cached'):
@@ -934,6 +1029,8 @@ class Castlevania2Profile(Castlevania2, Profile):
             else:
                 row.update(style='enemy', name=self.enemy_name(rec['type']), remove='Remove this enemy',
                            fields=[{'key': 'type', 'label': 'Swap for', 'value': rec['type'], 'choices': 'enemies'}])
+                if self.enemy_does(rec['type']):
+                    row['does'] = self.enemy_does(rec['type'])
                 if kind == 0:
                     row['note'] = 'In towns the game places enemies only at night.'
             out.append(row)

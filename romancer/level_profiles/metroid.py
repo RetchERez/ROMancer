@@ -1,4 +1,4 @@
-"""Metroid (USA) and Kid Icarus (USA, Europe) (Rev 1): enemies, items, doors and block roles.
+"""Metroid (USA) and Kid Icarus (USA, Europe) (Rev 1, worlds 1 to 3): enemies, items, doors and block roles.
 
 Both games are MMC1 cartridges of eight 16 KB banks with the last bank fixed at $C000; the reading helpers (`_Cart`) are
 shared. The level formats differ and each game has its own decoders below, proven separately (research notes:
@@ -499,53 +499,106 @@ class MetroidProfile(Metroid, Profile):
 # ------------------------------------------------------------------------------------------------------------ Kid Icarus
 
 class KidIcarus(_Cart):
-    """Kid Icarus (USA, Europe) (Rev 1). World 1 keeps its level data in bank 6 and the game copies $0F00 bytes of it
-    to cartridge RAM $7000 when the world starts (bank 6 $98D0; source words at $9907: $9940 while $A0 is 2, world 1);
-    the stage code (bank 2) reads the copy. All tables below are read by bank 2 (world 1) and were proven by replays
-    (research notes).
+    """Kid Icarus (USA, Europe) (Rev 1), worlds 1 to 3 (research notes: research/metroid-level-profile.md).
 
-    In the copy, each per-stage table is a word per stage pointing at a byte per screen, read with the screen number
-    $04D1 as the index (the screen that is coming into view at the top):
-      $7BF0  screen layouts (words), $FFFF ends them; a layout is one byte, then [YX, structure, palette] to $FD
-      $7CD0  enemy group A (slots $0760-$0790): the kind for all four slots, read when all four are empty
-             (0 none, 5 Keron, 8 Monoeye, 10 a red floater, 13 leave the slots alone)
-      $7D05  a Reaper for slot $0760: YX (row = the scroll where it starts, column = x); 0 none
-      $7D3A  enemy group B (slots $07C0-$07D8): 0 none, 2 Shemum (four), 3 Nettler (two), 13 leave alone
-      $7D6F  a Reaper for slot $07C0, as $7D05
-      $7E07  number of item records; $7E08 records [stage, screen, YX, item] (0 harp, 1 chalice), in play order
-    $7B60, $7B80, $7BA0 and $7BC0 are four lists of up to 8 records [stage, screen, scroll, 0] ($FF ends a list; bank 2
-    $8B51): when the stage ($0130), the screen ($04D1) and the fine scroll ($FD) match a record, the game starts a moving
-    platform (kind 15, $0701 = $78) in that list's slot ($0760, $0770, $0780, $0790).
+    $A0 says what is being played: 2 world 1, 3 fortress 1, 4 world 2, 5 fortress 2, 6 world 3, 7 fortress 3, 8 world 4
+    (bank 7 $C15C: the code bank of each). World 1 (bank 2 $8000) and world 3 (bank 3 $8000) climb up; when such a world
+    starts the game copies $0F00 bytes of bank 6 to cartridge RAM $7000 (bank 6 $98D0: $9940 for world 1, $A790 for
+    world 3) and the stage code reads the copy. World 2 scrolls across; its code (bank 2 $99A0) reads its tables
+    straight from bank 2. Each world's code is its own copy of the same routines, reading its own addresses:
 
-    Chamber doors are not in the copy: bank 7 $F001 (the word at bank 2 $8056) lists [stage, screen, YX, block] to $FF.
-    When a screen loads (bank 6 $94FE) the game puts block $50 at YX and the door's block below it in the screen's
-    block map ($0500 for even screens, $05F0 for odd ones). Going through a door starts the chamber whose number is the
-    low nibble of that block (bank 7 $CD5C -> bank 6 $8075, $3B).
+      world 1 (copy)   world 2 (bank 2)   world 3 (copy)
+      $7BF0            $BB04              $772B      screens of each stage (words; world 2: two bytes a screen)
+      $7CD0            $BC3F              $77E1      enemy group A (slots $0760-$0790), a byte per screen
+      $7D05            -                  $781B      a Reaper for slot $0760: YX, 0 none
+      $7D3A            $BCF9              $7855      enemy group B (slots $07C0-$07D8), a byte per screen
+      $7D6F            -                  $788F      a Reaper for slot $07C0
+      $7E07            $BC2A              $792C      number of item records, then the records
+      $7B60...         $BDB3...           $769B...   four lists of moving platforms [stage, screen, scroll, 0] ($FF ends)
+
+    Per-stage tables hold a word per stage pointing at a byte per screen, read with the screen number $04D1 as the index
+    (the screen coming into view: at the top in worlds 1 and 3, on the right in world 2). Group A: 13 leaves the slots
+    alone (also group B in worlds 1 and 3). Item records are [stage, screen, YX, item] (0 harp, 1 chalice) in worlds 1
+    and 2; in world 3 they are [stage, screen, YX] and always a harp. The game walks the records in order from the first
+    at each stage start (index $A1), skipping those behind it and waiting at the first one ahead, so a record after one
+    of a later stage or a later place can never come; such records are not shown.
+
+    Chamber doors are in the fixed bank, found through the word at $7F56 (the $7F00 code each world copies from its
+    bank: bank 2 $8056 -> $F001 world 1, bank 2 $99F6 -> $F037 world 2, bank 3 $8056 -> $F095 world 3): [stage, screen,
+    YX, block] to $FF. When a screen loads (bank 6 $94FE) the game puts block $50 at YX and the door's block below it in
+    the screen's block map ($0500 for even screens, $05F0 for odd ones). Going through a door starts the chamber whose
+    number is the low nibble of that block (bank 6 $803C, the same rooms in every world).
     """
     name = 'Kid Icarus'
     sha256 = '335d09f48e5ebb1d7123d1599c5867b9e52b5b4393b7ad92c39cf6a064424233'
-    WORLDS = {1: (2, 0x9940)}                       # world: ($A0 while playing it, start of its data in bank 6)
-    LISTS = (0x7B60, 0x7B80, 0x7BA0, 0x7BC0)
+    WORLDS = {
+        1: {'mode': 2, 'copy': 0x9940, 'way': 'up', 'screens': 0x7BF0, 'groupA': 0x7CD0, 'reaperA': 0x7D05,
+            'groupB': 0x7D3A, 'reaperB': 0x7D6F, 'item_count': 0x7E07, 'item_size': 4,
+            'lists': (0x7B60, 0x7B80, 0x7BA0, 0x7BC0), 'doors': (2, 0x8056), 'keepB': True},
+        2: {'mode': 4, 'bank': 2, 'way': 'across', 'screens': 0xBB04, 'groupA': 0xBC3F, 'groupB': 0xBCF9,
+            'item_count': 0xBC2A, 'item_size': 4, 'lists': (0xBDB3, 0xBDD3, 0xBDF3, 0xBE13), 'doors': (2, 0x99F6),
+            'keepB': False},
+        3: {'mode': 6, 'copy': 0xA790, 'way': 'up', 'screens': 0x772B, 'groupA': 0x77E1, 'reaperA': 0x781B,
+            'groupB': 0x7855, 'reaperB': 0x788F, 'item_count': 0x792C, 'item_size': 3,
+            'lists': (0x769B, 0x76BB, 0x76DB, 0x76FB), 'doors': (3, 0x8056), 'keepB': True},
+    }
+    # world 1 names of the tables (kept for callers that read them)
+    LISTS = WORLDS[1]['lists']
     SCREENS, GROUP_A, REAPER_A, GROUP_B, REAPER_B = 0x7BF0, 0x7CD0, 0x7D05, 0x7D3A, 0x7D6F
     ITEM_COUNT, ITEMS_AT = 0x7E07, 0x7E08
-    DOOR_LIST = (2, 0x8056)                         # bank and address of the word pointing at the door list (bank 7)
+    DOOR_LIST = WORLDS[1]['doors']
     KEEP = 13                                       # group value: leave the slots as they are
+    # names from spawning each kind and looking at what the game draws (research notes; pictures in the scratch folders)
     ENEMIES = {5: 'Keron', 8: 'Monoeye', 10: 'Red floater', 2: 'Shemum', 3: 'Nettler', 13: 'Reaper', 15: 'Moving platform'}
     KINDS_A, KINDS_B = (5, 8, 10), (2, 3)
+    WORLD_ENEMIES = {
+        1: ({5: 'Keron', 8: 'Monoeye', 10: 'Red floater'}, {2: 'Shemum', 3: 'Nettler'}),
+        2: ({4: 'Rokman (likely)', 5: 'Keepah (likely)', 7: 'Red critter', 8: 'Biting plant head', 10: 'Pink floater'},
+            {2: 'Enemy 2', 3: 'Burrower', 9: 'Pale walker'}),
+        3: ({7: 'Enemy 7', 8: 'Komayto (likely)', 10: 'Orange walker', 11: 'Orange spawner', 12: 'Blue winged imp'},
+            {2: 'Shemum', 3: 'Purple ring'}),
+    }
     ITEMS = {0: 'Harp', 1: 'Chalice'}
     CHAMBERS = {0x20: 'Treasure chamber', 0x22: 'Enemy lair', 0x23: 'Training room', 0x24: 'God’s chamber',
                 0x25: 'Shop', 0x26: 'Black market'}
+    HOT_SPRING = 0x27
     CHAMBER_DETAIL = {0x20: 'a room of pots', 0x22: 'a room full of flying enemies',
                       0x23: 'the trainer says CAN YOU ENDURE THIS HARSH TRAINING',
                       0x24: 'a god gives an arrow when the score is at least 10000; otherwise the room is empty',
                       0x25: 'the shopkeeper says MAY I HELP YOU? WE HAVE EVERYTHING',
-                      0x26: 'the shopkeeper says WHAT DO YA SAY! TRY BUYING FROM ME'}
+                      0x26: 'the shopkeeper says WHAT DO YA SAY! TRY BUYING FROM ME',
+                      0x27: 'a pool that fills Pit’s health while he stands in it'}
 
+    @classmethod
+    def chambers(cls, world: int) -> dict:
+        """The chambers a world's doors may lead to: world 1's own six; worlds 2 and 3 also have hot springs."""
+        out = dict(cls.CHAMBERS)
+        if world != 1:
+            out[cls.HOT_SPRING] = 'Hot spring chamber'
+        return out
+
+    def kinds(self, world: int, group: str) -> tuple:
+        names = self.WORLD_ENEMIES[world][0 if group == 'A' else 1]
+        return tuple(names)
+
+    def enemy_name(self, world: int, group: str, kind: int) -> str:
+        return self.WORLD_ENEMIES[world][0 if group == 'A' else 1].get(kind, f'Enemy {kind}')
+
+    # ---- reading
     def copy_offset(self, world: int, address: int) -> int:
-        """ROM offset of a byte of the world's data, by its address in the copy the game reads ($7000-$7EFF)."""
-        if not 0x7000 <= address < 0x7F00:
+        """ROM offset of a byte of the world's data, by the address the world's code reads it at ($7000-$7EFF in the
+        copy for worlds 1 and 3, bank 2 $8000-$BFFF for world 2)."""
+        cfg = self.WORLDS[world]
+        if 'copy' in cfg:
+            if not 0x7000 <= address < 0x7F00:
+                raise ValueError('That is not part of the world data.')
+            return self.offset(6, cfg['copy'] + address - 0x7000)
+        if not 0x8000 <= address < 0xC000:
             raise ValueError('That is not part of the world data.')
-        return self.offset(6, self.WORLDS[world][1] + address - 0x7000)
+        return self.offset(cfg['bank'], address)
+
+    def _inside(self, world: int, address: int) -> bool:
+        return (0x7000 <= address < 0x7F00) if 'copy' in self.WORLDS[world] else (0x8000 <= address < 0xC000)
 
     def ram_byte(self, world: int, address: int) -> int:
         return self.rom[self.copy_offset(world, address)]
@@ -554,32 +607,37 @@ class KidIcarus(_Cart):
         return self.ram_byte(world, address) | self.ram_byte(world, address + 1) << 8
 
     def stage_screens(self, world: int, stage: int) -> list:
-        """RAM addresses of a stage's screens, in the order of the game's screen number $04D1."""
-        table = self.ram_word(world, self.SCREENS + stage * 2)
+        """A stage's screens, in the order of the game's screen number $04D1: the word of each (in world 1 and 3 the
+        address of its layout; in world 2 the two bytes the game reads, $FF in the second ends them)."""
+        cfg = self.WORLDS[world]
+        table = self.ram_word(world, cfg['screens'] + stage * 2)
         out = []
         for k in range(64):
-            if not 0x7000 <= table + 2 * k + 1 < 0x7F00:
+            if not (self._inside(world, table + 2 * k) and self._inside(world, table + 2 * k + 1)):
                 break
             word = self.ram_word(world, table + 2 * k)
-            if word == 0xFFFF or not 0x7000 <= word < 0x7F00:
+            if cfg['way'] == 'across':
+                if word >> 8 == 0xFF:
+                    break
+            elif word == 0xFFFF or not 0x7000 <= word < 0x7F00:
                 break
             out.append(word)
         return out
 
     def per_screen(self, world: int, table: int, stage: int) -> list:
-        """[(screen, RAM address, value)] of a per-screen table for the stage's screens 1 and up."""
+        """[(screen, address, value)] of a per-screen table for the stage's screens 1 and up."""
         start = self.ram_word(world, table + stage * 2)
         out = []
         for screen in range(1, len(self.stage_screens(world, stage))):
             at = start + screen
-            if 0x7000 <= at < 0x7F00:
+            if self._inside(world, at):
                 out.append((screen, at, self.ram_byte(world, at)))
         return out
 
     def spawns(self, world: int) -> list:
-        """Every record of the four lists: {'list', 'number', 'stage', 'screen', 'scroll', 'at' (RAM address)}."""
+        """Every record of the four lists: {'list', 'number', 'stage', 'screen', 'scroll', 'at' (address)}."""
         out = []
-        for k, start in enumerate(self.LISTS):
+        for k, start in enumerate(self.WORLDS[world]['lists']):
             for n in range(8):
                 at = start + 4 * n
                 first = self.ram_byte(world, at)
@@ -590,7 +648,7 @@ class KidIcarus(_Cart):
         return out
 
     def remove_spawn(self, world: int, list_number: int, number: int) -> list:
-        start = self.LISTS[list_number]
+        start = self.WORLDS[world]['lists'][list_number]
         count = sum(1 for r in self.spawns(world) if r['list'] == list_number)
         if not 0 <= number < count:
             raise ValueError('That is not part of this stage any more. Reopen the map.')
@@ -599,38 +657,57 @@ class KidIcarus(_Cart):
         return _shift_out(self.rom, offsets, rest, 0xFF)
 
     def items(self, world: int) -> list:
-        """The item records: {'number', 'stage', 'screen', 'yx', 'item', 'at'}."""
-        count = self.ram_byte(world, self.ITEM_COUNT)
+        """The item records: {'number', 'stage', 'screen', 'yx', 'item' (None in world 3: always a harp), 'at', 'live'
+        (the game can reach it: no earlier record is of a later stage or a later place of the same stage)}."""
+        cfg = self.WORLDS[world]
+        count, size = self.ram_byte(world, cfg['item_count']), cfg['item_size']
         out = []
         for n in range(min(count, 0x3E)):
-            at = self.ITEMS_AT + 4 * n
+            at = cfg['item_count'] + 1 + size * n
+            if not self._inside(world, at + size - 1):
+                break
             out.append({'number': n, 'stage': self.ram_byte(world, at), 'screen': self.ram_byte(world, at + 1),
-                        'yx': self.ram_byte(world, at + 2), 'item': self.ram_byte(world, at + 3), 'at': at})
+                        'yx': self.ram_byte(world, at + 2), 'item': self.ram_byte(world, at + 3) if size == 4 else None,
+                        'at': at})
+        for k, r in enumerate(out):
+            r['live'] = r['stage'] < 3 and all(e['stage'] < r['stage'] or (e['stage'] == r['stage'] and
+                                                                           self._place(world, e) <= self._place(world, r))
+                                               for e in out[:k])
         return out
+
+    def _place(self, world: int, record: dict) -> tuple:
+        """Where in a stage an item record comes, in the order the game meets it."""
+        yx = record['yx']
+        if self.WORLDS[world]['way'] == 'across':
+            return record['screen'], yx & 15
+        return record['screen'], -(yx & 0xF0)
 
     def remove_item(self, world: int, number: int) -> list:
         """Writes that take item record `number` out: the later records move down one place and the count drops by one."""
+        cfg = self.WORLDS[world]
+        size = cfg['item_size']
         records = self.items(world)
         if not 0 <= number < len(records):
             raise ValueError('That is not part of this stage any more. Reopen the map.')
+        first = cfg['item_count'] + 1
         writes = []
         for n in range(number, len(records) - 1):
-            for k in range(4):
-                off = self.copy_offset(world, self.ITEMS_AT + 4 * n + k)
-                new = self.ram_byte(world, self.ITEMS_AT + 4 * (n + 1) + k)
+            for k in range(size):
+                off = self.copy_offset(world, first + size * n + k)
+                new = self.ram_byte(world, first + size * (n + 1) + k)
                 if self.rom[off] != new:
                     writes.append((off, self.rom[off], new))
-        off = self.copy_offset(world, self.ITEM_COUNT)
+        off = self.copy_offset(world, cfg['item_count'])
         writes.append((off, self.rom[off], len(records) - 1))
         return writes
 
-    def door_list(self) -> int:
-        bank, address = self.DOOR_LIST
+    def door_list(self, world: int = 1) -> int:
+        bank, address = self.WORLDS[world]['doors']
         return self.word(bank, address)
 
-    def doors(self) -> list:
-        """World 1's chamber doors: {'number', 'stage', 'screen', 'yx', 'block', 'offset' (ROM offset of the record)}."""
-        start = self.door_list()
+    def doors(self, world: int = 1) -> list:
+        """A world's chamber doors: {'number', 'stage', 'screen', 'yx', 'block', 'offset' (ROM offset of the record)}."""
+        start = self.door_list(world)
         if not 0xC000 <= start < 0xFFF0:
             return []
         out = []
@@ -642,11 +719,11 @@ class KidIcarus(_Cart):
                         'block': self.at(7, at + 3), 'offset': self.offset(7, at)})
         return out
 
-    def remove_door(self, number: int) -> list:
-        records = self.doors()
+    def remove_door(self, number: int, world: int = 1) -> list:
+        records = self.doors(world)
         if not 0 <= number < len(records):
             raise ValueError('That is not part of this stage any more. Reopen the map.')
-        start = self.door_list() + 4 * number
+        start = self.door_list(world) + 4 * number
         rest = [self.at(7, start + 4 + k) for k in range(4 * (len(records) - number - 1))]
         return _shift_out(self.rom, [self.offset(7, start + k) for k in range(len(rest) + 1)], rest, 0xFF)
 
@@ -654,6 +731,11 @@ class KidIcarus(_Cart):
     def block_map(screen: int) -> int:
         """RAM address of a screen's block map (16 x 15 blocks, a byte each)."""
         return 0x5F0 if screen & 1 else 0x500
+
+
+def _ki_calm(ram, mode: int) -> bool:
+    """Playing the stage itself (not a chamber): $3A is below $10 in world 1 (as measured there) and 0 in worlds 2-3."""
+    return ram[0x3A] < 0x10 if mode == 2 else ram[0x3A] == 0
 
 
 class _KidIcarusWatcher(Watcher):
@@ -664,21 +746,22 @@ class _KidIcarusWatcher(Watcher):
 
     def here(self, ram) -> bool:
         w = self.w
-        return ram[0xA0] == w['mode'] and ram[0x3A] < 0x10 and ram[0x130] == w['stage'] and ram[0x4D1] == w['screen']
+        return ram[0xA0] == w['mode'] and _ki_calm(ram, w['mode']) and ram[0x130] == w['stage'] and ram[0x4D1] == w['screen']
 
 
 class _KiSpawnWatcher(_KidIcarusWatcher):
     """A removed moving platform: the list's slot ($0760 + 16 * list) must not get kind 15 ($78) when the stage, screen
-    and scroll of the record come by."""
+    and scroll of the record come by (the scroll is $FD, or $FE in world 2)."""
 
     def see(self, ram, frame, run):
         w = self.w
         if not self.here(ram):
             return False
         slot = 0x760 + 16 * w['list']
-        if ram[0xFD] == w['scroll']:
+        if ram[w.get('scroll_at', 0xFD)] == w['scroll']:
             self.reached = True
-        if self.reached and ram[slot + 1] == 0x78 and ram[slot] < 8:
+        start = ram[slot + 3] >= 0xE8 if 'scroll_at' in w else ram[slot] < 8     # just started (right edge, or top)
+        if self.reached and ram[slot + 1] == 0x78 and start:
             self.seen = True
             return True
         return False
@@ -720,7 +803,9 @@ class _KiWaveWatcher(_KidIcarusWatcher):
         w = self.w
         if self.seen is None and self.empty < 30:
             return super().result()
-        got = KidIcarus.ENEMIES.get(self.seen, f'enemy kind {self.seen}') if self.seen else 'no enemies'
+        world = w.get('world', 1)
+        names = KidIcarus.WORLD_ENEMIES[world][0 if w['group'] == 'A' else 1]
+        got = names.get(self.seen, f'enemy kind {self.seen}') if self.seen else 'no enemies'
         ok = (self.seen or 0) == w['want']
         return {'state': 'good' if ok else 'bad', 'text': f'Played from the start, that screen brought {got}.'}
 
@@ -754,8 +839,9 @@ class _KiReaperWatcher(_KidIcarusWatcher):
 
 
 class _KiItemWatcher(_KidIcarusWatcher):
-    """An item record: slot $0750 gets state $81 at the record's column when the screen scrolls to its row; $0752 is
-    the item (0 harp, 1 chalice)."""
+    """An item record: slot $0750 gets state $81 when the record's place comes; $0752 is the item (0 harp, 1 chalice).
+    Climbing worlds: at the record's column (x $0753) when the screen scrolls to its row. World 2: at the record's row
+    (y $0750) when the fine scroll $FE reaches its column."""
 
     def __init__(self, watch):
         super().__init__(watch)
@@ -765,9 +851,10 @@ class _KiItemWatcher(_KidIcarusWatcher):
         w = self.w
         state = ram[0x751]
         if self.here(ram):
-            if ram[0xFD] <= w['row']:
+            across = w.get('way') == 'across'
+            if (ram[0xFE] >= w['col'] if across else ram[0xFD] <= w['row']):
                 self.reached = True
-            if state == 0x81 and self.prev != 0x81 and ram[0x753] == w['x']:
+            if state == 0x81 and self.prev != 0x81 and (ram[0x750] == w['row'] if across else ram[0x753] == w['x']):
                 self.seen = ram[0x752]
                 return True
         self.prev = state
@@ -797,14 +884,17 @@ class _KiDoorWatcher(_KidIcarusWatcher):
 
     def see(self, ram, frame, run):
         w = self.w
-        if not (ram[0xA0] == w['mode'] and ram[0x3A] < 0x10 and ram[0x130] == w['stage']
+        if not (ram[0xA0] == w['mode'] and _ki_calm(ram, w['mode']) and ram[0x130] == w['stage']
                 and w['screen'] <= ram[0x4D1] <= w['screen'] + 1):
             return False
         self.frames += 1
-        if self.frames < 4:
+        top, block = ram[w['at'] - 16], ram[w['at']]
+        door = top == 0x50 and 0x20 <= block < 0x30
+        # world 1: decide 4 looks after the screen comes; worlds 2 and 3 (where the stage may still be loading when the
+        # screen number is already set, as after a password): at once when a door is there, otherwise after `settle`
+        if self.frames < 4 or (not door and self.frames < w.get('settle', 4)):
             return False
         self.reached = True
-        top, block = ram[w['at'] - 16], ram[w['at']]
         self.seen = (top, block)
         return True
 
@@ -818,23 +908,27 @@ class _KiDoorWatcher(_KidIcarusWatcher):
             return {'state': 'good' if ok else 'bad', 'text': 'Played from the start, there is no door there any more.' if ok
                     else 'Played from the start, the door is still there.'}
         ok = top == 0x50 and block == w['want']
-        got = KidIcarus.CHAMBERS.get(block, f'chamber block {block:#04x}')
+        got = KidIcarus.chambers(w.get('world', 1)).get(block, f'chamber block {block:#04x}')
         return {'state': 'good' if ok else 'bad', 'text': f'Played from the start, the door there leads to: {got}.'}
 
 
 class KidIcarusProfile(KidIcarus, Profile):
-    """Kid Icarus on the common profile interface, for world 1. A part is {'world', 'stage'}; its pixels have y 0 at
-    the top of the screen the stage starts on and grow downwards (the screens above are negative). Screen k of the
-    tables (k = $04D1) has its top at y 2 - 240 * k."""
+    """Kid Icarus on the common profile interface, for worlds 1 to 3 (not the fortresses). A part is {'world', 'stage'}.
+    Worlds 1 and 3 climb: the part's pixels have y 0 at the top of the screen the stage starts on and grow downwards
+    (the screens above are negative); screen k of the tables (k = $04D1) has its top at y 2 - 240 * k. World 2 scrolls
+    across: x is the camera ($04D1 - 1) * 256 + $FE, y the screen's own; screen k of the tables starts at x 256 * k."""
     sha256s = (KidIcarus.sha256,)
     START_SCROLL = 0xEE                                  # $FD when a stage starts (bank 2 $971D)
 
     def where(self, ram):
-        world = next((w for w, (mode, _) in self.WORLDS.items() if ram[0xA0] == mode), None)
-        if world is None or ram[0x3A] >= 0x10:          # title and menus, the other worlds and fortresses, chambers
+        world = next((w for w, cfg in self.WORLDS.items() if ram[0xA0] == cfg['mode']), None)
+        if world is None or not _ki_calm(ram, ram[0xA0]):   # title and menus, fortresses, chambers
             return None
+        part = {'world': world, 'stage': ram[0x130]}
+        if self.WORLDS[world]['way'] == 'across':
+            return {'part': part, 'x': (ram[0x4D1] - 1) * 256 + ram[0xFE], 'y': 0}
         y = -(ram[0x4D1] - 1) * 240 + ram[0xFD] - self.START_SCROLL
-        return {'part': {'world': world, 'stage': ram[0x130]}, 'x': 0, 'y': y}
+        return {'part': part, 'x': 0, 'y': y}
 
     def part_name(self, part):
         return f'Stage {part["world"]}-{int(part["stage"]) + 1}'
@@ -844,114 +938,160 @@ class KidIcarusProfile(KidIcarus, Profile):
         return 2 - 240 * screen
 
     def choices(self):
-        return {'enemiesA': [{'value': 0, 'name': 'No enemies'}] + [{'value': k, 'name': self.ENEMIES[k]} for k in self.KINDS_A],
-                'enemiesB': [{'value': 0, 'name': 'No enemies'}] + [{'value': k, 'name': self.ENEMIES[k]} for k in self.KINDS_B],
-                'items': [{'value': k, 'name': v} for k, v in self.ITEMS.items()],
-                'chambers': [{'value': k, 'name': v} for k, v in self.CHAMBERS.items()]}
+        out = {'items': [{'value': k, 'name': v} for k, v in self.ITEMS.items()]}
+        for world in self.WORLDS:
+            tail = '' if world == 1 else str(world)
+            for group in 'AB':
+                out[f'enemies{group}{tail}'] = [{'value': 0, 'name': 'No enemies'}] + [
+                    {'value': k, 'name': self.enemy_name(world, group, k)} for k in self.kinds(world, group)]
+        out['chambers'] = [{'value': k, 'name': v} for k, v in self.CHAMBERS.items()]
+        out['chambers2'] = [{'value': k, 'name': v} for k, v in self.chambers(2).items()]
+        return out
 
     def objects(self, part):
         world, stage = int(part['world']), int(part['stage'])
+        cfg = self.WORLDS[world]
+        across = cfg['way'] == 'across'
+        tail = '' if world == 1 else str(world)
         out = []
         for r in self.spawns(world):
             if r['stage'] != stage:
                 continue
+            if across:
+                x, y = (r['screen'] - 1) * 256 + r['scroll'] + 0xF8, 0x80 + 16
+                detail = f'starts at the right of the screen when screen {r["screen"]} has scrolled to {r["scroll"]}'
+            else:
+                x, y = 128, -(r['screen'] - 1) * 240 + r['scroll'] - self.START_SCROLL + 16
+                detail = f'starts at the top of the screen when screen {r["screen"]} has scrolled to {r["scroll"]}'
             out.append({'id': f'spawn:{r["list"]}:{r["number"]}', 'style': 'enemy', 'type': 0x78, 'name': 'Moving platform',
-                        'detail': f'starts at the top of the screen when screen {r["screen"]} has scrolled to {r["scroll"]}',
-                        'x': 128, 'y': -(r['screen'] - 1) * 240 + r['scroll'] - self.START_SCROLL + 16,
-                        'remove': 'Remove this', 'fields': []})
-        for group, table, kinds, x in (('A', self.GROUP_A, self.KINDS_A, 96), ('B', self.GROUP_B, self.KINDS_B, 160)):
-            for screen, at, value in self.per_screen(world, table, stage):
+                        'detail': detail, 'x': x, 'y': y, 'remove': 'Remove this', 'fields': []})
+        for group, x in (('A', 96), ('B', 160)):
+            kinds = self.kinds(world, group)
+            for screen, at, value in self.per_screen(world, cfg['group' + group], stage):
                 if value not in kinds:
                     continue
-                out.append({'id': f'group{group}:{screen}', 'style': 'enemy', 'type': value, 'name': self.ENEMIES[value],
-                            'detail': f'come as screen {screen} scrolls into view, when the last ones are gone',
-                            'x': x, 'y': -(screen - 1) * 240 + 24, 'remove': 'Remove these',
-                            'fields': [{'key': 'kind', 'label': 'Swap for', 'value': value, 'choices': f'enemies{group}'}]})
-        for group, table in (('A', self.REAPER_A), ('B', self.REAPER_B)):
+                if across:
+                    ox, oy = screen * 256 + (24 if group == 'A' else 56), (0x9A + 16 if group == 'A' else 112)
+                    detail = f'come as screen {screen} scrolls into view, when the last ones are gone'
+                else:
+                    ox, oy = x, -(screen - 1) * 240 + 24
+                    detail = f'come as screen {screen} scrolls into view, when the last ones are gone'
+                out.append({'id': f'group{group}:{screen}', 'style': 'enemy', 'type': value,
+                            'name': self.enemy_name(world, group, value), 'detail': detail, 'x': ox, 'y': oy,
+                            'remove': 'Remove these',
+                            'fields': [{'key': 'kind', 'label': 'Swap for', 'value': value, 'choices': f'enemies{group}{tail}'}]})
+        for group in 'AB':
+            table = cfg.get('reaper' + group)
+            if table is None:
+                continue
             for screen, at, yx in self.per_screen(world, table, stage):
                 if yx:
                     out.append({'id': f'reaper{group}:{screen}', 'style': 'enemy', 'type': 13, 'name': 'Reaper',
                                 'x': (yx & 15) * 16 + 8, 'y': self.top(screen) + (yx & 0xF0) + 16,
                                 'remove': 'Remove this enemy', 'fields': []})
         for r in self.items(world):
-            if r['stage'] != stage:
+            if r['stage'] != stage or not r['live']:
                 continue
-            out.append({'id': f'item:{r["number"]}', 'style': 'item', 'type': r['item'],
-                        'name': self.ITEMS.get(r['item'], f'Item {r["item"]:#04x}'),
-                        'detail': 'floats down from the top of the screen', 'x': (r['yx'] & 15) * 16 + 8,
-                        'y': self.top(r['screen']) + (r['yx'] & 0xF0) + 16, 'remove': 'Remove this item',
-                        'fields': [{'key': 'item', 'label': 'Item', 'value': r['item'], 'choices': 'items'}]
+            item = 0 if r['item'] is None else r['item']
+            if across:
+                x, y = r['screen'] * 256 + (r['yx'] & 15) * 16 + 8, (r['yx'] & 0xF0) + 16
+                detail = 'appears at the right of the screen'
+            else:
+                x, y = (r['yx'] & 15) * 16 + 8, self.top(r['screen']) + (r['yx'] & 0xF0) + 16
+                detail = 'floats down from the top of the screen'
+            if r['item'] is None:
+                detail += '; items in this world are always harps'
+            out.append({'id': f'item:{r["number"]}', 'style': 'item', 'type': item,
+                        'name': self.ITEMS.get(item, f'Item {item:#04x}'), 'detail': detail, 'x': x, 'y': y,
+                        'remove': 'Remove this item',
+                        'fields': [{'key': 'item', 'label': 'Item', 'value': item, 'choices': 'items'}]
                         if r['item'] in self.ITEMS else []})
-        for r in self.doors():
+        chambers = self.chambers(world)
+        for r in self.doors(world):
             if r['stage'] != stage:
                 continue
             block = r['block']
+            if across:
+                x, y = r['screen'] * 256 + (r['yx'] & 15) * 16 + 8, (r['yx'] & 0xF0) + 32
+            else:
+                x, y = (r['yx'] & 15) * 16 + 8, self.top(r['screen']) + (r['yx'] & 0xF0) + 32
             row = {'id': f'door:{r["number"]}', 'style': 'block', 'type': 'door',
-                   'name': self.CHAMBERS.get(block, f'Chamber {block:#04x}'), 'x': (r['yx'] & 15) * 16 + 8,
-                   'y': self.top(r['screen']) + (r['yx'] & 0xF0) + 32, 'remove': 'Remove this door',
-                   'fields': [{'key': 'chamber', 'label': 'Leads to', 'value': block, 'choices': 'chambers'}]
-                   if block in self.CHAMBERS else []}
-            if block in self.CHAMBER_DETAIL:
+                   'name': chambers.get(block, f'Chamber {block:#04x}'), 'x': x, 'y': y, 'remove': 'Remove this door',
+                   'fields': [{'key': 'chamber', 'label': 'Leads to', 'value': block,
+                               'choices': 'chambers' if world == 1 else 'chambers2'}] if block in chambers else []}
+            if block in self.CHAMBER_DETAIL and block in chambers:
                 row['detail'] = self.CHAMBER_DETAIL[block]
             out.append(row)
         return out
 
     def _table_entry(self, world, table, stage, screen):
-        entry = next((e for e in self.per_screen(world, table, stage) if e[0] == screen), None)
+        entry = next((e for e in self.per_screen(world, table, stage) if e[0] == screen), None) if table else None
         if entry is None:
             raise ValueError('That is not part of this stage any more. Reopen the map.')
         return entry
 
     def edit(self, part, object_id, values, remove=False):
         world, stage = int(part['world']), int(part['stage'])
-        mode = self.WORLDS[world][0]
+        if world not in self.WORLDS:
+            raise ValueError('ROMancer cannot change that yet.')
+        cfg = self.WORLDS[world]
+        across = cfg['way'] == 'across'
+        mode = cfg['mode']
         kind, _, rest = object_id.partition(':')
         base = {'mode': mode, 'stage': stage}
+        extra = {} if world == 1 else {'world': world}
         if kind == 'spawn':
             list_number, number = (int(v) for v in rest.split(':'))
             record = next((r for r in self.spawns(world) if r['list'] == list_number and r['number'] == number), None)
             if record is None or record['stage'] != stage or not remove:
                 raise ValueError('That is not part of this stage any more. Reopen the map.' if remove else
                                  'ROMancer cannot change that yet.')
+            watch = {'kind': 'spawn', **base, 'screen': record['screen'], 'scroll': record['scroll'], 'list': list_number, **extra}
+            if across:
+                watch['scroll_at'] = 0xFE
             return {'writes': self.remove_spawn(world, list_number, number),
-                    'title': f'Remove the moving platform (screen {record["screen"]})',
-                    'watch': {'kind': 'spawn', **base, 'screen': record['screen'], 'scroll': record['scroll'], 'list': list_number}}
+                    'title': f'Remove the moving platform (screen {record["screen"]})', 'watch': watch}
         if kind in ('groupA', 'groupB'):
             group = kind[-1]
             screen = int(rest)
-            _, at, value = self._table_entry(world, self.GROUP_A if group == 'A' else self.GROUP_B, stage, screen)
-            kinds = self.KINDS_A if group == 'A' else self.KINDS_B
+            _, at, value = self._table_entry(world, cfg['group' + group], stage, screen)
+            kinds = self.kinds(world, group)
             if value not in kinds:
                 raise ValueError('That is not part of this stage any more. Reopen the map.')
             new = 0 if remove else int(values.get('kind'))
             if new not in (0,) + kinds:
                 raise ValueError('That choice is not one of the game’s own.')
             off = self.copy_offset(world, at)
-            name = self.ENEMIES.get(new, 'no enemies')
+            name = self.enemy_name(world, group, new) if new else 'no enemies'
             return {'writes': [(off, self.rom[off], new)] if self.rom[off] != new else [],
-                    'title': f'Screen {screen}: {name}' if new else f'Screen {screen}: no enemies',
-                    'watch': {'kind': 'wave', **base, 'group': group, 'screen': screen, 'want': new}}
+                    'title': f'Screen {screen}: {name}',
+                    'watch': {'kind': 'wave', **base, 'group': group, 'screen': screen, 'want': new, **extra}}
         if kind in ('reaperA', 'reaperB'):
             group = kind[-1]
             screen = int(rest)
-            _, at, yx = self._table_entry(world, self.REAPER_A if group == 'A' else self.REAPER_B, stage, screen)
+            _, at, yx = self._table_entry(world, cfg.get('reaper' + group), stage, screen)
             if not yx:
                 raise ValueError('That is not part of this stage any more. Reopen the map.')
             if not remove:
                 raise ValueError('ROMancer cannot change that yet.')
             off = self.copy_offset(world, at)
             return {'writes': [(off, yx, 0)], 'title': f'Remove the Reaper (screen {screen})',
-                    'watch': {'kind': 'reaper', **base, 'group': group, 'screen': screen, 'row': yx & 0xF0}}
+                    'watch': {'kind': 'reaper', **base, 'group': group, 'screen': screen, 'row': yx & 0xF0, **extra}}
         if kind == 'item':
             number = int(rest)
             record = next((r for r in self.items(world) if r['number'] == number), None)
-            if record is None or record['stage'] != stage:
+            if record is None or record['stage'] != stage or not record['live']:
                 raise ValueError('That is not part of this stage any more. Reopen the map.')
-            watch = {'kind': 'item', **base, 'screen': record['screen'], 'row': record['yx'] & 0xF0,
-                     'x': (record['yx'] << 4) & 0xF0}
+            yx = record['yx']
+            if across:
+                watch = {'kind': 'item', **base, 'screen': record['screen'], 'row': yx & 0xF0, 'col': (yx & 15) << 4,
+                         'way': 'across', **extra}
+            else:
+                watch = {'kind': 'item', **base, 'screen': record['screen'], 'row': yx & 0xF0, 'x': (yx << 4) & 0xF0, **extra}
+            name = self.ITEMS.get(0 if record['item'] is None else record['item'], 'item').lower()
             if remove:
-                return {'writes': self.remove_item(world, number), 'title': f'Remove the {self.ITEMS.get(record["item"], "item").lower()} '
-                        f'(screen {record["screen"]})', 'watch': {**watch, 'want': None}}
+                return {'writes': self.remove_item(world, number), 'title': f'Remove the {name} (screen {record["screen"]})',
+                        'watch': {**watch, 'want': None}}
             new = int(values.get('item'))
             if new not in self.ITEMS or record['item'] not in self.ITEMS:
                 raise ValueError('That choice is not one of the game’s own.')
@@ -960,20 +1100,23 @@ class KidIcarusProfile(KidIcarus, Profile):
                     'title': f'Item: {self.ITEMS[new]} (screen {record["screen"]})', 'watch': {**watch, 'want': new}}
         if kind == 'door':
             number = int(rest)
-            record = next((r for r in self.doors() if r['number'] == number), None)
+            record = next((r for r in self.doors(world) if r['number'] == number), None)
             if record is None or record['stage'] != stage:
                 raise ValueError('That is not part of this stage any more. Reopen the map.')
             watch = {'kind': 'door', **base, 'screen': record['screen'],
-                     'at': self.block_map(record['screen']) + record['yx'] + 16}
+                     'at': self.block_map(record['screen']) + record['yx'] + 16, **extra}
+            if world != 1:
+                watch['settle'] = 60
             if remove:
-                return {'writes': self.remove_door(number), 'title': f'Remove the door (screen {record["screen"]})',
+                return {'writes': self.remove_door(number, world), 'title': f'Remove the door (screen {record["screen"]})',
                         'watch': {**watch, 'want': None}}
+            chambers = self.chambers(world)
             new = int(values.get('chamber'))
-            if new not in self.CHAMBERS or record['block'] not in self.CHAMBERS:
+            if new not in chambers or record['block'] not in chambers:
                 raise ValueError('That choice is not one of the game’s own.')
             off = record['offset'] + 3
             return {'writes': [(off, self.rom[off], new)] if self.rom[off] != new else [],
-                    'title': f'Door to: {self.CHAMBERS[new]} (screen {record["screen"]})', 'watch': {**watch, 'want': new}}
+                    'title': f'Door to: {chambers[new]} (screen {record["screen"]})', 'watch': {**watch, 'want': new}}
         raise ValueError('ROMancer cannot change that yet.')
 
     def watcher(self, watch):

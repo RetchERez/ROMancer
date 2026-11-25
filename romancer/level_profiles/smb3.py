@@ -19,6 +19,10 @@ The cartridge is MMC3 with 8 KB banks: bank 30 sits at $8000 and bank 31 at $E00
   its id in $0671 + slot.
 * RAM: $0727 world, $070A tileset, $7EB9/$7EBA layout and $7EBB/$7EBC enemy list of the area being played, $FD/$12 the
   camera x, $FC/$13 the vertical scroll, $6000 + screen * $1B0 + row * 16 + column the area's tiles.
+* Level pieces: a record's place is absolute (b1 screen and column, b0 low five bits the row 0-26), and the game builds
+  the whole area into tile memory when it loads, so a record can move anywhere in its area without anything else
+  changing. Records keep their order (a later one draws over an earlier one). Removing a record moves the rest of the
+  layout down; the bytes after the new $FF are never read.
 """
 from __future__ import annotations
 
@@ -62,6 +66,26 @@ class SMB3:
                0xA3: 'Piranha Plant (red, upside down)', 0xA6: 'Venus Fire Trap (red)'}
     CONTROL = 0xB4                # ids from here on are level controls (scrolling, bosses' rooms, ...), not enemies
     MAP_TILES = {0x67: 'mini-fortress', 0xC9: 'castle', 0x50: 'Toad house'}
+    # Level pieces: builders (bank 14, shared by tilesets 1-14 and 18) whose records were each built alone in World 1-1
+    # and measured in tile memory (trace/v15_profiles/smb_layout/sweep3.py, sweep3.json, sweep3_zoom.png). The value says
+    # which way the kind's low nibble makes the piece longer: 'across' (columns) or 'down' (rows), length = nibble + 1.
+    PIECE_BUILDERS = {0xCBA7: None, 0xCBAE: None, 0xCBB5: None, 0xC62B: None, 0xC614: None, 0xD01B: None,
+                      0xD283: 'across', 0xCFD6: 'across', 0xD306: None, 0xD39F: 'across', 0xC64C: 'down',
+                      0xC6A6: 'down', 0xC775: 'across', 0xC7DA: 'across', 0xCEAA: 'down', 0xCEEE: 'across',
+                      0xCF57: 'down', 0xCB4C: 'across', 0xC6FC: 'down'}
+    LONG_AT_ZERO = {0xD39F, 0xC6A6, 0xC7DA, 0xC6FC}     # with length nibble 0 these run on to the end of the area
+    # what each kind draws in the plains tileset (1), named from the pictures; elsewhere pieces show their numbers
+    PIECE_NAMES = {(0, 0x00): 'Big hill', (0, 0x01): 'Small hill', (0, 0x02): 'Tall hill', (0, 0x90): 'Row of bushes',
+                   (0, 0xB0): 'Row of cloud blocks', (0, 0xC0): 'Ground', (0, 0xD0): 'Ground (blue)', (0, 0xE0): 'Cloud',
+                   (1, 0x90): 'Pipe (kind 9)', (1, 0xA0): 'Pipe (kind 10)', (1, 0xB0): 'Pipe (kind 11)',
+                   (1, 0xC0): 'Upside-down pipe (kind 12)', (1, 0xD0): 'Upside-down pipe (kind 13)',
+                   (1, 0xE0): 'Sideways pipe opening left (kind 14)', (1, 0xF0): 'Sideways pipe opening left (kind 15)',
+                   (2, 0x10): 'Sideways pipe opening right (kind 1)', (2, 0x20): 'Sideways pipe opening right (kind 2)',
+                   (2, 0x30): 'Bullet Bill cannon', (2, 0x60): 'Water with waves all over', (2, 0x70): 'Water (kind 7)',
+                   (2, 0x80): 'Water (kind 8)', (2, 0x90): 'Water (kind 9)', (2, 0xA0): 'Blue rock wall',
+                   (2, 0xB0): 'Wall of blue X blocks', (2, 0xC0): 'Orange dotted ground', (2, 0xD0): 'Pink block',
+                   (2, 0xE0): 'Row of white blocks', (2, 0xF0): 'Upside-down pipe (class 2)'}
+    ROWS = 27                       # rows of a screen in tile memory ($1B0 bytes = 27 rows of 16)
 
     def __init__(self, rom: bytes):
         self.rom = rom
@@ -275,6 +299,60 @@ class SMB3:
                     out.append((cls << 4 | kind, self.one_tile(cls, kind)))
         return out
 
+    def stream_end(self, tileset: int, layout: int) -> int:
+        """CPU address of the $FF that ends a layout."""
+        rows = self.records(tileset, layout)
+        if not rows:
+            return layout + 9
+        last = rows[-1]
+        return last['at'] + (4 if last['b3'] is not None else 3)
+
+    def record_size(self, r) -> int:
+        return 4 if r['b3'] is not None else 3
+
+    def remove_record_writes(self, tileset: int, layout: int, number: int) -> list:
+        """Writes that take a layout record out: the records after it and the $FF move down. Refused when another area's
+        layout starts inside the part that moves."""
+        rows = self.records(tileset, layout)
+        r = rows[number]
+        end = self.stream_end(tileset, layout)
+        bank = self.layout_bank(tileset)
+        for (ts, other) in self.areas():
+            if self.layout_bank(ts) == bank and r['at'] < other <= end:
+                raise ValueError('Another part of the game starts reading inside this layout, so this piece cannot be removed.')
+        size = self.record_size(r)
+        start = self._bank(bank, r['at'])
+        tail = bytes(self.rom[start + size:self._bank(bank, end) + 1])
+        return [(start + i, self.rom[start + i], b) for i, b in enumerate(tail) if self.rom[start + i] != b]
+
+    def piece_kind(self, tileset: int, r):
+        """For a record built by one of the measured builders: {'builder', 'class', 'key' (the kind without its length),
+        'length' (nibble or None), 'way' ('across'/'down'/None), 'name'}; None for others."""
+        if r['kind'] != 'build' or r['builder'] not in self.PIECE_BUILDERS or self._cbank(tileset) != 14:
+            return None
+        cls, b2 = r['b0'] >> 5, r['b2']
+        key = b2 & 0xF0 if b2 >= 0x10 else b2
+        way = self.PIECE_BUILDERS[r['builder']] if b2 >= 0x10 else None
+        name = self.PIECE_NAMES.get((cls, key)) if tileset == 1 else None
+        return {'builder': r['builder'], 'class': cls, 'key': key, 'length': b2 & 15 if way else None, 'way': way,
+                'name': name or f'Level piece {cls}-{key:#04x}'}
+
+    def piece_kinds(self, tileset: int, r) -> list:
+        """Kinds of the same class that this tileset builds with the same builder (so they read the same bytes)."""
+        cls, b2 = r['b0'] >> 5, r['b2']
+        cache = self.__dict__.setdefault('_kinds_cache', {})
+        key_ = (tileset, cls, b2 >= 0x10, r['builder'])
+        if key_ in cache:
+            return cache[key_]
+        out = cache[key_] = []
+        for key in (range(0x10, 0x100, 0x10) if b2 >= 0x10 else range(16)):
+            try:
+                if self.builder(tileset, cls << 5, key) == r['builder']:
+                    out.append(key)
+            except (ValueError, IndexError):
+                continue
+        return out
+
     def row_choices(self, tileset: int) -> list:
         out = []
         for kind in range(1, 16):
@@ -410,6 +488,64 @@ class _EnemyWatcher(_Settled):
                 'text': f'Played from the start, the game now loads {w["name"]} there. The recorded walk did not get '
                         'close enough to see it appear.' if ok else
                         'Played from the start, the game still loads the old enemy there.'}
+
+
+class _PieceWatcher(_Settled):
+    """A level piece edit: the area's whole tile memory once the part is loaded, on the original game and then on the
+    changed one. Every tile that differs must be explained by the edit: for a move, each is the piece's tile arriving
+    (it was at the same spot of the old place) or leaving (it is now at the same spot of the new place); otherwise
+    the differences must lie from the piece's place onward."""
+    compare = True
+
+    def __init__(self, watch):
+        super().__init__(watch)
+        self.tiles = {}
+
+    def see(self, ram, frame, run):
+        if run in self.tiles:
+            return True
+        if not self.settled(ram, frame):
+            return False
+        self.tiles[run] = bytes(ram[0x800:0x800 + self.w['screens'] * SCREEN])
+        return True
+
+    def result(self):
+        w = self.w
+        before, after = self.tiles.get('original'), self.tiles.get('changed')
+        if before is None or after is None:
+            return super().result()
+        rows = SCREEN // 16
+
+        def place(i):
+            return (i // SCREEN) * 16 + i % 16, (i % SCREEN) // 16
+
+        def index(x, y):
+            return (x // 16) * SCREEN + y * 16 + x % 16 if 0 <= y < rows and 0 <= x < w['screens'] * 16 else None
+        differ = [i for i in range(len(before)) if before[i] != after[i]]
+        name = w['name']
+        if not differ:
+            return {'state': 'bad', 'text': f'Played from the start, the game still builds the {name} as before.'}
+        if w.get('shift'):
+            dx, dy = w['shift']
+            for i in differ:
+                x, y = place(i)
+                came, left = index(x - dx, y - dy), index(x + dx, y + dy)
+                if not ((came is not None and after[i] == before[came]) or (left is not None and before[i] == after[left])):
+                    return {'state': 'bad', 'text': f'Played from the start, the game changed tiles at screen {x // 16 + 1}, '
+                                                    f'column {x % 16 + 1}, row {y + 1} that moving the {name} does not explain.'}
+            x, y = w['to']
+            if not any(abs(place(i)[0] - x) <= 16 for i in differ):
+                return {'state': 'bad', 'text': f'Played from the start, nothing new is built where the {name} was moved.'}
+            return {'state': 'good', 'text': f'Played from the start, the game now builds the {name} at its new place and no longer at the old one.'}
+        start = min(w['at'][0], w['to'][0])
+        stray = [place(i) for i in differ if place(i)[0] < start - 1]
+        if stray:
+            x, y = stray[0]
+            return {'state': 'bad', 'text': f'Played from the start, the game changed tiles at screen {x // 16 + 1}, '
+                                            f'column {x % 16 + 1}, row {y + 1}, away from the {name}.'}
+        if w['remove']:
+            return {'state': 'good', 'text': f'Played from the start, the game no longer builds the {name}.'}
+        return {'state': 'good', 'text': f'Played from the start, the game now builds the {w["now"]} there.'}
 
 
 class _WayWatcher(_Settled):
@@ -557,7 +693,8 @@ class SMB3Profile(SMB3, Profile):
                     blocks = self._blocks_list(tileset)
                 item = {'id': f'block:{number}', 'style': 'secret' if tile in self.HIDDEN else 'item', 'type': tile,
                         'name': self.block_name(tile), 'x': x, 'y': y,
-                        'fields': [{'key': 'block', 'label': 'Block', 'value': cls << 4 | kind, 'choices': blocks}], 'remove': None}
+                        'fields': [{'key': 'block', 'label': 'Block', 'value': cls << 4 | kind, 'choices': blocks}] +
+                                  self._place_fields(tileset, layout, r), 'remove': 'Remove this block'}
                 if tile in (0x6E, 0x45):
                     item['note'] = 'The game remembers this 1-up once it is taken and does not build it again.'
                 out.append(item)
@@ -567,8 +704,79 @@ class SMB3Profile(SMB3, Profile):
                     rows = self._rows_list(tileset)
                 out.append({'id': f'row:{number}', 'style': 'block', 'type': tile, 'name': self.row_name(tile),
                             'detail': f'{(r["b2"] & 15) + 1} long', 'x': x, 'y': y,
-                            'fields': [{'key': 'row', 'label': 'Blocks', 'value': r['b2'] >> 4, 'choices': rows}], 'remove': None})
+                            'fields': [{'key': 'row', 'label': 'Blocks', 'value': r['b2'] >> 4, 'choices': rows}] +
+                                      self._place_fields(tileset, layout, r) +
+                                      [{'key': 'size', 'label': 'Length', 'value': r['b2'] & 15,
+                                        'choices': [{'value': n, 'name': f'{n + 1} long'} for n in range(16)]}],
+                            'remove': 'Remove this row'})
+            else:
+                info = self.piece_kind(tileset, r)
+                if info is None:
+                    continue
+                item = {'id': f'piece:{number}', 'style': 'block', 'type': f'{info["class"]}-{info["key"]:02x}',
+                        'name': info['name'], 'x': x, 'y': y, 'fields': self._place_fields(tileset, layout, r),
+                        'remove': 'Remove this piece'}
+                if info['way']:
+                    low = 1 if info['builder'] in self.LONG_AT_ZERO else 0
+                    item['detail'] = f'{info["length"] + 1} long' if info['way'] == 'across' else f'{info["length"] + 1} tall'
+                    item['fields'].append({'key': 'size', 'label': 'Length' if info['way'] == 'across' else 'Height',
+                                           'value': info['length'],
+                                           'choices': [{'value': n, 'name': f'{n + 1} blocks'} for n in sorted(set(range(low, 16)) | {info['length']})]})
+                kinds = self.piece_kinds(tileset, r)
+                if len(kinds) > 1:
+                    name = lambda key: (self.PIECE_NAMES.get((info['class'], key)) if tileset == 1 else None) or f'Level piece {info["class"]}-{key:#04x}'
+                    item['fields'].append({'key': 'piece', 'label': 'Piece', 'value': info['key'],
+                                           'choices': [{'value': k, 'name': name(k)} for k in kinds]})
+                item['note'] = ('The game builds the whole area when it starts, so a piece can go anywhere in it; pieces '
+                                'later in the layout draw over earlier ones.')
+                out.append(item)
         return out
+
+    def _place_fields(self, tileset, layout, r) -> list:
+        screen, column, row = r['b1'] >> 4, r['b1'] & 15, r['b0'] & 31
+        last = self.screens_of(tileset, layout) - 1
+        x = screen * 16 + column
+        first, end = max(0, screen - 1) * 16, (min(last, screen + 1) + 1) * 16
+        return [{'key': 'x', 'label': 'Place', 'value': x,
+                 'choices': [{'value': v, 'name': f'Screen {v // 16 + 1}, column {v % 16 + 1}'} for v in range(first, end)]},
+                {'key': 'y', 'label': 'Row', 'value': row,
+                 'choices': [{'value': v, 'name': f'Row {v + 1} from the top'} for v in sorted(set(range(self.ROWS)) | {row})]}]
+
+    def _move(self, tileset, layout, r, values):
+        """New b0 and b1 for the x and y in values (the record's own when not given)."""
+        x = int(values.get('x', (r['b1'] >> 4) * 16 + (r['b1'] & 15)))
+        row = int(values.get('y', r['b0'] & 31))
+        if not 0 <= x < self.screens_of(tileset, layout) * 16 or not 0 <= row < max(self.ROWS, (r['b0'] & 31) + 1):
+            raise ValueError('That place is outside this area.')
+        return (r['b0'] & 0xE0) | row, x
+
+    def _piece_plan(self, tileset, layout, number, r, b0, b1, b2, remove, name, now, watch, unit='long'):
+        """Writes and watch for a piece moved, changed or removed."""
+        old_x = (r['b1'] >> 4) * 16 + (r['b1'] & 15)
+        old_row = r['b0'] & 31
+        if remove:
+            writes = self.remove_record_writes(tileset, layout, number)
+            title = f'Remove the {name[0].lower() + name[1:]} (screen {old_x // 16 + 1})'
+            new_x, new_row = old_x, old_row
+        else:
+            new_x, new_row = b1, b0 & 31
+            nb1 = (b1 // 16) << 4 | b1 % 16
+            writes = [w for w in ((r['offset'], r['b0'], b0), (r['offset'] + 1, r['b1'], nb1), (r['offset'] + 2, r['b2'], b2))
+                      if w[1] != w[2]]
+            parts = []
+            if new_x != old_x:
+                parts.append(f'moved to screen {new_x // 16 + 1}, column {new_x % 16 + 1}, row {new_row + 1}')
+            elif new_row != old_row:
+                parts.append(f'moved to row {new_row + 1}')
+            if now != name:
+                parts.append(f'now {now[0].lower() + now[1:]}')
+            if (b2 & 15) != (r['b2'] & 15) and r['b2'] >= 0x10:
+                parts.append(f'now {(b2 & 15) + 1} {unit}')
+            title = f'{name}: {", ".join(parts) or "unchanged"}'
+        watch.update(kind='piece', at=[old_x, old_row], to=[new_x, new_row], remove=bool(remove),
+                     shift=[new_x - old_x, new_row - old_row] if not remove and b2 == r['b2'] else None,
+                     screens=self.screens_of(tileset, layout), name=name[0].lower() + name[1:], now=now[0].lower() + now[1:])
+        return {'writes': writes, 'title': title, 'watch': watch}
 
     def _way_target(self, tileset, layout):
         head = self.header(tileset, layout)
@@ -609,6 +817,46 @@ class SMB3Profile(SMB3, Profile):
             return {'writes': writes, 'title': f'Enemy here: {self.enemy_name(new_id)} (screen {e["column"] // 16 + 1})', 'watch': watch}
         r = self._record(tileset, layout, number)
         address = TILE_BASE + (r['b1'] >> 4) * SCREEN + (r['b0'] & 31) * 16 + (r['b1'] & 15)
+        placed = remove or any(k in values and int(values[k]) != v for k, v in
+                               (('x', (r['b1'] >> 4) * 16 + (r['b1'] & 15)), ('y', r['b0'] & 31), ('size', r['b2'] & 15)))
+        if kind == 'piece':
+            info = self.piece_kind(tileset, r)
+            if info is None:
+                raise ValueError('That is not part of this level any more. Reopen the map.')
+            key = int(values.get('piece', info['key']))
+            if key != info['key'] and key not in self.piece_kinds(tileset, r):
+                raise ValueError('That choice is not one of the game’s own.')
+            length = int(values.get('size', r['b2'] & 15)) if info['way'] else r['b2'] & 15
+            if not 0 <= length <= 15:
+                raise ValueError('That choice is not one of the game’s own.')
+            b0, x = self._move(tileset, layout, r, values)
+            b2 = key | length if r['b2'] >= 0x10 else key
+            now = (self.PIECE_NAMES.get((info['class'], key)) if tileset == 1 else None) or f'Level piece {info["class"]}-{key:#04x}'
+            return self._piece_plan(tileset, layout, number, r, b0, x, b2, remove, info['name'], now, watch,
+                                    'tall' if info['way'] == 'down' else 'long')
+        if kind == 'block' and placed:
+            if r['builder'] != self.BLOCK_ONE:
+                raise ValueError('That is not part of this level any more. Reopen the map.')
+            value = int(values.get('block', (r['b0'] >> 5) << 4 | r['b2']))
+            allowed = dict(self.block_choices(tileset))
+            if value not in allowed or allowed[value] not in self.BLOCK_NAMES:
+                raise ValueError('That choice is not one of the game’s own.')
+            b0, x = self._move(tileset, layout, r, values)
+            b0 = (b0 & 0x1F) | (value >> 4) << 5
+            old = self.block_name(self.one_tile(r['b0'] >> 5, r['b2']))
+            return self._piece_plan(tileset, layout, number, r, b0, x, value & 15, remove, old,
+                                    self.block_name(allowed[value]), watch)
+        if kind == 'row' and placed:
+            if r['builder'] != self.BLOCK_ROW:
+                raise ValueError('That is not part of this level any more. Reopen the map.')
+            value = int(values.get('row', r['b2'] >> 4))
+            allowed = dict(self.row_choices(tileset))
+            length = int(values.get('size', r['b2'] & 15))
+            if value not in allowed or not 0 <= length <= 15:
+                raise ValueError('That choice is not one of the game’s own.')
+            b0, x = self._move(tileset, layout, r, values)
+            return self._piece_plan(tileset, layout, number, r, b0, x, value << 4 | length, remove,
+                                    self.row_name(self.row_tile(r['b2'])), self.row_name(allowed[value]), watch)
         if kind == 'block':
             if r['builder'] != self.BLOCK_ONE:
                 raise ValueError('That is not part of this level any more. Reopen the map.')
@@ -649,6 +897,8 @@ class SMB3Profile(SMB3, Profile):
         raise ValueError('ROMancer cannot change that yet.')
 
     def watcher(self, watch):
+        if watch['kind'] == 'piece':
+            return _PieceWatcher(watch)
         if watch['kind'] == 'enemy':
             return _EnemyWatcher(watch)
         if watch['kind'] == 'way':

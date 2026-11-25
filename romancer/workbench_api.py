@@ -22,7 +22,7 @@ from .workbench_jobs import JobManager
 from .workbench_runtime import RuntimePool
 from . import ROMANCER_VERSION,ROMANCER_RELEASE_NAME,ROMANCER_BUILD_LABEL
 
-OPTIONAL_PARAMETERS={'games.maps.plan':{'state':None},'edits.level_compare':{'x':None,'y':None},'checks.from_trace':{'expectations':None}}
+OPTIONAL_PARAMETERS={'games.maps.plan':{'state':None},'edits.level_compare':{'x':None,'y':None},'edits.level_start':{'extend':None},'edits.level_export':{'labels':False},'checks.from_trace':{'expectations':None}}
 
 
 class WorkbenchAPI:

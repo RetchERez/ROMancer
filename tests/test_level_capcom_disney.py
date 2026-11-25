@@ -342,5 +342,47 @@ class ChipDaleWatcher(unittest.TestCase):
         self.assertEqual(self.run_frames(self.p.watcher(plan['watch']), spot, 0x100), 'bad')
 
 
+class Names(unittest.TestCase):
+    """Every type a profile shows or offers has a name (not a bare number) and, when it was watched, a does-line."""
+
+    def test_ducktales_names_and_does(self):
+        p = cd.DuckTalesProfile(bytes(build().rom))
+        for kind, name in {0x02: 'Spider on a thread', 0x12: 'Falling stone', 0x46: 'Snow rabbit', 0x5D: 'Icicle',
+                           0x1F: 'Skeleton duck, lying down', 0x78: 'Orange block platform, moving',
+                           0x49: 'Red alien, jumping', 0x2C: 'Invisible object', 0x3C: 'Invisible object'}.items():
+            self.assertEqual(p.kind_name(kind, 0), name)
+        self.assertEqual(p.kind_does(0x5D, 0), 'Hangs from above and falls when Scrooge comes near.')
+        self.assertEqual(p.kind_does(0x2C, 0), 'Draws nothing and stays in one place.')
+        self.assertIsNone(p.kind_does(0x22, 0))                                  # never seen on screen
+        self.assertEqual(p.kind_does(0x08, 0), 'Opens when Scrooge bounces on it with his cane and lets out what it holds.')
+        self.assertEqual(p.kind_does(0x17, 0), 'Appears when Scrooge comes near; taking it adds $2,000 to the money.')
+        objs = {o['id']: o for o in p.objects({'land': 0})}
+        self.assertEqual(objs['object:1']['does'], 'Hangs in a tree and coils and uncoils.')
+        self.assertEqual(objs['object:5']['does'], 'Stays in one place.')
+        self.assertIn('does', objs['object:2'])                                 # the stone block
+        self.assertEqual([c['name'] for c in p.enemy_choices(0)], ['Snake', 'Man-eating plant'])
+        for kind, name in p.NAMES.items():
+            self.assertTrue(name and not name.startswith(('Object 0x', 'Enemy 0x')), kind)
+        for sentence in list(p.DOES.values()):
+            self.assertTrue(sentence[0].isupper() and sentence.endswith('.'), sentence)
+
+    def test_chip_dale_names_and_does(self):
+        p = cd.ChipDaleProfile(bytes(cd_build().rom))
+        for kind, name in {0x04: 'Black diving creature', 0x22: 'Jester toy', 0x43: 'Owl', 0x3A: 'Glass dome with legs',
+                           0x37: 'Invisible object', 0x00: 'Robot bulldog'}.items():
+            self.assertEqual(p.kind_name(kind), name)
+        self.assertEqual(p.kind_does(0x26), 'Runs to the wall and climbs up it.')
+        self.assertEqual(p.kind_does(0x0B), 'Waits under a box; taking it adds one to the flower count.')
+        self.assertEqual(p.kind_does(0x0A), 'Appears when Chip or Dale touches the spot; taking it adds one to the star count.')
+        self.assertIsNone(p.kind_does(0x02))                                     # never spawned in the pictures
+        objs = {o['id']: o for o in p.objects({'level': 0})}
+        self.assertEqual(objs['object:2']['does'], 'Walks along the floor.')
+        self.assertEqual(objs['object:5']['does'], 'Runs along the floor.')
+        self.assertEqual(objs['object:6']['does'], 'Stays in one place.')       # a boss part, left as it is
+        self.assertEqual([c['name'] for c in p.enemy_choices(0)], ['Robot bulldog', 'Robot mouse'])
+        for sentence in list(p.DOES.values()):
+            self.assertTrue(sentence[0].isupper() and sentence.endswith('.'), sentence)
+
+
 if __name__ == '__main__':
     unittest.main()
