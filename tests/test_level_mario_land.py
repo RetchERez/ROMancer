@@ -318,3 +318,22 @@ class SuperMarioLand2Test(unittest.TestCase):
         w.see(ram, 8, 'changed')
         self.assertEqual(w.result()['state'], 'bad')
         self.assertEqual(self.p.watcher(edit['watch']).result()['state'], 'warn')
+
+
+class NamesTest(unittest.TestCase):
+    """Naming pass: every name is a name, every does-line a plain sentence."""
+
+    def test_tables(self):
+        for cls in (ml.SuperMarioLand, ml.SuperMarioLand2):
+            for kind, name in cls.ENEMIES.items():
+                self.assertFalse(name.startswith('Enemy'), name)
+            for kind, does in cls.DOES.items():
+                self.assertIn(kind, cls.ENEMIES)
+                self.assertTrue(does[0].isupper() and does.endswith('.'), does)
+        self.assertEqual(ml.SuperMarioLand.ENEMIES[0x3F], 'Gao')
+        self.assertEqual(ml.SuperMarioLand2.ENEMIES[0x5B], 'Diving bird')
+
+    def test_unsure_cleared(self):
+        p = ml.SuperMarioLand(bytes(0x10000))
+        self.assertEqual(p.enemy_name(0x3C), 'Bunbun')
+        self.assertEqual(p.enemy_name(0x36), 'Enemy 0x36')      # not settled by a picture yet

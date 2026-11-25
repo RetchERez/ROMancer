@@ -32,6 +32,121 @@ class MegaMan6(_MegaMan3On):
     # pictures in trace/v15_profiles/megaman6/items.png
     NAMES = {0x38: 'Small life energy', 0x39: 'Large life energy', 0x49: 'Small weapon energy', 0x4A: 'Large weapon energy',
              0x37: 'Extra life', 0x1D: 'Energy Tank'}
+    ITEM_DOES = {0x38: 'Restores 2 units of life energy.', 0x39: 'Restores 10 units of life energy.',
+                 0x49: 'Restores 2 units of the weapon in use.', 0x4A: 'Restores 10 units of the weapon in use.',
+                 0x37: 'Gives one extra life (at most 9).', 0x1D: 'Adds one Energy Tank (at most 9).'}
+    # Enemies. The type number picks the enemy's code, but each stage loads its own pictures, so one number can look like a
+    # different enemy in another stage. Names and does-lines come from giving each stage's first screen-1 record (the
+    # first record in a fortress stage) each of the stage's own types, walking up until the game placed it and watching it
+    # for 240 frames (trace/v15_profiles/naming_capcom_sml_mm6/mm6/, research/megaman6-level-profile.md).
+    STAGE_ENEMIES = {
+        0: {0x10: ('Green shell robot', 'Drops into place and fires.'),
+            0x12: ('Sliding number block', 'Slides left and right along the floor.'),
+            0x13: ('Red propeller robot', 'Hovers in one place.'),
+            0x19: ('Number block', 'Stays in place.'),
+            0x1E: ('Red-capped capsule robot', 'Slides toward you and drops off ledges.'),
+            0x1F: ('Cannon robot with a rider, facing left', 'Stays in place with its cannon pointed left.'),
+            0x20: ('Cannon robot with a rider, facing right', 'Stays in place with its cannon pointed right.'),
+            0x21: ('Number block, on its side', 'Stays in place.'),
+            0x24: ('Propeller capsule robot', 'Flies down to the ground, then moves toward you.'),
+            0x4D: ('Blue seal robot', 'Stays in place.')},
+        1: {0x1B: ('Green hopping robot', 'Bounces up and down in place.'),
+            0x27: ('White bear robot', 'Stays in place and fires shots.'),
+            0x29: ('Spiked armadillo robot', 'Rolls back and forth along the floor.'),
+            0x2D: ('Hard hat robot with a gun', 'Walks toward you and fires.'),
+            0x34: ('Wall cannon', 'Stays in place.'),
+            0x36: ('Small red turret', 'Stays in place and fires small pellets sideways.'),
+            0x59: ('Large spring robot', 'Jumps high toward you on its spring.'),
+            0x75: ('Ceiling crawler', 'Climbs to the ceiling and moves along it toward you.')},
+        2: {0x24: ('Orange lantern robot', 'Flies down to the ground, then moves toward you.'),
+            0x54: ('Purple bird robot', 'Stays in place.'),
+            0x58: ('Purple pod', 'Hangs in one place.'),
+            0x59: ('Large spring robot', 'Jumps high toward you on its spring.'),
+            0x5F: ('Invisible object', None),
+            0x60: ('Yellow bird robot', 'Hops along the ground toward you.'),
+            0x61: ('Green propeller robot', 'Flies down at a slant toward you.'),
+            0x62: ('Purple flying robot', 'Flies straight across the screen toward you.'),
+            0x70: ('Small red helmet robot', 'Waits, then jumps up.')},
+        3: {0x18: ('Hard hat (Met)', 'Hides under its helmet and peeks out.'),
+            0x2A: ('Fire-headed robot', 'Stays in place and throws fireballs.'),
+            0x2B: ('Small orange walker', 'Walks slowly away from you.'),
+            0x2C: ('Flame pillar robot', 'Moves straight toward you.'),
+            0x73: ('Green hooded walker', 'Walks back and forth.'),
+            0xC0: ('Green barrel robot', 'Stays in place.'),
+            0xC9: ('Green antenna bug', 'Stays in place.')},
+        4: {0x13: ('Red hanging robot', 'Hangs in one place.'),
+            0x24: ('Propeller capsule robot', 'Flies down to the ground, then moves toward you.'),
+            0x54: ('Blue turret head', 'Stays in place and fires shots.'),
+            0x5F: ('Invisible object', None),
+            0x69: ('Green rider on a wheel', 'Rolls quickly toward you.'),
+            0x75: ('Ceiling crawler', 'Climbs to the ceiling and moves along it toward you.'),
+            0xA2: ('Spear-throwing robot', 'Stays in place and throws spears.'),
+            0xA7: ('Spring-necked robot', 'Bounces toward you on its spring.'),
+            0xC2: ('Orange helmet robot', 'Stays in place and opens up to attack.')},
+        5: {0x12: ('Pink flower robot', 'Moves back and forth along the floor.'),
+            0x13: ('Red bird robot', 'Stays in place.'),
+            0x18: ('Hard hat (Met)', 'Hides under its helmet, then fires three shots.'),
+            0x29: ('Green armadillo robot', 'Rolls back and forth along the floor.'),
+            0x4F: ('Hard hat (Met) that pops up', 'Pops up from under its helmet and fires.'),
+            0x59: ('Large spring robot', 'Jumps high toward you on its spring.'),
+            0x66: ('Pink skull walker', 'Walks toward you and fires.'),
+            0x67: ('Green cactus robot', 'Hops toward you.'),
+            0x6C: ('Cowboy robot', 'Stands in place and fires its gun.'),
+            0x6E: ('Blue charging robot', 'Charges straight toward you.'),
+            0x70: ('Small red helmet robot', 'Waits, then jumps up.'),
+            0x8A: ('Rising post', 'Shoots straight up out of the ground.'),
+            0xA0: ('Hovering platform', 'Bobs up and down in one place.'),
+            0xA1: ('Green spiked machine', 'Stays in place.')},
+        6: {0x29: ('Orange armadillo robot', 'Rolls back and forth along the floor.'),
+            0x2D: ('Crown turret', 'Stays in place and fires shots.'),
+            0x3C: ('Blue dome walker', 'Walks toward you.'),
+            0x3D: ('Orange pot', 'Stays in place.'),
+            0x65: ('Green cannon', 'Stays in place and fires.'),
+            0x67: ('Skull walker', 'Hops toward you.'),
+            0x6E: ('Drill tank', 'Drives straight toward you.'),
+            0x70: ('Small red helmet robot', 'Waits, then jumps up.'),
+            0x75: ('Ceiling crawler', 'Climbs to the ceiling and moves along it toward you.'),
+            0xC6: ('Shield knight robot', 'Walks back and forth behind its shield.')},
+        7: {0x10: ('Green shell robot', 'Stays in place and fires.'),
+            0x2B: ('Orange dome crab', 'Opens its shell and creeps away from you.'),
+            0x70: ('Small red helmet robot', 'Waits, then jumps up.'),
+            0xA5: ('Orange submarine robot', 'Swims toward you and fires.'),
+            0xA9: ('Dome jellyfish robot', 'Drifts down toward the floor.'),
+            0xAB: ('Propeller robot with a claw', 'Flies straight toward you.'),
+            0xC1: ('Red robot fish', 'Swims back and forth.'),
+            0xC4: ('Teal fish robot', 'Stays in place and throws balls.'),
+            0xC9: ('Red shrimp robot', 'Stays in place and fires small shots.')},
+        9: {0x18: ('Hard hat (Met)', 'Hides under its helmet and fires.'),
+            0x66: ('Helmet walker', 'Walks back and forth.'),
+            0x67: ('Skull walker', 'Hops toward you.'),
+            0x6E: ('Drill tank', 'Drives straight toward you.')},
+        10: {0x1B: ('Green hopping robot', 'Bounces up and down in place.'),
+             0x2B: ('Pink dome crab', 'Stays in place.'),
+             0x6F: ('Green ring block', 'Stays in place.')},
+        12: {0x1B: ('Green hopping robot', 'Bounces up and down in place.'),
+             0x20: ('Cannon robot with a rider, facing right', 'Stays in place with its cannon pointed right.'),
+             0x2C: ('Flame pillar robot', 'Moves straight toward you.'),
+             0x2D: ('Small green antenna robot', 'Shuffles back and forth in place.'),
+             0x34: ('Wall cannon', 'Stays in place.'),
+             0x36: ('Small red turret', 'Stays in place and fires small pellets sideways.'),
+             0x41: ('Small red turret on a barrel', 'Pops up from its barrel and fires.'),
+             0x65: ('Green cannon', 'Stays in place and fires.'),
+             0xA2: ('Spear-throwing robot', 'Stays in place and throws spears.')},
+        13: {0x12: ('Sliding pink block', 'Slides left and right.'),
+             0x1E: ('Red-capped capsule robot', 'Slides toward you and drops off ledges.'),
+             0x65: ('Green cannon robot', 'Stays in place and fires.'),
+             0x8F: ('Small green block', 'Stays in place.'),
+             0xC6: ('Shield knight robot', 'Walks back and forth behind its shield.')},
+        15: {0x4F: ('Hard hat (Met) that pops up', 'Pops up from under its helmet and fires.'),
+             0x54: ('Blue turret head', 'Stays in place and fires shots.')},
+    }
+    # types that looked and acted the same in every stage where they were watched; the fortress stages (9-16) use these
+    # names where their own pictures were not looked at
+    SAME_EVERYWHERE = {0x18: ('Hard hat (Met)', 'Hides under its helmet and fires.'),
+                       0x70: ('Small red helmet robot', 'Waits, then jumps up.'),
+                       0x10: ('Green shell robot', 'Stays in place and fires.'),
+                       0x59: ('Large spring robot', 'Jumps high toward you on its spring.'),
+                       0x75: ('Ceiling crawler', 'Climbs to the ceiling and moves along it toward you.')}
     PICKUPS = {0x1D, 0x37, 0x38, 0x39, 0x49, 0x4A}
     SCRIPT = 0x80
     LINKS = {0x80: 'Ladder up to the next section', 0x40: 'Way down to the next section'}
@@ -166,13 +281,49 @@ class MegaMan6(_MegaMan3On):
                     if record['editable']:
                         found.setdefault(self.choice_list(record), set()).add(record['type'])
             found['items'] = set(self.PICKUPS)
-            self._choices = {name: [{'value': k, 'name': self.type_name(k)} for k in sorted(kinds)] for name, kinds in found.items()}
+            stage_of = lambda name: int(name.split()[1]) if name.startswith('enemies ') else None
+            self._choices = {name: [{'value': k, 'name': self.type_name(k, stage_of(name))} for k in sorted(kinds)]
+                             for name, kinds in found.items()}
         return self._choices
 
-    def type_name(self, kind):
+    def type_name(self, kind, stage=None):
         if kind in self.NAMES:
             return self.NAMES[kind]
+        found = self.STAGE_ENEMIES.get(stage, {}).get(kind) or self.SAME_EVERYWHERE.get(kind)
+        if found:
+            return found[0]
         return f'{"Item" if kind in self.PICKUPS else "Enemy"} {kind:#04x}'
+
+    def does(self, kind, stage=None):
+        """One plain sentence on what the type does in that stage, or None when it was not watched."""
+        if kind in self.ITEM_DOES:
+            return self.ITEM_DOES[kind]
+        found = self.STAGE_ENEMIES.get(stage, {}).get(kind) or self.SAME_EVERYWHERE.get(kind)
+        return found[1] if found else None
+
+    def objects(self, part):
+        stage = int(part['stage'])
+        out = super().objects(part)
+        for o in out:
+            if o['id'].startswith('record:'):
+                o['name'] = self.type_name(o['type'], stage)
+                does = self.does(o['type'], stage)
+                if does:
+                    o['does'] = does
+        return out
+
+    def edit(self, part, object_id, values, remove=False):
+        """The shared edit, with the stage's own names in the title."""
+        plan = super().edit(part, object_id, values, remove)
+        stage, watch = int(part['stage']), plan['watch']
+        old = self.type_name(watch['old'], stage)
+        if remove:
+            plan['title'] = f'Remove the {old[0].lower()}{old[1:]}'
+        else:
+            new = self.type_name(watch['new'], stage)
+            plan['title'] = f'{old} becomes {new[0].lower()}{new[1:]}'
+            watch['name'] = new
+        return plan
 
     # ---- edits
     def remove_writes(self, stage, record):

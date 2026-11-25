@@ -106,5 +106,33 @@ class MegaMan6Test(unittest.TestCase):
         self.assertEqual(w.result()['state'], 'good')
 
 
+
+class MegaMan6NamesTest(unittest.TestCase):
+    def setUp(self):
+        self.p = MegaMan6(bytes(cart()))
+
+    def test_stage_names(self):
+        # the made-up stage 0 has enemies 0x24 and 0x25: 0x24 is named for Blizzard Man's stage, 0x25 is not watched
+        objects = self.p.objects({'stage': 0, 'section': 0})
+        self.assertEqual(objects[0]['name'], 'Propeller capsule robot')
+        self.assertEqual(objects[0]['does'], 'Flies down to the ground, then moves toward you.')
+        self.assertEqual(objects[1]['does'], 'Restores 2 units of life energy.')
+        self.assertEqual([c['name'] for c in self.p.choices()['enemies 0']], ['Propeller capsule robot', 'Enemy 0x25'])
+        self.assertEqual(self.p.type_name(0x24, 2), 'Orange lantern robot')     # one number, another stage's picture
+        self.assertEqual(self.p.type_name(0x70, 11), 'Small red helmet robot')  # same in every stage watched
+
+    def test_titles(self):
+        plan = self.p.edit({'stage': 0, 'section': 0}, 'record:1', {}, remove=True)
+        self.assertEqual(plan['title'], 'Remove the propeller capsule robot')
+        plan = self.p.edit({'stage': 0, 'section': 0}, 'record:1', {'type': 0x25})
+        self.assertEqual(plan['title'], 'Propeller capsule robot becomes enemy 0x25')
+
+    def test_tables(self):
+        for stage, kinds in self.p.STAGE_ENEMIES.items():
+            for kind, (name, does) in kinds.items():
+                self.assertFalse(name.startswith('Enemy'))
+                self.assertTrue(does is None or does.endswith('.'))
+
+
 if __name__ == '__main__':
     unittest.main()

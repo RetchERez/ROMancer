@@ -45,12 +45,27 @@ class SuperMarioLand:
     TOP = 16                # level row 0 is background pixel row 16
     QUESTION, BRICK_ITEM, HIDDEN, BRICK, PIPE = 0x81, 0x80, 0x5F, 0x82, 0x70
     # names from spawning each type in 1-1 and looking at what the game draws (trace/v15_profiles/mario_land/spawn_sheet3.png);
-    # the four bosses are each the last enemy of their world's third level and draw as the big boss
+    # the four bosses are each the last enemy of their world's third level and draw as the big boss. The rest were named by
+    # starting the first level of a world that uses the type (high RAM $FFE4/$FFB4 written through a save state as the game
+    # starts) with the type in the level's first enemy entry, and watching it (trace/v15_profiles/naming_capcom_sml_mm6/sml/);
+    # each world loads its own enemy pictures, so a type is looked at in its own world
     ENEMIES = {0x00: 'Goombo', 0x04: 'Nokobon', 0x08: 'King Totomesu (boss)', 0x1A: 'Dragonzamasu (boss)',
                0x32: 'Hiyoihoi (boss)', 0x61: 'Tatanga (boss)', 0x3C: 'Bunbun',
                0x0B: 'Lift (3 blocks)', 0x39: 'Lift (3 blocks)', 0x3B: 'Lift (2 blocks)', 0x0C: 'Lift (wide block)',
-               0x0A: 'Falling lift (3 blocks)', 0x38: 'Falling lift (3 blocks)', 0x3A: 'Falling lift (2 blocks)'}
-    UNSURE = {0x3C}         # named from one spawned picture (trace/v15_profiles/mario_land/spawn_zoom.png)
+               0x0A: 'Falling lift (3 blocks)', 0x38: 'Falling lift (3 blocks)', 0x3A: 'Falling lift (2 blocks)',
+               0x02: 'Pakkun Flower', 0x0E: 'Hopping fly', 0x3F: 'Gao', 0x42: 'Running creature',
+               0x25: 'Jumping spider', 0x35: 'Small sprout', 0x47: 'Falling boulder', 0x49: 'Small hopping statue',
+               0x4B: 'Small flying craft', 0x52: 'Hopping creature', 0x54: 'Bouncing ball'}
+    # what each one did while Mario stood still for 200 frames (slot positions in the .json files beside the pictures)
+    DOES = {0x00: 'Walks toward you.', 0x04: 'Walks toward you.', 0x08: 'Jumps up and down in place.',
+            0x02: 'Rises and sinks in place.', 0x0E: 'Hops toward you.', 0x3F: 'Sits in place and spits fireballs.',
+            0x42: 'Runs toward you.', 0x25: 'Jumps up and down in place.', 0x35: 'Stays in place.',
+            0x47: 'Drops and rolls away.', 0x49: 'Hops in place and fires small shots.', 0x4B: 'Flies straight toward you.',
+            0x52: 'Hops toward you, then stops.', 0x54: 'Bounces around in a loop.',
+            0x3C: 'Flies toward you, swooping up and down.',
+            0x0B: 'Moves left and right.', 0x3B: 'Moves left and right.', 0x39: 'Moves back and forth at a slant.',
+            0x0C: 'Drops after a short wait.', 0x0A: 'Falls straight down.', 0x3A: 'Falls straight down.'}
+    UNSURE = set()          # Bunbun (0x3C) was shown as likely from one picture in 1-1; watched flying in 3-1 since
     BOSSES = {0x08, 0x1A, 0x32, 0x61}
     # what a block can hold: hit with each value in a scripted 1-1 replay (trace/v15_profiles/mario_land/hit_sheet.png); $28
     # turns into the flower for big Mario in the code ($1911)
@@ -345,6 +360,8 @@ class SuperMarioLandProfile(SuperMarioLand, Profile):
                    'remove': None if e['second_quest'] or boss else 'Remove this enemy',
                    'fields': [] if boss else [{'key': 'type', 'label': 'Swap for', 'value': e['type'],
                                                'choices': f'enemies_world{level // 3 + 1}'}]}
+            if e['type'] in self.DOES:
+                row['does'] = self.DOES[e['type']]
             if e['second_quest']:
                 row['note'] = ('Only in the second quest (the harder game after the ending). The recorded walk plays the first '
                                'quest, so a change here cannot be watched in the game.')
@@ -455,8 +472,29 @@ class SuperMarioLand2:
     # what a ? block gives when an object of this type sits in it: each put in the first level's mushroom block and hit
     # in a scripted replay (trace/v15_profiles/mario_land/hit25.png)
     ITEMS = {0x11: 'Mushroom', 0x12: 'Fire flower', 0x13: 'Carrot', 0x14: 'Star', 0x15: 'Heart (extra life)'}
-    # names from putting each type in place of the first level's first enemy and looking (spawn20.png)
-    ENEMIES = {0x09: 'Goomba', 0x01: 'Koopa Troopa', 0x08: 'Goomba with wings', 0x0C: 'Piranha Plant'}
+    # names from putting each type in place of the first level's first enemy and looking (spawn20.png); the rest from
+    # putting each type in the left-most enemy of the first level that uses it (the level chosen by writing $A269 as the
+    # map starts it) and watching it (trace/v15_profiles/naming_capcom_sml_mm6/sml/l2_*.png); each level loads its own
+    # enemy pictures, so a type is looked at in its own level
+    ENEMIES = {0x09: 'Goomba', 0x01: 'Koopa Troopa', 0x08: 'Goomba with wings', 0x0C: 'Piranha Plant',
+               0x05: 'Small fish', 0x06: 'Fish', 0x0B: 'Small darting fish', 0x18: 'Large horned beast',
+               0x1F: 'Small hopping creature', 0x21: 'Spiky creature', 0x22: 'Small walking creature',
+               0x25: 'Shelled walker with a propeller', 0x27: 'Small black walker', 0x2B: 'Moving lift',
+               0x2C: 'Moving lift, at a slant', 0x40: 'Small winged creature', 0x41: 'Crawling grub', 0x42: 'Crawling ant',
+               0x43: 'White egg', 0x44: 'Small shelled walker', 0x47: 'Black ball', 0x48: 'Small soldier',
+               0x49: 'Hanging claw', 0x4A: 'Spiked ball', 0x4C: 'Spiked ball', 0x57: 'Hopping mushroom creature',
+               0x5A: 'Hopping broom', 0x5B: 'Diving bird', 0x5C: 'Flying pin', 0x5D: 'Black bird',
+               0x6E: 'Large spiked ball'}
+    DOES = {0x09: 'Walks toward you.', 0x01: 'Walks toward you.', 0x08: 'Hops toward you.', 0x0C: 'Rises and sinks in place.',
+            0x05: 'Swims toward you.', 0x06: 'Swims toward you.', 0x0B: 'Swims toward you, then rises.',
+            0x18: 'Stays in place.', 0x1F: 'Hops toward you.', 0x21: 'Stays in place.', 0x22: 'Walks toward you.',
+            0x25: 'Walks toward you.', 0x27: 'Walks toward you.', 0x2B: 'Moves back and forth.',
+            0x2C: 'Moves back and forth at a slant.', 0x40: 'Stays in place.', 0x41: 'Crawls back and forth.',
+            0x42: 'Crawls back and forth.', 0x43: 'Stays in place.', 0x44: 'Walks toward you.', 0x47: 'Stays in place.',
+            0x48: 'Drops down and walks toward you.', 0x49: 'Hangs in one place.', 0x4A: 'Stays in place.',
+            0x4C: 'Stays in place.', 0x57: 'Hops toward you.', 0x5A: 'Hops toward you.',
+            0x5B: 'Swoops down toward you and back up.', 0x5C: 'Flies toward you in short hops.', 0x5D: 'Stays in place.',
+            0x6E: 'Rolls back and forth.'}
     # objects that are not enemies, shown but left alone: the bells (the end and the middle of the first level; drawn as
     # bells in spawn20.png) and a heart lying in the open
     FIXED = {0x0F: 'Heart (extra life)', 0x16: 'Bell (likely the end of the level)', 0x17: 'Bell (likely the midway bell)'}
@@ -647,10 +685,12 @@ class SuperMarioLand2Profile(SuperMarioLand2, Profile):
                             'name': self.FIXED[o['type']], 'remove': None, 'fields': [],
                             'note': 'ROMancer leaves this as it is.'})
                 continue
-            out.append({'id': f'object:{o["number"]}', 'style': 'enemy', 'type': o['type'], 'x': o['x'], 'y': o['y'],
-                        'name': self.enemy_name(o['type']), 'remove': 'Remove this enemy',
-                        'fields': [{'key': 'type', 'label': 'Swap for', 'value': o['type'],
-                                    'choices': self.enemy_choices(level)}]})
+            row = {'id': f'object:{o["number"]}', 'style': 'enemy', 'type': o['type'], 'x': o['x'], 'y': o['y'],
+                   'name': self.enemy_name(o['type']), 'remove': 'Remove this enemy',
+                   'fields': [{'key': 'type', 'label': 'Swap for', 'value': o['type'], 'choices': self.enemy_choices(level)}]}
+            if o['type'] in self.DOES:
+                row['does'] = self.DOES[o['type']]
+            out.append(row)
         return out
 
     def edit(self, part, object_id, values, remove=False):

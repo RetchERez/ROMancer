@@ -40,9 +40,41 @@ class DuckTales:
              0x24: 'Ice cream', 0x25: 'Cake', 0x26: 'Coin with an M', 0x27: 'Extra life', 0x1B: 'Treasure chest'}
     # enemies and other objects named from what the game draws when one is spawned on a land's first screen
     # (shots/p<land>_<kind>.png); the rest show their kind number
-    NAMES = {0x01: 'Snake', 0x03: 'Man-eating plant', 0x05: 'Man-eating plant', 0x0C: 'Launchpad',
-             0x67: 'Nephew', 0x68: 'Nephew', 0x69: 'Nephew', 0x6A: 'Nephew', 0x6B: 'Nephew', 0x6C: 'Nephew',
-             0x6E: 'Nephew', 0x70: 'Nephew', 0x1E: 'Skeleton duck', 0x0B: 'Striped drum', 0x0A: 'Gorilla'}
+    # (shots/p<land>_<kind>.png), and in the naming pass from a kind put next to Scrooge and watched for four seconds
+    # (trace/v15_profiles/naming_capcom_sml_mm6/capcom_disney/dt*, names.png); the rest show their kind number
+    NAMES = {0x01: 'Snake', 0x02: 'Spider on a thread', 0x03: 'Man-eating plant', 0x05: 'Man-eating plant, snapping',
+             0x0C: 'Launchpad', 0x67: 'Nephew', 0x68: 'Nephew', 0x69: 'Nephew', 0x6A: 'Nephew', 0x6B: 'Nephew',
+             0x6C: 'Nephew', 0x6E: 'Nephew', 0x70: 'Nephew', 0x1E: 'Skeleton duck', 0x1F: 'Skeleton duck, lying down',
+             0x0B: 'Striped drum', 0x0A: 'Gorilla', 0x12: 'Falling stone', 0x13: 'Falling stone', 0x46: 'Snow rabbit',
+             0x48: 'Red alien', 0x49: 'Red alien, jumping', 0x4A: 'Grey antenna robot', 0x5B: 'Orange block platform',
+             0x78: 'Orange block platform, moving', 0x5D: 'Icicle', 0x6F: 'Small orange box', 0x56: 'Large golden chest',
+             0x71: 'Small orange chest'}
+    # kinds that draw nothing at all when spawned (graphic 0, or nothing on screen in the pictures)
+    INVISIBLE = {0x0E, 0x2C, 0x2D, 0x2E, 0x2F, 0x37, 0x38, 0x39, 0x3A, 0x3B, 0x3C, 0x3D, 0x64, 0x65, 0x72, 0x73}
+    # what each one did while watched (positions every 8 frames, dt_watch.log); kinds whose picture is drawn wrongly
+    # away from their own room keep their number but still say what they did
+    DOES = {0x01: 'Hangs in a tree and coils and uncoils.', 0x02: 'Drops down on its thread and climbs back up.',
+            0x03: 'Stays in one place.', 0x05: 'Stays in one place and opens its mouth.',
+            0x0A: 'Runs along the ground and jumps.', 0x0B: 'Stands on the ground and blocks the way.',
+            0x0C: 'Stands in one place.', 0x12: 'Waits overhead and drops when Scrooge walks under it.',
+            0x13: 'Waits overhead and drops when Scrooge walks under it.',
+            0x1E: 'Walks back and forth near Scrooge.', 0x1F: 'Lies on the floor as a heap of bones, then gets up and walks.',
+            0x46: 'Hops back and forth across the snow.', 0x48: 'Walks a short way back and forth.',
+            0x49: 'Jumps up and down in one place.', 0x4A: 'Stands in one place and rocks from side to side.',
+            0x5B: 'Stays in one place.', 0x78: 'Moves left and right.',
+            0x5D: 'Hangs from above and falls when Scrooge comes near.', 0x6F: 'Stays in one place.',
+            0x56: 'Stays in one place.', 0x71: 'Stays in one place.',
+            0x0D: 'Moves around in the air.', 0x50: 'Moves back and forth and jumps high.',
+            0x51: 'Flies around near the top of the screen.', 0x53: 'Jumps toward Scrooge.', 0x54: 'Moves around and jumps.',
+            0x5C: 'Moves toward Scrooge along the ground.', 0x1A: 'Moves a little back and forth.',
+            0x29: 'Moves toward Scrooge and then stops.', 0x20: 'Shakes from side to side in one place.',
+            0x21: 'Stays in one place.', 0x23: 'Stays in one place.', 0x24: 'Stays in one place.',
+            0x26: 'Stays in one place.', 0x2B: 'Stays in one place.', 0x52: 'Stays in one place.', 0x55: 'Stays in one place.',
+            0x6D: 'Stays in one place.'}
+    DOES.update({kind: 'Stands in one place.' for kind in (0x67, 0x68, 0x69, 0x6A, 0x6B, 0x6C, 0x6E, 0x70)})
+    # what picking an item up did (money digits $0324-$0329, lives $0361, music $C5)
+    ITEM_DOES = {0x23: 'adds $2,000 to the money', 0x28: 'adds $10,000 to the money', 0x61: 'adds $50,000 to the money',
+                 0x27: 'gives one more life', 0x26: 'changes the music'}
     CONTAINER_NAMES = {0x1A: 'Stone block', 0x1C: 'Rock', 0x20: 'Block'}
     # kinds left as they are: invisible when spawned (likely triggers or level machinery: $15, $2F, $0C, $3C, $41,
     # $18 and kind $14), the big objects that are each land's boss or set piece ($0D, $50-$54, $5C, $21) and a chest
@@ -136,7 +168,24 @@ class DuckTales:
             return self.CONTAINER_NAMES[k['gfx'] & 0x7F]
         if role['role'] == 'hidden':
             return 'Hidden ' + self.item_name(role['item']).split(' (')[0].lower()
+        if kind in self.INVISIBLE:
+            return 'Invisible object'
         return self.NAMES.get(kind, f'Object {kind:#04x}')
+
+    def kind_does(self, kind: int, land: int):
+        """One plain sentence on what the kind does in the game, or None when it was not seen."""
+        role = self.role(kind, land)
+        if role['role'] == 'chest':
+            return 'Opens when Scrooge bounces on it with his cane and lets out what it holds.'
+        if role['role'] == 'block':
+            return 'Breaks when Scrooge hits it and lets out what it holds.' if role['item'] is not None else \
+                'Breaks when Scrooge hits it.'
+        if role['role'] == 'hidden':
+            effect = self.ITEM_DOES.get(role['item'])
+            return 'Appears when Scrooge comes near' + (f'; taking it {effect}.' if effect else '.')
+        if kind in self.INVISIBLE:
+            return 'Draws nothing and stays in one place.'
+        return self.DOES.get(kind)
 
     # ---- choices: always kinds from the game's own table
     def used_kinds(self, land: int) -> list:
@@ -289,6 +338,9 @@ class DuckTalesProfile(DuckTales, Profile):
                            fields=[{'key': 'kind', 'label': 'Swap for', 'value': r['kind'], 'choices': f'land{land}'}])
             if r['role'] in ('chest', 'block', 'hidden'):
                 row['remove'] = 'Remove this object'
+            does = self.kind_does(r['kind'], land)
+            if does:
+                row['does'] = does
             out.append(row)
         return out
 
@@ -423,7 +475,7 @@ class _SlotWatcher(Watcher):
 class _RecordProfile(Profile):
     """Common adapter for the decoders below. The decoder gives records(level) (each with 'index', 'kind', 'role' and
     'item'), place(record) -> (x, y), role(kind), kind_name(kind), item_name(item), content_choices(kind, index),
-    enemy_choices(level), swap_writes, remove_writes and wanted(kind) -> {'types', 'gfx'} (how a spawn of that kind
+    enemy_choices(level), kind_does(kind) (a sentence or None), swap_writes, remove_writes and wanted(kind) -> {'types', 'gfx'} (how a spawn of that kind
     looks in the slots). Roles: 'enemy' (swap and remove), 'covered' (an item under a box), 'container' (an object
     holding an item), 'hidden' (a hidden item) and 'fixed' (left as it is)."""
     KEY = 'level'
@@ -456,6 +508,9 @@ class _RecordProfile(Profile):
             else:
                 row.update(style='enemy', fields=[], remove=None,
                            note='ROMancer does not know what this object does yet, so it stays as it is.')
+            does = self.kind_does(r['kind'])
+            if does:
+                row['does'] = does
             out.append(row)
         return out
 
@@ -541,7 +596,37 @@ class ChipDale:
     NAMES = {0x00: 'Robot bulldog', 0x01: 'Robot mouse', 0x03: 'Caterpillar', 0x1D: 'Ape', 0x1F: 'Kangaroo',
              0x26: 'Lizard', 0x29: 'Crab', 0x2A: 'Pelican', 0x2C: 'Spark', 0x2D: 'Spark', 0x2E: 'Spark',
              0x30: 'Rolling ball', 0x33: 'Rolling ball', 0x34: 'Rolling ball', 0x3C: 'Rolling ball',
-             0x09: 'Apple', 0x53: 'Red ball', 0x14: 'Hidden Zipper', 0x15: 'Hidden Zipper'}
+             0x09: 'Apple', 0x53: 'Red ball', 0x14: 'Hidden Zipper', 0x15: 'Hidden Zipper',
+             # naming pass: each kind put on its level's first record and watched for four seconds
+             # (trace/v15_profiles/naming_capcom_sml_mm6/capcom_disney/cd*, names.png)
+             0x04: 'Black diving creature', 0x05: 'Black diving creature', 0x06: 'Small brown creature',
+             0x1E: 'Red crate', 0x20: 'Brown hopping creature', 0x21: 'Toy robot with a ball', 0x22: 'Jester toy',
+             0x23: 'Creature hanging on a thread', 0x24: 'White puff', 0x25: 'Green lizard, standing',
+             0x28: 'Pink running creature', 0x35: 'Glass dome', 0x3A: 'Glass dome with legs', 0x36: 'Small black robot',
+             0x38: 'Grey long-eared toy', 0x1A: 'Extra life, not hidden', 0x31: 'Stack of crates', 0x43: 'Owl',
+             0x48: 'Large grey ball', 0x52: 'Wooden plank'}
+    INVISIBLE = {0x37, 0x3D, 0x3E}          # graphic 0: nothing is drawn
+    DOES = {0x00: 'Walks along the floor.', 0x01: 'Runs along the floor.', 0x03: 'Crawls slowly along the branch.',
+            0x04: 'Drops down from above and falls out of sight.', 0x05: 'Drops down from above and falls out of sight.',
+            0x06: 'Runs fast along the floor.', 0x1D: 'Walks toward you and stops.', 0x1E: 'Stays in one place.',
+            0x1F: 'Stands in one place and bobs.', 0x20: 'Hops in one place.', 0x21: 'Stays in one place.',
+            0x22: 'Stays in one place.', 0x23: 'Stays in one place.', 0x24: 'Stays in one place.',
+            0x25: 'Stays in one place.', 0x26: 'Runs to the wall and climbs up it.', 0x28: 'Runs along the floor.',
+            0x29: 'Moves a little from side to side.', 0x2A: 'Stays in one place.',
+            0x2C: 'Moves back and forth along the pipe.', 0x2D: 'Moves back and forth along the pipe.',
+            0x2E: 'Moves back and forth along the pipe.',
+            0x30: 'Falls from the top of the screen to the bottom, again and again.',
+            0x33: 'Rolls to the left and stops.', 0x34: 'Rolls to the left and stops.', 0x3C: 'Rolls to the left and stops.',
+            0x35: 'Bobs up and down in one place.', 0x3A: 'Jumps from place to place.', 0x36: 'Stays in one place.',
+            0x38: 'Stays in one place.', 0x31: 'Stays in one place.', 0x48: 'Stays in one place.', 0x52: 'Stays in one place.',
+            0x43: 'Flies back and forth, bobbing up and down.', 0x09: 'Stays in one place.',
+            0x2B: 'Stays in one place.', 0x27: 'Stays in one place.', 0x1C: 'Stays in one place.',
+            0x40: 'Stays in one place.', 0x4A: 'Moves around the screen in loops.', 0x45: 'Moves back and forth.',
+            0x39: 'Moves back and forth.', 0x4F: 'Moves back and forth.', 0x4C: 'Flies all over the screen.',
+            0x07: 'Moves back and forth.', 0x44: 'Rises to the top and then moves across the screen.'}
+    # what picking each item up changed (status screen counters and hearts)
+    ITEM_DOES = {0x2D: 'adds one to the flower count', 0x2E: 'adds one to the star count', 0x2F: 'gives one more life',
+                 0x30: 'fills one empty heart', 0x31: 'fills every empty heart'}
     FIRST_BOSS_KIND = 0x40        # kinds $40-$53: each level's boss, its parts and the boss room's red ball
 
     def __init__(self, rom: bytes):
@@ -611,7 +696,21 @@ class ChipDale:
             return 'Hidden ' + self.item_name(role['item']).lower() if role['item'] in self.ITEMS else f'Hidden object {kind:#04x}'
         if role['role'] == 'enemy':
             return f'Enemy {kind:#04x}'
+        if kind in self.INVISIBLE:
+            return 'Invisible object'
         return f'Object {kind:#04x}'
+
+    def kind_does(self, kind: int):
+        """One plain sentence on what the kind does in the game, or None when it was not seen."""
+        role = self.role(kind)
+        effect = self.ITEM_DOES.get(role['item']) if role['item'] is not None else None
+        if role['role'] == 'covered':
+            return f'Waits under a box; taking it {effect}.' if effect else 'Waits under a box.'
+        if role['role'] == 'hidden':
+            return f'Appears when Chip or Dale touches the spot; taking it {effect}.' if effect else                 'Appears when Chip or Dale touches the spot.'
+        if kind in self.INVISIBLE:
+            return 'Draws nothing and stays in one place.'
+        return self.DOES.get(kind)
 
     def content_choices(self, kind: int, index: int) -> list:
         """Kinds of the same sort (an item under a box, or a hidden item) with another known item. The extra life is
