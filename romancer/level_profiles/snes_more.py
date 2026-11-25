@@ -426,9 +426,79 @@ class SuperCastlevania4:
     ITEMS = {0x18: 'Small heart', 0x19: 'Large heart', 0x1A: 'Dagger', 0x1B: 'Axe', 0x1C: 'Holy water', 0x1D: 'Cross',
              0x1E: 'Stopwatch', 0x1F: 'Rosary', 0x20: 'Potion', 0x22: 'Money bag', 0x62: 'Money bag (second kind)',
              0xA2: 'Money bag (third kind)', 0xE2: 'Money bag (fourth kind)', 0x25: 'Small meat', 0x26: 'Pot roast',
-             0x28: '1-Up'}
-    # Objects named from what the game drew (survey_sc4, sheet_sc4survey.png)
-    NAMES = {0x11: 'Skeleton', 0x10: 'Bird', 0x0C: 'Bat (likely)'}
+             0x65: 'Small meat (second kind)', 0x28: '1-Up'}
+    # What picking it up did in RAM (sc4item.py; sc4item2.py lowers life to 4 first): $13F2 hearts, $13F4 life,
+    # $008E sub-weapon. Items without a line changed nothing that was measured.
+    ITEM_DOES = {0x18: 'Adds 1 heart.', 0x19: 'Adds 5 hearts.', 0x1A: 'Makes the dagger your sub-weapon.',
+                 0x1B: 'Makes the axe your sub-weapon.', 0x1C: 'Makes holy water your sub-weapon.',
+                 0x1D: 'Makes the cross your sub-weapon.', 0x1E: 'Makes the stopwatch your sub-weapon.',
+                 0x25: 'Restores 5 life.', 0x65: 'Restores 5 life.', 0x26: 'Restores 10 life.'}
+    # Every object type in the lists, named from what the game drew when it was spawned in its own room and watched for
+    # 240 frames (sc4look.py; pictures look_sc4/, contact sheets zU_*.png, zV_*.png, zW.png; positions look_sc4_*.txt).
+    # "(likely)" where the picture was hard to read; "Hidden helper" for slots that drew nothing.
+    _H = ('Hidden helper', 'Draws nothing and stays in place.')
+    NAMES = {
+        0x03: ('Swing ring', 'Hangs in place; the whip can catch it so Simon swings.'),
+        0x04: ('Hidden helper', 'Draws nothing; it rises a little and stays.'),
+        0x05: _H, 0x14: _H, 0x15: _H, 0x2A: _H, 0x2E: _H, 0x2F: _H, 0x38: _H, 0x41: _H, 0x42: _H, 0x46: _H, 0x47: _H,
+        0x49: _H, 0x55: _H, 0x5C: _H, 0x60: _H, 0x65: _H, 0x7C: _H, 0x7F: _H,
+        0x06: ('Floor log (likely)', 'Stays in place as part of the floor.'),
+        0x08: ('Pale ghost (likely)', 'Floats out and drifts toward you.'),
+        0x09: ('Spiked roller', 'Curls into a spiked ball and rolls along the ground.'),
+        0x0A: ('Leaping hound (likely)', 'Runs along the ground and leaps at you.'),
+        0x0B: ('Bone pillar', 'Stays in place; its skulls spit fire.'),
+        0x0C: ('Red bat (likely)', 'Flies low toward you.'),
+        0x0D: ('Lantern man (likely)', 'Walks back and forth carrying a lantern.'),
+        0x10: ('Raven', 'Swoops down from the trees toward you.'),
+        0x11: ('Skeleton', 'Walks back and forth near you.'),
+        0x12: ('Red crawler (likely)', 'Moves along the ground toward you.'),
+        0x16: ('Spike crusher', 'Drops down and rises again.'),
+        0x17: ('Thorny creeper (likely)', 'Creeps a short way and is gone after a moment.'),
+        0x2B: ('Barred gate', 'Stays in place in the wall.'),
+        0x2C: ('Wall creature (likely)', 'Stays in place.'),
+        0x30: ('Green lizard (likely)', 'Leaps out and is gone after a moment.'),
+        0x31: ('Yellow skeleton (likely)', 'Walks toward you, up and down stairs.'),
+        0x32: ('Hanging plant (likely)', 'Hangs from the ceiling and stays in place.'),
+        0x33: ('Coffin', 'Stands upright and shakes in place.'),
+        0x34: ('Hulking ghoul (likely)', 'Walks slowly toward you.'),
+        0x35: ('Snapping plant (likely)', 'Sits on the floor in place.'),
+        0x36: ('Fast flyer (likely)', 'Crosses the screen quickly and is gone.'),
+        0x37: ('Falling block', 'Drops away soon after it appears.'),
+        0x3A: ('Waterfall sparkle', 'A small sparkle that stays on the waterfall.'),
+        0x3C: ('Vine creature (likely)', 'Rises from the ground and moves toward you.'),
+        0x3E: ('Green harpy (likely)', 'Flies all around the screen.'),
+        0x3F: ('Dropping spider (likely)', 'Drops from the ceiling on a thread.'),
+        0x43: ('Spider', 'Hangs on a thread and moves up and down.'),
+        0x48: ('Hidden helper', 'Draws nothing; it sends out small pieces around it.'),
+        0x4A: ('Spiked ledge (likely)', 'Stays in place.'),
+        0x4D: ('Chandelier', 'Hangs from the ceiling.'),
+        0x4E: ('Bat', 'Flies at you in a wavy line.'),
+        0x52: ('Stone knight with shield (likely)', 'Walks slowly back and forth.'),
+        0x54: ('Dancing ghost (likely)', 'Glides slowly toward you.'),
+        0x56: ('Hunched skeleton (likely)', 'Walks back and forth.'),
+        0x59: ('Spear knight', 'Steps back and forth with its spear.'),
+        0x5A: ('Ghost lady (likely)', 'Floats up and down and drifts toward you.'),
+        0x5B: ('Pale zombie (likely)', 'Walks toward you in a line with others.'),
+        0x5D: ('Bone serpent', 'Snakes out of the wall and bends toward you.'),
+        0x5E: ('Bone serpent in a nest (likely)', 'Rises from its nest and sways.'),
+        0x5F: ('Colour blob (likely)', 'Flies around changing colour.'),
+        0x61: ('Swinging spiked chain', 'Swings back and forth on a chain.'),
+        0x62: ('Spiked press', 'Moves up and down.'),
+        0x63: ('Grey ghost', 'Floats in place.'),
+        0x68: ('Wall skull (likely)', 'Stays in the wall.'),
+        0x69: ('Red skeleton', 'Walks toward you.'),
+        0x6B: ('Orange leaper (likely)', 'Leaps through the air at you.'),
+        0x6C: ('Hidden helper', 'Draws nothing and is gone after two seconds.'),
+        0x6D: ('Sparkle (likely)', 'A small sparkle that drifts a little.'),
+        0x6E: ('Hidden mover', 'Draws nothing clear; it moves down and to the left, then goes.'),
+        0x6F: ('Ground creature (likely)', 'Stays low on the ground.'),
+        0x71: ('Hanging bat (likely)', 'Hangs under a ledge.'),
+        0x72: ('Floating eyeball', 'Floats toward you.'),
+        0x73: ('Small teal creature (likely)', 'Stays in place.'),
+        0x76: ('Dancing ghost couple', 'Waltzes around the room.'),
+        0x7A: ('Haunted portrait (likely)', 'Hangs on the wall.'),
+        0x7D: ('Small wall figure (likely)', 'Stays in place.'),
+    }
     SLOTS = (0x0580, 0x40, 0x26)
 
     def __init__(self, rom: bytes):
@@ -451,7 +521,8 @@ class SuperCastlevania4:
         while _w(self.rom, p) != 0xFFFF and len(out) < 300:
             x, y = _w(self.rom, p), _w(self.rom, p + 2)
             out.append({'index': len(out), 'offset': p, 'x': x & 0xFFC, 'y': y & 0xFFC, 'kind': x & 3,
-                        'type': self.rom[p + 4], 'value': self.rom[p + 5]})
+                        'type': self.rom[p + 4], 'value': self.rom[p + 5],
+                        'hard': (x & 3) == 0 and bool(x & 0x4000)})
             p += 6
         self._cache[('end', room)] = p
         self._cache[('list', room)] = out
@@ -478,8 +549,21 @@ class SuperCastlevania4:
         return sorted(seen)
 
     def object_name(self, number: int, value: int | None = None) -> str:
-        name = self.NAMES.get(number, f'Object {number:#04x}')
-        return name if not value else f'{name} (setting {value:#04x})'
+        """The type's name; a type the game places with more than one value gets "second kind" and so on."""
+        name = self.NAMES[number][0] if number in self.NAMES else self.unseen_name(number)
+        values = sorted({e['value'] for r in range(self.ROOMS) for e in self.entries(r) if e['kind'] != 1 and e['type'] == number})
+        if value is None or len(values) < 2 or value not in values or values.index(value) == 0:
+            return name
+        order = ['second', 'third', 'fourth', 'fifth', 'sixth', 'seventh', 'eighth', 'ninth', 'tenth']
+        n = values.index(value) - 1
+        return f'{name}, {order[n] if n < len(order) else "another"} kind'
+
+    def unseen_name(self, number: int) -> str:
+        rooms = sorted({r for r in range(self.ROOMS) for e in self.entries(r) if e['kind'] != 1 and e['type'] == number})
+        return f'Room {rooms[0]} object, not seen yet' if rooms else 'Unplaced object, not seen yet'
+
+    def object_does(self, number: int):
+        return self.NAMES.get(number, (None, None))[1]
 
     def remove_writes(self, room: int, index: int) -> list:
         entries = self.entries(room)
@@ -553,10 +637,10 @@ class _Sc4Watcher(Watcher):
         if w['candle']:
             return {'state': 'good' if ok else 'bad',
                     'text': f'Played from the start, this candle now holds {w["name"]}.' if ok
-                    else f'Played from the start, this candle holds item {self.seen:#04x}, not the one chosen.'}
+                    else f'Played from the start, this candle holds {SuperCastlevania4.ITEMS.get(self.seen, "another item").lower()}, not the one chosen.'}
         return {'state': 'good' if ok else 'bad',
                 'text': f'Played from the start, the game now puts {w["name"]} there.' if ok
-                else f'Played from the start, the game put object {self.seen:#04x} there, not the one chosen.'}
+                else f'Played from the start, the game put {w.get("old_name", "the old object")} there, not the one chosen.'}
 
 
 class SuperCastlevania4Profile(SuperCastlevania4, Profile):
@@ -587,14 +671,18 @@ class SuperCastlevania4Profile(SuperCastlevania4, Profile):
                 row = {'id': f'obj:{e["index"]}', 'style': 'item', 'type': 0x0E, 'x': e['x'], 'y': e['y'],
                        'name': 'Candle', 'detail': f'holds {item[0].lower() + item[1:]}', 'remove': 'Remove this candle',
                        'fields': []}
+                if e['value'] in self.ITEM_DOES:
+                    row['does'] = 'Drops its item when whipped. The item ' + self.ITEM_DOES[e['value']][0].lower() + self.ITEM_DOES[e['value']][1:]
                 if e['value'] in self.ITEMS:
                     row['fields'] = [{'key': 'item', 'label': 'Holds', 'value': e['value'], 'choices': 'items'}]
                 out.append(row)
             elif e['kind'] in (0, 2):
                 row = {'id': f'obj:{e["index"]}', 'style': 'enemy', 'type': e['type'], 'x': e['x'], 'y': e['y'],
-                       'name': self.object_name(e['type']), 'remove': None, 'fields': []}
-                if e['value']:
-                    row['detail'] = f'setting {e["value"]:#04x}'
+                       'name': self.object_name(e['type'], e['value']), 'remove': None, 'fields': []}
+                if self.object_does(e['type']):
+                    row['does'] = self.object_does(e['type'])
+                if e['hard']:
+                    row['detail'] = 'only on the harder setting'
                 if self.editable_enemy(e):
                     row['remove'] = 'Remove this'
                     choices = self.enemy_choices(room, e)
@@ -617,7 +705,7 @@ class SuperCastlevania4Profile(SuperCastlevania4, Profile):
         candle = e['kind'] == 1
         if not candle and not self.editable_enemy(e):
             raise ValueError('ROMancer cannot change that yet.')
-        name = 'candle' if candle else self.object_name(e['type'])
+        name = 'candle' if candle else self.object_name(e['type'], e['value'])
         watch = {'room': room, 'x': e['x'], 'y': e['y'], 'candle': candle}
         if remove:
             return {'writes': self.remove_writes(room, e['index']), 'title': f'Remove the {name}',
@@ -638,10 +726,11 @@ class SuperCastlevania4Profile(SuperCastlevania4, Profile):
                   if self.rom[e['offset'] + 4 + i] != v]
         new_name = self.object_name(value >> 8, value & 0xFF)
         return {'writes': writes, 'title': f'Here: {new_name}',
-                'watch': {**watch, 'remove': False, 'want': value >> 8, 'types': [e['type'], value >> 8], 'name': new_name}}
+                'watch': {**watch, 'remove': False, 'want': value >> 8, 'types': [e['type'], value >> 8], 'name': new_name,
+                          'old_name': self.object_name(e['type'], e['value'])}}
 
     def watcher(self, watch):
         return _Sc4Watcher(watch)
 
 
-PROFILES = [MegaManXProfile]      # Super Castlevania IV is added once its edits are proven in the game
+PROFILES = [MegaManXProfile, SuperCastlevania4Profile]

@@ -85,7 +85,25 @@ class Sonic3KTest(unittest.TestCase):
         with self.assertRaises(ValueError):
             self.p.edit(self.part, 'object:0', {'contents': 9})
 
+    def test_removal_not_offered(self):
+        objs = self.p.objects(self.part)
+        self.assertTrue(all(o['remove'] is None for o in objs))
+        with self.assertRaises(ValueError):
+            self.p.edit(self.part, 'object:1', {}, True)
+
+    def test_where_uses_the_scroll_the_picture_used(self):
+        from romancer.level_profiles import Ram
+        ram = Ram(ram_with({0xF600: (1, 0x0C), 0xFE10: (2, 0), 0xEE78: (2, 0x1240), 0xEE7C: (2, 0x300)}))
+        vram = bytearray(0x10000)
+        put_w(vram, 0xF000, -0x1234)
+        ram.domains = {'vram': bytes(vram), 'vsram': bytes([0x02, 0xFE]) + bytes(78)}
+        self.assertEqual(self.p.where(ram), {'part': {'zone': 0, 'act': 0}, 'x': 0x1234, 'y': 0x2FE})
+        put_w(vram, 0xF000, 0)              # far from the camera: not the level's scroll, so the camera is kept
+        ram.domains['vram'] = bytes(vram)
+        self.assertEqual(self.p.where(ram)['x'], 0x1240)
+
     def test_remove_closes_the_list(self):
+        self.p.REMOVAL = True
         e = self.p.edit(self.part, 'object:1', {}, True)
         rom = bytearray(self.p.rom)
         for at, old, new in e['writes']:
@@ -109,6 +127,28 @@ class Sonic3KTest(unittest.TestCase):
         w = self.p.watcher(e['watch'])
         ram = ram_with({0xF600: (1, 0x0C), 0xFE10: (2, 0), slot: (4, 0x18D10), slot + 0x48: (2, 0xEB01)})
         self.assertTrue(w.see(ram, 2, 'changed'))
+        self.assertEqual(w.result()['state'], 'bad')
+        # an enemy removal: one fewer of that kind than the unchanged game at the same frames
+        self.p.REMOVAL = True
+        e = self.p.edit(self.part, 'object:1', {}, True)
+        w = self.p.watcher(e['watch'])
+        self.assertTrue(w.compare)
+        other = slot + 0x4A
+        both = ram_with({0xF600: (1, 0x0C), 0xFE10: (2, 0), slot: (4, 0x18D10), slot + 0x48: (2, 0xEB01),
+                         other: (4, 0x18D20), other + 0x48: (2, 0xEB05)})
+        one = ram_with({0xF600: (1, 0x0C), 0xFE10: (2, 0), other: (4, 0x18D20), other + 0x48: (2, 0xEB05)})
+        for f in range(2, 62, 2):
+            w.see(both, f, 'original')
+        for f in range(2, 62, 2):
+            if w.see(one, f, 'changed'):
+                break
+        self.assertEqual(w.result()['state'], 'good')
+        w = self.p.watcher(e['watch'])
+        for f in range(2, 62, 2):
+            w.see(both, f, 'original')
+        for f in range(2, 62, 2):
+            if w.see(both, f, 'changed'):
+                break
         self.assertEqual(w.result()['state'], 'bad')
         # a ring removal: one ring fewer in the window than the unchanged game at the same frame and camera
         e = self.p.edit(self.part, 'ring:1', {}, True)
@@ -161,6 +201,10 @@ class BloodlinesTest(unittest.TestCase):
     def test_edits(self):
         e = self.p.edit(self.part, 'object:1', {'contents': 0xB1})
         self.assertEqual(e['writes'], [(self.lists + 16 + 3, 0x10, 0xB1)])
+        with self.assertRaises(ValueError):          # removal is not offered yet
+            self.p.edit(self.part, 'object:1', {}, True)
+        self.assertTrue(all(o['remove'] is None for o in self.p.objects(self.part)))
+        self.p.REMOVAL = True
         e2 = self.p.edit(self.part, 'object:1', {}, True)
         self.assertEqual(e2['writes'], [(self.lists + 16 + 2, 0x77, 0x03)])
         with self.assertRaises(ValueError):
@@ -173,14 +217,19 @@ class BloodlinesTest(unittest.TestCase):
         ram = ram_with({0x9002: (2, 9), 0x9264: (2, 1), slot: (2, 1), slot + 0x16: (2, 0x77), slot + 0x4C: (1, 3), slot + 0x53: (1, 0xB1)})
         self.assertTrue(w.see(ram, 2, 'changed'))
         self.assertEqual(w.result()['state'], 'good')
-        w = self.p.watcher(e2['watch'])
-        self.assertTrue(w.see(ram, 2, 'changed'))
-        self.assertEqual(w.result()['state'], 'bad')
-        w = self.p.watcher(e2['watch'])
+        # a removal compares with the unchanged game: the candle must be missing at the frames it was there
         empty = ram_with({0x9002: (2, 9), 0x9264: (2, 1), 0x9220: (2, 0x40)})
-        for f in range(30):
-            w.see(empty, f, 'changed')
-        self.assertEqual(w.result()['state'], 'good')
+        for after, state in ((empty, 'good'), (ram, 'bad')):
+            w = self.p.watcher(e2['watch'])
+            self.assertTrue(w.compare)
+            for f in range(0, 80, 2):
+                w.see(ram, f, 'original')
+            for f in range(0, 80, 2):
+                if w.see(after, f, 'changed'):
+                    break
+            self.assertEqual(w.result()['state'], state)
+        self.assertEqual(self.p.CONTENTS[0x70], 'Silver disc')
+        self.assertEqual(self.p.CONTENTS[0x90], 'Dark orb')
 
 
 if __name__ == '__main__':
