@@ -52,6 +52,7 @@ START_PRESSES = {
     '6791433fd1c6': 5,          # Mega Man 6: Plant Man
     '1271dce8678f': 8,          # Darkwing Duck: through the intro into the first level
     'dff668a78853': 6,          # Chip 'n Dale 2: into level 0
+    '1f4a9b3f04e2': 3,          # Contra: skip the title scroll, 1 PLAYER, then Stage 1
 }
 
 
