@@ -2404,6 +2404,9 @@ class EditSessionTools:
             'edits.level_screen_at': (base + ' level_id x', lambda p, c: {'ok': True, **self.session(p).level_screen_at(p['level_id'], p['x'])}),
             'edits.level_length': (base + ' level_id part screen delta', lambda p, c: {'ok': True, 'change': self.session(p).propose_level_length(
                 p['level_id'], p['part'], p['screen'], p['delta'])}),
+            'edits.level_add_at': (base + ' level_id x y', lambda p, c: {'ok': True, **self.session(p).level_add_at(p['level_id'], p['x'], p['y'])}),
+            'edits.level_add': (base + ' level_id part kind x y values', lambda p, c: {'ok': True, 'change': self.session(p).propose_level_add(
+                p['level_id'], p['part'], p['kind'], p['x'], p['y'], p['values'])}),
             'edits.level_edit': (base + ' level_id part object_id values remove', lambda p, c: {'ok': True, 'change': self.session(p).propose_level_edit(
                 p['level_id'], p['part'], p['object_id'], p['values'], bool(p['remove']))}),
             'edits.play': (base + ' frames buttons', lambda p, c: {'ok': True, **self.session(p).play(p['frames'], p['buttons'])}),
@@ -2427,7 +2430,7 @@ class EditSessionTools:
                 p['scene_id'], p['cells'])}),
             'edits.find_color': (base + ' scene_id domain entry colors', lambda p, c: {'ok': True, 'change': self.session(p).find_color(
                 p['scene_id'], p['domain'], p['entry'], p['colors'])}),
-            'edits.level_start': (base + ' name', lambda p, c: self._summary(self.session(p), self.session(p).level_start(p['name']))),
+            'edits.level_start': (base + ' name', lambda p, c: self._summary(self.session(p), self.session(p).level_start(p['name'], p.get('extend')))),
             'edits.level_auto': (base + ' steps direction', lambda p, c: self._summary(self.session(p), self.session(p).level_auto(p['steps'], p['direction']))),
             'edits.level_stop': (base, lambda p, c: self._summary(self.session(p), self.session(p).level_stop())),
             'edits.level_forget': (base + ' level_id', lambda p, c: self._summary(self.session(p), self.session(p).level_forget(p['level_id']))),

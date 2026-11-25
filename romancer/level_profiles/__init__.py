@@ -18,6 +18,10 @@ The interface every profile gives (see Profile):
 * watcher(watch) -> Watcher: looks at the replayed game and says whether the change happened
 * tile_role(tile) -> 'solid', 'breakable', 'open', or None when the profile has no block roles
 * screens(part) -> {'count', 'most'} or None, and resize(part, at, delta) -> {'writes', 'notes', 'watch'}
+* addable(part) -> [{'kind', 'name', 'fields'}]: what can be added to that part ([] when nothing can), and
+  add(part, kind, x, y, values) -> {'writes', 'title', 'watch'}: put a new one at the part's pixel x, y (its bottom
+  middle, rounded the way the game stores places). Only kinds the part can draw are offered; the game's own tables
+  must have room, or add() says why not
 """
 from __future__ import annotations
 
@@ -71,6 +75,12 @@ class Profile:
 
     def resize(self, part: dict, at: int, delta: int) -> dict:
         raise ValueError('ROMancer cannot change the length of this game’s levels yet.')
+
+    def addable(self, part: dict) -> list:
+        return []
+
+    def add(self, part: dict, kind: str, x: int, y: int, values: dict) -> dict:
+        raise ValueError('ROMancer cannot add new things to this game’s levels yet.')
 
     # helpers
     def find(self, part: dict, object_id: str) -> dict:

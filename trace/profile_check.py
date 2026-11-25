@@ -2,9 +2,10 @@
 and run edits through the real session and its watcher, with a control on the unchanged game.
 
     python -B trace/profile_check.py <corpus index.json> <key> <out folder> [--presses N] [--steps N]
-        [--edit 'PART|OBJECT|VALUES|remove'] ... [--length 'PART|SCREEN|DELTA'] ... [--control]
+        [--edit 'PART|OBJECT|VALUES|remove'] ... [--length 'PART|SCREEN|DELTA'] ... [--add 'PART|KIND|X|Y|VALUES'] ...
+        [--control]
 
-PART and VALUES are JSON ({"stage": 1} and {"record": 84}); add |remove to remove the object. Writes to the out folder:
+--add puts a new object of KIND at the part's pixel X, Y (profile.addable / profile.add). PART and VALUES are JSON ({"stage": 1} and {"record": 84}); add |remove to remove the object. Writes to the out folder:
 map.png (the map with every object's box, style colour and name), objects.json, results.json. --control also runs each
 edit's watcher on the unchanged game: a good watcher says "bad" (or "warn") there.
 
@@ -75,6 +76,7 @@ def main() -> None:
     parser.add_argument('--intro', type=int, default=8)
     parser.add_argument('--edit', action='append', default=[])
     parser.add_argument('--length', action='append', default=[])
+    parser.add_argument('--add', action='append', default=[])
     parser.add_argument('--control', action='store_true')
     args = parser.parse_args()
     os.environ.setdefault('ROMANCER_TRACE_CORES', str(ROOT.parent / 'release-v1.3.9' / 'work' / 'trace-pack-windows'))
@@ -117,6 +119,25 @@ def main() -> None:
                 row['check'] = wait_change(session, change['id'])
                 if args.control:
                     plan = profile.edit(part, object_id, values, remove)
+                    row['control'] = control(session, level, profile.watcher(plan['watch']))
+                session.remove(change['id']) if any(c['id'] == change['id'] for c in session.changes) else None
+                session.preview = None
+            except ValueError as error:
+                row['error'] = str(error)
+            results.append(row)
+            print(json.dumps(row), flush=True)
+        for spec in args.add:
+            bits = spec.split('|')
+            part, kind, x, y = json.loads(bits[0]), bits[1], int(bits[2]), int(bits[3])
+            values = json.loads(bits[4]) if len(bits) > 4 and bits[4] else {}
+            row = {'add': spec}
+            try:
+                change = session.propose_level_add(level['id'], part, kind, x, y, values)
+                row['title'] = change['title']
+                row['bytes'] = len(session._find(change['id'])['writes'])
+                row['check'] = wait_change(session, change['id'])
+                if args.control:
+                    plan = profile.add(part, kind, x, y, values)
                     row['control'] = control(session, level, profile.watcher(plan['watch']))
                 session.remove(change['id']) if any(c['id'] == change['id'] for c in session.changes) else None
                 session.preview = None

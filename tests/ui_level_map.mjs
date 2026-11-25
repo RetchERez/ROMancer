@@ -1,5 +1,5 @@
 import assert from 'node:assert/strict';
-import {placeAt,units,snap,brushFrom,stamp,paintedCells,paintLayers,layerChoices,steps,levelStatus,levelsPart,levelPart,levelChange,objectLabel,objectAt,fieldChoices,gamesPart} from '../romancer/ui/level_map.js';
+import {placeAt,units,snap,brushFrom,stamp,paintedCells,paintLayers,layerChoices,steps,levelStatus,levelsPart,levelPart,levelChange,objectLabel,objectAt,fieldChoices,gamesPart,addOption} from '../romancer/ui/level_map.js';
 
 // a map of 12 by 6 cells; (5,2) was never seen, (7,3) cannot be changed
 const width=12,height=6,frames=Array.from({length:width*height},()=>0),status=Array.from({length:width*height},()=>'r');
@@ -148,4 +148,22 @@ assert.match(gamesHtml,/<strong>Castlevania<\/strong> has full level editing/);
 assert.match(gamesHtml,/<strong>Game Boy<\/strong>/);
 assert.match(gamesPart({games:[{name:'A',system:'NES'}],this:null}),/general level tools/);
 assert.equal(gamesPart(null),'');
+// adding something new: the tool shows only when the profile can add, and the panel is built from the chosen kind
+assert.ok(!toolsHtml.includes('Add new'));
+const addable={...known,objects:{...known.objects,addable:true}};
+assert.ok(levelPart({level:addable,proposal:null},verdict,keep).includes('Add new'));
+const spot={part:{stage:1},name:'stage 1',x:40,y:96,map_x:40,map_y:96,choices:{enemies:[{value:3,name:'Bat'},{value:5,name:'Ghost'}]},
+ options:[{kind:'enemy',name:'Enemy',fields:[{key:'type',label:'Which enemy',value:3,choices:'enemies'}]},{kind:'item',name:'Item',fields:[]}]};
+assert.equal(addOption(spot,'item').kind,'item');
+assert.equal(addOption(spot,'nope').kind,'enemy');
+assert.equal(addOption(null,'enemy'),null);
+const addHtml=levelPart({level:{...addable,tool:'add',spot,addKind:'enemy'},proposal:null},verdict,keep);
+assert.match(addHtml,/Add at this spot<\/strong> in stage 1/);
+assert.match(addHtml,/<select id="level-add-field-type" data-key="type">/);
+assert.match(addHtml,/value="5" >Ghost/);
+assert.match(addHtml,/data-action="level-add-apply"/);
+// adding to a map that is already there
+assert.match(levelStatus({level_recording:{name:'Level map 1',captures:30,limit:200,extends:'lvl',added:4}},true),/Adding to Level map 1, 4 new screens so far/);
+assert.match(levelPart({level:fresh,proposal:null,summary:{}},verdict,keep),/data-action="level-extend"[^>]*disabled/);
+assert.ok(!/data-action="level-extend"[^>]*disabled/.test(levelPart({level:fresh,proposal:null,playing:true,summary:{}},verdict,keep)));
 console.log('level map checks passed');
