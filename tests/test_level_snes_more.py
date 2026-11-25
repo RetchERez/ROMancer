@@ -142,8 +142,10 @@ class SuperCastlevania4Test(unittest.TestCase):
     def test_decode(self):
         objs = self.p.objects({'room': 0})
         self.assertEqual([(o['name'], o['x'], o['y']) for o in objs],
-                         [('Candle', 0x80, 0xA0), ('Skeleton', 0x2A8, 0xB8), ('Bat (likely)', 0x2C8, 0xB8)])
+                         [('Candle', 0x80, 0xA0), ('Skeleton', 0x2A8, 0xB8), ('Red bat (likely)', 0x2C8, 0xB8)])
         self.assertEqual(objs[0]['detail'], 'holds small heart')
+        self.assertEqual(objs[0]['does'], 'Drops its item when whipped. The item adds 1 heart.')
+        self.assertEqual(objs[1]['does'], 'Walks back and forth near you.')
         ram = bytearray(0x20000)
         ram[0x70] = 5
         ram[0x1280], ram[0x1281] = 0x34, 0x01
@@ -180,6 +182,30 @@ class SuperCastlevania4Test(unittest.TestCase):
         ram[s + 0x10], ram[s + 0x0A], ram[s + 0x0B], ram[s + 0x0E] = 0x0C, 0xC8, 0x02, 0xB8
         self.assertTrue(w.see(bytes(ram), 0, 'original'))
         self.assertEqual(w.result()['state'], 'bad')
+
+    def test_names(self):
+        p = self.p
+        # every type the profile can name has a name and a does-line, and no name or choice shows a number
+        for number, (name, does) in p.NAMES.items():
+            self.assertTrue(name and does)
+            self.assertNotIn('0x', name)
+        for number in range(0x100):
+            self.assertNotIn('0x', p.object_name(number))
+        self.assertEqual(p.object_name(0x99), 'Unplaced object, not seen yet')
+        for option in p.choices()['items']:
+            self.assertNotIn('0x', option['name'])
+        for o in p.objects({'room': 0}) + p.objects({'room': 1}):
+            self.assertNotIn('0x', o['name'])
+        self.assertEqual(p.ITEMS[0x65], 'Small meat (second kind)')
+
+    def test_hard_flag_and_kinds(self):
+        rom = sc4_rom()
+        put(rom, 0x059000, [0] * 6 + [0x40, 0x40, 0x40, 0x00, 0x11, 0x00, 0x62, 0x00, 0x40, 0x00, 0x2B, 0x01,
+                                      0x66, 0x00, 0x48, 0x00, 0x2B, 0x00, 0xFF, 0xFF])
+        p = SuperCastlevania4Profile(bytes(rom))
+        objs = p.objects({'room': 1})
+        self.assertEqual(objs[0]['detail'], 'only on the harder setting')
+        self.assertEqual([o['name'] for o in objs[1:]], ['Barred gate, second kind', 'Barred gate'])
 
 
 if __name__ == '__main__':
