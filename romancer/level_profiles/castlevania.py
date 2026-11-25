@@ -55,7 +55,8 @@ class Castlevania:
         0x5D: ('Dracula (boss)', 'The last boss, at the end of stage 18.'),
         0x5E: ('Giant bat', 'A big red bat that flies about in wide swoops.'),
     }
-    # enemy indexes from 69 on read candle records (both share the pool at $D6A1); no zone uses them as enemies
+    # enemy indexes from 69 on read candle records (both share the pool at $D6A1); no zone uses them as enemies, so
+    # they are not offered
     NOT_ENEMIES = {0x20, 0xFE, 0xFF}
     # item codes, from the pickup code at $E73E (bank 7): 0 small heart (a weak whip gets the whip upgrade instead), 1 money
     # bag, 3 whip upgrade, 4 large heart, 5 pot roast, 6 magic crystal, A rosary, C double or triple shot, E invisibility
@@ -455,7 +456,7 @@ class Castlevania:
                 record = self.enemy_record(index)
             except IndexError:
                 break
-            if record and (record['type'], record['dx'], record['y']) not in seen:
+            if record and record['type'] not in self.NOT_ENEMIES and (record['type'], record['dx'], record['y']) not in seen:
                 seen.add((record['type'], record['dx'], record['y']))
                 found.append({'index': index, **record, 'name': self.enemy_name(record['type'])})
         return found

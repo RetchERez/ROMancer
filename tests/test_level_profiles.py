@@ -279,6 +279,13 @@ class Names(unittest.TestCase):
         self.assertEqual((names[6], names[7]), ('Axe Knight, high, in the middle, a little to the left', 'Axe Knight, high, in the middle, a little to the right'))
         self.assertEqual(len(set(names.values())), len(names))
 
+    def test_candle_records_are_not_offered_as_enemies(self):
+        p = lp.Castlevania(bytes(build().rom))
+        # index 2 of the shared pool is a candle record ($FF, drop, ...): read as an enemy its type is $FF
+        self.assertEqual(p.enemy_record(2)['type'], 0xFF)
+        self.assertNotIn(2, [c['index'] for c in p.enemy_choices()])
+        self.assertIn(1, [c['index'] for c in p.enemy_choices()])
+
     def test_choices_have_no_heights(self):
         from romancer.level_profiles.castlevania import CastlevaniaProfile
         names = [c['name'] for c in CastlevaniaProfile(bytes(build().rom)).choices()['enemies']]

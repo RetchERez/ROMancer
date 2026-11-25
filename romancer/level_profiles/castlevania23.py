@@ -950,6 +950,23 @@ class Castlevania2Profile(Castlevania2, Profile):
         0x15: ('Wall creature', 'Clings to a wall and spits fire.'),
         0x17: ('Zombie', 'Walks toward you through town at night.'),
         0x1D: ('Fire man', 'A man made of fire that walks about and throws fireballs.'),
+        0x02: ('Red snake', 'Wriggles in place on the wall.'),
+        0x05: ('Spear skeleton', 'Stands guard and thrusts a spear.'),
+        0x0D: ('Bone-throwing skeleton', 'Throws bones at you.'),
+        0x0F: ('Gargoyle', 'A winged demon that flies about and spits fireballs.'),
+        0x11: ('Bat', 'Flies about the room.'),
+        0x12: ('Wolf', 'Leaps at you.'),
+        0x16: ('Ghoul', 'Walks along the graveyard.'),
+        0x18: ('Fishman', 'Leaps out of the swamp and spits fireballs.'),
+        0x38: ('Grave hand', 'Pokes up out of the ground.'),
+        0x39: ('Ghost', 'Floats toward you.'),
+        0x3A: ('Mummy', 'Walks slowly toward you.'),
+        0x3B: ('Eagle', 'Swoops across the sky.'),
+        0x3F: ('Man-eating plant', 'Stays rooted and spits at you.'),
+        0x41: ('Floating eyeball', 'Drifts up and down above the ground.'),
+        0x42: ('Giant floating mask (boss)', 'A huge stone face that drifts about the room.'),
+        0x44: ('Death (boss)', 'The Grim Reaper; he swings his scythe at you.'),
+        0x4A: ('Bone serpent', 'A neck of bones that rises from the ground and spits fireballs.'),
     }
 
     def where(self, ram):
