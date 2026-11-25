@@ -31,23 +31,67 @@ class Zelda1:
     sha256 = '44e33dc0a6fb663b98908ea761b33bbd77ca5092f25c624b10bf2a97e5406a5a'
     BANKS = 8
     # enemy types, named by spawning each one in a room and looking at what the game drew (pictures in
-    # trace/v15_profiles/zelda/sheet_ow.png, sheet_dg*.png, sheet_re.png); types never seen keep their number
+    # trace/v15_profiles/zelda/sheet_ow.png, sheet_dg*.png, sheet_re.png, and trace/v15_profiles/naming_zelda_smb2/z1/);
+    # two of a kind are told apart by what they were seen doing (z1_track.py: speeds, Gleeok heads, Patra eyes)
     ENEMIES = {0x01: 'Blue Lynel', 0x02: 'Red Lynel', 0x03: 'Blue Moblin', 0x04: 'Red Moblin', 0x05: 'Blue Goriya',
-               0x06: 'Red Goriya', 0x07: 'Red Octorok', 0x08: 'Red Octorok (second kind)', 0x09: 'Blue Octorok',
-               0x0A: 'Blue Octorok (second kind)', 0x0B: 'Red Darknut', 0x0C: 'Blue Darknut', 0x0D: 'Blue Tektite',
+               0x06: 'Red Goriya', 0x07: 'Red Octorok, slow', 0x08: 'Red Octorok, fast', 0x09: 'Blue Octorok, slow',
+               0x0A: 'Blue Octorok, fast', 0x0B: 'Red Darknut', 0x0C: 'Blue Darknut', 0x0D: 'Blue Tektite',
                0x0E: 'Red Tektite', 0x0F: 'Blue Leever', 0x10: 'Red Leever', 0x12: 'Vire', 0x13: 'Zol', 0x15: 'Gel',
-               0x16: 'Pols Voice', 0x17: 'Like Like', 0x1A: 'Peahat', 0x1B: 'Blue Keese', 0x1D: 'Black Keese',
+               0x16: 'Pols Voice', 0x17: 'Like Like', 0x18: 'Green hopper drawn with the wrong tiles',
+               0x1A: 'Peahat', 0x1B: 'Blue Keese', 0x1D: 'Black Keese',
                0x1F: 'Falling rocks', 0x21: 'Ghini', 0x23: 'Blue Wizzrobe', 0x24: 'Red Wizzrobe', 0x27: 'Wallmaster',
-               0x28: 'Rope', 0x2A: 'Stalfos', 0x2B: 'Bubble', 0x2C: 'Blue Bubble', 0x2D: 'Red Bubble', 0x2F: 'Fairy',
+               0x28: 'Rope', 0x29: 'Nothing that shows', 0x2A: 'Stalfos', 0x2B: 'Bubble', 0x2C: 'Blue Bubble',
+               0x2D: 'Red Bubble', 0x2F: 'Fairy',
                0x30: 'Gibdo', 0x31: 'Dodongo', 0x32: 'Dodongo (one)', 0x33: 'Blue Gohma', 0x34: 'Red Gohma',
                0x35: 'Ring of rupees', 0x36: 'Hungry Goriya', 0x37: 'Old man', 0x38: 'Digdogger',
                0x39: 'Digdogger (one)', 0x3A: 'Red Lanmola', 0x3B: 'Blue Lanmola', 0x3C: 'Manhandla',
-               0x3D: 'Aquamentus', 0x3E: 'Ganon', 0x3F: 'Fire', 0x41: 'Moldorm', 0x43: 'Gleeok', 0x44: 'Gleeok',
-               0x45: 'Gleeok', 0x47: 'Patra', 0x48: 'Patra', 0x49: 'Blade trap', 0x4A: 'Blade traps in the corners',
+               0x3D: 'Aquamentus', 0x3E: 'Ganon', 0x3F: 'Fire', 0x41: 'Moldorm', 0x42: 'Gleeok with one head',
+               0x43: 'Gleeok with two heads', 0x44: 'Gleeok with three heads', 0x45: 'Gleeok with four heads',
+               0x47: 'Patra, eyes circle close', 0x48: 'Patra, eyes swing wide', 0x49: 'Blade trap',
+               0x4A: 'Blade traps in the corners',
                0x4B: 'Old man (hint about Dodongo)', 0x4C: 'Old man (hint about the eastmost peninsula)',
                0x4D: 'Old man (hint about the eyes of Gohma)', 0x4E: 'Old man (hint about the waterfall)',
                0x4F: 'Old man who gives or takes rupees', 0x50: 'Old man (hint about the tip of the nose)',
                0x51: 'Old man who asks for life or money', 0x52: 'Old man (hint about the arrow)'}
+    # what each one does, from watching it for six seconds with Link standing at the door (z1_track.py: positions of
+    # every enemy slot each frame and the shots that appeared)
+    _PERSON = 'Stands still between two fires.'
+    DOES = {0x01: 'Walks about slowly and shoots sword beams.', 0x02: 'Walks about slowly and shoots sword beams.',
+            0x03: 'Walks about and throws spears.', 0x04: 'Walks about and throws spears.',
+            0x05: 'Walks about and throws boomerangs.', 0x06: 'Walks about and throws boomerangs.',
+            0x07: 'Walks about slowly and spits rocks.', 0x08: 'Walks about quickly and spits rocks.',
+            0x09: 'Walks about slowly and spits rocks.', 0x0A: 'Walks about quickly and spits rocks.',
+            0x0B: 'Walks about the room.', 0x0C: 'Walks about the room a little faster.',
+            0x0D: 'Jumps about now and then.', 0x0E: 'Jumps about all the time.',
+            0x0F: 'Comes up out of the sand and wanders about.',
+            0x10: 'Comes up out of the sand near Link and sinks again.',
+            0x12: 'Bounces about in hops.', 0x13: 'Creeps slowly about the room.', 0x15: 'Creeps about the room.',
+            0x16: 'Hops about the room.', 0x17: 'Walks slowly about the room.',
+            0x18: 'Stays still most of the time and now and then jumps a short way.',
+            0x1A: 'Flies about in loops.', 0x1B: 'Flutters about the room.', 0x1D: 'Flutters quickly about the room.',
+            0x1F: 'Rocks fall and bounce down the screen.', 0x21: 'Floats about the screen.',
+            0x23: 'Walks about and vanishes from place to place.', 0x24: 'Appears near Link and shoots magic.',
+            0x27: 'Stays hidden in the walls while Link keeps away from them.', 0x28: 'Walks about the room.',
+            0x29: 'Nothing appears and nothing moves.', 0x2A: 'Walks about the room.',
+            0x2B: 'Flies quickly about the room.', 0x2C: 'Flies quickly about the room.',
+            0x2D: 'Flies quickly about the room.', 0x2F: 'Hovers in one place.', 0x30: 'Walks about the room.',
+            0x31: 'Walks back and forth.', 0x32: 'Walks back and forth.',
+            0x33: 'Moves along the top of the room and fires from its eye.',
+            0x34: 'Moves along the top of the room and fires from its eye.',
+            0x35: 'Rupees appear in a ring around Link.', 0x36: 'Stands still and blocks the way.', 0x37: _PERSON,
+            0x38: 'Drifts about the room.', 0x39: 'Drifts about the room.',
+            0x3A: 'Crawls about the room as a long body.', 0x3B: 'Crawls quickly about the room as a long body.',
+            0x3C: 'Moves about the room and shoots fireballs.', 0x3D: 'Walks back and forth and shoots fireballs.',
+            0x3E: 'Waits at the top of the room.', 0x3F: 'Burns in one place.', 0x41: 'Crawls about the room.',
+            0x42: 'Stays at the top of the room and swings its head.',
+            0x43: 'Stays at the top of the room, swings its heads and spits fire.',
+            0x44: 'Stays at the top of the room, swings its heads and spits fire.',
+            0x45: 'Stays at the top of the room, swings its heads and spits fire.',
+            0x47: 'Flies about with eight eyes circling close around it.',
+            0x48: 'Flies about with eight eyes swinging far out and back.',
+            0x49: 'Waits in place and slides out at Link.', 0x4A: 'Wait in the corners and slide out at Link.',
+            0x4B: _PERSON, 0x4C: _PERSON, 0x4D: _PERSON, 0x4E: _PERSON, 0x4F: _PERSON, 0x50: _PERSON,
+            0x51: _PERSON, 0x52: _PERSON}
     # item numbers (caves and dungeons share them), named by placing each one and looking at it
     # (trace/v15_profiles/zelda/items_crop.png, sheet_shop.png)
     ITEMS = {0x00: 'Bombs', 0x01: 'Wooden sword', 0x02: 'White sword', 0x03: 'Magical sword', 0x04: 'Bait',
@@ -57,6 +101,9 @@ class Zelda1:
              0x16: 'Compass', 0x17: 'Map', 0x18: 'Rupee', 0x19: 'Key', 0x1A: 'Heart container',
              0x1B: 'Triforce piece', 0x1C: 'Magic shield', 0x1D: 'Boomerang', 0x1E: 'Magic boomerang',
              0x1F: 'Blue potion', 0x20: 'Red potion', 0x21: 'Clock', 0x22: 'Heart', 0x23: 'Fairy'}
+    # named but not offered as a choice: the Triforce of Power, only in Ganon's room (placed in level 9's start room
+    # and looked at: trace/v15_profiles/naming_zelda_smb2/z1/item0e_42.png); elsewhere the game draws it as garbage
+    SHOWN_ITEMS = {0x0E: 'Triforce of Power'}
     NO_ITEM = 0x03                      # a dungeon room whose item number is 3 has no item ($B84E)
     NO_CAVE_ITEM = 0x3F
     # door types (dungeon tables A and B): drawn in sheet_doors.png; walls 1-3 told apart by the walk code at
@@ -220,7 +267,7 @@ class Zelda1:
         return {'action': r['f'] & 7, 'at': r['f_at']}
 
     def item_name(self, item: int) -> str:
-        return self.ITEMS.get(item, f'Item {item:#04x}')
+        return self.ITEMS.get(item, self.SHOWN_ITEMS.get(item, f'Item {item:#04x}'))
 
     # ---- overworld screens: layout (bank 5 $AA04), entrances and secrets
     def squares(self, room: int, quest: int = 1) -> list:
@@ -533,6 +580,9 @@ class Zelda1Profile(Zelda1, Profile):
                    'note': 'The game places them when the room starts; the box marks the room, not where they stand.',
                    'fields': [{'key': 'enemy', 'label': 'Enemy', 'value': e['type'], 'choices': f'enemies_{level}'},
                               {'key': 'count', 'label': 'How many', 'value': e['count_index'], 'choices': f'counts_{level}_{quest}'}]}
+            kinds = {m for m in e['members'] if m}
+            if len(kinds) == 1 and next(iter(kinds)) in self.DOES:
+                row['does'] = self.DOES[next(iter(kinds))]
             if 0x32 <= e['type'] < 0x62:
                 row['note'] += ' The game always makes this one of a kind, whatever the count.'
             if e['c_at'] is None or e['d_at'] is None:
@@ -732,25 +782,99 @@ class Zelda2:
     # $0E/$0F raise the magic and heart containers ($0783/$0784), $10/$11 refill magic ($05E2: a little / all),
     # $12 adds a life ($0700); $13-$15 set quest flags and keep their number
     ITEMS = {0x00: 'Candle', 0x01: 'Glove', 0x02: 'Raft', 0x03: 'Boots', 0x04: 'Flute', 0x05: 'Cross', 0x06: 'Hammer',
-             0x07: 'Magic key', 0x08: 'Key', 0x0A: 'P-bag (50 points)', 0x0B: 'P-bag (100 points)',
-             0x0C: 'P-bag (200 points)', 0x0D: 'P-bag (500 points)', 0x0E: 'Magic container', 0x0F: 'Heart container',
-             0x10: 'Blue magic jar', 0x11: 'Red magic jar', 0x12: 'Doll (extra life)', 0x13: 'Item 0x13',
-             0x14: 'Item 0x14', 0x15: 'Item 0x15'}
-    # enemy types per bank of scene data, named by placing each type in a scene the walk reaches and looking at what
-    # the game drew (trace/v15_profiles/zelda/z2/names_*.png); types never seen keep their number
-    # (descriptive names: what the picture shows)
+             0x07: 'Magic key', 0x08: 'Key', 0x0A: 'P-bag (50 points)',
+             0x0B: 'P-bag (100 points)', 0x0C: 'P-bag (200 points)', 0x0D: 'P-bag (500 points)',
+             0x0E: 'Magic container', 0x0F: 'Heart container', 0x10: 'Blue magic jar', 0x11: 'Red magic jar',
+             0x12: 'Doll (extra life)', 0x13: 'Kidnapped child', 0x14: 'Trophy', 0x15: 'Water of Life'}
+    SHOWN_ITEMS = {0x09: 'Unused glove picture'}         # named, not offered: the pickup code has no case for it
+    # what picking an item up does, from the pickup code at bank 7 $E771
+    ITEM_DOES = {**{k: 'Adds it to Link\'s items.' for k in range(8)}, 0x08: 'Adds a key.',
+                 0x09: 'Nothing: the pickup code has no case for it.',
+                 0x0A: 'Gives 50 experience points.', 0x0B: 'Gives 100 experience points.',
+                 0x0C: 'Gives 200 experience points.', 0x0D: 'Gives 500 experience points.',
+                 0x0E: 'Adds a magic container.', 0x0F: 'Adds a heart container.', 0x10: 'Refills some magic.',
+                 0x11: 'Refills all magic.', 0x12: 'Gives an extra life.', 0x13: 'Marks a quest step as done.',
+                 0x14: 'Marks a quest step as done.', 0x15: 'Marks a quest step as done.'}
+    # enemy types per bank of scene data, named by placing each type in a scene and looking at what the game drew
+    # (trace/v15_profiles/zelda/z2/names_*.png; trace/v15_profiles/naming_zelda_smb2/z2/view_*.png and crops_*.png:
+    # every entry of one list set to the type, Link walking in from the left). Descriptive names say what the picture
+    # shows; "Unseen" types drew nothing in the test scene. Banks 1 and 2 run the same enemy code (bank bytes
+    # $8109-$8505 and $A0FC-$BFFF are the same), so East Hyrule and Maze Island use West Hyrule's names.
+    _OUTDOORS = {0x00: 'Fairy', 0x01: 'Item lying in the scene', 0x03: 'Black beetle', 0x04: 'Blue slime',
+                 0x05: 'Red slime', 0x06: 'Red flying eye', 0x07: 'Blue spiked crawler', 0x0A: 'Red spiked crawler',
+                 0x0B: 'Unseen enemy', 0x0C: 'Red ball', 0x0D: 'Red spider', 0x0E: 'Blue spider',
+                 0x0F: 'Sender of small flyers', 0x11: 'Red octopus', 0x12: 'Red octopus that spits rocks',
+                 0x14: 'Orange spear soldier', 0x15: 'Red pig-faced soldier', 0x16: 'Blue pig-faced soldier',
+                 0x17: 'Orange club thrower', 0x18: 'Dark pig-faced soldier', 0x19: 'Orange lizard soldier',
+                 0x1A: 'Red lizard soldier', 0x1B: 'Blue lizard soldier', 0x1C: 'Blue grass creatures',
+                 0x1D: 'Blue grass creature', 0x1F: 'Blue grass creature that jumps', 0x20: 'White column creature',
+                 0x21: 'Unseen sender'}
     ENEMIES = {
-        1: {0x03: 'Black beetle', 0x04: 'Blue slime', 0x05: 'Red slime', 0x06: 'Red flying eye',
-            0x07: 'Blue spiked crawler', 0x0A: 'Red spiked crawler', 0x0C: 'Red ball', 0x0D: 'Red spider',
-            0x0E: 'Blue spider', 0x11: 'Red octopus', 0x12: 'Red octopus (second kind)', 0x14: 'Orange spear soldier',
-            0x15: 'Red pig-faced soldier', 0x16: 'Blue pig-faced soldier', 0x17: 'Orange club thrower',
-            0x18: 'Dark pig-faced soldier', 0x19: 'Orange lizard soldier', 0x1A: 'Red lizard soldier',
-            0x1B: 'Blue lizard soldier', 0x1C: 'Blue grass creatures', 0x1D: 'Blue grass creature',
-            0x1F: 'Blue grass creature (second kind)', 0x20: 'White column creature'},
-        3: {0x06: 'Purple flying eye', 0x0B: 'Purple slime', 0x0D: 'Old woman (purple)', 0x0E: 'Man (purple)',
-            0x10: 'Child', 0x11: 'Woman (purple dress)', 0x12: 'Man (red)', 0x14: 'Door (kind 0x14)',
-            0x15: 'Door (kind 0x15)', 0x16: 'Door (kind 0x16)', 0x17: 'Woman (red dress)', 0x18: 'Old woman (orange)'},
-        4: {0x03: 'Dark blue beetle', 0x04: 'Blue slime', 0x07: 'Orange flying head', 0x1D: 'Flame'}}
+        1: _OUTDOORS,
+        2: _OUTDOORS,
+        3: {0x06: 'Purple flying eye', 0x0A: 'Red bat', 0x0B: 'Purple slime', 0x0C: 'Unseen townsperson',
+            0x0D: 'Old woman (purple)', 0x0E: 'Man (purple)', 0x0F: 'Wizard (the screen flashes red)', 0x10: 'Child',
+            0x11: 'Woman (purple dress)', 0x12: 'Man (red)', 0x14: 'Door (kind 0x14)', 0x15: 'Door (kind 0x15)',
+            0x16: 'Door (kind 0x16)', 0x17: 'Woman (red dress)', 0x18: 'Old woman (orange)',
+            0x1D: 'Unseen walker', 0x1E: 'Unseen walker', 0x1F: 'Unseen walker', 0x20: 'Unseen walker',
+            0x21: 'Unseen townsperson', 0x22: 'Unseen townsperson', 0x23: 'Woman with dark hair (purple dress)'},
+        4: {0x00: 'Fairy', 0x03: 'Dark blue beetle', 0x04: 'Blue slime', 0x05: 'Unseen enemy',
+            0x06: 'Floating skull, slow', 0x07: 'Orange flying head', 0x08: 'Unseen enemy', 0x0A: 'Unseen enemy',
+            0x0B: 'Unseen enemy', 0x0C: 'Red horned creature', 0x0D: 'Red face block',
+            0x0E: 'Floating skull, fast', 0x0F: 'Sender of small flyers', 0x11: 'Blue snake',
+            0x12: 'Blue snake that spits fire', 0x14: 'Unseen dripper', 0x16: 'Unseen enemy',
+            0x17: 'Bouncing blue orb', 0x18: 'Orange armored knight', 0x19: 'Red armored knight',
+            0x1A: 'Blue armored knight', 0x1B: 'Unseen enemy', 0x1D: 'Flame', 0x1E: 'Red ogre that throws',
+            0x1F: 'Red skeleton', 0x20: 'Red wolf-headed knight', 0x21: 'Big blue armored knight',
+            0x23: 'Blue skeleton'},
+        5: {0x00: 'Fairy', 0x03: 'Blue beetle', 0x04: 'Blue slime', 0x05: 'Unseen enemy',
+            0x0F: 'Sender of small flyers', 0x11: 'Red hopping creature', 0x14: 'Floating skull, bounces',
+            0x15: 'Floating skull, bounces fast', 0x16: 'Orange flying dragon head', 0x17: 'Masked flying creature',
+            0x19: 'Red armored knight', 0x1A: 'Blue armored knight', 0x1D: 'Red ogre', 0x1E: 'Unseen enemy',
+            0x20: 'Unseen enemy', 0x22: 'Thunderbird', 0x23: 'Unseen enemy'}}
+    # what each one does, from its path over five seconds in the same scenes (z2_track.py, z2/track.log)
+    _OUT_DOES = {0x00: 'Hovers in one place.', 0x01: 'Lies on the ground until picked up.',
+                 0x03: 'Crawls slowly along the ground.', 0x04: 'Hops about on the ground.',
+                 0x05: 'Hops slowly along the ground.', 0x06: 'Flies about in swoops.',
+                 0x07: 'Hangs from above and drops down.', 0x0A: 'Hangs from above and drops down.',
+                 0x0B: 'Stays where it is.', 0x0C: 'Stays where it is.', 0x0D: 'Drops from a tree and crawls.',
+                 0x0E: 'Drops from a tree and crawls.', 0x0F: 'Sends small flyers across the screen.',
+                 0x11: 'Jumps up and down in place.', 0x12: 'Walks about, jumps and spits rocks.',
+                 0x14: 'Walks toward Link and throws spears.', 0x15: 'Walks toward Link and throws spears.',
+                 0x16: 'Walks toward Link and throws spears.', 0x17: 'Walks toward Link and throws clubs.',
+                 0x18: 'Walks toward Link and throws spears.', 0x19: 'Walks toward Link and attacks.',
+                 0x1A: 'Walks toward Link and throws blades.', 0x1B: 'Walks toward Link and throws blades.',
+                 0x1C: 'Crawl along the ground toward Link.', 0x1D: 'Crawls along the ground toward Link.',
+                 0x1F: 'Jumps about quickly.', 0x20: 'Stands tall in one place.',
+                 0x21: 'Sends out a red creature.'}
+    DOES = {
+        1: _OUT_DOES,
+        2: _OUT_DOES,
+        3: {0x06: 'Flies about in swoops.', 0x0A: 'Stays where it is.', 0x0B: 'Stays where it is.', 0x0C: 'Stays where it is.',
+            0x0D: 'Stands in the town.', 0x0E: 'Stands in the town.', 0x0F: 'Stands still.',
+            0x10: 'Stands in the town.', 0x11: 'Stands in the town.', 0x12: 'Stands in the town.',
+            0x17: 'Walks about the town.', 0x18: 'Walks about the town.', 0x1D: 'Walks across the town.',
+            0x1E: 'Walks across the town.', 0x1F: 'Walks across the town.', 0x20: 'Walks across the town.',
+            0x21: 'Stays where it is.', 0x22: 'Stays where it is.', 0x23: 'Stands still.'},
+        4: {0x00: 'Hovers in one place.', 0x03: 'Crawls along the floor.', 0x04: 'Hops about on the floor.',
+            0x05: 'Stays where it is.', 0x06: 'Floats about the room.', 0x07: 'Flies about in waves.',
+            0x08: 'Stays where it is.', 0x0A: 'Stays where it is.', 0x0B: 'Stays where it is.',
+            0x0C: 'Runs quickly about the room.', 0x0D: 'Stays in place and lets blue slimes fall out.',
+            0x0E: 'Floats quickly about the room.', 0x0F: 'Sends small flyers across the room.',
+            0x11: 'Hops in place.', 0x12: 'Hops about and spits fire.', 0x14: 'Drips from the ceiling.',
+            0x16: 'Stays where it is.', 0x17: 'Bounces about the room.', 0x18: 'Stands guard.',
+            0x19: 'Stands guard.', 0x1A: 'Stands guard.', 0x1B: 'Stays where it is.',
+            0x1D: 'Appears and vanishes from place to place.', 0x1E: 'Stands and throws at Link.',
+            0x1F: 'Stands guard.', 0x20: 'Stands guard.', 0x21: 'Stands guard.',
+            0x23: 'Stands guard.'},
+        5: {0x00: 'Hovers in one place.', 0x03: 'Crawls along the floor.', 0x04: 'Hops about on the floor.',
+            0x05: 'Stays where it is.', 0x0F: 'Sends small flyers across the room.',
+            0x11: 'Hops in place and spits fire.', 0x14: 'Bounces up and down the room.',
+            0x15: 'Bounces quickly up and down the room.', 0x16: 'Flies quickly across the room.',
+            0x17: 'Flies up and down the room.', 0x19: 'Jumps about and attacks.',
+            0x1A: 'Jumps about and attacks.', 0x1D: 'Hops about and attacks.',
+            0x1E: 'Stays where it is.', 0x20: 'Stays where it is.', 0x22: 'Flies above the room.',
+            0x23: 'Stays where it is.'}}
 
     def __init__(self, rom: bytes):
         self.rom = rom
@@ -856,7 +980,7 @@ class Zelda2:
         return names.get(kind_type, f'Enemy {kind_type:#04x}')
 
     def item_name(self, item):
-        return self.ITEMS.get(item & 0x7F, f'Item {item & 0x7F:#04x}')
+        return self.ITEMS.get(item & 0x7F, self.SHOWN_ITEMS.get(item & 0x7F, f'Item {item & 0x7F:#04x}'))
 
     def set_types(self, kind):
         found = set()
@@ -1033,6 +1157,9 @@ class Zelda2Profile(Zelda2, Profile):
                     notes.append(note)
                 if notes:
                     row['note'] = ' '.join(notes)
+                does = self.DOES.get(self.SETS[kind][1], {}).get(e['type'])
+                if does:
+                    row['does'] = does
                 out.append(row)
         shared = len(self.layout_users(kind, area)) > 1
         for it in self.items(kind, area):
@@ -1042,6 +1169,8 @@ class Zelda2Profile(Zelda2, Profile):
                    'detail': f'screen {it["screen"] + 1}, column {it["column"]}', 'remove': None,
                    'note': 'It falls to the floor below this spot.',
                    'fields': [{'key': 'item', 'label': 'Item', 'value': it['item'] & 0x7F, 'choices': 'items'}]}
+            if it['item'] & 0x7F in self.ITEM_DOES:
+                row['does'] = self.ITEM_DOES[it['item'] & 0x7F]
             if shared:
                 row['fields'] = []
                 row['note'] += (f' {len(self.layout_users(kind, area)) - 1} other areas are drawn from the same layout, '

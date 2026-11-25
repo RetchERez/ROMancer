@@ -101,6 +101,23 @@ class Decode(unittest.TestCase):
         names = [c['name'] for c in self.p.choices()['enemies_0c']]
         self.assertEqual(names, ['Shy Guy (pink)', 'Shy Guy (red)'])
 
+    def test_names_and_does(self):
+        import re
+        for kind, name in {**smb2.ENEMIES, **smb2.FIXED}.items():
+            self.assertFalse(re.search(r'0x|\(\d', name), name)                # a name, never a number
+        for kind in list(smb2.ENEMIES) + [0x15, 0x16, 0x1C, 0x28, 0x2D, 0x3B, 0x47, 0x48, 0x49, 0x4A, 0x5C, 0x5D,
+                                          0x5F, 0x61, 0x6A, 0x6C]:
+            self.assertTrue(smb2.DOES[kind].endswith('.'), kind)
+        self.assertEqual(smb2.ENEMIES[0x0F], 'Beezo, swoops down')
+        self.assertEqual(smb2.ENEMIES[0x2F], 'Spark, fast, clockwise')
+        self.assertEqual(smb2.FIXED[0x6A], 'Fryguy')
+        objs = {o['id']: o for o in self.p.objects(PART)}
+        self.assertEqual(objs['enemy:1']['does'], 'Walks along the ground and walks off ledges.')
+        self.assertEqual(objs['enemy:6']['does'], 'Walks along the ground and turns back at ledges.')
+        self.assertNotIn('does', objs['enemy:3'])                              # crystal ball: does nothing by itself
+        names = {c['name'] for v in self.p.choices().values() for c in v}
+        self.assertFalse([n for n in names if re.search(r'0x', n)])
+
     def test_vertical_tiles_sit_16_lines_above_sprites(self):
         objs = {o['id']: o for o in self.p.objects({'level': 0, 'area': 1})}
         self.assertEqual((objs['grass:4']['x'], objs['grass:4']['y']), (8, 0))
