@@ -281,5 +281,175 @@ class KidIcarusTest(unittest.TestCase):
         self.assertEqual(w.result()['state'], 'good')
 
 
+def kid_icarus_worlds_cart():
+    """World 1 as above, plus world 2 (tables in bank 2) and world 3 (copied from bank 6 $A790), with their door lists."""
+    c = kid_icarus_cart()
+    w = Cart.word
+    # world 2: stage 0 has screens 0-2; Rokman on screen 1 (group A), a Pale walker on screen 2 (group B)
+    c.put(2, 0xBB04, w(0xB000) * 3)
+    c.put(2, 0xB000, [0x10, 0x00, 0x11, 0x00, 0x12, 0x00, 0x00, 0xFF])
+    c.put(2, 0xBC3F, w(0xB100) * 3)
+    c.put(2, 0xB100, [0x00, 0x04, 0x00])
+    c.put(2, 0xBCF9, w(0xB110) * 3)
+    c.put(2, 0xB110, [0x00, 0x00, 0x09])
+    # items: a harp on screen 1 at YX $8E; then a chalice on screen 0, behind it, which the game never reaches
+    c.put(2, 0xBC2A, [0x02, 0x00, 0x01, 0x8E, 0x00, 0x00, 0x00, 0x88, 0x01])
+    for start in m.KidIcarus.WORLDS[2]['lists']:
+        c.put(2, start, [0xFF] * 32)
+    c.put(2, 0xBDB3, [0x00, 0x02, 0x26, 0x00, 0xFF])
+    c.put(2, 0x99F6, w(0xF037))
+    c.put(7, 0xF037, [0x00, 0x01, 0xAF, 0x25, 0xFF])
+
+    def put3(address, data):
+        c.put(6, 0xA790 + address - 0x7000, data)
+    # world 3: stage 0 has two screens; Komayto (group A 8) and a Reaper (group B: 13 keeps the slots, Reaper at $D8)
+    put3(0x772B, w(0x7300) * 3)
+    put3(0x7300, w(0x7000) + w(0x7010) + [0xFF, 0xFF])
+    put3(0x77E1, w(0x7400) * 3)
+    put3(0x7400, [0x00, 0x08])
+    put3(0x781B, w(0x7410) * 3)
+    put3(0x7855, w(0x7420) * 3)
+    put3(0x7420, [0x00, 0x0D])
+    put3(0x788F, w(0x7430) * 3)
+    put3(0x7430, [0x00, 0xD8])
+    # items (always harps): one on stage 3-3 screen 1 at YX $15, then one of stage 3-1 the game never reaches
+    put3(0x792C, [0x02, 0x02, 0x01, 0x15, 0x00, 0x01, 0x07])
+    for start in m.KidIcarus.WORLDS[3]['lists']:
+        put3(start, [0xFF] * 32)
+    c.put(3, 0x8056, w(0xF095))
+    c.put(7, 0xF095, [0x00, 0x00, 0xBE, 0x27, 0xFF])
+    return c
+
+
+class KidIcarusWorldsTest(unittest.TestCase):
+    def setUp(self):
+        self.c = kid_icarus_worlds_cart()
+        self.p = m.KidIcarusProfile(bytes(self.c.rom))
+
+    def apply(self, plan):
+        rom = bytearray(self.c.rom)
+        for offset, old, new in plan['writes']:
+            self.assertEqual(rom[offset], old)
+            rom[offset] = new
+        return m.KidIcarusProfile(bytes(rom))
+
+    def test_world2_decoding(self):
+        self.assertEqual(self.p.stage_screens(2, 0), [0x0010, 0x0011, 0x0012])
+        self.assertEqual([(r['number'], r['live']) for r in self.p.items(2)], [(0, True), (1, False)])
+        part = {'world': 2, 'stage': 0}
+        objects = {o['id']: o for o in self.p.objects(part)}
+        self.assertEqual(sorted(objects), ['door:0', 'groupA:1', 'groupB:2', 'item:0', 'spawn:0:0'])
+        self.assertEqual(objects['groupA:1']['name'], 'Rokman (likely)')
+        self.assertEqual(objects['groupB:2']['name'], 'Pale walker')
+        self.assertEqual((objects['item:0']['x'], objects['item:0']['y']), (256 + 14 * 16 + 8, 0x80 + 16))
+        self.assertEqual((objects['door:0']['x'], objects['door:0']['y']), (256 + 15 * 16 + 8, 0xA0 + 32))
+        self.assertEqual(objects['spawn:0:0']['x'], 256 + 0x26 + 0xF8)
+        self.assertEqual([d['block'] for d in self.p.doors(2)], [0x25])
+        self.assertEqual([d['block'] for d in self.p.doors()], [0x24, 0x22])     # world 1's list is still the default
+
+    def test_world2_where(self):
+        ram = bytearray(0x2800)
+        ram[0xA0], ram[0x130], ram[0x4D1], ram[0xFE] = 4, 1, 3, 0x40
+        self.assertEqual(self.p.where(ram), {'part': {'world': 2, 'stage': 1}, 'x': 2 * 256 + 0x40, 'y': 0})
+        ram[0x3A] = 5                                           # in a chamber
+        self.assertIsNone(self.p.where(ram))
+        ram[0x3A], ram[0xA0] = 0, 3                             # fortress 1
+        self.assertIsNone(self.p.where(ram))
+        self.assertEqual(self.p.part_name({'world': 2, 'stage': 1}), 'Stage 2-2')
+
+    def test_world2_edits(self):
+        part = {'world': 2, 'stage': 0}
+        plan = self.p.edit(part, 'groupA:1', {'kind': 8})
+        self.assertEqual(plan['writes'], [(m._Cart.offset(2, 0xB101), 4, 8)])
+        self.assertEqual(plan['watch'], {'kind': 'wave', 'mode': 4, 'stage': 0, 'group': 'A', 'screen': 1, 'want': 8, 'world': 2})
+        self.assertEqual(self.apply(plan).find(part, 'groupA:1')['name'], 'Biting plant head')
+        with self.assertRaises(ValueError):
+            self.p.edit(part, 'groupB:2', {'kind': 5})          # a group A kind in group B
+        plan = self.p.edit(part, 'item:0', {'item': 1})
+        self.assertEqual(plan['writes'], [(m._Cart.offset(2, 0xBC2E), 0, 1)])
+        self.assertEqual((plan['watch']['row'], plan['watch']['col'], plan['watch']['way']), (0x80, 0xE0, 'across'))
+        p = self.apply(self.p.edit(part, 'item:0', {}, remove=True))
+        self.assertEqual([(r['screen'], r['item']) for r in p.items(2)], [(0, 1)])
+        with self.assertRaises(ValueError):
+            self.p.edit(part, 'item:1', {}, remove=True)        # a record the game never reaches
+        plan = self.p.edit(part, 'door:0', {'chamber': 0x27})   # worlds 2 and 3 have hot springs
+        self.assertEqual(plan['writes'], [(m._Cart.offset(7, 0xF03A), 0x25, 0x27)])
+        self.assertEqual((plan['watch']['at'], plan['watch']['settle']), (0x5F0 + 0xAF + 16, 60))
+        p = self.apply(self.p.edit(part, 'door:0', {}, remove=True))
+        self.assertEqual(p.doors(2), [])
+        self.assertEqual(len(p.doors(1)), 2)
+        plan = self.p.edit(part, 'spawn:0:0', {}, remove=True)
+        self.assertEqual(plan['watch']['scroll_at'], 0xFE)
+        self.assertEqual(self.apply(plan).spawns(2), [])
+
+    def test_world2_watchers(self):
+        part = {'world': 2, 'stage': 0}
+        ram = bytearray(0x2800)
+        ram[0xA0], ram[0x130], ram[0x4D1], ram[0xFE] = 4, 0, 1, 0xD0
+        w = self.p.watcher(self.p.edit(part, 'item:0', {'item': 1})['watch'])
+        self.assertFalse(w.see(ram, 0, 'changed'))
+        self.assertFalse(w.reached)
+        ram[0xFE], ram[0x750], ram[0x751], ram[0x752] = 0xE0, 0x80, 0x81, 1
+        self.assertTrue(w.see(ram, 1, 'changed'))
+        self.assertEqual(w.result()['state'], 'good')
+        ram[0x751] = 0x80
+        w = self.p.watcher(self.p.edit(part, 'spawn:0:0', {}, remove=True)['watch'])
+        ram[0x4D1], ram[0xFE] = 2, 0x26
+        self.assertFalse(w.see(ram, 0, 'changed'))
+        self.assertEqual(w.result()['state'], 'good')
+        ram[0x761], ram[0x763] = 0x78, 0xF8
+        w = self.p.watcher(self.p.edit(part, 'spawn:0:0', {}, remove=True)['watch'])
+        self.assertTrue(w.see(ram, 0, 'changed'))
+        self.assertEqual(w.result()['state'], 'bad')
+        w = self.p.watcher(self.p.edit(part, 'groupA:1', {'kind': 8})['watch'])
+        ram[0x4D1], ram[0x761] = 1, 0
+        self.assertFalse(w.see(ram, 0, 'changed'))
+        ram[0x761] = ram[0x771] = 0x40
+        self.assertTrue(w.see(ram, 1, 'changed'))
+        self.assertEqual(w.result(), {'state': 'good', 'text': 'Played from the start, that screen brought Biting plant head.'})
+
+    def test_world3(self):
+        part = {'world': 3, 'stage': 0}
+        objects = {o['id']: o for o in self.p.objects(part)}
+        self.assertEqual(sorted(objects), ['door:0', 'groupA:1', 'reaperB:1'])
+        self.assertEqual(objects['groupA:1']['name'], 'Komayto (likely)')
+        self.assertEqual(objects['door:0']['name'], 'Hot spring chamber')
+        self.assertEqual(objects['door:0']['y'], 2 + 0xB0 + 32)
+        self.assertEqual([(r['number'], r['live']) for r in self.p.items(3)], [(0, True), (1, False)])
+        item = self.p.find({'world': 3, 'stage': 2}, 'item:0')
+        self.assertEqual((item['name'], item['fields'], item['x']), ('Harp', [], 5 * 16 + 8))
+        with self.assertRaises(ValueError):
+            self.p.edit({'world': 3, 'stage': 2}, 'item:0', {'item': 1})     # world 3 items are always harps
+        plan = self.p.edit({'world': 3, 'stage': 2}, 'item:0', {}, remove=True)
+        offset = m._Cart.offset(6, 0xA790 + 0x092C)
+        self.assertEqual(plan['writes'][-1], (offset, 2, 1))
+        self.assertEqual([r['stage'] for r in self.apply(plan).items(3)], [0])
+        plan = self.p.edit(part, 'reaperB:1', {}, remove=True)
+        self.assertEqual(plan['writes'], [(m._Cart.offset(6, 0xA790 + 0x0431), 0xD8, 0)])
+        plan = self.p.edit(part, 'groupA:1', {'kind': 11})
+        self.assertEqual(plan['writes'], [(m._Cart.offset(6, 0xA790 + 0x0401), 8, 11)])
+        with self.assertRaises(ValueError):
+            self.p.edit(part, 'groupA:1', {'kind': 5})          # a world 1 kind
+        ram = bytearray(0x2800)
+        ram[0xA0], ram[0x130], ram[0x4D1], ram[0xFD] = 6, 2, 1, 0xEE
+        self.assertEqual(self.p.where(ram), {'part': {'world': 3, 'stage': 2}, 'x': 0, 'y': 0})
+        # door watcher: the screen number is set before the block map is built (after a password), so worlds 2 and 3
+        # decide at once when the door is there and otherwise only after 60 looks
+        watch = self.p.edit(part, 'door:0', {'chamber': 0x25})['watch']
+        self.assertEqual((watch['at'], watch['settle']), (0x500 + 0xBE + 16, 60))
+        ram[0x130] = 0
+        w = self.p.watcher(watch)
+        self.assertEqual([w.see(ram, f, 'changed') for f in range(60)], [False] * 59 + [True])
+        self.assertEqual(w.result()['state'], 'bad')
+        w = self.p.watcher(watch)
+        ram[0x5BE], ram[0x5CE] = 0x50, 0x25
+        self.assertEqual([w.see(ram, f, 'changed') for f in range(4)], [False] * 3 + [True])
+        self.assertEqual(w.result(), {'state': 'good', 'text': 'Played from the start, the door there leads to: Shop.'})
+        choices = self.p.choices()
+        self.assertEqual([c['value'] for c in choices['enemiesA3']], [0, 7, 8, 10, 11, 12])
+        self.assertIn(0x27, [c['value'] for c in choices['chambers2']])
+        self.assertNotIn(0x27, [c['value'] for c in choices['chambers']])
+
+
 if __name__ == '__main__':
     unittest.main()
