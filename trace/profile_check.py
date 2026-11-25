@@ -3,9 +3,11 @@ and run edits through the real session and its watcher, with a control on the un
 
     python -B trace/profile_check.py <corpus index.json> <key> <out folder> [--presses N] [--steps N]
         [--edit 'PART|OBJECT|VALUES|remove'] ... [--length 'PART|SCREEN|DELTA'] ... [--add 'PART|KIND|X|Y|VALUES'] ...
+        [--layout 'PART|[[COLUMN, ROW, BLOCK], ...]'] ...
         [--control]
 
---add puts a new object of KIND at the part's pixel X, Y (profile.addable / profile.add). PART and VALUES are JSON ({"stage": 1} and {"record": 84}); add |remove to remove the object. Writes to the out folder:
+--layout puts blocks into a packed layout (profile.layout / profile.set_layout) and checks it the way the
+Level Editor does. --add puts a new object of KIND at the part's pixel X, Y (profile.addable / profile.add). PART and VALUES are JSON ({"stage": 1} and {"record": 84}); add |remove to remove the object. Writes to the out folder:
 map.png (the map with every object's box, style colour and name), objects.json, results.json. --control also runs each
 edit's watcher on the unchanged game: a good watcher says "bad" (or "warn") there.
 
@@ -77,6 +79,7 @@ def main() -> None:
     parser.add_argument('--edit', action='append', default=[])
     parser.add_argument('--length', action='append', default=[])
     parser.add_argument('--add', action='append', default=[])
+    parser.add_argument('--layout', action='append', default=[])
     parser.add_argument('--control', action='store_true')
     args = parser.parse_args()
     os.environ.setdefault('ROMANCER_TRACE_CORES', str(ROOT.parent / 'release-v1.3.9' / 'work' / 'trace-pack-windows'))
@@ -138,6 +141,25 @@ def main() -> None:
                 row['check'] = wait_change(session, change['id'])
                 if args.control:
                     plan = profile.add(part, kind, x, y, values)
+                    row['control'] = control(session, level, profile.watcher(plan['watch']))
+                session.remove(change['id']) if any(c['id'] == change['id'] for c in session.changes) else None
+                session.preview = None
+            except ValueError as error:
+                row['error'] = str(error)
+            results.append(row)
+            print(json.dumps(row), flush=True)
+        for spec in args.layout:
+            part_text, changes_text = spec.split('|', 1)
+            part, changes = json.loads(part_text), [tuple(c) for c in json.loads(changes_text)]
+            row = {'layout': spec}
+            try:
+                plan = profile.set_layout(part, changes)
+                change = session.propose_writes(level['scene_ids'][0], plan['writes'], plan['title'], kind='level-object')
+                stored = session._find(change['id'])
+                row['title'], row['bytes'] = plan['title'], len(plan['writes'])
+                session._watch_change(stored, level, lambda: profile.watcher(plan['watch']))
+                row['check'] = stored['object_check']
+                if args.control:
                     row['control'] = control(session, level, profile.watcher(plan['watch']))
                 session.remove(change['id']) if any(c['id'] == change['id'] for c in session.changes) else None
                 session.preview = None

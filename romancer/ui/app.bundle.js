@@ -10355,6 +10355,7 @@ ${state2.artifact.system_id ? `<details><summary>Advanced byte options</summary>
   }
   function units(view2) {
     const out = [{ id: "cells", label: "Single tiles", width: 1, height: 1, left: 0, top: 0 }], blocks = view2.blocks;
+    if (view2.layout) return [{ id: "layout", label: `Whole blocks (${view2.layout.width}×${view2.layout.height})`, ...view2.layout }];
     if (blocks) {
       out.push({ id: "blocks", label: `Whole blocks (${blocks.width}×${blocks.height})`, ...blocks });
       if (blocks.larger) out.push({ id: "larger", label: `Big blocks (${blocks.larger.width}×${blocks.larger.height})`, ...blocks.larger });
@@ -10461,7 +10462,7 @@ ${state2.artifact.system_id ? `<details><summary>Advanced byte options</summary>
     const tools = [...TOOLS, ...((_a = level.objects) == null ? void 0 : _a.profile) ? [["objects", "Enemies, items and secrets"], ...level.objects.addable ? [["add", "Add new"]] : [], ...level.objects.resizable ? [["length", "Longer or shorter"]] : []] : [], ["play", "Play from here"], ["compare", "Before and after"]].map(([id, label]) => `<button type="button" class="scene-mode ${level.tool === id ? "active" : ""}" data-action="level-tool" data-id="${id}" aria-pressed="${level.tool === id}">${label}</button>`).join("");
     const hint = level.tool === "add" ? "Click an empty spot on the map to add a new enemy, item or secret there. Only things this part of the level can draw are offered." : level.tool === "length" ? "Click a screen of the level to repeat it or remove it. Enemies, candles and secrets on later screens move along with them." : level.tool === "objects" ? "Click an enemy, a candle, a breakable block (purple) or a hidden treasure (green) to see what it is and change it." : level.tool === "compare" ? "Click a spot on the map. ROMancer replays your recorded walk from there on the original game and on the game with your kept changes, side by side." : level.tool === "play" ? "Click a spot on the map. The game starts there with your kept changes, so you can play it." : level.tool === "objects" ? "Click an enemy or a candle to see what it is and change it." : level.tool === "pick" ? "Click a spot on the map to copy it, or drag across a bigger piece like a platform or a tree." : !brush ? "Copy something from the map first." : level.tool === "paint" ? "Click or drag where you want it." : "Click or drag over your paint to remove it.";
     const brushText = brush ? `Copied a ${brush.width}×${brush.height} piece.` : "Nothing copied yet.";
-    const built = view2.blocks ? " The brush moves in whole blocks, the way this level is built, so a change can stay in one spot." : "";
+    const built = view2.layout ? " This level is stored packed, so the brush copies whole blocks of it, and ROMancer packs the level again." : view2.blocks ? " The brush moves in whole blocks, the way this level is built, so a change can stay in one spot." : "";
     const locked = view2.status.includes("u") ? " Spots with a cross can't be changed yet." : "";
     const known = ((_b = level.objects) == null ? void 0 : _b.profile) ? `<label class="level-toggle"><input type="checkbox" id="level-show-objects" ${level.showObjects ? "checked" : ""}> Show enemies, items and secrets (object layer)</label>${level.objects.roles ? `<label class="level-toggle"><input type="checkbox" id="level-show-solid" ${level.showSolid ? "checked" : ""}> Show what's solid</label>` : ""}` : "";
     const picked = level.picked;
@@ -10813,7 +10814,7 @@ ${state2.artifact.system_id ? `<details><summary>Advanced byte options</summary>
         const level = ed.level;
         if (!level || !level.painted.size) return;
         await host.dropPreview();
-        const result = await host.call("level_paint", { level_id: level.id, plane: level.view.plane, cells: paintedCells(level.painted), layers: paintLayers(level.view, level.paintOn) });
+        const result = level.view.layout ? await host.call("level_layout", { level_id: level.id, cells: paintedCells(level.painted) }) : await host.call("level_paint", { level_id: level.id, plane: level.view.plane, cells: paintedCells(level.painted), layers: paintLayers(level.view, level.paintOn) });
         if (!host.current()) return;
         ed.proposal = result.change;
         ed.inspect = null;

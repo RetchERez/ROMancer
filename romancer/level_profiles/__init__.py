@@ -22,6 +22,11 @@ The interface every profile gives (see Profile):
   add(part, kind, x, y, values) -> {'writes', 'title', 'watch'}: put a new one at the part's pixel x, y (its bottom
   middle, rounded the way the game stores places). Only kinds the part can draw are offered; the game's own tables
   must have room, or add() says why not
+* layout(part) -> {'size', 'width', 'height', 'blocks', 'left', 'top'} or None: the part's layout as the game stores
+  it when it is packed (compressed or built from chunks), so the general painter cannot change it: blocks of 'size'
+  pixels, 'width' by 'height' of them row by row, block 0, 0 at the part's pixel 'left', 'top'; and
+  set_layout(part, changes [(column, row, block)]) -> {'writes', 'title', 'watch'}: put those blocks there and pack
+  the layout again (it must fit where it was, or be moved to free space with its pointer fixed; otherwise say why not)
 """
 from __future__ import annotations
 
@@ -81,6 +86,12 @@ class Profile:
 
     def add(self, part: dict, kind: str, x: int, y: int, values: dict) -> dict:
         raise ValueError('ROMancer cannot add new things to this game’s levels yet.')
+
+    def layout(self, part: dict):
+        return None
+
+    def set_layout(self, part: dict, changes: list) -> dict:
+        raise ValueError('ROMancer cannot change the layout of this game’s levels yet.')
 
     # helpers
     def find(self, part: dict, object_id: str) -> dict:

@@ -2440,6 +2440,8 @@ class EditSessionTools:
             'edits.level_paint': (base + ' level_id plane cells layers', lambda p, c: {'ok': True, 'change': self.session(p).propose_level(
                 p['level_id'], p['plane'], p['cells'], p['layers'])}),
             'edits.level_export': (base + ' level_id plane edited', self._export_level),
+            'edits.level_layout': (base + ' level_id cells', lambda p, c: {'ok': True, 'change': self.session(p).propose_level_layout(
+                p['level_id'], p['cells'])}),
             'edits.level_objects': (base + ' level_id', lambda p, c: {'ok': True, **self.session(p).level_objects(p['level_id'])}),
             'edits.change': (base + ' change_id', lambda p, c: {'ok': True, 'change': self.session(p).change(p['change_id'])}),
             'edits.keep': (base + ' change_id', lambda p, c: self._summary(self.session(p), self.session(p).keep(p['change_id']))),

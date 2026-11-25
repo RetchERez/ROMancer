@@ -398,7 +398,14 @@ class LevelTools:
                 # memory but that shows somewhere else is said plainly.
                 differ = self._level_changed(level_id, number, after.rsplit(':', 1)[1])
                 unshown = sum(1 for place in shown['level']['places'] if tuple(place) not in differ)
+            layout = self._layout_grid(level) if number == 0 else None
+            if layout:                      # a packed layout the profile can change: its places are not locked
+                for place in layout['cells']:
+                    at = place[1] * width + place[0]
+                    if 0 <= at < len(status) and status[at] == 'u':
+                        status[at] = 'p'
             return {'id': level_id, 'name': level['name'], 'plane': number, 'unshown': unshown,
+                    'layout': {k: layout[k] for k in ('width', 'height', 'left', 'top')} if layout else None,
                     'planes': [{'index': k, 'name': p['name'], 'width': p['width'], 'height': p['height'], 'cell': p['px']}
                                for k, p in enumerate(level['planes'])],
                     'width': width, 'height': height, 'cell': stored['px'], 'sections': stored['sections'], 'blocks': stored.get('blocks'),
@@ -444,6 +451,77 @@ class LevelTools:
         if not isinstance(part, dict) or not any(p['part'] == part for p in parts):
             raise ValueError('That part of the level is not on this map.')
         return profile, next(p for p in parts if p['part'] == part)
+
+    def _layout_grid(self, level: dict):
+        """Where the blocks of every packed layout the profile knows sit on the first map: {'width', 'height', 'left',
+        'top'} (one block in map cells, and where the grid starts) and 'cells': {(column, row): (part, block column,
+        block row)}; None when the game has no such layout."""
+        try:
+            context = self._profile_context(level)
+        except Exception:
+            return None
+        if context is None:
+            return None
+        profile, parts = context
+        px = level['planes'][0]['px']
+        plane = self._level_plane(level, 0)
+        out = None
+        for part in parts:
+            grid = profile.layout(part['part'])
+            if not grid or grid['size'] % px:
+                continue
+            cells = grid['size'] // px
+            left, top = part['dx'] + grid.get('left', 0), part['dy'] + grid.get('top', 0)
+            if out is None:
+                out = {'width': cells, 'height': cells, 'left': (left // px) % cells, 'top': (top // px) % cells, 'cells': {}}
+            for (column, row), spot in plane.cells.items():
+                window = plane.windows.get(spot.frame)
+                if window is None or window.section != part['section']:
+                    continue
+                bx, by = (column * px - left) // grid['size'], (row * px - top) // grid['size']
+                if 0 <= bx < grid['width'] and 0 <= by < grid['height']:
+                    out['cells'][(column, row)] = (part['part'], bx, by)
+        return out
+
+    def propose_level_layout(self, level_id: str, cells) -> dict:
+        """Copy whole blocks of a packed layout from one place on the first map to others ([{'col', 'row', 'from'}]);
+        the profile packs the layout again, and the change is checked by replaying the recorded walk."""
+        with self.lock:
+            level = self._level(level_id)
+            grid = self._layout_grid(level)
+            if not grid:
+                raise ValueError('ROMancer cannot change the layout of this level yet.')
+            profile, _ = self._profile_context(level)
+            wanted: dict = {}
+            places = []
+            part = None
+            for item in cells:
+                here, there = (int(item['col']), int(item['row'])), (int(item['from'][0]), int(item['from'][1]))
+                target, source = grid['cells'].get(here), grid['cells'].get(there)
+                if target is None or source is None:
+                    raise ValueError('No capture showed that part of the level, so it cannot be painted.')
+                if target[0] != source[0] or (part is not None and target[0] != part):
+                    raise ValueError('Copy blocks within one part of the level at a time.')
+                part = target[0]
+                layout = profile.layout(part)
+                wanted.setdefault((target[1], target[2]), layout['blocks'][source[2] * layout['width'] + source[1]])
+                places.append(list(here))
+            if part is None:
+                raise ValueError('Paint something first.')
+            layout = profile.layout(part)
+            changes = [(bx, by, block) for (bx, by), block in sorted(wanted.items())
+                       if layout['blocks'][by * layout['width'] + bx] != block]
+            if not changes:
+                raise ValueError('Those places already look like that. Paint a different picture first.')
+            plan = profile.set_layout(part, changes)
+            change = self.propose_writes(level['scene_ids'][0], plan['writes'], plan['title'], kind='level-object')
+            stored = self._find(change['id'])
+            stored['level'] = {'id': level_id, 'plane': 0, 'places': places, 'name': level['name']}
+            stored['object_check'] = {'state': 'working', 'text': 'Playing the game from the start to see the new blocks…'}
+            watch = plan['watch']
+            watcher = lambda: profile.watcher(watch)
+        threading.Thread(target=self._watch_change, args=(stored, level, watcher), name='romancer-layout-check', daemon=True).start()
+        return self.change(change['id'])
 
     def level_objects(self, level_id: str) -> dict:
         """Everything the game's profile knows in the level, placed on the map, and what each map place is (solid,

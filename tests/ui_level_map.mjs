@@ -166,4 +166,7 @@ assert.match(addHtml,/data-action="level-add-apply"/);
 assert.match(levelStatus({level_recording:{name:'Level map 1',captures:30,limit:200,extends:'lvl',added:4}},true),/Adding to Level map 1, 4 new screens so far/);
 assert.match(levelPart({level:fresh,proposal:null,summary:{}},verdict,keep),/data-action="level-extend"[^>]*disabled/);
 assert.ok(!/data-action="level-extend"[^>]*disabled/.test(levelPart({level:fresh,proposal:null,playing:true,summary:{}},verdict,keep)));
+// a packed layout the profile can change: the brush is its blocks only
+assert.deepEqual(units({...view,layout:{width:2,height:2,left:0,top:1}}).map(u=>u.id),['layout']);
+assert.match(levelPart({level:{...fresh,view:{...view,layout:{width:2,height:2,left:0,top:0}}},proposal:null},verdict,keep),/stored packed/);
 console.log('level map checks passed');
