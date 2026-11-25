@@ -55,7 +55,7 @@ START_PRESSES = {
 
 # Games whose first level is reached from a map: the inputs (buttons, frames) played after the Start presses.
 # Games where the automatic play before recording (intro steps) already starts a level the walk cannot use.
-INTROS = {'6f74e8a7575a': 1, '9f5fa2106293': 1, '0838e531fe22': 5, 'a13fa8164a0a': 1, '7aaaf89257b1': 1, 'd50c957bd76c': 1, '1e06f2224792': 1, '010673ff28a6': 1, '6791433fd1c6': 1}
+INTROS = {'6f74e8a7575a': 1, '9f5fa2106293': 1, '0838e531fe22': 5, 'a13fa8164a0a': 1, '7aaaf89257b1': 1, 'd50c957bd76c': 1, '1e06f2224792': 1, '010673ff28a6': 1, '6791433fd1c6': 1, 'f2db2cbdaaed': 1}
 
 ROUTES = {
     'd50c957bd76c': [([], 120), (['right'], 4), ([], 30), (['start'], 4)] + [([], 100)] * 5,                    # Mega Man 3: Top Man
@@ -68,6 +68,7 @@ ROUTES = {
     '9f5fa2106293': [([], 120), (['down'], 4), ([], 30), (['start'], 4)] + [([], 100)] * 6,                      # Mega Man 2: Flash Man
     '1ddc4b429490': [(['right'], 20), ([], 40), (['up'], 20), ([], 40), (['a'], 4), ([], 200)],   # Super Mario Bros. 3: World 1 map into 1-1
     '6791433fd1c6': [([], 120), (['left'], 4), ([], 30), (['start'], 4)] + [([], 120)] * 5,   # Mega Man 6: Plant Man
+    'f2db2cbdaaed': [([], 120)] * 3 + [(['b'], 4), ([], 150), (['down'], 4), ([], 30), (['b'], 4)] + [([], 120)] * 10,   # Wonder Boy III: button 1 starts, then the first room
 }
 
 # Longer routes are kept as JSON files in trace/routes/<key>.json: [[buttons, frames], ...]
