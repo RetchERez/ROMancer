@@ -67,7 +67,23 @@ def build():
           0x2E, 0x25, 0xAA],   # page 5 col 2: pipes lead to ground area 5, screen 11, in world 6
          0xA000, 0xA100)
     area(0x42, [0x0B, 0x42], [0x1E, 0xA5, 0x0A], 0xA200, 0xA300)       # underground area 2: way back to 0x25 screen 11
+    # ground area 6 (World 1-3): level pieces, in the order the parser needs them
+    area(0x26,
+         [0x27, 0x23,          # page 0 col 2 row 7: row of bricks, 4 long
+          0x89, 0x72,          # page 0 col 8 row 9: pipe, 3 tall
+          0x0C, 0x81,          # page 1 col 0: gap in the ground, 2 long
+          0x0B, 0x63,          # page 1 col 0 row 11: column of solid blocks
+          0x03, 0x43,          # page 1 col 0 row 3: row of coins, 4 long (three pieces on column 16)
+          0x47, 0x01,          # page 1 col 4 row 7: question block with a coin
+          0x0D, 0x03,          # page select: page 3
+          0x1F, 0x33,          # page 3 col 1: staircase, 4 long
+          0x05, 0x8A],         # page 4 col 0 row 5: used block
+         [], 0xA400, 0xA480)
+    # castle area 1 (World 2-4): a loop command, so nothing may shift
+    area(0x61, [0x27, 0x23, 0x89, 0x72, 0xCD, 0x4B, 0x0B, 0x81], [], 0xA500, 0xA580)
     c.put(0xBDE8, [0xC1, 0xC0, 0x5F, 0x60, 0x55, 0x56, 0x57, 0x58, 0x59, 0x5A, 0x5B, 0x5C, 0x5D, 0x5E])
+    c.put(0x9AA5, [7, 7, 6, 5, 4, 3, 2, 1, 0])          # staircase columns (rows drawn, first row)
+    c.put(0x9AAE, [3, 3, 4, 5, 6, 7, 8, 9, 10])
     return bytes(c.rom)
 
 
@@ -177,6 +193,99 @@ class Edits(unittest.TestCase):
         self.assertEqual(values, {0x42 << 5, 0x25 << 5 | 10})
 
 
+PIECES = {'world': 1, 'level': 3, 'area': 0x26}
+
+
+def apply(rom, writes):
+    data = bytearray(rom)
+    for offset, old, new in writes:
+        assert data[offset] == old
+        data[offset] = new
+    return bytes(data)
+
+
+class Pieces(unittest.TestCase):
+    def setUp(self):
+        self.rom = build()
+        self.p = smb1.SMB1Profile(self.rom)
+
+    def layout(self, rom=None):
+        p = smb1.SMB1Profile(rom) if rom else self.p
+        return [(t['page'], t['col'], t['row'], t['value']) for t in p.tokens(0x26) if t['kind'] == 'object']
+
+    def test_listing(self):
+        objects = {o['id']: o for o in self.p.objects(PIECES)}
+        bricks = objects['piece:2']
+        self.assertEqual((bricks['style'], bricks['name'], bricks['detail'], bricks['x'], bricks['y']),
+                         ('block', 'Row of bricks', '4 blocks', 2 * 16 + 4 * 8, 48 + 7 * 16))
+        fields = {f['key']: f for f in bricks['fields']}
+        self.assertEqual(fields['size']['value'], 3)
+        self.assertEqual(fields['piece']['value'], 0x20)
+        self.assertIn({'value': 0x10, 'name': 'Treetop platform'}, fields['piece']['choices'])
+        self.assertEqual(len(fields['y']['choices']), 12)
+        self.assertEqual(objects['piece:4']['name'], 'Pipe')
+        self.assertEqual({f['key']: f['value'] for f in objects['piece:4']['fields']}['size'], 2)
+        self.assertEqual(objects['piece:6']['name'], 'Gap in the ground')
+        self.assertNotIn('y', {f['key'] for f in objects['piece:6']['fields']})
+        self.assertEqual(objects['piece:16']['name'], 'Staircase')
+        self.assertEqual(objects['piece:18']['name'], 'Used block')
+        self.assertEqual(objects['block:12']['remove'], 'Remove this block')
+        self.assertIn('x', {f['key'] for f in objects['block:12']['fields']})
+        places = {c['value'] for c in fields['x']['choices']}
+        self.assertIn(5, places)
+        self.assertNotIn(16, places)                      # column 16 already has three pieces on it
+
+    def test_move_in_place(self):
+        plan = self.p.edit(PIECES, 'piece:2', {'x': 5})
+        self.assertEqual(plan['writes'], [(Cart.at(0xA400 + 2), 0x27, 0x57)])
+        self.assertEqual(plan['watch']['old'][0], [2, 7])
+        self.assertEqual(plan['watch']['new'][0], [5, 7])
+        self.assertEqual(plan['watch']['shift'], [3, 0])
+
+    def test_move_past_others(self):
+        plan = self.p.edit(PIECES, 'piece:2', {'x': 22, 'y': 5})
+        after = self.layout(apply(self.rom, plan['writes']))
+        self.assertEqual(after, [(0, 8, 9, 0x72), (1, 0, 12, 0x01), (1, 0, 11, 0x63), (1, 0, 3, 0x43), (1, 4, 7, 0x01),
+                                 (1, 6, 5, 0x23), (3, 1, 15, 0x33), (4, 0, 5, 0x0A)])
+        plan = self.p.edit(PIECES, 'piece:4', {'x': 32})              # past the page select, onto page 2
+        after = self.layout(apply(self.rom, plan['writes']))
+        self.assertIn((2, 0, 9, 0x72), after)
+        self.assertEqual(sorted(after), sorted([t for t in self.layout() if t != (0, 8, 9, 0x72)] + [(2, 0, 9, 0x72)]))
+        with self.assertRaises(ValueError):
+            self.p.edit(PIECES, 'piece:2', {'x': 16})                 # three pieces there already
+
+    def test_size_and_kind(self):
+        plan = self.p.edit(PIECES, 'piece:2', {'size': 1})
+        self.assertEqual(plan['writes'], [(Cart.at(0xA400 + 3), 0x23, 0x21)])
+        self.assertIsNone(plan['watch']['shift'])
+        self.assertEqual(len(plan['watch']['new']), 2)
+        plan = self.p.edit(PIECES, 'piece:2', {'piece': 0x40})
+        self.assertEqual(plan['writes'], [(Cart.at(0xA400 + 3), 0x23, 0x43)])
+        plan = self.p.edit(PIECES, 'piece:4', {'size': 5})
+        self.assertEqual(plan['writes'], [(Cart.at(0xA400 + 5), 0x72, 0x75)])
+        plan = self.p.edit(PIECES, 'piece:2', {'piece': 0x78})            # a pipe keeps a pipe's height
+        self.assertEqual(plan['writes'], [(Cart.at(0xA400 + 3), 0x23, 0x7B)])
+        with self.assertRaises(ValueError):
+            self.p.edit(PIECES, 'piece:6', {'piece': 0x78})               # not a kind of row $C
+
+    def test_remove(self):
+        plan = self.p.edit(PIECES, 'piece:6', {}, remove=True)
+        self.assertEqual(plan['writes'], [(Cart.at(0xA400 + 6), 0x0C, 0x0D), (Cart.at(0xA400 + 7), 0x81, 0x01)])   # page 1
+        changed = apply(self.rom, plan['writes'])
+        self.assertEqual(self.layout(changed), [t for t in self.layout() if t != (1, 0, 12, 0x01)])
+        plan = self.p.edit(PIECES, 'block:12', {}, remove=True)
+        self.assertEqual(self.layout(apply(self.rom, plan['writes'])), [t for t in self.layout() if t != (1, 4, 7, 0x01)])
+
+    def test_loop_area_keeps_bytes(self):
+        part = {'world': 2, 'level': 4, 'area': 0x61}
+        self.assertTrue(self.p.looping(0x61))
+        writes, reason = self.p.place(0x61, 2, 0, 12, 7, 0x23)            # would pass the pipe
+        self.assertIsNone(writes)
+        self.assertIn('loops', reason)
+        plan = self.p.edit(part, 'piece:2', {'x': 5})
+        self.assertEqual(plan['writes'], [(Cart.at(0xA500 + 2), 0x27, 0x57)])
+
+
 class Watchers(unittest.TestCase):
     def setUp(self):
         self.p = smb1.SMB1Profile(build())
@@ -209,6 +318,42 @@ class Watchers(unittest.TestCase):
         self.assertEqual(self.play(self.p.watcher(plan['watch']), [(0, coin)]), 'bad')
         far = ram(_75F=0, _74E=1, _74F=5, _71A=3, _71C=0)
         self.assertEqual(self.play(self.p.watcher(plan['watch']), [(0, far)]), 'warn')
+
+    def test_piece(self):
+        from romancer.level_profiles import Ram
+        plan = self.p.edit(PIECES, 'piece:2', {'x': 5})
+
+        def frame(drawn):
+            r = Ram(bytes(ram(_75F=0, _74E=1, _74F=6, _71A=0, _71C=0)))
+            vram = bytearray(0x800)
+            for column in drawn:
+                base = (7 * 2 + 4) * 32 + column * 2
+                vram[base:base + 2] = vram[base + 32:base + 34] = bytes([0x45, 0x45])
+            r.domains = {'vram': bytes(vram)}
+            return r
+
+        def run(original, changed):
+            w = self.p.watcher(plan['watch'])
+            self.assertTrue(w.compare)
+            for f in range(0, 40, 4):
+                if w.see(original, f, 'original'):
+                    break
+            for f in range(0, 40, 4):
+                if w.see(changed, f, 'changed'):
+                    break
+            return w.result()['state']
+        before, moved = frame([2, 3, 4, 5]), frame([5, 6, 7, 8])
+        self.assertEqual(run(before, moved), 'good')
+        self.assertEqual(run(before, before), 'bad')                          # the control: nothing changed
+        self.assertEqual(run(before, frame([2, 3, 4, 5, 6, 7, 8])), 'bad')    # not gone from the old place
+        removing = self.p.edit(PIECES, 'piece:2', {}, remove=True)
+        w = self.p.watcher(removing['watch'])
+        for f in range(0, 40, 4):
+            w.see(before, f, 'original')
+        for f in range(0, 40, 4):
+            w.see(frame([]), f, 'changed')
+        self.assertEqual(w.result()['state'], 'good')
+        self.assertEqual(self.p.watcher(plan['watch']).result()['state'], 'warn')
 
     def test_way(self):
         plan = self.p.edit(PART, 'way:0', {'to': 0x25 << 5 | 10})

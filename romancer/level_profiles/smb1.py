@@ -18,6 +18,14 @@ The game is NROM: 32 KB of program at CPU $8000-$FFFF (file offset = 16 + addres
   Row $F selects a page (byte 2 & $3F) when no page flag was taken just before it. Row $E is three bytes: the area a
   pipe or vine leads to (byte 2, stored in $0750) and, when the world in byte 3's top three bits is this one, the
   page to come out on (byte 3 & $1F, stored in $0751).
+* Level pieces (area objects, $9595 and the jump table at $9667): rows 0-$B with byte 2 bits 4-6 = 1-7 are the large
+  pieces (1 the area style's platform or cannon, 2-4 rows of bricks, solid blocks, coins, 5-6 columns of bricks and
+  solid blocks, 7 a pipe; low nibble the length), with bits 4-6 clear and low nibble 9-$B small pieces; row $C holds
+  gaps, bridges and rows of ? blocks (bits 4-6 the kind, low nibble the length), row $F ropes, the castle, staircases
+  and the sideways way-out pipe. The parser has three buffers ($0730-$0732, one per piece being drawn, counting down
+  the columns left) and draws a piece only when the screen reaches its page ($0725) and column ($0726) exactly, so
+  the stream must stay in order and no column may have more than three pieces on it (the game's own data never has
+  more). Castle loops ($C08C) jump back to fixed byte offsets ($9BF8) of their areas, so there nothing may shift.
 """
 from __future__ import annotations
 
@@ -61,6 +69,20 @@ CONTENTS = {0: 'Question block with a power-up', 1: 'Question block with a coin'
 HOLDS = {0: 'a power-up', 1: 'a coin', 2: 'a coin', 3: 'a 1-up', 4: 'a power-up', 5: 'a vine', 6: 'a star',
          7: 'several coins', 8: 'a 1-up'}
 HIDDEN = {2, 3}
+
+# Level pieces. Every kind was drawn at World 1-1 page 0 column 10 and looked at (trace/v15_profiles/smb_layout/
+# kinds1.py, kinds1_sheet.png); the platform of kind 1 follows the area's style (header byte 2 bits 6-7).
+STYLE_PIECES = {0: 'Treetop platform', 1: 'Mushroom platform', 2: 'Bullet Bill cannon'}
+LARGE = {0x20: 'Row of bricks', 0x30: 'Row of solid blocks', 0x40: 'Row of coins', 0x50: 'Column of bricks',
+         0x60: 'Column of solid blocks', 0x70: 'Pipe', 0x78: 'Pipe Mario can go down'}
+SMALL = {9: 'Short pipe, one block wide', 10: 'Used block', 11: 'Springboard'}
+ROW12 = {0x00: 'Gap in the ground', 0x10: 'Pulley rope', 0x20: 'Bridge (high)', 0x30: 'Bridge (middle)',
+         0x40: 'Bridge (low)', 0x50: 'Gap filled with water', 0x60: 'Row of ? blocks with coins (high)',
+         0x70: 'Row of ? blocks with coins (low)'}
+ROW15 = {0x00: 'Rope from top to bottom', 0x10: 'Rope of a balanced lift', 0x20: 'Castle', 0x30: 'Staircase',
+         0x40: 'Sideways pipe out of the area'}
+BUFFERS = 3                          # $0730-$0732: pieces the parser can draw at once
+NAMETABLE_ROW = 4                    # metatile row 0 is tile row 4 of the nametable (32 pixels down)
 
 
 class SMB1Data:
@@ -213,6 +235,251 @@ class SMB1Data:
         byte = rows[at]['byte']
         return [(byte + k, old[index + k], new[index + k]) for k in (0, 1) if old[index + k] != new[index + k]]
 
+    # ---- level pieces (area objects)
+    STAIR_COUNT, STAIR_ROW = 0x9AA5, 0x9AAE     # staircase columns: rows drawn and first row, read backwards from 8
+
+    def tokens(self, area: int, data: bytes = None) -> list:
+        """The area data as the parser reads it ($9508): [{'kind': 'page'|'object', 'index', 'byte', 'page', 'col',
+        'row', 'value' (byte 2 without bit 7), 'flag' (bit 7)}]. `data` reads a changed copy (from byte 0 of the area)."""
+        start = self.area_data(area)
+        read = (lambda k: data[k]) if data is not None else (lambda k: self.at(start + k))
+        i, page, out = 2, 0, []
+        while i < 0x400:
+            b0 = read(i)
+            if b0 == 0xFD:
+                break
+            b1 = read(i + 1)
+            taken = bool(b1 & 0x80)
+            if taken:
+                page += 1
+            row = b0 & 15
+            base = {'index': i, 'byte': self.offset(start + i), 'col': b0 >> 4, 'row': row, 'value': b1 & 0x7F, 'flag': taken}
+            if row == 13 and not b1 & 0x40 and not taken:
+                page = b1 & 0x1F
+                out.append({**base, 'kind': 'page', 'page': page})
+            else:
+                out.append({**base, 'kind': 'object', 'page': page})
+            i += 2
+        return out
+
+    def area_bytes(self, area: int) -> bytes:
+        start = self.area_data(area)
+        end = 2
+        while self.at(start + end) != 0xFD and end < 0x400:
+            end += 2
+        return bytes(self.at(start + k) for k in range(end + 1))
+
+    def style(self, area: int) -> int:
+        """The area's platform style (header byte 2 bits 6-7; 3 is the cloud setting, which keeps style 0)."""
+        value = self.at(self.area_data(area) + 1) >> 6
+        return 0 if value == 3 else value
+
+    def looping(self, area: int) -> bool:
+        """Does the area hold a loop command (row $D, $4B)? Those jump back to fixed byte offsets of the area data."""
+        return any(t['row'] == 13 and t['kind'] == 'object' and t['value'] & 0x3F == 0x0B for t in self.tokens(area))
+
+    def piece(self, row: int, value: int, style: int):
+        """What an area object is: {'group', 'kind' (the value that names it), 'name', 'size' (length field or None),
+        'sizes' (choices), 'width' (parser columns it takes), 'cells' [(column, row)] it draws} or None for objects
+        that are not pieces (single blocks with contents, page selects, scenery and level controls)."""
+        t, n = (value >> 4) & 7, value & 15
+        cells, size, sizes = None, None, None
+        if row <= 11:
+            if t == 0:
+                if n not in SMALL:
+                    return None
+                group, kind, name, width = 'small', n, SMALL[n], 1
+                cells = [(0, row), (0, row + 1)] if n in (9, 11) else [(0, row)]
+            elif t == 1:
+                group, kind, name = 'large', 0x10, STYLE_PIECES[style]
+                size, sizes = n, range(16)
+                if style == 2:
+                    width, cells, sizes = 1, [(0, row + j) for j in range(n + 1)], range(13 - row) if row < 12 else range(1)
+                else:
+                    width, cells = n + 1, [(i, row) for i in range(n + 1)]
+            elif t == 7:
+                kind = 0x78 if n & 8 else 0x70
+                group, name, width, size, sizes = 'large', LARGE[kind], 2, n & 7, range(1, 8)
+                cells = [(i, row + j) for i in (0, 1) for j in range((n & 7) + 1)]
+            else:
+                group, kind, name, size, sizes = 'large', t << 4, LARGE[t << 4], n, range(16)
+                if t in (2, 3, 4):
+                    width, cells = n + 1, [(i, row) for i in range(n + 1)]
+                else:
+                    width, cells, sizes = 1, [(0, row + j) for j in range(n + 1)], range(max(1, 13 - row))
+        elif row == 12:
+            group, kind, name, width, size, sizes = 'row12', t << 4, ROW12[t << 4], n + 1, n, range(16)
+            rows = {0: range(8, 13), 1: [0], 2: [6, 7], 3: [7, 8], 4: [9, 10], 5: range(10, 13), 6: [3], 7: [7]}[t]
+            cells = [(i, r) for i in range(n + 1) for r in rows]
+        elif row == 15:
+            if (t << 4) not in ROW15:
+                return None
+            group, kind, name = 'row15', t << 4, ROW15[t << 4]
+            if t == 0:
+                width, cells = 1, [(0, r) for r in range(13)]
+            elif t == 1:
+                width, size, sizes, cells = 1, n, range(12), [(0, r) for r in range(1, min(n + 2, 13))]
+            elif t == 2:
+                width, cells = 5, [(i, r) for i in range(5) for r in range(n, 11)]
+            elif t == 3:
+                width, size, sizes = n + 1, n, range(9)
+                cells = []
+                for k in range(n + 1):
+                    step = 8 - k if k <= 8 else 0
+                    first, count = self.at(self.STAIR_ROW + step), self.at(self.STAIR_COUNT + step) + 1
+                    cells += [(k, r) for r in range(first, min(first + count, 13))]
+            else:
+                width = 4
+                cells = [(i, r) for i in (0, 1) for r in (n - 1, n) if r >= 0] + [(i, r) for i in (2, 3) for r in range(n + 1)]
+        else:
+            return None
+        cells = [(c, r) for c, r in cells if 0 <= r <= 12]
+        if sizes is not None:
+            sizes = sorted(set(sizes) | {size})
+        return {'group': group, 'kind': kind, 'name': name, 'size': size, 'sizes': sizes,
+                'width': width, 'cells': cells}
+
+    @staticmethod
+    def parser_width(row: int, value: int, style: int) -> int:
+        """Parser columns an area object keeps one of the three buffers busy ($0730,X counts them down; handlers that
+        call $9BAC take the low nibble, $9BAF a fixed number, the rest only their own column)."""
+        t, n = (value >> 4) & 7, value & 15
+        if row <= 11:
+            if t == 0 or t in (5, 6) or (t == 1 and style == 2):
+                return 1
+            return 2 if t == 7 else n + 1
+        if row == 12:
+            return n + 1
+        if row == 13:
+            return {0: 4, 4: 13}.get(value & 0x3F, 1)       # $9882 the pipe into the level, $9A01 the castle bridge
+        if row == 15:
+            return {2: 5, 3: n + 1, 4: 4}.get(t, 1)
+        return 1
+
+    def encode(self, area: int, sequence: list):
+        """Bytes of the area data for a sequence of tokens (objects with absolute pages, page selects as they are), or
+        None when a page cannot be reached with the page flag (every object may move on one page from the one before)."""
+        out = bytearray(self.area_bytes(area)[:2])
+        state = 0
+        for t in sequence:
+            if t['kind'] == 'page':
+                out += bytes([t['col'] << 4 | 13, t['page']])
+                state = t['page']
+                continue
+            step = t['page'] - state
+            if step not in (0, 1):
+                return None
+            out += bytes([t['col'] << 4 | t['row'], t['value'] | (0x80 if step else 0)])
+            state = t['page']
+        return bytes(out + b'\xFD')
+
+    def _cover(self, area: int, skip_index=None) -> dict:
+        style, cover = self.style(area), {}
+        for t in self.tokens(area):
+            if t['kind'] == 'object' and t['index'] != skip_index:
+                x = t['page'] * 16 + t['col']
+                for k in range(self.parser_width(t['row'], t['value'], style)):
+                    cover[x + k] = cover.get(x + k, 0) + 1
+        return cover
+
+    def place(self, area: int, index: int, page: int, col: int, row: int, value: int):
+        """Writes that put the area object at `index` at page/column/row with byte 2 `value`, every other object staying
+        exactly where it is (the stream is reordered when the object passes others). Returns (writes, reason): reason is
+        a plain sentence when it cannot be done."""
+        tokens = self.tokens(area)
+        j = next((k for k, t in enumerate(tokens) if t['index'] == index and t['kind'] == 'object'), None)
+        if j is None:
+            return None, 'That is not part of this level any more. Reopen the map.'
+        if not 0 <= page <= 0x1F or not 0 <= col <= 15:
+            return None, 'That place is outside what the level can hold.'
+        style = self.style(area)
+        cover = self._cover(area, index)
+        x = page * 16 + col
+        if any(cover.get(x + k, 0) >= BUFFERS for k in range(self.parser_width(row, value, style))):
+            return None, 'The game draws at most three level pieces on one column, and that place already has three.'
+        moved = {**tokens[j], 'page': page, 'col': col, 'row': row, 'value': value}
+        others = tokens[:j] + tokens[j + 1:]
+        key = (page, col)
+        before = [k for k, t in enumerate(others) if t['kind'] == 'object' and (t['page'], t['col']) > key]
+        after = [k for k, t in enumerate(others) if t['kind'] == 'object' and (t['page'], t['col']) < key]
+        low = after[-1] + 1 if after else 0
+        high = before[0] if before else len(others)
+        old = self.area_bytes(area)
+        loop = self.looping(area)
+        spots = sorted(range(low, high + 1), key=lambda k: (k != j, abs(k - j)))
+        for k in spots:
+            data = self.encode(area, others[:k] + [moved] + others[k:])
+            if data is None or len(data) != len(old):
+                continue
+            writes = [(self.offset(self.area_data(area) + i), old[i], data[i]) for i in range(len(old)) if old[i] != data[i]]
+            if loop and any(not index <= w[0] - self.offset(self.area_data(area)) <= index + 1 for w in writes):
+                continue
+            return writes, None
+        if loop:
+            return None, ('This castle loops back to fixed places in its layout, so a piece can only move where nothing '
+                          'else has to change.')
+        return None, ('The layout cannot hold that place: the pieces just before and after it would need another '
+                      'screen jump the level has no room for.')
+
+    def x_choices(self, area: int, index: int, row: int, value: int, near: int = None) -> list:
+        """Every column (page * 16 + column) the object can be put at with place(), worked out without writing; with
+        `near`, only on its own screen and the screens either side of it that far."""
+        tokens = self.tokens(area)
+        j = next(k for k, t in enumerate(tokens) if t['index'] == index)
+        style = self.style(area)
+        width = self.parser_width(row, value, style)
+        cover = self._cover(area, index)
+        last = max([t['page'] for t in tokens] + [0])
+        loop = self.looping(area)
+        others = tokens[:j] + tokens[j + 1:]
+        # page state before each position of `others`, and whether the token at each position can follow a given page
+        states, state = [], 0
+        for t in others:
+            states.append(state)
+            state = t['page']
+        states.append(state)
+        objects = [(k, (t['page'], t['col'])) for k, t in enumerate(others) if t['kind'] == 'object']
+        out = []
+        first, end = 0, (last + 1) * 16
+        if near is not None:
+            first, end = max(0, (tokens[j]['page'] - near) * 16), min(end, (tokens[j]['page'] + near + 1) * 16)
+        for x in range(first, end):
+            page, col = divmod(x, 16)
+            if (page, col) == (tokens[j]['page'], tokens[j]['col']):
+                out.append(x)
+                continue
+            if any(cover.get(x + k, 0) >= BUFFERS for k in range(width)):
+                continue
+            low = max([k + 1 for k, p in objects if p < (page, col)] + [0])
+            high = min([k for k, p in objects if p > (page, col)] + [len(others)])
+            for k in range(low, high + 1):
+                if loop and k != j:
+                    continue
+                if page - states[k] not in (0, 1):
+                    continue
+                follow = others[k] if k < len(others) else None
+                if follow and follow['kind'] == 'object' and follow['page'] - page not in (0, 1):
+                    continue
+                if loop and follow and follow['kind'] == 'object' and follow['page'] - page != int(follow['flag']):
+                    continue
+                hole = others[j] if j < len(others) else None       # what followed the object where it was
+                if k != j and hole and hole['kind'] == 'object':
+                    if hole['page'] - (tokens[j - 1]['page'] if j > 0 else 0) not in (0, 1):
+                        continue
+                out.append(x)
+                break
+        return out
+
+    def remove_piece(self, area: int, index: int) -> list:
+        """Writes that take an area object out without moving anything: its two bytes become a page select for the page
+        it was on, so the objects after it keep their pages and every byte keeps its place."""
+        t = next((t for t in self.tokens(area) if t['index'] == index and t['kind'] == 'object'), None)
+        if t is None:
+            return []
+        byte = t['byte']
+        new = (t['col'] << 4 | 13, t['page'])
+        return [(byte + k, self.rom[byte + k], new[k]) for k in (0, 1) if self.rom[byte + k] != new[k]]
+
 
 def _list(names: list) -> str:
     return names[0] if len(names) == 1 else ', '.join(names[:-1]) + ' and ' + names[-1]
@@ -298,6 +565,88 @@ class _BlockWatcher(Watcher):
         if w['contents'] == 3:
             text += ' The game only shows a hidden 1-up block while its 1-up flag is set.'
         return {'state': 'bad', 'text': text}
+
+
+def nametable_tiles(vram, column: int, row: int):
+    """The four tiles the game drew for the metatile at an area column (page * 16 + column) and row: nametable page & 1
+    (the two nametables side by side), tile row row * 2 + 4."""
+    base = (column >> 4 & 1) * 0x400 + (row * 2 + NAMETABLE_ROW) * 32 + (column & 15) * 2
+    return (vram[base], vram[base + 1], vram[base + 32], vram[base + 33])
+
+
+class _PieceWatcher(Watcher):
+    """A level piece edit: plays the original game, then the changed one, and reads what the game drew in its nametable
+    at every place the piece covered and now covers, each when it first comes on screen. The piece must be gone from
+    where it no longer is, drawn where it now is, and (when it only moved) drawn the same as it was."""
+    every = 4
+    compare = True
+    SETTLE = 8
+
+    def __init__(self, watch):
+        self.w = watch
+        self.runs = {}
+        self.since = {}
+
+    def see(self, ram, frame, run):
+        w = self.w
+        seen = self.runs.setdefault(run, {})
+        if ram[MODE] != 1 or (ram[AREA_TYPE] << 5 | ram[AREA_NUMBER]) != w['area'] or ram[WORLD] != w['world'] - 1:
+            self.since.pop(run, None)
+            return False
+        start = self.since.setdefault(run, frame)
+        vram = getattr(ram, 'domains', {}).get('vram')
+        if vram is None or frame - start < self.SETTLE:
+            return False
+        left = ram[SCREEN_PAGE] * 256 + ram[SCREEN_X]
+        cells = {tuple(c) for c in w['old']} | {tuple(c) for c in w['new']}
+        for column, row in cells:
+            if (column, row) not in seen and left <= column * 16 <= left + 240:
+                seen[(column, row)] = nametable_tiles(vram, column, row)
+        return len(seen) == len(cells)
+
+    def result(self):
+        w = self.w
+        before, after = self.runs.get('original', {}), self.runs.get('changed', {})
+        both = lambda c: c in before and c in after
+        changed = lambda c: both(c) and before[c] != after[c]
+        skip = {tuple(c) for c in w.get('skip', [])}       # drawn by other pieces too, so they tell nothing
+        old, new = [tuple(c) for c in w['old'] if tuple(c) not in skip], [tuple(c) for c in w['new'] if tuple(c) not in skip]
+        gone = [c for c in old if c not in new and both(c)]
+        there = [c for c in new if c not in old and both(c)]
+        name = w['name']
+        if old and not new:
+            if not gone:
+                return super().result()
+            ok = any(changed(c) for c in gone)
+            return {'state': 'good' if ok else 'bad',
+                    'text': f'Played from the start, the game no longer draws the {name} there.' if ok else
+                            f'Played from the start, the game still draws the {name} there.'}
+        if set(old) == set(new) or not w.get('moved', True):
+            measured = [c for c in set(old) | set(new) if both(c)]
+            if not measured:
+                return super().result()
+            ok = any(changed(c) for c in measured)
+            return {'state': 'good' if ok else 'bad',
+                    'text': f'Played from the start, the game now draws the {w["now"]} there.' if ok else
+                            f'Played from the start, the game still draws the {name} there.'}
+        if (set(old) - set(new) and not gone) or (set(new) - set(old) and not there):
+            return super().result()
+        problems = []
+        if gone and not any(changed(c) for c in gone):
+            problems.append('it is still drawn where it was')
+        if there and not any(changed(c) for c in there):
+            problems.append('nothing new is drawn where it now is')
+        if w.get('shift') and not problems:
+            dx, dy = w['shift']
+            pairs = [(c, (c[0] + dx, c[1] + dy)) for c in old if c in before and (c[0] + dx, c[1] + dy) in after
+                     and (c[0] + dx, c[1] + dy) not in skip]
+            telling = [(a, b) for a, b in pairs if b in before and before[a] != before[b]]
+            if any(after[b] != before[a] for a, b in telling):
+                problems.append('it does not look the same at its new place')
+        if problems:
+            return {'state': 'bad', 'text': f'Played from the start, the {name} did not change as chosen: ' + ' and '.join(problems) + '.'}
+        return {'state': 'good', 'text': f'Played from the start, the game now draws the {w["now"]} where chosen' +
+                (' and no longer where it was.' if gone else '.')}
 
 
 class _WayWatcher(Watcher):
@@ -450,7 +799,8 @@ class SMB1Profile(SMB1Data, Profile):
             item = {'id': f'block:{obj["index"]}', 'style': 'secret' if n in HIDDEN else 'item', 'type': f'block{n}',
                     'name': CONTENTS[n].split(' with ')[0], 'detail': f'holds {HOLDS[n]}',
                     'x': obj['page'] * 256 + obj['col'] * 16 + 8, 'y': 48 + obj['row'] * 16,
-                    'fields': [{'key': 'holds', 'label': 'Block', 'value': n, 'choices': 'blocks'}], 'remove': None}
+                    'fields': [{'key': 'holds', 'label': 'Block', 'value': n, 'choices': 'blocks'}] + self._place_fields(area, obj, n),
+                    'remove': 'Remove this block'}
             notes = []
             if n == 3:
                 notes.append('The game shows a hidden 1-up block only while its 1-up flag is set: at the start of a game '
@@ -460,7 +810,62 @@ class SMB1Profile(SMB1Data, Profile):
             if notes:
                 item['note'] = ' '.join(notes)
             out.append(item)
+        style = self.style(area)
+        for obj in self.objects_raw(area):
+            info = self.piece(obj['row'], obj['value'], style)
+            if info is None:
+                continue
+            columns = max(c for c, _ in info['cells']) + 1 if info['cells'] else 1
+            bottom = max(r for _, r in info['cells']) if info['cells'] else obj['row']
+            item = {'id': f'piece:{obj["index"]}', 'style': 'block', 'type': f'piece{obj["row"] if obj["row"] > 11 else 0}-{info["kind"]}',
+                    'name': info['name'], 'x': obj['page'] * 256 + obj['col'] * 16 + columns * 8, 'y': 48 + bottom * 16,
+                    'fields': self._place_fields(area, obj, obj['value']), 'remove': 'Remove this piece'}
+            if info['size'] is not None:
+                item['detail'] = self._size_name(info, info['size'])
+                item['fields'].append({'key': 'size', 'label': self._size_label(info), 'value': info['size'],
+                                       'choices': [{'value': n, 'name': self._size_name(info, n)} for n in info['sizes']]})
+            kinds = self._kinds(info['group'], style)
+            if len(kinds) > 1:
+                item['fields'].append({'key': 'piece', 'label': 'Piece', 'value': info['kind'],
+                                       'choices': [{'value': k, 'name': v} for k, v in kinds.items()]})
+            notes = ['The game draws at most three pieces on one column, so places where three already meet are not offered.']
+            if self.looping(area):
+                notes.append('This castle loops back to fixed places in its layout, so pieces here move only where nothing else has to change.')
+            if info['kind'] == 0x78:
+                notes.append('Going down this pipe leads where this area’s pipes lead.')
+            item['note'] = ' '.join(notes)
+            out.append(item)
         return out
+
+    # ---- level pieces on the map
+    def _place_fields(self, area, obj, value) -> list:
+        fields = [{'key': 'x', 'label': 'Place', 'value': obj['page'] * 16 + obj['col'],
+                   'choices': [{'value': x, 'name': f'Screen {x // 16 + 1}, column {x % 16 + 1}'}
+                               for x in self.x_choices(area, obj['index'], obj['row'], value, near=1)]}]
+        if obj['row'] <= 11:
+            fields.append({'key': 'y', 'label': 'Row', 'value': obj['row'],
+                           'choices': [{'value': r, 'name': f'Row {r + 1} from the top'} for r in range(12)]})
+        return fields
+
+    @staticmethod
+    def _size_label(info) -> str:
+        across = info['width'] > 1 or info['group'] == 'row12' or info['kind'] == 0x30 and info['group'] == 'row15'
+        return 'Length' if across and info['kind'] not in (0x70, 0x78) else 'Height'
+
+    @staticmethod
+    def _size_name(info, n) -> str:
+        count = n + 1
+        return f'{count} block' if count == 1 else f'{count} blocks'
+
+    @staticmethod
+    def _kinds(group, style) -> dict:
+        if group == 'large':
+            return {0x10: STYLE_PIECES[style], **LARGE}
+        if group == 'small':
+            return dict(SMALL)
+        if group == 'row12':
+            return dict(ROW12)
+        return {}
 
     def objects_raw(self, area: int) -> list:
         return SMB1Data.objects(self, area)
@@ -498,13 +903,19 @@ class SMB1Profile(SMB1Data, Profile):
                     'title': f'Enemy here: {name} ({where}, screen {row["page"] + 1})',
                     'watch': {'kind': 'enemy', 'area': area, 'world': world, 'index': index, 'x': x, 'wanted': new,
                               'name': name if name.startswith(('Two', 'Three', 'Bowser', 'Toad')) else 'a ' + name[0].lower() + name[1:] if name.startswith(('Stream', 'Lift', 'Short', 'Long', 'Fire', 'Fast', 'Pulley', 'Warp')) else 'a ' + name}}
+        if kind == 'piece':
+            return self._piece_edit(world, area, index, values, remove, where)
         if kind == 'block':
             obj = next((o for o in self.objects_raw(area) if o['index'] == index), None)
             if obj is None or obj['row'] > 11 or obj['value'] & 0x70 or obj['value'] > 8:
                 raise ValueError('That is not part of this level any more. Reopen the map.')
-            n = int(values.get('holds'))
+            n = int(values.get('holds', obj['value']))
             if n not in CONTENTS:
                 raise ValueError('That choice is not one of the game’s own.')
+            x = int(values.get('x', obj['page'] * 16 + obj['col']))
+            row = int(values.get('y', obj['row']))
+            if remove or (x, row) != (obj['page'] * 16 + obj['col'], obj['row']):
+                return self._piece_edit(world, area, index, {**values, 'holds': n}, remove, where)
             byte = obj['byte'] + 1
             old = self.rom[byte]
             value = (old & 0xF0) | n
@@ -533,7 +944,100 @@ class SMB1Profile(SMB1Data, Profile):
                               'name': name[0].lower() + name[1:] if not name.startswith('World') else name}}
         raise ValueError('ROMancer cannot change that yet.')
 
+    def _piece_edit(self, world, area, index, values, remove, where):
+        """Move, resize, change or remove a level piece (or move or remove a single block)."""
+        obj = next((o for o in self.objects_raw(area) if o['index'] == index), None)
+        style = self.style(area)
+        if obj is None:
+            raise ValueError('That is not part of this level any more. Reopen the map.')
+        single = obj['row'] <= 11 and not obj['value'] & 0x70 and obj['value'] <= 8
+        info = None if single else self.piece(obj['row'], obj['value'], style)
+        if not single and info is None:
+            raise ValueError('That is not part of this level any more. Reopen the map.')
+        name = CONTENTS[obj['value']].split(' with ')[0].lower() if single else info['name'].lower()
+        old_x = obj['page'] * 16 + obj['col']
+        old_cells = [[old_x + c, r] for c, r in ([(0, obj['row'])] if single else info['cells'])]
+        watch = {'kind': 'piece', 'area': area, 'world': world, 'old': old_cells, 'name': name}
+        if remove:
+            writes = self.remove_piece(area, index)
+            watch['skip'] = self._others_cells(area, index, old_cells)
+            return {'writes': writes, 'title': f'Remove the {name} ({where}, screen {obj["page"] + 1})',
+                    'watch': {**watch, 'new': [], 'now': 'nothing'}}
+        x, row = int(values.get('x', old_x)), int(values.get('y', obj['row']))
+        if obj['row'] > 11:
+            row = obj['row']
+        elif not 0 <= row <= 11:
+            raise ValueError('That choice is not one of the game’s own.')
+        if single:
+            value = int(values.get('holds', obj['value']))
+            new_name = CONTENTS[value].split(' with ')[0].lower()
+            new_cells = [(0, row)]
+        else:
+            kind = int(values.get('piece', info['kind']))
+            kinds = self._kinds(info['group'], style)
+            if kinds and kind not in kinds or not kinds and kind != info['kind']:
+                raise ValueError('That choice is not one of the game’s own.')
+            size = info['size']
+            if 'size' in values and info['size'] is not None:
+                size = int(values['size'])
+            value = self._value(info, kind, size, obj['value'])
+            new = self.piece(row, value, style)
+            if new is None:
+                raise ValueError('That choice is not one of the game’s own.')
+            new_name, new_cells = new['name'].lower(), new['cells']
+        writes, reason = self.place(area, index, x // 16, x % 16, row, value)
+        if writes is None:
+            raise ValueError(reason)
+        parts = []
+        if x != old_x:
+            parts.append(f'moved to screen {x // 16 + 1}, column {x % 16 + 1}' + (f', row {row + 1}' if row != obj['row'] else ''))
+        elif row != obj['row']:
+            parts.append(f'moved to row {row + 1}')
+        if new_name != name:
+            parts.append(f'now a {new_name}')
+        if not single and new['size'] is not None and new['size'] != info['size'] and info['kind'] == new['kind']:
+            parts.append(f'now {self._size_name(new, new["size"])} {self._size_label(new).lower()}'.replace(' length', ' long').replace(' height', ' tall'))
+        same_shape = value == obj['value']
+        new_abs = [[x + c, r] for c, r in new_cells]
+        watch.update(new=new_abs, now=new_name, moved=(x, row) != (old_x, obj['row']), shift=[x - old_x, row - obj['row']] if same_shape else None,
+                     skip=self._others_cells(area, index, old_cells + new_abs))
+        return {'writes': writes, 'title': f'{name[0].upper() + name[1:]}: {", ".join(parts) or "unchanged"} ({where})', 'watch': watch}
+
+    def _others_cells(self, area, index, near) -> list:
+        """Cells the other area objects draw on, next to the given cells (they may cover the piece or be covered)."""
+        style = self.style(area)
+        columns = {c for c, _ in near}
+        low, high = min(columns) - 1, max(columns) + 1
+        out = set()
+        for t in self.tokens(area):
+            if t['kind'] != 'object' or t['index'] == index:
+                continue
+            if t['row'] <= 11 and not t['value'] & 0x70 and t['value'] <= 8:
+                cells = [(0, t['row'])]
+            else:
+                info = self.piece(t['row'], t['value'], style)
+                if info is None:
+                    continue
+                cells = info['cells']
+            x = t['page'] * 16 + t['col']
+            out |= {(x + c, r) for c, r in cells if low <= x + c <= high}
+        return sorted([list(c) for c in out])
+
+    @staticmethod
+    def _value(info, kind, size, old) -> int:
+        """Byte 2 (without the page flag) for a piece of `kind` with length `size`, the nearest length the kind takes."""
+        if info['group'] == 'small':
+            return kind
+        if info['group'] == 'row15':
+            return (old & 0x70) | ((size if size is not None else old & 15) & 15)
+        if kind in (0x70, 0x78):
+            size = min(max(size if size is not None else 1, 1), 7)
+            return 0x70 | (kind & 8) | size
+        return kind | ((size if size is not None else old & 15) & 15)
+
     def watcher(self, watch):
+        if watch['kind'] == 'piece':
+            return _PieceWatcher(watch)
         if watch['kind'] == 'enemy':
             return _EnemyWatcher(watch)
         if watch['kind'] == 'block':
