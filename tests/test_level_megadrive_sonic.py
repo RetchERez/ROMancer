@@ -2,7 +2,7 @@
 games' tables at their real addresses (nothing else of the games)."""
 import unittest
 
-from romancer.level_profiles.megadrive_sonic import Sonic1, Sonic2
+from romancer.level_profiles.megadrive_sonic import Sonic1, Sonic2, kos_decode, kos_encode
 
 
 def word(value):
@@ -200,6 +200,158 @@ class Sonic2Tests(unittest.TestCase):
         ram[table + 6 * 4 + 2:table + 6 * 4 + 6] = bytes(4)
         w = self.p.watcher(plan['watch'])
         w.see(ram, 0, 'changed')
+        self.assertEqual(w.result()['state'], 'bad')
+
+
+def with_s1_layouts(rom):
+    """Green Hill act 1: 4 by 2 chunks; act 2: 3 by 1 with chunk 7 and a loop chunk $85; every other act a 1 by 1."""
+    rom = bytearray(rom)
+    index = Sonic1.LAYOUT_INDEX
+    bodies = {(0, 0): bytes([3, 1, 0, 1, 2, 0, 3, 4, 0, 5]), (0, 1): bytes([2, 0, 7, 0x85, 0])}
+    plain = 0x100
+    rom[index + plain:index + plain + 3] = bytes([0, 0, 0])
+    at, starts = 0xA8, {}
+    for key, body in bodies.items():
+        starts[key] = at
+        rom[index + at:index + at + len(body)] = body
+        at += len(body)
+    for zone in range(7):
+        for act in range(4):
+            entry = index + (zone * 4 + act) * 6
+            rom[entry:entry + 6] = word(starts.get((zone, act), plain)) + word(plain) + word(plain)
+    return bytes(rom)
+
+
+def s2_layout(fill):
+    data = bytearray(0x1000)
+    for (column, row), block in fill.items():
+        data[row * 0x100 + column] = block
+    return bytes(data)
+
+
+def with_s2_layouts(rom, first, second):
+    """Emerald Hill act 1 at the index + $44, act 2 (and every other act) right after it, 16-byte aligned."""
+    rom = bytearray(rom)
+    index = Sonic2.LAYOUT_INDEX
+    one, two = kos_encode(first), kos_encode(second)
+    at2 = (0x44 + len(one) + 15) // 16 * 16 + 4
+    rom[index + 0x44:index + 0x44 + len(one)] = one
+    rom[index + at2:index + at2 + len(two)] = two
+    for n in range(34):
+        rom[index + 2 * n:index + 2 * n + 2] = word(0x44 if n == 0 else at2)
+    return bytes(rom), at2
+
+
+class KosinskiTests(unittest.TestCase):
+    def test_small_stream(self):
+        # one literal, then the end: descriptor bits 1, 0, 1 (low bit first), the byte, the end's $00 $F0 $00
+        self.assertEqual(kos_encode(b'A'), bytes([0x05, 0x00, 0x41, 0x00, 0xF0, 0x00]))
+        self.assertEqual(kos_decode(bytes([0x05, 0x00, 0x41, 0x00, 0xF0, 0x00])), (b'A', 6))
+
+    def test_round_trip(self):
+        import random
+        rng = random.Random(4)
+        samples = [bytes(0x1000), bytes(rng.randrange(256) for _ in range(700)),
+                   bytes(rng.choice((0, 0, 0, 1, 2, 0x93, 0xA2)) for _ in range(0x1000)),
+                   bytes(range(256)) * 20 + b'\x07' * 300]
+        for data in samples:
+            for chain in (1, 48, 320):
+                packed = kos_encode(data, chain)
+                self.assertEqual(kos_decode(packed + b'\xEE' * 4), (data, len(packed)))
+
+
+class Sonic1LayoutTests(unittest.TestCase):
+    def setUp(self):
+        self.p = Sonic1(with_s1_layouts(sonic1_rom()))
+        self.part = {'zone': 0, 'act': 0}
+
+    def test_layout(self):
+        self.assertEqual(self.p.packed_layout(self.part), {'size': 256, 'width': 4, 'height': 2, 'blocks': [0, 1, 2, 0, 3, 4, 0, 5],
+                                                           'left': 0, 'top': 0})
+        self.assertEqual(self.p.packed_layout({'zone': 0, 'act': 1})['blocks'], [7, 0x85, 0])
+        self.assertIsNone(self.p.packed_layout({'zone': 0, 'act': 3}))
+        self.assertEqual(self.p.zone_chunks(0), {0, 1, 2, 3, 4, 5, 7, 0x85})
+
+    def test_set_layout(self):
+        start = Sonic1.LAYOUT_INDEX + 0xA8 + 2
+        plan = self.p.set_packed_layout(self.part, [(0, 0, 0x85), (3, 1, 2), (1, 0, 1)])   # the last is already there
+        self.assertEqual(plan['writes'], [(start, 0, 0x85), (start + 7, 5, 2)])
+        self.assertEqual(plan['title'], 'Layout: 2 chunks changed (Green Hill Zone, act 1)')
+        self.assertEqual(plan['watch']['places'], [[0, 0, 0x85, 0], [3, 1, 2, 5]])
+        with self.assertRaises(ValueError):
+            self.p.set_packed_layout(self.part, [(0, 0, 9)])         # not a Green Hill chunk
+        with self.assertRaises(ValueError):
+            self.p.set_packed_layout(self.part, [(4, 0, 1)])         # outside the layout
+        with self.assertRaises(ValueError):
+            self.p.set_packed_layout(self.part, [(1, 0, 1)])         # nothing changes
+
+    def test_watcher(self):
+        plan = self.p.set_packed_layout(self.part, [(0, 0, 0x85), (3, 1, 2)])
+        ram = ram_with()
+        ram[0xA400], ram[0xA400 + 0x80 + 3] = 0x85, 2
+        w = self.p.watcher(plan['watch'])
+        self.assertFalse(w.see(ram, 0, 'changed'))                   # two looks must agree
+        self.assertTrue(w.see(ram, 4, 'changed'))
+        self.assertEqual(w.result()['state'], 'good')
+        ram[0xA400 + 0x80 + 3] = 5                                   # the unchanged game
+        w = self.p.watcher(plan['watch'])
+        w.see(ram, 0, 'original'), w.see(ram, 4, 'original')
+        self.assertEqual(w.result()['state'], 'bad')
+        w = self.p.watcher(plan['watch'])
+        self.assertFalse(w.see(ram_with(zone=0, act=1), 0, 'changed') or w.see(ram_with(zone=0, act=1), 4, 'changed'))
+        self.assertEqual(w.result()['state'], 'warn')
+
+
+class Sonic2LayoutTests(unittest.TestCase):
+    def setUp(self):
+        self.first = s2_layout({(0, 5): 0x02, (1, 5): 0x02, (2, 5): 0x0F, (3, 4): 0x93})
+        self.second = s2_layout({**{(n, 6): 1 + n % 200 for n in range(0x80)}, **{(n, 7): 1 + (n * 7) % 200 for n in range(0x80)}})
+        rom, self.at2 = with_s2_layouts(sonic2_rom(), self.first, self.second)
+        self.p = Sonic2(rom)
+        self.part = {'zone': 0, 'act': 0}
+
+    def test_layout(self):
+        grid = self.p.packed_layout(self.part)
+        self.assertEqual((grid['size'], grid['width'], grid['height']), (128, 128, 16))
+        self.assertEqual(grid['blocks'][5 * 128:5 * 128 + 4], [2, 2, 0x0F, 0])
+        self.assertEqual(grid['blocks'][4 * 128 + 3], 0x93)
+        self.assertEqual(self.p.layout_room(self.p.layout_start(0, 0)), self.at2 - 0x44)
+
+    def test_set_layout(self):
+        plan = self.p.set_packed_layout(self.part, [(3, 5, 0x02), (10, 4, 0x93)])
+        after = bytearray(self.p.rom)
+        for at, old, new in plan['writes']:
+            self.assertEqual(after[at], old)
+            self.assertTrue(Sonic2.LAYOUT_INDEX + 0x44 <= at < Sonic2.LAYOUT_INDEX + self.at2)     # within its own room
+            after[at] = new
+        data, _ = kos_decode(after, Sonic2.LAYOUT_INDEX + 0x44)
+        want = bytearray(self.first)
+        want[5 * 0x100 + 3], want[4 * 0x100 + 10] = 0x02, 0x93
+        self.assertEqual(data, bytes(want))
+        self.assertEqual(kos_decode(after, Sonic2.LAYOUT_INDEX + self.at2)[0], self.second)        # the next one untouched
+        self.assertEqual(plan['watch']['places'], [[3, 5, 2, 0], [10, 4, 0x93, 0]])
+        self.assertEqual(plan['watch']['ram'], 0x8000)
+
+    def test_refused_when_too_big(self):
+        import random
+        rng = random.Random(9)
+        chunks = sorted(self.p.zone_chunks(0) - {0})
+        changes = [(n % 0x80, 8 + n // 0x80, rng.choice(chunks)) for n in range(0x60)]
+        with self.assertRaises(ValueError) as caught:
+            self.p.set_packed_layout(self.part, changes)
+        self.assertIn('fit where it was', str(caught.exception))
+
+    def test_watcher(self):
+        plan = self.p.set_packed_layout(self.part, [(3, 5, 0x02)])
+        ram = ram_with()
+        ram[0x8000 + 5 * 0x100 + 3] = 0x02
+        w = self.p.watcher(plan['watch'])
+        w.see(ram, 0, 'changed')
+        self.assertTrue(w.see(ram, 4, 'changed'))
+        self.assertEqual(w.result()['state'], 'good')
+        ram[0x8000 + 5 * 0x100 + 3] = 0
+        w = self.p.watcher(plan['watch'])
+        w.see(ram, 0, 'original'), w.see(ram, 4, 'original')
         self.assertEqual(w.result()['state'], 'bad')
 
 
