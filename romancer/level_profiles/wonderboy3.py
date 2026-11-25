@@ -141,6 +141,14 @@ class WonderBoy3Profile(Profile):
                0x44: 'Small flower', 0x45: 'Tall flower'}
     OTHER = {0x20: 'Blue ball', 0x39: 'Floating block', 0x40: 'Rock', 0x41: 'Rock', 0x42: 'Rock', 0x43: 'Rock'}
     KINDS = ['sword', 'shield', 'armour', 'magic', 'item']
+    # items with no name in the game's lists: pictured when a beaten cobra drops them, and the RAM change measured the
+    # frame the hero picks them up (trace/v15_profiles/naming_sega/wb3_items.py; full life is $680, one heart $D0)
+    EXTRA_ITEMS = {0x43: 'Heart in a box', 0x44: 'Large heart', 0x45: 'Small heart', 0x46: 'Question box'}
+    ITEM_DOES = {0x43: 'Restores one heart of life.', 0x44: 'Restores about six hearts of life.',
+                 0x45: 'Restores half a heart of life.', 0x46: 'Sets the flag that some locked doors need.'}
+    # gold: the amount added to the gold count ($CF55-$CF56, decimal digits) when picked up (measured)
+    GOLD = {0x50: 1, 0x51: 4, 0x52: 7, 0x53: 10, 0x54: 13, 0x55: 20, 0x56: 27, 0x57: 34, 0x58: 41, 0x59: 56, 0x5A: 71,
+            0x5B: 84, 0x5C: 84, 0x5D: 84, 0x5E: 84, 0x5F: 84}
 
     # -- the game's tables
     def word(self, offset):
@@ -238,8 +246,10 @@ class WonderBoy3Profile(Profile):
                 name = ' '.join(w for w in words if w)
                 if name:
                     return name.title()
-        if 0x50 <= item <= 0x5F:
-            return f'Gold (0x{item:02X})'
+        if item in self.EXTRA_ITEMS:
+            return self.EXTRA_ITEMS[item]
+        if item in self.GOLD:
+            return f'{self.GOLD[item]} gold'
         return f'Item 0x{item:02X}'
 
     def drop_name(self, drop):

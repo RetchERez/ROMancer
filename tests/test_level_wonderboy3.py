@@ -134,9 +134,12 @@ class Decoding(unittest.TestCase):
     def test_names(self):
         self.assertEqual(self.p.item_name(0x03), 'Shogun Blade')
         self.assertEqual(self.p.item_name(0x42), 'Medicine')
-        self.assertEqual(self.p.item_name(0x55), 'Gold (0x55)')
+        self.assertEqual(self.p.item_name(0x55), '20 gold')
+        self.assertEqual(self.p.item_name(0x50), '1 gold')
+        self.assertEqual(self.p.item_name(0x43), 'Heart in a box')
+        self.assertEqual(self.p.item_name(0x45), 'Small heart')
         self.assertEqual(self.p.drop_name(0xFF), 'Nothing')
-        self.assertEqual(self.p.drop_name(0x00), 'Random 0: nothing, Item 0x45, Fire Ball')
+        self.assertEqual(self.p.drop_name(0x00), 'Random 0: nothing, Small heart, Fire Ball')
         self.assertIn(0xC2, self.p.drops())
         self.assertEqual(self.p.wares(), [0x02, 0x12, 0x22, 0xFF])
 
