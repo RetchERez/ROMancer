@@ -118,6 +118,157 @@ class NinjaGaiden1:
     def item_name(self, item: int) -> str:
         return self.ITEMS.get(item, f'Item {item:#04x}')
 
+    def lantern_delete_writes(self, area: int, index: int) -> list:
+        """Take a lantern out of its area's list: the later lanterns move up one place and the count ($AE10) drops by
+        one. The game walks the lantern list in order with a cursor that only moves on when the next lantern's column
+        comes up (code $D8E8), so a lantern given a column that never comes up would stop every lantern after it."""
+        L = self.lists(area)
+        count = L['lanterns']
+        if count >= 0x80 or not 0 <= index < count:
+            raise ValueError('That is not part of this level any more. Reopen the map.')
+        shared = self.owners()
+        writes = []
+        for start in (L['lantern_col'], L['lantern_item']):
+            values = [self._b(2, start + i) for i in range(count)]
+            new = values[:index] + values[index + 1:]
+            for i, value in enumerate(new):
+                if value != values[i]:
+                    offset = self.offset(2, start + i)
+                    if shared.get(offset, 1) > 1:
+                        raise ValueError('The game reads this lantern list for another list too, so ROMancer leaves it alone.')
+                    writes.append((offset, values[i], value))
+        writes.append((self.offset(0, 0xAE10 + area), count, count - 1))
+        return writes
+
+    # ---- length (code $E902: layout pointer $AC30 + area * 2, last screen $AD20 + area; scrolling stops at $53, $F1EE)
+    LAYOUT = 0xAC30             # bank 0: word per area, the area's columns (6 block numbers of 32 px each), 8 a screen
+    LAST = 0xAD20               # bank 0: low 7 bits last screen ($53), bit 7 the area starts at its end and scrolls left
+    FREE = (0xB58C, 0xBFDA)     # bank 0: unused ($FF) space that a longer layout is moved to
+    MOST = 15                   # camera columns ($4E, $4E + 16 for lanterns) stay below 256 up to 15 screens
+    MOST_REVERSED = 12          # the start table at $E95F is right for last screens 0-11 only
+    SCREEN = 48                 # layout bytes a screen
+
+    def area_last(self, area: int) -> int:
+        return self._b(0, self.LAST + area) & 0x7F
+
+    def area_reversed(self, area: int) -> bool:
+        return bool(self._b(0, self.LAST + area) & 0x80)
+
+    def layout(self, area: int) -> int:
+        return self._w(0, self.LAYOUT + area * 2)
+
+    def resizable(self, area: int) -> str:
+        """'' when the area's length can be changed, otherwise the reason it cannot."""
+        if self.area_last(area) == 0:
+            return 'This part is a single screen (a boss room or a room behind a door), so its length stays as it is.'
+        if any(e['type'] in self.BOSS_TYPES and e['col'] != self.NEVER for e in self.enemies(area)):
+            return 'This part holds a boss, so its length stays as it is.'
+        return ''
+
+    def most_screens(self, area: int) -> int:
+        return self.MOST_REVERSED if self.area_reversed(area) else self.MOST
+
+    def column_buffer(self, stage: int, area: int, column: int) -> bytes:
+        """The 12 bytes the game copies into its column buffer ($0300 + slot * 12, code $F5EA) for a layout column: for
+        each of its 6 blocks the two bytes of the block's entry in the stage's block table ($A430 + ($AF00 & 3) * $200,
+        code $EAE1)."""
+        table = 0xA430 + (self._b(0, 0xAF00 + stage) & 3) * 0x200
+        out = bytearray(12)
+        for row in range(6):
+            block = self._b(0, self.layout(area) + column * 6 + row)
+            out[row] = self._b(0, table + block * 2)
+            out[row + 6] = self._b(0, table + block * 2 + 1)
+        return bytes(out)
+
+    def _free0(self, size: int) -> int:
+        """Where in bank 0's unused space `size` bytes fit, after anything already moved there."""
+        start, end = self.FREE
+        used = max((a for a in range(start, end) if self._b(0, a) != 0xFF), default=None)
+        if used is not None:
+            start = used + 1
+        if start + size > end:
+            raise ValueError('There is no room left in the game for a longer layout.')
+        return start
+
+    def resize_writes(self, area: int, at: int, delta: int) -> dict:
+        """Writes that remove `-delta` screens starting at screen `at`, or repeat screen `at` `delta` more times right
+        after it; the enemies and lanterns of later screens move along. {'writes', 'screens', 'notes'}."""
+        area, at, delta = int(area), int(at), int(delta)
+        why = self.resizable(area)
+        if why:
+            raise ValueError(why)
+        last = self.area_last(area)
+        count = last + 1
+        if not 0 <= at < count:
+            raise ValueError('That screen is not part of this stage.')
+        if delta == 0:
+            raise ValueError('Choose how many screens to add or remove.')
+        if delta < 0 and (at == 0 or at - delta > last):
+            raise ValueError('The first and the last screen hold the way in and the way out, so they stay. Choose a screen in between.')
+        most = self.most_screens(area)
+        if not 2 <= count + delta <= most:
+            raise ValueError(f'This part can be 2 to {most} screens long.')
+        writes, notes = {}, []
+        shared = self.owners()
+
+        def put(offset, value):
+            writes[offset] = value & 0xFF
+
+        boundary = (at - delta if delta < 0 else at + 1) * 16          # first column that moves
+        removed = range(at * 16, (at - delta) * 16) if delta < 0 else range(0)
+        for e in self.enemies(area):
+            col = e['col']
+            if col == self.NEVER:
+                continue
+            if col in removed:
+                new = self.NEVER
+                notes.append('The enemies of the removed screens are taken out.')
+            elif col >= boundary:
+                new = col + delta * 16
+            else:
+                continue
+            if shared.get(e['col_byte'], 1) > 1:
+                raise ValueError('An enemy that would move shares its bytes with another list, so ROMancer cannot change this part’s length.')
+            put(e['col_byte'], new)
+        gone = [l for l in self.lanterns(area) if l['col'] in removed]
+        for lantern in self.lanterns(area):
+            if lantern['col'] >= boundary and lantern['col'] != self.NEVER:
+                if shared.get(lantern['col_byte'], 1) > 1:
+                    raise ValueError('A lantern that would move shares its bytes with another list, so ROMancer cannot change this part’s length.')
+                put(lantern['col_byte'], lantern['col'] + delta * 16)
+        if gone:                         # take them out of the list, last first, from the already moved columns
+            rom = bytearray(self.rom)
+            for offset, value in writes.items():
+                rom[offset] = value
+            for lantern in sorted(gone, key=lambda l: -l['index']):
+                for offset, old, value in type(self)(bytes(rom)).lantern_delete_writes(area, lantern['index']):
+                    rom[offset] = value
+                    put(offset, value)
+            notes.append('The lanterns of the removed screens are taken out.')
+
+        put(self.offset(0, self.LAST + area), (self._b(0, self.LAST + area) & 0x80) | (count + delta - 1))
+        base = self.layout(area)
+        size = count * self.SCREEN
+        screens = [bytes(self._b(0, base + i * self.SCREEN + k) for k in range(self.SCREEN)) for i in range(count)]
+        if delta < 0:
+            new = screens[:at] + screens[at - delta:]
+            new += new[-1:] * (-delta)          # what the game draws past the end (off screen) stays a copy of the last screen
+            for i, byte in enumerate(b''.join(new)):
+                put(self.offset(0, base) + i, byte)
+        else:
+            new = screens[:at + 1] + screens[at:at + 1] * delta + screens[at + 1:]
+            pad = 3 * self.SCREEN               # the game draws up to three screens beyond either end, off screen
+            before = bytes(self._b(0, a) if a >= 0x8000 else self._b(0, base + (a - base) % self.SCREEN) for a in range(base - pad, base))
+            after = bytes(self._b(0, base + size + i) if base + size + i < 0xC000 else 0 for i in range(pad))
+            block = before + b''.join(new) + after
+            start = self._free0(len(block))
+            for i, byte in enumerate(block):
+                put(self.offset(0, start) + i, byte)
+            put(self.offset(0, self.LAYOUT + area * 2), (start + pad) & 0xFF)
+            put(self.offset(0, self.LAYOUT + area * 2 + 1), (start + pad) >> 8)
+        out = [(offset, self.rom[offset], value) for offset, value in sorted(writes.items()) if self.rom[offset] != value]
+        return {'writes': out, 'screens': count + delta, 'notes': sorted(set(notes))}
+
     def stage_types(self, stage: int) -> list:
         """Regular enemy types used anywhere in a stage (its sprites are loaded per stage, so these all draw right)."""
         first = self.stage_area(stage)
@@ -138,6 +289,7 @@ class _NG1Watcher(Watcher):
         self.flag_was = False
         self.seen = None            # what appeared (enemy type or lantern item), or 'nothing'
         self.lo = self.hi = None    # camera columns seen in the part
+        self.slots, self.appeared = {}, {}
 
     def see(self, ram, frame, run):
         w = self.w
@@ -154,6 +306,15 @@ class _NG1Watcher(Watcher):
                 self.seen = ram[0x400 + slots[0]] if slots else -1
             self.flag_was = flag
             return self.seen is not None and (w['remove'] or self.seen == w.get('type'))
+        elif w['remove']:
+            # after a removal the later lanterns move up a place in the list, so list numbers change: count what
+            # appears at the removed column ($4F, the game's own test) and check the next lantern still appears
+            slots = {s: ram[0x4F1 + s] for s in range(4) if ram[0xC0] >> s & 1}
+            for s, number in slots.items():
+                if self.slots.get(s) != number:
+                    self.appeared[column] = self.appeared.get(column, 0) + 1
+            self.slots = slots
+            return False
         else:
             for s in range(4):
                 if ram[0xC0] >> s & 1 and ram[0x4F1 + s] == w['index'] and self.seen is None:
@@ -165,6 +326,17 @@ class _NG1Watcher(Watcher):
         w = self.w
         reached = self.lo is not None and self.lo <= w['col'] <= self.hi
         what = 'enemy' if w['kind'] == 'enemy' else 'lantern'
+        if w['remove'] and w['kind'] == 'lantern' and 'same' in w:
+            if not reached:
+                return super().result()
+            if self.appeared.get(w['col'], 0) > w['same']:
+                return {'state': 'bad', 'text': 'Played from the start, the lantern still appears there.'}
+            text = 'Played from the start, the walk passes that spot and no lantern appears there any more.'
+            if w['next'] is not None and self.hi >= w['next']:
+                if not self.appeared.get(w['next']):
+                    return {'state': 'bad', 'text': 'Played from the start, the lantern is gone but the next lantern does not appear either.'}
+                text += ' The next lantern still appears.'
+            return {'state': 'good', 'text': text}
         if w['remove']:
             if self.seen is not None:
                 return {'state': 'bad', 'text': f'Played from the start, the {what} still appears there.'}
@@ -182,6 +354,97 @@ class _NG1Watcher(Watcher):
         return {'state': 'good' if ok else 'bad',
                 'text': f'Played from the start, the lantern there now holds {w["name"]}.' if ok
                 else f'Played from the start, the lantern there holds item {self.seen:#04x}, not the one chosen.'}
+
+
+class _NG1LengthWatcher(Watcher):
+    """A length change in Ninja Gaiden, judged from the game's own memory on the original and the changed game: the
+    scroll limit $53 the area set-up loads, the layout columns the game copies into its column buffer ($0300, 12 bytes
+    a column, slot = column mod 16 in areas that scroll right) as the camera passes, and the camera column ($4E) at
+    which each enemy spawns."""
+    compare = True
+    every = 1
+
+    def __init__(self, watch):
+        self.w = watch
+        self.visits = {}
+
+
+    def see(self, ram, frame, run):
+        w = self.w
+        visits = self.visits.setdefault(run, [])
+        inside = ram[0x6D] == w['stage'] and ram[0x6E] == w['area'] and ram[0x53] < 0x10
+        visit = visits[-1] if visits and visits[-1]['open'] else None
+        if not inside:
+            if visit is not None:
+                visit['open'] = False
+                visit['left'] = frame
+            return False
+        if visit is None:
+            visit = {'open': True, 'start': frame, 'limit': None, 'far': 0, 'cols': {}, 'spawn': {}, 'flags': bytes(ram[0xB7:0xBB]), 'left': None}
+            visits.append(visit)
+        visit['limit'] = ram[0x53]
+        camera = ram[0x51] | ram[0x52] << 8
+        visit['far'] = max(visit['far'], camera)
+        first = camera // 32
+        for k in range(first, first + 9):           # the columns on screen are always in the buffer
+            slot = k % 16
+            visit['cols'][k] = bytes(ram[0x300 + slot * 12:0x300 + slot * 12 + 12])     # the latest look: settled
+        flags = bytes(ram[0xB7:0xBB])
+        for i in range(32):
+            byte, mask = _bit(i)
+            if flags[byte] & mask and not visit['flags'][byte] & mask and i not in visit['spawn']:
+                visit['spawn'][i] = ram[0x4E]
+        visit['flags'] = flags
+        return False
+
+    @staticmethod
+    def _best(visits):
+        return max(visits, key=lambda v: (v['far'], v['start'])) if visits else None
+
+    def result(self):
+        w = self.w
+        old, new = self._best(self.visits.get('original', [])), self._best(self.visits.get('changed', []))
+        if old is None or new is None:
+            return super().result()
+        if new['limit'] != w['new'] - 1 or old['limit'] != w['old'] - 1:
+            return {'state': 'bad', 'text': f'Played from the start, the game gives this part {(new["limit"] or 0) + 1} screens, not the {w["new"]} chosen.'}
+        # the layout: each column the changed game showed must hold the blocks of the planned layout
+        same = differ = 0
+        for k, data in new['cols'].items():
+            if k < len(w['expect']):
+                if data.hex() == w['expect'][k]:
+                    same += 1
+                else:
+                    differ += 1
+        # the enemies: an enemy that moved spawns that much later (or earlier); a removed one never spawns
+        moved = wrong = 0
+        for i, (was, now) in enumerate(w['enemy_cols']):
+            if was == now:
+                continue
+            if now == 0xFF:
+                wrong += i in new['spawn']
+            elif i in old['spawn'] and i in new['spawn']:
+                if new['spawn'][i] - old['spawn'][i] == now - was:
+                    moved += 1
+                else:
+                    wrong += 1
+        if differ or wrong:
+            return {'state': 'bad', 'text': f'Played from the start, the game gives this part {w["new"]} screens, but what it shows does not follow the plan '
+                                            f'({differ} of {same + differ} columns and {wrong} enemies differ).'}
+        text = f'Played from the start, the game now gives this part {w["new"]} screens (it had {w["old"]}).'
+        if same:
+            text += f' All {same} columns of blocks the walk passed hold the planned layout.'
+        if moved:
+            text += f' {moved} {"enemy appears" if moved == 1 else "enemies appear"} {abs(w["new"] - w["old"])} screen{"s" if abs(w["new"] - w["old"]) > 1 else ""} {"later" if w["new"] > w["old"] else "earlier"}, as planned.'
+        if new['far'] >= (w['new'] - 1) * 256 and new['left'] and old['left']:
+            seconds = round(abs(new['left'] - old['left']) / 60, 1)
+            text += f' The walk reaches the new end, and the next part starts {seconds} seconds {"later" if new["left"] > old["left"] else "earlier"}.'
+        else:
+            got = new['far'] // 256 + 1
+            text += f' The recorded walk gets {got} screen{"s" if got > 1 else ""} in.'
+        if w['notes']:
+            text += ' ' + ' '.join(w['notes'])
+        return {'state': 'good', 'text': text}
 
 
 class NinjaGaiden1Profile(NinjaGaiden1, Profile):
@@ -260,7 +523,10 @@ class NinjaGaiden1Profile(NinjaGaiden1, Profile):
             lantern = self.lanterns(area)[number]
             watch = {'kind': 'lantern', 'stage': stage, 'area': area, 'index': number, 'col': lantern['col'], 'remove': bool(remove)}
             if remove:
-                writes = [(lantern['col_byte'], lantern['col'], self.NEVER)]
+                writes = self.lantern_delete_writes(area, number)
+                rest = self.lanterns(area)
+                watch.update(same=sum(1 for l in rest if l['col'] == lantern['col']) - 1,
+                             next=next((l['col'] for l in rest[number + 1:] if l['col'] != lantern['col']), None))
                 title = 'Remove the lantern'
             else:
                 new = int(values.get('item'))
@@ -275,10 +541,150 @@ class NinjaGaiden1Profile(NinjaGaiden1, Profile):
         return {'writes': [w for w in writes if w[1] != w[2]], 'title': f'{title} ({self.part_name(part)})', 'watch': watch}
 
     def watcher(self, watch):
+        if watch.get('kind') == 'length':
+            return _NG1LengthWatcher(watch)
         return _NG1Watcher(watch)
 
+    def screens(self, part):
+        area = int(part['area'])
+        if self.resizable(area):
+            return None
+        return {'count': self.area_last(area) + 1, 'most': self.most_screens(area)}
 
-class NinjaGaiden2:
+    def resize(self, part, at, delta):
+        stage, area, at, delta = int(part['stage']), int(part['area']), int(at), int(delta)
+        old = self.area_last(area) + 1
+        result = self.resize_writes(area, at, delta)
+        changed = bytearray(self.rom)
+        for offset, _, value in result['writes']:
+            changed[offset] = value
+        after = type(self)(bytes(changed))
+        new = result['screens']
+        # what the game should copy into its column buffer for each column of the new layout (forward areas only)
+        expect = [] if self.area_reversed(area) else [after.column_buffer(stage, area, k).hex() for k in range(new * 8)]
+        enemy_cols = [(e['col'], f['col']) for e, f in zip(self.enemies(area), after.enemies(area))]
+        watch = {'kind': 'length', 'stage': stage, 'area': area, 'old': old, 'new': new, 'expect': expect,
+                 'enemy_cols': enemy_cols, 'notes': result['notes']}
+        return {'writes': result['writes'], 'notes': result['notes'], 'watch': watch}
+
+
+class _TecmoLength:
+    """Level length for Ninja Gaiden II and III, whose area set-up and column code work the same way (each game at its
+    own addresses): a word per area points at the area's layout in 8 KiB banks 0 and 1 (CPU $8000-$BFFF = ROM
+    $0000-$3FFF while the column code reads it), columns of 6 block numbers (32 px each), 8 a screen; the low nibble of
+    a per-area byte is the last screen, where the camera stops. Enemy and lantern lists are read in order by column,
+    so entries of later screens get their columns moved and entries of removed screens are taken out of the lists."""
+    LAYOUT_LO = LAYOUT_HI = LAST = 0        # ROM offsets of the pointer bytes; CPU address of the last-screen bytes
+    FREE = None                             # CPU range of unused ($FF) space in banks 0-1 for a longer layout, if any
+    MOST = 15                               # camera columns (and + 16 for lanterns) stay below 256 up to 15 screens
+    SCREEN = 48
+
+    def area_last(self, area: int) -> int:
+        return self._b(self.LAST + area) & 0x0F
+
+    def layout(self, area: int) -> int:
+        return self.rom[HEADER_NES + self.LAYOUT_LO + area] | self.rom[HEADER_NES + self.LAYOUT_HI + area] << 8
+
+    def layout_offset(self, address: int) -> int:
+        return HEADER_NES + address - 0x8000
+
+    def most_screens(self, area: int) -> int:
+        return self.MOST if self.FREE else self.area_last(area) + 1          # no free space: shorter only
+
+    def plain_section(self, area: int) -> bool:
+        return True
+
+    def resizable(self, area: int) -> str:
+        if self.area_last(area) == 0:
+            return 'This part is a single screen (a boss room or a room behind a door), so its length stays as it is.'
+        if not self.plain_section(area):
+            return 'This part scrolls up, down or to the left, and ROMancer only changes the length of parts that scroll to the right.'
+        if self.FREE is None and self.area_last(area) < 2:
+            return 'This part is two screens long and there is no room in the game for a longer layout, so its length stays as it is.'
+        if any(e['type'] in getattr(self, 'BOSS_TYPES', ()) for e in self.enemies(area)):
+            return 'This part holds a boss, so its length stays as it is.'
+        return ''
+
+    def resize_writes(self, area: int, at: int, delta: int) -> dict:
+        """Writes that remove `-delta` screens starting at screen `at`, or repeat screen `at` `delta` more times right
+        after it; enemies and lanterns of later screens move along, those of removed screens are taken out of their
+        lists. {'writes', 'screens', 'notes', 'enemy_map'}."""
+        area, at, delta = int(area), int(at), int(delta)
+        why = self.resizable(area)
+        if why:
+            raise ValueError(why)
+        last = self.area_last(area)
+        count = last + 1
+        if not 0 <= at < count:
+            raise ValueError('That screen is not part of this stage.')
+        if delta == 0:
+            raise ValueError('Choose how many screens to add or remove.')
+        if delta < 0 and (at == 0 or at - delta > last):
+            raise ValueError('The first and the last screen hold the way in and the way out, so they stay. Choose a screen in between.')
+        if not 2 <= count + delta <= self.most_screens(area):
+            raise ValueError('There is no room left in the game for a longer layout.' if delta > 0 and self.FREE is None
+                             else f'This part can be 2 to {self.most_screens(area)} screens long.')
+        rom = bytearray(self.rom)
+        notes = []
+        boundary = (at - delta if delta < 0 else at + 1) * 16
+        removed = range(at * 16, (at - delta) * 16) if delta < 0 else range(0)
+        shared = self.owners()
+        L = self.lists(area)
+        for key, n in (('col', L['enemies']), ('lantern_col', L['lanterns'])):
+            for i in range(n):
+                o = self.offset(L[key] + i)
+                col = rom[o]
+                if col >= boundary and col not in removed:
+                    if shared.get(o, 1) > 1:
+                        raise ValueError('Something that would move shares its bytes with another list, so ROMancer cannot change this part’s length.')
+                    rom[o] = col + delta * 16
+        enemy_map = [[e['index'], e['index'], e['col'], None] for e in self.enemies(area)]
+        for kind, items in (('enemy', self.enemies(area)), ('lantern', self.lanterns(area))):
+            gone = [x['index'] for x in items if x['col'] in removed]
+            for index in sorted(gone, reverse=True):
+                for o, _, value in type(self)(bytes(rom)).delete_writes(area, kind, index):
+                    rom[o] = value
+                if kind == 'enemy':
+                    for row in enemy_map:
+                        if row[1] is not None and row[1] > index:
+                            row[1] -= 1
+                        elif row[1] == index:
+                            row[1] = None
+            if gone:
+                notes.append(f'The {"enemies" if kind == "enemy" else "lanterns"} of the removed screens are taken out.')
+        after = type(self)(bytes(rom))
+        for row in enemy_map:
+            if row[1] is not None:
+                row[3] = after.enemies(area)[row[1]]['col']
+        o = self.offset(self.LAST + area)
+        rom[o] = (rom[o] & 0xF0) | (count + delta - 1)
+        base = self.layout(area)
+        screens = [bytes(self.rom[self.layout_offset(base) + i * self.SCREEN:self.layout_offset(base) + (i + 1) * self.SCREEN]) for i in range(count)]
+        if delta < 0:
+            new = screens[:at] + screens[at - delta:]
+            new += new[-1:] * (-delta)          # what the game draws past the end (off screen) stays a copy of the last screen
+            data = b''.join(new)
+            rom[self.layout_offset(base):self.layout_offset(base) + len(data)] = data
+        else:
+            new = screens[:at + 1] + screens[at:at + 1] * delta + screens[at + 1:]
+            pad = 3 * self.SCREEN               # the game draws up to three screens beyond either end, off screen
+            lo = self.layout_offset(base)
+            before = bytes(self.rom[lo - pad:lo]) if base - pad >= 0x8000 else screens[0] * 3
+            after_bytes = bytes(self.rom[lo + count * self.SCREEN:lo + count * self.SCREEN + pad])
+            block = before + b''.join(new) + after_bytes
+            start, end = self.FREE
+            used = max((a for a in range(start, end) if self.rom[self.layout_offset(a)] != 0xFF), default=None)
+            start = start if used is None else used + 1
+            if start + len(block) > end:
+                raise ValueError('There is no room left in the game for a longer layout.')
+            rom[self.layout_offset(start):self.layout_offset(start) + len(block)] = block
+            rom[HEADER_NES + self.LAYOUT_LO + area] = (start + pad) & 0xFF
+            rom[HEADER_NES + self.LAYOUT_HI + area] = (start + pad) >> 8
+        writes = [(i, self.rom[i], rom[i]) for i in range(len(rom)) if rom[i] != self.rom[i]]
+        return {'writes': writes, 'screens': count + delta, 'notes': notes, 'enemy_map': enemy_map}
+
+
+class NinjaGaiden2(_TecmoLength):
     """Ninja Gaiden II - The Dark Sword of Chaos (USA), MMC3. Its own engine (not the first game's code).
 
     The area $7E (0-47) indexes tables in the bank at $8000 (ROM $8000-$9FFF, set up at $CEE3): enemy lists column
@@ -313,8 +719,16 @@ class NinjaGaiden2:
              0x7: 'Spirit limit up (10)', 0x8: 'Health (restores 6)', 0x9: 'Extra life', 0xA: 'Shadow double',
              0xB: 'Bonus points (1000)', 0xC: 'Bonus points (2000)'}
 
+    # length (code $CED2): layout pointer $A700/$A730 in bank 1 (ROM $2700/$2730), last screen low nibble of $8180,
+    # the camera stops at screen $7F ($DAA6); unused space after the last layout, $A136-$A6FF (the first 144 bytes stay:
+    # the game draws up to three screens past an area's end, off screen)
+    LAYOUT_LO, LAYOUT_HI, LAST, FREE = 0x2700, 0x2730, 0x8180, (0xA1C6, 0xA700)
+
     def __init__(self, rom: bytes):
         self.rom = rom
+
+    def plain_section(self, area: int) -> bool:
+        return not self.leftward(area)
 
     def offset(self, address: int) -> int:
         """ROM file offset of a CPU address in the list bank ($8000-$9FFF is ROM $8000-$9FFF)."""
@@ -489,6 +903,109 @@ class _NG2Watcher(Watcher):
                 else f'Played from the start, the lantern there holds item {self.seen & 0xFF:#04x}, not the one chosen.'}
 
 
+class _NG23LengthWatcher(Watcher):
+    """A length change in Ninja Gaiden II or III, judged from the game's own memory on the original and the changed
+    game: the scroll limit the area set-up loads, the layout column the game last copied (its 6 block numbers and the
+    layout pointer it read them from, checked against the planned layout and the camera), and the camera column at
+    which each enemy spawns. The RAM addresses differ per game (the class attributes)."""
+    compare = True
+    every = 1
+    AREA, LIMIT, CAMERA, COLUMN, FLAGS, FLAG_BYTES, POINTER, BLOCKS = 0x7E, 0x7F, 0x3A, 0x40, 0x440, 8, 0x86, 0x1E0
+    FLAG_HIGH_FIRST = False
+    AHEAD = (8, 9, 10)          # layout column - camera column of the column just copied, walking right
+
+    def __init__(self, watch):
+        self.w = watch
+        self.visits = {}
+
+    @staticmethod
+    def _numbers(ram):
+        """List numbers of the enemies in the game's enemy slots ($0B-$17, in use: bits of $48-$4A, number $0658)."""
+        return {ram[0x658 + s] for s in range(0x0B, 0x18) if ram[0x48 + (s >> 3)] >> (s & 7) & 1}
+
+    def _flag(self, flags, i):
+        mask = 0x80 >> (i & 7) if self.FLAG_HIGH_FIRST else 1 << (i & 7)
+        return bool(flags[i >> 3] & mask)
+
+    def see(self, ram, frame, run):
+        w = self.w
+        visits = self.visits.setdefault(run, [])
+        inside = ram[self.AREA] == w['area'] and (ram[self.LIMIT] & 0x0F) == ram[self.LIMIT]
+        visit = visits[-1] if visits and visits[-1]['open'] else None
+        if not inside:
+            if visit is not None:
+                visit['open'] = False
+                visit['left'] = frame
+            return False
+        flags = bytes(ram[self.FLAGS:self.FLAGS + self.FLAG_BYTES])
+        if visit is None:
+            visit = {'open': True, 'start': frame, 'limit': None, 'far': 0, 'spawn': {}, 'flags': flags, 'left': None,
+                     'same': 0, 'differ': 0, 'last': None}
+            visits.append(visit)
+        visit['limit'] = ram[self.LIMIT]
+        camera = ram[self.CAMERA] | ram[self.CAMERA + 1] << 8
+        visit['far'] = max(visit['far'], camera)
+        for i in range(self.FLAG_BYTES * 8):
+            # a flag that rises with an enemy of that list number in a slot (the flags hold other things on the title)
+            if self._flag(flags, i) and not self._flag(visit['flags'], i) and i not in visit['spawn'] and i in self._numbers(ram):
+                visit['spawn'][i] = ram[self.COLUMN]
+        visit['flags'] = flags
+        if run == 'changed' and w['expect']:
+            pointer = ram[self.POINTER] | ram[self.POINTER + 1] << 8
+            blocks = bytes(ram[self.BLOCKS:self.BLOCKS + 6]).hex()
+            if blocks != visit['last']:         # only when the game has just copied a column (not when it turns round)
+                visit['last'] = blocks
+                k = (pointer - w['base']) // 6
+                near = [j for j in (k - 1, k) if 0 <= j < len(w['expect'])]
+                # walking right the game reads the column 8 to 10 columns ahead of the camera; walking left it reads
+                # behind it, and those looks are left out
+                if near and k * 6 == pointer - w['base'] and k - camera // 32 in self.AHEAD:
+                    visit['same' if any(w['expect'][j] == blocks for j in near) else 'differ'] += 1
+        return False
+
+    @staticmethod
+    def _best(visits):
+        return max(visits, key=lambda v: (v['far'], v['start'])) if visits else None
+
+    def result(self):
+        w = self.w
+        old, new = self._best(self.visits.get('original', [])), self._best(self.visits.get('changed', []))
+        if old is None or new is None:
+            return super().result()
+        if new['limit'] != w['new'] - 1 or old['limit'] != w['old'] - 1:
+            return {'state': 'bad', 'text': f'Played from the start, the game gives this part {(new["limit"] or 0) + 1} screens, not the {w["new"]} chosen.'}
+        moved = wrong = 0
+        for was_index, now_index, was, now in w['enemy_map']:
+            if now == was:
+                continue
+            if now_index is None:
+                continue                    # taken out of the list: its number now belongs to the next enemy
+            if was_index in old['spawn'] and now_index in new['spawn']:
+                if new['spawn'][now_index] - old['spawn'][was_index] == now - was:
+                    moved += 1
+                else:
+                    wrong += 1
+        if w['expect'] and not new['same']:
+            return {'state': 'bad', 'text': f'Played from the start, the game gives this part {w["new"]} screens, but ROMancer could not see it read the planned layout.'}
+        if new['differ'] or wrong:
+            return {'state': 'bad', 'text': f'Played from the start, the game gives this part {w["new"]} screens, but what it shows does not follow the plan '
+                                            f'({new["differ"]} of {new["same"] + new["differ"]} columns and {wrong} enemies differ).'}
+        text = f'Played from the start, the game now gives this part {w["new"]} screens (it had {w["old"]}).'
+        if new['same']:
+            text += f' All {new["same"]} columns of blocks the game read as the walk went on are the planned ones, at the planned place.'
+        if moved:
+            text += f' {moved} {"enemy appears" if moved == 1 else "enemies appear"} {abs(w["new"] - w["old"])} screen{"s" if abs(w["new"] - w["old"]) > 1 else ""} {"later" if w["new"] > w["old"] else "earlier"}, as planned.'
+        if new['far'] >= (w['new'] - 1) * 256 and new['left'] and old['left']:
+            seconds = round(abs(new['left'] - old['left']) / 60, 1)
+            text += f' The walk reaches the new end, and the next part starts {seconds} seconds {"later" if new["left"] > old["left"] else "earlier"}.'
+        else:
+            got = new['far'] // 256 + 1
+            text += f' The recorded walk gets {got} screen{"s" if got > 1 else ""} in.'
+        if w['notes']:
+            text += ' ' + ' '.join(w['notes'])
+        return {'state': 'good', 'text': text}
+
+
 class NinjaGaiden2Profile(NinjaGaiden2, Profile):
     """Ninja Gaiden II on the common profile interface. Parts are {'area': $7E}; x is the camera ($3A/$3B)."""
     sha256s = (NinjaGaiden2.sha256,)
@@ -573,10 +1090,33 @@ class NinjaGaiden2Profile(NinjaGaiden2, Profile):
         return {'writes': [w for w in writes if w[1] != w[2]], 'title': f'{title} ({self.part_name(part)})', 'watch': watch}
 
     def watcher(self, watch):
+        if watch.get('kind') == 'length':
+            return _NG23LengthWatcher(watch)
         return _NG2Watcher(watch)
 
+    def screens(self, part):
+        area = int(part['area'])
+        if self.resizable(area):
+            return None
+        return {'count': self.area_last(area) + 1, 'most': self.MOST}
 
-class NinjaGaiden3:
+    def resize(self, part, at, delta):
+        area = int(part['area'])
+        old = self.area_last(area) + 1
+        result = self.resize_writes(area, int(at), int(delta))
+        changed = bytearray(self.rom)
+        for offset, _, value in result['writes']:
+            changed[offset] = value
+        after = type(self)(bytes(changed))
+        new, base = result['screens'], after.layout(area)
+        expect = [] if self.leftward(area) else [bytes(changed[after.layout_offset(base) + 6 * k:after.layout_offset(base) + 6 * k + 6]).hex()
+                                                 for k in range(new * 8)]
+        watch = {'kind': 'length', 'area': area, 'old': old, 'new': new, 'base': base, 'expect': expect,
+                 'enemy_map': result['enemy_map'], 'notes': result['notes']}
+        return {'writes': result['writes'], 'notes': result['notes'], 'watch': watch}
+
+
+class NinjaGaiden3(_TecmoLength):
     """Ninja Gaiden III - The Ancient Ship of Doom (USA), MMC3. Its own code again (laid out like the second game's,
     but moved and changed: none of the second game's spawn code is in it byte for byte).
 
@@ -610,6 +1150,13 @@ class NinjaGaiden3:
 
     def __init__(self, rom: bytes):
         self.rom = rom
+
+    # length (code $86EE): layout pointer $B960/$B990 in bank 1 (ROM $3960/$3990), last screen low nibble of $A1B0 ($48,
+    # where the camera screen $DC stops, $910D); banks 0 and 1 have no unused space, so parts can only be made shorter
+    LAYOUT_LO, LAYOUT_HI, LAST, FREE = 0x3960, 0x3990, 0xA1B0, None
+
+    def plain_section(self, area: int) -> bool:
+        return self.plain(area)
 
     def offset(self, address: int) -> int:
         """ROM file offset of a CPU address in the table bank ($A000-$BFFF is ROM $C000-$DFFF)."""
@@ -747,6 +1294,18 @@ class _NG3Watcher(_NG2Watcher):
         return self.seen is not None
 
 
+class _NG3LengthWatcher(_NG23LengthWatcher):
+    """Ninja Gaiden III: area $5F, last screen $48, camera $84/$85, camera column $D1, enemy spawned flags $D7-$D9
+    (high bit first), layout pointer $40/$41 and the column copied to $01E0 (code $C01E)."""
+    AREA, LIMIT, CAMERA, COLUMN, FLAGS, FLAG_BYTES, POINTER, BLOCKS = 0x5F, 0x48, 0x84, 0xD1, 0xD7, 3, 0x40, 0x1E0
+    FLAG_HIGH_FIRST = True
+
+    @staticmethod
+    def _numbers(ram):
+        """List numbers of the enemies in slots $10-$17 (in use: bit 7 of $04E6, number $043E)."""
+        return {ram[0x43E + s] for s in range(0x10, 0x18) if ram[0x4E6 + s] & 0x80}
+
+
 class NinjaGaiden3Profile(NinjaGaiden3, Profile):
     """Ninja Gaiden III on the common profile interface. Parts are {'area': $5F}; x is the camera ($84/$85)."""
     sha256s = (NinjaGaiden3.sha256,)
@@ -830,7 +1389,29 @@ class NinjaGaiden3Profile(NinjaGaiden3, Profile):
         return {'writes': [w for w in writes if w[1] != w[2]], 'title': f'{title} ({self.part_name(part)})', 'watch': watch}
 
     def watcher(self, watch):
+        if watch.get('kind') == 'length':
+            return _NG3LengthWatcher(watch)
         return _NG3Watcher(watch)
+
+    def screens(self, part):
+        area = int(part['area'])
+        if self.resizable(area):
+            return None
+        return {'count': self.area_last(area) + 1, 'most': self.most_screens(area)}
+
+    def resize(self, part, at, delta):
+        area = int(part['area'])
+        old = self.area_last(area) + 1
+        result = self.resize_writes(area, int(at), int(delta))
+        changed = bytearray(self.rom)
+        for offset, _, value in result['writes']:
+            changed[offset] = value
+        after = type(self)(bytes(changed))
+        new, base = result['screens'], after.layout(area)
+        expect = [bytes(changed[after.layout_offset(base) + 6 * k:after.layout_offset(base) + 6 * k + 6]).hex() for k in range(new * 8)]
+        watch = {'kind': 'length', 'area': area, 'old': old, 'new': new, 'base': base, 'expect': expect,
+                 'enemy_map': result['enemy_map'], 'notes': result['notes']}
+        return {'writes': result['writes'], 'notes': result['notes'], 'watch': watch}
 
 
 PROFILES = [NinjaGaiden1Profile, NinjaGaiden2Profile, NinjaGaiden3Profile]

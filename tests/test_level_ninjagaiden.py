@@ -78,8 +78,10 @@ class NinjaGaiden1Test(unittest.TestCase):
         self.assertEqual(gone['writes'], [(self.p.offset(2, L['col'] + 1), 0x17, 0xFF)])
         item = self.p.edit(self.part, 'lantern:1', {'item': 0x8})
         self.assertEqual(item['writes'], [(self.p.offset(2, L['lantern_item'] + 1), 0x95, 0x98)])
-        lantern = self.p.edit(self.part, 'lantern:0', {}, remove=True)
-        self.assertEqual(lantern['writes'], [(self.p.offset(2, L['lantern_col']), 0x18, 0xFF)])
+        lantern = self.p.edit(self.part, 'lantern:0', {}, remove=True)      # taken out of the list (the game reads it in order)
+        self.assertEqual(lantern['writes'], [(self.p.offset(2, L['lantern_col']), 0x18, 0x30), (self.p.offset(2, L['lantern_item']), 0xB0, 0x95),
+                                             (self.p.offset(0, 0xAE10), 2, 1)])
+        self.assertEqual((lantern['watch']['same'], lantern['watch']['next']), (0, 0x30))
 
     def test_shared_bytes_are_left_alone(self):
         objects = self.p.objects({'stage': 1, 'area': 2})
@@ -101,6 +103,87 @@ class NinjaGaiden1Test(unittest.TestCase):
             ram[0x4E] = column
             removal.see(ram, column, 'changed')
         self.assertEqual(removal.result()['state'], 'good')
+
+
+def ng1_long_rom():
+    """ng1_rom with area 0 four screens long: layout at $8000 (bank 0), every byte of screen n is n; free space $FF."""
+    rom = bytearray(ng1_rom())
+    b0 = lambda a: 16 + (a - 0x8000)
+    rom[b0(0xAD20)] = 3
+    _put(rom, b0(0xAC30), [0x00, 0x80])
+    for screen in range(4):
+        _put(rom, b0(0x8000 + screen * 48), [screen] * 48)
+    _put(rom, b0(0x80C0), [9] * 144)                 # what follows (the next area's layout)
+    _put(rom, b0(0xB58C), [0xFF] * (0xBFDA - 0xB58C))
+    return bytes(rom)
+
+
+class NinjaGaiden1LengthTest(unittest.TestCase):
+    def setUp(self):
+        self.p = ng.NinjaGaiden1Profile(ng1_long_rom())
+        self.part = {'stage': 0, 'area': 0}
+        self.b0 = lambda a: 16 + (a - 0x8000)
+        self.b2 = lambda a: 16 + 2 * 0x4000 + (a - 0x8000)
+
+    def apply(self, writes):
+        rom = bytearray(self.p.rom)
+        for offset, old, new in writes:
+            self.assertEqual(rom[offset], old)
+            rom[offset] = new
+        return ng.NinjaGaiden1Profile(bytes(rom))
+
+    def test_screens(self):
+        self.assertEqual(self.p.screens(self.part), {'count': 4, 'most': 15})
+        self.assertIsNone(self.p.screens({'stage': 0, 'area': 1}))       # a single screen
+        with self.assertRaises(ValueError):
+            self.p.resize(self.part, 0, -1)                               # the first screen stays
+        with self.assertRaises(ValueError):
+            self.p.resize(self.part, 3, -1)                               # the last screen stays
+
+    def test_remove(self):
+        plan = self.p.resize(self.part, 1, -1)
+        after = self.apply(plan['writes'])
+        self.assertEqual(after.area_last(0), 2)
+        self.assertEqual([after._b(0, 0x8000 + s * 48) for s in range(4)], [0, 2, 3, 3])    # past the end: the last screen again
+        self.assertEqual([e['col'] for e in after.enemies(0)], [0x02, 0xFF, 0x10])          # screen 1's enemy taken out, screen 2's moved
+        self.assertEqual([(l['col'], l['item']) for l in after.lanterns(0)], [(0x20, 5)])   # screen 1's lantern taken out of the list
+        self.assertEqual(plan['watch']['enemy_cols'], [(0x02, 0x02), (0x17, 0xFF), (0x20, 0x10)])
+        self.assertEqual(len(plan['watch']['expect']), 3 * 8)
+
+    def test_repeat(self):
+        plan = self.p.resize(self.part, 0, 1)
+        after = self.apply(plan['writes'])
+        self.assertEqual(after.area_last(0), 4)
+        start = after.layout(0)
+        self.assertEqual(start, 0xB58C + 144)                             # moved to the free space, 3 screens of margin first
+        self.assertEqual([after._b(0, start + s * 48) for s in range(5)], [0, 0, 1, 2, 3])
+        self.assertEqual(after._b(0, start - 1), 0)                       # before the first area: copies of its first screen
+        self.assertEqual(after._b(0, start + 5 * 48), 9)                  # what followed the old layout follows the new one
+        self.assertEqual([e['col'] for e in after.enemies(0)], [0x02, 0x27, 0x30])
+        self.assertEqual([l['col'] for l in after.lanterns(0)], [0x28, 0x40])
+        with self.assertRaises(ValueError):
+            self.p.resize(self.part, 1, 12)                               # more than 15 screens
+
+    def test_watcher(self):
+        plan = self.p.resize(self.part, 1, -1)
+        w = self.p.watcher(plan['watch'])
+        self.assertTrue(w.compare)
+        expect = [bytes.fromhex(e) for e in plan['watch']['expect']]
+        for run, limit in (('original', 3), ('changed', 2)):
+            ram = bytearray(0x800)
+            ram[0x53] = limit
+            for k in range(9):
+                ram[0x300 + k * 12:0x300 + k * 12 + 12] = expect[k] if run == 'changed' else bytes(12)
+            w.see(ram, 1, run)
+            ram[0x6E] = 5
+            w.see(ram, 2, run)
+        self.assertEqual(w.result()['state'], 'good')
+        control = self.p.watcher(plan['watch'])                           # the unchanged game: the old length
+        for run in ('original', 'changed'):
+            ram = bytearray(0x800)
+            ram[0x53] = 3
+            control.see(ram, 1, run)
+        self.assertEqual(control.result()['state'], 'bad')
 
 
 # ----------------------------------------------------------------- Ninja Gaiden II
@@ -167,6 +250,60 @@ class NinjaGaiden2Test(unittest.TestCase):
         self.assertEqual(w.result()['state'], 'good')
 
 
+class NinjaGaiden2LengthTest(unittest.TestCase):
+    """Area 0 three screens long: layout pointer at ROM $2700/$2730 (bank 1), layout at ROM 0 ($8000), last screen $8180."""
+    def setUp(self):
+        rom = bytearray(ng2_rom())
+        rom[16 + 0x8180] = 0x02
+        rom[16 + 0x2730] = 0x80                                           # area 0's layout at $8000
+        for screen in range(3):
+            _put(rom, 16 + screen * 48, [screen] * 48)
+        _put(rom, 16 + 0x90, [9] * 144)
+        _put(rom, 16 + 0x21C6 - 0x90, [0xFF] * (0x2700 - 0x21C6 + 0x90))
+        self.p = ng.NinjaGaiden2Profile(bytes(rom))
+        self.part = {'area': 0}
+
+    def apply(self, writes):
+        rom = bytearray(self.p.rom)
+        for offset, old, new in writes:
+            self.assertEqual(rom[offset], old)
+            rom[offset] = new
+        return ng.NinjaGaiden2Profile(bytes(rom))
+
+    def test_remove_and_repeat(self):
+        self.assertEqual(self.p.screens(self.part), {'count': 3, 'most': 15})
+        self.assertIsNone(self.p.screens({'area': 1}))
+        gone = self.apply(self.p.resize(self.part, 1, -1)['writes'])
+        self.assertEqual(gone.area_last(0), 1)
+        self.assertEqual([gone.rom[16 + s * 48] for s in range(3)], [0, 2, 2])
+        self.assertEqual(gone.lanterns(0), [])                            # both lanterns were on screen 1
+        self.assertEqual([e['col'] for e in gone.enemies(0)], [4, 8, 14])
+        plan = self.p.resize(self.part, 0, 1)
+        more = self.apply(plan['writes'])
+        self.assertEqual(more.layout(0), 0xA1C6 + 144)
+        self.assertEqual([more.rom[more.layout_offset(0xA256) + s * 48] for s in range(5)], [0, 0, 1, 2, 9])
+        self.assertEqual([l['col'] for l in more.lanterns(0)], [0x23, 0x2D])
+        self.assertEqual(len(plan['watch']['expect']), 4 * 8)
+
+    def test_length_watcher(self):
+        plan = self.p.resize(self.part, 0, 1)
+        w = self.p.watcher(plan['watch'])
+        for run, limit in (('original', 2), ('changed', 3)):
+            ram = bytearray(0x800)
+            ram[0x7F] = limit
+            pointer = plan['watch']['base'] + 9 * 6                    # the game reads 9 columns ahead of the camera
+            ram[0x86], ram[0x87] = pointer & 0xFF, pointer >> 8
+            ram[0x1E0:0x1E6] = bytes.fromhex(plan['watch']['expect'][9])
+            w.see(ram, 1, run)
+        self.assertEqual(w.result()['state'], 'good')
+        control = self.p.watcher(plan['watch'])
+        for run in ('original', 'changed'):
+            ram = bytearray(0x800)
+            ram[0x7F] = 2
+            control.see(ram, 1, run)
+        self.assertEqual(control.result()['state'], 'bad')
+
+
 # ----------------------------------------------------------------- Ninja Gaiden III
 
 def ng3_rom():
@@ -214,6 +351,36 @@ class NinjaGaiden3Test(unittest.TestCase):
         p = ng.NinjaGaiden3Profile(bytes(rom))
         with self.assertRaises(ValueError):
             p.edit(self.part, 'enemy:0', {'type': 0x17})
+
+
+class NinjaGaiden3LengthTest(unittest.TestCase):
+    """Area 0 four screens long: layout pointer at ROM $3960/$3990, layout at ROM 0 ($8000), last screen $A1B0. Banks 0
+    and 1 have no free space in the game, so parts only get shorter."""
+    def setUp(self):
+        rom = bytearray(ng3_rom())
+        rom[16 + 0xC1B0] = 0x03
+        rom[16 + 0x3990] = 0x80                                           # area 0's layout at $8000
+        for screen in range(4):
+            _put(rom, 16 + screen * 48, [screen] * 48)
+        self.p = ng.NinjaGaiden3Profile(bytes(rom))
+        self.part = {'area': 0}
+
+    def test_shorter_only(self):
+        self.assertEqual(self.p.screens(self.part), {'count': 4, 'most': 4})
+        self.assertIsNone(self.p.screens({'area': 1}))                    # vertical section
+        with self.assertRaises(ValueError):
+            self.p.resize(self.part, 1, 1)
+        plan = self.p.resize(self.part, 1, -1)
+        rom = bytearray(self.p.rom)
+        for offset, old, new in plan['writes']:
+            rom[offset] = new
+        after = ng.NinjaGaiden3Profile(bytes(rom))
+        self.assertEqual(after.area_last(0), 2)
+        self.assertEqual([rom[16 + s * 48] for s in range(4)], [0, 2, 3, 3])
+        self.assertEqual(after.lanterns(0), [])                           # both lanterns were on screen 1
+        self.assertEqual(rom[16 + 0xC000 + 0xA240 - 0xA000] >> 3, 0)
+        self.assertEqual([e['col'] for e in after.enemies(0)], [4, 5, 9])
+        self.assertEqual(self.p.watcher(plan['watch']).LIMIT, 0x48)
 
 
 class RegistryTest(unittest.TestCase):
