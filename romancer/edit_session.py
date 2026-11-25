@@ -2435,7 +2435,7 @@ class EditSessionTools:
                 p['scene_id'], p['cells'])}),
             'edits.find_color': (base + ' scene_id domain entry colors', lambda p, c: {'ok': True, 'change': self.session(p).find_color(
                 p['scene_id'], p['domain'], p['entry'], p['colors'])}),
-            'edits.level_start': (base + ' name', lambda p, c: self._summary(self.session(p), self.session(p).level_start(p['name'], p.get('extend')))),
+            'edits.level_start': (base + ' name', lambda p, c: self._summary(self.session(p), self.session(p).level_start(p['name'], p['extend']))),
             'edits.level_auto': (base + ' steps direction', lambda p, c: self._summary(self.session(p), self.session(p).level_auto(p['steps'], p['direction']))),
             'edits.level_stop': (base, lambda p, c: self._summary(self.session(p), self.session(p).level_stop())),
             'edits.level_forget': (base + ' level_id', lambda p, c: self._summary(self.session(p), self.session(p).level_forget(p['level_id']))),
@@ -2471,7 +2471,7 @@ class EditSessionTools:
         return {'ok': True, 'name': out['name'], 'gif_base64': base64.b64encode(out['gif']).decode()}
 
     def _export_level(self, p, c):
-        out = self.session(p).export_level(p['level_id'], p['plane'], bool(p['edited']))
+        out = self.session(p).export_level(p['level_id'], p['plane'], bool(p['edited']), bool(p['labels']))
         return {'ok': True, **{k: v for k, v in out.items() if k != 'png'}, 'png_base64': base64.b64encode(out['png']).decode()}
 
     def _import_picture(self, p, c):

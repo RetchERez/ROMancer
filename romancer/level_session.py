@@ -640,7 +640,9 @@ class LevelTools:
                 for item in profile.objects(part['part']):
                     x, y = item['x'] + part['dx'], item['y'] + part['dy']
                     if part['left'] - px <= x < part['right'] + px:
-                        objects.append({**item, 'map_x': x, 'map_y': y, 'part': part['part']})
+                        mine = [{'id': c['id'], 'title': c['title']} for c in self._active()
+                                if c.get('object') and c['object']['part'] == part['part'] and c['object']['id'] == item['id']]
+                        objects.append({**item, 'map_x': x, 'map_y': y, 'part': part['part'], 'changes': mine})
             roles = ''
             if profile.tile_role(0) is not None:
                 cells = ['.'] * (stored['width'] * stored['height'])
@@ -732,6 +734,7 @@ class LevelTools:
                 raise ValueError('That is how the game already has it.')
             change = self.propose_writes(level['scene_ids'][0], plan['writes'], plan['title'], kind='level-object')
             stored = self._find(change['id'])
+            stored['object'] = {'level': level_id, 'part': part, 'id': str(object_id)}
             stored['object_check'] = {'state': 'working', 'text': 'Playing the game from the start to see the change happen…'}
             watch = plan['watch']
             watcher = lambda: profile.watcher(watch)
@@ -1079,14 +1082,61 @@ class LevelTools:
         except (OSError, ValueError):
             return set()
 
-    def export_level(self, level_id: str, plane: int = 0, edited: bool = False) -> dict:
+    def export_level(self, level_id: str, plane: int = 0, edited: bool = False, labels: bool = False) -> dict:
         with self.lock:
             level = self._level(level_id)
             view = self.level_view(level_id, plane)
             stamp = view['after'].rsplit(':', 1)[1] if edited and view['after'] else ''
             name = ''.join(ch if ch.isalnum() else '-' for ch in level['name']).strip('-').lower() or 'level'
-            return {'png': self.level_image(level_id, plane, stamp), 'name': f"{name}{'-edited' if stamp else ''}.png",
-                    'width': view['width'] * view['cell'], 'height': view['height'] * view['cell']}
+            png = self.level_image(level_id, plane, stamp)
+            width, height = view['width'] * view['cell'], view['height'] * view['cell']
+        if labels:
+            png, width, height = self._labeled(level_id, png)
+        return {'png': png, 'name': f"{name}{'-edited' if stamp else ''}{'-named' if labels else ''}.png", 'width': width, 'height': height}
+
+    def _labeled(self, level_id: str, png: bytes):
+        """The map twice as big with every object the profile knows boxed in its colour and named, and a key below."""
+        from PIL import Image, ImageDraw
+        objects = self.level_objects(level_id).get('objects') or []
+        base = Image.open(io.BytesIO(png)).convert('RGB')
+        zoom = 2
+        key_height = 24
+        sheet = Image.new('RGB', (base.width * zoom, base.height * zoom + key_height), (20, 20, 24))
+        sheet.paste(base.resize((base.width * zoom, base.height * zoom), Image.NEAREST), (0, 0))
+        draw = ImageDraw.Draw(sheet)
+        colours = {'enemy': (255, 90, 90), 'item': (255, 209, 102), 'secret': (94, 230, 176), 'block': (199, 146, 255)}
+        for item in objects:
+            x, y = item['map_x'] * zoom, item['map_y'] * zoom
+            draw.rectangle([x - 16, y - 32, x + 16, y], outline=colours.get(item['style'], (255, 255, 255)), width=2)
+        placed = []             # label boxes already drawn: a label that would cover one moves a line down
+        for item in sorted(objects, key=lambda o: (o['map_x'], o['map_y'])):
+            x, y = item['map_x'] * zoom, item['map_y'] * zoom
+            colour = colours.get(item['style'], (255, 255, 255))
+            label = item['name'] + (f", {item['detail']}" if item.get('detail') else '')
+            width = int(draw.textlength(label))
+            left = max(2, min(int(x) - 16, sheet.width - width - 4))
+            top = int(y) + 2
+            for _ in range(8):
+                box = (left - 2, top - 1, left + width + 2, top + 12)
+                if not any(box[0] < b[2] and b[0] < box[2] and box[1] < b[3] and b[1] < box[3] for b in placed):
+                    break
+                top += 13
+            top = min(top, base.height * zoom - 13)
+            box = (left - 2, top - 1, left + width + 2, top + 12)
+            placed.append(box)
+            if top > y + 4:     # moved down: a thin line back to its box
+                draw.line([x, y, x, top - 1], fill=colour)
+            draw.rectangle(box, fill=(0, 0, 0))
+            draw.text((left, top), label, fill=colour)
+        at = 6
+        for style, text in (('enemy', 'Enemies'), ('item', 'Items'), ('secret', 'Secrets'), ('block', 'Blocks')):
+            if any(o['style'] == style for o in objects):
+                draw.rectangle([at, base.height * zoom + 7, at + 10, base.height * zoom + 17], outline=colours[style], width=2)
+                draw.text((at + 14, base.height * zoom + 6), text, fill=(230, 230, 230))
+                at += 24 + int(draw.textlength(text))
+        out = io.BytesIO()
+        sheet.save(out, format='PNG')
+        return out.getvalue(), sheet.width, sheet.height
 
     # ---- changes
 

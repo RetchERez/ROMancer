@@ -172,4 +172,9 @@ assert.match(levelPart({level:{...fresh,view:{...view,layout:{width:2,height:2,l
 // a map's walk can be saved, and a saved walk opened
 assert.match(levelPart({level:fresh,proposal:null,summary:{}},verdict,keep),/data-action="level-walk-save"/);
 assert.match(levelsPart({summary:{levels:[]},playing:false}),/id="level-walk-file"/);
+// an object's own changes can be undone from its panel; a profile game can save the map with names
+const undoHtml=levelPart({level:{...known,tool:'objects',picked:{id:'enemy:1',style:'enemy',name:'Bat',fields:[],part:{stage:0},changes:[{id:'c9',title:'Bat swapped for Ghost'}]}},proposal:null},verdict,keep);
+assert.match(undoHtml,/Bat swapped for Ghost <button type="button" data-action="level-edit-undo" data-id="c9"/);
+assert.match(toolsHtml,/data-action="level-export-named"/);
+assert.ok(!plain.includes('level-export-named'));
 console.log('level map checks passed');
