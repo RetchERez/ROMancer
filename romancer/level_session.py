@@ -17,6 +17,8 @@ from __future__ import annotations
 import hashlib
 import io
 import json
+import zlib
+import base64
 import os
 import threading
 import time
@@ -192,6 +194,105 @@ class LevelTools:
         if wait:
             thread.join()
         return self.summary()
+
+    # ---- a map's walk as a file: the inputs exactly as they were played, so the map and its checks can be made again
+
+    WALK_FORMAT = 'romancer-walk/1'
+
+    def level_walk_file(self, level_id: str) -> dict:
+        """The recorded walks of a map as a small file: for each walk, the inputs from power on to the end of the map and
+        where the map starts. Anyone with the same ROM can open it and get the same map."""
+        from array import array
+        with self.lock:
+            level = self._level(level_id)
+            walks = {}
+            for sid in level['scene_ids']:
+                meta = self.meta[sid]
+                walks.setdefault(meta['run'], []).append(meta['frame'])
+            out = []
+            for run, frames in walks.items():
+                inputs = array('H')
+                inputs.frombytes((self.store / 'runs' / run / 'inputs.bin').read_bytes())
+                end = min(len(inputs), max(frames) + 60)
+                out.append({'start': max(0, min(frames) - 30), 'end': end,
+                            'inputs': base64.b64encode(zlib.compress(inputs[:end].tobytes(), 9)).decode()})
+            name = ''.join(ch if ch.isalnum() else '-' for ch in level['name']).strip('-').lower() or 'level'
+            text = json.dumps({'format': self.WALK_FORMAT, 'rom_sha256': self.rom_sha, 'name': level['name'], 'walks': out})
+            return {'name': f'{name}.romancer-walk', 'text': text}
+
+    def level_walk_open(self, text: str) -> dict:
+        """Play a saved walk back from power on and put its map together, as if it had been played here."""
+        from array import array
+        try:
+            data = json.loads(text)
+        except ValueError:
+            raise ValueError('That is not a ROMancer walk file.')
+        if not isinstance(data, dict) or data.get('format') != self.WALK_FORMAT or not data.get('walks'):
+            raise ValueError('That is not a ROMancer walk file.')
+        if data.get('rom_sha256') != self.rom_sha:
+            raise ValueError('That walk was recorded on a different ROM. Open it with the same exact ROM it was recorded on.')
+        walks = []
+        for walk in data['walks'][:4]:
+            inputs = array('H')
+            try:
+                inputs.frombytes(zlib.decompress(base64.b64decode(walk['inputs'])))
+                start, end = int(walk['start']), int(walk['end'])
+            except (ValueError, KeyError, TypeError, zlib.error):
+                raise ValueError('That walk file is damaged.')
+            if not 0 <= start < end <= len(inputs) or end > 600_000:
+                raise ValueError('That walk file is damaged.')
+            walks.append((inputs, start, end))
+        self._require_core()
+        name = str(data.get('name') or 'Opened walk')[:60]
+        with self.lock:
+            if self.level_rec or (self.level_job and self.level_job['state'] == 'running'):
+                raise ValueError('A level map is being recorded or put together. Wait for it to finish.')
+            if len(self.levels) >= MAX_LEVELS:
+                raise ValueError(f'This game already has {MAX_LEVELS} level maps. Remove one before opening a walk.')
+            total = sum(end - start for _, start, end in walks)
+            self.level_job = {'state': 'running', 'done': 0, 'total': total, 'message': 'Playing the saved walk…', 'level_id': None}
+        threading.Thread(target=self._walk_worker, args=(walks, name), name='romancer-walk', daemon=True).start()
+        return self.summary()
+
+    def _walk_worker(self, walks, name: str) -> None:
+        job = self.level_job
+        level_id = None
+        try:
+            for inputs, start, end in walks:
+                with self.host_lock:
+                    self._drop_host()
+                    (self.store / 'current_run').write_text(uuid.uuid4().hex)      # a fresh run from power on
+                    self._start_host()
+                    conn = self._host[1]
+                    frame = self.live.get('frame') or 0
+                    for at in range(frame, start, 600):
+                        conn.send(('advance', inputs[at:min(start, at + 600)].tobytes(), ''))
+                        frame = self._receive()[1]
+                    with self.lock:
+                        if level_id is None:
+                            self.level_rec = {'id': uuid.uuid4().hex[:16], 'name': name, 'scene_ids': []}
+                        else:
+                            level = self._level(level_id)
+                            self.level_rec = {'id': uuid.uuid4().hex[:16], 'name': level['name'], 'scene_ids': list(level['scene_ids']),
+                                              'extends': level_id, 'had': len(level['scene_ids'])}
+                    for at in range(start, end, 600):
+                        conn.send(('walk', inputs[at:min(end, at + 600)].tobytes(), name))
+                        _, frame, metas = self._receive()
+                        self.live['frame'] = frame
+                        self._level_captured(metas)
+                        job['done'] += min(end, at + 600) - at
+                with self.lock:
+                    rec, self.level_rec = self.level_rec, None
+                self._level_build(rec)
+                if job['state'] != 'finished':
+                    return
+                level_id = job['level_id']
+                job['state'] = 'running'
+            job.update(state='finished', message=f'{name} is ready, made from the saved walk.')
+        except (RuntimeError, ValueError, OSError) as error:
+            with self.lock:
+                self.level_rec = None
+            job.update(state='failed', message=f'The walk could not be played: {error}')
 
     def _level_frames(self, scene_ids, job=None) -> list:
         frames = []
@@ -467,7 +568,7 @@ class LevelTools:
         plane = self._level_plane(level, 0)
         out = None
         for part in parts:
-            grid = profile.layout(part['part'])
+            grid = profile.packed_layout(part['part'])
             if not grid or grid['size'] % px:
                 continue
             cells = grid['size'] // px
@@ -503,17 +604,17 @@ class LevelTools:
                 if target[0] != source[0] or (part is not None and target[0] != part):
                     raise ValueError('Copy blocks within one part of the level at a time.')
                 part = target[0]
-                layout = profile.layout(part)
+                layout = profile.packed_layout(part)
                 wanted.setdefault((target[1], target[2]), layout['blocks'][source[2] * layout['width'] + source[1]])
                 places.append(list(here))
             if part is None:
                 raise ValueError('Paint something first.')
-            layout = profile.layout(part)
+            layout = profile.packed_layout(part)
             changes = [(bx, by, block) for (bx, by), block in sorted(wanted.items())
                        if layout['blocks'][by * layout['width'] + bx] != block]
             if not changes:
                 raise ValueError('Those places already look like that. Paint a different picture first.')
-            plan = profile.set_layout(part, changes)
+            plan = profile.set_packed_layout(part, changes)
             change = self.propose_writes(level['scene_ids'][0], plan['writes'], plan['title'], kind='level-object')
             stored = self._find(change['id'])
             stored['level'] = {'id': level_id, 'plane': 0, 'places': places, 'name': level['name']}

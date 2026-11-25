@@ -10441,7 +10441,7 @@ ${state2.artifact.system_id ? `<details><summary>Advanced byte options</summary>
     return `<div class="card-heading"><h3>Level maps <small class="beta-tag">BETA</small></h3>${badge(plural2(levels.length, "level map"), levels.length ? "good" : "neutral")}</div><p class="subtle">The level editor is in beta. Every change is checked in the game before you keep it, but expect rough edges.</p>
  <p class="subtle">Record a level while you play and you get a map of the whole level that you can paint on.</p>
  ${gamesPart(summary.level_games)}
- <div class="actions">${actions3}</div>
+ <div class="actions">${actions3}<label class="button level-walk-open">Open a saved walk<input id="level-walk-file" type="file" accept=".romancer-walk,application/json" aria-label="Open a saved walk" ${rec || building ? "disabled" : ""}></label></div>
  <p class="subtle" id="level-status" role="status" aria-live="polite">${esc(levelStatus(summary, ed.playing))}</p>
  ${building ? `<progress max="${job.total}" value="${job.done}" aria-label="Putting the map together"></progress>` : ""}
  <div class="scene-strip" role="group" aria-label="Level maps">${levels.map((row) => {
@@ -10480,7 +10480,7 @@ ${state2.artifact.system_id ? `<details><summary>Advanced byte options</summary>
     const propose2 = button("Check in the game", "level-propose", { primary: true, disabled: !painted, reason: "Paint something first." }) + button("Clear paint", "level-clear", { disabled: !painted && !change });
     return `<div class="card-heading"><h3>${esc(view2.name)}</h3>${badge(`${view2.width}×${view2.height} tiles`, "neutral")}</div>
  ${guide}
- <div class="actions level-bar">${planes}${paintOn}${zoom}${unitPart}${known}${after}${button("Save map as PNG", "level-export", { icon: "download" })}${button("Add to this map", "level-extend", { disabled: !ed.playing || !!((_c = ed.summary) == null ? void 0 : _c.level_recording), reason: ((_d = ed.summary) == null ? void 0 : _d.level_recording) ? "A map is being recorded now." : "Start playing above first, then play through what the map is missing." })}${button("Delete map", "level-forget")}${button("Close", "level-close")}</div>
+ <div class="actions level-bar">${planes}${paintOn}${zoom}${unitPart}${known}${after}${button("Save map as PNG", "level-export", { icon: "download" })}${button("Save the walk", "level-walk-save", { icon: "download" })}${button("Add to this map", "level-extend", { disabled: !ed.playing || !!((_c = ed.summary) == null ? void 0 : _c.level_recording), reason: ((_d = ed.summary) == null ? void 0 : _d.level_recording) ? "A map is being recorded now." : "Start playing above first, then play through what the map is missing." })}${button("Delete map", "level-forget")}${button("Close", "level-close")}</div>
  <div class="scene-modes" role="group" aria-label="Tool">${tools}</div>
  <p class="subtle" role="status">${hint}${built}${locked}</p>
  <div class="level-scroll" id="level-scroll" tabindex="0" aria-label="The level map. Scroll to move around."><canvas id="level-canvas" class="level-canvas" width="${view2.width * view2.cell * level.zoom}" height="${view2.height * view2.cell * level.zoom}" role="img" aria-label="Map of ${esc(view2.name)}"></canvas></div>
@@ -10781,6 +10781,18 @@ ${state2.artifact.system_id ? `<details><summary>Advanced byte options</summary>
         link.remove();
         ctx2.notify(`Saved ${result.name} (${result.width} by ${result.height} pixels).`);
       },
+      "level-walk-save": async () => {
+        const level = ed.level;
+        if (!level) return;
+        const result = await host.call("level_walk_file", { level_id: level.id });
+        const link = document.createElement("a");
+        link.href = URL.createObjectURL(new Blob([result.text], { type: "application/json" }));
+        link.download = result.name;
+        document.body.append(link);
+        link.click();
+        link.remove();
+        ctx2.notify(`Saved ${result.name}. Anyone with the same ROM can open it to get this map and replay its checks.`);
+      },
       "level-compare-save": () => {
         const level = ed.level;
         if (!(level == null ? void 0 : level.compareGif)) return;
@@ -11036,6 +11048,24 @@ ${state2.artifact.system_id ? `<details><summary>Advanced byte options</summary>
       main.addEventListener("pointerup", finish);
       main.addEventListener("pointercancel", finish);
       main.addEventListener("change", async (event) => {
+        var _a2;
+        if (event.target.id === "level-walk-file") {
+          const file = (_a2 = event.target.files) == null ? void 0 : _a2[0];
+          if (!file) return;
+          if (file.size > 8 * 1024 * 1024) {
+            ctx2.notify("That file is too big to be a saved walk.", true);
+            return;
+          }
+          try {
+            ed.summary = await host.call("level_walk_open", { text: await file.text() });
+            host.update(["scene-levels"]);
+            watch();
+          } catch (error) {
+            ctx2.notify(error.message, true);
+          }
+          event.target.value = "";
+          return;
+        }
         const level = ed.level;
         if (!level) return;
         if (event.target.id === "level-add-kind") {

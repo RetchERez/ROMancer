@@ -169,4 +169,7 @@ assert.ok(!/data-action="level-extend"[^>]*disabled/.test(levelPart({level:fresh
 // a packed layout the profile can change: the brush is its blocks only
 assert.deepEqual(units({...view,layout:{width:2,height:2,left:0,top:1}}).map(u=>u.id),['layout']);
 assert.match(levelPart({level:{...fresh,view:{...view,layout:{width:2,height:2,left:0,top:0}}},proposal:null},verdict,keep),/stored packed/);
+// a map's walk can be saved, and a saved walk opened
+assert.match(levelPart({level:fresh,proposal:null,summary:{}},verdict,keep),/data-action="level-walk-save"/);
+assert.match(levelsPart({summary:{levels:[]},playing:false}),/id="level-walk-file"/);
 console.log('level map checks passed');

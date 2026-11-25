@@ -6,7 +6,7 @@ and run edits through the real session and its watcher, with a control on the un
         [--layout 'PART|[[COLUMN, ROW, BLOCK], ...]'] ...
         [--control]
 
---layout puts blocks into a packed layout (profile.layout / profile.set_layout) and checks it the way the
+--layout puts blocks into a packed layout (profile.packed_layout / profile.set_packed_layout) and checks it the way the
 Level Editor does. --add puts a new object of KIND at the part's pixel X, Y (profile.addable / profile.add). PART and VALUES are JSON ({"stage": 1} and {"record": 84}); add |remove to remove the object. Writes to the out folder:
 map.png (the map with every object's box, style colour and name), objects.json, results.json. --control also runs each
 edit's watcher on the unchanged game: a good watcher says "bad" (or "warn") there.
@@ -153,7 +153,7 @@ def main() -> None:
             part, changes = json.loads(part_text), [tuple(c) for c in json.loads(changes_text)]
             row = {'layout': spec}
             try:
-                plan = profile.set_layout(part, changes)
+                plan = profile.set_packed_layout(part, changes)
                 change = session.propose_writes(level['scene_ids'][0], plan['writes'], plan['title'], kind='level-object')
                 stored = session._find(change['id'])
                 row['title'], row['bytes'] = plan['title'], len(plan['writes'])

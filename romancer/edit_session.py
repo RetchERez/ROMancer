@@ -505,6 +505,11 @@ class _Host:
                 conn.send(('frame', png_bytes(frame.width, frame.height, frame.rgb), self.session.frame, frame.width, frame.height, metas))
             elif kind == 'capture':
                 conn.send(('scene', self.record(command[1], 'play', only_new=False), self.session.frame))
+            elif kind in ('advance', 'walk'):          # a saved walk being played back: inputs exactly as recorded
+                masks = array('H')
+                masks.frombytes(command[1])
+                metas = self.play_level(masks, command[2]) if kind == 'walk' else (self.advance(masks) or [])
+                conn.send(('walked', self.session.frame, metas))
 
 
 def _host_main(conn, cfg: dict) -> None:
@@ -2442,6 +2447,8 @@ class EditSessionTools:
             'edits.level_export': (base + ' level_id plane edited', self._export_level),
             'edits.level_layout': (base + ' level_id cells', lambda p, c: {'ok': True, 'change': self.session(p).propose_level_layout(
                 p['level_id'], p['cells'])}),
+            'edits.level_walk_file': (base + ' level_id', lambda p, c: {'ok': True, **self.session(p).level_walk_file(p['level_id'])}),
+            'edits.level_walk_open': (base + ' text', lambda p, c: self._summary(self.session(p), self.session(p).level_walk_open(p['text']))),
             'edits.level_objects': (base + ' level_id', lambda p, c: {'ok': True, **self.session(p).level_objects(p['level_id'])}),
             'edits.change': (base + ' change_id', lambda p, c: {'ok': True, 'change': self.session(p).change(p['change_id'])}),
             'edits.keep': (base + ' change_id', lambda p, c: self._summary(self.session(p), self.session(p).keep(p['change_id']))),
