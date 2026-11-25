@@ -159,6 +159,26 @@ class Castlevania3Tests(unittest.TestCase):
         self.assertEqual(p.watcher({'kind': 'candle', 'zone': 9, 'record': None, 'part': [0, 0, 0], 'name': ''}).result()['state'], 'warn')
 
 
+class Castlevania3NameTests(unittest.TestCase):
+    def setUp(self):
+        self.p = cv.Castlevania3Profile(bytes(build3().rom))
+
+    def test_names_and_does(self):
+        for kind, (name, does) in cv.Castlevania3.ENEMIES.items():
+            self.assertNotIn('0x', name)
+            self.assertTrue(does.endswith('.'), kind)
+        objs = {o['id']: o for o in self.p.objects(ROOM)}
+        self.assertEqual(objs['enemy:1']['does'], 'Throws bones at you in an arc.')
+        self.assertEqual(objs['enemy:5']['does'], 'Zombies rise and walk toward you along the floor.')
+        self.assertEqual(self.p.enemy_name(0x29), 'Spider')
+        self.assertEqual(self.p.enemy_name(0x50), 'Enemy 0x50')          # never seen, so it keeps its number
+
+    def test_choice_names(self):
+        names = {c['value']: c['name'] for c in self.p.choices()['enemies']}
+        self.assertEqual(names, {1: 'Bone-throwing skeleton', 2: 'Sword skeleton'})
+        self.assertEqual(self.p._vertical_enemy_choices(), [{'value': '50:1:2', 'name': 'Bone-throwing skeleton'}])
+
+
 class Castlevania3BlockTests(unittest.TestCase):
     def setUp(self):
         self.p = cv.Castlevania3Profile(bytes(build3().rom))
@@ -271,6 +291,12 @@ class Castlevania2Tests(unittest.TestCase):
             p.edit(TOWN, 'obj:0', {'setting': 0x30})          # no talker in the game says that one
         with self.assertRaises(ValueError):
             p.edit(TOWN, 'obj:1', {'type': 0x55})
+
+    def test_names(self):
+        objs = {o['id']: o for o in self.p.objects(TOWN)}
+        self.assertEqual(objs['obj:1']['does'], 'Walks toward you through town at night.')
+        self.assertEqual(objs['obj:3']['name'], 'Skeleton')
+        self.assertEqual({c['value']: c['name'] for c in self.p.choices()['enemies']}, {0x03: 'Skeleton', 0x17: 'Zombie'})
 
     def test_watcher(self):
         p = self.p

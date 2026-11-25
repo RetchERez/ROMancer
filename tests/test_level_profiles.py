@@ -243,3 +243,44 @@ class Matching(unittest.TestCase):
 
 if __name__ == '__main__':
     unittest.main()
+
+
+class Names(unittest.TestCase):
+    """The naming pass: every enemy type has a name and a line on what it does, and variants read as names."""
+
+    def setUp(self):
+        self.p = lp.Castlevania(bytes(build().rom))
+
+    def test_enemy_names_and_does(self):
+        from romancer.level_profiles.castlevania import Castlevania
+        for kind, (name, does) in Castlevania.ENEMIES.items():
+            self.assertNotIn('0x', name)
+            self.assertTrue(does.endswith('.'), kind)
+        self.assertEqual(self.p.enemy_name(0x4F), 'Raven')
+        self.assertEqual(self.p.enemy_name(0x59), 'Phantom Bat (boss)')
+        self.assertEqual(self.p.enemy_name(0x05), 'Medusa heads (second quest only)')
+        self.assertEqual(self.p.enemy_name(0xFF), 'Not an enemy (candle data)')
+        self.assertEqual(self.p.enemy_name(0x77), 'Enemy 0x77')
+        panther = next(o for o in self.p.objects(0, 0, 14) if o['kind'] == 'enemy')
+        self.assertEqual(panther['does'], 'Crouches on a ledge and pounces when you come near.')
+
+    def test_variant_names(self):
+        from romancer.level_profiles.castlevania import variant_names
+        rows = [{'index': 1, 'name': 'Raven', 'dx': 24, 'y': 72}, {'index': 2, 'name': 'Raven', 'dx': 40, 'y': 120},
+                {'index': 3, 'name': 'Raven', 'dx': 48, 'y': 64}, {'index': 4, 'name': 'Raven', 'dx': 44, 'y': 72},
+                {'index': 5, 'name': 'Eagle', 'dx': 32, 'y': 80}, {'index': 6, 'name': 'Axe Knight', 'dx': 24, 'y': 80},
+                {'index': 7, 'name': 'Axe Knight', 'dx': 32, 'y': 80}]
+        names = {c['value']: c['name'] for c in variant_names(rows)}
+        self.assertEqual(names[2], 'Raven, halfway up')
+        self.assertEqual(names[1], 'Raven, near the top, in the middle')
+        self.assertEqual(names[3], 'Raven, near the top, to the right, a little higher')
+        self.assertEqual(names[4], 'Raven, near the top, to the right, a little lower')
+        self.assertEqual(names[5], 'Eagle')
+        self.assertEqual((names[6], names[7]), ('Axe Knight, high, in the middle, a little to the left', 'Axe Knight, high, in the middle, a little to the right'))
+        self.assertEqual(len(set(names.values())), len(names))
+
+    def test_choices_have_no_heights(self):
+        from romancer.level_profiles.castlevania import CastlevaniaProfile
+        names = [c['name'] for c in CastlevaniaProfile(bytes(build().rom)).choices()['enemies']]
+        self.assertTrue(names)
+        self.assertFalse([n for n in names if 'height' in n])
