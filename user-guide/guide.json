@@ -1086,6 +1086,44 @@
       ]
     },
     {
+      "id": "level-tools",
+      "image": "274-level-tools",
+      "image_alt": "A level map with Add new chosen: a new enemy being placed on an empty spot, and the panel that picks which enemy",
+      "caption": "Adding a new enemy on a level map. The check plays the game to see it appear.",
+      "title": "Add new things, add to a map, and share a walk",
+      "part": "Basic",
+      "kicker": "SCENES AND COLORS / NEW IN v1.5",
+      "intro": "These tools build on the level maps. Where a game's profile allows it you can add new enemies, items and secrets, not only change the ones that are there. You can also fill in what a map is missing, save a map with every object named, and save the walk behind a map so someone else with the same ROM can make the same map.",
+      "steps": [
+        "Open a level map. If the game can take new things, the tools include <b>Add new</b>. Choose it and click an empty spot. Pick what to add and choose <b>Check in the game</b>. Only things that part of the level can draw are offered.",
+        "To fill in hatched parts of a map, start playing, open the map and choose <b>Add to this map</b>. Play through what the map is missing, then choose <b>Finish the map</b>. The map is put together again from both walks.",
+        "<b>Save map with names</b> saves the map twice as big with a box and a name for every enemy, item and secret, and a key below.",
+        "Click something you changed with <b>Enemies, items and secrets</b>. Its panel lists your changes to it, and <b>Undo</b> takes one back.",
+        "<b>Save the walk</b> saves the inputs behind the map as a small .romancer-walk file. On the Level Editor page, <b>Open a saved walk</b> plays it back on the same ROM and makes the map again."
+      ],
+      "result": "A change made with any of these tools is checked by playing the game before you keep it, the same as every other level change.",
+      "note": "A saved walk only works with the exact ROM it was recorded on. ROMancer checks this before it plays the walk.",
+      "details": [
+        {
+          "title": "Packed levels",
+          "text": "Some games store their levels packed, so a block can't be changed in one spot by the general tools. Where a game's profile knows the packing, <b>Copy</b> and <b>Paint</b> move whole blocks of the level, and ROMancer packs the level again before the check. The map says so above it when this is the case."
+        },
+        {
+          "title": "How an added thing is checked",
+          "text": "ROMancer plays your recorded walk from the start and reads the game's memory when that part of the level loads. The check says good only when the game has the new enemy, item or secret at that spot. When a map was put together from more than one walk, each walk is tried until one reaches that spot."
+        }
+      ],
+      "related": [
+        "level-objects",
+        "level-maps",
+        "play"
+      ],
+      "terms": [
+        "term-scene",
+        "term-build"
+      ]
+    },
+    {
       "id": "play",
       "title": "Playtest, pause and save a state",
       "kicker": "TEST THE SELECTED BUILD",
